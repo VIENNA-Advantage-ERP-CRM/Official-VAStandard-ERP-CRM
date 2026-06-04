@@ -1,0 +1,133 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_CreateNewReceipt — Quick Action dashboard widget that opens a new
+ * AR Receipt (C_Payment with IsReceipt = 'Y') on the host Receipt window.
+ *
+ * Design (per supplied "New Lead" mock): pale-blue tile with a solid blue
+ * rounded-square icon well pinned to the top-left and the action title
+ * pinned to the bottom-left. The subtitle markup is kept in the DOM for
+ * backward compatibility but hidden visually — the mock no longer shows
+ * it. The three-dot kebab in the top-right of the screenshot is the host
+ * dashboard's per-widget menu, not part of this widget.
+ *
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * Namespaced vas-cnr-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-cnr-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-cnr-root,
+    .vas-cnr-root * {
+        box-sizing: border-box;
+    }
+
+/* ── Quick-action card — icon top-left, title bottom-left ─────────── */
+
+.vas-cnr-card {
+    width: 100%;
+    height: 100%;
+    min-height: 8.75em;
+    font-size: 1em;
+    font-family: inherit;
+    /* No visible border — the mock relies on the pale-blue surface alone
+       to define the tile, sitting flush with the dashboard background. */
+    border: 0;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.05);
+    background: linear-gradient(180deg, #EAF4FE 0%, #F8FBFE 100%);
+    padding: 1em;
+    /* Column layout with space-between so the icon stays anchored at the
+       top and the title sits anchored at the bottom of the card. */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5em;
+    cursor: pointer;
+    text-align: left;
+    color: #102C3F;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    overflow: hidden;
+}
+
+    .vas-cnr-card:hover {
+        background: linear-gradient(180deg, #DEEEFC 0%, #F0F7FD 100%);
+        box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.08);
+    }
+
+    .vas-cnr-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+    .vas-cnr-card:active {
+        transform: scale(0.99);
+    }
+
+/* ── Icon well: solid blue rounded square with white glyph ────────── */
+
+.vas-cnr-icon {
+    width: 2.5em;
+    height: 2.5em;
+    min-width: 2.5em;
+    border-radius: 0.625em;
+    background: linear-gradient(180deg, #1F83FF, #0083DA);
+    color: #FFFFFF;
+    box-shadow: 0 0.375em 0.875em rgba(0, 131, 218, 0.30);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    /* No bottom margin needed — the space-between layout already places
+       the title at the opposite end of the card. */
+}
+
+    .vas-cnr-icon svg {
+        width: 1.25em;
+        height: 1.25em;
+        stroke: currentColor;
+    }
+
+/* ── Title: bottom-left, bold, single line ─────────────────────────── */
+
+.vas-cnr-title {
+    display: block;
+    /* Bumped to 1.5em (24px @ base) so the title reads at the same scale
+       as the "New Lead" mock; was 1.125em / 18px which rendered noticeably
+       smaller in screenshots. */
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #141414;
+    line-height: 1.2;
+    letter-spacing: -0.00625em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    align-self: flex-start;
+}
+
+/* The mock no longer shows a subtitle. The markup is kept in the DOM
+   (the JS still renders it) so existing message-key wiring is preserved,
+   but it is hidden visually. To bring it back, remove this rule and
+   re-enable .vas-cnr-copy styling. */
+.vas-cnr-copy {
+    display: none;
+}
+
+/* ── Responsive: shrink the whole card on narrow dashboard cells by
+ *    lowering its base font-size. Inner em sizing scales automatically. */
+@container (max-width: 12.5em) {       /* < 200px */
+    .vas-cnr-card { font-size: 0.875em; }
+}
+
+@container (max-width: 10em) {         /* < 160px */
+    .vas-cnr-card {
+        font-size: 0.8125em;
+        padding: 0.75em;
+    }
+}

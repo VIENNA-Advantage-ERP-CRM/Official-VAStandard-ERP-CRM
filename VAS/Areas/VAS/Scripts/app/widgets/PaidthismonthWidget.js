@@ -10,7 +10,6 @@
  *  1  | Paid this month                                     | VIS_PaidThisMonth            | Paid this month
  *  2  | Cash received                                       | VIS_CashReceived             | Cash received
  *  3  | WHY                                                 | VIS_Why                      | WHY
- *  4  | Loading…                                            | VIS_Loading                  | Loading…
  *  5  | Received from ... customer/s so far this month.     | VIS_ReceivedFromCustomers    | Received from
  *  6  | customer / customers                                | VIS_Customer / VIS_Customers | customer / customers
  *  7  | so far this month.                                  | VIS_SoFarThisMonth           | so far this month.
@@ -30,10 +29,18 @@
 
         var $metricEl;
         var $whyText;
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -44,18 +51,20 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'PaidThisMonth/GetPaidThisMonth',
                 type: 'GET',
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalPaidAmount, data.customerCount);
+                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol);
                     }
                 },
                 error: function () {
                     /* Leave placeholder values on error */
-                }
+                },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -75,10 +84,20 @@
             return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
+        /* Build metric markup with the base-currency symbol placed *before* the
+           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
+        function formatMetric(value, symbol) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var absStr = formatCurrency(Math.abs(value));
+            var symHtml = symbol ? '<span class="vas-ptm-cur">' + symbol + '</span>' : '';
+            return sign + symHtml + absStr;
+        }
+
         /* ── Render metric values ── */
-        function renderMetric(total, count) {
+        function renderMetric(total, count, symbol) {
             if ($metricEl) {
-                $metricEl.text(formatCurrency(total));
+                $metricEl.html(formatMetric(total, symbol));
             }
             if ($whyText) {
                 var customerLabel = count !== 1
@@ -133,18 +152,23 @@
             );
 
             var $pill = $(
-                '<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'
+                /*'<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
             );
 
+            /* Empty until data loads; the busy overlay covers the wait. */
             $whyText = $(
-                '<span id="vis-ptm-why-' + uid + '" class="vas-ptm-why-text">' +
-                lbl("VIS_Loading", 'Loading…') +
-                '</span>'
+                '<span id="vis-ptm-why-' + uid + '" class="vas-ptm-why-text"></span>'
             );
 
             $why.append($pill).append($whyText);
             $card.append($header).append($metricEl).append($why);
             $root.append($card);
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-ptm-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */

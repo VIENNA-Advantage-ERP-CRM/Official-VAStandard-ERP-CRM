@@ -1,13 +1,16 @@
 /**
  * Customer Paid Method Widget
- * Purpose - Show how customers paid through AR receipts.
+ * Purpose - Grid-data widget showing how customers paid through AR receipts.
+ * Design   - Glass card per design.md / dashboard-widgets.md: shared widget header
+ *            (icon well + title + subtitle), repeated method rows with progress
+ *            bars, WHY pill + explanatory copy in the footer.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                              | Message Key
  * ----+-------------------------------------------+--------------------------------
  *  1  | How customers paid                        | VIS_HowCustomersPaid
- *  2  | WHY                                       | VIS_Why
- *  3  | UPI dominates — instant settle, near-zero fees | VIS_CustomerPaidWhy
+ *  2  | AR receipts                               | VIS_ARReceipts
+ *  3  | Payment methods distribution              | VIS_CustomerPaidWhy
  *  4  | Loading…                                  | VIS_Loading
  *  5  | No data                                   | VIS_NoData
  * ─────────────────────────────────────────────────────────────────────
@@ -34,9 +37,17 @@
             "#7A8EA8"
         ];
 
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
+
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         this.Initalize = function () {
@@ -45,7 +56,7 @@
         };
 
         function loadData() {
-            setLoading();
+            showBusy(true);
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'CustomerPaidMethod/GetCustomerPaidMethod',
@@ -75,18 +86,9 @@
                 },
                 error: function () {
                     setNoData();
-                }
+                },
+                complete: function () { showBusy(false); }
             });
-        }
-
-        function setLoading() {
-            if ($listBody) {
-                $listBody.html(
-                    '<div class="vas-cpm-nodata">' +
-                    lbl("VIS_Loading", "Loading…") +
-                    '</div>'
-                );
-            }
         }
 
         function setNoData() {
@@ -180,29 +182,28 @@
                 '<div class="vas-cpm-card">' +
                 '<div class="vas-cpm-header">' +
                 '<div class="vas-cpm-icon-wrap">' +
-                '<svg width="25" height="25" viewBox="0 0 24 24" fill="none" ' +
-                'stroke="#4F7FEA" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' +
+                '<svg viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="1.8" ' +
+                'stroke-linecap="round" stroke-linejoin="round">' +
                 '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/>' +
                 '<path d="M22 12A10 10 0 0 0 12 2v10z"/>' +
                 '</svg>' +
                 '</div>' +
+                '<div class="vas-cpm-title-group">' +
                 '<div class="vas-cpm-title">' +
                 lbl("VIS_HowCustomersPaid", "How customers paid") +
                 '</div>' +
+                '<div class="vas-cpm-subtitle">' +
+                lbl("VIS_ARReceipts", "AR receipts") +
+                '</div>' +
+                '</div>' +
                 '</div>' +
 
-                '<div class="vas-cpm-list">' +
-                '<div class="vas-cpm-nodata">' +
-                lbl("VIS_Loading", "Loading…") +
-                '</div>' +
-                '</div>' +
+                '<div class="vas-cpm-list"></div>' +
 
                 '<div class="vas-cpm-divider"></div>' +
 
                 '<div class="vas-cpm-footer">' +
-                '<span class="vas-cpm-why">' +
-                lbl("VIS_Why", "WHY") +
-                '</span>' +
                 '<span class="vas-cpm-desc"></span>' +
                 '</div>' +
                 '</div>'
@@ -212,6 +213,11 @@
             $whyText = $card.find('.vas-cpm-desc');
 
             $root.append($card);
+
+            /* Busy/loading overlay over the card (core spinner classes). Hidden until a fetch runs. */
+            $busy = $('<div class="vas-cpm-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         this.refreshWidget = function () {

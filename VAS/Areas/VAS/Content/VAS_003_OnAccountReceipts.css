@@ -1,0 +1,544 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * On-account Receipts (Widget 06) — KPI glass card (tint-success) + drill-down
+ * modal. Design source: design.md (Onfinity) + image_2 (card) and image_1
+ * (modal). Per CLAUDE.md project rule, every CSS value is expressed in `em`.
+ * `1em` resolves to the widget's base font-size (16px on card and dialog).
+ * Namespaced vas-oar-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-oar-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-oar-root,
+    .vas-oar-root * {
+        box-sizing: border-box;
+    }
+
+.vas-oar-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── KPI card (glass, tint-success) ─────────────────────────────────── */
+
+.vas-oar-card {
+    font-size: 1em;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    /* Pale green → white success tint per image_2. */
+    background: linear-gradient(135deg, rgba(229, 245, 234, 0.85), rgba(255, 255, 255, 0.62));
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 180ms ease;
+}
+
+    .vas-oar-card:hover {
+        box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
+    }
+
+    .vas-oar-card:focus-visible {
+        outline: 0.125em solid #019D89;
+        outline-offset: 0.125em;
+    }
+
+/* ── Header: icon + label (left) · View hint (right) ──────────────── */
+
+.vas-oar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-oar-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-oar-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0B6B45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-oar-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+/* Widget header label — bold per request. */
+.vas-oar-label {
+    font-size: 1.125em;
+    color: #102C3F;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-oar-view {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0.3125em 0.625em;
+    border-radius: 999em;
+    color: #0B6B45;
+    font-size: 0.75em;
+    font-weight: 500;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+    .vas-oar-view svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-oar-view:hover {
+        background: rgba(1, 157, 137, 0.10);
+        color: #0B6B45;
+    }
+
+/* ── Metric: big deep-green value with currency symbol + underline ─── */
+
+.vas-oar-metric {
+    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-weight: 700;
+    color: #0B6B45;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    align-self: flex-start;
+    max-width: 100%;
+}
+
+.vas-oar-cur {
+    font-size: 1em;
+    font-weight: inherit;
+    margin-inline-end: 0.04em;
+    vertical-align: baseline;
+}
+
+/* ── Detail: plain text "N unapplied advances" (no pill) ──────────── */
+
+.vas-oar-detail-text {
+    display: block;
+    align-self: flex-start;
+    max-width: 100%;
+    font-size: 0.75em;
+    color: #5F7283;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Card responsive (container queries on the widget cell) ───────── */
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-oar-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-oar-card { font-size: 0.6875em; }
+    .vas-oar-view span { display: none; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Drill-down modal (image_1). Attached to <body>; fixed positioning.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-oar-body-lock {
+    overflow: hidden;
+}
+
+.vas-oar-dialog {
+    font-family: Roboto, sans-serif;
+    font-size: 1em;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-oar-dialog,
+    .vas-oar-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-oar-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-oar-dialog-card {
+    position: relative;
+    width: min(62em, 100%);
+    /* Tall enough for a full 10-row page so the body doesn't scroll on a full
+       page; clamps to the viewport on short screens. */
+    height: min(40em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-oar-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.vas-oar-dialog-icon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    border-radius: 0.5em;
+    background: #E5F5EA;
+    border: 0.0625em solid #B7E4C7;
+    color: #0B6B45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-oar-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-oar-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-oar-dialog-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-oar-dialog-subtitle {
+    margin-top: 0.125em;
+    font-size: 0.8125em;
+    color: #748494;
+    line-height: 1.3;
+}
+
+.vas-oar-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-oar-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-oar-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+.vas-oar-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+.vas-oar-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.vas-oar-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+}
+
+    .vas-oar-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        background: #FFFFFF;
+        font-size: 0.8125em;
+        font-weight: 400;
+        color: #748494;
+        text-align: left;
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-oar-dialog-table thead th.vas-oar-th-amount {
+            text-align: right;
+        }
+
+        .vas-oar-dialog-table thead th.vas-oar-th-currency {
+            text-align: center;
+        }
+
+    .vas-oar-dialog-table tbody td {
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.875em;
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vas-oar-dialog-table tbody tr:hover td {
+        background: #F8FBFE;
+    }
+
+/* Column widths. All six are explicit so — with table-layout:fixed — any
+   surplus distributes proportionally across every column instead of being
+   dumped into a single greedy `auto` column (which left a large gap after
+   Customer). Date is wide enough for the full "Jan 09, 2026"; Amount never
+   truncates so the full value always shows (project requirement #8). */
+.vas-oar-th-date,     .vas-oar-td-date     { width: 8em; }
+.vas-oar-th-doc,      .vas-oar-td-doc      { width: 8em; }
+.vas-oar-th-customer, .vas-oar-td-customer { width: 12em; }
+.vas-oar-th-bank,     .vas-oar-td-bank     { width: 13em; }
+.vas-oar-th-currency, .vas-oar-td-currency { width: 6em; text-align: center; }
+.vas-oar-th-amount,   .vas-oar-td-amount   { width: 9.5em; text-align: right; }
+
+.vas-oar-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-oar-td-date {
+    color: #748494;
+}
+
+.vas-oar-td-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    color: #5F7283;
+    font-size: 0.8125em;
+}
+
+.vas-oar-td-customer {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-oar-td-bank {
+    color: #5F7283;
+}
+
+.vas-oar-td-currency {
+    text-align: center;
+    color: #5F7283;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+/* Amount: deep-green, right-aligned, full value — never ellipsis-clipped. */
+.vas-oar-td-amount {
+    text-align: right;
+    font-weight: 700;
+    color: #0B6B45;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.vas-oar-cur-inline {
+    margin-inline-end: 0.2em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+.vas-oar-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+    background: #FFFFFF;
+}
+
+/* Footer: helper (left) · compact pager (right). */
+.vas-oar-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-oar-pager-helper {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-oar-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-oar-pager-btn {
+    width: 2em;
+    height: 2em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-oar-pager-btn svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-oar-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-oar-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-oar-pager-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Dialog responsive — small screens ────────────────────────────── */
+
+@media (max-width: 40em) {            /* ~640px */
+    .vas-oar-dialog { padding: 0; }
+    .vas-oar-dialog-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-oar-dialog-table thead th,
+    .vas-oar-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    .vas-oar-td-doc { font-size: 0.75em; }
+
+    /* Drop Bank account + Payment Currency on phones — keep
+       Date/Receipt/Customer/Amount (amount keeps its currency symbol). */
+    .vas-oar-th-bank,
+    .vas-oar-td-bank,
+    .vas-oar-th-currency,
+    .vas-oar-td-currency { display: none; }
+
+    .vas-oar-th-amount, .vas-oar-td-amount { width: 9em; }
+
+    .vas-oar-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .vas-oar-pager-helper { flex: 1 1 100%; order: 2; text-align: center; }
+    .vas-oar-pager { order: 1; margin: 0 auto; }
+}

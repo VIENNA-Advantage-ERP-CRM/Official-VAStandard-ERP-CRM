@@ -1,60 +1,173 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Top Debtors Widget — list card (Onfinity design system, see design.md §8).
+ * Glass surface, tinted icon well, header with "Chase all" action, and a
+ * scrollable list of debtor rows (avatar · name/overdue · amount + risk chip).
+ * Inner sizing is em-based off a per-widget base font-size so the whole card
+ * scales as one unit; container queries lower that base on narrow dashboard
+ * cells to avoid overflow. RTL-safe via flex + logical properties. All
+ * selectors are namespaced vas-td-* to avoid collisions.
+ * ───────────────────────────────────────────────────────────────────────── */
+
 .vas-td-root {
-    height: 100%;
     width: 100%;
+    height: 100%;
+    container-type: inline-size;
     font-family: Roboto, sans-serif;
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
 }
 
-.vas-td-chip {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 10px;
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-td-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
+}
+
+.vas-td-card {
+    /* Base unit: every em below is relative to this value. */
+    font-size: 16px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* Glass widget surface (design.md §8) */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 2px solid #fff;
+    border-radius: 0.875em;          /* 14px */
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    overflow: hidden;
+}
+
+/* ── Header: icon + title/subtitle on the left, "Chase all" on the right ── */
+.vas-td-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    /* Widget edge spacing: top 16 / sides 18 / 12 above the list */
+    padding: 1em 1.125em 0.75em;
+    flex-shrink: 0;
+}
+
+.vas-td-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;                    /* 10px */
+    min-width: 0;
+}
+
+.vas-td-icon {
+    width: 2.25em;                   /* 36px */
+    height: 2.25em;
+    flex-shrink: 0;
+    border-radius: 0.5em;            /* 8px */
+    background: #EAF8FF;             /* light active blue surface */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-td-icon svg {
+    width: 1.125em;                  /* 18px */
+    height: 1.125em;
+}
+
+.vas-td-title {
+    font-size: 0.875em;              /* 14px */
     font-weight: 700;
-    white-space: nowrap;
-    letter-spacing: 0.4px;
+    color: #102C3F;
+    line-height: 1.2;
 }
 
-.vas-td-overdue-label {
-    font-size: 12px;
+.vas-td-subtitle {
+    font-size: 0.625em;              /* 10px */
     color: #748494;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 0.125em;
 }
 
-.vas-td-nodata {
-    text-align: center;
-    padding: 24px 16px;
-    color: #748494;
-    font-size: 12px;
+.vas-td-header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.vas-td-chase-all {
+    font-size: 0.8125em;             /* 13px */
+    font-weight: 600;
+    color: #0083DA;
+}
+
+.vas-td-header-right svg {
+    width: 0.875em;                  /* 14px */
+    height: 0.875em;
+}
+
+/* ── Scrollable list body ── */
+.vas-td-list-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 0.25em;
 }
 
 .vas-td-list-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
+    gap: 0.75em;                     /* 12px */
+    padding: 0.2em 1.125em;         /* 12px / 18px — aligns with header */
     transition: background 0.15s;
     cursor: pointer;
 }
 
+.vas-td-list-row:not(:last-child) {
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas-td-list-row:hover {
+    background: #F8FBFF;
+}
+
+/* ── Avatar (cycled palette via vas-td-avatar-N classes) ── */
 .vas-td-avatar {
-    width: 36px;
-    height: 36px;
+    width: 2.25em;                   /* 36px */
+    height: 2.25em;
     border-radius: 50%;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 0.75em;               /* 12px */
     font-weight: 700;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.02em;
 }
 
+.vas-td-avatar-0 { background: #DBEAFE; color: #1E40AF; }
+.vas-td-avatar-1 { background: #FCE7F3; color: #9D174D; }
+.vas-td-avatar-2 { background: #D1FAE5; color: #065F46; }
+.vas-td-avatar-3 { background: #FEF3C7; color: #92400E; }
+.vas-td-avatar-4 { background: #EDE9FE; color: #5B21B6; }
+.vas-td-avatar-5 { background: #FFE4E6; color: #9F1239; }
+
+/* ── Name + overdue status ── */
 .vas-td-name-wrap {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
 .vas-td-name {
-    font-size: 14px;
+    font-size: 0.875em;              /* 14px */
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -63,90 +176,65 @@
 }
 
 .vas-td-overdue-wrap {
-    margin-top: 2px;
+    margin-top: 0.125em;
 }
 
+.vas-td-overdue-label {
+    font-size: 0.75em;               /* 12px */
+    color: #748494;
+}
+
+/* ── Amount + risk chip ── */
 .vas-td-amount-wrap {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 4px;
+    gap: 0.25em;
     flex-shrink: 0;
 }
 
 .vas-td-amount {
-    font-size: 15px;
+    font-size: 0.9375em;             /* 15px */
     font-weight: 700;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-.vas-td-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
-    border: 2px solid #fff;
-    border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
-    overflow: hidden;
-    height: 100%;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
+/* Base-currency symbol prefixed before the amount (RTL-safe spacing). */
+.vas-td-cur {
+    font-weight: inherit;
+    margin-inline-end: 0.08em;
+    vertical-align: baseline;
 }
 
-.vas-td-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 18px 12px;
-}
-
-.vas-td-header-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.vas-td-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    flex-shrink: 0;
-    background: #EAF8FF;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.vas-td-title {
-    font-size: 14px;
+.vas-td-chip {
+    display: inline-block;
+    padding: 0.1875em 0.625em;       /* 3px 10px */
+    border-radius: 999px;
+    font-size: 0.625em;              /* 10px */
     font-weight: 700;
-    color: #102C3F;
-    line-height: 1.2;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
 }
 
-.vas-td-subtitle {
-    font-size: 10px;
+.vas-td-chip-risk    { background: #FAD7D7; color: #8F2D2D; }
+.vas-td-chip-ontrack { background: #CCEFDD; color: #0C5D38; }
+
+/* ── Loading / empty state ── */
+.vas-td-nodata {
+    text-align: center;
+    padding: 1.5em 1em;
     color: #748494;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    margin-top: 2px;
+    font-size: 0.75em;
 }
 
-.vas-td-header-right {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    cursor: pointer;
+/* ── Responsive: shrink the whole card by lowering its base font-size on
+ *    narrow dashboard cells. Inner em sizing scales automatically. ── */
+@container (max-width: 300px) {
+    .vas-td-card { font-size: 14px; }
 }
 
-.vas-td-chase-all {
-    font-size: 13px;
-    font-weight: 600;
-    color: #0083DA;
-}
-
-.vas-td-list-body {
-    flex: 1;
-    overflow-y: auto;
-    padding-bottom: 4px;
+@container (max-width: 240px) {
+    .vas-td-card { font-size: 12px; }
 }

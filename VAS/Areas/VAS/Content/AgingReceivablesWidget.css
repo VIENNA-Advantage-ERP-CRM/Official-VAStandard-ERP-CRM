@@ -1,6 +1,22 @@
 .vas-ar-root {
     height: 100%;
+    width:100%;
     font-family: Roboto, sans-serif;
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
+}
+
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-ar-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
 }
 
 .vas-ar-nodata {
@@ -17,6 +33,8 @@
 .vas-ar-bucket-label-wrap {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
     font-size: 12px;
     margin-bottom: 4px;
     color: #102C3F;
@@ -25,6 +43,15 @@
 .vas-ar-bucket-val {
     font-weight: 600;
     font-family: monospace;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Base-currency symbol prefixed before the amount */
+.vas-ar-cur {
+    font-weight: inherit;
+    margin-inline-end: 0.08em;
+    vertical-align: baseline;
 }
 
 .vas-ar-bucket-track {

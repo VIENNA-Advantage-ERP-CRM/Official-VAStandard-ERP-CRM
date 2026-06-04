@@ -13,13 +13,23 @@
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
 
+@import "../VAS_010_CashGlCashInWidget.css";
+@import "../VAS_CreateNewReceipt.css";
+@import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AutoAllocatedWidget.css";
+@import "../VAS_RecentReceiptsWidget.css";
 @import "../BouncedChequesWidget.css";
 @import "../CustomerPaidMethodWidget.css";
-@import "../CollectionEfficiencyWidget.css";
-@import "../ExpectedReceiptsWidget.css";
+@import "../VAS_001_CollectionEfficiencyWidget.css";
+@import "../VAS_003_OnAccountReceipts.css";
+@import "../VAS_011_UnreconciledReceipts.css";
+@import "../VAS_012_TodayReceipts.css";
+@import "../VAS_013_TopCustomerReceipts.css";
+@import "../VAS_014_DailyCollectionTrend.css";
+@import "../VAS_015_OutstandingVsReceived.css";
+@import "../VAS_034_ExpectedReceipts.css";
 @import "../ExpectedThisWeekWidget.css";
 @import "../AgingReceivablesWidget.css";
 @import "../AvgDaysToPayWidget.css";
@@ -28,6 +38,7 @@
 @import "../OverdueWidget.css";
 @import "../PaidthismonthWidget.css";
 @import "../TopDebtorsWidget.css";
+
 @import "../VAS_041_GLJournalEntriesWidget.css";
 @import "../VAS_036_GLJournalUnpostedWidget.css";
 @import "../VAS_039_GLJournalPostedWidget.css";
@@ -38,3 +49,6 @@
 @import "../VAS_042_GLJournalVolumeWidget.css";
 @import "../VAS_043_GLJournalTopMovementWidget.css";
 @import "../VAS_045_GLJournalPendingWidget.css";
+
+@import "../SalesInvoiceCustomerSearchWidget.css";
+

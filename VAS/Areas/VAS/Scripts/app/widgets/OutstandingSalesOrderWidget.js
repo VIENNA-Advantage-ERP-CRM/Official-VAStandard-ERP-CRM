@@ -1,24 +1,34 @@
 /**
  * Outstanding Sales Order Widget
- * Purpose - KPI card showing total unpaid (outstanding) sales order value owed to the company.
- * Design   - Matches design2.md KPI/Summary widget: glass surface, tinted pale-blue icon,
- *            large bold metric, WHY pill with explanatory copy.
+ * Purpose - KPI card showing total unpaid (outstanding) sales value owed to the company.
+ * Design  - Implements the design.md "Glass Widget" + "KPI/Summary Widget" pattern:
+ *           glass surface, pale-blue (info) icon tint, large bold metric, and a WHY
+ *           pill with explanatory copy. The card fills 100% of its grid cell and
+ *           scales responsively via OutstandingSalesOrderWidget.css.
  *
- * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
- *  #  | Current Text                                   | Message Key              | MsgText
- * ----+------------------------------------------------+--------------------------+-----------------------------------------------
- *  1  | Outstanding                                    | VIS_Outstanding          | Outstanding
- *  2  | Money owed to you                              | VIS_MoneyOwedToYou       | Money owed to you
- *  3  | WHY                                            | VIS_Why                  | WHY
- *  4  | Total unpaid invoices across all customers.    | VIS_TotalUnpaidInvoices  | Total unpaid invoices across all customers.
+ * ── Labels / Message Keys ───────────────────────────────────────────────────────────────
+ *  #  | Current Text                                   | Message Key                        | MsgText
+ * ----+------------------------------------------------+------------------------------------+------------------------------------------------
+ *  1  | Outstanding                                    | VIS_Outstanding                    | Outstanding
+ *  2  | Money owed to you                              | VIS_MoneyOwedToYou                 | Money owed to you
+ *  3  | WHY                                            | VIS_Why                            | WHY
+ *  4  | Total unpaid invoices across all customers.    | VIS_TotalUnpaidInvoices            | Total unpaid invoices across all customers.
  *  5  | unpaid order / unpaid orders                   | VIS_UnpaidOrder / VIS_UnpaidOrders | unpaid order / unpaid orders
- *  6  | across all customers.                          | VIS_AcrossAllCustomers   | across all customers.
- *  7  | Largest:                                       | VIS_Largest              | Largest:
- * ──────────────────────────────────────────────────────────────────────────────────────
+ *  6  | across all customers.                          | VIS_AcrossAllCustomers             | across all customers.
+ *  7  | Largest:                                       | VIS_Largest                        | Largest:
+ * ───────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* Dollar-circle icon (lucide-style). Stroke inherits the icon-well color via currentColor. */
+    var ICON_SVG =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+        'stroke-linecap="round" stroke-linejoin="round">' +
+        '<line x1="12" y1="1" x2="12" y2="23"/>' +
+        '<path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>' +
+        '</svg>';
 
     VIS.OutstandingSalesOrderWidget = function () {
 
@@ -29,11 +39,19 @@
 
         var $metricEl;
         var $whyText;
-        var $trendEl;
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
+        /* Resolve a translated label, falling back to readable English text. */
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -44,25 +62,26 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'OutstandingSalesOrder/GetOutstanding',
                 type: 'GET',
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalOutstanding, data.orderCount, data.topCustomer);
+                        renderMetric(data.totalOutstanding, data.orderCount, data.topCustomer, data.curSymbol);
                     }
                 },
                 error: function () {
                     /* Leave placeholder values on error */
-                }
+                },
+                complete: function () { showBusy(false); }
             });
         }
 
-        /* ── Format currency ── */
+        /* ── Format a currency amount into a compact, locale-aware string ── */
         function formatCurrency(value) {
             var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-
             var sign = value < 0 ? '-' : '';
             var absVal = Math.abs(value);
 
@@ -75,23 +94,30 @@
             return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
         }
 
-        /* ── Render metric values ── */
-        function renderMetric(total, count, topCustomer) {
-            if ($metricEl) {
-                $metricEl.text(formatCurrency(total));
-            }
-            if ($whyText) {
+        /* ── Build the WHY explanatory copy from the optional count / top-customer data ── */
+        function buildWhyText(count, topCustomer) {
+            var why = lbl("VIS_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.');
+
+            if (count > 0) {
                 var orderLabel = count !== 1
                     ? lbl("VIS_UnpaidOrders", 'unpaid orders')
                     : lbl("VIS_UnpaidOrder", 'unpaid order');
-                var why = lbl("VIS_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.');
-                if (count > 0) {
-                    why = count + ' ' + orderLabel + ' ' + lbl("VIS_AcrossAllCustomers", 'across all customers.');
-                }
-                if (topCustomer) {
-                    why += ' ' + lbl("VIS_Largest", 'Largest:') + ' ' + topCustomer + '.';
-                }
-                $whyText.text(why);
+                why = count + ' ' + orderLabel + ' ' + lbl("VIS_AcrossAllCustomers", 'across all customers.');
+            }
+            if (topCustomer) {
+                why += ' ' + lbl("VIS_Largest", 'Largest:') + ' ' + topCustomer + '.';
+            }
+            return why;
+        }
+
+        /* ── Render metric values ── */
+        function renderMetric(total, count, topCustomer, symbol) {
+            if ($metricEl) {
+                /* Base-currency symbol (from the accounting schema) sits before the amount. */
+                $metricEl.text((symbol || '') + formatCurrency(total));
+            }
+            if ($whyText) {
+                $whyText.text(buildWhyText(count, topCustomer));
             }
         }
 
@@ -99,57 +125,43 @@
         function createWidget() {
             var uid = $self.AD_UserHomeWidgetID || 'oso';
 
-            var $card = $(
-                '<div class="vas-oso-card">'
-            );
-
-            /* ── Header row: icon + labels ── */
+            /* Header: pale-blue icon well + title / subtitle */
             var $header = $(
                 '<div class="vas-oso-header">' +
-
-                /* Icon well — pale blue, matching design2.md KPI tinted info surface */
-                '<div class="vas-oso-icon">' +
-                /* Dollar-circle icon (lucide-style inline SVG) */
-                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" ' +
-                'stroke="oklch(0.45 0.17 220)" stroke-width="1.8" ' +
-                'stroke-linecap="round" stroke-linejoin="round">' +
-                '<line x1="12" y1="1" x2="12" y2="23"/>' +
-                '<path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>' +
-                '</svg>' +
-                '</div>' +
-
-                '<div>' +
-                '<div class="vas-oso-title">' + lbl("VIS_Outstanding", 'Outstanding') + '</div>' +
-                '<div class="vas-oso-subtitle">' + lbl("VIS_MoneyOwedToYou", 'Money owed to you') + '</div>' +
-                '</div>' +
+                    '<div class="vas-oso-icon">' + ICON_SVG + '</div>' +
+                    '<div class="vas-oso-labels">' +
+                        '<div class="vas-oso-title">' + lbl("VIS_Outstanding", 'Outstanding') + '</div>' +
+                        '<div class="vas-oso-subtitle">' + lbl("VIS_MoneyOwedToYou", 'Money owed to you') + '</div>' +
+                    '</div>' +
                 '</div>'
             );
 
-            /* ── Metric value ── */
-            $metricEl = $(
-                '<div id="vis-oso-metric-' + uid + '" class="vas-oso-metric">' +
-                '—' +
-                '</div>'
-            );
+            /* Large bold metric (placeholder until data loads) */
+            $metricEl = $('<div id="vis-oso-metric-' + uid + '" class="vas-oso-metric">—</div>');
 
-            /* ── WHY pill + explanatory text ── */
-            var $why = $(
-                '<div class="vas-oso-why-wrap">'
-            );
-
-            var $pill = $(
-                '<span class="vas-oso-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'
-            );
-
+            /* WHY pill + explanatory text */
             $whyText = $(
                 '<span class="vas-oso-why-text">' +
                 lbl("VIS_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.') +
                 '</span>'
             );
 
-            $why.append($pill).append($whyText);
-            $card.append($header).append($metricEl).append($why);
-            $root.append($card);
+            var $why = $('<div class="vas-oso-why-wrap">')
+                /*.append('<span class="vas-oso-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>')*/
+                .append($whyText);
+
+            $root.append(
+                $('<div class="vas-oso-card">')
+                    .append($header)
+                    .append($metricEl)
+                    .append($why)
+            );
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-oso-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */

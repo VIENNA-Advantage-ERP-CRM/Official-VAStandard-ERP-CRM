@@ -29,7 +29,8 @@ namespace VIS.Controllers
             string schemaCurrencySql = @"
                 SELECT AD_ClientInfo.AD_Client_ID,
                        C_AcctSchema.C_Currency_ID AS Acct_Currency_ID,
-                       C_Currency.StdPrecision
+                       C_Currency.StdPrecision,
+                       COALESCE(C_Currency.CurSymbol, C_Currency.ISO_Code) AS CurSymbol
                 FROM AD_ClientInfo AD_ClientInfo
                 INNER JOIN C_AcctSchema C_AcctSchema ON (C_AcctSchema.C_AcctSchema_ID=AD_ClientInfo.C_AcctSchema1_ID)
                 INNER JOIN C_Currency C_Currency ON (C_Currency.C_Currency_ID=C_AcctSchema.C_Currency_ID)
@@ -60,8 +61,7 @@ namespace VIS.Controllers
                                    C_Invoice.AD_Org_ID
                                )
                            ELSE 0
-                       END AS OutstandingAmount,
-                       SchemaCurrency.StdPrecision
+                       END AS OutstandingAmount
                 FROM C_InvoicePaySchedule C_InvoicePaySchedule
                 INNER JOIN C_Invoice C_Invoice ON (C_InvoicePaySchedule.C_Invoice_ID=C_Invoice.C_Invoice_ID)
                 INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=C_Invoice.AD_Client_ID)
@@ -90,6 +90,12 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
+            /*
+             * Source the currency symbol and precision from the SchemaCurrency CTE (the
+             * client's base/accounting-schema currency) rather than from the data rows, so
+             * both stay correct even when there are no outstanding invoices. OutstandingData
+             * is LEFT joined so SUM still returns 0 (not an empty result) in that case.
+             */
             string sql = @"
                 WITH SchemaCurrency AS (
                     " + schemaCurrencySql + @"
@@ -97,10 +103,14 @@ namespace VIS.Controllers
                 OutstandingData AS (
                     " + outstandingDataSql + @"
                 )
-                SELECT ROUND(COALESCE(SUM(OutstandingData.OutstandingAmount), 0), MAX(OutstandingData.StdPrecision)) AS TotalOutstanding
-                FROM OutstandingData OutstandingData";
+                SELECT ROUND(COALESCE(SUM(OutstandingData.OutstandingAmount), 0), SchemaCurrency.StdPrecision) AS TotalOutstanding,
+                       SchemaCurrency.CurSymbol AS CurSymbol
+                FROM SchemaCurrency SchemaCurrency
+                LEFT OUTER JOIN OutstandingData OutstandingData ON (OutstandingData.AD_Client_ID=SchemaCurrency.AD_Client_ID)
+                GROUP BY SchemaCurrency.StdPrecision, SchemaCurrency.CurSymbol";
 
             decimal totalOutstanding = 0;
+            string curSymbol = "";
 
             IDataReader dr = null;
 
@@ -111,6 +121,7 @@ namespace VIS.Controllers
                 if (dr != null && dr.Read())
                 {
                     totalOutstanding = Util.GetValueOfDecimal(dr["TotalOutstanding"]);
+                    curSymbol = Util.GetValueOfString(dr["CurSymbol"]);
                 }
             }
             finally
@@ -123,7 +134,8 @@ namespace VIS.Controllers
 
             var result = new
             {
-                totalOutstanding = totalOutstanding
+                totalOutstanding = totalOutstanding,
+                curSymbol = curSymbol
             };
 
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

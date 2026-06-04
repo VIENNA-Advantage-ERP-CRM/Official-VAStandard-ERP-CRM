@@ -1,86 +1,144 @@
+/**
+ * Outstanding Sales Order Widget — KPI/Summary card
+ *
+ * Implements the design.md "Glass Widget" + "KPI/Summary Widget" pattern:
+ * white translucent gradient surface, 2px white border, soft blue-gray shadow,
+ * pale-blue (info) icon tint, large bold metric, and a WHY pill + copy.
+ *
+ * Sizing: the card always fills its grid cell (100% width/height). Inner
+ * typography and spacing use em units derived from the card's base font-size,
+ * so the whole card scales as one unit. Container queries step that base size
+ * down on narrow cells (design.md §6 Responsive Unit Rules) to keep the layout
+ * aligned and overflow-free at any resolution.
+ */
+
 .vas-oso-root {
+    width: 100%;
     height: 100%;
+    box-sizing: border-box;
+    container: vas-oso / inline-size;
     font-family: Roboto, sans-serif;
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
+}
+
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-oso-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 999;
 }
 
 .vas-oso-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
-    border: 2px solid #fff;
-    border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
-    padding: 16px 18px 18px;
-    height: 100%;
+    font-size: 16px; /* em basis for all inner sizing */
     box-sizing: border-box;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    padding: 1em 1.125em 1.125em; /* 16px 18px 18px */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
 
 .vas-oso-header {
     display: flex;
     align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 0.625em; /* 10px */
+    margin-bottom: 0.625em;
 }
 
 .vas-oso-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
     flex-shrink: 0;
-    background: oklch(0.92 0.07 220);
+    width: 2.25em; /* 36px */
+    height: 2.25em;
+    border-radius: 0.5em; /* 8px */
     display: flex;
     align-items: center;
     justify-content: center;
+    color: oklch(0.45 0.17 220); /* drives the inline SVG stroke via currentColor */
+    background: oklch(0.92 0.07 220); /* info: pale blue tint */
+}
+
+.vas-oso-icon svg {
+    width: 1em; /* 16px */
+    height: 1em;
+}
+
+/* Let the label column shrink so long text wraps instead of pushing the card wider */
+.vas-oso-labels {
+    min-width: 0;
 }
 
 .vas-oso-title {
-    font-size: 13px;
+    font-size: 0.8125em; /* 13px */
     font-weight: 600;
-    color: #102C3F;
     line-height: 1.2;
+    color: #102C3F;
 }
 
 .vas-oso-subtitle {
-    font-size: 11px;
-    color: #748494;
+    margin-top: 1px;
+    font-size: 0.6875em; /* 11px */
     letter-spacing: 0.3px;
     text-transform: uppercase;
-    margin-top: 1px;
+    color: #748494;
 }
 
 .vas-oso-metric {
-    font-size: 40px;
+    margin-bottom: 0.5em; /* 8px */
+    font-size: 2.5em; /* 40px */
     font-weight: 700;
-    color: #102C3F;
     line-height: 1;
-    margin-bottom: 8px;
+    color: #102C3F;
+    overflow-wrap: anywhere;
 }
 
 .vas-oso-why-wrap {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: 0.375em; /* 6px */
     margin-top: auto;
 }
 
 .vas-oso-why-pill {
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
-    background: oklch(0.96 0.03 220);
-    padding: 1px 7px;
-    border-radius: 999px;
-    flex-shrink: 0;
     margin-top: 2px;
-    font-size: 9px;
+    padding: 0.0625em 0.4375em; /* 1px 7px */
+    border-radius: 999px;
+    font-size: 0.5625em; /* 9px */
     font-weight: 700;
     letter-spacing: 0.08em;
     color: oklch(0.45 0.15 220);
-    font-family: Roboto, monospace;
+    background: oklch(0.96 0.03 220);
 }
 
 .vas-oso-why-text {
-    font-size: 11px;
-    color: #748494;
+    font-size: 0.6875em; /* 11px */
     line-height: 1.45;
+    color: #748494;
+    overflow-wrap: anywhere;
+}
+
+/* Scale the card base size down on narrow grid cells so the KPI never overflows */
+@container vas-oso (max-width: 230px) {
+    .vas-oso-card {
+        font-size: 14px;
+    }
+}
+
+@container vas-oso (max-width: 180px) {
+    .vas-oso-card {
+        font-size: 12px;
+    }
 }
