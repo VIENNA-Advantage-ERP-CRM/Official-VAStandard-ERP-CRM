@@ -61,7 +61,6 @@
         var $self    = this;
         var $root    = $('<div class="VAS-gljr-root">');
         var baseUrl  = VIS.Application.contextUrl;
-        var windowId = 0;   // GL Journal AD_Window_ID — set after first load
 
         this.Initalize = function () {
             createWidget();
@@ -146,21 +145,8 @@
 
             $root.append(html);
 
-            // Fix button → zoom to the unbalanced journal
-            $root.find('#VAS-gljr-btn-fix-' + id).on('click', function () {
-                var fixId = $(this).data('journal-id');
-                if (windowId > 0 && fixId) {
-                    VIS.ADialog.openTabAd(windowId, fixId);
-                }
-            });
-
-            // Row click → zoom to that journal
-            $root.find('#VAS-gljr-tbody-' + id).on('click', 'tr[data-id]', function () {
-                var jid = $(this).data('id');
-                if (windowId > 0 && jid) {
-                    VIS.ADialog.openTabAd(windowId, jid);
-                }
-            });
+       
+             
         }
 
         function loadData() {
@@ -174,7 +160,6 @@
                         var data = JSON.parse(result);
                         if (data) {
                             var id = $self.AD_UserHomeWidgetID;
-                            windowId = data.WindowID || 0;
 
                             renderAlert(data, id);
                             renderRows(data, id);

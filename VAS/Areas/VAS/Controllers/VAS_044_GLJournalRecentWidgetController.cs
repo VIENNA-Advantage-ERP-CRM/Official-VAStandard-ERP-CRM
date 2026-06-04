@@ -94,18 +94,18 @@ namespace VAS.Controllers
             // ── Step 3: Resolve GL_Journal window ID for zoom ─────────────────
             // Query system-level (AD_Client_ID=0) primary tab to get the
             // standard GL Journal window — avoids client-specific overrides.
-            int windowId = 0;
-            string winSql = "SELECT MIN(AD_Tab.AD_Window_ID) FROM AD_Tab"
-                          + " WHERE AD_Tab.TableName='GL_Journal'"
-                          + " AND AD_Tab.TabLevel=0"
-                          + " AND AD_Tab.IsActive='Y'"
-                          + " AND AD_Tab.AD_Client_ID=0";
+            //int windowId = 0;
+            //string winSql = "SELECT MIN(AD_Tab.AD_Window_ID) FROM AD_Tab"
+            //              + " WHERE AD_Tab.TableName='GL_Journal'"
+            //              + " AND AD_Tab.TabLevel=0"
+            //              + " AND AD_Tab.IsActive='Y'"
+            //              + " AND AD_Tab.AD_Client_ID=0";
 
-            DataSet winDs = DB.ExecuteDataset(winSql, null, null);
-            if (winDs != null && winDs.Tables[0].Rows.Count > 0)
-            {
-                windowId = Util.GetValueOfInt(winDs.Tables[0].Rows[0][0]);
-            }
+            //DataSet winDs = DB.ExecuteDataset(winSql, null, null);
+            //if (winDs != null && winDs.Tables[0].Rows.Count > 0)
+            //{
+            //    windowId = Util.GetValueOfInt(winDs.Tables[0].Rows[0][0]);
+            //}
 
             // ── Step 4: Build result — SQL already capped at 25 rows ─────────
             var    entries          = new List<object>();
@@ -169,8 +169,7 @@ namespace VAS.Controllers
             return Json(JsonConvert.SerializeObject(new
             {
                 Entries         = entries,
-                UnbalancedEntry = unbalancedEntry,
-                WindowID        = windowId,
+                UnbalancedEntry = unbalancedEntry, 
                 CurSymbol       = curSymbol,
                 ISOCode         = isoCode,
                 StdPrecision    = stdPrecision
