@@ -1,11 +1,28 @@
-﻿.vas-cpm-root {
+/* ─────────────────────────────────────────────────────────────────────────
+ * Customer Paid Method Widget — grid-data glass card.
+ * Design source: design.md / dashboard-widgets.md (Onfinity Dashboard
+ * Design System). Conforms to:
+ *   §Glass Widget             — translucent white gradient, 2px white
+ *                               border, 12-14px radius, 16-18px padding.
+ *   §Widget Header            — icon well + title + optional subtitle.
+ *                               Title: Roboto 18px black (Bold per
+ *                               project rule). Subtitle: Roboto Regular
+ *                               12px #717182.
+ *   §Widget Edge Spacing      — 16px top/left/right, 18px bottom.
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` resolves to the widget's base font-size (16px on the card).
+ * Container queries scale the card on narrow dashboard cells.
+ * Namespaced vas-cpm-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-cpm-root {
+    position: relative;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    box-sizing: border-box;
-    padding: 0;
     font-family: Roboto, sans-serif;
+    container-type: inline-size;
 }
 
     .vas-cpm-root,
@@ -13,78 +30,116 @@
         box-sizing: border-box;
     }
 
+.vas-cpm-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── Glass card shell (design.md §Glass Widget) ──────────────────── */
+
 .vas-cpm-card {
+    font-size: 1em;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
     position: relative;
-    background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.58));
-    border: 2px solid #FFFFFF;
-    border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
-    padding: 16px 16px 18px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
     display: flex;
     flex-direction: column;
 }
 
-/* Header */
+/* ── Header: icon well + title + subtitle ────────────────────────── */
+
 .vas-cpm-header {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 14px;
+    align-items: center;            /* spec: icon and title align middle */
+    gap: 0.625em;
+    margin-bottom: 0.875em;
     min-width: 0;
     flex-shrink: 0;
 }
 
 .vas-cpm-icon-wrap {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #DFF1FF, #BFE4FF);
+    /* Multi-line header (title + subtitle) uses 2.25rem per spec. */
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    border-radius: 0.5em;
+    background: #DFF1FF;
     color: #0083DA;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
 
     .vas-cpm-icon-wrap svg {
-        width: 14px;
-        height: 14px;
-        stroke: #0083DA;
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
     }
 
-.vas-cpm-title {
-    font-size: 17px;
-    font-weight: 700;
-    color: #102C3F;
-    line-height: 1.2;
-    letter-spacing: -0.2px;
+.vas-cpm-title-group {
     min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-cpm-title {
+    /* design.md / dashboard-widgets.md §"Widget Header":
+       18px black title. Per project request the weight is Bold (700)
+       instead of the spec's Medium (500). */
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #141414;
+    line-height: 1.2;
+    letter-spacing: -0.0125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* Body */
+.vas-cpm-subtitle {
+    /* Spec: Roboto Regular 12px #717182, tight gap to title (≈2px),
+       no caps/letter-spacing. */
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #717182;
+    margin-top: 0.125em;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Body: repeated method rows with progress bars ───────────────── */
+
 .vas-cpm-list {
     flex: 1 1 auto;
     min-height: 0;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    gap: 16px;
+    justify-content: flex-start;
+    gap: 0.875em;
+    overflow: hidden;
 }
 
 .vas-cpm-row {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 0.375em;
     min-width: 0;
 }
 
@@ -92,13 +147,13 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
+    gap: 0.625em;
     min-width: 0;
 }
 
 .vas-cpm-method {
-    font-size: 13px;
-    font-weight: 500;
+    font-size: 0.875em;
+    font-weight: 400;
     color: #102C3F;
     min-width: 0;
     overflow: hidden;
@@ -107,7 +162,7 @@
 }
 
 .vas-cpm-percent {
-    font-size: 13px;
+    font-size: 0.875em;
     font-weight: 700;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -116,19 +171,18 @@
 
 .vas-cpm-track {
     width: 100%;
-    height: 6px;
+    height: 0.375em;
     background: #EDF2F6;
-    border-radius: 999px;
+    border-radius: 999em;
     overflow: hidden;
 }
 
 .vas-cpm-fill {
     height: 100%;
-    border-radius: 999px;
+    border-radius: 999em;
     transition: width 600ms ease;
 }
 
-/* لأن اللون يجي inline من JS، هذا فقط fallback */
 .vas-cpm-row:nth-child(1) .vas-cpm-fill {
     background: linear-gradient(90deg, #1F83FF, #0083DA);
 }
@@ -145,47 +199,41 @@
     background: linear-gradient(90deg, #B7A8FF, #5F4AA6);
 }
 
-/* Footer */
+/* ── Footer: WHY pill + explanatory copy ─────────────────────────── */
+
 .vas-cpm-divider {
-    height: 1px;
+    height: 0.0625em;
     background: #EDF2F6;
-    margin-top: 12px;
-    margin-bottom: 12px;
+    margin: 0.75em 0;
     flex-shrink: 0;
 }
 
 .vas-cpm-footer {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5em;
     min-width: 0;
     flex-shrink: 0;
-    font-size: 12px;
-    color: #586575;
-}
-
-.vas-cpm-why {
-    font-size: 9px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    background: rgba(0,131,218,0.08);
-    color: #0083DA;
-    padding: 3px 7px;
-    border-radius: 4px;
-    font-weight: 700;
-    flex-shrink: 0;
+    /* No font-size on the footer — children set their own size from the
+       card root (1em). Previously this was 0.75em and .vas-cpm-desc was
+       also 0.75em, which compounded to ~9px and made the footer text
+       look much smaller than the body. */
+    color: #748494;
 }
 
 .vas-cpm-desc {
-    font-size: 12px;
-    color: #586575;
+    /* Spec footer copy: 12px (0.75em from card root). */
+    font-size: 0.75em;
+    color: #748494;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.45;
 }
 
-/* Loading / No Data */
+/* ── No data ────────────────────────────────────────────────────── */
+
 .vas-cpm-nodata {
     flex: 1 1 auto;
     min-height: 0;
@@ -193,67 +241,18 @@
     align-items: center;
     justify-content: center;
     color: #748494;
-    font-size: 13px;
+    font-size: 0.8125em;
     font-weight: 600;
     text-align: center;
 }
 
-/* Responsive */
-@media (max-width: 620px) {
-    .vas-cpm-card {
-        padding: 14px;
-    }
+/* ── Responsive (dashboard cell) ─────────────────────────────────── */
 
-    .vas-cpm-title {
-        font-size: 16px;
-    }
-
-    .vas-cpm-list {
-        gap: 12px;
-    }
-
+@container (max-width: 22.5em) {       /* ~360px */
+    .vas-cpm-card { padding: 0.875em; }
+    .vas-cpm-title { font-size: 1em; }
+    .vas-cpm-list { gap: 0.625em; }
     .vas-cpm-method,
-    .vas-cpm-percent {
-        font-size: 12px;
-    }
-
-    .vas-cpm-desc {
-        white-space: normal;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-    }
-}
-
-@media (max-width: 360px) {
-    .vas-cpm-card {
-        padding: 12px;
-    }
-
-    .vas-cpm-icon-wrap {
-        width: 26px;
-        height: 26px;
-        min-width: 26px;
-    }
-
-        .vas-cpm-icon-wrap svg {
-            width: 13px;
-            height: 13px;
-        }
-
-    .vas-cpm-title {
-        font-size: 15px;
-    }
-
-    .vas-cpm-list {
-        gap: 10px;
-    }
-
-    .vas-cpm-track {
-        height: 5px;
-    }
-
-    .vas-cpm-footer {
-        font-size: 11px;
-    }
+    .vas-cpm-percent { font-size: 0.8125em; }
+    .vas-cpm-track { height: 0.3125em; }
 }

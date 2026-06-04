@@ -128,15 +128,23 @@ import "../app/widgets/ReconciliationStatusWidget.js";
 
 import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
 
-import "../app/widgets/VAS_CreateNewReceipt.js";
+import "../app/widgets/VAS_010_CashGlCashInWidget.js";
+import "../app/widgets/VAS_002_CreateNewReceipt.js";
 import "../app/widgets/VAS_ReceiptSearch.js";
 import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
 import "../app/widgets/ExpectedThisWeekWidget.js";
 import "../app/widgets/AutoAllocatedWidget.js";
+import "../app/widgets/VAS_RecentReceiptsWidget.js";
 import "../app/widgets/BouncedChequesWidget.js";
 import "../app/widgets/CustomerPaidMethodWidget.js";
-import "../app/widgets/CollectionEfficiencyWidget.js";
-import "../app/widgets/ExpectedReceiptsWidget.js";
+import "../app/widgets/VAS_001_CollectionEfficiencyWidget.js";
+import "../app/widgets/VAS_003_OnAccountReceipts.js";
+import "../app/widgets/VAS_011_UnreconciledReceipts.js";
+import "../app/widgets/VAS_012_TodayReceipts.js";
+import "../app/widgets/VAS_013_TopCustomerReceipts.js";
+import "../app/widgets/VAS_014_DailyCollectionTrend.js";
+import "../app/widgets/VAS_015_OutstandingVsReceived.js";
+import "../app/widgets/VAS_034_ExpectedReceipts.js";
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/AgingReceivablesWidget.js";
 import "../app/widgets/AvgDaysToPayWidget.js";
