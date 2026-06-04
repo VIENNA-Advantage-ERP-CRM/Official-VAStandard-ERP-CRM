@@ -113,7 +113,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'ReconciliationStatus/GetReconciliationStatus',
+                url: VIS.Application.contextUrl + 'VAS_046_ReconciliationStatusWidget/GetReconciliationStatus',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
