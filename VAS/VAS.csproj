@@ -222,6 +222,7 @@
     <Compile Include="Areas\VAS\Controllers\PaidThisMonthController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_011_UnreconciledReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_012_TodayReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_013_TopCustomerReceiptsController.cs" />
@@ -286,6 +287,7 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_010_CashGlCashInWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_003_OnAccountReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_011_UnreconciledReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_012_TodayReceipts.css" />
@@ -376,6 +378,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_010_CashGlCashInWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_003_OnAccountReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_011_UnreconciledReceipts.js" />
