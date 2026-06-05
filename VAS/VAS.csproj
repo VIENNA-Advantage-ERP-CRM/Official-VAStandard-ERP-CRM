@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -237,14 +237,12 @@
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_045_GLJournalPendingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_042_GLJournalVolumeWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_011_UnreconciledReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_012_TodayReceiptsController.cs" />
@@ -253,7 +251,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_015_OutstandingVsReceivedController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_035_MatchSuggestionsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RecentReceiptsController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />
