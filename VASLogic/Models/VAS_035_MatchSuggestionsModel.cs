@@ -85,7 +85,7 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="pageNo">1-based page number.</param>
-        /// <param name="pageSize">Rows per page (default 5).</param>
+        /// <param name="pageSize">Rows per page (default 6).</param>
         /// <returns>Populated <see cref="MatchSuggestionList"/> (Rows may be empty).</returns>
         public MatchSuggestionList GetMatchSuggestions(Ctx ctx, int pageNo, int pageSize)
         {
