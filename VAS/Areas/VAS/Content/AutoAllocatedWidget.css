@@ -253,11 +253,12 @@
 }
 
 .vas-aa-dialog-icon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
-    border-radius: 0.5em;
-    background: #E5F5EA;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
     border: 0.0625em solid #B6E1C2;
     color: #0B6B45;
     display: flex;
@@ -339,6 +340,8 @@
     cursor: pointer;
     padding: 0.875em 0.625em;
     font-family: inherit;
+    /* 0.875em of the viewport-anchored dialog base = the shared 14–28px
+       token, so the tab labels match the family at every screen size. */
     font-size: 0.875em;
     font-weight: 500;
     color: #748494;
@@ -374,7 +377,10 @@
     border-radius: 999em;
     background: #F3F7FB;
     color: #5F7283;
-    font-size: 0.75em;
+    /* Chip text = xs token. 0.7857em counters the 0.875em tab font so the
+       chip lands on 0.6875em of the dialog base (11–22px), matching the
+       family's chips/metadata at every screen size. */
+    font-size: 0.7857em;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
@@ -516,7 +522,7 @@
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
-    font-size: 0.875em;
+    font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;
 }
 

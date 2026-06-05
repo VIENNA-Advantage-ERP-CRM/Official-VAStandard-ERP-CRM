@@ -456,9 +456,10 @@
 }
 
 .vas-rr-dialog-hicon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     border-radius: 0.5625em;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
     border: 0.0625em solid #BFE4FF;
@@ -470,8 +471,8 @@
 }
 
     .vas-rr-dialog-hicon svg {
-        width: 1.15em;
-        height: 1.15em;
+        width: 1.125em;
+        height: 1.125em;
         stroke: currentColor;
     }
 
@@ -522,17 +523,20 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #141414;
+    /* Family dialog close button — muted glyph, soft blue-gray hover
+       (matches the sibling dialogs). */
+    color: #5F7283;
     flex-shrink: 0;
 }
 
     .vas-rr-dialog-close:hover {
-        background: rgba(0, 0, 0, 0.05);
+        background: #F3F7FB;
+        color: #102C3F;
     }
 
     .vas-rr-dialog-close svg {
-        width: 1.25em;
-        height: 1.25em;
+        width: 1em;
+        height: 1em;
         stroke: currentColor;
     }
 
@@ -550,6 +554,8 @@
     background: #EAF4FE;
     color: #0083DA;
     font-family: inherit;
+    /* 0.8125em of the viewport-anchored dialog base = the shared 13–26px
+       helper token, so the Print pill matches the family at every size. */
     font-size: 0.8125em;
     font-weight: 500;
     line-height: 1;
@@ -603,7 +609,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.7);
+    /* Family dialog busy scrim — same 0.62 white as the sibling dialogs. */
+    background: rgba(255, 255, 255, 0.62);
     z-index: 5;
 }
 
@@ -866,7 +873,7 @@
 
 /* On-account empty state — dashed hint + warning pill. */
 .vas-rr-alloc-empty {
-    font-size: 0.8125em;
+    font-size: 0.75em;               /* sm — matches the table data */
     color: #748494;
     padding: 0.875em 0.75em;
     border: 0.0625em dashed #E4EDF4;

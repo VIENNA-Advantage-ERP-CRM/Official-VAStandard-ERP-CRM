@@ -132,7 +132,10 @@
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
-    font-size: 0.875em;
+    /* Used in BOTH the widget body (cqi root) and the dialog body (vw base),
+       so it carries the absolute shared data clamp to render the same px
+       in either context. */
+    font-size: clamp(12px, 0.88vw, 24px);
 }
 
 .vas-msug-row {
@@ -720,6 +723,8 @@
     background: #FFFFFF;
     color: #5F7283;
     font-family: inherit;
+    /* 0.875em of the viewport-anchored dialog base = the shared 14–28px
+       token, so footer buttons match the family at every screen size. */
     font-size: 0.875em;
     font-weight: 500;
     padding: 0.5em 1.125em;
@@ -737,6 +742,8 @@
     background: #0083DA;
     color: #FFFFFF;
     font-family: inherit;
+    /* 0.875em of the viewport-anchored dialog base = the shared 14–28px
+       token, so footer buttons match the family at every screen size. */
     font-size: 0.875em;
     font-weight: 500;
     padding: 0.5em 1.125em;

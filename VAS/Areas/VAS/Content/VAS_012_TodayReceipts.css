@@ -262,11 +262,12 @@
 }
 
 .vas-tdr-dialog-icon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
-    border-radius: 0.5em;
-    background: #EAF4FE;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
     border: 0.0625em solid #BFE4FF;
     color: #106AB0;
     display: flex;
@@ -455,7 +456,7 @@
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
-    font-size: 0.875em;
+    font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;
 }
 
