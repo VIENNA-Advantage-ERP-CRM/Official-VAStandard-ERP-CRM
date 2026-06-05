@@ -272,7 +272,8 @@
 }
 
 .vas-msug-footer-info {
-    font-size: 0.8125em;
+    /* Shared viewport clamp — matches the sibling widgets' footer helpers. */
+    font-size: clamp(13px, 0.95vw, 26px);
     color: #5F7283;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -316,11 +317,13 @@
 }
 
 .vas-msug-page-btn {
-    width: 2em;
-    height: 2em;
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the sibling widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -348,7 +351,8 @@
 .vas-msug-page-text {
     min-width: 3em;
     text-align: center;
-    font-size: 0.875em;
+    /* Shared viewport clamp — matches the sibling widgets' pager text. */
+    font-size: clamp(14px, 1.03vw, 28px);
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -373,7 +377,10 @@
 
 .vas-msug-dialog {
     font-family: Roboto, sans-serif;
-    font-size: 1em;
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, 1.1733vw, 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -417,7 +424,8 @@
 }
 
 .vas-msug-dialog-title {
-    font-size: 1.125em;
+    /* Shared viewport-anchored title clamp — matches the widget titles. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     font-weight: 700;
     color: #102C3F;
     line-height: 1.2;

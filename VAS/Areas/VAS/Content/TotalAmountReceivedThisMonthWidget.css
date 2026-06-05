@@ -216,7 +216,12 @@
 
 .vas-tarm-dialog {
     font-family: Roboto, sans-serif;
-    font-size: 1em;                   /* = 16px from <body> */
+    /* Viewport-anchored dialog base: 1.1733vw is chosen so 0.75em of it
+       equals the shared data clamp (0.88vw) — dialog table data renders
+       the same px as widget data, and every em-sized part of the dialog
+       (width, columns, paddings) scales in proportion, so nothing
+       overflows. 16px floor keeps small screens unchanged. */
+    font-size: clamp(16px, 1.1733vw, 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -290,7 +295,8 @@
 }
 
 .vas-tarm-dialog-title {
-    font-size: 1.125em;               /* 18px design.md title */
+    /* Shared viewport-anchored title clamp — matches the widget titles. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     font-weight: 700;
     color: #102C3F;
     line-height: 1.2;
@@ -298,7 +304,8 @@
 
 .vas-tarm-dialog-subtitle {
     margin-top: 0.125em;
-    font-size: 0.8125em;              /* 13px */
+    /* Shared viewport-anchored sm clamp — matches the widget subtitles. */
+    font-size: clamp(12px, 0.88vw, 24px);
     color: #748494;
     line-height: 1.3;
 }
@@ -364,7 +371,7 @@
         position: sticky;
         top: 0;
         background: #FFFFFF;
-        font-size: 0.8125em;          /* 13px header */
+        font-size: 0.75em;            /* sm — 0.75em of the dialog base = shared data clamp */
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -387,7 +394,7 @@
     .vas-tarm-dialog-table tbody td {
         padding: 0.875em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -428,7 +435,7 @@
 .vas-tarm-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
     color: #5F7283;
-    font-size: 0.8125em;
+    font-size: 0.6875em;              /* xs — secondary metadata cell */
 }
 
 .vas-tarm-td-customer {
@@ -540,11 +547,13 @@
 
 /* Rounded-square pager buttons per design.md (not circular). */
 .vas-tarm-pager-btn {
-    width: 2em;                       /* 32px */
-    height: 2em;
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;                   /* primary blue chevron */
     cursor: pointer;
@@ -554,8 +563,8 @@
 }
 
     .vas-tarm-pager-btn svg {
-        width: 1em;
-        height: 1em;
+        width: 0.875em;
+        height: 0.875em;
         stroke: currentColor;
     }
 

@@ -193,7 +193,10 @@
 
 .vas-unr-dialog {
     font-family: Roboto, sans-serif;
-    font-size: 1em;
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, 1.1733vw, 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -264,7 +267,8 @@
 }
 
 .vas-unr-dialog-title {
-    font-size: 1.125em;
+    /* Shared viewport-anchored title clamp — matches the widget titles. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     font-weight: 700;
     color: #102C3F;
     line-height: 1.2;
@@ -272,7 +276,8 @@
 
 .vas-unr-dialog-subtitle {
     margin-top: 0.125em;
-    font-size: 0.8125em;
+    /* Shared viewport-anchored sm clamp — matches the widget subtitles. */
+    font-size: clamp(12px, 0.88vw, 24px);
     color: #748494;
     line-height: 1.3;
 }
@@ -331,7 +336,7 @@
         position: sticky;
         top: 0;
         background: #FFFFFF;
-        font-size: 0.8125em;
+        font-size: 0.75em;            /* sm — 0.75em of the dialog base = shared data clamp */
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -353,7 +358,7 @@
     .vas-unr-dialog-table tbody td {
         padding: 0.875em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -390,7 +395,7 @@
 .vas-unr-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
     color: #5F7283;
-    font-size: 0.8125em;
+    font-size: 0.6875em;              /* xs — secondary metadata cell */
 }
 
 .vas-unr-td-customer {
@@ -464,11 +469,13 @@
 }
 
 .vas-unr-pager-btn {
-    width: 2em;
-    height: 2em;
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -478,8 +485,8 @@
 }
 
     .vas-unr-pager-btn svg {
-        width: 1em;
-        height: 1em;
+        width: 0.875em;
+        height: 0.875em;
         stroke: currentColor;
     }
 

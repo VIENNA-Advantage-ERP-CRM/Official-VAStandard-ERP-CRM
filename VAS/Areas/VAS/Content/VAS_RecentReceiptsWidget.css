@@ -400,7 +400,10 @@
 
 .vas-rr-dialog {
     font-family: Roboto, sans-serif;
-    font-size: 1em;
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, 1.1733vw, 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -479,9 +482,11 @@
 }
 
 .vas-rr-dialog-title {
-    font-size: 1.125em;
-    font-weight: 500;
-    color: #141414;
+    /* Shared viewport-anchored title clamp — matches the widget titles;
+       weight/color normalized to the family dialog-title style. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
+    font-weight: 700;
+    color: #102C3F;
     line-height: 1.15;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -490,7 +495,8 @@
 
 .vas-rr-dialog-sub {
     margin-top: 0.125em;
-    font-size: 0.75em;
+    /* Shared viewport-anchored sm clamp — matches the widget subtitles. */
+    font-size: clamp(12px, 0.88vw, 24px);
     color: #717182;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -755,7 +761,7 @@
     .vas-rr-alloc-table tbody td {
         padding: 0.6875em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
