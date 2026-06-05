@@ -8,7 +8,7 @@
  *           strip and the "why this match" signal list. The modal Apply
  *           buttons POST to ApplyAllocation, which creates and completes a
  *           C_AllocationHdr on the payment accounting date (same outcome as
- *           the standard Allocation form). The footer "Open allocation form"
+ *           the standard Allocation form). The header "Open allocation form"
  *           link opens the standard Allocation form (AD_Form classname
  *           VAdvantage.Apps.AForms.VAllocation) via
  *           VIS.viewManager.startForm(AD_Form_ID).
@@ -31,7 +31,7 @@
  *  4  | Review                                | VAS_035_Review
  *  6  | due                                   | VAS_035_Due
  *  7  | suggestion / suggestions              | VAS_035_Suggestion / VAS_035_Suggestions
- *  8  | ready to allocate                     | VAS_035_ReadyToAllocate
+ *  8  | Showing                               | VAS_Showing
  *  9  | No match suggestions                  | VAS_035_NoSuggestions
  * 10  | Match Review                          | VAS_035_MatchReview
  * 11  | High confidence match                 | VAS_035_HighConfidenceMatch
@@ -93,6 +93,7 @@
         var $root = $('<div class="vas-msug-root">');
         var $card;
         var $listBody;
+        var $footer;
         var $footerInfo;
         var $openFormLink;
         var $pager;
@@ -119,7 +120,7 @@
         var allocationFormId = 0;
 
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 6;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -220,7 +221,6 @@
                 );
             }
 
-            if ($footerInfo) { $footerInfo.text(""); }
             updatePager();
         }
 
@@ -242,20 +242,6 @@
 
             for (var i = 0; i < rows.length; i++) {
                 $listBody.append(buildRow(rows[i]));
-            }
-
-            if ($footerInfo) {
-                var sugLabel = totalRecords === 1
-                    ? lbl("VAS_035_Suggestion", "suggestion")
-                    : lbl("VAS_035_Suggestions", "suggestions");
-
-                /* Count and total in bold; the total stays in the receipt
-                   currency (no base-currency conversion). */
-                $footerInfo.html(
-                    '<b>' + escapeHtml(totalRecords + ' ' + sugLabel) + '</b> · ' +
-                    '<b>' + escapeHtml(formatAmount(data.ReadyToAllocate, data.CurrencySymbol, data.Precision)) + '</b> ' +
-                    escapeHtml(lbl("VAS_035_ReadyToAllocate", "ready to allocate"))
-                );
             }
 
             updatePager();
@@ -283,9 +269,9 @@
                 '<span class="vas-msug-row-amount">' + escapeHtml(receiptAmt) + '</span>' +
                 '</div>' +
                 '<div class="vas-msug-meta">' +
-                '<span class="vas-msug-doc" title="' + escapeHtml(row.ReceiptNo) + '">' + escapeHtml(row.ReceiptNo) + '</span>' +
+                '<span class="vas-msug-doc" title="' + escapeHtml(lbl("VAS_035_ReceiptNo", "Receipt No.")) + '">' + escapeHtml(row.ReceiptNo) + '</span>' +
                 ' → ' +
-                '<span class="vas-msug-doc" title="' + escapeHtml(row.InvoiceNo) + '">' + escapeHtml(row.InvoiceNo) + '</span>' +
+                '<span class="vas-msug-doc" title="' + escapeHtml(lbl("VAS_035_InvoiceDetails", "Invoice details")) + '">' + escapeHtml(row.InvoiceNo) + '</span>' +
                 ' · ' + escapeHtml(openAmt) +
                 ' · ' + escapeHtml(lbl("VAS_035_Due", "due")) + ' ' + escapeHtml(formatShortDate(row.DueDate)) +
                 '</div>' +
@@ -311,18 +297,36 @@
         }
 
         function updatePager() {
+            /* Left helper: "Showing X–Y of Z suggestions" result range (image_1). */
+            if ($footerInfo) {
+                if (totalRecords > 0) {
+                    var from = (pageNo - 1) * pageSize + 1;
+                    var to = Math.min(pageNo * pageSize, totalRecords);
+                    var sugLabel = totalRecords === 1
+                        ? lbl("VAS_035_Suggestion", "suggestion")
+                        : lbl("VAS_035_Suggestions", "suggestions");
+
+                    $footerInfo.text(
+                        lbl("VAS_Showing", "Showing") + ' ' +
+                        from + '–' + to + ' ' +
+                        lbl("VAS_Of", "of") + ' ' + totalRecords + ' ' + sugLabel
+                    );
+                }
+                else {
+                    $footerInfo.text("");
+                }
+            }
+
             if ($pageText) {
                 $pageText.text(totalPages > 1 ? (pageNo + " " + lbl("VAS_Of", "of") + " " + totalPages) : "");
             }
             if ($prevBtn) { $prevBtn.prop("disabled", pageNo <= 1 || totalPages <= 1); }
             if ($nextBtn) { $nextBtn.prop("disabled", totalPages <= 1 || pageNo >= totalPages); }
 
-            /* No pager chrome at all when there is nothing to page through —
-               the whole pager row collapses so it leaves no gap. */
-            if ($pager) {
-                $pager.css('display', totalPages > 1 ? 'inline-flex' : 'none');
-                $pager.closest('.vas-msug-footer-row').css('display', totalPages > 1 ? 'flex' : 'none');
-            }
+            /* Pager chrome only when there is something to page through; the
+               whole footer collapses when the list is empty. */
+            if ($pager) { $pager.css('display', totalPages > 1 ? 'inline-flex' : 'none'); }
+            if ($footer) { $footer.css('display', totalRecords > 0 ? 'flex' : 'none'); }
         }
 
         /* ── Allocation form (VAdvantage.Apps.AForms.VAllocation) ─────── */
@@ -649,25 +653,22 @@
                 '<span class="vas-msug-subtitle">' + escapeHtml(lbl("VAS_035_Subtitle", "Unallocated receipts paired with their best-fit invoice")) + '</span>' +
                 '</div>' +
                 '</div>' +
-                '</div>' +
-
-                '<div class="vas-msug-body"></div>' +
-
-                /* Footer: info (left) + open-form link (right) on one line,
-                   pager on its own line below. */
-                '<div class="vas-msug-footer">' +
-                '<div class="vas-msug-footer-top">' +
-                '<span class="vas-msug-footer-info"></span>' +
+                /* Header right: open-form link (image_2). */
                 '<a href="javascript:void(0)" class="vas-msug-openform" style="display:none;">' +
                 escapeHtml(lbl("VAS_035_OpenAllocationForm", "Open Allocation Form")) + ' ' + arrowR +
                 '</a>' +
                 '</div>' +
-                '<div class="vas-msug-footer-row" style="display:none;">' +
+
+                '<div class="vas-msug-body"></div>' +
+
+                /* Footer (image_1): "Showing X–Y of Z" helper (left) +
+                   compact pager (right) on one line. */
+                '<div class="vas-msug-footer" style="display:none;">' +
+                '<span class="vas-msug-footer-info"></span>' +
                 '<div class="vas-msug-pager" style="display:none;">' +
                 '<button type="button" class="vas-msug-page-btn vas-msug-prev" aria-label="' + escapeHtml(lbl("VAS_Previous", "Previous")) + '">' + chevL + '</button>' +
                 '<span class="vas-msug-page-text"></span>' +
                 '<button type="button" class="vas-msug-page-btn vas-msug-next" aria-label="' + escapeHtml(lbl("VAS_Next", "Next")) + '">' + chevR + '</button>' +
-                '</div>' +
                 '</div>' +
                 '</div>' +
 
@@ -675,6 +676,7 @@
             );
 
             $listBody = $card.find('.vas-msug-body');
+            $footer = $card.find('.vas-msug-footer');
             $footerInfo = $card.find('.vas-msug-footer-info');
             $openFormLink = $card.find('.vas-msug-openform');
             $pager = $card.find('.vas-msug-pager');
@@ -682,7 +684,7 @@
             $nextBtn = $card.find('.vas-msug-next');
             $pageText = $card.find('.vas-msug-page-text');
 
-            /* The footer link lands the user on the standard Allocation form
+            /* The header link lands the user on the standard Allocation form
                where every suggestion is one click away. */
             $openFormLink.on('click', function () { openAllocationForm(); });
 

@@ -255,23 +255,15 @@
         stroke: currentColor;
     }
 
-/* ── Footer: info + open-form link on one line, pager below ───────── */
+/* ── Footer: "Showing X–Y of Z" helper (left) + pager (right) ─────── */
 
 .vas-msug-footer {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5em;
-    padding-top: 0.625em;
-    flex-shrink: 0;
-}
-
-/* Top row: info (left) · open-form link (right). */
-.vas-msug-footer-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1em;
+    padding-top: 0.625em;
+    flex-shrink: 0;
     min-width: 0;
 }
 
@@ -287,20 +279,7 @@
     flex: 1 1 auto;
 }
 
-    .vas-msug-footer-info b {
-        color: #102C3F;
-        font-weight: 700;
-    }
-
-/* Bottom row: pager only (collapsed entirely when there is one page). */
-.vas-msug-footer-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 1em;
-    min-width: 0;
-}
-
+/* Header-right link to the standard Allocation form (image_2). */
 .vas-msug-openform {
     display: inline-flex;
     align-items: center;
