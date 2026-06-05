@@ -96,8 +96,10 @@
     flex: 1 1 auto;
 }
 
+/* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+   Header"): same resolved px in every widget at any screen size. */
 .vas-msug-title {
-    font-size: 0.97em;
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     color: #102C3F;
     font-weight: 700;
     min-width: 0;
@@ -107,7 +109,9 @@
 }
 
 .vas-msug-subtitle {
-    font-size: 0.75em;
+    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
+       the subtitle renders the same px in every widget at any screen size. */
+    font-size: clamp(12px, 0.88vw, 24px);
     color: #717182;
     min-width: 0;
     overflow: hidden;

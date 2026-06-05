@@ -4,9 +4,11 @@
  * allocation table).
  * Design source: the supplied reference HTML + design.md (Onfinity).
  * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
- * `1em` resolves to the widget's base font-size (16px on the card, 16px on
- * the dialog). Container queries scale the card on small dashboard cells;
- * media queries scale the dialog on small viewports.
+ * `1em` on the card resolves to clamp(16px, 1.4cqi, 24px) — the cell-width-
+ * anchored base that scales the whole widget on large dashboard cells.
+ * `1em` on the dialog (attached to <body>) stays at 16px — viewport-relative.
+ * Container queries shrink the card on small cells; media queries narrow
+ * the dialog on small viewports.
  * Namespaced vas-rr-*.
  * ───────────────────────────────────────────────────────────────────────── */
 
@@ -37,16 +39,21 @@
 /* ── Glass card shell ─────────────────────────────────────────────── */
 
 .vas-rr-card {
-    font-size: 1em;
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. cqi resolves
+       against .vas-rr-root (container-type: inline-size), so the spec's 1.4cqi is
+       retuned for the 6-col cell width (≈1.9cqi, matching VAS_015) and the ceiling
+       raised to 32px so content keeps pace with the grid on 2560-wide dashboards. */
+    font-size: clamp(16px, 1.9cqi, 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
     min-width: 0;
     min-height: 0;
@@ -93,11 +100,15 @@
     }
 
 .vas-rr-title {
-    font-size: 1.125em;
+    /* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
+       Bold (700) per project request. Shared viewport-anchored title clamp —
+       the title sizes off the dashboard width (spec), NOT the widget cell,
+       so a 6-col title matches a 2-col title at every screen size. Bounds =
+       0.97 × the 16–32px root range. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     font-weight: 700;
-    color: #141414;
-    line-height: 1.15;
-    letter-spacing: -0.00625em;
+    color: #102C3F;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -135,7 +146,10 @@
            thead above the tbody during scroll. */
         background: #FFFFFF;
         z-index: 2;
-        font-size: 0.8125em;
+        /* Spec §Grid Data Widget header row: sm token — viewport-anchored
+           (0.75 × the 16–32px root range) so data renders the SAME px in
+           every widget at every screen size. */
+        font-size: clamp(12px, 0.88vw, 24px);
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -153,7 +167,10 @@
     .vas-rr-table tbody td {
         padding: 0.875em 0.5em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        /* spec §"List / Grid Hierarchy Rule": all cells share the sm token,
+           one step below the title; weight/color carry the hierarchy.
+           Viewport-anchored like the title so rows match sibling widgets. */
+        font-size: clamp(12px, 0.88vw, 24px);
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -185,23 +202,24 @@
      "+$ 1,428,000.00") never truncates.
    - Customer is the only flexing column. If the name exceeds its space the
      `.vas-rr-truncate` span clips with an ellipsis. */
-.vas-rr-th-date,        .vas-rr-td-date        { width: 7.5em; color: #5F7283; font-size: 0.8125em; }
-.vas-rr-th-doc,         .vas-rr-td-doc         { width: 8em; }
+.vas-rr-th-date,        .vas-rr-td-date        { width: 7em; color: #5F7283; }
+.vas-rr-th-doc,         .vas-rr-td-doc         { width: 7em; }
 .vas-rr-th-customer,    .vas-rr-td-customer    { width: auto; min-width: 8em; }
-.vas-rr-th-method,      .vas-rr-td-method      { width: 8em; }
-.vas-rr-th-bank,        .vas-rr-td-bank        { width: 9em; color: #5F7283; font-size: 0.8125em; }
+.vas-rr-th-method,      .vas-rr-td-method      { width: 7em; }
+.vas-rr-th-bank,        .vas-rr-td-bank        { width: 7em; color: #5F7283; }
 .vas-rr-th-amount,      .vas-rr-td-amount      { width: 10em; text-align: right; }
 
 .vas-rr-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
     color: #5F7283;
-    font-size: 0.75em;
+    font-size: clamp(11px, 0.8vw, 22px);   /* xs — secondary metadata cell */
 }
 
 .vas-rr-td-customer {
+    /* Primary row title cell: same sm size as the other cells, bold + dark
+       per the hierarchy rule (differentiate by weight/color, not size). */
     font-weight: 700;
     color: #102C3F;
-    font-size: 0.9375em;
 }
 
 .vas-rr-td-amount {
@@ -209,12 +227,13 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    /* Amount must render in full — no ellipsis or clipping. The fixed
-       width above is already wide enough for the largest expected value
-       ("+$ 1,428,000.00"); `overflow: visible` lets a longer string
-       overflow into adjacent space rather than truncating. */
-    overflow: visible;
-    text-overflow: clip;
+    /* Amount column is the rightmost column and has a generous fixed
+       width (10em).  On very narrow container cells the amount must not
+       bleed past the table edge and escape the card's overflow:hidden
+       boundary, so we keep overflow:hidden here.  The column width
+       already accommodates the largest realistic value. */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .vas-rr-td-amount-pos { color: #0B6B45; }
@@ -240,13 +259,15 @@
     white-space: nowrap;
 }
 
-/* Method chip — muted neutral pill matching the reference design. */
+/* Method chip — muted neutral pill matching the reference design. Chip text
+   is the xs token via the shared viewport clamp (absolute, so it doesn't
+   compound against the cell's font-size). */
 .vas-rr-method-chip {
     display: inline-flex;
     align-items: center;
     padding: 0.25em 0.625em;
     border-radius: 999em;
-    font-size: 0.75em;
+    font-size: clamp(11px, 0.8vw, 22px);
     font-weight: 500;
     line-height: 1.3;
     background: #EDF2F6;
@@ -280,7 +301,9 @@
 }
 
 .vas-rr-pager-helper {
-    font-size: 0.75em;
+    /* Spec §Widget Footer Pager helper text — shared viewport clamp
+       (0.8125 × the 16–32px root range) so it matches sibling widgets. */
+    font-size: clamp(13px, 0.95vw, 26px);
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -296,12 +319,14 @@
     flex-shrink: 0;
 }
 
+/* Spec §Pager Buttons: widget pagers are 24px square (1.5em) with a 14px
+   (0.875em) chevron. */
 .vas-rr-pager-btn {
-    width: 1.75em;
-    height: 1.75em;
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.4375em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -329,7 +354,9 @@
 .vas-rr-pager-text {
     min-width: 2.5em;
     text-align: center;
-    font-size: 0.75em;
+    /* Spec page text: Roboto Medium, dark — shared viewport clamp
+       (0.875 × the 16–32px root range). */
+    font-size: clamp(14px, 1.03vw, 28px);
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -678,6 +705,31 @@
 .vas-rr-alloc-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
+}
+
+/* Allocation table column widths (table-layout:fixed needs at least the
+   header cells to declare widths). Widths resolve against the th font-size
+   (0.75em). Per the reference design (image_1) the Reference column stays
+   COMPACT (11em ≈ chip + doc number) with Date right beside it; the
+   right-aligned Document-amount column is the auto/flex one, so any spare
+   modal width becomes the gap between Date and the amounts instead of
+   pushing Date away from Reference. Date needs 8em (~96px) for
+   "May 28, 2026"; Allocated amount 9.5em (~114px) for "$ 555,999.89". */
+.vas-rr-alloc-table thead th:nth-child(1) { width: 15em; }
+.vas-rr-alloc-table thead th:nth-child(2) { width: 10em; }
+.vas-rr-alloc-table thead th:nth-child(3) { width: auto; }
+.vas-rr-alloc-table thead th:nth-child(4) { width: 12em; }
+
+/* Reference cell: truncate long doc-numbers that would otherwise force
+   the table wider than the dialog card on small viewports. The date cell
+   gets the same guard so an unusually long locale date clips instead of
+   overlapping the amount column. */
+.vas-rr-alloc-table td:nth-child(1),
+.vas-rr-alloc-table td:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
     .vas-rr-alloc-table thead th {

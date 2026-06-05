@@ -4,10 +4,12 @@
  *           base (accounting schema) currency. Clicking the card opens a modal
  *           dialog listing every receipt (Date, Receipt No., Customer, Bank
  *           account, Amount, Payment Currency, Allocated).
- * Design   - Per design.md / widget.html: Onfinity Glass Widget with `tint-info`
- *            KPI shell — 2rem icon well, 13px muted label, ↗ View hint, big bold
- *            primary-blue metric prefixed with the base currency symbol, and a
- *            translucent "POSTED · Customer collections so far" detail pill.
+ * Design   - Per design.md / dashboard-widgets.md §"KPI And Summary Widget":
+ *            glass KPI shell on the em-based Widget Root Anchor
+ *            (clamp(16px, 5.6cqi, 32px) tuned to the 2-col cell) — 2em icon
+ *            well, dark bold title-label, ↗ View hint, 1.75em Medium
+ *            primary-blue metric prefixed with the base currency symbol, and
+ *            an xs muted "Customer collections so far" meta line.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                              | Message Key

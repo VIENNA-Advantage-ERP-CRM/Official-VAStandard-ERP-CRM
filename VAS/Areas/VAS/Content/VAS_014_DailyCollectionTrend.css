@@ -34,13 +34,17 @@
 /* ── Glass card ───────────────────────────────────────────────────── */
 
 .vas-dct-card {
-    font-size: 1em;
+    /* Widget root anchor (dashboard-widgets.md "Widget Internal Sizing"): scale the whole
+       widget with the cell so it fills tall cells on large dashboards instead of staying
+       16px. cqi resolves against .vas-dct-root (container-type: inline-size). Only grows
+       past 16px on wide cells, so normal/small dashboards are unchanged. */
+    font-size: clamp(16px, 1.9cqi, 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     gap: 0.625em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.60));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
@@ -92,9 +96,11 @@
     flex: 1 1 auto;
 }
 
-/* Widget header — bold per request. */
+/* Widget header — bold per request. Shared viewport-anchored title clamp
+   (dashboard-widgets.md §"Widget Header"): same resolved px in every widget
+   at any screen size. */
 .vas-dct-title {
-    font-size: 1.125em;
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     font-weight: 700;
     color: #102C3F;
     line-height: 1.2;
@@ -106,7 +112,9 @@
 
 .vas-dct-subtitle {
     margin-top: 0.125em;
-    font-size: 0.75em;
+    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
+       the subtitle renders the same px in every widget at any screen size. */
+    font-size: clamp(12px, 0.88vw, 24px);
     color: #717182;
     line-height: 1.3;
     overflow: hidden;

@@ -4,8 +4,11 @@
  * Design source: design.md / dashboard-widgets.md (Onfinity Dashboard
  * Design System) + the supplied image_1 (widget) and image_2 (modal).
  * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
- * `1em` resolves to the widget's base font-size (16px on the card and
- * dialog). Container queries scale the card on small dashboard cells;
+ * `.vas-ce-card` uses `font-size: clamp(16px, 5cqi, 24px)` so the whole
+ * card scales with the dashboard cell on large screens (5cqi = KPI/Summary
+ * ~2-col coefficient, matching sibling receipt widgets). `1em` on the dialog
+ * stays fixed — it is body-attached and not container-sized.
+ * Container queries scale the card on small dashboard cells;
  * media queries scale the dialog on small viewports.
  * Namespaced vas-ce-*.
  * ───────────────────────────────────────────────────────────────────────── */
@@ -37,7 +40,12 @@
 /* ── Glass card shell (design.md §Glass Widget) ──────────────────── */
 
 .vas-ce-card {
-    font-size: 1em;
+    /* Responsive root anchor: scale the whole card with the cell so it
+       fills larger dashboard cells on wide screens. cqi resolves against
+       .vas-ce-root (container-type: inline-size). 5cqi matches the
+       KPI/Summary (~2-col) sibling receipt widgets. Clamp keeps it
+       between 16px (default) and 24px (large cells). */
+    font-size: clamp(16px, 5.6cqi, 32px);
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -110,14 +118,13 @@
 }
 
 .vas-ce-title {
-    /* design.md / dashboard-widgets.md §"Widget Header":
-       18px black title. Per project request the weight is Bold (700)
-       instead of the spec's Medium (500). */
-    font-size: 1.125em;
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size.
+       Weight Bold (700) per project request. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     font-weight: 700;
-    color: #141414;
-    line-height: 1.15;
-    letter-spacing: -0.00625em;
+    color: #102C3F;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -166,6 +173,7 @@
 .vas-ce-donut {
     width: 7em;
     height: 7em;
+    min-height: 7em;
     position: relative;
     flex-shrink: 0;
 }
@@ -205,12 +213,16 @@
 
 .vas-ce-meta {
     text-align: center;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .vas-ce-dso {
     font-size: 1.1em;
     color: #102C3F;
     line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
     .vas-ce-dso strong { font-weight: 700; }
@@ -220,6 +232,8 @@
     font-size: 0.85em;
     color: #748494;
     line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .vas-ce-cur-inline {
@@ -232,7 +246,7 @@
 
 @container (max-width: 22em) {        /* ~352px */
     .vas-ce-card { font-size: 0.875em; }
-    .vas-ce-donut { width: 6em; height: 6em; }
+    .vas-ce-donut { width: 6em; height: 6em; min-height: 6em; }
     .vas-ce-percent { font-size: 1.5em; }
 }
 

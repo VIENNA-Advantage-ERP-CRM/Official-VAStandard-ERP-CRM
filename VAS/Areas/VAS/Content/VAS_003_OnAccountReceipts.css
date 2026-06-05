@@ -33,15 +33,18 @@
 /* ── KPI card (glass, tint-success) ─────────────────────────────────── */
 
 .vas-oar-card {
-    font-size: 1em;
+    /* Anchored to the widget's own inline width (cqi resolves against .vas-oar-root's
+       container-type: inline-size) so interior type scales with the cell, not the viewport
+       (foundations.md §Responsive Unit Rules). KPI/Summary ~2-col widget → 5cqi. */
+    font-size: clamp(16px, 5.6cqi, 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5em;
-    /* Pale green → white success tint per image_2. */
-    background: linear-gradient(135deg, rgba(229, 245, 234, 0.85), rgba(255, 255, 255, 0.62));
+    /* Shared neutral glass surface (design.md): default widget surface, no semantic tint. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
@@ -98,9 +101,11 @@
         stroke: currentColor;
     }
 
-/* Widget header label — bold per request. */
+/* Widget header label — bold per request. Shared viewport-anchored title
+   clamp (dashboard-widgets.md §"Widget Header"): same resolved px in every
+   widget at any screen size. */
 .vas-oar-label {
-    font-size: 1.125em;
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     color: #102C3F;
     font-weight: 700;
     min-width: 0;
@@ -139,7 +144,7 @@
 /* ── Metric: big deep-green value with currency symbol + underline ─── */
 
 .vas-oar-metric {
-    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-size: 2em;/*2.5em; */                /* 40px design.md KPI value */
     font-weight: 700;
     color: #0B6B45;
     line-height: 1.05;

@@ -177,9 +177,13 @@
             var pts = series.Months;
             var n = pts.length;
 
+            /* Scale chart geometry with the widget's resolved font-size so the chart grows
+               to fill tall cells on large dashboards (16px base => s = 1). */
+            var s = (parseFloat(window.getComputedStyle($chartEl[0]).fontSize) || 16) / 16;
+
             /* Plot box (px). Bottom band reserved for the dated x-axis. Tight side
                insets so the bars/line use the full card width. */
-            var padL = 6, padR = 6, padTop = 12, padBottom = 22;
+            var padL = 6 * s, padR = 6 * s, padTop = 12 * s, padBottom = 22 * s;
             var plotW = Math.max(1, w - padL - padR);
             var plotH = Math.max(1, h - padTop - padBottom);
             var bottom = padTop + plotH;
@@ -212,7 +216,7 @@
             }
 
             /* Outstanding bars (pale blue), centred in each month band. */
-            var barW = Math.max(4, bandW * 0.46);
+            var barW = Math.max(4 * s, bandW * 0.46);
             var bars = "";
             var bandRefs = [];
             for (var b = 0; b < n; b++) {
@@ -244,13 +248,13 @@
             var lineD = 'M' + linePts.join(' L');
             for (var d2 = 0; d2 < n; d2++) {
                 dots += '<circle cx="' + centerOf(d2).toFixed(1) + '" cy="' + yOf(pts[d2].Received).toFixed(1) +
-                    '" r="4" class="vas-ovr-dot"/>';
+                    '" r="' + (4 * s).toFixed(1) + '" class="vas-ovr-dot"/>';
             }
 
             /* X-axis month labels (one per band). */
             var labels = "";
             for (var x = 0; x < n; x++) {
-                labels += '<text x="' + centerOf(x).toFixed(1) + '" y="' + (h - 6) +
+                labels += '<text x="' + centerOf(x).toFixed(1) + '" y="' + (h - 6 * s).toFixed(1) +
                     '" text-anchor="middle" class="vas-ovr-axis-label">' +
                     escapeHtml(formatMonth(pts[x].Month)) + '</text>';
             }
@@ -308,7 +312,23 @@
                 var maxW = $chartEl[0].clientWidth;
                 if (left < half) { left = half; }
                 if (left > maxW - half) { left = maxW - half; }
-                $tooltip.css({ display: 'block', left: left + 'px', top: c.lineY + 'px' });
+
+                /* Clamp vertically: the CSS transform shifts the tooltip upward by
+                   its own height + the 0.625em gap.  When the line point is near the
+                   top of the plot the tooltip would be clipped by the card's
+                   overflow:hidden.  If it would go above y=0 (chart-area top), flip
+                   it below the point with a small offset instead. */
+                var ttH = $tooltip.outerHeight();
+                var gap = parseFloat(window.getComputedStyle($tooltip[0]).fontSize) * 0.625;
+                var top;
+                if (c.lineY - ttH - gap < 0) {
+                    /* Flip below: override the upward CSS transform with an inline
+                       transform that positions the top edge just below the point. */
+                    top = c.lineY + gap;
+                    $tooltip.css({ display: 'block', left: left + 'px', top: top + 'px', transform: 'translate(-50%, 0)' });
+                } else {
+                    $tooltip.css({ display: 'block', left: left + 'px', top: c.lineY + 'px', transform: '' });
+                }
             }
         }
 

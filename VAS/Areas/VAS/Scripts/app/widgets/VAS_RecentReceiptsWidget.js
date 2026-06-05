@@ -99,9 +99,9 @@
         var currentPaymentId = 0;
         var printBusy = false;
 
-        /* Server-paged list state. pageSize is 9 rows per page; pageNo /
+        /* Server-paged list state. pageSize is 7 rows per page; pageNo /
            totalPages / totalRecords come from the server response. */
-        var pageSize = 9;
+        var pageSize = 7;
         var pageNo = 1;
         var totalPages = 0;
         var totalRecords = 0;

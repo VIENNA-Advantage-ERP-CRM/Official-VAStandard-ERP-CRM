@@ -1,18 +1,17 @@
 /**
  * Bounced Cheques Widget
  * Purpose - KPI card showing count of bounced cheques from AR receipts.
- * Design   - Glass KPI/Summary card per design.md / dashboard-widgets.md: glass
- *            surface, tinted danger icon well, large bold danger-red count,
- *            ACTION pill + explanatory copy.
+ * Design   - Glass KPI/Summary card per design.md / dashboard-widgets.md. Anatomy
+ *            mirrors TotalAmountReceivedThisMonthWidget: shared neutral glass surface,
+ *            single-line icon-well + title header (no View link), large bold danger-red
+ *            count, and a detail-text footer. Danger semantics come from icon/value
+ *            color, not the surface.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                | Message Key
  * ----+-----------------------------+--------------------------------
  *  1  | Bounced cheques             | VIS_BouncedCheques
- *  2  | Awaiting follow-up          | VIS_AwaitingFollowUp
- *  3  | ACTION                      | VIS_Action
- *  4  | Customer follow-up required | VIS_CustomerFollowUpRequired
- *  5  | Loading…                    | VIS_Loading
+ *  2  | Customer follow-up required | VIS_CustomerFollowUpRequired
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
@@ -83,8 +82,12 @@
         function createWidget() {
             var $card = $('<div class="vas-bc-card">');
 
+            /* Header anatomy mirrors TotalAmountReceivedThisMonthWidget: a single-line
+               icon-well + title (no eyebrow subtitle, no View link — there is no
+               bounced-cheques drill-down). */
             var $header = $(
-                '<div class="vas-bc-header">' +
+                '<div class="vas-bc-head">' +
+                '<div class="vas-bc-head-left">' +
                 '<div class="vas-bc-icon">' +
                 '<svg viewBox="0 0 24 24" fill="none" ' +
                 'stroke="currentColor" stroke-width="1.8" ' +
@@ -94,23 +97,19 @@
                 '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
                 '</svg>' +
                 '</div>' +
-                '<div>' +
-                '<div class="vas-bc-title">' + lbl("VIS_BouncedCheques", "Bounced cheques") + '</div>' +
-                '<div class="vas-bc-subtitle">' + lbl("VIS_AwaitingFollowUp", "Awaiting follow-up") + '</div>' +
+                '<span class="vas-bc-title">' + lbl("VIS_BouncedCheques", "Bounced cheques") + '</span>' +
                 '</div>' +
                 '</div>'
             );
 
             $metricEl = $('<div class="vas-bc-metric">—</div>');
 
-            var $why = $('<div class="vas-bc-why-wrap">');
-            /*var $pill = $('<span class="vas-bc-why-pill">' + lbl("VIS_Action", "ACTION") + '</span>');*/
-            var $whyText = $('<span class="vas-bc-why-text">' +
+            /* Detail line mirrors .vas-tarm-detail-text. */
+            var $detail = $('<span class="vas-bc-detail-text">' +
                 lbl("VIS_CustomerFollowUpRequired", "Customer follow-up required") +
                 '</span>');
 
-            $why.append($whyText);
-            $card.append($header).append($metricEl).append($why);
+            $card.append($header).append($metricEl).append($detail);
             $root.append($card);
 
             $busy = $('<div class="vas-bc-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');

@@ -5,10 +5,12 @@
  *           modal dialog listing every receipt with Date, Receipt No.,
  *           Customer, Bank Account, Payment Currency, Amount (in payment
  *           currency, no conversion), and a Matched flag.
- * Design   - Per design.md / dashboard-widgets.md: Onfinity Glass Widget with
- *            `tint-success` KPI shell — icon well, muted label, ↗ View hint,
- *            big bold success-green percentage, and a plain "Receipt Match to
- *            Invoice" detail line.
+ * Design   - Per design.md / dashboard-widgets.md §"KPI And Summary Widget":
+ *            glass KPI shell on the em-based Widget Root Anchor
+ *            (clamp(16px, 5.6cqi, 32px) tuned to the 2-col cell) — 2em icon
+ *            well, dark bold title-label, ↗ View hint, 1.75em Medium
+ *            success-green percentage, and an xs muted "Receipt Match to
+ *            Invoice" meta line.
  *
  * ── Labels / Message Keys (VAS_ prefix) ───────────────────────────────
  *  #  | Current Text                              | Message Key

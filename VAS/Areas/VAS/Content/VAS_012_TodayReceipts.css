@@ -33,15 +33,18 @@
 /* ── KPI card (glass, tint-info) ────────────────────────────────────── */
 
 .vas-tdr-card {
-    font-size: 1em;
+    /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
+       large dashboards instead of staying 16px. cqi resolves against .vas-tdr-root
+       (container-type: inline-size). Only grows past 16px on wide cells. */
+    font-size: clamp(16px, 5.6cqi, 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5em;
-    /* Pale blue → white info tint. */
-    background: linear-gradient(135deg, rgba(199, 232, 255, 0.80), rgba(255, 255, 255, 0.62));
+    /* Shared neutral glass surface (design.md): default widget surface, no semantic tint. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
@@ -98,8 +101,10 @@
         stroke: currentColor;
     }
 
+/* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+   Header"): same resolved px in every widget at any screen size. */
 .vas-tdr-label {
-    font-size: 1.125em;
+    font-size: clamp(15.5px, 1.1375vw, 31px);
     color: #102C3F;
     font-weight: 700;
     min-width: 0;
@@ -138,7 +143,7 @@
 /* ── Metric: big bold info-blue amount (compact, symbol-prefixed) ──── */
 
 .vas-tdr-metric {
-    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-size: 2em;/*2.5em;           */      /* 40px design.md KPI value */
     font-weight: 700;
     color: #106AB0;
     line-height: 1.05;

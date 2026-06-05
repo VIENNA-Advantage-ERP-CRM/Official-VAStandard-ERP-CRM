@@ -85,7 +85,7 @@
         var toDate = "";
 
         var pageNo = 1;
-        var pageSize = 10;
+        var pageSize = 8;
         var totalPages = 0;
         var totalRecords = 0;
 

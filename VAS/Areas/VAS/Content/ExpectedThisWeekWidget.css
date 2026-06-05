@@ -35,15 +35,19 @@
 /* ── KPI card (glass widget, tint-success) ────────────────────────── */
 
 .vas-etw-card {
-    font-size: 1em;
+    /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
+       large dashboards instead of staying 16px. cqi resolves against .vas-etw-root
+       (container-type: inline-size). Only grows past 16px on wide cells. */
+    font-size: clamp(16px, 5.6cqi, 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5em;
-    /* Tint-success glass surface per design.md — pale green → white. */
-    background: linear-gradient(135deg, rgba(206, 238, 212, 0.78), rgba(255, 255, 255, 0.62));
+    /* Shared neutral glass surface across all KPI cards (dashboard-widgets.md: keep the
+       default surface; semantic meaning comes from icon/text/border, not a tinted surface). */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
@@ -99,11 +103,11 @@
     }
 
 .vas-etw-label {
-    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
-       Per project request the weight is Bold (700) instead of the spec's
-       Medium (500). */
-    font-size: 1.125em;
-    color: #141414;
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size.
+       Weight Bold (700) per project request. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
+    color: #102C3F;
     font-weight: 700;
     min-width: 0;
     overflow: hidden;
@@ -140,7 +144,7 @@
 
 /* Big metric — success green to match the tint, with base-currency symbol leading. */
 .vas-etw-metric {
-    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-size: 2em;/*2.5em;*/                 /* 40px design.md KPI value */
     font-weight: 700;
     color: #0B6B45;
     line-height: 1;

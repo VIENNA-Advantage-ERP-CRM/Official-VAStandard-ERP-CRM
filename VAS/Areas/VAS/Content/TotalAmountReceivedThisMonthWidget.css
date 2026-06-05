@@ -33,22 +33,28 @@
 /* ── KPI card (glass widget) ────────────────────────────────────────── */
 
 .vas-tarm-card {
-    font-size: 1em;                  /* = 16px from root */
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. cqi resolves
+       against .vas-tarm-root (container-type: inline-size), so the spec's 1.4cqi is
+       retuned for the 2-col cell width (≈5.6cqi) and the ceiling raised to 32px so
+       content keeps pace with the grid on 2560-wide dashboards. */
+    font-size: clamp(16px, 5.6cqi, 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 0.5em;
-    /* Tint-info glass surface per widget.html — pale blue → white. */
-    background: linear-gradient(135deg, rgba(199, 232, 255, 0.80), rgba(255, 255, 255, 0.62));
+    gap: 0.25em;                     /* spec stack gap between label/value/meta */
+    /* Shared neutral glass surface across all KPI cards (dashboard-widgets.md: keep the
+       default surface; semantic meaning comes from icon/text/border, not a tinted surface). */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;          /* 14px */
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;        /* 16/16/18 design.md edge spacing */
+    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
     cursor: pointer;
-    transition: box-shadow 180ms ease, transform 180ms ease;
+    transition: box-shadow 180ms ease;
 }
 
     .vas-tarm-card:hover {
@@ -99,12 +105,18 @@
     }
 
 .vas-tarm-label {
-    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
+    /* dashboard-widgets.md §"KPI And Summary Widget": the stat label IS the
+       widget title (shared Widget Header style, dark #102C3F, line-height 1.3).
        Per project request the weight is Bold (700) instead of the spec's
-       Medium (500). */
-    font-size: 1.125em;
-    color: #141414;
+       Medium (500). The size is the SHARED title clamp — viewport-anchored
+       (spec §Widget Header: title clamps on the dashboard width, not the
+       widget cell) so every widget's title resolves to the same px at any
+       screen size; em-of-root made 2-col titles ~31px while 6-col stayed
+       ~20px. Bounds = 0.97 × the 16–32px root range. */
+    font-size: clamp(15.5px, 1.1375vw, 31px);
+    color: #102C3F;
     font-weight: 700;
+    line-height: 1.3;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -141,10 +153,13 @@
 /* ── Metric: big bold info-blue value with currency symbol ───────── */
 
 .vas-tarm-metric {
-    font-size: 2.5em;                 /* 40px design.md KPI value */
+    /* dashboard-widgets.md §"Widget Stat Values": canonical KPI stat —
+       2em, line-height 1.1. Per project request the weight is Bold
+       (700) instead of the spec's Medium (500). */
+    font-size: 2em;
     font-weight: 700;
     color: #106AB0;                   /* link-blue */
-    line-height: 1;
+    line-height: 1.1;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
     min-width: 0;
@@ -167,9 +182,12 @@
     display: block;
     align-self: flex-start;
     max-width: 100%;
-    font-size: 0.75em;                /* 12px secondary */
-    color: #5F7283;
-    font-weight: 500;
+    /* dashboard-widgets.md KPI meta: xs token, muted, one step below the
+       label so the explanation reads as secondary. */
+    font-size: 0.6875em;
+    color: #717182;
+    font-weight: 400;
+    line-height: 1.3;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -589,4 +607,18 @@
     }
 
     .vas-tarm-pager { order: 1; }
+}
+
+@media (max-width: 36em) {            /* ~576px phone */
+    .vas-tarm-dialog {
+        padding: 0;
+    }
+
+    /* Hide the Bank account column on the narrowest screens so the remaining
+       6 columns (Date / Receipt No. / Customer / Currency / Amount / Allocated)
+       have enough room to render without becoming unreadably narrow. */
+    .vas-tarm-th-bank,
+    .vas-tarm-td-bank {
+        display: none;
+    }
 }
