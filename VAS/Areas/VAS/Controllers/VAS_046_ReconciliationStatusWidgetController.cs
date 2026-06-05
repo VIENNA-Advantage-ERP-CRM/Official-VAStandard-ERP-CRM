@@ -7,9 +7,9 @@ using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
 
-namespace VIS.Controllers
+namespace VAS.Controllers
 {
-    public class ReconciliationStatusController : Controller
+    public class VAS_046_ReconciliationStatusWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -102,9 +102,9 @@ namespace VIS.Controllers
 
                 return Json(new
                 {
-                    title = GetMsg(ctx, "VAS_ReconciliationStatus", "Reconciliation status"),
-                    subTitle = GetMsg(ctx, "VAS_MatchedToBillsBank", "Matched to bills + bank"),
-                    matchedLabel = GetMsg(ctx, "VAS_Matched", "Matched"),
+                    title = GetMsg(ctx, "VAS_046_ReconciliationStatus", "Reconciliation status"),
+                    subTitle = GetMsg(ctx, "VAS_046_MatchedToBillsBank", "Matched to bills + bank"),
+                    matchedLabel = GetMsg(ctx, "VAS_046_Matched", "Matched"),
                     matchedPayments = matchedPayments,
                     totalPayments = totalPayments,
                     manualMatchCount = manualMatchCount,
