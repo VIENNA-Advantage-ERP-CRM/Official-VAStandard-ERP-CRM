@@ -24,8 +24,8 @@ public X_VAS_Opportunity (Ctx ctx, IDataReader dr, Trx trxName) : base(ctx, dr, 
  Set Table ID By Table Name
  added by ->Harwinder */
 static X_VAS_Opportunity(){ Table_ID = Get_Table_ID(Table_Name); model = new KeyNamePair(Table_ID,Table_Name);}/** Serial Version No */
-static long serialVersionUID = 28062182994489L;/** Last Updated Timestamp 5/29/2026 5:57:57 PM */
-public static long updatedMS = 1780057677700L;/** AD_Table_ID=1000722 */
+static long serialVersionUID = 28062608414978L;/** Last Updated Timestamp 6/3/2026 4:08:18 PM */
+public static long updatedMS = 1780483098189L;/** AD_Table_ID=1000722 */
 public static int Table_ID; // =1000722;
 /** TableName=VAS_Opportunity */
 public static String Table_Name="VAS_Opportunity";
@@ -88,7 +88,11 @@ public int GetC_Lead_ID() {Object ii = Get_Value("C_Lead_ID");if (ii == null) re
 @param Comments Comments or additional information */
 public void SetComments (String Comments){if (Comments != null && Comments.Length > 2000){log.Warning("Length > 2000 - truncated");Comments = Comments.Substring(0,2000);}Set_Value ("Comments", Comments);}/** Get Comments.
 @return Comments or additional information */
-public String GetComments() {return (String)Get_Value("Comments");}/** Set Description.
+public String GetComments() {return (String)Get_Value("Comments");}/** Set Add Related Products.
+@param CreateRelatedLines Generate related products lines for selected related types  */
+public void SetCreateRelatedLines (String CreateRelatedLines){if (CreateRelatedLines != null && CreateRelatedLines.Length > 1){log.Warning("Length > 1 - truncated");CreateRelatedLines = CreateRelatedLines.Substring(0,1);}Set_Value ("CreateRelatedLines", CreateRelatedLines);}/** Get Add Related Products.
+@return Generate related products lines for selected related types  */
+public String GetCreateRelatedLines() {return (String)Get_Value("CreateRelatedLines");}/** Set Description.
 @param Description Optional short description of the record */
 public void SetDescription (String Description){if (Description != null && Description.Length > 255){log.Warning("Length > 255 - truncated");Description = Description.Substring(0,255);}Set_Value ("Description", Description);}/** Get Description.
 @return Optional short description of the record */
@@ -96,7 +100,15 @@ public String GetDescription() {return (String)Get_Value("Description");}/** Set
 @param Export_ID Export */
 public void SetExport_ID (String Export_ID){if (Export_ID != null && Export_ID.Length > 50){log.Warning("Length > 50 - truncated");Export_ID = Export_ID.Substring(0,50);}Set_Value ("Export_ID", Export_ID);}/** Get Export.
 @return Export */
-public String GetExport_ID() {return (String)Get_Value("Export_ID");}/** Set Is Opportunity.
+public String GetExport_ID() {return (String)Get_Value("Export_ID");}/** Set Generate Order.
+@param Generate_Order Generate Sales Order */
+public void SetGenerate_Order (String Generate_Order){if (Generate_Order != null && Generate_Order.Length > 1){log.Warning("Length > 1 - truncated");Generate_Order = Generate_Order.Substring(0,1);}Set_Value ("Generate_Order", Generate_Order);}/** Get Generate Order.
+@return Generate Sales Order */
+public String GetGenerate_Order() {return (String)Get_Value("Generate_Order");}/** Set Generate Quotation.
+@param Generate_Quotation Generate Sales Quotation */
+public void SetGenerate_Quotation (String Generate_Quotation){if (Generate_Quotation != null && Generate_Quotation.Length > 1){log.Warning("Length > 1 - truncated");Generate_Quotation = Generate_Quotation.Substring(0,1);}Set_Value ("Generate_Quotation", Generate_Quotation);}/** Get Generate Quotation.
+@return Generate Sales Quotation */
+public String GetGenerate_Quotation() {return (String)Get_Value("Generate_Quotation");}/** Set Is Opportunity.
 @param IsOpportunity Is Opportunity */
 public void SetIsOpportunity (Boolean IsOpportunity){Set_Value ("IsOpportunity", IsOpportunity);}/** Get Is Opportunity.
 @return Is Opportunity */
