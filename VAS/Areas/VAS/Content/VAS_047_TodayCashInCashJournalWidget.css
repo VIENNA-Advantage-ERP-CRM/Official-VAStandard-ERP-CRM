@@ -1,0 +1,252 @@
+﻿/*
+ * VAS_047_TodayCashInCashJournal.css
+ * Widget  : Today Cash In — Cash Journal
+ * Prefix  : VAS-047-today-cash-in-cash-journal
+ * Scope   : All selectors are scoped under the root class to avoid
+ *           polluting the global stylesheet.
+ *
+ * Sizing contract
+ * ───────────────
+ * The dashboard grid wrapper carries  container-type: inline-size.
+ * The widget root sets  font-size: clamp(16px, 1.4cqi, 24px)  so every
+ * internal em value scales proportionally with the container width.
+ * Borders, radii, and shadows stay in px (physical edges must not scale).
+ */
+
+/* ── Reset ───────────────────────────────────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-root,
+.VAS-047-today-cash-in-cash-journal-root * {
+    box-sizing: border-box;
+}
+
+/* ── Root ─────────────────────────────────────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-family: Roboto, Arial, sans-serif;
+    /* Single lever: change this and everything inside rescales. */
+    font-size: clamp(16px, 1.4cqi, 24px);
+    color: #102C3F;
+}
+
+/* ── Card surface ─────────────────────────────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.875em;
+    border-radius: 14px;
+    border: 2px solid #FFFFFF;
+    background: linear-gradient(180deg, #EAF7F0 0%, #E2F5EC 100%);
+    box-shadow: 0 10px 24px rgba(18, 90, 58, 0.08);
+    position: relative; /* anchor for absolute overlay states */
+}
+
+/* ── Header row ───────────────────────────────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-header {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+
+/* Title + icon cluster */
+.VAS-047-today-cash-in-cash-journal-title-wrap {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Icon box — semi-transparent pill */
+.VAS-047-today-cash-in-cash-journal-icon {
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #087246;
+}
+
+    .VAS-047-today-cash-in-cash-journal-icon svg {
+        width: 1em;
+        height: 1em;
+        display: block;
+    }
+
+/* Widget title — md token (0.875em) */
+.VAS-047-today-cash-in-cash-journal-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em; /* md token */
+    line-height: 1.2;
+    font-weight: 700;
+    color: #5F7283;
+}
+
+/* Date period pill — xs token (0.6875em) */
+.VAS-047-today-cash-in-cash-journal-period {
+    flex: 0 0 auto;
+    padding: 0.25em 0.625em;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #748494;
+    font-size: 0.6875em; /* xs token */
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 42%;
+}
+
+/* ── Body — KPI hero value ────────────────────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+}
+
+/*
+ * KPI value — xl token (1.375em).
+ * Spec: KPI/summary cards 2x1 and 3x1 use xl.
+ * display (2.125em) is reserved for hero/full-width stat widgets only.
+ */
+.VAS-047-today-cash-in-cash-journal-value {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #087246;
+    font-size: 1.375em; /* xl token — corrected from 2.125em */
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+/* ── Footer row ───────────────────────────────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-footer {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Delta badge — xs token (0.6875em) */
+.VAS-047-today-cash-in-cash-journal-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+    padding: 0.22em 0.5em;
+    border-radius: 999px;
+    background: transparent;
+    color: #087246;
+    font-size: 0.6875em; /* xs token */
+    line-height: 1.15;
+    font-weight: 700;
+}
+
+    /* Up / down arrow icon inside badge */
+    .VAS-047-today-cash-in-cash-journal-badge svg {
+        width: 0.85em;
+        height: 0.85em;
+        display: block;
+        flex-shrink: 0;
+    }
+
+    /* Down-trend colour override */
+    .VAS-047-today-cash-in-cash-journal-badge.is-down {
+        color: #D14545;
+    }
+
+/* Description text — sm token (0.75em) */
+.VAS-047-today-cash-in-cash-journal-desc {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75em; /* sm token */
+    line-height: 1.25;
+    font-weight: 400;
+    color: #5F7283;
+}
+
+/* ── Overlay states: loading + message ───────────────────────────────── */
+.VAS-047-today-cash-in-cash-journal-busy,
+.VAS-047-today-cash-in-cash-journal-state {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none; /* hidden by default */
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    text-align: center;
+    background: rgba(234, 247, 240, 0.82);
+    backdrop-filter: blur(3px);
+    color: #5F7283;
+    font-size: 0.8125em; /* body token */
+    line-height: 1.35;
+    font-weight: 600;
+    border-radius: 14px; /* match card radius */
+}
+
+    /* JS adds .is-visible to show the overlay */
+    .VAS-047-today-cash-in-cash-journal-state.is-visible,
+    .VAS-047-today-cash-in-cash-journal-busy.is-visible {
+        display: flex;
+    }
+
+/* ── Compact / small breakpoint ──────────────────────────────────────── */
+@media (max-width: 32.5em) {
+    .VAS-047-today-cash-in-cash-journal-root {
+        font-size: clamp(14px, 1.3cqi, 18px);
+    }
+
+    .VAS-047-today-cash-in-cash-journal-card {
+        padding: 0.75em;
+        gap: 0.375em;
+        border-radius: 12px;
+    }
+
+    .VAS-047-today-cash-in-cash-journal-icon {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 10px;
+    }
+
+    /* Value shrinks proportionally at narrow sizes */
+    .VAS-047-today-cash-in-cash-journal-value {
+        font-size: 1.25em;
+    }
+
+    .VAS-047-today-cash-in-cash-journal-period {
+        max-width: 38%;
+        padding: 0.2em 0.5em;
+        font-size: 0.625em;
+    }
+}

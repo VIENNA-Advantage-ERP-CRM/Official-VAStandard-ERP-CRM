@@ -23,6 +23,7 @@
 
 @import "../VAS_033_PaymentMethodsWidget.css";
 @import "../VAS_046_ReconciliationStatusWidget.css";
+@import "../VAS_047_TodayCashInCashJournalWidget.css";
 
 
 @import "../VAS_010_CashGlCashInWidget.css";
@@ -65,4 +66,9 @@
 @import "../VAS_045_GLJournalPendingWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
+
+@import "../VAS_048_TodayCashOutCashJournalWidget.css";
+@import "../VAS_049_NetCashForCashJournalWidget.css";
+@import "../VAS_050_CurrentCashForCashJournalWidget.css";
+@import "../VAS_051_SevenDayCashFlowCashJournalWidget.css";
 

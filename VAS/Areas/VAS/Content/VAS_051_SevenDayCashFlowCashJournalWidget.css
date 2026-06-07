@@ -1,0 +1,277 @@
+/*
+ * VAS_051_SevenDayCashFlowCashJournalWidget.css
+ * Widget : 7-Day Cash Flow - Cash Journal
+ * Screen : Cash Journal
+ * Prefix : VAS_051_
+ * Scope  : All selectors are scoped under the widget root.
+ */
+
+.VAS_051_cash-flow-root,
+.VAS_051_cash-flow-root * {
+    box-sizing: border-box;
+}
+
+.VAS_051_cash-flow-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    container-type: inline-size;
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.VAS_051_cash-flow-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+    padding: 0.875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+}
+
+.VAS_051_cash-flow-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.VAS_051_cash-flow-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.VAS_051_cash-flow-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(0, 131, 218, 0.08);
+    color: #3B7DD8;
+}
+
+.VAS_051_cash-flow-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+.VAS_051_cash-flow-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS_051_cash-flow-meta {
+    flex: 0 0 auto;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #748494;
+}
+
+.VAS_051_cash-flow-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75em;
+    flex-shrink: 0;
+    min-width: 0;
+    color: #5F7283;
+}
+
+.VAS_051_cash-flow-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.VAS_051_cash-flow-dot {
+    width: 0.5em;
+    height: 0.5em;
+    flex: 0 0 auto;
+    display: inline-block;
+    border-radius: 3px;
+}
+
+.VAS_051_cash-flow-dot-in {
+    background: #5AA36D;
+}
+
+.VAS_051_cash-flow-dot-out {
+    background: #BF514B;
+}
+
+.VAS_051_cash-flow-body {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.VAS_051_cash-flow-chart {
+    width: 100%;
+    height: 100%;
+    min-height: 7.5em;
+}
+
+.VAS_051_cash-flow-chart svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.VAS_051_cash-flow-grid {
+    stroke: #E4EDF4;
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+}
+
+.VAS_051_cash-flow-bar {
+    cursor: default;
+    transition: opacity 0.16s ease;
+}
+
+.VAS_051_cash-flow-day:hover .VAS_051_cash-flow-bar {
+    opacity: 0.82;
+}
+
+.VAS_051_cash-flow-bar-in {
+    fill: #5AA36D;
+}
+
+.VAS_051_cash-flow-bar-out {
+    fill: #BF514B;
+}
+
+.VAS_051_cash-flow-axis-label {
+    fill: #5F7283;
+    font-family: "Roboto Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+}
+
+.VAS_051_cash-flow-tooltip {
+    position: absolute;
+    z-index: 4;
+    min-width: 8.5em;
+    max-width: 14em;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+    padding: 0.5em 0.625em;
+    border: 1px solid rgba(16, 44, 63, 0.12);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.12);
+    color: #102C3F;
+    font-size: 0.6875em;
+    line-height: 1.25;
+}
+
+.VAS_051_cash-flow-tooltip strong,
+.VAS_051_cash-flow-tooltip span {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    white-space: nowrap;
+}
+
+.VAS_051_cash-flow-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    background: rgba(255, 255, 255, 0.74);
+    color: #5F7283;
+    font-size: 0.875em;
+    font-weight: 600;
+    text-align: center;
+}
+
+.VAS_051_cash-flow-state {
+    position: absolute;
+    inset: auto 1em 1em 1em;
+    z-index: 2;
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.625em 0.75em;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #748494;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 500;
+    text-align: center;
+}
+
+@container (max-width: 24em) {
+    .VAS_051_cash-flow-card {
+        padding: 0.75em;
+        border-radius: 12px;
+        gap: 0.5em;
+    }
+
+    .VAS_051_cash-flow-header {
+        align-items: flex-start;
+    }
+
+    .VAS_051_cash-flow-title-row {
+        gap: 0.375em;
+    }
+
+    .VAS_051_cash-flow-meta {
+        display: none;
+    }
+}
+
+@container (max-width: 16em) {
+    .VAS_051_cash-flow-card {
+        padding: 0.625em;
+    }
+
+    .VAS_051_cash-flow-icon {
+        width: 1.5em;
+        height: 1.5em;
+    }
+
+    .VAS_051_cash-flow-legend {
+        gap: 0.5em;
+    }
+}

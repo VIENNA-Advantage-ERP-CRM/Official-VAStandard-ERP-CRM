@@ -1,0 +1,197 @@
+/*
+ * VAS_048_TodayCashOutCashJournal.css
+ * Widget : Today Cash Out — Cash Journal
+ * Screen : Cash Journal
+ * Prefix : VAS_048_
+ * Scope  : All selectors are scoped under the widget root.
+ */
+
+.VAS_today-cash-out-cash-journal-root,
+.VAS_today-cash-out-cash-journal-root * {
+    box-sizing: border-box;
+}
+
+.VAS_today-cash-out-cash-journal-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    container-type: inline-size;
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.VAS_today-cash-out-cash-journal-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.70), rgba(255,255,255,0.49));
+    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
+    color: #5F6E7E;
+}
+
+.VAS_today-cash-out-cash-journal-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.VAS_today-cash-out-cash-journal-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.VAS_today-cash-out-cash-journal-date {
+    flex-shrink: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.25em 0.625em;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7C8795;
+}
+
+.VAS_today-cash-out-cash-journal-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    font-size: 1.375em;
+    line-height: 1.1;
+    letter-spacing: 0;
+    font-weight: 700;
+    color: #A33F3F;
+}
+
+.VAS_today-cash-out-cash-journal-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex-shrink: 0;
+    font-size: 0.6875em;
+    line-height: 1.3;
+    color: #5F6E7E;
+}
+
+.VAS_today-cash-out-cash-journal-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    min-width: 0;
+    flex-shrink: 0;
+    font-weight: 700;
+    color: #A33F3F;
+}
+
+    .VAS_today-cash-out-cash-journal-delta svg {
+        width: 1em;
+        height: 1em;
+        flex-shrink: 0;
+    }
+
+.VAS_today-cash-out-cash-journal-delta-down {
+    color: #A33F3F;
+}
+
+.VAS_today-cash-out-cash-journal-delta-up {
+    color: #9A6500;
+}
+
+.VAS_today-cash-out-cash-journal-description {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #5F6E7E;
+    font-weight: 400;
+}
+
+.VAS_today-cash-out-cash-journal-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    background: rgba(255, 255, 255, 0.76);
+    color: #102C3F;
+    font-size: 0.8125em;
+    font-weight: 600;
+    text-align: center;
+}
+
+.VAS_today-cash-out-cash-journal-state {
+    position: absolute;
+    inset: auto 0.875em 0.875em 0.875em;
+    z-index: 1;
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #748494;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 400;
+    text-align: center;
+}
+
+@container (max-width: 18.75em) {
+    .VAS_today-cash-out-cash-journal-card {
+        padding: 0.75em;
+        gap: 0.375em;
+        border-radius: 12px;
+    }
+
+    .VAS_today-cash-out-cash-journal-date {
+        padding: 0.25em 0.625em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .VAS_today-cash-out-cash-journal-card {
+        padding: 0.625em;
+        gap: 0.25em;
+    }
+
+    .VAS_today-cash-out-cash-journal-footer {
+        gap: 0.375em;
+    }
+}
+
+

@@ -124,6 +124,7 @@ import "../app/widgets/VAS_032_RecentAPPaymentsWidget.js";
 import "../app/widgets/VAS_033_PaymentMethodsWidget.js";
 
 import "../app/widgets/VAS_046_ReconciliationStatusWidget.js";
+import "../app/widgets/VAS_047_TodayCashInCashJournalWidget.js";
 
 
 import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
@@ -167,4 +168,9 @@ import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+
+import "../app/widgets/VAS_048_TodayCashOutCashJournalWidget.js";
+import "../app/widgets/VAS_049_NetCashForCashJournalWidget.js";
+import "../app/widgets/VAS_050_CurrentCashForCashJournalWidget.js";
+import "../app/widgets/VAS_051_SevenDayCashFlowCashJournalWidget.js";
 
