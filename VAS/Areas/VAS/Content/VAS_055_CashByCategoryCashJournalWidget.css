@@ -17,9 +17,10 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(14px, 1.15cqi, 18px);
+    font-size: clamp(16px, 1.4cqi, 24px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
 }
 
 .VAS_055_cash-category-card {
@@ -31,8 +32,8 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 1em;
-    padding: 1em;
+    gap: 0.875em;
+    padding: 0.875em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
@@ -52,25 +53,25 @@
 .VAS_055_cash-category-title-row {
     display: inline-flex;
     align-items: center;
-    gap: 0.75em;
+    gap: 0.625em;
     min-width: 0;
 }
 
 .VAS_055_cash-category-icon {
-    width: 2.2em;
-    height: 2.2em;
+    width: 2em;
+    height: 2em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 11px;
+    border-radius: 12px;
     background: rgba(79, 131, 216, 0.08);
     color: #4F83D8;
 }
 
     .VAS_055_cash-category-icon svg {
-        width: 1.25em;
-        height: 1.25em;
+        width: 1em;
+        height: 1em;
     }
 
 .VAS_055_cash-category-title {
@@ -78,18 +79,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 1.05em;
+    font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 800;
-    color: #17293A;
+    font-weight: 700;
+    color: #102C3F;
 }
 
 .VAS_055_cash-category-meta {
     flex: 0 0 auto;
-    font-size: 0.75em;
+    font-size: 0.6875em;
     line-height: 1.2;
-    font-weight: 800;
-    letter-spacing: 0.18em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #738090;
     white-space: nowrap;
@@ -109,7 +110,7 @@
 .VAS_055_cash-category-row {
     display: flex;
     flex-direction: column;
-    gap: 0.45em;
+    gap: 0.5em;
     min-width: 0;
 }
 
@@ -136,12 +137,12 @@
 .VAS_055_cash-category-percent {
     flex: 0 0 auto;
     text-align: right;
-    font-size: 0.95em;
+    font-size: 0.875em;
 }
 
 .VAS_055_cash-category-track {
     width: 100%;
-    height: 0.58em;
+    height: 0.625em;
     min-width: 0;
     overflow: hidden;
     border-radius: 999px;
@@ -171,7 +172,7 @@
 .VAS_055_cash-category-footer {
     display: flex;
     align-items: center;
-    gap: 0.6em;
+    gap: 0.625em;
     min-width: 0;
     flex-shrink: 0;
     font-size: 0.75em;
@@ -213,8 +214,10 @@
     background: rgba(255, 255, 255, 0.74);
     color: #60748A;
     font-size: 0.8125em;
+    line-height: 1.35;
     font-weight: 600;
     text-align: center;
+    border-radius: 14px;
 }
 
 .VAS_055_cash-category-state {
@@ -238,22 +241,23 @@
 
 @container (max-width: 24em) {
     .VAS_055_cash-category-card {
-        padding: 0.8em;
-        gap: 0.75em;
+        padding: 0.75em;
+        gap: 0.375em;
         border-radius: 12px;
     }
 
     .VAS_055_cash-category-title-row {
-        gap: 0.55em;
+        gap: 0.625em;
     }
 
     .VAS_055_cash-category-icon {
-        width: 1.85em;
-        height: 1.85em;
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 10px;
     }
 
     .VAS_055_cash-category-title {
-        font-size: 0.92em;
+        font-size: 0.875em;
     }
 
     .VAS_055_cash-category-meta {
@@ -276,17 +280,17 @@
 
 @container (max-width: 16em) {
     .VAS_055_cash-category-card {
-        padding: 0.65em;
-        gap: 0.55em;
+        padding: 0.625em;
+        gap: 0.25em;
     }
 
     .VAS_055_cash-category-icon {
-        width: 1.55em;
-        height: 1.55em;
+        width: 1.75em;
+        height: 1.75em;
     }
 
     .VAS_055_cash-category-title {
-        font-size: 0.8em;
+        font-size: 0.875em;
     }
 
     .VAS_055_cash-category-body {
@@ -299,10 +303,10 @@
     }
 
     .VAS_055_cash-category-track {
-        height: 0.45em;
+        height: 0.5em;
     }
 
     .VAS_055_cash-category-footer {
-        gap: 0.35em;
+        gap: 0.375em;
     }
 }

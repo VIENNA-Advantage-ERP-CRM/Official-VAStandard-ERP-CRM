@@ -20,6 +20,7 @@
     font-size: clamp(16px, 1.4cqi, 24px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
 }
 
 .VAS_052_cashbook-card {
@@ -57,13 +58,13 @@
 }
 
 .VAS_052_cashbook-icon {
-    width: 1.75em;
-    height: 1.75em;
+    width: 2em;
+    height: 2em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
+    border-radius: 12px;
     background: rgba(0, 131, 218, 0.08);
     color: #4F83D8;
 }
@@ -80,7 +81,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0;
     color: #102C3F;
 }
@@ -93,7 +94,7 @@
     font-size: 0.6875em;
     line-height: 1.2;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #748494;
 }
@@ -153,7 +154,7 @@
 .VAS_052_cashbook-table th {
     padding: 0 0.75em 0.75em;
     color: #748494;
-    font-family: "Roboto Mono", ui-monospace, monospace;
+    font-family: Roboto, Arial, sans-serif;
     font-size: 0.75em;
     line-height: 1.2;
     font-weight: 700;
@@ -174,9 +175,9 @@
 }
 
 .VAS_052_cashbook-col-time {
-    width: 6.5em;
+    width: 6em;
     color: #748494 !important;
-    font-family: "Roboto Mono", ui-monospace, monospace;
+    font-family: Roboto, Arial, sans-serif;
     font-weight: 500 !important;
 }
 
@@ -191,7 +192,7 @@
 }
 
 .VAS_052_cashbook-col-amount {
-    width: 6.5em;
+    width: 6em;
     text-align: right !important;
     font-weight: 800 !important;
 }
@@ -250,8 +251,10 @@
     background: rgba(255, 255, 255, 0.74);
     color: #60748A;
     font-size: 0.8125em;
+    line-height: 1.35;
     font-weight: 600;
     text-align: center;
+    border-radius: 14px;
 }
 
 .VAS_052_cashbook-state {
@@ -276,7 +279,7 @@
 @container (max-width: 38em) {
     .VAS_052_cashbook-card {
         padding: 0.75em;
-        gap: 0.75em;
+        gap: 0.375em;
         border-radius: 12px;
     }
 
@@ -288,7 +291,13 @@
 @container (max-width: 26em) {
     .VAS_052_cashbook-card {
         padding: 0.625em;
-        gap: 0.5em;
+        gap: 0.25em;
+    }
+
+    .VAS_052_cashbook-icon {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 10px;
     }
 
     .VAS_052_cashbook-action {

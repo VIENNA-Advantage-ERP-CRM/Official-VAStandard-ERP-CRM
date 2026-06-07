@@ -20,6 +20,7 @@
     font-size: clamp(16px, 1.4cqi, 24px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
 }
 
 .VAS_054_counterparties-card {
@@ -31,7 +32,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.75em;
+    gap: 0.875em;
     padding: 0.875em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -52,18 +53,18 @@
 .VAS_054_counterparties-title-row {
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     min-width: 0;
 }
 
 .VAS_054_counterparties-icon {
-    width: 1.75em;
-    height: 1.75em;
+    width: 2em;
+    height: 2em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
+    border-radius: 12px;
     background: rgba(0, 131, 218, 0.08);
     color: #4F83D8;
 }
@@ -80,7 +81,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0;
     color: #102C3F;
 }
@@ -90,7 +91,7 @@
     font-size: 0.6875em;
     line-height: 1.2;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #748494;
 }
@@ -122,9 +123,9 @@
     min-width: 0;
     flex: 1 1 0;
     display: grid;
-    grid-template-columns: 2.25em minmax(8em, 1fr) 6.5em 3em 6em 7em;
+    grid-template-columns: 2em minmax(8em, 1fr) 6em 3em 6em 7em;
     align-items: center;
-    gap: 2.75em;
+    gap: 0.75em;
     padding: 0.5em 0.5em;
     border-top: 1px solid rgba(212, 225, 234, 0.66);
 }
@@ -174,7 +175,7 @@
     white-space: nowrap;
     font-size: 0.8125em;
     line-height: 1.2;
-    font-weight: 800;
+    font-weight: 700;
     color: #102C3F;
 }
 
@@ -257,7 +258,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: right;
-    font-size: 0.875em;
+    font-size: 0.8125em;
     line-height: 1.2;
     font-weight: 800;
     color: #102C3F;
@@ -270,36 +271,38 @@
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 1em;
+    padding: 0.875em;
     background: rgba(255, 255, 255, 0.76);
-    color: #102C3F;
-    font-size: 0.875em;
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
     font-weight: 600;
     text-align: center;
+    border-radius: 14px;
 }
 
 .VAS_054_counterparties-state {
     position: absolute;
-    inset: auto 1em 1em 1em;
+    inset: auto 0.875em 0.875em 0.875em;
     z-index: 2;
     display: none;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0.625em 0.75em;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.74);
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
     color: #748494;
     font-size: 0.8125em;
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     text-align: center;
 }
 
 @container (max-width: 38em) {
     .VAS_054_counterparties-row {
-        grid-template-columns: 2.25em minmax(6em, 1fr) 5.75em 2.5em 4.75em 6em;
+        grid-template-columns: 2em minmax(6em, 1fr) 6em 2em 5em 6em;
         gap: 0.5em;
     }
 
@@ -311,6 +314,7 @@
 @container (max-width: 26em) {
     .VAS_054_counterparties-card {
         padding: 0.75em;
+        gap: 0.375em;
         border-radius: 12px;
     }
 
@@ -320,6 +324,12 @@
     }
 
     .VAS_054_counterparties-row {
-        grid-template-columns: 2.25em minmax(5em, 1fr) 5.5em 2.25em 5.5em;
+        grid-template-columns: 2em minmax(5em, 1fr) 5em 2em 5em;
+    }
+
+    .VAS_054_counterparties-icon {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 10px;
     }
 }

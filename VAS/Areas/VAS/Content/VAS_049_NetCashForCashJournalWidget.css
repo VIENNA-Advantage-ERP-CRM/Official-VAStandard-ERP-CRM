@@ -20,6 +20,7 @@
     font-size: clamp(16px, 1.4cqi, 24px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
+    color: #60748A;
 }
 
 .VAS_net-cash-cash-journal-card {
@@ -112,8 +113,6 @@
     gap: 0.5em;
     min-width: 0;
     flex-shrink: 0;
-    font-size: 0.6875em;
-    line-height: 1.3;
     color: #60748A;
 }
 
@@ -123,12 +122,14 @@
     gap: 0.25em;
     min-width: 0;
     flex-shrink: 0;
+    font-size: 0.6875em;
+    line-height: 1.15;
     font-weight: 700;
 }
 
     .VAS_net-cash-cash-journal-delta svg {
-        width: 1em;
-        height: 1em;
+        width: 0.85em;
+        height: 0.85em;
         flex-shrink: 0;
     }
 
@@ -150,7 +151,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #60748A;
-    font-weight: 500;
+    font-size: 0.75em;
+    line-height: 1.25;
+    font-weight: 400;
 }
 
 .VAS_net-cash-cash-journal-busy {
@@ -164,8 +167,10 @@
     background: rgba(255, 255, 255, 0.74);
     color: #60748A;
     font-size: 0.8125em;
+    line-height: 1.35;
     font-weight: 600;
     text-align: center;
+    border-radius: 14px;
 }
 
 .VAS_net-cash-cash-journal-state {

@@ -20,6 +20,7 @@
     font-size: clamp(16px, 1.4cqi, 24px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
 }
 
 .VAS_053_approval-card {
@@ -57,13 +58,13 @@
 }
 
 .VAS_053_approval-icon {
-    width: 1.75em;
-    height: 1.75em;
+    width: 2em;
+    height: 2em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
+    border-radius: 12px;
     background: rgba(0, 131, 218, 0.07);
     color: #3B7DD8;
 }
@@ -80,7 +81,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: 0;
     color: #102C3F;
 }
@@ -93,7 +94,7 @@
     font-size: 0.6875em;
     line-height: 1.2;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: #748494;
 }
@@ -139,7 +140,7 @@
 
 .VAS_053_approval-row {
     min-width: 0;
-    min-height: 5em;
+    min-height: 4em;
     flex: 0 0 auto;
     display: flex;
     align-items: flex-start;
@@ -155,7 +156,7 @@
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    gap: 0.1875em;
+    gap: 0.25em;
     align-self: stretch;
 }
 
@@ -179,9 +180,9 @@
 
 .VAS_053_approval-priority {
     flex: 0 0 auto;
-    padding: 0.1875em 0.45em;
+    padding: 0.25em 0.5em;
     border-radius: 6px;
-    font-size: 0.5625em;
+    font-size: 0.625em;
     line-height: 1.1;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -215,7 +216,7 @@
 }
 
 .VAS_053_approval-message {
-    margin-top: 0.0625em;
+    margin-top: 0.125em;
     color: #7C8795;
 }
 
@@ -292,8 +293,10 @@
     background: rgba(255, 255, 255, 0.76);
     color: #60748A;
     font-size: 0.8125em;
+    line-height: 1.35;
     font-weight: 600;
     text-align: center;
+    border-radius: 14px;
 }
 
 .VAS_053_approval-state {
@@ -319,7 +322,7 @@
     .VAS_053_approval-card {
         padding: 0.75em;
         border-radius: 12px;
-        gap: 0.625em;
+        gap: 0.375em;
     }
 
     .VAS_053_approval-action,
@@ -328,7 +331,7 @@
     }
 
     .VAS_053_approval-row {
-        min-height: 4.75em;
+        min-height: 4em;
     }
 }
 
@@ -338,8 +341,9 @@
     }
 
     .VAS_053_approval-icon {
-        width: 1.5em;
-        height: 1.5em;
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 10px;
     }
 
     .VAS_053_approval-row {
@@ -347,8 +351,8 @@
     }
 
     .VAS_053_approval-btn {
-        width: 1.5em;
-        height: 1.5em;
+        width: 1.75em;
+        height: 1.75em;
     }
 
     .VAS_053_approval-amount {

@@ -143,7 +143,7 @@
     font-size: 1.375em; /* xl token — corrected from 2.125em */
     line-height: 1.1;
     font-weight: 700;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
 }
 
 /* ── Footer row ───────────────────────────────────────────────────────── */
@@ -160,8 +160,8 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 0.2em;
-    padding: 0.22em 0.5em;
+    gap: 0.25em;
+    padding: 0.25em 0.5em;
     border-radius: 999px;
     background: transparent;
     color: #087246;
@@ -224,7 +224,7 @@
 /* ── Compact / small breakpoint ──────────────────────────────────────── */
 @media (max-width: 32.5em) {
     .VAS-047-today-cash-in-cash-journal-root {
-        font-size: clamp(14px, 1.3cqi, 18px);
+        font-size: clamp(16px, 1.4cqi, 24px);
     }
 
     .VAS-047-today-cash-in-cash-journal-card {
@@ -241,12 +241,12 @@
 
     /* Value shrinks proportionally at narrow sizes */
     .VAS-047-today-cash-in-cash-journal-value {
-        font-size: 1.25em;
+        font-size: 1.375em;
     }
 
     .VAS-047-today-cash-in-cash-journal-period {
         max-width: 38%;
-        padding: 0.2em 0.5em;
+        padding: 0.25em 0.5em;
         font-size: 0.625em;
     }
 }

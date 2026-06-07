@@ -1,9 +1,7 @@
 using System;
 using System.Data;
-using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
-using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
@@ -13,12 +11,11 @@ namespace VAS.Controllers
     /// <summary>
     /// Module Name : Cash Journal
     /// Purpose     : Provides today's net cash KPI for Cash Journal dashboard widget.
-    /// Chronological development:
-    ///   VAS   Created 2026-06-06
     /// </summary>
     public class VAS_049_NetCashForCashJournalWidgetController : Controller
     {
-       
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
         public JsonResult GetNetCashForCashJournal()
         {
             Ctx ctx = Session["ctx"] as Ctx;
@@ -43,107 +40,73 @@ namespace VAS.Controllers
                 DateTime previousDateFrom = today.AddDays(-1);
                 DateTime previousDateTo = today;
 
-                string todayDateFilter = GetDateFilter("CashHeader.StatementDate", dateFrom, dateTo);
-                string previousDateFilter = GetDateFilter("CashHeader.StatementDate", previousDateFrom, previousDateTo);
+                string dateFromSql = ToSqlDate(dateFrom);
+                string dateToSql = ToSqlDate(dateTo);
+                string previousDateFromSql = ToSqlDate(previousDateFrom);
+                string previousDateToSql = ToSqlDate(previousDateTo);
+
+                string filteredCashLineSql = @"
+SELECT CashLine.C_CashLine_ID,
+CashLine.C_Cash_ID,
+CashLine.Amount
+FROM C_CashLine CashLine
+WHERE CashLine.IsActive='Y'";
+
+                filteredCashLineSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    filteredCashLineSql,
+                    "CashLine",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                    INNER JOIN C_Currency Currency
-                        ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
+SELECT ClientInfo.AD_Client_ID,
+AcctSchema.C_Currency_ID AS C_Currency_ID,
+Currency.StdPrecision,
+Currency.ISO_Code AS ISO_Code,
+CASE
+WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+ELSE Currency.ISO_Code
+END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
 
                 string convertedAmountExpression = @"
-                    CASE
-                        WHEN CashHeader.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(CashLine.Amount, 0)
-                        ELSE CurrencyConvert(
-                            COALESCE(CashLine.Amount, 0),
-                            CashHeader.C_Currency_ID,
-                            SchemaCurrency.C_Currency_ID,
-                            CashHeader.DateAcct,
-                            0,
-                            CashHeader.AD_Client_ID,
-                            CashHeader.AD_Org_ID
-                        )
-                    END";
+CASE
+WHEN CashBook.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(FilteredCashLine.Amount,0)
+ELSE CurrencyConvert(COALESCE(FilteredCashLine.Amount,0),CashBook.C_Currency_ID,SchemaCurrency.C_Currency_ID,CashHeader.DateAcct,0,CashHeader.AD_Client_ID,CashHeader.AD_Org_ID)
+END";
 
-                string todayCashSql = @"
-                    SELECT ROUND(
-                               COALESCE(SUM(" + convertedAmountExpression + @"), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS NetAmount,
-                           ROUND(
-                               COALESCE(SUM(CASE WHEN CashLine.Amount > 0 THEN " + convertedAmountExpression + @" ELSE 0 END), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS CashInAmount,
-                           ROUND(
-                               COALESCE(SUM(CASE WHEN CashLine.Amount < 0 THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS CashOutAmount,
-                           COUNT(CashLine.C_CashLine_ID) AS LineCount,
-                           COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
-                           MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
-                           MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
-                           MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
-                    FROM C_CashLine CashLine
-                    INNER JOIN C_Cash CashHeader
-                        ON (CashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
-                    WHERE CashLine.IsActive='Y'
-                    AND CashHeader.IsActive='Y'
-                    AND CashHeader.DocStatus IN ('CO','CL')"
-                    + todayDateFilter;
-
-                todayCashSql = MRole.GetDefault(ctx).AddAccessSQL(todayCashSql, "CashLine", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                string previousCashSql = @"
-                    SELECT ROUND(
-                               COALESCE(SUM(" + convertedAmountExpression + @"), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS PreviousNetAmount
-                    FROM C_CashLine CashLine
-                    INNER JOIN C_Cash CashHeader
-                        ON (CashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
-                    WHERE CashLine.IsActive='Y'
-                    AND CashHeader.IsActive='Y'
-                    AND CashHeader.DocStatus IN ('CO','CL')"
-                    + previousDateFilter;
-
-                previousCashSql = MRole.GetDefault(ctx).AddAccessSQL(previousCashSql, "CashLine", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                string todayCondition = "CashRows.StatementDate >= " + dateFromSql + " AND CashRows.StatementDate < " + dateToSql;
+                string previousCondition = "CashRows.StatementDate >= " + previousDateFromSql + " AND CashRows.StatementDate < " + previousDateToSql;
 
                 string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    ),
-                    TodayCash AS (
-                        " + todayCashSql + @"
-                    ),
-                    PreviousCash AS (
-                        " + previousCashSql + @"
-                    )
-                    SELECT TodayCash.NetAmount,
-                           TodayCash.CashInAmount,
-                           TodayCash.CashOutAmount,
-                           TodayCash.LineCount,
-                           TodayCash.StdPrecision,
-                           TodayCash.C_Currency_ID,
-                           TodayCash.CurrencyISO,
-                           TodayCash.CurrencySymbol,
-                           PreviousCash.PreviousNetAmount
-                    FROM TodayCash TodayCash
-                    INNER JOIN PreviousCash PreviousCash
-                        ON (1=1)";
+SELECT ROUND(COALESCE(SUM(CASE WHEN " + todayCondition + @" THEN CashRows.ConvertedAmount ELSE 0 END),0),COALESCE(MAX(CashRows.StdPrecision),2)) AS NetAmount,
+ROUND(COALESCE(SUM(CASE WHEN " + todayCondition + @" AND CashRows.ConvertedAmount > 0 THEN CashRows.ConvertedAmount ELSE 0 END),0),COALESCE(MAX(CashRows.StdPrecision),2)) AS CashInAmount,
+ROUND(COALESCE(SUM(CASE WHEN " + todayCondition + @" AND CashRows.ConvertedAmount < 0 THEN 0 - CashRows.ConvertedAmount ELSE 0 END),0),COALESCE(MAX(CashRows.StdPrecision),2)) AS CashOutAmount,
+COUNT(CASE WHEN " + todayCondition + @" THEN CashRows.C_CashLine_ID ELSE NULL END) AS LineCount,
+ROUND(COALESCE(SUM(CASE WHEN " + previousCondition + @" THEN CashRows.ConvertedAmount ELSE 0 END),0),COALESCE(MAX(CashRows.StdPrecision),2)) AS PreviousNetAmount,
+COALESCE(MAX(CashRows.StdPrecision),2) AS StdPrecision,
+MAX(CashRows.C_Currency_ID) AS C_Currency_ID,
+MAX(CashRows.CurrencyISO) AS CurrencyISO,
+MAX(CashRows.CurrencySymbol) AS CurrencySymbol
+FROM (SELECT FilteredCashLine.C_CashLine_ID,
+CashHeader.StatementDate,
+" + convertedAmountExpression + @" AS ConvertedAmount,
+SchemaCurrency.StdPrecision,
+SchemaCurrency.C_Currency_ID,
+SchemaCurrency.ISO_Code AS CurrencyISO,
+SchemaCurrency.Cur_Symbol AS CurrencySymbol
+FROM (" + filteredCashLineSql + @") FilteredCashLine
+INNER JOIN C_Cash CashHeader ON (FilteredCashLine.C_Cash_ID=CashHeader.C_Cash_ID)
+INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
+INNER JOIN (" + schemaCurrencySql + @") SchemaCurrency ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
+WHERE CashHeader.IsActive='Y'
+AND CashBook.IsActive='Y'
+AND CashHeader.DocStatus IN ('CO','CL')
+AND CashHeader.StatementDate >= " + previousDateFromSql + @"
+AND CashHeader.StatementDate < " + dateToSql + @") CashRows";
 
                 decimal netAmount = 0;
                 decimal cashInAmount = 0;
@@ -180,12 +143,21 @@ namespace VAS.Controllers
                         success = true,
                         error = string.Empty,
                         hasData = false,
+                        title = GetMsg(ctx, "VAS_049_NetCash", "Net cash"),
                         mainMetric = 0,
                         mainMetricText = "0",
                         description = string.Empty,
                         badgeText = GetMsg(ctx, "VAS_049_Today", "Today"),
                         dateFrom = FormatDate(dateFrom),
-                        dateTo = FormatDate(dateTo.AddDays(-1))
+                        dateTo = FormatDate(dateTo.AddDays(-1)),
+                        currencyISO = currencyISO,
+                        currencySymbol = currencySymbol,
+                        cCurrencyId = currencyId,
+                        stdPrecision = stdPrecision,
+                        deltaAmount = deltaAmount,
+                        cashInAmount = cashInAmount,
+                        cashOutAmount = cashOutAmount,
+                        previousNetAmount = previousNetAmount
                     }, JsonRequestBehavior.AllowGet);
                 }
 
@@ -211,9 +183,8 @@ namespace VAS.Controllers
                     hasData = true
                 }, JsonRequestBehavior.AllowGet);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
                 return Json(new
                 {
                     success = false,
@@ -231,52 +202,23 @@ namespace VAS.Controllers
             }
         }
 
-        /// <summary>
-        /// Builds database-specific half-open date filter.
-        /// </summary>
-        /// <param name="columnName">Hardcoded date column name.</param>
-        /// <param name="dateFrom">Start date inclusive.</param>
-        /// <param name="dateTo">End date exclusive.</param>
-        /// <returns>SQL date filter text.</returns>
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
-        {
-            return @"
-                AND " + columnName + @" >= " + ToSqlDate(dateFrom) + @"
-                AND " + columnName + @" < " + ToSqlDate(dateTo) + @"
-            ";
-        }
-
         private string ToSqlDate(DateTime date)
         {
-            DateTime day = date.Date;
+            string dateText = FormatDate(date.Date);
 
             if (DB.IsOracle())
             {
-                return "TO_DATE('"
-                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                    + "','YYYY-MM-DD')";
+                return "TO_DATE('" + dateText + "','YYYY-MM-DD')";
             }
 
-            return DB.TO_DATE(day, true);
+            return "DATE '" + dateText + "'";
         }
 
-        /// <summary>
-        /// Formats date using fixed yyyy-MM-dd pattern.
-        /// </summary>
-        /// <param name="date">Date value.</param>
-        /// <returns>Formatted date text.</returns>
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");
         }
 
-        /// <summary>
-        /// Gets translated message with fallback.
-        /// </summary>
-        /// <param name="ctx">VIS context.</param>
-        /// <param name="key">Message key.</param>
-        /// <param name="fallback">Fallback text.</param>
-        /// <returns>Translated message or fallback.</returns>
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
@@ -289,12 +231,6 @@ namespace VAS.Controllers
             return msg;
         }
 
-        /// <summary>
-        /// Gets net cash day description.
-        /// </summary>
-        /// <param name="ctx">VIS context.</param>
-        /// <param name="netAmount">Net cash amount.</param>
-        /// <returns>Translated day status.</returns>
         private string GetNetCashDescription(Ctx ctx, decimal netAmount)
         {
             if (netAmount > 0)
@@ -310,12 +246,6 @@ namespace VAS.Controllers
             return GetMsg(ctx, "VAS_049_NeutralCashDay", "Neutral cash day");
         }
 
-        /// <summary>
-        /// Safely reads decimal value from data reader by column name.
-        /// </summary>
-        /// <param name="reader">Data reader.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <returns>Decimal value.</returns>
         private decimal GetDecimal(IDataReader reader, string columnName)
         {
             object value = reader[columnName];
@@ -329,13 +259,6 @@ namespace VAS.Controllers
             return decimal.TryParse(value.ToString(), out result) ? result : 0;
         }
 
-        /// <summary>
-        /// Safely reads integer value from data reader by column name.
-        /// </summary>
-        /// <param name="reader">Data reader.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <param name="fallback">Fallback value.</param>
-        /// <returns>Integer value.</returns>
         private int GetInt(IDataReader reader, string columnName, int fallback = 0)
         {
             object value = reader[columnName];
@@ -349,12 +272,6 @@ namespace VAS.Controllers
             return int.TryParse(value.ToString(), out result) ? result : fallback;
         }
 
-        /// <summary>
-        /// Safely reads string value from data reader by column name.
-        /// </summary>
-        /// <param name="reader">Data reader.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <returns>String value.</returns>
         private string GetString(IDataReader reader, string columnName)
         {
             object value = reader[columnName];
