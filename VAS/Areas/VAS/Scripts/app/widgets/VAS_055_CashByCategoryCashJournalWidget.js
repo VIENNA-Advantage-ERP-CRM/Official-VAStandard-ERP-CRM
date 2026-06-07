@@ -1,0 +1,346 @@
+﻿/**
+ * Cash Out by Category - Cash Journal
+ * Purpose - Shows today's cash out distribution grouped by cash type.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Cash Out by Category                 | VAS_055_CashOutByCategory
+ *  2  | Today                                | VAS_055_Today
+ *  3  | Why                                  | VAS_055_Why
+ *  4  | Grouped by cash type for today.      | VAS_055_WhyText
+ *  5  | Other                                | VAS_055_Other
+ *  6  | Loading                              | VAS_055_Loading
+ *  7  | No cash out today                    | VAS_055_NoData
+ *  8  | Unable to load cash out by category  | VAS_055_LoadError
+ * ─────────────────────────────────────────────────────────────────────
+ */
+
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+    VAS.VAS_055_CashByCategoryCashJournalWidget = function () {
+        var $self = this;
+        var $root = null;
+        var isDisposed = false;
+        var ajaxRequest = null;
+
+        function lbl(key, fallback) {
+            var text = VIS.Msg.getMsg(key);
+            return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+        }
+
+        function safeNumber(value) {
+            var numberValue = Number(value || 0);
+            return isNaN(numberValue) ? 0 : numberValue;
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+        }
+
+        function showBusy(show) {
+            if (!$root) {
+                return;
+            }
+
+            var $busy = $root.find('#VAS_055_cash-category-busy-' + $self.AD_UserHomeWidgetID);
+
+            if (show) {
+                $busy.show();
+            }
+            else {
+                $busy.hide();
+            }
+        }
+
+        function buildLayout() {
+            var widgetId = $self.AD_UserHomeWidgetID;
+
+            $root = $('<div>', {
+                'class': 'VAS_055_cash-category-root',
+                'id': 'VAS_055_cash-category-root-' + widgetId
+            });
+
+            var $card = $('<section>', {
+                'class': 'VAS_055_cash-category-card',
+                'aria-label': lbl('VAS_055_CashOutByCategory', 'Cash Out by Category')
+            });
+
+            var $busy = $('<div>', {
+                'class': 'VAS_055_cash-category-busy',
+                'id': 'VAS_055_cash-category-busy-' + widgetId,
+                'text': lbl('VAS_055_Loading', 'Loading')
+            }).hide();
+
+            var $header = $('<div>', {
+                'class': 'VAS_055_cash-category-header'
+            });
+
+            var $titleRow = $('<div>', {
+                'class': 'VAS_055_cash-category-title-row'
+            });
+
+            var $icon = $(
+                '<span class="VAS_055_cash-category-icon">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<path d="M21 12a9 9 0 1 1-9-9v9Z"></path>' +
+                '<path d="M12 3a9 9 0 0 1 9 9h-9Z"></path>' +
+                '</svg>' +
+                '</span>'
+            );
+
+            var $title = $('<span>', {
+                'class': 'VAS_055_cash-category-title',
+                'id': 'VAS_055_cash-category-title-' + widgetId,
+                'text': lbl('VAS_055_CashOutByCategory', 'Cash Out by Category')
+            });
+
+            var $meta = $('<span>', {
+                'class': 'VAS_055_cash-category-meta',
+                'id': 'VAS_055_cash-category-meta-' + widgetId,
+                'text': lbl('VAS_055_Today', 'Today')
+            });
+
+            var $body = $('<div>', {
+                'class': 'VAS_055_cash-category-body',
+                'id': 'VAS_055_cash-category-body-' + widgetId
+            });
+
+            var $footer = $('<div>', {
+                'class': 'VAS_055_cash-category-footer'
+            });
+
+            var $why = $('<span>', {
+                'class': 'VAS_055_cash-category-why',
+                'id': 'VAS_055_cash-category-why-' + widgetId,
+                'text': lbl('VAS_055_Why', 'Why')
+            });
+
+            var $whyText = $('<span>', {
+                'class': 'VAS_055_cash-category-why-text',
+                'id': 'VAS_055_cash-category-why-text-' + widgetId,
+                'text': lbl('VAS_055_WhyText', 'Grouped by cash type for today.')
+            });
+
+            var $state = $('<div>', {
+                'class': 'VAS_055_cash-category-state',
+                'id': 'VAS_055_cash-category-state-' + widgetId
+            }).hide();
+
+            $titleRow.append($icon).append($title);
+            $header.append($titleRow).append($meta);
+            $footer.append($why).append($whyText);
+            $card.append($busy).append($header).append($body).append($footer).append($state);
+            $root.append($card);
+        }
+
+        function setState(message) {
+            if (!$root) {
+                return;
+            }
+
+            var widgetId = $self.AD_UserHomeWidgetID;
+
+            $root.find('#VAS_055_cash-category-state-' + widgetId).text(message || '').show();
+            $root.find('#VAS_055_cash-category-body-' + widgetId).empty();
+        }
+
+        function createRow(item, index, currencySymbol, currencyISO) {
+            var percent = Math.max(0, Math.min(100, safeNumber(item.percent)));
+            var amount = safeNumber(item.cashOutAmount);
+            var colorClass = item.colorClass || 'VAS_055_cash-category-bar-' + ((index % 3) + 1);
+
+            var $row = $('<div>', {
+                'class': 'VAS_055_cash-category-row',
+                'title': (item.name || lbl('VAS_055_Other', 'Other')) + ' · ' + formatCurrencyAmount(amount, currencySymbol, currencyISO)
+            });
+
+            var $rowTop = $('<div>', {
+                'class': 'VAS_055_cash-category-row-top'
+            });
+
+            var $name = $('<span>', {
+                'class': 'VAS_055_cash-category-name',
+                'text': item.name || lbl('VAS_055_Other', 'Other')
+            });
+
+            var $percent = $('<span>', {
+                'class': 'VAS_055_cash-category-percent',
+                'text': percent.toLocaleString(window.navigator.language, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }) + '%'
+            });
+
+            var $track = $('<div>', {
+                'class': 'VAS_055_cash-category-track',
+                'role': 'progressbar',
+                'aria-valuemin': '0',
+                'aria-valuemax': '100',
+                'aria-valuenow': percent
+            });
+
+            var $bar = $('<div>', {
+                'class': 'VAS_055_cash-category-fill ' + colorClass
+            }).css('--VAS_055_bar-width', percent + '%');
+
+            $rowTop.append($name).append($percent);
+            $track.append($bar);
+            $row.append($rowTop).append($track);
+
+            return $row;
+        }
+
+        function renderData(data) {
+            if (!$root || isDisposed) {
+                return;
+            }
+
+            var widgetId = $self.AD_UserHomeWidgetID;
+            var items = data.items || [];
+            var $body = $root.find('#VAS_055_cash-category-body-' + widgetId);
+            var currencySymbol = data.currencySymbol || '';
+            var currencyISO = data.currencyISO || data.currencyISOCode || '';
+
+            $root.find('#VAS_055_cash-category-state-' + widgetId).hide().text('');
+            $root.find('#VAS_055_cash-category-title-' + widgetId).text(data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category'));
+            $root.find('#VAS_055_cash-category-meta-' + widgetId).text(data.metaText || lbl('VAS_055_Today', 'Today'));
+            $root.find('#VAS_055_cash-category-why-' + widgetId).text(data.whyLabel || lbl('VAS_055_Why', 'Why'));
+            $root.find('#VAS_055_cash-category-why-text-' + widgetId).text(data.whyText || lbl('VAS_055_WhyText', 'Grouped by cash type for today.'));
+
+            $body.empty();
+
+            if (data.hasData === false || items.length === 0) {
+                setState(data.noDataText || lbl('VAS_055_NoData', 'No cash out today'));
+                return;
+            }
+
+            $.each(items.slice(0, 3), function (index, item) {
+                $body.append(createRow(item, index, currencySymbol, currencyISO));
+            });
+        }
+
+        function loadData() {
+            if (!$root || isDisposed) {
+                return;
+            }
+
+            if (ajaxRequest && ajaxRequest.readyState !== 4) {
+                ajaxRequest.abort();
+            }
+
+            showBusy(true);
+
+            ajaxRequest = $.ajax({
+                url: VIS.Application.contextUrl + 'VAS/VAS_055_CashByCategoryCashJournal/GetTodayCashOutByCategory',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    if (!response) {
+                        setState(lbl('VAS_055_LoadError', 'Unable to load cash out by category'));
+                        return;
+                    }
+
+                    if (response.success === false || response.error) {
+                        setState(response.error || lbl('VAS_055_LoadError', 'Unable to load cash out by category'));
+                        return;
+                    }
+
+                    renderData(response);
+                },
+                error: function () {
+                    if (!isDisposed) {
+                        setState(lbl('VAS_055_LoadError', 'Unable to load cash out by category'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed && $root) {
+                        showBusy(false);
+                    }
+                }
+            });
+        }
+
+        this.initalize = function () {
+            buildLayout();
+            loadData();
+        };
+
+        this.refreshWidget = function () {
+            loadData();
+        };
+
+        this.disposeComponent = function () {
+            isDisposed = true;
+
+            if (ajaxRequest && ajaxRequest.readyState !== 4) {
+                ajaxRequest.abort();
+            }
+
+            if ($root) {
+                $root.off();
+                $root.remove();
+            }
+
+            ajaxRequest = null;
+            $root = null;
+            $self = null;
+        };
+
+        this.getRoot = function () {
+            return $root;
+        };
+    };
+
+    VAS.VAS_055_CashByCategoryCashJournalWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.windowNo = windowNo;
+
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
+
+        if (!this.AD_UserHomeWidgetID) {
+            this.AD_UserHomeWidgetID = windowNo || new Date().getTime();
+        }
+
+        this.initalize();
+
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
+    };
+
+    VAS.VAS_055_CashByCategoryCashJournalWidget.prototype.widgetSizeChange = function (height, width) {
+    };
+
+    VAS.VAS_055_CashByCategoryCashJournalWidget.prototype.dispose = function () {
+        this.disposeComponent();
+
+        if (this.frame) {
+            this.frame.dispose();
+        }
+
+        this.frame = null;
+    };
+})(VAS, jQuery);

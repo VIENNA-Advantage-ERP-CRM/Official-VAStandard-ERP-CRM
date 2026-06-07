@@ -17,7 +17,7 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(14px, 1.05cqi, 18px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
 }
@@ -31,11 +31,11 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.625em;
-    padding: 0.875em;
+    gap: 0.75em;
+    padding: 1.125em 1.35em 1em 1.35em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.52));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102C3F;
 }
@@ -44,7 +44,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.75em;
+    gap: 1em;
     min-width: 0;
     flex-shrink: 0;
 }
@@ -52,159 +52,143 @@
 .VAS_051_cash-flow-title-row {
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.75em;
     min-width: 0;
 }
 
 .VAS_051_cash-flow-icon {
-    width: 1.75em;
-    height: 1.75em;
+    width: 2.25em;
+    height: 2.25em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 10px;
-    background: rgba(0, 131, 218, 0.08);
-    color: #3B7DD8;
+    border-radius: 11px;
+    background: rgba(79, 131, 216, 0.08);
+    color: #4F83D8;
 }
 
-.VAS_051_cash-flow-icon svg {
-    width: 1em;
-    height: 1em;
-}
+    .VAS_051_cash-flow-icon svg {
+        width: 1.25em;
+        height: 1.25em;
+    }
 
 .VAS_051_cash-flow-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: 1.05em;
     line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0;
-    color: #102C3F;
+    font-weight: 800;
+    color: #17293A;
 }
 
 .VAS_051_cash-flow-meta {
     flex: 0 0 auto;
-    font-size: 0.6875em;
+    font-size: 0.75em;
     line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.14em;
+    font-weight: 800;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: #748494;
+    color: #738090;
+    white-space: nowrap;
+}
+
+.VAS_051_cash-flow-body,
+.VAS_051_cash-flow-seven-body {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    gap: 2.4em;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 3em 0 1.6em 0;
+    background-image: linear-gradient(to bottom, rgba(210, 222, 233, 0.55) 0 1px, transparent 1px);
+    background-size: 100% 25%;
+}
+
+.VAS_051_cash-flow-day {
+    flex: 0 1 8em;
+    min-width: 4.5em;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.VAS_051_cash-flow-bars {
+    flex: 1 1 auto;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 0.5em;
+    min-height: 0;
+}
+
+.VAS_051_cash-flow-day-bar {
+    width: 2.7em;
+    min-height: 0;
+    border-radius: 7px 7px 3px 3px;
+    transition: height 0.2s ease;
+}
+
+.VAS_051_cash-flow-day-in {
+    background: #5B9B66;
+}
+
+.VAS_051_cash-flow-day-out {
+    background: #B94E49;
+}
+
+.VAS_051_cash-flow-day-label {
+    flex: 0 0 auto;
+    margin-top: 0.55em;
+    font-size: 1em;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    color: #627181;
+    text-align: center;
 }
 
 .VAS_051_cash-flow-legend {
     display: inline-flex;
     align-items: center;
-    gap: 0.75em;
-    flex-shrink: 0;
-    min-width: 0;
-    color: #5F7283;
+    justify-content: flex-end;
+    gap: 1.25em;
+    flex: 0 0 auto;
+    font-size: 0.95em;
+    color: #627181;
 }
 
 .VAS_051_cash-flow-legend-item {
     display: inline-flex;
     align-items: center;
-    gap: 0.375em;
-    font-size: 0.6875em;
-    line-height: 1.2;
+    gap: 0.45em;
     font-weight: 500;
     white-space: nowrap;
 }
 
-.VAS_051_cash-flow-dot {
-    width: 0.5em;
-    height: 0.5em;
-    flex: 0 0 auto;
-    display: inline-block;
-    border-radius: 3px;
+    .VAS_051_cash-flow-legend-item::before {
+        content: '';
+        width: 0.65em;
+        height: 0.65em;
+        display: inline-block;
+        border-radius: 2px;
+        background: #D7DDE6;
+    }
+
+.VAS_051_cash-flow-legend-in::before {
+    background: #5B9B66;
 }
 
-.VAS_051_cash-flow-dot-in {
-    background: #5AA36D;
-}
-
-.VAS_051_cash-flow-dot-out {
-    background: #BF514B;
-}
-
-.VAS_051_cash-flow-body {
-    position: relative;
-    min-width: 0;
-    min-height: 0;
-    flex: 1 1 auto;
-}
-
-.VAS_051_cash-flow-chart {
-    width: 100%;
-    height: 100%;
-    min-height: 7.5em;
-}
-
-.VAS_051_cash-flow-chart svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.VAS_051_cash-flow-grid {
-    stroke: #E4EDF4;
-    stroke-width: 1;
-    stroke-dasharray: 3 3;
-}
-
-.VAS_051_cash-flow-bar {
-    cursor: default;
-    transition: opacity 0.16s ease;
-}
-
-.VAS_051_cash-flow-day:hover .VAS_051_cash-flow-bar {
-    opacity: 0.82;
-}
-
-.VAS_051_cash-flow-bar-in {
-    fill: #5AA36D;
-}
-
-.VAS_051_cash-flow-bar-out {
-    fill: #BF514B;
-}
-
-.VAS_051_cash-flow-axis-label {
-    fill: #5F7283;
-    font-family: "Roboto Mono", ui-monospace, monospace;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0;
-}
-
-.VAS_051_cash-flow-tooltip {
-    position: absolute;
-    z-index: 4;
-    min-width: 8.5em;
-    max-width: 14em;
-    pointer-events: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25em;
-    padding: 0.5em 0.625em;
-    border: 1px solid rgba(16, 44, 63, 0.12);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.12);
-    color: #102C3F;
-    font-size: 0.6875em;
-    line-height: 1.25;
-}
-
-.VAS_051_cash-flow-tooltip strong,
-.VAS_051_cash-flow-tooltip span {
-    display: flex;
-    align-items: center;
-    gap: 0.375em;
-    white-space: nowrap;
+.VAS_051_cash-flow-legend-out::before {
+    background: #B94E49;
 }
 
 .VAS_051_cash-flow-busy {
@@ -214,64 +198,107 @@
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 1em;
+    padding: 0.875em;
     background: rgba(255, 255, 255, 0.74);
-    color: #5F7283;
-    font-size: 0.875em;
+    color: #60748A;
+    font-size: 0.8125em;
     font-weight: 600;
     text-align: center;
 }
 
 .VAS_051_cash-flow-state {
     position: absolute;
-    inset: auto 1em 1em 1em;
+    inset: auto 0.875em 0.875em 0.875em;
     z-index: 2;
     display: none;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0.625em 0.75em;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.68);
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.78);
     color: #748494;
     font-size: 0.8125em;
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     text-align: center;
 }
 
-@container (max-width: 24em) {
+@container (max-width: 32em) {
     .VAS_051_cash-flow-card {
-        padding: 0.75em;
-        border-radius: 12px;
-        gap: 0.5em;
+        padding: 0.9em;
     }
 
     .VAS_051_cash-flow-header {
-        align-items: flex-start;
+        gap: 0.75em;
     }
 
-    .VAS_051_cash-flow-title-row {
-        gap: 0.375em;
+    .VAS_051_cash-flow-body,
+    .VAS_051_cash-flow-seven-body {
+        gap: 0.75em;
+        padding-top: 2em;
+        padding-bottom: 1.2em;
+    }
+
+    .VAS_051_cash-flow-day {
+        min-width: 2.8em;
+    }
+
+    .VAS_051_cash-flow-day-bar {
+        width: 1.25em;
+    }
+
+    .VAS_051_cash-flow-day-label {
+        font-size: 0.75em;
+        letter-spacing: 0.08em;
     }
 
     .VAS_051_cash-flow-meta {
         display: none;
     }
+
+    .VAS_051_cash-flow-legend {
+        font-size: 0.75em;
+        gap: 0.75em;
+    }
 }
 
-@container (max-width: 16em) {
+@container (max-width: 18em) {
     .VAS_051_cash-flow-card {
-        padding: 0.625em;
+        padding: 0.75em;
+        gap: 0.5em;
     }
 
     .VAS_051_cash-flow-icon {
-        width: 1.5em;
-        height: 1.5em;
+        width: 1.75em;
+        height: 1.75em;
+    }
+
+    .VAS_051_cash-flow-title {
+        font-size: 0.875em;
     }
 
     .VAS_051_cash-flow-legend {
-        gap: 0.5em;
+        display: none;
+    }
+
+    .VAS_051_cash-flow-body,
+    .VAS_051_cash-flow-seven-body {
+        gap: 0.35em;
+        padding-top: 1.5em;
+    }
+
+    .VAS_051_cash-flow-day {
+        min-width: 2em;
+    }
+
+    .VAS_051_cash-flow-day-bar {
+        width: 0.8em;
+    }
+
+    .VAS_051_cash-flow-day-label {
+        font-size: 0.625em;
+        letter-spacing: 0.04em;
     }
 }

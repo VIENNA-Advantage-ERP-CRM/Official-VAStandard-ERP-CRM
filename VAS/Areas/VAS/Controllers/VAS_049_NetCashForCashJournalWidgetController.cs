@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -239,21 +240,24 @@ namespace VAS.Controllers
         /// <returns>SQL date filter text.</returns>
         private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
         {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
+            return @"
+                AND " + columnName + @" >= " + ToSqlDate(dateFrom) + @"
+                AND " + columnName + @" < " + ToSqlDate(dateTo) + @"
+            ";
+        }
+
+        private string ToSqlDate(DateTime date)
+        {
+            DateTime day = date.Date;
 
             if (DB.IsOracle())
             {
-                return @"
-                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
-                ";
+                return "TO_DATE('"
+                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    + "','YYYY-MM-DD')";
             }
 
-            return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
-            ";
+            return DB.TO_DATE(day, true);
         }
 
         /// <summary>

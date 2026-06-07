@@ -71,4 +71,7 @@
 @import "../VAS_049_NetCashForCashJournalWidget.css";
 @import "../VAS_050_CurrentCashForCashJournalWidget.css";
 @import "../VAS_051_SevenDayCashFlowCashJournalWidget.css";
-
+@import "../VAS_052_TodaysCashbookCashJournalWidget.css";
+@import "../VAS_053_ApprovalQueueCashJournalWidget.css";
+@import "../VAS_054_TopCounterpartiesCashJournalWidget.css";
+@import "../VAS_055_CashByCategoryCashJournalWidget.css";

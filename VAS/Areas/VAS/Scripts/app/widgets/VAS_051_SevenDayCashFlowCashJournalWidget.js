@@ -1,15 +1,6 @@
 /**
  * 7-Day Cash Flow - Cash Journal
- * Purpose - Shows cash in vs cash out for the last seven days including today.
- *
- * Labels / Message Keys
- *  1 | 7-Day Cash Flow                 | VAS_051_SevenDayCashFlow
- *  2 | In vs Out                       | VAS_051_InVsOut
- *  3 | In                              | VAS_051_In
- *  4 | Out                             | VAS_051_Out
- *  5 | Loading                         | VAS_051_Loading
- *  6 | No data                         | VAS_051_NoData
- *  7 | Unable to load 7-day cash flow  | VAS_051_LoadError
+ * Purpose - Shows cash in vs cash out for the last 7 days including today.
  */
 
 ; VAS = window.VAS || {};
@@ -31,26 +22,19 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
-        function getPrecision() {
-            var stdPrecision = 2;
-
-            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+        function showBusy(show) {
+            if (!$root) {
+                return;
             }
 
-            return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
-        }
-
-        function formatAmount(value, currencySymbol) {
-            return (currencySymbol || '') + safeNumber(value).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getPrecision(),
-                maximumFractionDigits: getPrecision()
-            });
-        }
-
-        function showBusy(show) {
             var $busy = $root.find('#VAS_051_cash-flow-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $busy.show(); } else { $busy.hide(); }
+
+            if (show) {
+                $busy.show();
+            }
+            else {
+                $busy.hide();
+            }
         }
 
         function buildLayout() {
@@ -83,8 +67,8 @@
             var $icon = $(
                 '<span class="VAS_051_cash-flow-icon">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-                '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>' +
-                '<polyline points="17 6 23 6 23 12"></polyline>' +
+                '<path d="M3 17l6-6 4 4 8-8"></path>' +
+                '<path d="M14 7h7v7"></path>' +
                 '</svg>' +
                 '</span>'
             );
@@ -98,48 +82,36 @@
             var $meta = $('<span>', {
                 'class': 'VAS_051_cash-flow-meta',
                 'id': 'VAS_051_cash-flow-meta-' + widgetId,
-                'text': lbl('VAS_051_InVsOut', 'In vs Out')
+                'text': lbl('VAS_051_InVsOut', 'IN VS OUT')
             });
 
             var $legend = $('<div>', {
-                'class': 'VAS_051_cash-flow-legend'
+                'class': 'VAS_051_cash-flow-legend',
+                'id': 'VAS_051_cash-flow-legend-' + widgetId
             });
 
-            var $inLegend = $('<span>', {
-                'class': 'VAS_051_cash-flow-legend-item',
-                'html': '<span class="VAS_051_cash-flow-dot VAS_051_cash-flow-dot-in"></span><span id="VAS_051_cash-flow-in-label-' + widgetId + '">' + lbl('VAS_051_In', 'In') + '</span>'
-            });
-
-            var $outLegend = $('<span>', {
-                'class': 'VAS_051_cash-flow-legend-item',
-                'html': '<span class="VAS_051_cash-flow-dot VAS_051_cash-flow-dot-out"></span><span id="VAS_051_cash-flow-out-label-' + widgetId + '">' + lbl('VAS_051_Out', 'Out') + '</span>'
-            });
+            $legend
+                .append($('<span>', {
+                    'class': 'VAS_051_cash-flow-legend-item VAS_051_cash-flow-legend-in',
+                    'text': lbl('VAS_051_CashIn', 'In')
+                }))
+                .append($('<span>', {
+                    'class': 'VAS_051_cash-flow-legend-item VAS_051_cash-flow-legend-out',
+                    'text': lbl('VAS_051_CashOut', 'Out')
+                }));
 
             var $body = $('<div>', {
-                'class': 'VAS_051_cash-flow-body'
+                'class': 'VAS_051_cash-flow-body VAS_051_cash-flow-seven-body',
+                'id': 'VAS_051_cash-flow-body-' + widgetId
             });
-
-            var $chart = $('<div>', {
-                'class': 'VAS_051_cash-flow-chart',
-                'id': 'VAS_051_cash-flow-chart-' + widgetId,
-                'role': 'img',
-                'aria-label': 'Bar chart of cash in vs cash out for the past seven days'
-            });
-
-            var $tooltip = $('<div>', {
-                'class': 'VAS_051_cash-flow-tooltip',
-                'id': 'VAS_051_cash-flow-tooltip-' + widgetId
-            }).hide();
 
             var $state = $('<div>', {
                 'class': 'VAS_051_cash-flow-state',
                 'id': 'VAS_051_cash-flow-state-' + widgetId
             }).hide();
 
-            $legend.append($inLegend).append($outLegend);
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow).append($legend);
-            $body.append($chart).append($tooltip);
             $card.append($busy).append($header).append($body).append($state);
             $root.append($card);
         }
@@ -150,93 +122,57 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
+
             $root.find('#VAS_051_cash-flow-state-' + widgetId).text(message || '').show();
-            $root.find('#VAS_051_cash-flow-chart-' + widgetId).empty();
+            $root.find('#VAS_051_cash-flow-body-' + widgetId).empty();
         }
 
-        function renderChart(days, currencySymbol) {
-            var widgetId = $self.AD_UserHomeWidgetID;
-            var maxAmount = 0;
+        function createDayColumn(item, maxAmount) {
+            var cashIn = safeNumber(item.cashInAmount);
+            var cashOut = safeNumber(item.cashOutAmount);
 
-            $.each(days, function (index, day) {
-                maxAmount = Math.max(maxAmount, safeNumber(day.cashInAmount), safeNumber(day.cashOutAmount));
-            });
+            var inHeight = maxAmount > 0 ? Math.round((cashIn / maxAmount) * 100) : 0;
+            var outHeight = maxAmount > 0 ? Math.round((cashOut / maxAmount) * 100) : 0;
 
-            maxAmount = maxAmount > 0 ? maxAmount : 1;
-
-            var width = 600;
-            var height = 200;
-            var chartTop = 18;
-            var chartBottom = 166;
-            var barMaxHeight = chartBottom - chartTop;
-            var groupWidth = width / 7;
-            var barWidth = 22;
-            var barGap = 6;
-            var html = [
-                '<svg viewBox="0 0 600 200" preserveAspectRatio="none" aria-hidden="true">'
-            ];
-
-            for (var gridIndex = 1; gridIndex <= 4; gridIndex++) {
-                var gridY = chartTop + (barMaxHeight / 4) * gridIndex;
-                html.push('<line x1="0" y1="' + gridY.toFixed(2) + '" x2="600" y2="' + gridY.toFixed(2) + '" class="VAS_051_cash-flow-grid"></line>');
+            if (cashIn === 0) {
+                inHeight = 0;
             }
 
-            $.each(days, function (index, day) {
-                var groupX = index * groupWidth;
-                var centerX = groupX + (groupWidth / 2);
-                var inAmount = safeNumber(day.cashInAmount);
-                var outAmount = safeNumber(day.cashOutAmount);
-                var inHeight = Math.max(2, (inAmount / maxAmount) * barMaxHeight);
-                var outHeight = Math.max(2, (outAmount / maxAmount) * barMaxHeight);
-                var inX = centerX - barWidth - (barGap / 2);
-                var outX = centerX + (barGap / 2);
-                var inY = chartBottom - inHeight;
-                var outY = chartBottom - outHeight;
-                var label = day.dayLabel || '';
-                var date = day.date || '';
+            if (cashOut === 0) {
+                outHeight = 0;
+            }
 
-                html.push('<g class="VAS_051_cash-flow-day" data-day="' + label + '" data-date="' + date + '" data-in="' + inAmount + '" data-out="' + outAmount + '">');
-                html.push('<rect class="VAS_051_cash-flow-bar VAS_051_cash-flow-bar-in" x="' + inX.toFixed(2) + '" y="' + inY.toFixed(2) + '" width="' + barWidth + '" height="' + inHeight.toFixed(2) + '" rx="3"></rect>');
-                html.push('<rect class="VAS_051_cash-flow-bar VAS_051_cash-flow-bar-out" x="' + outX.toFixed(2) + '" y="' + outY.toFixed(2) + '" width="' + barWidth + '" height="' + outHeight.toFixed(2) + '" rx="3"></rect>');
-                html.push('<text class="VAS_051_cash-flow-axis-label" x="' + centerX.toFixed(2) + '" y="194" text-anchor="middle">' + label + '</text>');
-                html.push('</g>');
+            var tooltip = item.tooltip ||
+                ((item.dayLabel || '') + ' ' + (item.date || '') +
+                    ' | In: ' + cashIn +
+                    ' | Out: ' + cashOut);
+
+            var $column = $('<div>', {
+                'class': 'VAS_051_cash-flow-day',
+                'title': tooltip
             });
 
-            html.push('</svg>');
+            var $bars = $('<div>', {
+                'class': 'VAS_051_cash-flow-bars'
+            });
 
-            $root.find('#VAS_051_cash-flow-chart-' + widgetId).html(html.join(''));
-            bindTooltip(currencySymbol);
-        }
+            var $inBar = $('<div>', {
+                'class': 'VAS_051_cash-flow-day-bar VAS_051_cash-flow-day-in'
+            }).css('height', inHeight + '%');
 
-        function bindTooltip(currencySymbol) {
-            var widgetId = $self.AD_UserHomeWidgetID;
-            var $chart = $root.find('#VAS_051_cash-flow-chart-' + widgetId);
-            var $tooltip = $root.find('#VAS_051_cash-flow-tooltip-' + widgetId);
+            var $outBar = $('<div>', {
+                'class': 'VAS_051_cash-flow-day-bar VAS_051_cash-flow-day-out'
+            }).css('height', outHeight + '%');
 
-            $chart.find('.VAS_051_cash-flow-day')
-                .off('mouseenter.VAS051 mousemove.VAS051 mouseleave.VAS051')
-                .on('mouseenter.VAS051 mousemove.VAS051', function (event) {
-                    var $day = $(this);
-                    var inText = formatAmount($day.data('in'), currencySymbol);
-                    var outText = formatAmount($day.data('out'), currencySymbol);
-                    var tooltipHtml = '<strong>' + ($day.data('day') || '') + '</strong>' +
-                        '<span><i class="VAS_051_cash-flow-dot VAS_051_cash-flow-dot-in"></i>' + lbl('VAS_051_In', 'In') + ': ' + inText + '</span>' +
-                        '<span><i class="VAS_051_cash-flow-dot VAS_051_cash-flow-dot-out"></i>' + lbl('VAS_051_Out', 'Out') + ': ' + outText + '</span>';
+            var $label = $('<div>', {
+                'class': 'VAS_051_cash-flow-day-label',
+                'text': (item.dayLabel || '').toUpperCase()
+            });
 
-                    $tooltip.html(tooltipHtml).show();
+            $bars.append($inBar).append($outBar);
+            $column.append($bars).append($label);
 
-                    var chartOffset = $chart.offset();
-                    var left = event.pageX - chartOffset.left + 12;
-                    var top = event.pageY - chartOffset.top - 10;
-
-                    $tooltip.css({
-                        left: left + 'px',
-                        top: top + 'px'
-                    });
-                })
-                .on('mouseleave.VAS051', function () {
-                    $tooltip.hide();
-                });
+            return $column;
         }
 
         function renderData(data) {
@@ -245,19 +181,33 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            var days = data.days || [];
+            var items = data.items || [];
+            var $body = $root.find('#VAS_051_cash-flow-body-' + widgetId);
 
             $root.find('#VAS_051_cash-flow-state-' + widgetId).hide().text('');
             $root.find('#VAS_051_cash-flow-title-' + widgetId).text(data.title || lbl('VAS_051_SevenDayCashFlow', '7-Day Cash Flow'));
-            $root.find('#VAS_051_cash-flow-meta-' + widgetId).text(data.metaText || lbl('VAS_051_InVsOut', 'In vs Out'));
-            $root.find('#VAS_051_cash-flow-in-label-' + widgetId).text(data.inLabel || lbl('VAS_051_In', 'In'));
-            $root.find('#VAS_051_cash-flow-out-label-' + widgetId).text(data.outLabel || lbl('VAS_051_Out', 'Out'));
+            $root.find('#VAS_051_cash-flow-meta-' + widgetId).text(lbl('VAS_051_InVsOut', 'IN VS OUT'));
 
-            renderChart(days, data.currencySymbol);
+            $body.empty();
 
-            if (data.hasData === false) {
-                $root.find('#VAS_051_cash-flow-state-' + widgetId).text(lbl('VAS_051_NoData', 'No data')).show();
+            if (data.hasData === false || items.length === 0) {
+                setState(lbl('VAS_051_NoData', 'No data'));
+                return;
             }
+
+            var maxAmount = 0;
+
+            $.each(items, function (index, item) {
+                maxAmount = Math.max(
+                    maxAmount,
+                    safeNumber(item.cashInAmount),
+                    safeNumber(item.cashOutAmount)
+                );
+            });
+
+            $.each(items.slice(0, 7), function (index, item) {
+                $body.append(createDayColumn(item, maxAmount));
+            });
         }
 
         function loadData() {
@@ -282,12 +232,12 @@
                     }
 
                     if (!response) {
-                        setState(lbl('VAS_051_LoadError', 'Unable to load 7-day cash flow'));
+                        setState(lbl('VAS_051_LoadError', 'Unable to load seven day cash flow'));
                         return;
                     }
 
                     if (response.success === false || response.error) {
-                        setState(response.error || lbl('VAS_051_LoadError', 'Unable to load 7-day cash flow'));
+                        setState(response.error || lbl('VAS_051_LoadError', 'Unable to load seven day cash flow'));
                         return;
                     }
 
@@ -295,7 +245,7 @@
                 },
                 error: function () {
                     if (!isDisposed) {
-                        setState(lbl('VAS_051_LoadError', 'Unable to load 7-day cash flow'));
+                        setState(lbl('VAS_051_LoadError', 'Unable to load seven day cash flow'));
                     }
                 },
                 complete: function () {

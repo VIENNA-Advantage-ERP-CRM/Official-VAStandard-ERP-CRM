@@ -1,0 +1,357 @@
+/*
+ * VAS_053_ApprovalQueueCashJournalWidget.css
+ * Widget : Approval Queue - Cash Journal
+ * Screen : Cash Journal
+ * Prefix : VAS_053_
+ * Scope  : All selectors are scoped under the widget root.
+ */
+
+.VAS_053_approval-root,
+.VAS_053_approval-root * {
+    box-sizing: border-box;
+}
+
+.VAS_053_approval-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    container-type: inline-size;
+    font-family: Roboto, Arial, sans-serif;
+}
+
+.VAS_053_approval-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    padding: 0.875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+}
+
+.VAS_053_approval-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.VAS_053_approval-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.VAS_053_approval-icon {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(0, 131, 218, 0.07);
+    color: #3B7DD8;
+}
+
+.VAS_053_approval-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+.VAS_053_approval-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em;
+    line-height: 1.2;
+    font-weight: 800;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS_053_approval-meta {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #748494;
+}
+
+.VAS_053_approval-action {
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #3B7DD8;
+    font: inherit;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+
+.VAS_053_approval-list {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    overflow: hidden auto;
+    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
+    scrollbar-width: thin;
+}
+
+.VAS_053_approval-list::-webkit-scrollbar {
+    width: 0.375em;
+}
+
+.VAS_053_approval-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.VAS_053_approval-list::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(16, 44, 63, 0.18);
+}
+
+.VAS_053_approval-row {
+    min-width: 0;
+    min-height: 5em;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    padding: 0.625em 0.75em;
+    border: 1px solid rgba(212, 225, 234, 0.86);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.52);
+}
+
+.VAS_053_approval-row-main {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1875em;
+    align-self: stretch;
+}
+
+.VAS_053_approval-row-top {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    min-width: 0;
+}
+
+.VAS_053_approval-row-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 800;
+    color: #102C3F;
+}
+
+.VAS_053_approval-priority {
+    flex: 0 0 auto;
+    padding: 0.1875em 0.45em;
+    border-radius: 6px;
+    font-size: 0.5625em;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.VAS_053_approval-priority-high {
+    background: rgba(196, 63, 68, 0.14);
+    color: #B44045;
+}
+
+.VAS_053_approval-priority-med {
+    background: rgba(154, 101, 0, 0.14);
+    color: #9A6500;
+}
+
+.VAS_053_approval-priority-low {
+    background: rgba(0, 120, 212, 0.12);
+    color: #0B6CA8;
+}
+
+.VAS_053_approval-row-sub,
+.VAS_053_approval-message {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.6875em;
+    line-height: 1.25;
+    color: #5F7283;
+}
+
+.VAS_053_approval-message {
+    margin-top: 0.0625em;
+    color: #7C8795;
+}
+
+.VAS_053_approval-side {
+    min-width: 0;
+    flex: 0 0 auto;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.625em;
+}
+
+.VAS_053_approval-amount {
+    flex: 0 0 auto;
+    max-width: 6.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 800;
+    color: #102C3F;
+}
+
+.VAS_053_approval-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+.VAS_053_approval-btn {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #60748A;
+    cursor: pointer;
+}
+
+.VAS_053_approval-btn svg {
+    width: 0.875em;
+    height: 0.875em;
+    stroke-width: 2.4;
+}
+
+.VAS_053_approval-btn-approve {
+    background: rgba(12, 116, 87, 0.10);
+    color: #0C7457;
+}
+
+.VAS_053_approval-btn-reject {
+    background: rgba(196, 63, 68, 0.12);
+    color: #B44045;
+}
+
+.VAS_053_approval-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    background: rgba(255, 255, 255, 0.76);
+    color: #60748A;
+    font-size: 0.8125em;
+    font-weight: 600;
+    text-align: center;
+}
+
+.VAS_053_approval-state {
+    position: absolute;
+    inset: auto 0.875em 0.875em 0.875em;
+    z-index: 2;
+    display: none;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #748494;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 400;
+    text-align: center;
+}
+
+@container (max-width: 24em) {
+    .VAS_053_approval-card {
+        padding: 0.75em;
+        border-radius: 12px;
+        gap: 0.625em;
+    }
+
+    .VAS_053_approval-action,
+    .VAS_053_approval-meta {
+        display: none;
+    }
+
+    .VAS_053_approval-row {
+        min-height: 4.75em;
+    }
+}
+
+@container (max-width: 16em) {
+    .VAS_053_approval-card {
+        padding: 0.625em;
+    }
+
+    .VAS_053_approval-icon {
+        width: 1.5em;
+        height: 1.5em;
+    }
+
+    .VAS_053_approval-row {
+        padding: 0.5625em 0.625em;
+    }
+
+    .VAS_053_approval-btn {
+        width: 1.5em;
+        height: 1.5em;
+    }
+
+    .VAS_053_approval-amount {
+        max-width: 5em;
+    }
+}

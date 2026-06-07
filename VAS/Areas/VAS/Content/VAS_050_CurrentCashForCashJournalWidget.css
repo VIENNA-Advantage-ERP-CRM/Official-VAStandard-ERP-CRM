@@ -64,12 +64,12 @@
 
 .VAS_current-cash-cash-journal-filter {
     flex-shrink: 0;
-    max-width: 52%;
+    max-width: 45%;
     min-width: 0;
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
-    padding: 0.3125em 0.75em;
+    padding: 0.25em 0.625em;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.78);
@@ -118,8 +118,8 @@
     flex: 1 1 auto;
     display: flex;
     align-items: center;
-    font-size: 2.5em;
-    line-height: 1.05;
+    font-size: 1.375em;
+    line-height: 1.1;
     letter-spacing: 0;
     font-weight: 700;
     color: #FFFFFF;
@@ -181,7 +181,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: rgba(255, 255, 255, 0.56);
-    font-weight: 600;
+    font-weight: 400;
 }
 
 .VAS_current-cash-cash-journal-busy {
@@ -191,42 +191,38 @@
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 1em;
+    padding: 0.875em;
     background: rgba(9, 32, 55, 0.78);
     color: rgba(255, 255, 255, 0.72);
-    font-size: 0.875em;
+    font-size: 0.8125em;
     font-weight: 600;
     text-align: center;
 }
 
 .VAS_current-cash-cash-journal-state {
     position: absolute;
-    inset: auto 1em 1em 1em;
+    inset: auto 0.875em 0.875em 0.875em;
     z-index: 1;
     display: none;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0.625em 0.75em;
-    border-radius: 10px;
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.10);
     color: rgba(255, 255, 255, 0.68);
     font-size: 0.8125em;
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     text-align: center;
 }
 
 @container (max-width: 18.75em) {
     .VAS_current-cash-cash-journal-card {
         padding: 0.75em;
+        gap: 0.375em;
         border-radius: 12px;
-        gap: 0.4375em;
-    }
-
-    .VAS_current-cash-cash-journal-value {
-        font-size: 2.25em;
     }
 
     .VAS_current-cash-cash-journal-filter {
@@ -241,15 +237,11 @@
 @container (max-width: 13.75em) {
     .VAS_current-cash-cash-journal-card {
         padding: 0.625em;
-        gap: 0.375em;
-    }
-
-    .VAS_current-cash-cash-journal-value {
-        font-size: 2em;
+        gap: 0.25em;
     }
 
     .VAS_current-cash-cash-journal-footer {
-        gap: 0.5em;
+        gap: 0.375em;
     }
 
     .VAS_current-cash-cash-journal-select {

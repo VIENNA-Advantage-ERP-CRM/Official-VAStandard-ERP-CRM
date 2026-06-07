@@ -1,0 +1,368 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Web.Mvc;
+using VAdvantage.DataBase;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VIS.Filters;
+
+namespace VAS.Controllers
+{
+    /// <summary>
+    /// Module Name : Cash Journal
+    /// Purpose     : Provides in-progress cash journal approval queue entries.
+    /// </summary>
+    public class VAS_053_ApprovalQueueCashJournalController : Controller
+    {
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetApprovalQueue()
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (ctx == null)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Session Expired",
+                    hasData = false
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            IDataReader reader = null;
+
+            try
+            {
+                string workflowSql = @"
+                    SELECT WorkflowProcess.Record_ID,
+                           WorkflowProcess.TextMsg AS WorkflowMessage,
+                           WorkflowProcess.Priority,
+                           WorkflowProcess.Created AS WorkflowCreated,
+                           WorkflowProcess.AD_WF_Process_ID
+                    FROM AD_WF_Process WorkflowProcess
+                    WHERE WorkflowProcess.IsActive='Y'
+                    AND WorkflowProcess.AD_Table_ID=(SELECT AD_Table.AD_Table_ID
+                        FROM AD_Table AD_Table
+                        WHERE AD_Table.TableName='C_Cash')
+                    AND NOT EXISTS (SELECT 1
+                        FROM AD_WF_Process WorkflowProcess2
+                        WHERE WorkflowProcess2.IsActive='Y'
+                        AND WorkflowProcess2.AD_Table_ID=WorkflowProcess.AD_Table_ID
+                        AND WorkflowProcess2.Record_ID=WorkflowProcess.Record_ID
+                        AND (
+                            WorkflowProcess2.Created > WorkflowProcess.Created
+                            OR (
+                                WorkflowProcess2.Created=WorkflowProcess.Created
+                                AND WorkflowProcess2.AD_WF_Process_ID > WorkflowProcess.AD_WF_Process_ID
+                                )
+                            )
+                    )";
+
+                string queueSql = @"
+                    SELECT CashHeader.C_Cash_ID,
+                           CashHeader.DocumentNo,
+                           CashHeader.Created,
+                           CashHeader.CreatedBy,
+                           CashHeader.StatementDate,
+                           CashHeader.EndingBalance,
+                           CashHeader.DocStatus,
+                           CashBook.Name AS CashBookName,
+                           CreatedBy.Name AS CreatedByName,
+                           Currency.ISO_Code AS CurrencyISO,
+                           Currency.CurSymbol AS CurrencySymbol,
+                           Currency.StdPrecision,
+                           LatestWorkflow.WorkflowMessage,
+                           LatestWorkflow.Priority
+                    FROM C_Cash CashHeader
+                    INNER JOIN C_CashBook CashBook
+                        ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
+                    INNER JOIN C_Currency Currency
+                        ON (CashBook.C_Currency_ID=Currency.C_Currency_ID)
+                    LEFT OUTER JOIN AD_User CreatedBy
+                        ON (CashHeader.CreatedBy=CreatedBy.AD_User_ID)
+                    LEFT OUTER JOIN LatestWorkflow LatestWorkflow
+                        ON (LatestWorkflow.Record_ID=CashHeader.C_Cash_ID)
+                    WHERE CashHeader.IsActive='Y'
+                    AND CashBook.IsActive='Y'
+                    AND CashHeader.DocStatus='IP'";
+
+                queueSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    queueSql,
+                    "CashHeader",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
+
+                string sql = @"
+                    WITH LatestWorkflow AS (
+                        " + workflowSql + @"
+                    )
+                    SELECT ApprovalQueue.C_Cash_ID,
+                           ApprovalQueue.DocumentNo,
+                           ApprovalQueue.Created,
+                           ApprovalQueue.CreatedBy,
+                           ApprovalQueue.StatementDate,
+                           ApprovalQueue.EndingBalance,
+                           ApprovalQueue.DocStatus,
+                           ApprovalQueue.CashBookName,
+                           ApprovalQueue.CreatedByName,
+                           ApprovalQueue.CurrencyISO,
+                           ApprovalQueue.CurrencySymbol,
+                           ApprovalQueue.StdPrecision,
+                           ApprovalQueue.WorkflowMessage,
+                           ApprovalQueue.Priority
+                    FROM (" + queueSql.Trim() + @") ApprovalQueue
+                    ORDER BY ApprovalQueue.Created DESC,
+                             ApprovalQueue.C_Cash_ID DESC";
+
+                List<object> items = new List<object>();
+                int pendingCount = 0;
+
+                reader = DB.ExecuteReader(sql, null, null);
+
+                while (reader.Read())
+                {
+                    pendingCount++;
+
+                    int priority = GetInt(reader, "Priority");
+
+                    string workflowMessage = GetString(reader, "WorkflowMessage");
+                    workflowMessage = ShortText(workflowMessage, 90);
+
+                    items.Add(new
+                    {
+                        cCashId = GetInt(reader, "C_Cash_ID"),
+                        documentNo = GetString(reader, "DocumentNo"),
+                        title = GetTitle(ctx, reader),
+                        cashBookName = GetString(reader, "CashBookName"),
+                        createdByName = GetString(reader, "CreatedByName"),
+                        created = FormatDbDateTime(reader["Created"]),
+                        relativeTime = GetRelativeTime(ctx, reader["Created"]),
+                        amount = GetDecimal(reader, "EndingBalance"),
+                        currencyISO = GetString(reader, "CurrencyISO"),
+                        currencySymbol = GetString(reader, "CurrencySymbol"),
+                        stdPrecision = GetInt(reader, "StdPrecision", 2),
+                        workflowMessage = workflowMessage,
+                        priority = priority,
+                        priorityText = GetPriorityText(ctx, priority),
+                        priorityClass = GetPriorityClass(priority)
+                    });
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    error = string.Empty,
+                    title = GetMsg(ctx, "VAS_053_ApprovalQueue", "Approval Queue"),
+                    pendingText = GetMsg(ctx, "VAS_053_Pending", "Pending"),
+                    viewAllText = GetMsg(ctx, "VAS_053_ViewAll", "View all ->"),
+                    submittedByText = GetMsg(ctx, "VAS_053_SubmittedBy", "Submitted by"),
+                    noDataText = GetMsg(ctx, "VAS_053_NoData", "No in-progress cash journals"),
+                    pendingCount = pendingCount,
+                    items = items,
+                    hasData = pendingCount > 0
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = GetMsg(ctx, "VAS_053_LoadError", "Unable to load approval queue"),
+                    hasData = false
+                }, JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (reader != null)
+                {
+                    reader.Close();
+                    reader.Dispose();
+                }
+            }
+        }
+
+        private string GetTitle(Ctx ctx, IDataReader reader)
+        {
+            string documentNo = GetString(reader, "DocumentNo");
+            string cashBookName = GetString(reader, "CashBookName");
+
+            if (!string.IsNullOrWhiteSpace(documentNo) && !string.IsNullOrWhiteSpace(cashBookName))
+            {
+                return documentNo + " - " + cashBookName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(documentNo))
+            {
+                return documentNo;
+            }
+
+            if (!string.IsNullOrWhiteSpace(cashBookName))
+            {
+                return cashBookName;
+            }
+
+            return GetMsg(ctx, "VAS_053_CashJournal", "Cash Journal");
+        }
+
+        private string GetPriorityText(Ctx ctx, int priority)
+        {
+            if (priority >= 8)
+            {
+                return GetMsg(ctx, "VAS_053_High", "High");
+            }
+
+            if (priority >= 4)
+            {
+                return GetMsg(ctx, "VAS_053_Medium", "Med");
+            }
+
+            return GetMsg(ctx, "VAS_053_Low", "Low");
+        }
+
+        private string GetPriorityClass(int priority)
+        {
+            if (priority >= 8)
+            {
+                return "high";
+            }
+
+            if (priority >= 4)
+            {
+                return "med";
+            }
+
+            return "low";
+        }
+
+        private string GetRelativeTime(Ctx ctx, object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return string.Empty;
+            }
+
+            DateTime created;
+
+            if (!DateTime.TryParse(value.ToString(), out created))
+            {
+                return string.Empty;
+            }
+
+            TimeSpan elapsed = DateTime.Now - created;
+
+            if (elapsed.TotalMinutes < 1)
+            {
+                return GetMsg(ctx, "VAS_053_JustNow", "just now");
+            }
+
+            if (elapsed.TotalHours < 1)
+            {
+                return Math.Max(1, Convert.ToInt32(Math.Floor(elapsed.TotalMinutes))) + "m " + GetMsg(ctx, "VAS_053_Ago", "ago");
+            }
+
+            if (elapsed.TotalDays < 1)
+            {
+                return Math.Max(1, Convert.ToInt32(Math.Floor(elapsed.TotalHours))) + "h " + GetMsg(ctx, "VAS_053_Ago", "ago");
+            }
+
+            if (elapsed.TotalDays < 2)
+            {
+                return GetMsg(ctx, "VAS_053_Yesterday", "yesterday");
+            }
+
+            return Math.Max(1, Convert.ToInt32(Math.Floor(elapsed.TotalDays))) + "d " + GetMsg(ctx, "VAS_053_Ago", "ago");
+        }
+
+        private string GetMsg(Ctx ctx, string key, string fallback)
+        {
+            string msg = Msg.GetMsg(ctx, key);
+
+            if (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]")
+            {
+                return fallback;
+            }
+
+            return msg;
+        }
+
+        private string FormatDbDateTime(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return string.Empty;
+            }
+
+            DateTime dateValue;
+
+            if (DateTime.TryParse(value.ToString(), out dateValue))
+            {
+                return dateValue.ToString("yyyy-MM-dd HH:mm");
+            }
+
+            return string.Empty;
+        }
+
+        private string ShortText(string text, int maxLength)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            text = text.Replace("\r", " ").Replace("\n", " ").Trim();
+
+            while (text.Contains("  "))
+            {
+                text = text.Replace("  ", " ");
+            }
+
+            if (text.Length <= maxLength)
+            {
+                return text;
+            }
+
+            return text.Substring(0, maxLength) + "...";
+        }
+
+        private decimal GetDecimal(IDataReader reader, string columnName)
+        {
+            object value = reader[columnName];
+
+            if (value == null || value == DBNull.Value)
+            {
+                return 0;
+            }
+
+            decimal result;
+            return decimal.TryParse(value.ToString(), out result) ? result : 0;
+        }
+
+        private int GetInt(IDataReader reader, string columnName, int fallback = 0)
+        {
+            object value = reader[columnName];
+
+            if (value == null || value == DBNull.Value)
+            {
+                return fallback;
+            }
+
+            int result;
+            return int.TryParse(value.ToString(), out result) ? result : fallback;
+        }
+
+        private string GetString(IDataReader reader, string columnName)
+        {
+            object value = reader[columnName];
+
+            if (value == null || value == DBNull.Value)
+            {
+                return string.Empty;
+            }
+
+            return value.ToString();
+        }
+    }
+}

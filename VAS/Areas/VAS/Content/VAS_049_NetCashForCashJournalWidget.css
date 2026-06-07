@@ -36,9 +36,9 @@
     padding: 0.875em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    color: #5F7283;
+    background: linear-gradient(180deg, #E4F4FF 0%, #F2FAFF 100%);
+    box-shadow: 0 10px 24px rgba(20, 86, 132, 0.08);
+    color: #60748A;
 }
 
 .VAS_net-cash-cash-journal-row {
@@ -59,7 +59,7 @@
     line-height: 1.2;
     font-weight: 700;
     letter-spacing: 0;
-    color: #102C3F;
+    color: #60748A;
 }
 
 .VAS_net-cash-cash-journal-date {
@@ -68,15 +68,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0.3125em 0.75em;
+    padding: 0.25em 0.625em;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.72);
+    background: rgba(255, 255, 255, 0.86);
     font-size: 0.6875em;
     line-height: 1.2;
     font-weight: 700;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #748494;
+    color: #7C8795;
 }
 
 .VAS_net-cash-cash-journal-value {
@@ -87,23 +87,23 @@
     flex: 1 1 auto;
     display: flex;
     align-items: center;
-    font-size: 2.5em;
-    line-height: 1.05;
+    font-size: 1.375em;
+    line-height: 1.1;
     letter-spacing: 0;
     font-weight: 700;
-    color: #2A558B;
+    color: #005487;
 }
 
 .VAS_net-cash-cash-journal-value-positive {
-    color: #2A558B;
+    color: #005487;
 }
 
 .VAS_net-cash-cash-journal-value-negative {
-    color: #A33F3F;
+    color: #A94747;
 }
 
 .VAS_net-cash-cash-journal-value-neutral {
-    color: #5F7283;
+    color: #60748A;
 }
 
 .VAS_net-cash-cash-journal-footer {
@@ -114,7 +114,7 @@
     flex-shrink: 0;
     font-size: 0.6875em;
     line-height: 1.3;
-    color: #5F7283;
+    color: #60748A;
 }
 
 .VAS_net-cash-cash-journal-delta {
@@ -133,15 +133,15 @@
     }
 
 .VAS_net-cash-cash-journal-delta-positive {
-    color: #0B6B45;
+    color: #0B6F55;
 }
 
 .VAS_net-cash-cash-journal-delta-negative {
-    color: #A33F3F;
+    color: #A94747;
 }
 
 .VAS_net-cash-cash-journal-delta-neutral {
-    color: #5F7283;
+    color: #60748A;
 }
 
 .VAS_net-cash-cash-journal-description {
@@ -149,7 +149,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #5F7283;
+    color: #60748A;
     font-weight: 500;
 }
 
@@ -160,42 +160,38 @@
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 1em;
+    padding: 0.875em;
     background: rgba(255, 255, 255, 0.74);
-    color: #5F7283;
-    font-size: 0.875em;
+    color: #60748A;
+    font-size: 0.8125em;
     font-weight: 600;
     text-align: center;
 }
 
 .VAS_net-cash-cash-journal-state {
     position: absolute;
-    inset: auto 1em 1em 1em;
+    inset: auto 0.875em 0.875em 0.875em;
     z-index: 1;
     display: none;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0.625em 0.75em;
-    border-radius: 10px;
+    padding: 0.5em 0.75em;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.68);
     color: #748494;
     font-size: 0.8125em;
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     text-align: center;
 }
 
 @container (max-width: 18.75em) {
     .VAS_net-cash-cash-journal-card {
         padding: 0.75em;
+        gap: 0.375em;
         border-radius: 12px;
-        gap: 0.4375em;
-    }
-
-    .VAS_net-cash-cash-journal-value {
-        font-size: 2.25em;
     }
 
     .VAS_net-cash-cash-journal-date {
@@ -206,14 +202,10 @@
 @container (max-width: 13.75em) {
     .VAS_net-cash-cash-journal-card {
         padding: 0.625em;
-        gap: 0.375em;
-    }
-
-    .VAS_net-cash-cash-journal-value {
-        font-size: 2em;
+        gap: 0.25em;
     }
 
     .VAS_net-cash-cash-journal-footer {
-        gap: 0.5em;
+        gap: 0.375em;
     }
 }

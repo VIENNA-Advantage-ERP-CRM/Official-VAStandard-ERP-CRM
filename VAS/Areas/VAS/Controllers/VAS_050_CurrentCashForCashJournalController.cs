@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -13,16 +14,15 @@ namespace VAS.Controllers
     /// <summary>
     /// Module Name : Cash Journal
     /// Purpose     : Provides latest cash book ending balance for Current Cash dashboard widget.
-    /// Chronological development:
-    ///   VAS   Created 2026-06-06
     /// </summary>
     public class VAS_050_CurrentCashForCashJournalController : Controller
     {
-       
         /// <summary>
         /// Gets latest ending balance for selected Cash Book / Drawer.
         /// </summary>
-        /// <param name="cashBookId">Selected C_CashBook_ID. Pass 0 to use first accessible drawer with latest cash journal.</param>
+        /// <param name="cashBookId">
+        /// Selected C_CashBook_ID. Pass 0 to use first accessible drawer with latest cash journal.
+        /// </param>
         /// <returns>JSON response for Current Cash widget.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -41,9 +41,41 @@ namespace VAS.Controllers
             }
 
             IDataReader reader = null;
+            IDataReader cashBookReader = null;
 
             try
             {
+                List<object> cashBooks = new List<object>();
+
+                string cashBookListSql = @"
+                    SELECT CashBook.C_CashBook_ID,
+                           CashBook.Name
+                    FROM C_CashBook CashBook
+                    WHERE CashBook.IsActive = 'Y'
+                    ORDER BY CashBook.Name";
+
+                cashBookListSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    cashBookListSql,
+                    "CashBook",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
+
+                cashBookReader = DB.ExecuteReader(cashBookListSql, null, null);
+
+                while (cashBookReader.Read())
+                {
+                    cashBooks.Add(new
+                    {
+                        cCashBookId = GetInt(cashBookReader, "C_CashBook_ID"),
+                        name = GetString(cashBookReader, "Name")
+                    });
+                }
+
+                cashBookReader.Close();
+                cashBookReader.Dispose();
+                cashBookReader = null;
+
                 string schemaCurrencySql = @"
                     SELECT ClientInfo.AD_Client_ID,
                            AcctSchema.C_Currency_ID AS C_Currency_ID,
@@ -54,7 +86,7 @@ namespace VAS.Controllers
                                ELSE Currency.ISO_Code
                            END AS Cur_Symbol
                     FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
+                INNER JOIN C_AcctSchema AcctSchema
                         ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
                     INNER JOIN C_Currency Currency
                         ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
@@ -64,12 +96,12 @@ namespace VAS.Controllers
                 if (cashBookId > 0)
                 {
                     cashBookFilter = @"
-                    AND CashBook.C_CashBook_ID=" + cashBookId;
+                    AND CashBook.C_CashBook_ID=@CashBookId";
                 }
 
                 string convertedEndingBalanceExpression = @"
                     CASE
-                        WHEN CashBook.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(CashHeader.EndingBalance, 0)
+                        WHEN CashBook.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashHeader.EndingBalance, 0)
                         ELSE CurrencyConvert(
                             COALESCE(CashHeader.EndingBalance, 0),
                             CashBook.C_Currency_ID,
@@ -81,7 +113,7 @@ namespace VAS.Controllers
                         )
                     END";
 
-                string rankedCashSql = @"
+                string latestCashSql = @"
                     SELECT CashHeader.C_Cash_ID,
                            CashHeader.C_CashBook_ID,
                            CashBook.Name AS CashBookName,
@@ -95,77 +127,91 @@ namespace VAS.Controllers
                            COALESCE(SchemaCurrency.StdPrecision, 2) AS StdPrecision,
                            SchemaCurrency.C_Currency_ID AS C_Currency_ID,
                            SchemaCurrency.ISO_Code AS CurrencyISO,
-                           SchemaCurrency.Cur_Symbol AS CurrencySymbol,
-                           ROW_NUMBER() OVER (
-                               PARTITION BY CashHeader.C_CashBook_ID
-                               ORDER BY CashHeader.StatementDate DESC, CashHeader.C_Cash_ID DESC
-                           ) AS RowNo
+                           SchemaCurrency.Cur_Symbol AS CurrencySymbol
                     FROM C_Cash CashHeader
                     INNER JOIN C_CashBook CashBook
                         ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
                     INNER JOIN SchemaCurrency SchemaCurrency
                         ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
                     WHERE CashHeader.IsActive='Y'
-                    AND CashBook.IsActive='Y'"
-                    + cashBookFilter;
+                    AND CashHeader.DocStatus IN ('DR','CO','CL')
+                    AND CashBook.IsActive='Y'
+                    " + cashBookFilter + @"
+                    AND NOT EXISTS (SELECT 1
+                        FROM C_Cash CashHeader2
+                        WHERE CashHeader2.IsActive='Y'
+                        AND CashHeader2.DocStatus IN ('DR','CO','CL')
+                        AND CashHeader2.C_CashBook_ID=CashHeader.C_CashBook_ID
+                        AND (
+                            CashHeader2.StatementDate > CashHeader.StatementDate
+                            OR (
+                                CashHeader2.StatementDate=CashHeader.StatementDate
+                                AND CashHeader2.C_Cash_ID > CashHeader.C_Cash_ID
+                                )
+                            )
+                    )";
 
-                rankedCashSql = MRole.GetDefault(ctx).AddAccessSQL(rankedCashSql, "CashHeader", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                latestCashSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    latestCashSql,
+                    "CashHeader",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 string sql = @"
                     WITH SchemaCurrency AS (
                         " + schemaCurrencySql + @"
-                    ),
-                    RankedCash AS (
-                        " + rankedCashSql + @"
                     )
-                    SELECT RankedCash.C_Cash_ID,
-                           RankedCash.C_CashBook_ID,
-                           RankedCash.CashBookName,
-                           RankedCash.DocumentNo,
-                           RankedCash.StatementDate,
-                           RankedCash.DateAcct,
-                           RankedCash.CurrentBalance,
-                           RankedCash.StdPrecision,
-                           RankedCash.C_Currency_ID,
-                           RankedCash.CurrencyISO,
-                           RankedCash.CurrencySymbol
-                    FROM RankedCash RankedCash
-                    WHERE RankedCash.RowNo=1
-                    ORDER BY RankedCash.CashBookName";
+                    SELECT LatestCash.C_Cash_ID,
+                           LatestCash.C_CashBook_ID,
+                           LatestCash.CashBookName,
+                           LatestCash.DocumentNo,
+                           LatestCash.StatementDate,
+                           LatestCash.DateAcct,
+                           LatestCash.CurrentBalance,
+                           LatestCash.StdPrecision,
+                           LatestCash.C_Currency_ID,
+                           LatestCash.CurrencyISO,
+                           LatestCash.CurrencySymbol
+                    FROM (" + latestCashSql.Trim() + @") LatestCash
+                    ORDER BY LatestCash.CashBookName";
 
                 int selectedCashBookId = 0;
                 int cashId = 0;
                 int stdPrecision = 2;
                 int currencyId = 0;
+
                 decimal currentBalance = 0;
+
                 string cashBookName = string.Empty;
                 string documentNo = string.Empty;
                 string statementDate = string.Empty;
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
-                List<object> cashBooks = new List<object>();
 
-                reader = DB.ExecuteReader(sql, null, null);
+                SqlParameter[] parameters = null;
+
+                if (cashBookId > 0)
+                {
+                    parameters = new SqlParameter[]
+                    {
+                        new SqlParameter("@CashBookId", cashBookId)
+                    };
+                }
+
+                reader = DB.ExecuteReader(sql, parameters, null);
 
                 bool selectedRowRead = false;
 
                 while (reader.Read())
                 {
-                    int rowCashBookId = GetInt(reader, "C_CashBook_ID");
-                    string rowCashBookName = GetString(reader, "CashBookName");
-
-                    cashBooks.Add(new
-                    {
-                        cCashBookId = rowCashBookId,
-                        name = rowCashBookName
-                    });
-
                     if (!selectedRowRead)
                     {
                         selectedRowRead = true;
-                        selectedCashBookId = rowCashBookId;
+
+                        selectedCashBookId = GetInt(reader, "C_CashBook_ID");
                         cashId = GetInt(reader, "C_Cash_ID");
-                        cashBookName = rowCashBookName;
+                        cashBookName = GetString(reader, "CashBookName");
                         documentNo = GetString(reader, "DocumentNo");
                         statementDate = FormatDbDate(reader["StatementDate"]);
                         currentBalance = GetDecimal(reader, "CurrentBalance");
@@ -183,9 +229,11 @@ namespace VAS.Controllers
                         success = true,
                         error = string.Empty,
                         hasData = false,
+                        title = GetMsg(ctx, "VAS_050_CurrentCash", "Current cash"),
                         mainMetric = 0,
                         mainMetricText = "0",
-                        description = string.Empty,
+                        footerAmount = 0,
+                        description = GetMsg(ctx, "VAS_050_NoCashLeft", "no cash left"),
                         badgeText = GetMsg(ctx, "VAS_050_Live", "Live"),
                         cashBooks = cashBooks
                     }, JsonRequestBehavior.AllowGet);
@@ -218,7 +266,8 @@ namespace VAS.Controllers
             }
             catch (Exception ex)
             {
-             
+                VLogger.Get().SaveError("GetCurrentCash", ex);
+
                 return Json(new
                 {
                     success = false,
@@ -233,40 +282,18 @@ namespace VAS.Controllers
                     reader.Close();
                     reader.Dispose();
                 }
+
+                if (cashBookReader != null)
+                {
+                    cashBookReader.Close();
+                    cashBookReader.Dispose();
+                }
             }
-        }
-
-        /// <summary>
-        /// Builds database-specific half-open date filter.
-        /// </summary>
-        /// <param name="columnName">Hardcoded date column name.</param>
-        /// <param name="dateFrom">Start date inclusive.</param>
-        /// <param name="dateTo">End date exclusive.</param>
-        /// <returns>SQL date filter text.</returns>
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
-        {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
-
-            if (DB.IsOracle())
-            {
-                return @"
-                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
-                ";
-            }
-
-            return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
-            ";
         }
 
         /// <summary>
         /// Formats date using fixed yyyy-MM-dd pattern.
         /// </summary>
-        /// <param name="date">Date value.</param>
-        /// <returns>Formatted date text.</returns>
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");
@@ -275,10 +302,6 @@ namespace VAS.Controllers
         /// <summary>
         /// Gets translated message with fallback.
         /// </summary>
-        /// <param name="ctx">VIS context.</param>
-        /// <param name="key">Message key.</param>
-        /// <param name="fallback">Fallback text.</param>
-        /// <returns>Translated message or fallback.</returns>
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
@@ -294,9 +317,6 @@ namespace VAS.Controllers
         /// <summary>
         /// Gets status message for current cash balance.
         /// </summary>
-        /// <param name="ctx">VIS context.</param>
-        /// <param name="currentBalance">Latest cash ending balance.</param>
-        /// <returns>Translated balance status text.</returns>
         private string GetCurrentCashDescription(Ctx ctx, decimal currentBalance)
         {
             if (currentBalance < 0)
@@ -315,9 +335,6 @@ namespace VAS.Controllers
         /// <summary>
         /// Safely reads decimal value from data reader by column name.
         /// </summary>
-        /// <param name="reader">Data reader.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <returns>Decimal value.</returns>
         private decimal GetDecimal(IDataReader reader, string columnName)
         {
             object value = reader[columnName];
@@ -334,10 +351,6 @@ namespace VAS.Controllers
         /// <summary>
         /// Safely reads integer value from data reader by column name.
         /// </summary>
-        /// <param name="reader">Data reader.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <param name="fallback">Fallback value.</param>
-        /// <returns>Integer value.</returns>
         private int GetInt(IDataReader reader, string columnName, int fallback = 0)
         {
             object value = reader[columnName];
@@ -354,9 +367,6 @@ namespace VAS.Controllers
         /// <summary>
         /// Safely reads string value from data reader by column name.
         /// </summary>
-        /// <param name="reader">Data reader.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <returns>String value.</returns>
         private string GetString(IDataReader reader, string columnName)
         {
             object value = reader[columnName];
@@ -372,8 +382,6 @@ namespace VAS.Controllers
         /// <summary>
         /// Safely formats a database date value.
         /// </summary>
-        /// <param name="value">Database date value.</param>
-        /// <returns>Formatted date text.</returns>
         private string FormatDbDate(object value)
         {
             if (value == null || value == DBNull.Value)
