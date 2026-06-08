@@ -8,14 +8,18 @@
  * cannot clip it.
  *
  * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` on .vas-rsw-esw resolves to clamp(16px, 1.4cqi, 24px) — the cell-
+ * width-anchored base that scales the whole widget on large dashboard cells.
+ * cqi resolves against .vas-rsw-root (container-type: inline-size).
+ * `1em` on the body-mounted suggest dropdown stays at 16px (viewport-relative).
  * Namespaced vas-rsw-*.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .vas-rsw-root {
     width: 100%;
     height: 100%;
+    container-type: inline-size;
     font-family: Roboto, sans-serif;
-    font-size: 1em;
     color: #102C3F;
     display: flex;
     align-items: center;
@@ -28,8 +32,12 @@
         box-sizing: border-box;
     }
 
-/* Gutter band — equal empty space left & right; pill floats centered. */
+/* Gutter band — equal empty space left & right; pill floats centered.
+   font-size clamp anchors the whole widget to the dashboard cell width
+   (cqi resolves against .vas-rsw-root which carries container-type: inline-size).
+   1.4cqi matches the 1x9 full-width pattern — same coefficient as VAS_RecentReceipts. */
 .vas-rsw-esw {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 24px);
     width: 100%;
     max-width: 93.75em;               /* ~1500px */
     padding: 0 9.7%;
@@ -46,13 +54,10 @@
     display: flex;
     align-items: center;
     gap: 0.75em;
-    height: 3.5em;                    /* 56px */
+    height: 3em;                    /* 56px */
     padding: 0 0.875em 0 1.25em;
-    /* Pale tinted glass: faint blue → faint green, matching the app gradient pickup. */
-    background: linear-gradient(100deg,
-        rgb(240, 248, 255) 0%,
-        rgb(244, 250, 253) 50%,
-        rgb(247, 252, 247) 100%);
+    /* Shared neutral glass surface (design.md): default widget glass, no tint. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.0625em solid rgba(255, 255, 255, 0.85);
     border-top-color: rgba(255, 255, 255, 0.95);
     border-radius: 1em;               /* 16px */
@@ -265,15 +270,24 @@
         color: #102C3F;
     }
 
-/* small-screen safety */
-@media (max-width: 45em) {            /* ~720px */
+/* Narrow-cell safety — container-based (matches the cqi font anchor) so the height
+   responds to the dashboard CELL width, not the viewport. Fires when the widget cell
+   is narrow (sidebar + right panel open, or a small screen). */
+@container (max-width: 45em) {        /* narrow cell (~720px) */
     .vas-rsw-esw {
         padding: 0 1em;
     }
     .vas-rsw-input {
         height: 3.125em;
     }
-    .vas-rsw-field {
+    .vas-rsw-input .vas-rsw-field {
         font-size: 0.875em;
+    }
+}
+
+/* Very narrow cell — keep the pill a usable height and tighten further. */
+@container (max-width: 26em) {        /* ~420px */
+    .vas-rsw-input {
+        height: 2.875em;
     }
 }

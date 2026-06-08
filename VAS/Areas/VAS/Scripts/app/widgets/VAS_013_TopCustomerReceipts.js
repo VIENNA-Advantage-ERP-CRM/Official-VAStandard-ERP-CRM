@@ -24,6 +24,28 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_013_TopCustomerReceipts = function () {
 
         this.frame;
@@ -122,7 +144,8 @@
             });
         }
 
-        /* Symbol *before* the amount, sign before symbol when negative. */
+        /* Symbol *before* the amount, explicit sign before symbol (+ for zero or
+           positive, - for negative). */
         function formatAmount(value, symbol, stdPrecision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -168,7 +191,8 @@
                 var name = row.CustomerName || "";
                 var amount = Number(row.Amount || 0);
                 var amtHtml = formatAmount(amount, symbol, stdPrecision);
-                var exactTitle = (symbol ? symbol + ' ' : '') + formatExactAmount(amount, stdPrecision);
+                var exactSign = amount < 0 ? '-' : '';
+                var exactTitle = exactSign + (symbol ? symbol + ' ' : '') + formatExactAmount(Math.abs(amount), stdPrecision);
 
                 /* Proportion of the top customer; keep a small floor so tiny
                    non-zero values still render a visible sliver. */
@@ -247,6 +271,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_013_TopCustomerReceipts.prototype.widgetSizeChange = function (height, width) { };

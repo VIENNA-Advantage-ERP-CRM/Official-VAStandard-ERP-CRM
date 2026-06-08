@@ -38,6 +38,28 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_034_ExpectedReceipts = function () {
 
         this.frame;
@@ -85,7 +107,7 @@
         var toDate = "";
 
         var pageNo = 1;
-        var pageSize = 10;
+        var pageSize = 7;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -287,7 +309,10 @@
         }
 
         function formatAmount(row) {
-            var absVal = Number(row && row.TotalAmt || 0);
+            /* Use the raw signed value to determine the sign; format the magnitude only. */
+            var rawVal = Number(row && row.TotalAmt || 0);
+            var sign = rawVal < 0 ? '-' : '';
+            var absVal = Math.abs(rawVal);
             var precision = Number(row && row.stdPrecision || 0);
 
             var text = absVal.toLocaleString(window.navigator.language, {
@@ -298,11 +323,13 @@
             var symbol = row && row.Symbol ? row.Symbol.toString() : "";
 
             if (!symbol) {
-                return text;
+                /* No symbol: sign then magnitude. */
+                return sign + text;
             }
 
-            /* 3-char ISO codes read better after the amount; glyph symbols before. */
-            return symbol.length === 3 ? (text + " " + symbol) : (symbol + "" + text);
+            /* 3-char ISO codes read better after the amount; glyph symbols before.
+               Sign is always the very first character, before the currency symbol. */
+            return symbol.length === 3 ? (sign + text + " " + symbol) : (sign + symbol + text);
         }
 
         function updatePager() {
@@ -624,6 +651,9 @@
 
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_034_ExpectedReceipts.prototype.widgetSizeChange = function (height, width) {

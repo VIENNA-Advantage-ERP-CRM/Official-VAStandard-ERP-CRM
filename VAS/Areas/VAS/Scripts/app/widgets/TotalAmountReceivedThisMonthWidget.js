@@ -4,10 +4,12 @@
  *           base (accounting schema) currency. Clicking the card opens a modal
  *           dialog listing every receipt (Date, Receipt No., Customer, Bank
  *           account, Amount, Payment Currency, Allocated).
- * Design   - Per design.md / widget.html: Onfinity Glass Widget with `tint-info`
- *            KPI shell — 2rem icon well, 13px muted label, ↗ View hint, big bold
- *            primary-blue metric prefixed with the base currency symbol, and a
- *            translucent "POSTED · Customer collections so far" detail pill.
+ * Design   - Per design.md / dashboard-widgets.md §"KPI And Summary Widget":
+ *            glass KPI shell on the em-based Widget Root Anchor
+ *            (clamp(16px, 5.6cqi, 32px) tuned to the 2-col cell) — 2em icon
+ *            well, dark bold title-label, ↗ View hint, 1.75em Medium
+ *            primary-blue metric prefixed with the base currency symbol, and
+ *            an xs muted "Customer collections so far" meta line.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                              | Message Key
@@ -36,6 +38,28 @@
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.TotalAmountReceivedThisMonthWidget = function () {
 
@@ -246,6 +270,7 @@
 
         function formatExactAmount(value) {
             var num = Number(value || 0);
+            var sign = num < 0 ? '-' : '';
             var stdPrecision = 2;
 
             try {
@@ -257,14 +282,15 @@
                 stdPrecision = 2;
             }
 
-            return num.toLocaleString(window.navigator.language, {
+            return sign + Math.abs(num).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
         }
 
         /* Place the currency symbol *before* the amount, sign before symbol
-           when negative (e.g. -₹1.2M). Matches design.md and image_2.png. */
+           (e.g. ₹1.2M or -₹1.2M). Negatives show '-'; positives and zero show no sign.
+           Matches design.md and image_2.png. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -556,12 +582,6 @@
                 '</div>' +
                 '<span class="vas-tarm-label">' + lbl("VIS_ReceivedThisMonth", "Received this month") + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-tarm-view">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>' +
-                '</svg>' +
-                '<span>' + lbl("VIS_View", "View") + '</span>' +
-                '</button>' +
                 '</div>' +
 
                 '<div class="vas-tarm-metric">—</div>' +
@@ -584,12 +604,6 @@
                     e.preventDefault();
                     openDialog();
                 }
-            });
-
-            /* The view link is a child of the clickable card — let it propagate. */
-            $card.find('.vas-tarm-view').on('click', function (e) {
-                e.stopPropagation();
-                openDialog();
             });
 
             $root.append($card);
@@ -630,6 +644,9 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.TotalAmountReceivedThisMonthWidget.prototype.widgetSizeChange = function (height, width) { };

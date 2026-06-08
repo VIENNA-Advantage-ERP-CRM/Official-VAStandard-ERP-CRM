@@ -40,6 +40,28 @@
 
 ; (function (VIS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VIS.ExpectedThisWeekWidget = function () {
 
         this.frame;
@@ -252,7 +274,8 @@
             });
         }
 
-        /* Currency symbol leads the amount (sign before symbol when negative). */
+        /* Currency symbol leads the amount (sign before symbol; nothing for zero
+           and positive, - for negative). */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -343,10 +366,13 @@
                 var dueDateText = formatDate(row.dueDate);
                 var invoiceCurrency = row.invoiceCurrency || "";
                 var sym = row.invoiceCurrencySymbol || invoiceCurrency || "";
-                var amountText = formatExactAmount(row.amount);
+                var rawAmount = Number(row.amount || 0);
+                var amountSign = rawAmount < 0 ? '-' : '';
+                var amountText = formatExactAmount(Math.abs(rawAmount));
                 /* Amount keeps its invoice-currency symbol inline — no
-                   conversion to base currency, per spec. */
-                var amountHtml = (sym ? '<span class="vas-etw-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
+                   conversion to base currency, per spec.  Sign leads the
+                   symbol: e.g. "$1,000.00" (positive) or "-$1,000.00" (negative). */
+                var amountHtml = escapeHtml(amountSign) + (sym ? '<span class="vas-etw-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
 
                 var dueDays = getDaysUntilDue(row.dueDate);
                 var dueInText = formatDueIn(dueDays);
@@ -372,7 +398,7 @@
                     '</td>' +
                     '<td class="vas-etw-td-duedate" title="' + escapeHtml(dueDateText) + '">' + escapeHtml(dueDateText) + '</td>' +
                     '<td class="vas-etw-td-currency" title="' + escapeHtml(invoiceCurrency) + '">' + escapeHtml(invoiceCurrency) + '</td>' +
-                    '<td class="vas-etw-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-etw-td-amount" title="' + escapeHtml(amountSign + (sym ? sym : '') + amountText) + '">' + amountHtml + '</td>' +
                     '<td class="vas-etw-td-duein" title="' + escapeHtml(dueInText) + '">' +
                     (dueInText ? '<span class="' + dueInClass + '">' + escapeHtml(dueInText) + '</span>' : '') +
                     '</td>' +
@@ -549,12 +575,6 @@
                 '</div>' +
                 '<span class="vas-etw-label">' + lbl("VIS_ExpectedThisWeek", "Expected this week") + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-etw-view">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>' +
-                '</svg>' +
-                '<span>' + lbl("VIS_View", "View") + '</span>' +
-                '</button>' +
                 '</div>' +
 
                 '<div class="vas-etw-metric">—</div>' +
@@ -577,11 +597,6 @@
                     e.preventDefault();
                     openDialog();
                 }
-            });
-
-            $card.find('.vas-etw-view').on('click', function (e) {
-                e.stopPropagation();
-                openDialog();
             });
 
             $root.append($card);
@@ -623,6 +638,9 @@
 
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.ExpectedThisWeekWidget.prototype.widgetSizeChange = function (height, width) { };

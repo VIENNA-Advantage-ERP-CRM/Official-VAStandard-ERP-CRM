@@ -4,8 +4,11 @@
  * Design source: design.md / dashboard-widgets.md (Onfinity Dashboard
  * Design System) + the supplied image_1 (widget) and image_2 (modal).
  * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
- * `1em` resolves to the widget's base font-size (16px on the card and
- * dialog). Container queries scale the card on small dashboard cells;
+ * `.vas-ce-card` uses `font-size: clamp(16px, 5cqi, 24px)` so the whole
+ * card scales with the dashboard cell on large screens (5cqi = KPI/Summary
+ * ~2-col coefficient, matching sibling receipt widgets). `1em` on the dialog
+ * stays fixed — it is body-attached and not container-sized.
+ * Container queries scale the card on small dashboard cells;
  * media queries scale the dialog on small viewports.
  * Namespaced vas-ce-*.
  * ───────────────────────────────────────────────────────────────────────── */
@@ -37,7 +40,12 @@
 /* ── Glass card shell (design.md §Glass Widget) ──────────────────── */
 
 .vas-ce-card {
-    font-size: 1em;
+    /* Responsive root anchor: scale the whole card with the cell so it
+       fills larger dashboard cells on wide screens. cqi resolves against
+       .vas-ce-root (container-type: inline-size). 5cqi matches the
+       KPI/Summary (~2-col) sibling receipt widgets. Clamp keeps it
+       between 16px (default) and 24px (large cells). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -46,7 +54,7 @@
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    padding: .875em;
     display: flex;
     flex-direction: column;
     cursor: pointer;
@@ -110,14 +118,13 @@
 }
 
 .vas-ce-title {
-    /* design.md / dashboard-widgets.md §"Widget Header":
-       18px black title. Per project request the weight is Bold (700)
-       instead of the spec's Medium (500). */
-    font-size: 1.125em;
-    font-weight: 700;
-    color: #141414;
-    line-height: 1.15;
-    letter-spacing: -0.00625em;
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size.
+       Weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -125,7 +132,10 @@
 
 .vas-ce-subtitle {
     margin-top: 0.125em;
-    font-size: 0.75em;
+    /* Dashboard-width-anchored sm clamp (--dash-inline-size — the dashboard's
+       visible content width in px; falls back to 100vw when unset) so the
+       subtitle tracks the dashboard width like the title. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #717182;
     line-height: 1.2;
     overflow: hidden;
@@ -139,7 +149,7 @@
     gap: 0.25em;
     font-size: 0.75em;
     color: #0083DA;
-    font-weight: 500;
+    font-weight: 400;
     flex-shrink: 0;
 }
 
@@ -166,8 +176,12 @@
 .vas-ce-donut {
     width: 7em;
     height: 7em;
+    min-height: 7em;
     position: relative;
     flex-shrink: 0;
+    /* Become a query container so the centred figure can size itself in cqi
+       relative to the DONUT (not the card) and always fit inside the ring. */
+    container-type: inline-size;
 }
 
     .vas-ce-donut svg {
@@ -182,22 +196,31 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    padding: 0 0.375em;        /* keep the centred text clear of the ring */
+    min-width: 0;
+    text-align: center;
 }
 
 .vas-ce-percent {
-    font-size: 1.875em;
+    /* Sized in cqi RELATIVE TO THE DONUT (.vas-ce-donut is container-type:
+       inline-size) so the figure always fits inside the ring — even the
+       widest value "100.00%" — and scales with the donut on any screen.
+       The em bounds clamp it on very small / very large donuts. */
+    font-size: clamp(0.8em, 18cqi, 1.6em);
     font-weight: 700;
     color: #0B6B45;
     line-height: 1;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .vas-ce-on-time {
     margin-top: 0.25em;
     font-size: 0.625em;
     line-height: 1;
-    font-weight: 500;
+    font-weight: 400;
     color: #748494;
     letter-spacing: 0.0875em;
     text-transform: uppercase;
@@ -205,12 +228,16 @@
 
 .vas-ce-meta {
     text-align: center;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .vas-ce-dso {
     font-size: 1.1em;
     color: #102C3F;
     line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
     .vas-ce-dso strong { font-weight: 700; }
@@ -220,6 +247,8 @@
     font-size: 0.85em;
     color: #748494;
     line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 
 .vas-ce-cur-inline {
@@ -232,8 +261,9 @@
 
 @container (max-width: 22em) {        /* ~352px */
     .vas-ce-card { font-size: 0.875em; }
-    .vas-ce-donut { width: 6em; height: 6em; }
-    .vas-ce-percent { font-size: 1.5em; }
+    .vas-ce-donut { width: 6em; height: 6em; min-height: 6em; }
+    /* .vas-ce-percent now sizes in cqi against the donut, so it shrinks with
+       the smaller donut automatically — no manual override needed. */
 }
 
 @container (max-width: 16em) {        /* ~256px */
@@ -250,7 +280,10 @@
 
 .vas-ce-dialog {
     font-family: Roboto, sans-serif;
-    font-size: 1em;
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -274,6 +307,7 @@
 
 .vas-ce-dialog-card {
     position: relative;
+    min-height: 34em;
     width: min(68em, 100%);
     height: min(42em, 100%);
     background: #FFFFFF;
@@ -294,9 +328,10 @@
 }
 
 .vas-ce-dialog-hicon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     border-radius: 0.5625em;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
     border: 0.0625em solid #BFE4FF;
@@ -320,7 +355,7 @@
 
 .vas-ce-dialog-title {
     font-size: 1.125em;
-    font-weight: 700;
+    font-weight: 400;
     color: #141414;
     line-height: 1.15;
     overflow: hidden;
@@ -348,15 +383,20 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #141414;
+    /* Family dialog close button — muted glyph, soft blue-gray hover
+       (matches the sibling dialogs). */
+    color: #5F7283;
     flex-shrink: 0;
 }
 
-    .vas-ce-dialog-close:hover { background: rgba(0, 0, 0, 0.05); }
+    .vas-ce-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
 
     .vas-ce-dialog-close svg {
-        width: 1.25em;
-        height: 1.25em;
+        width: 1em;
+        height: 1em;
         stroke: currentColor;
     }
 
@@ -391,7 +431,7 @@
         top: 0;
         background: #FFFFFF;
         z-index: 2;
-        font-size: 0.8125em;
+        font-size: 0.75em;            /* sm — 0.75em of the dialog base = shared data clamp */
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -412,7 +452,7 @@
            leaving large empty space at the bottom. */
         padding: 0.75em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -444,19 +484,19 @@
 }
 
 .vas-ce-d-td-cust {
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     font-size: 0.9375em;
 }
 
 .vas-ce-d-td-cur {
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.02em;
 }
 
 .vas-ce-d-td-amount {
-    font-weight: 700;
+    font-weight: 400;
     color: #9A6500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -505,7 +545,7 @@
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
-    font-size: 0.875em;
+    font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;
 }
 
@@ -541,11 +581,13 @@
 }
 
 .vas-ce-pager-btn {
-    width: 2em;
-    height: 2em;
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -555,8 +597,8 @@
 }
 
     .vas-ce-pager-btn svg {
-        width: 1em;
-        height: 1em;
+        width: 0.875em;
+        height: 0.875em;
         stroke: currentColor;
     }
 
@@ -574,7 +616,7 @@
     min-width: 3em;
     text-align: center;
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
