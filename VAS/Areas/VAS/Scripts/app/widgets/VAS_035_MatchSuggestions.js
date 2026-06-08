@@ -171,16 +171,17 @@
         }
 
         function formatAmount(amount, symbol, precision) {
-            var text = Number(amount || 0).toLocaleString(window.navigator.language, {
+            var raw = Number(amount || 0);
+            var sign = raw < 0 ? '-' : '';
+            var text = Number(Math.abs(raw)).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: Number(precision || 0),
                 maximumFractionDigits: Number(precision || 0)
             });
 
             var sym = symbol ? symbol.toString() : "";
-            if (!sym) { return text; }
-
             /* 3-char ISO codes read better after the amount; glyph symbols before. */
-            return sym.length === 3 ? (text + " " + sym) : (sym + text);
+            var formatted = sym.length === 3 ? (text + " " + sym) : (sym ? (sym + text) : text);
+            return sign + formatted;
         }
 
         function formatDate(value) {
@@ -503,8 +504,9 @@
                 invoicePane +
                 '</div>';
 
-            /* 3 — balance strip (receipt currency): exact / short / over. */
-            var balanceAmt = formatAmount(Math.abs(balance), data.ReceiptCurrencySymbol, data.ReceiptPrecision);
+            /* 3 — balance strip (receipt currency): exact / short / over.
+               Pass the raw signed balance; formatAmount prefixes + or -. */
+            var balanceAmt = formatAmount(balance, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
             var balanceStrip;
             if (isShort) {
                 /* Receipt is short — the difference stays open on the schedule. */

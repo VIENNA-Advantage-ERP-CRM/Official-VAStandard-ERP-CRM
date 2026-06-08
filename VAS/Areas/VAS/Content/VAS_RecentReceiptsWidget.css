@@ -44,7 +44,7 @@
        against .vas-rr-root (container-type: inline-size), so the spec's 1.4cqi is
        retuned for the 6-col cell width (≈1.9cqi, matching VAS_015) and the ceiling
        raised to 32px so content keeps pace with the grid on 2560-wide dashboards. */
-    font-size: clamp(16px, 1.9cqi, 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -150,7 +150,7 @@
         /* Spec §Grid Data Widget header row: sm token — viewport-anchored
            (0.75 × the 16–32px root range) so data renders the SAME px in
            every widget at every screen size. */
-        font-size: clamp(12px, 0.88vw, 24px);
+        font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -171,7 +171,7 @@
         /* spec §"List / Grid Hierarchy Rule": all cells share the sm token,
            one step below the title; weight/color carry the hierarchy.
            Viewport-anchored like the title so rows match sibling widgets. */
-        font-size: clamp(12px, 0.88vw, 24px);
+        font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -213,7 +213,7 @@
 .vas-rr-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
     color: #5F7283;
-    font-size: clamp(11px, 0.8vw, 22px);   /* xs — secondary metadata cell */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);   /* xs — secondary metadata cell */
 }
 
 .vas-rr-td-customer {
@@ -268,7 +268,7 @@
     align-items: center;
     padding: 0.25em 0.625em;
     border-radius: 999em;
-    font-size: clamp(11px, 0.8vw, 22px);
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);
     font-weight: 500;
     line-height: 1.3;
     background: #EDF2F6;
@@ -304,7 +304,7 @@
 .vas-rr-pager-helper {
     /* Spec §Widget Footer Pager helper text — shared viewport clamp
        (0.8125 × the 16–32px root range) so it matches sibling widgets. */
-    font-size: clamp(13px, 0.95vw, 26px);
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -357,7 +357,7 @@
     text-align: center;
     /* Spec page text: Roboto Medium, dark — shared viewport clamp
        (0.875 × the 16–32px root range). */
-    font-size: clamp(14px, 1.03vw, 28px);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -404,7 +404,7 @@
     /* Viewport-anchored dialog base. Lowered from the old 32px cap (text was
        too large) but kept responsive — grows with the viewport up to 22px on
        big screens so the modal scales up instead of looking tiny. */
-    font-size: clamp(15px, 0.85vw, 22px);
+    font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0085), 22px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -600,7 +600,7 @@
     /* Screen-anchored clamp so the body content scales with the viewport —
        grows on big screens (up to 26px) to fill the now-wide modal, with a
        15px floor so small screens stay compact. */
-    font-size: clamp(15px, 1vw, 32px);
+    font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.01), 32px);
     /* Body is a flex column so the receipt-summary section (labels +
        grid) and the allocation section can coexist with different
        overflow behaviour: summary is fixed-height, allocation flexes

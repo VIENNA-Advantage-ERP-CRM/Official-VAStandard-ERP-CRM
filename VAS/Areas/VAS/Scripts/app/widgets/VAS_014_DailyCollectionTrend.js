@@ -145,13 +145,15 @@
         function formatAmount(value) {
             var sym = (trend && trend.CurrencySymbol) || "";
             var prec = trend ? Number(trend.StdPrecision) : getStdPrecision();
-            return (sym ? sym : "") + formatCompactAmount(value, prec);
+            var sign = (Number(value) < 0) ? '-' : '';
+            return sign + (sym ? sym : "") + formatCompactAmount(Math.abs(Number(value || 0)), prec);
         }
 
         function formatExactAmount(value) {
             var sym = (trend && trend.CurrencySymbol) || "";
             var prec = trend ? Number(trend.StdPrecision) : getStdPrecision();
-            return (sym ? ' ' + sym : '') + Number(value || 0).toLocaleString(window.navigator.language, {
+            var sign = (Number(value) < 0) ? '-' : '';
+            return sign + (sym ? sym : '') + Number(Math.abs(Number(value || 0))).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: prec, maximumFractionDigits: prec
             });
         }

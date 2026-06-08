@@ -218,15 +218,16 @@
         }
 
         /* Signed amount renderer for the widget table.
-              positive incoming receipt  → "+<sym><amt>"  green
-              negative (refund / void)   → "−<sym><amt>"  red
+              positive / zero             → "+<sym><abs>"  green
+              negative (refund / void)   → "-<sym><abs>"  red
+           Sign is ASCII '+' or '-', driven from the raw signed value.
            The CSS class is returned alongside so the caller can apply it. */
         function signedAmountHtml(value, stdPrecision, sym) {
             var num = Number(value || 0);
             var isNeg = num < 0;
             var absText = formatExactAmount(Math.abs(num), stdPrecision);
             var symHtml = sym ? '<span class="vas-rr-cur-inline">' + escapeHtml(sym) + '</span>' : '';
-            var sign = isNeg ? '−' : '+';
+            var sign = isNeg ? '-' : '';
             return {
                 html: '<span class="vas-rr-amt-sign">' + sign + '</span>' + symHtml + escapeHtml(absText),
                 cls: isNeg ? 'vas-rr-td-amount-neg' : 'vas-rr-td-amount-pos',
@@ -540,7 +541,7 @@
             var method = methodDisplay(pick(detail, "TenderType", "tenderType"));
             var payAmountNum = Number(pick(detail, "PayAmount", "payAmount") || 0);
             var payAmountText = formatExactAmount(Math.abs(payAmountNum), stdPrecision);
-            var payAmountSign = payAmountNum < 0 ? '−' : '';
+            var payAmountSign = payAmountNum < 0 ? '-' : '';
             var amountValueClass = payAmountNum < 0 ? 'vas-rr-d-value-amt-neg' : 'vas-rr-d-value-amt';
 
             /* Title: "Receipt <DocNo>" + customer subtitle, per Image_3. */
@@ -556,7 +557,7 @@
                reference / bank, currency / amount. */
             var symHtml = sym ? '<span class="vas-rr-cur-inline">' + escapeHtml(sym) + '</span>' : '';
             var amountHtml = '<span class="' + amountValueClass + '">' +
-                (payAmountSign ? '<span class="vas-rr-amt-sign">' + payAmountSign + '</span>' : '') +
+                '<span class="vas-rr-amt-sign">' + payAmountSign + '</span>' +
                 symHtml + escapeHtml(payAmountText) + '</span>';
 
             var gridHtml =
@@ -641,9 +642,12 @@
 
                 var refDocText = String(refDoc || "");
                 var refDateText = formatDate(refDate);
-                var refAmount = formatExactAmount(Number(refAmtNum || 0), stdPrecision);
+                var refAmtNumVal = Number(refAmtNum || 0);
+                var refAmtSign = refAmtNumVal < 0 ? '-' : '';
+                var refAmount = refAmtSign + formatExactAmount(Math.abs(refAmtNumVal), stdPrecision);
                 var appliedNum = Number(pick(line, "AppliedAmount", "appliedAmount") || 0);
-                var applied = formatExactAmount(appliedNum, stdPrecision);
+                var appliedSign = appliedNum < 0 ? '-' : '';
+                var applied = appliedSign + formatExactAmount(Math.abs(appliedNum), stdPrecision);
 
                 /* Type chip — INV (blue) / PMT (success-deep) / GL (warning). */
                 var chipText = type === "Payment" ? "PMT"
@@ -667,8 +671,7 @@
                     '</tr>';
             }
 
-            var totalText = (payAmountSign ? payAmountSign : '') +
-                            (sym ? sym : '') + payAmountText;
+            var totalText = payAmountSign + (sym ? sym : '') + payAmountText;
             var invCountLabel = lines.length === 1
                 ? lbl("VAS_Invoice", "allocation")
                 : lbl("VAS_Invoices", "allocations");

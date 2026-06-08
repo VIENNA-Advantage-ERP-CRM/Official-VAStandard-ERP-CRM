@@ -208,13 +208,19 @@
             return Number(value || 0).toLocaleString(window.navigator.language);
         }
 
+        /* Returns a signed amount string: sign ('+'/'-') comes FIRST, followed by
+           the absolute magnitude formatted to stdPrecision decimal places.
+           Examples: "+63,000.00", "-13,000.00".
+           Callers must pass the RAW signed value (never Math.abs'd). */
         function formatExactAmount(value, stdPrecision) {
             var num = Number(value || 0);
             var prec = (typeof stdPrecision === "number") ? stdPrecision : getStdPrecision();
-            return num.toLocaleString(window.navigator.language, {
+            var sign = num < 0 ? '-' : '';
+            var magnitude = Math.abs(num).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: prec,
                 maximumFractionDigits: prec
             });
+            return sign + magnitude;
         }
 
         function renderMetric(data) {
@@ -265,10 +271,18 @@
                 var customer = row.customer || "";
                 var bankText = formatBankAccount(row);
                 var stdPrecision = Number(row.stdPrecision || getStdPrecision());
-                var amtText = formatExactAmount(row.amount, stdPrecision);
+                /* Sign comes from the raw value; magnitude is formatted from the
+                   ABSOLUTE value so the formatter never injects its own sign
+                   (passing the raw value would leave the first digit to be mis-read
+                   as the sign). Rendered order: sign · symbol-span · magnitude. */
+                var rawAmt = Number(row.amount || 0);
+                var amtSign = rawAmt < 0 ? '-' : '';
+                var amtMagnitude = formatExactAmount(Math.abs(rawAmt), stdPrecision);
                 var iso = row.currencyIso || "";
                 var sym = row.curSymbol || iso || "";
-                var amtHtml = (sym ? '<span class="vas-unr-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                var amtHtml = escapeHtml(amtSign) +
+                    (sym ? '<span class="vas-unr-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
+                    escapeHtml(amtMagnitude);
 
                 var $tr = $(
                     '<tr>' +
@@ -283,7 +297,7 @@
                     '<span class="vas-unr-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-unr-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-unr-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-unr-td-amount" title="' + escapeHtml(amtSign + (sym ? sym : '') + amtMagnitude) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 

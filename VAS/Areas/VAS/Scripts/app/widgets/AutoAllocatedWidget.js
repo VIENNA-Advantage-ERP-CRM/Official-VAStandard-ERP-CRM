@@ -256,10 +256,11 @@
             }) + "%";
         }
 
-        /* formatExactAmount returns { sign, magnitude } where sign is ASCII '+' or
-           '-' and magnitude is the absolute value formatted to stdPrecision digits.
+        /* formatExactAmount returns { sign, magnitude } where sign is '-' for
+           negative values or '' (empty) for positive/zero, and magnitude is the
+           absolute value formatted to stdPrecision digits.
            Call sites prepend sign BEFORE the currency symbol so the result reads
-           "+$1,000.00" / "-$1,000.00". */
+           "$1,000.00" / "-$1,000.00". */
         function formatExactAmount(value) {
             var num = Number(value || 0);
             var stdPrecision = 2;
@@ -273,7 +274,7 @@
                 stdPrecision = 2;
             }
 
-            var sign = num < 0 ? '-' : '+';
+            var sign = num < 0 ? '-' : '';
             var magnitude = Number(Math.abs(num)).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision

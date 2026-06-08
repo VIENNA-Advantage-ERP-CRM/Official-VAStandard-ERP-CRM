@@ -270,6 +270,7 @@
 
         function formatExactAmount(value) {
             var num = Number(value || 0);
+            var sign = num < 0 ? '-' : '';
             var stdPrecision = 2;
 
             try {
@@ -281,14 +282,15 @@
                 stdPrecision = 2;
             }
 
-            return num.toLocaleString(window.navigator.language, {
+            return sign + Math.abs(num).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
         }
 
         /* Place the currency symbol *before* the amount, sign before symbol
-           when negative (e.g. -₹1.2M). Matches design.md and image_2.png. */
+           (e.g. ₹1.2M or -₹1.2M). Negatives show '-'; positives and zero show no sign.
+           Matches design.md and image_2.png. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';

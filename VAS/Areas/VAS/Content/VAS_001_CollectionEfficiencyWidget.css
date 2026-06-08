@@ -45,7 +45,7 @@
        .vas-ce-root (container-type: inline-size). 5cqi matches the
        KPI/Summary (~2-col) sibling receipt widgets. Clamp keeps it
        between 16px (default) and 24px (large cells). */
-    font-size: clamp(16px, 5.6cqi, 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -54,7 +54,7 @@
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    padding: .875em;
     display: flex;
     flex-direction: column;
     cursor: pointer;
@@ -283,7 +283,7 @@
     /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
        0.88vw): dialog data matches widget data px and the whole em-sized
        dialog scales in proportion. 16px floor = unchanged small screens. */
-    font-size: clamp(16px, 1.1733vw, 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;

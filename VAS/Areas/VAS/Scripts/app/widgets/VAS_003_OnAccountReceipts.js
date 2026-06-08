@@ -234,7 +234,7 @@
             });
         }
 
-        /* Symbol before the amount; sign before symbol when negative. */
+        /* Symbol before the amount; '-' for negative, no sign for positive/zero. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -304,10 +304,12 @@
                 var customer = row.customer || "";
                 var bankText = formatBankAccount(row);
                 var stdPrecision = Number(row.stdPrecision || getStdPrecision());
-                var amtText = formatExactAmount(row.amount, stdPrecision);
+                var rawAmt = Number(row.amount || 0);
+                var amtSign = rawAmt < 0 ? '-' : '';
+                var amtText = formatExactAmount(Math.abs(rawAmt), stdPrecision);
                 var iso = row.currencyIso || "";
                 var sym = row.curSymbol || iso || "";
-                var amtHtml = (sym ? '<span class="vas-oar-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                var amtHtml = escapeHtml(amtSign) + (sym ? '<span class="vas-oar-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
 
                 var $tr = $(
                     '<tr>' +
@@ -322,7 +324,7 @@
                     '<span class="vas-oar-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-oar-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-oar-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-oar-td-amount" title="' + escapeHtml(amtSign + (sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 

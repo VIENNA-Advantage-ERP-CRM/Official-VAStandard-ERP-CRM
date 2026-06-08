@@ -144,7 +144,8 @@
             });
         }
 
-        /* Symbol *before* the amount, sign before symbol when negative. */
+        /* Symbol *before* the amount, explicit sign before symbol (+ for zero or
+           positive, - for negative). */
         function formatAmount(value, symbol, stdPrecision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -190,7 +191,8 @@
                 var name = row.CustomerName || "";
                 var amount = Number(row.Amount || 0);
                 var amtHtml = formatAmount(amount, symbol, stdPrecision);
-                var exactTitle = (symbol ? symbol + ' ' : '') + formatExactAmount(amount, stdPrecision);
+                var exactSign = amount < 0 ? '-' : '';
+                var exactTitle = exactSign + (symbol ? symbol + ' ' : '') + formatExactAmount(Math.abs(amount), stdPrecision);
 
                 /* Proportion of the top customer; keep a small floor so tiny
                    non-zero values still render a visible sliver. */

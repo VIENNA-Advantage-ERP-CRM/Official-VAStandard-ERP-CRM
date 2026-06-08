@@ -274,7 +274,8 @@
             });
         }
 
-        /* Currency symbol leads the amount (sign before symbol when negative). */
+        /* Currency symbol leads the amount (sign before symbol; nothing for zero
+           and positive, - for negative). */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -365,10 +366,13 @@
                 var dueDateText = formatDate(row.dueDate);
                 var invoiceCurrency = row.invoiceCurrency || "";
                 var sym = row.invoiceCurrencySymbol || invoiceCurrency || "";
-                var amountText = formatExactAmount(row.amount);
+                var rawAmount = Number(row.amount || 0);
+                var amountSign = rawAmount < 0 ? '-' : '';
+                var amountText = formatExactAmount(Math.abs(rawAmount));
                 /* Amount keeps its invoice-currency symbol inline — no
-                   conversion to base currency, per spec. */
-                var amountHtml = (sym ? '<span class="vas-etw-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
+                   conversion to base currency, per spec.  Sign leads the
+                   symbol: e.g. "$1,000.00" (positive) or "-$1,000.00" (negative). */
+                var amountHtml = escapeHtml(amountSign) + (sym ? '<span class="vas-etw-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
 
                 var dueDays = getDaysUntilDue(row.dueDate);
                 var dueInText = formatDueIn(dueDays);
@@ -394,7 +398,7 @@
                     '</td>' +
                     '<td class="vas-etw-td-duedate" title="' + escapeHtml(dueDateText) + '">' + escapeHtml(dueDateText) + '</td>' +
                     '<td class="vas-etw-td-currency" title="' + escapeHtml(invoiceCurrency) + '">' + escapeHtml(invoiceCurrency) + '</td>' +
-                    '<td class="vas-etw-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-etw-td-amount" title="' + escapeHtml(amountSign + (sym ? sym : '') + amountText) + '">' + amountHtml + '</td>' +
                     '<td class="vas-etw-td-duein" title="' + escapeHtml(dueInText) + '">' +
                     (dueInText ? '<span class="' + dueInClass + '">' + escapeHtml(dueInText) + '</span>' : '') +
                     '</td>' +

@@ -28,7 +28,7 @@
     /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
        large dashboards instead of staying 16px. cqi resolves against .vas-bc-root
        (container-type: inline-size). Only grows past 16px on wide cells. */
-    font-size: clamp(16px, 5.6cqi, 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     box-sizing: border-box;
     width: 100%;
     height: 100%;
@@ -103,7 +103,7 @@
 
 .vas-bc-metric {
     padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
-    font-size: 2em;
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
     font-weight: 700;
     color: #ED1C24;                   /* danger */
     line-height: 1;
@@ -120,7 +120,7 @@
     display: block;
     align-self: flex-start;
     max-width: 100%;
-    font-size: 0.75em;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: #5F7283;
     font-weight: 500;
     overflow: hidden;

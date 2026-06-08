@@ -52,7 +52,7 @@
        against .vas-er-root (container-type: inline-size), so the spec's 1.4cqi is
        retuned for the wide cell (≈1.9cqi, matching the 6-col family) and the ceiling
        raised to 32px so content keeps pace with the grid on 2560-wide dashboards. */
-    font-size: clamp(16px, 1.9cqi, 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -320,7 +320,7 @@
    16–32px root range) so rows render the SAME px in every widget at every
    screen size — em-of-root diverged between widgets of different spans. */
 .vas-er-row-title {
-    font-size: clamp(12px, 0.88vw, 24px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.25;
     font-weight: 500;                /* Roboto Bold */
     color: #102C3F;
@@ -333,7 +333,7 @@
    (0.6875 × the 16–32px root range). */
 .vas-er-meta {
     margin-top: 0.125em;
-    font-size: clamp(11px, 0.8vw, 22px);
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);
     line-height: 1.3;
     font-weight: 400;
     color: #748494;
@@ -345,7 +345,7 @@
 /* Emphasized value cell — sm token (shared viewport clamp), bold, success green. */
 .vas-er-amount {
     flex-shrink: 0;
-    font-size: clamp(12px, 0.88vw, 24px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.2;
     font-weight: 500;
     color: #0B6B45;
@@ -383,7 +383,7 @@
 .vas-er-footer-info {
     /* Spec §Widget Footer Pager helper text — shared viewport clamp
        (0.8125 × the 16–32px root range) so it matches sibling widgets. */
-    font-size: clamp(13px, 0.95vw, 26px);
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -436,7 +436,7 @@
     text-align: center;
     /* Spec page text: Roboto Medium, dark — shared viewport clamp
        (0.875 × the 16–32px root range). */
-    font-size: clamp(14px, 1.03vw, 28px);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;

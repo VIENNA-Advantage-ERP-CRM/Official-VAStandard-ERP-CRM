@@ -123,7 +123,7 @@
             }
 
             if ($whyText) {
-                $whyText.text("");
+                $whyText.text("").attr("title", "");
             }
         }
 
@@ -190,12 +190,12 @@
             }
 
             if ($whyText) {
-                if (topMethodName) {
-                    $whyText.text(topMethodName + " dominates — instant settle, near-zero fees");
-                }
-                else {
-                    $whyText.text(lbl("VIS_CustomerPaidWhy", "Payment methods distribution"));
-                }
+                /* Mirror the copy into the title attribute so the full text is
+                   visible on hover when it truncates (the desc is nowrap+ellipsis). */
+                var whyStr = topMethodName
+                    ? (topMethodName + " dominates — instant settle, near-zero fees")
+                    : lbl("VIS_CustomerPaidWhy", "Payment methods distribution");
+                $whyText.text(whyStr).attr("title", whyStr);
             }
         }
 

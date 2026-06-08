@@ -37,7 +37,7 @@
    (cqi resolves against .vas-rsw-root which carries container-type: inline-size).
    1.4cqi matches the 1x9 full-width pattern — same coefficient as VAS_RecentReceipts. */
 .vas-rsw-esw {
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 24px);
     width: 100%;
     max-width: 93.75em;               /* ~1500px */
     padding: 0 9.7%;

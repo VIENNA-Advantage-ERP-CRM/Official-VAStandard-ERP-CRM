@@ -107,7 +107,7 @@
         var toDate = "";
 
         var pageNo = 1;
-        var pageSize = 8;
+        var pageSize = 7;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -309,7 +309,10 @@
         }
 
         function formatAmount(row) {
-            var absVal = Number(row && row.TotalAmt || 0);
+            /* Use the raw signed value to determine the sign; format the magnitude only. */
+            var rawVal = Number(row && row.TotalAmt || 0);
+            var sign = rawVal < 0 ? '-' : '';
+            var absVal = Math.abs(rawVal);
             var precision = Number(row && row.stdPrecision || 0);
 
             var text = absVal.toLocaleString(window.navigator.language, {
@@ -320,11 +323,13 @@
             var symbol = row && row.Symbol ? row.Symbol.toString() : "";
 
             if (!symbol) {
-                return text;
+                /* No symbol: sign then magnitude. */
+                return sign + text;
             }
 
-            /* 3-char ISO codes read better after the amount; glyph symbols before. */
-            return symbol.length === 3 ? (text + " " + symbol) : (symbol + "" + text);
+            /* 3-char ISO codes read better after the amount; glyph symbols before.
+               Sign is always the very first character, before the currency symbol. */
+            return symbol.length === 3 ? (sign + text + " " + symbol) : (sign + symbol + text);
         }
 
         function updatePager() {

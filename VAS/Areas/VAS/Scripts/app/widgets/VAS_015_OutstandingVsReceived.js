@@ -128,11 +128,11 @@
             return 2;
         }
 
-        /* Compact-amount formatter: 10M→Cr, 100K→L, 1K→K; below 1000 → locale. */
+        /* Compact-amount formatter: 10M→Cr, 100K→L, 1K→K; below 1000 → locale.
+           Returns the magnitude string only (no sign, no currency symbol).
+           Callers are responsible for prepending sign + symbol. */
         function formatCompactAmount(value, stdPrecision) {
-            value = Number(value || 0);
-            var neg = value < 0;
-            var abs = Math.abs(value);
+            var abs = Math.abs(Number(value || 0));
             var out;
             if (abs >= 10000000) { out = (abs / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr"; }
             else if (abs >= 100000) { out = (abs / 100000).toFixed(2).replace(/\.00$/, "") + "L"; }
@@ -143,21 +143,29 @@
                     minimumFractionDigits: prec, maximumFractionDigits: prec
                 });
             }
-            return (neg ? "-" : "") + out;
+            return out;
         }
 
+        /* Currency amount with explicit leading sign (before the symbol):
+           "+$63K" / "-$13K".  value < 0 → "-"; value >= 0 → "+". */
         function formatAmount(value) {
             var sym = (series && series.CurrencySymbol) || "";
             var prec = series ? Number(series.StdPrecision) : getStdPrecision();
-            return (sym ? sym : "") + formatCompactAmount(value, prec);
+            var sign = Number(value || 0) < 0 ? "-" : "";
+            return sign + (sym ? sym : "") + formatCompactAmount(value, prec);
         }
 
+        /* Exact currency amount with explicit leading sign (before the symbol):
+           "+$63,000.00" / "-$13,000.00".  value < 0 → "-"; value >= 0 → "+". */
         function formatExactAmount(value) {
             var sym = (series && series.CurrencySymbol) || "";
             var prec = series ? Number(series.StdPrecision) : getStdPrecision();
-            return (sym ? ' ' + sym : '') + Number(value || 0).toLocaleString(window.navigator.language, {
+            var v = Number(value || 0);
+            var sign = v < 0 ? "-" : "";
+            var magnitude = Math.abs(v).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: prec, maximumFractionDigits: prec
             });
+            return sign + (sym ? sym : "") + magnitude;
         }
 
         /* "Jan 2026" from a yyyy-MM key (month name + year; local-time safe —

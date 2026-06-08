@@ -245,8 +245,8 @@
             });
         }
 
-        /* Currency symbol *before* the amount, sign before symbol when negative
-           (e.g. -₹1.2M). Matches design.md / image_1. */
+        /* Currency symbol *before* the amount, sign before symbol only for
+           negatives ('-' for value < 0; no sign for value >= 0; e.g. ₹1.2M, -₹0.5K). */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -283,7 +283,8 @@
                 $metricEl.html(formatMetric(lastAmount, lastSymbol));
                 /* Full (non-compact) value on hover so the abbreviation never
                    hides the exact figure. */
-                $metricEl.attr('title', (lastSymbol ? lastSymbol + ' ' : '') + formatExactAmount(lastAmount));
+                var _metricSign = lastAmount < 0 ? '-' : '';
+                $metricEl.attr('title', _metricSign + (lastSymbol ? lastSymbol + ' ' : '') + formatExactAmount(Math.abs(lastAmount)));
             }
 
             renderDetail();
@@ -333,10 +334,12 @@
                 var customer = row.customer || "";
                 var bankText = formatBankAccount(row);
                 var stdPrecision = Number(row.stdPrecision || getStdPrecision());
-                var amtText = formatExactAmount(row.amount, stdPrecision);
+                var rawAmt = Number(row.amount || 0);
+                var amtSign = rawAmt < 0 ? '-' : '';
+                var amtText = formatExactAmount(Math.abs(rawAmt), stdPrecision);
                 var iso = row.currencyIso || "";
                 var sym = row.curSymbol || iso || "";
-                var amtHtml = (sym ? '<span class="vas-tdr-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                var amtHtml = escapeHtml(amtSign) + (sym ? '<span class="vas-tdr-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
 
                 var $tr = $(
                     '<tr>' +
@@ -351,7 +354,7 @@
                     '<span class="vas-tdr-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-tdr-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-tdr-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-tdr-td-amount" title="' + escapeHtml(amtSign + (sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 

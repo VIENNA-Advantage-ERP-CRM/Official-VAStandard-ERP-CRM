@@ -36,7 +36,7 @@
     /* Scales with the cell on large dashboards; cqi resolves against
        .vas-msug-root (container-type: inline-size). 6-col-wide footprint,
        so a gentler factor than the 1x1 KPI cards. */
-    font-size: clamp(16px, 2.2cqi, 24px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 24px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -45,7 +45,8 @@
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    /* padding: 0.2em 0.3em 1em;*/
+    padding: .875em;
     overflow: hidden;
 }
 
@@ -111,7 +112,7 @@
 .vas-msug-subtitle {
     /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
        the subtitle renders the same px in every widget at any screen size. */
-    font-size: clamp(12px, 0.88vw, 24px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #717182;
     min-width: 0;
     overflow: hidden;
@@ -135,14 +136,14 @@
     /* Used in BOTH the widget body (cqi root) and the dialog body (vw base),
        so it carries the absolute shared data clamp to render the same px
        in either context. */
-    font-size: clamp(12px, 0.88vw, 24px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
 }
 
 .vas-msug-row {
     display: flex;
     align-items: center;
     gap: 0.625em;
-    padding: 0.625em 0.25em;
+    padding: 0.525em 0.25em;
     border-bottom: 0.0625em solid #EDF2F6;
     cursor: pointer;
     min-width: 0;
@@ -181,7 +182,8 @@
 }
 
 .vas-msug-customer {
-    font-size: 0.9375em;
+    /*font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0017188), 22.5px);*/
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
     font-weight: 500;
     color: #102C3F;
     min-width: 0;
@@ -191,13 +193,15 @@
 }
 
 .vas-msug-row-sep {
-    font-size: 0.9375em;
+    /*font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0017188), 22.5px);*/
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
     color: #748494;
     flex-shrink: 0;
 }
 
 .vas-msug-row-amount {
-    font-size: 0.9375em;
+    /*font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0017188), 22.5px);*/
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
     font-weight: 500;
     color: #5F7283;
     font-variant-numeric: tabular-nums;
@@ -207,7 +211,7 @@
 
 .vas-msug-meta {
     margin-top: 0.125em;
-    font-size: 0.75em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.008375), 20px);
     color: #5F7283;
     font-variant-numeric: tabular-nums;
     overflow: hidden;
@@ -222,7 +226,7 @@
     gap: 0.375em;
     border-radius: 999em;
     padding: 0.25em 0.75em;
-    font-size: 0.75em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009375), 18px);
     font-weight: 700;
     flex-shrink: 0;
     white-space: nowrap;
@@ -276,7 +280,7 @@
 
 .vas-msug-footer-info {
     /* Shared viewport clamp — matches the sibling widgets' footer helpers. */
-    font-size: clamp(13px, 0.95vw, 26px);
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
     color: #5F7283;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -292,7 +296,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
-    font-size: 0.8125em;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0101563), 19.5px);
     font-weight: 500;
     color: #106AB0;
     text-decoration: none;
@@ -355,7 +359,7 @@
     min-width: 3em;
     text-align: center;
     /* Shared viewport clamp — matches the sibling widgets' pager text. */
-    font-size: clamp(14px, 1.03vw, 28px);
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -387,7 +391,7 @@
        scroll, responsive on small and large screens alike. (1.7vh derived from
        the modal's ~55em natural height: 55em·f ≤ 100vh ⇒ f ≤ ~1.8vh, rounded
        down for safety. 12px floor for very short screens.) */
-    font-size: clamp(12px, min(1.1733vw, 1.7vh), 32px);
+    font-size: clamp(12px, min(calc(var(--dash-inline-size, 100vw) * 0.011733), 1.7vh), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -432,7 +436,7 @@
 
 .vas-msug-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
-    font-size: clamp(15.5px, 1.1375vw, 31px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
