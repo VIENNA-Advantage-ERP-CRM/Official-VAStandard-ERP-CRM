@@ -1,14 +1,36 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_034 Expected Receipts — glass dashboard card with a paged list of
+ * expected customer receipts + a filter flyout reusing the shared VIS
+ * lookup controls (doc type / period / customer / date range).
+ * Design source: design.md / dashboard-widgets.md (Onfinity). Conforms to:
+ *   §Glass Widget             — translucent white gradient, 2px white
+ *                               border, 14px radius.
+ *   §Widget Root Anchor       — em-based internal sizing against
+ *                               clamp(16px, 1.9cqi, 32px) on the card.
+ *   §Widget Header            — 2em glass icon well + shared title clamp.
+ *   §Widget Edge Spacing      — 0.875em on all sides.
+ *   §List / Grid Hierarchy    — row cells on the sm token (0.75em), row
+ *                               metadata on xs (0.6875em).
+ *   §Widget Footer Pager      — left helper + right 24px compact pager.
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only
+ * (clamp() bounds excepted — the shared root-anchor convention).
+ * Namespaced vas-er-*. Structure mirrors VAS_RecentReceiptsWidget.css.
+ * ───────────────────────────────────────────────────────────────────────── */
+
 .vas-er-root {
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    box-sizing: border-box;
-    padding: 0;
-    font-family: Roboto, sans-serif;
-    position: relative;
     container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
 }
+
+    .vas-er-root,
+    .vas-er-root * {
+        box-sizing: border-box;
+    }
 
 /* Busy/loading overlay over the card while data is fetched (initial load + refresh). */
 .vas-er-busy {
@@ -22,42 +44,40 @@
     z-index: 999;
 }
 
-    .vas-er-root,
-    .vas-er-root * {
-        box-sizing: border-box;
-    }
+/* ── Glass card shell ─────────────────────────────────────────────── */
 
 .vas-er-card {
-    --vas-er-base: clamp(13px, 0.68vw + 8px, 18px);
-    --vas-er-pad-x: 1em;
-    --vas-er-pad-y: 0.95em;
-    /* Standard glass widget surface (design.md §Glass Widget). Shared with the filter
-       flyout so its panel + controls read as the same material as the widget. */
-    --vas-er-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. cqi resolves
+       against .vas-er-root (container-type: inline-size), so the spec's 1.4cqi is
+       retuned for the wide cell (≈1.9cqi, matching the 6-col family) and the ceiling
+       raised to 32px so content keeps pace with the grid on 2560-wide dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    padding: var(--vas-er-pad-y) var(--vas-er-pad-x) calc(var(--vas-er-pad-y) + 0.05em);
-    border-radius: 0.875em;
-    border: 0.125em solid #FFFFFF;
-    background: var(--vas-er-glass);
-    box-shadow: 0 0.6em 1.5em rgba(15, 61, 97, 0.06);
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    font-size: var(--vas-er-base);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    overflow: hidden;
     position: relative;
 }
+
+/* ── Header: icon well + title (left), filter trigger (right) ─────── */
 
 .vas-er-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.8em;
-    margin-bottom: 0.5em;
-    flex-shrink: 0;
+    gap: 0.75em;
+    margin-bottom: 0.875em;
     min-width: 0;
+    flex-shrink: 0;
 }
 
 .vas-er-head-left {
@@ -68,16 +88,18 @@
 .vas-er-title-line {
     display: flex;
     align-items: center;
-    gap: 0.65em;
+    gap: 0.625em;
     min-width: 0;
 }
 
+/* Family glass icon well (dashboard-widgets.md §"Widget Header": 2em well, ~1em glyph). */
 .vas-er-icon {
-    width: 2.25em;                   /* design.md icon well ~36px */
-    height: 2.25em;
-    min-width: 2.25em;
-    border-radius: 0.5em;
-    background: #DFF1FF;              /* pale info tint */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
     color: #0083DA;
     display: flex;
     align-items: center;
@@ -86,19 +108,22 @@
 }
 
     .vas-er-icon svg {
-        width: 0.95em;
-        height: 0.95em;
+        width: 1.125em;
+        height: 1.125em;
         stroke: currentColor;
     }
 
+/* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
+   Medium (500) per project request. Shared dashboard-width-anchored title clamp so
+   every widget's title resolves to the same px at any screen size. Bounds =
+   0.97 × the 16–32px root range. */
 .vas-er-title {
     min-width: 0;
     max-width: 100%;
-    font-size: 1.125em;              /* design.md §Widget Header ~18px */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     line-height: 1.2;
-    font-weight: 500;                /* Roboto Medium */
+    font-weight: 400;
     color: #102C3F;
-    letter-spacing: -0.2px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -133,16 +158,26 @@
         color: #0083DA;
     }
 
+/* ── Filter flyout ─────────────────────────────────────────────────── */
+
 /* Filter flyout (design.md): an OPAQUE panel overlaying the list area — the list behind
    must never show through. It carries the widget's glass gradient as a tint over an opaque
    white base so it reads as the same surface as the widget without being see-through.
    The control markup is the shared VIS lookup set; only the surfaces/colors are re-skinned
-   here instead of the gray Expected-Payment look. Positioning (position/left/right) is
-   inherited from the shared .vas-expay-filter-flyout rules; everything below overrides its
-   gray styling. */
+   here instead of the gray Expected-Payment look. This rule sets position/top/left/right/width
+   explicitly to override the shared .vas-expay-filter-flyout values (fixed px top, legacy
+   width:calc(100%-12px)) so left+right alone control the flyout width at all container sizes. */
 .vas-er-filter-flyout {
+    /* Anchor the flyout's em sizing to --dash-inline-size (the dashboard's
+       visible content width in px; falls back to 100vw when unset) instead of
+       inheriting the cell-based cqi card font, so the filter panel scales with
+       the screen consistently regardless of the widget's cell size. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: absolute;
     top: 3.5em;
+    left: 0;
+    right: 0;
+    width: auto;                              /* override shared width:calc(100%-12px) so left+right fully control flyout width */
     max-height: calc(100% - 4.25em);
     overflow-y: auto;
     padding: 1em 1.1em 0.9em;
@@ -210,10 +245,6 @@
         font-size: 0.85em;
         font-weight: 700;
         cursor: pointer;
-    }
-
-    .vas-er-filter-flyout .vas-er-clear-btn,
-    .vas-er-filter-flyout .vas-er-apply-btn {
         background: #0083DA;
         color: #FFFFFF;
     }
@@ -222,6 +253,8 @@
         .vas-er-filter-flyout .vas-er-apply-btn:hover {
             background: #0069AE;
         }
+
+/* ── Body: repeated receipt rows ──────────────────────────────────── */
 
 .vas-er-body {
     flex: 1 1 auto;
@@ -236,8 +269,13 @@
 .vas-er-row {
     display: flex;
     align-items: center;
-    gap: 0.65em;
-    padding: 0.32em 0.5em 0.32em 0;      /* right gap so the amount clears the scrollbar */
+    gap: 0.625em;
+    /* Responsive top/bottom padding anchored on --dash-inline-size (the
+       dashboard's visible content width in px; falls back to 100vw when unset)
+       so the rows gain breathing room small → medium → large screen. The em
+       bounds clamp it (min keeps small screens compact, max caps big ones). */
+    padding-block: clamp(0.375em, calc(var(--dash-inline-size, 100vw) * 0.0045), 0.85em);
+    padding-inline: 0 0.5em;             /* right gap so the amount clears the scrollbar */
     border-bottom: 0.0625em solid #EDF2F6;
     min-width: 0;
     flex-shrink: 0;
@@ -247,11 +285,15 @@
         border-bottom: none;
     }
 
+/* Method rail — full-pill color sentinel at the left of each row. */
 .vas-er-bar {
-    width: 0.22em;
-    min-width: 0.22em;
-    height: 1.6em;
-    border-radius: 999px;
+    width: 0.1875em;
+    min-width: 0.1875em;
+    /* Stretch to the row's content height (driven by the tallest child,
+       .vas-er-info — title + meta), instead of a fixed 1.6em that fell short
+       of the two-line info block. */
+    align-self: stretch;
+    border-radius: 999em;
     flex-shrink: 0;
 }
 
@@ -272,21 +314,27 @@
     min-width: 0;
 }
 
-/* Data font sized to match the sibling list widgets (compact rows for 9 records). */
+/* dashboard-widgets.md §"List / Grid Hierarchy Rule": row cells use the sm
+   token, one step below the title; weight/color carry the hierarchy. Like
+   the shared title clamp, data text is viewport-anchored (0.75 × the
+   16–32px root range) so rows render the SAME px in every widget at every
+   screen size — em-of-root diverged between widgets of different spans. */
 .vas-er-row-title {
-    font-size: 0.8225em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.25;
-    font-weight: 700;                /* Roboto Bold */
+    font-weight: 400;                /* Roboto Bold */
     color: #102C3F;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+/* Secondary metadata line under the row title — xs token, viewport-anchored
+   (0.6875 × the 16–32px root range). */
 .vas-er-meta {
-    margin-top: 0.1em;
-    font-size: 0.6875em;
-    line-height: 1.25;
+    margin-top: 0.125em;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);
+    line-height: 1.3;
     font-weight: 400;
     color: #748494;
     overflow: hidden;
@@ -294,17 +342,19 @@
     white-space: nowrap;
 }
 
+/* Emphasized value cell — sm token (shared viewport clamp), bold, success green. */
 .vas-er-amount {
     flex-shrink: 0;
-    font-size: 0.8125em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     text-align: right;
 }
 
+/* Empty state. */
 .vas-er-nodata {
     flex: 1 1 auto;
     min-height: 0;
@@ -312,56 +362,62 @@
     align-items: center;
     justify-content: center;
     color: #748494;
-    font-size: 0.9em;
-    font-weight: 600;
+    font-size: 0.8125em;
     text-align: center;
 }
 
-/* Footer pager (design.md "Widget Footer Pager"): left result helper + right compact pager.
+/* ── Footer: "Showing X–Y of Z" helper (left) + compact pager (right) ──
    JS toggles display:flex only when there is more than one page. */
+
 .vas-er-footer {
     flex-shrink: 0;
     align-items: center;
     justify-content: space-between;
     gap: 0.75em;
-    margin-top: 0.5em;
-    padding-top: 0.6em;
+    margin-top: 0.25em;
+    padding-top: 0.625em;
     border-top: 0.0625em solid #EDF2F6;
+    min-width: 0;
 }
 
 .vas-er-footer-info {
-    font-size: 0.72em;
+    /* Spec §Widget Footer Pager helper text — shared viewport clamp
+       (0.8125 × the 16–32px root range) so it matches sibling widgets. */
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .vas-er-pager {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.5em;
     flex-shrink: 0;
 }
 
-/* Rounded-square pager buttons (not circular): soft white surface, light border, blue chevron. */
+/* Spec §Pager Buttons: widget pagers are 24px square (1.5em) with a 14px
+   (0.875em) chevron — rounded square, not circular. */
 .vas-er-page-btn {
-    width: 2em;
-    height: 2em;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
 }
 
     .vas-er-page-btn svg {
-        width: 0.85em;
-        height: 0.85em;
+        width: 0.875em;
+        height: 0.875em;
         stroke: currentColor;
     }
 
@@ -378,21 +434,26 @@
 .vas-er-page-text {
     min-width: 3em;
     text-align: center;
-    font-size: 0.78em;
+    /* Spec page text: Roboto Medium, dark — shared viewport clamp
+       (0.875 × the 16–32px root range). */
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
+    font-weight: 400;
     color: #102C3F;
-    font-weight: 500;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
-@container (max-width: 620px) {
-    .vas-er-card {
-        --vas-er-base: clamp(12px, 1vw + 7px, 15px);
-    }
+/* ── Card responsive (dashboard cell) ─────────────────────────────── */
 
+@container (max-width: 38.75em) {     /* < 620px — sidebar + panels open */
+    /* No card font-size step here: data text carries its own viewport
+       clamp, so dropping the base below the family's 16px floor made this
+       widget's rows render smaller than its siblings on small screens. */
     .vas-er-filter-flyout {
         top: 3.25em;
         left: 0.5em;
         right: 0.5em;
+        width: auto;    /* neutralise shared width:calc(100%-12px) so left+right insets fully control the flyout width */
         padding: 0.85em;
     }
 }

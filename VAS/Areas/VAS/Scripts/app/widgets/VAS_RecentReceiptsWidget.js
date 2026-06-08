@@ -55,6 +55,29 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size
+       on :root equal to the dashboard container's current pixel width so the
+       title/subtitle clamps resolve against the DASHBOARD's visible content
+       area, not the viewport. A single document-level ResizeObserver serves
+       every widget (the var is global); without a marked container — or
+       without ResizeObserver — the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            /* Spec: write a PIXEL length — calc() needs a length, not a number. */
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     /* Standard Compiere tender-type codes mapped to short display strings.
        Custom values (e.g. UPI / NEFT / RTGS) are passed through unchanged. */
     var TENDER_TYPES = {
@@ -99,9 +122,9 @@
         var currentPaymentId = 0;
         var printBusy = false;
 
-        /* Server-paged list state. pageSize is 9 rows per page; pageNo /
+        /* Server-paged list state. pageSize is 7 rows per page; pageNo /
            totalPages / totalRecords come from the server response. */
-        var pageSize = 9;
+        var pageSize = 7;
         var pageNo = 1;
         var totalPages = 0;
         var totalRecords = 0;
@@ -195,15 +218,16 @@
         }
 
         /* Signed amount renderer for the widget table.
-              positive incoming receipt  → "+<sym><amt>"  green
-              negative (refund / void)   → "−<sym><amt>"  red
+              positive / zero             → "+<sym><abs>"  green
+              negative (refund / void)   → "-<sym><abs>"  red
+           Sign is ASCII '+' or '-', driven from the raw signed value.
            The CSS class is returned alongside so the caller can apply it. */
         function signedAmountHtml(value, stdPrecision, sym) {
             var num = Number(value || 0);
             var isNeg = num < 0;
             var absText = formatExactAmount(Math.abs(num), stdPrecision);
             var symHtml = sym ? '<span class="vas-rr-cur-inline">' + escapeHtml(sym) + '</span>' : '';
-            var sign = isNeg ? '−' : '+';
+            var sign = isNeg ? '-' : '';
             return {
                 html: '<span class="vas-rr-amt-sign">' + sign + '</span>' + symHtml + escapeHtml(absText),
                 cls: isNeg ? 'vas-rr-td-amount-neg' : 'vas-rr-td-amount-pos',
@@ -517,7 +541,7 @@
             var method = methodDisplay(pick(detail, "TenderType", "tenderType"));
             var payAmountNum = Number(pick(detail, "PayAmount", "payAmount") || 0);
             var payAmountText = formatExactAmount(Math.abs(payAmountNum), stdPrecision);
-            var payAmountSign = payAmountNum < 0 ? '−' : '';
+            var payAmountSign = payAmountNum < 0 ? '-' : '';
             var amountValueClass = payAmountNum < 0 ? 'vas-rr-d-value-amt-neg' : 'vas-rr-d-value-amt';
 
             /* Title: "Receipt <DocNo>" + customer subtitle, per Image_3. */
@@ -533,7 +557,7 @@
                reference / bank, currency / amount. */
             var symHtml = sym ? '<span class="vas-rr-cur-inline">' + escapeHtml(sym) + '</span>' : '';
             var amountHtml = '<span class="' + amountValueClass + '">' +
-                (payAmountSign ? '<span class="vas-rr-amt-sign">' + payAmountSign + '</span>' : '') +
+                '<span class="vas-rr-amt-sign">' + payAmountSign + '</span>' +
                 symHtml + escapeHtml(payAmountText) + '</span>';
 
             var gridHtml =
@@ -618,9 +642,12 @@
 
                 var refDocText = String(refDoc || "");
                 var refDateText = formatDate(refDate);
-                var refAmount = formatExactAmount(Number(refAmtNum || 0), stdPrecision);
+                var refAmtNumVal = Number(refAmtNum || 0);
+                var refAmtSign = refAmtNumVal < 0 ? '-' : '';
+                var refAmount = refAmtSign + formatExactAmount(Math.abs(refAmtNumVal), stdPrecision);
                 var appliedNum = Number(pick(line, "AppliedAmount", "appliedAmount") || 0);
-                var applied = formatExactAmount(appliedNum, stdPrecision);
+                var appliedSign = appliedNum < 0 ? '-' : '';
+                var applied = appliedSign + formatExactAmount(Math.abs(appliedNum), stdPrecision);
 
                 /* Type chip — INV (blue) / PMT (success-deep) / GL (warning). */
                 var chipText = type === "Payment" ? "PMT"
@@ -644,8 +671,7 @@
                     '</tr>';
             }
 
-            var totalText = (payAmountSign ? payAmountSign : '') +
-                            (sym ? sym : '') + payAmountText;
+            var totalText = payAmountSign + (sym ? sym : '') + payAmountText;
             var invCountLabel = lines.length === 1
                 ? lbl("VAS_Invoice", "allocation")
                 : lbl("VAS_Invoices", "allocations");
@@ -884,6 +910,10 @@
 
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Now that the root is in the DOM, self-wire the dashboard-width
+           CSS variable the title clamp reads (spec §Measurement Setup). */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_RecentReceiptsWidget.prototype.widgetSizeChange = function (height, width) { };

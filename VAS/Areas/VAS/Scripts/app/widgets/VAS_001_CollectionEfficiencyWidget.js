@@ -48,6 +48,28 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_001_CollectionEfficiencyWidget = function () {
 
         this.frame;
@@ -133,7 +155,8 @@
 
         /* Compact INR/USD-style formatter for the small overdue summary on the
            widget — 6.20L, 1.20Cr, 25.5K. Falls back to the locale's full
-           number for amounts < 1000. */
+           number for amounts < 1000. Negative values get a leading '-';
+           positive/zero values show no sign. */
         function formatCompactAmount(value, sym, stdPrecision) {
             var num = Number(value || 0);
             var absVal = Math.abs(num);
@@ -150,6 +173,18 @@
                 return sign + s + (absVal / 1000).toFixed(2).replace(/\.00$/, "") + "K";
             }
             return sign + s + formatExactAmount(absVal, stdPrecision);
+        }
+
+        /* Full-precision signed currency formatter for modal table amounts.
+           Negative values get a leading '-' before the currency symbol;
+           positive/zero values show no sign. The numeric magnitude is the
+           absolute value. For a trailing ISO code (3-letter), sym is passed
+           as '' and iso is appended by the caller. */
+        function formatSignedAmount(value, stdPrecision) {
+            var num = Number(value || 0);
+            var sign = num < 0 ? '-' : '';
+            var absNum = Math.abs(num);
+            return sign + formatExactAmount(absNum, stdPrecision);
         }
 
         function formatDate(value) {
@@ -376,8 +411,26 @@
                 var iso = pick(row, "CurrencyIso", "currencyIso") || "";
                 var sym = pick(row, "CurSymbol", "curSymbol") || iso || "";
 
-                var amtText = formatExactAmount(amount, stdPrecision);
-                var amtHtml = (sym ? '<span class="vas-ce-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                /* Sign from the raw value; magnitude from the ABSOLUTE value so the
+                   formatter injects no sign (passing the raw signed value would leave
+                   the first digit to be mis-read as the sign). Sign always leads; for
+                   a 3-letter ISO code the symbol trails the number, else it leads. */
+                var rawAmt = Number(amount) || 0;
+                var amtSign = rawAmt < 0 ? '-' : '';
+                var amtMag = formatExactAmount(Math.abs(rawAmt), stdPrecision);
+                var isIso = sym.length === 3 && /^[A-Z]{3}$/.test(sym);
+                var amtHtml;
+                if (isIso) {
+                    /* sign + number + space + ISO: e.g. "-1,000.00 USD" / "1,000.00 USD" */
+                    amtHtml = escapeHtml(amtSign + amtMag) + ' <span class="vas-ce-cur-inline">' + escapeHtml(sym) + '</span>';
+                } else if (sym) {
+                    /* sign + symbol + number: e.g. "-$1,000.00" / "$1,000.00" */
+                    amtHtml = escapeHtml(amtSign) + '<span class="vas-ce-cur-inline">' + escapeHtml(sym) + '</span>' + escapeHtml(amtMag);
+                } else {
+                    amtHtml = escapeHtml(amtSign + amtMag);
+                }
+                /* Title mirrors the full signed display string. */
+                var amtTitle = isIso ? (amtSign + amtMag + ' ' + sym) : (sym ? (amtSign + sym + amtMag) : (amtSign + amtMag));
 
                 var chipCls = ageChipClass(ageDays);
                 var ageText = ageDays + ' ' + lbl("VAS_001_Days", "days");
@@ -395,7 +448,7 @@
                     '<span class="vas-ce-chip ' + chipCls + '" title="' + escapeHtml(ageText) + '">' + escapeHtml(ageText) + '</span>' +
                     '</td>' +
                     '<td class="vas-ce-d-td-cur" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-ce-d-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-ce-d-td-amount" title="' + escapeHtml(amtTitle) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
                 $dialogTbody.append($tr);
@@ -603,6 +656,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_001_CollectionEfficiencyWidget.prototype.widgetSizeChange = function (height, width) { };

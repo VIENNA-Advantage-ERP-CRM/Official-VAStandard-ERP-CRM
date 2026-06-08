@@ -4,9 +4,11 @@
  * allocation table).
  * Design source: the supplied reference HTML + design.md (Onfinity).
  * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
- * `1em` resolves to the widget's base font-size (16px on the card, 16px on
- * the dialog). Container queries scale the card on small dashboard cells;
- * media queries scale the dialog on small viewports.
+ * `1em` on the card resolves to clamp(16px, 1.4cqi, 24px) — the cell-width-
+ * anchored base that scales the whole widget on large dashboard cells.
+ * `1em` on the dialog (attached to <body>) stays at 16px — viewport-relative.
+ * Container queries shrink the card on small cells; media queries narrow
+ * the dialog on small viewports.
  * Namespaced vas-rr-*.
  * ───────────────────────────────────────────────────────────────────────── */
 
@@ -37,16 +39,21 @@
 /* ── Glass card shell ─────────────────────────────────────────────── */
 
 .vas-rr-card {
-    font-size: 1em;
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. cqi resolves
+       against .vas-rr-root (container-type: inline-size), so the spec's 1.4cqi is
+       retuned for the 6-col cell width (≈1.9cqi, matching VAS_015) and the ceiling
+       raised to 32px so content keeps pace with the grid on 2560-wide dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
     min-width: 0;
     min-height: 0;
@@ -93,11 +100,15 @@
     }
 
 .vas-rr-title {
-    font-size: 1.125em;
-    font-weight: 700;
-    color: #141414;
-    line-height: 1.15;
-    letter-spacing: -0.00625em;
+    /* dashboard-widgets.md §"Widget Header": the spec title clamp, anchored
+       on --dash-inline-size (the dashboard's visible content width in px,
+       written to :root by the widget bootstrap via ResizeObserver — see
+       §Measurement Setup; falls back to 100vw when unset). Dark #102C3F;
+       weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -105,7 +116,8 @@
 }
 
 .vas-rr-head-hint {
-    font-size: 0.75em;
+    /* Spec §Widget Header subtitle clamp — paired with the title above. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 22px);
     color: #717182;
     white-space: nowrap;
     flex-shrink: 0;
@@ -135,7 +147,10 @@
            thead above the tbody during scroll. */
         background: #FFFFFF;
         z-index: 2;
-        font-size: 0.8125em;
+        /* Spec §Grid Data Widget header row: sm token — viewport-anchored
+           (0.75 × the 16–32px root range) so data renders the SAME px in
+           every widget at every screen size. */
+        font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -153,7 +168,10 @@
     .vas-rr-table tbody td {
         padding: 0.875em 0.5em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        /* spec §"List / Grid Hierarchy Rule": all cells share the sm token,
+           one step below the title; weight/color carry the hierarchy.
+           Viewport-anchored like the title so rows match sibling widgets. */
+        font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -185,36 +203,38 @@
      "+$ 1,428,000.00") never truncates.
    - Customer is the only flexing column. If the name exceeds its space the
      `.vas-rr-truncate` span clips with an ellipsis. */
-.vas-rr-th-date,        .vas-rr-td-date        { width: 7.5em; color: #5F7283; font-size: 0.8125em; }
-.vas-rr-th-doc,         .vas-rr-td-doc         { width: 8em; }
+.vas-rr-th-date,        .vas-rr-td-date        { width: 7em; color: #5F7283; }
+.vas-rr-th-doc,         .vas-rr-td-doc         { width: 7em; }
 .vas-rr-th-customer,    .vas-rr-td-customer    { width: auto; min-width: 8em; }
-.vas-rr-th-method,      .vas-rr-td-method      { width: 8em; }
-.vas-rr-th-bank,        .vas-rr-td-bank        { width: 9em; color: #5F7283; font-size: 0.8125em; }
+.vas-rr-th-method,      .vas-rr-td-method      { width: 7em; }
+.vas-rr-th-bank,        .vas-rr-td-bank        { width: 7em; color: #5F7283; }
 .vas-rr-th-amount,      .vas-rr-td-amount      { width: 10em; text-align: right; }
 
 .vas-rr-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
     color: #5F7283;
-    font-size: 0.75em;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);   /* xs — secondary metadata cell */
 }
 
 .vas-rr-td-customer {
-    font-weight: 700;
+    /* Primary row title cell: same sm size as the other cells, bold + dark
+       per the hierarchy rule (differentiate by weight/color, not size). */
+    font-weight: 400;
     color: #102C3F;
-    font-size: 0.9375em;
 }
 
 .vas-rr-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    /* Amount must render in full — no ellipsis or clipping. The fixed
-       width above is already wide enough for the largest expected value
-       ("+$ 1,428,000.00"); `overflow: visible` lets a longer string
-       overflow into adjacent space rather than truncating. */
-    overflow: visible;
-    text-overflow: clip;
+    /* Amount column is the rightmost column and has a generous fixed
+       width (10em).  On very narrow container cells the amount must not
+       bleed past the table edge and escape the card's overflow:hidden
+       boundary, so we keep overflow:hidden here.  The column width
+       already accommodates the largest realistic value. */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .vas-rr-td-amount-pos { color: #0B6B45; }
@@ -240,14 +260,16 @@
     white-space: nowrap;
 }
 
-/* Method chip — muted neutral pill matching the reference design. */
+/* Method chip — muted neutral pill matching the reference design. Chip text
+   is the xs token via the shared viewport clamp (absolute, so it doesn't
+   compound against the cell's font-size). */
 .vas-rr-method-chip {
     display: inline-flex;
     align-items: center;
     padding: 0.25em 0.625em;
     border-radius: 999em;
-    font-size: 0.75em;
-    font-weight: 500;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);
+    font-weight: 400;
     line-height: 1.3;
     background: #EDF2F6;
     color: #5F7283;
@@ -280,7 +302,9 @@
 }
 
 .vas-rr-pager-helper {
-    font-size: 0.75em;
+    /* Spec §Widget Footer Pager helper text — shared viewport clamp
+       (0.8125 × the 16–32px root range) so it matches sibling widgets. */
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -296,12 +320,14 @@
     flex-shrink: 0;
 }
 
+/* Spec §Pager Buttons: widget pagers are 24px square (1.5em) with a 14px
+   (0.875em) chevron. */
 .vas-rr-pager-btn {
-    width: 1.75em;
-    height: 1.75em;
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.4375em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -329,8 +355,10 @@
 .vas-rr-pager-text {
     min-width: 2.5em;
     text-align: center;
-    font-size: 0.75em;
-    font-weight: 500;
+    /* Spec page text: Roboto Medium, dark — shared viewport clamp
+       (0.875 × the 16–32px root range). */
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -373,7 +401,10 @@
 
 .vas-rr-dialog {
     font-family: Roboto, sans-serif;
-    font-size: 1em;
+    /* Viewport-anchored dialog base. Lowered from the old 32px cap (text was
+       too large) but kept responsive — grows with the viewport up to 22px on
+       big screens so the modal scales up instead of looking tiny. */
+    font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0085), 22px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -397,9 +428,13 @@
 
 .vas-rr-dialog-card {
     position: relative;
+    min-height: 34em;
     width: 100%;
-    max-width: 45em;             /* ~720px on wide screens */
-    max-height: 86vh;
+    /* Responsive width: grows with the viewport on big screens (was a flat
+       45em, which collapsed to ~855px once the base font was reduced). min()
+       caps it so it never gets absurdly wide on ultra-wide displays. */
+    max-width: min(70em, 70vw);
+    max-height: 90vh;
     background: #FFFFFF;
     border: 0.0625em solid #E4EDF4;
     border-radius: 1em;
@@ -426,9 +461,10 @@
 }
 
 .vas-rr-dialog-hicon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     border-radius: 0.5625em;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
     border: 0.0625em solid #BFE4FF;
@@ -440,8 +476,8 @@
 }
 
     .vas-rr-dialog-hicon svg {
-        width: 1.15em;
-        height: 1.15em;
+        width: 1.125em;
+        height: 1.125em;
         stroke: currentColor;
     }
 
@@ -452,9 +488,12 @@
 }
 
 .vas-rr-dialog-title {
-    font-size: 1.125em;
-    font-weight: 500;
-    color: #141414;
+    /* Spec §Widget Header title clamp — same rule as the widget title so
+       the modal header matches it exactly; weight/color per the family
+       dialog-title style. */
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
     line-height: 1.15;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -463,7 +502,8 @@
 
 .vas-rr-dialog-sub {
     margin-top: 0.125em;
-    font-size: 0.75em;
+    /* Spec §Widget Header subtitle clamp — paired with the dialog title. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625),22px);
     color: #717182;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -489,17 +529,20 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #141414;
+    /* Family dialog close button — muted glyph, soft blue-gray hover
+       (matches the sibling dialogs). */
+    color: #5F7283;
     flex-shrink: 0;
 }
 
     .vas-rr-dialog-close:hover {
-        background: rgba(0, 0, 0, 0.05);
+        background: #F3F7FB;
+        color: #102C3F;
     }
 
     .vas-rr-dialog-close svg {
-        width: 1.25em;
-        height: 1.25em;
+        width: 1em;
+        height: 1em;
         stroke: currentColor;
     }
 
@@ -517,8 +560,10 @@
     background: #EAF4FE;
     color: #0083DA;
     font-family: inherit;
+    /* 0.8125em of the viewport-anchored dialog base = the shared 13–26px
+       helper token, so the Print pill matches the family at every size. */
     font-size: 0.8125em;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
@@ -553,6 +598,10 @@
 
 .vas-rr-dialog-body {
     flex: 1 1 auto;
+    /* Screen-anchored clamp so the body content scales with the viewport —
+       grows on big screens (up to 26px) to fill the now-wide modal, with a
+       15px floor so small screens stay compact. */
+    font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.01), 32px);
     /* Body is a flex column so the receipt-summary section (labels +
        grid) and the allocation section can coexist with different
        overflow behaviour: summary is fixed-height, allocation flexes
@@ -570,7 +619,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.7);
+    /* Family dialog busy scrim — same 0.62 white as the sibling dialogs. */
+    background: rgba(255, 255, 255, 0.62);
     z-index: 5;
 }
 
@@ -582,7 +632,7 @@
     text-transform: uppercase;
     color: #5F7283;
     font-weight: 700;
-    padding: 1em 1.375em 0;
+    padding: 0.625em 1.375em 0;
     /* Stays anchored; only the allocation table area below scrolls. */
     flex-shrink: 0;
 }
@@ -591,7 +641,7 @@
 
 .vas-rr-d-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0 1.75em;
     padding: 0.5em 1.375em 0.375em;
     /* Summary grid is fixed-height — its rows never scroll. */
@@ -599,27 +649,27 @@
 }
 
 .vas-rr-d-field {
-    padding: 0.6875em 0 0.5625em;
+    padding: 0.4375em 0 0.375em;
     border-bottom: 0.0625em solid #EDF2F6;
     min-width: 0;
 }
 
 .vas-rr-d-label {
-    font-size: 0.75em;
+    font-size: 0.85em;
     color: #141414;
     opacity: 0.55;
 }
 
 .vas-rr-d-value {
-    font-size: 0.9375em;
+    font-size: 0.975em;
     color: #141414;
-    margin-top: 0.4375em;
-    font-weight: 500;
+    margin-top: 0.1875em;
+    font-weight: 400;
     word-break: break-word;
 }
 
     .vas-rr-d-value strong {
-        font-weight: 700;
+        font-weight: 400;
     }
 
 .vas-rr-d-value-mono {
@@ -631,7 +681,7 @@
 
 .vas-rr-d-value-amt,
 .vas-rr-d-value-amt-neg {
-    font-size: 1.25em;
+    font-size: 1.0625em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     display: inline-block;
@@ -678,6 +728,30 @@
 .vas-rr-alloc-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
+}
+
+/* Allocation table column widths (table-layout:fixed needs the header cells to
+   declare widths). Proportional PERCENTAGES keep the four columns balanced at
+   every modal size: they fill the table exactly (sum = 100%) so no `auto`
+   column balloons on the wide modal and nothing overflows on a narrow one.
+   Tuned per breakpoint below — large (default, > 48em), medium (≤ 48em) and
+   small (≤ 36em, where Document amount is hidden). Order:
+   Reference · Date · Document amount · Allocated amount. */
+.vas-rr-alloc-table thead th:nth-child(1) { width: 34%; }   /* Reference   */
+.vas-rr-alloc-table thead th:nth-child(2) { width: 18%; }   /* Date        */
+.vas-rr-alloc-table thead th:nth-child(3) { width: 24%; }   /* Doc amount  */
+.vas-rr-alloc-table thead th:nth-child(4) { width: 24%; }   /* Allocated   */
+
+/* Reference cell: truncate long doc-numbers that would otherwise force
+   the table wider than the dialog card on small viewports. The date cell
+   gets the same guard so an unusually long locale date clips instead of
+   overlapping the amount column. */
+.vas-rr-alloc-table td:nth-child(1),
+.vas-rr-alloc-table td:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
     .vas-rr-alloc-table thead th {
@@ -686,7 +760,7 @@
         font-size: 0.75em;
         font-weight: 400;
         color: #748494;
-        padding: 0.625em 0.75em;
+        padding: 0.5em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
         white-space: nowrap;
         /* Sticky inside the scroll wrap so the header stays visible
@@ -701,9 +775,9 @@
         }
 
     .vas-rr-alloc-table tbody td {
-        padding: 0.6875em 0.75em;
+        padding: 0.5em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -780,7 +854,7 @@
 }
 
 .vas-rr-d-alloc-amt {
-    font-weight: 700;
+    font-weight: 400;
     color: #0B6B45;
 }
 
@@ -808,7 +882,7 @@
 
 /* On-account empty state — dashed hint + warning pill. */
 .vas-rr-alloc-empty {
-    font-size: 0.8125em;
+    font-size: 0.75em;               /* sm — matches the table data */
     color: #748494;
     padding: 0.875em 0.75em;
     border: 0.0625em dashed #E4EDF4;
@@ -849,6 +923,13 @@
         max-height: 100%;
         border-radius: 0;
     }
+
+    /* Medium screens: even split for the now full-width modal — give the two
+       amount columns a touch more room than on large. */
+    .vas-rr-alloc-table thead th:nth-child(1) { width: 30%; }   /* Reference  */
+    .vas-rr-alloc-table thead th:nth-child(2) { width: 20%; }   /* Date       */
+    .vas-rr-alloc-table thead th:nth-child(3) { width: 25%; }   /* Doc amount */
+    .vas-rr-alloc-table thead th:nth-child(4) { width: 25%; }   /* Allocated  */
 }
 
 @media (max-width: 36em) {            /* ~576px phone — collapse grid to single column */
@@ -879,4 +960,10 @@
     .vas-rr-alloc-table tbody td:nth-child(3) {
         display: none;
     }
+
+    /* Small screens: Document amount is hidden above — rebalance the three
+       remaining columns so they fill the row (sum = 100%). */
+    .vas-rr-alloc-table thead th:nth-child(1) { width: 42%; }   /* Reference */
+    .vas-rr-alloc-table thead th:nth-child(2) { width: 26%; }   /* Date      */
+    .vas-rr-alloc-table thead th:nth-child(4) { width: 32%; }   /* Allocated */
 }
