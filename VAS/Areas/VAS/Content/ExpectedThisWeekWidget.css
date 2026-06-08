@@ -51,7 +51,8 @@
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    /*padding: 1em 1em 1.125em;*/
+    padding: 0.875em;
     overflow: hidden;
     cursor: pointer;
     transition: box-shadow 180ms ease;
@@ -105,45 +106,19 @@
 .vas-etw-label {
     /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
        Header"): same resolved px in every widget at any screen size.
-       Weight Bold (700) per project request. */
-    font-size: clamp(15.5px, 1.1375vw, 31px);
+       Weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 700;
+    font-weight: 500;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.vas-etw-view {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    padding: 0.3125em 0.625em;
-    border-radius: 999em;
-    color: #0083DA;
-    font-size: 0.75em;
-    font-weight: 500;
-    font-family: inherit;
-    flex-shrink: 0;
-}
-
-    .vas-etw-view svg {
-        width: 0.875em;
-        height: 0.875em;
-        stroke: currentColor;
-    }
-
-    .vas-etw-view:hover {
-        background: rgba(0, 131, 218, 0.08);
-        color: #0069AE;
-    }
-
 /* Big metric — success green to match the tint, with base-currency symbol leading. */
 .vas-etw-metric {
+    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
     font-size: 2em;/*2.5em;*/                 /* 40px design.md KPI value */
     font-weight: 700;
     color: #0B6B45;
@@ -249,11 +224,12 @@
 }
 
 .vas-etw-dialog-icon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
-    border-radius: 0.5em;
-    background: #E5F5EA;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
     border: 0.0625em solid #B6E1C2;
     color: #0B6B45;
     display: flex;
@@ -276,7 +252,7 @@
 .vas-etw-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -418,7 +394,7 @@
 }
 
 .vas-etw-td-customer {
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
 }
 
@@ -431,7 +407,7 @@
 
 .vas-etw-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 500;
     color: #856404;                   /* amber to match design — image_1 */
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -482,7 +458,7 @@
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
-    font-size: 0.875em;
+    font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;
 }
 

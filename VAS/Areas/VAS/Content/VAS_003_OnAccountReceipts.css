@@ -48,7 +48,8 @@
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    /*padding: 1em 1em 1.125em;*/
+    padding: 0.875em;
     overflow: hidden;
     cursor: pointer;
     transition: box-shadow 180ms ease;
@@ -76,7 +77,7 @@
 .vas-oar-head-left {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     min-width: 0;
     flex: 1 1 auto;
 }
@@ -101,49 +102,23 @@
         stroke: currentColor;
     }
 
-/* Widget header label — bold per request. Shared viewport-anchored title
+/* Widget header label — Medium (500). Shared dashboard-width-anchored title
    clamp (dashboard-widgets.md §"Widget Header"): same resolved px in every
    widget at any screen size. */
 .vas-oar-label {
-    font-size: clamp(15.5px, 1.1375vw, 31px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 700;
+    font-weight: 500;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.vas-oar-view {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    padding: 0.3125em 0.625em;
-    border-radius: 999em;
-    color: #0B6B45;
-    font-size: 0.75em;
-    font-weight: 500;
-    font-family: inherit;
-    flex-shrink: 0;
-}
-
-    .vas-oar-view svg {
-        width: 0.875em;
-        height: 0.875em;
-        stroke: currentColor;
-    }
-
-    .vas-oar-view:hover {
-        background: rgba(1, 157, 137, 0.10);
-        color: #0B6B45;
-    }
-
 /* ── Metric: big deep-green value with currency symbol + underline ─── */
 
 .vas-oar-metric {
+    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
     font-size: 2em;/*2.5em; */                /* 40px design.md KPI value */
     font-weight: 700;
     color: #0B6B45;
@@ -277,7 +252,7 @@
 .vas-oar-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -409,7 +384,7 @@
 }
 
 .vas-oar-td-customer {
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
 }
 
@@ -427,7 +402,7 @@
 /* Amount: deep-green, right-aligned, full value — never ellipsis-clipped. */
 .vas-oar-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 500;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

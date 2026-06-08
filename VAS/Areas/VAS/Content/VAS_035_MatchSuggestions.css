@@ -63,7 +63,7 @@
 .vas-msug-head-left {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     min-width: 0;
     flex: 1 1 auto;
 }
@@ -97,11 +97,11 @@
 }
 
 /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
-   Header"): same resolved px in every widget at any screen size. */
+   Header"): same resolved px in every widget at any screen size. Medium (500). */
 .vas-msug-title {
-    font-size: clamp(15.5px, 1.1375vw, 31px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 700;
+    font-weight: 500;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -182,7 +182,7 @@
 
 .vas-msug-customer {
     font-size: 0.9375em;
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
     min-width: 0;
     overflow: hidden;
@@ -380,10 +380,14 @@
 
 .vas-msug-dialog {
     font-family: Roboto, sans-serif;
-    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
-       0.88vw): dialog data matches widget data px and the whole em-sized
-       dialog scales in proportion. 16px floor = unchanged small screens. */
-    font-size: clamp(16px, 1.1733vw, 32px);
+    /* Viewport-anchored dialog base. The whole dialog is em-sized off this, so
+       its base must track BOTH axes: 1.1733vw keeps dialog data == widget data
+       px on wide screens, but min(…, 1.7vh) shrinks the base when the viewport
+       is short so the modal's stacked height always fits the screen — no inner
+       scroll, responsive on small and large screens alike. (1.7vh derived from
+       the modal's ~55em natural height: 55em·f ≤ 100vh ⇒ f ≤ ~1.8vh, rounded
+       down for safety. 12px floor for very short screens.) */
+    font-size: clamp(12px, min(1.1733vw, 1.7vh), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -429,7 +433,7 @@
 .vas-msug-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
 }

@@ -114,15 +114,15 @@
     }
 
 /* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
-   Bold (700) per project request. Shared viewport-anchored title clamp so
+   Medium (500) per project request. Shared dashboard-width-anchored title clamp so
    every widget's title resolves to the same px at any screen size. Bounds =
    0.97 × the 16–32px root range. */
 .vas-er-title {
     min-width: 0;
     max-width: 100%;
-    font-size: clamp(15.5px, 1.1375vw, 31px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -168,6 +168,11 @@
    explicitly to override the shared .vas-expay-filter-flyout values (fixed px top, legacy
    width:calc(100%-12px)) so left+right alone control the flyout width at all container sizes. */
 .vas-er-filter-flyout {
+    /* Anchor the flyout's em sizing to --dash-inline-size (the dashboard's
+       visible content width in px; falls back to 100vw when unset) instead of
+       inheriting the cell-based cqi card font, so the filter panel scales with
+       the screen consistently regardless of the widget's cell size. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: absolute;
     top: 3.5em;
     left: 0;
@@ -265,7 +270,12 @@
     display: flex;
     align-items: center;
     gap: 0.625em;
-    padding: 0.375em 0.5em 0.375em 0;    /* right gap so the amount clears the scrollbar */
+    /* Responsive top/bottom padding anchored on --dash-inline-size (the
+       dashboard's visible content width in px; falls back to 100vw when unset)
+       so the rows gain breathing room small → medium → large screen. The em
+       bounds clamp it (min keeps small screens compact, max caps big ones). */
+    padding-block: clamp(0.375em, calc(var(--dash-inline-size, 100vw) * 0.0045), 0.85em);
+    padding-inline: 0 0.5em;             /* right gap so the amount clears the scrollbar */
     border-bottom: 0.0625em solid #EDF2F6;
     min-width: 0;
     flex-shrink: 0;
@@ -279,7 +289,10 @@
 .vas-er-bar {
     width: 0.1875em;
     min-width: 0.1875em;
-    height: 1.6em;
+    /* Stretch to the row's content height (driven by the tallest child,
+       .vas-er-info — title + meta), instead of a fixed 1.6em that fell short
+       of the two-line info block. */
+    align-self: stretch;
     border-radius: 999em;
     flex-shrink: 0;
 }
@@ -309,7 +322,7 @@
 .vas-er-row-title {
     font-size: clamp(12px, 0.88vw, 24px);
     line-height: 1.25;
-    font-weight: 700;                /* Roboto Bold */
+    font-weight: 500;                /* Roboto Bold */
     color: #102C3F;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -334,7 +347,7 @@
     flex-shrink: 0;
     font-size: clamp(12px, 0.88vw, 24px);
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 500;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

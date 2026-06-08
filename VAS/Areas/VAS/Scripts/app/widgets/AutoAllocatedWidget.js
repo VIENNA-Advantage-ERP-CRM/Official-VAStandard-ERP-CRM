@@ -43,6 +43,28 @@
 
 ; (function (VIS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VIS.AutoAllocatedWidget = function () {
 
         this.frame;
@@ -234,6 +256,10 @@
             }) + "%";
         }
 
+        /* formatExactAmount returns { sign, magnitude } where sign is ASCII '+' or
+           '-' and magnitude is the absolute value formatted to stdPrecision digits.
+           Call sites prepend sign BEFORE the currency symbol so the result reads
+           "+$1,000.00" / "-$1,000.00". */
         function formatExactAmount(value) {
             var num = Number(value || 0);
             var stdPrecision = 2;
@@ -247,10 +273,13 @@
                 stdPrecision = 2;
             }
 
-            return num.toLocaleString(window.navigator.language, {
+            var sign = num < 0 ? '-' : '+';
+            var magnitude = Number(Math.abs(num)).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+
+            return { sign: sign, magnitude: magnitude };
         }
 
         function renderMetric(data) {
@@ -360,10 +389,15 @@
                 var bankText = formatBankAccount(row);
                 var currencyCode = row.paymentCurrency || "";
                 var sym = row.paymentCurrencySymbol || currencyCode || "";
-                var amountText = formatExactAmount(row.amount);
+                var amountParts = formatExactAmount(row.amount);
+                var amountSign = amountParts.sign;
+                var amountMagnitude = amountParts.magnitude;
                 /* Amount keeps its payment-currency symbol inline — no
-                   conversion to base currency, per spec. */
-                var amountHtml = (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amountText);
+                   conversion to base currency, per spec. Sign precedes the
+                   symbol: "+$1,000.00" / "-$1,000.00". */
+                var amountHtml = escapeHtml(amountSign) +
+                    (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
+                    escapeHtml(amountMagnitude);
 
                 /* The Matched column was dropped — the active tab itself
                    indicates the allocated/unallocated state. */
@@ -380,7 +414,7 @@
                     '<span class="vas-aa-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-aa-td-currency" title="' + escapeHtml(currencyCode) + '">' + escapeHtml(currencyCode) + '</td>' +
-                    '<td class="vas-aa-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-aa-td-amount" title="' + escapeHtml(amountSign + (sym ? sym : '') + amountMagnitude) + '">' + amountHtml + '</td>' +
                     '</tr>'
                 );
 
@@ -583,12 +617,6 @@
                 '</div>' +
                 '<span class="vas-aa-label">' + lbl("VAS_AutoAllocated", "Auto-allocated") + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-aa-view">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>' +
-                '</svg>' +
-                '<span>' + lbl("VAS_View", "View") + '</span>' +
-                '</button>' +
                 '</div>' +
 
                 '<div class="vas-aa-metric">—</div>' +
@@ -611,11 +639,6 @@
                     e.preventDefault();
                     openDialog();
                 }
-            });
-
-            $card.find('.vas-aa-view').on('click', function (e) {
-                e.stopPropagation();
-                openDialog();
             });
 
             $root.append($card);
@@ -659,6 +682,9 @@
 
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.AutoAllocatedWidget.prototype.widgetSizeChange = function (height, width) { };

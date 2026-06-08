@@ -40,7 +40,8 @@
     border: 0.125em solid #fff;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    /*padding: 1em 1em 1.125em;*/
+    padding: 0.875em;
     overflow: hidden;
 }
 
@@ -89,9 +90,9 @@
 .vas-bc-title {
     /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
        Header"): same resolved px in every widget at any screen size.
-       Weight Bold (700) per project request. */
-    font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+       Weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
     min-width: 0;
@@ -101,6 +102,7 @@
 }
 
 .vas-bc-metric {
+    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
     font-size: 2em;
     font-weight: 700;
     color: #ED1C24;                   /* danger */

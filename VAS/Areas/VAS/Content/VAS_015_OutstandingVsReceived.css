@@ -98,14 +98,14 @@
 }
 
 /* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
-   Bold (700) per project request. Shared viewport-anchored title clamp so
+   Medium (500) per project request. Shared dashboard-width-anchored title clamp so
    every widget's title resolves to the same px at any screen size. Bounds =
    0.97 × the 16–32px root range. */
 .vas-ovr-title {
-    font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 500;
     color: #102C3F;
-    line-height: 1.2;
+    line-height: 1.3;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

@@ -100,13 +100,13 @@
     }
 
 .vas-rr-title {
-    /* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
-       Bold (700) per project request. Shared viewport-anchored title clamp —
-       the title sizes off the dashboard width (spec), NOT the widget cell,
-       so a 6-col title matches a 2-col title at every screen size. Bounds =
-       0.97 × the 16–32px root range. */
-    font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    /* dashboard-widgets.md §"Widget Header": the spec title clamp, anchored
+       on --dash-inline-size (the dashboard's visible content width in px,
+       written to :root by the widget bootstrap via ResizeObserver — see
+       §Measurement Setup; falls back to 100vw when unset). Dark #102C3F;
+       weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
     overflow: hidden;
@@ -116,7 +116,8 @@
 }
 
 .vas-rr-head-hint {
-    font-size: 0.75em;
+    /* Spec §Widget Header subtitle clamp — paired with the title above. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 22px);
     color: #717182;
     white-space: nowrap;
     flex-shrink: 0;
@@ -218,13 +219,13 @@
 .vas-rr-td-customer {
     /* Primary row title cell: same sm size as the other cells, bold + dark
        per the hierarchy rule (differentiate by weight/color, not size). */
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
 }
 
 .vas-rr-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     /* Amount column is the rightmost column and has a generous fixed
@@ -400,10 +401,10 @@
 
 .vas-rr-dialog {
     font-family: Roboto, sans-serif;
-    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
-       0.88vw): dialog data matches widget data px and the whole em-sized
-       dialog scales in proportion. 16px floor = unchanged small screens. */
-    font-size: clamp(16px, 1.1733vw, 32px);
+    /* Viewport-anchored dialog base. Lowered from the old 32px cap (text was
+       too large) but kept responsive — grows with the viewport up to 22px on
+       big screens so the modal scales up instead of looking tiny. */
+    font-size: clamp(15px, 0.85vw, 22px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -428,8 +429,11 @@
 .vas-rr-dialog-card {
     position: relative;
     width: 100%;
-    max-width: 45em;             /* ~720px on wide screens */
-    max-height: 86vh;
+    /* Responsive width: grows with the viewport on big screens (was a flat
+       45em, which collapsed to ~855px once the base font was reduced). min()
+       caps it so it never gets absurdly wide on ultra-wide displays. */
+    max-width: min(70em, 70vw);
+    max-height: 90vh;
     background: #FFFFFF;
     border: 0.0625em solid #E4EDF4;
     border-radius: 1em;
@@ -483,10 +487,11 @@
 }
 
 .vas-rr-dialog-title {
-    /* Shared viewport-anchored title clamp — matches the widget titles;
-       weight/color normalized to the family dialog-title style. */
-    font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    /* Spec §Widget Header title clamp — same rule as the widget title so
+       the modal header matches it exactly; weight/color per the family
+       dialog-title style. */
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.15;
     overflow: hidden;
@@ -496,8 +501,8 @@
 
 .vas-rr-dialog-sub {
     margin-top: 0.125em;
-    /* Shared viewport-anchored sm clamp — matches the widget subtitles. */
-    font-size: clamp(12px, 0.88vw, 24px);
+    /* Spec §Widget Header subtitle clamp — paired with the dialog title. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625),22px);
     color: #717182;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -592,6 +597,10 @@
 
 .vas-rr-dialog-body {
     flex: 1 1 auto;
+    /* Screen-anchored clamp so the body content scales with the viewport —
+       grows on big screens (up to 26px) to fill the now-wide modal, with a
+       15px floor so small screens stay compact. */
+    font-size: clamp(15px, 1vw, 32px);
     /* Body is a flex column so the receipt-summary section (labels +
        grid) and the allocation section can coexist with different
        overflow behaviour: summary is fixed-height, allocation flexes
@@ -622,7 +631,7 @@
     text-transform: uppercase;
     color: #5F7283;
     font-weight: 700;
-    padding: 1em 1.375em 0;
+    padding: 0.625em 1.375em 0;
     /* Stays anchored; only the allocation table area below scrolls. */
     flex-shrink: 0;
 }
@@ -631,7 +640,7 @@
 
 .vas-rr-d-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0 1.75em;
     padding: 0.5em 1.375em 0.375em;
     /* Summary grid is fixed-height — its rows never scroll. */
@@ -639,27 +648,27 @@
 }
 
 .vas-rr-d-field {
-    padding: 0.6875em 0 0.5625em;
+    padding: 0.4375em 0 0.375em;
     border-bottom: 0.0625em solid #EDF2F6;
     min-width: 0;
 }
 
 .vas-rr-d-label {
-    font-size: 0.75em;
+    font-size: 0.85em;
     color: #141414;
     opacity: 0.55;
 }
 
 .vas-rr-d-value {
-    font-size: 0.9375em;
+    font-size: 0.975em;
     color: #141414;
-    margin-top: 0.4375em;
+    margin-top: 0.1875em;
     font-weight: 500;
     word-break: break-word;
 }
 
     .vas-rr-d-value strong {
-        font-weight: 700;
+        font-weight: 500;
     }
 
 .vas-rr-d-value-mono {
@@ -671,7 +680,7 @@
 
 .vas-rr-d-value-amt,
 .vas-rr-d-value-amt-neg {
-    font-size: 1.25em;
+    font-size: 1.0625em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     display: inline-block;
@@ -721,18 +730,17 @@
     table-layout: fixed;
 }
 
-/* Allocation table column widths (table-layout:fixed needs at least the
-   header cells to declare widths). Widths resolve against the th font-size
-   (0.75em). Per the reference design (image_1) the Reference column stays
-   COMPACT (11em ≈ chip + doc number) with Date right beside it; the
-   right-aligned Document-amount column is the auto/flex one, so any spare
-   modal width becomes the gap between Date and the amounts instead of
-   pushing Date away from Reference. Date needs 8em (~96px) for
-   "May 28, 2026"; Allocated amount 9.5em (~114px) for "$ 555,999.89". */
-.vas-rr-alloc-table thead th:nth-child(1) { width: 15em; }
-.vas-rr-alloc-table thead th:nth-child(2) { width: 10em; }
-.vas-rr-alloc-table thead th:nth-child(3) { width: auto; }
-.vas-rr-alloc-table thead th:nth-child(4) { width: 12em; }
+/* Allocation table column widths (table-layout:fixed needs the header cells to
+   declare widths). Proportional PERCENTAGES keep the four columns balanced at
+   every modal size: they fill the table exactly (sum = 100%) so no `auto`
+   column balloons on the wide modal and nothing overflows on a narrow one.
+   Tuned per breakpoint below — large (default, > 48em), medium (≤ 48em) and
+   small (≤ 36em, where Document amount is hidden). Order:
+   Reference · Date · Document amount · Allocated amount. */
+.vas-rr-alloc-table thead th:nth-child(1) { width: 34%; }   /* Reference   */
+.vas-rr-alloc-table thead th:nth-child(2) { width: 18%; }   /* Date        */
+.vas-rr-alloc-table thead th:nth-child(3) { width: 24%; }   /* Doc amount  */
+.vas-rr-alloc-table thead th:nth-child(4) { width: 24%; }   /* Allocated   */
 
 /* Reference cell: truncate long doc-numbers that would otherwise force
    the table wider than the dialog card on small viewports. The date cell
@@ -751,7 +759,7 @@
         font-size: 0.75em;
         font-weight: 400;
         color: #748494;
-        padding: 0.625em 0.75em;
+        padding: 0.5em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
         white-space: nowrap;
         /* Sticky inside the scroll wrap so the header stays visible
@@ -766,7 +774,7 @@
         }
 
     .vas-rr-alloc-table tbody td {
-        padding: 0.6875em 0.75em;
+        padding: 0.5em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
         font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
@@ -845,7 +853,7 @@
 }
 
 .vas-rr-d-alloc-amt {
-    font-weight: 700;
+    font-weight: 500;
     color: #0B6B45;
 }
 
@@ -914,6 +922,13 @@
         max-height: 100%;
         border-radius: 0;
     }
+
+    /* Medium screens: even split for the now full-width modal — give the two
+       amount columns a touch more room than on large. */
+    .vas-rr-alloc-table thead th:nth-child(1) { width: 30%; }   /* Reference  */
+    .vas-rr-alloc-table thead th:nth-child(2) { width: 20%; }   /* Date       */
+    .vas-rr-alloc-table thead th:nth-child(3) { width: 25%; }   /* Doc amount */
+    .vas-rr-alloc-table thead th:nth-child(4) { width: 25%; }   /* Allocated  */
 }
 
 @media (max-width: 36em) {            /* ~576px phone — collapse grid to single column */
@@ -944,4 +959,10 @@
     .vas-rr-alloc-table tbody td:nth-child(3) {
         display: none;
     }
+
+    /* Small screens: Document amount is hidden above — rebalance the three
+       remaining columns so they fill the row (sum = 100%). */
+    .vas-rr-alloc-table thead th:nth-child(1) { width: 42%; }   /* Reference */
+    .vas-rr-alloc-table thead th:nth-child(2) { width: 26%; }   /* Date      */
+    .vas-rr-alloc-table thead th:nth-child(4) { width: 32%; }   /* Allocated */
 }

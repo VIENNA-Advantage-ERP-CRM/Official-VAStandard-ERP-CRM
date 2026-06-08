@@ -107,13 +107,13 @@
 .vas-aa-label {
     /* dashboard-widgets.md §"KPI And Summary Widget": the stat label IS the
        widget title (shared Widget Header style, dark #102C3F, line-height 1.3).
-       Per project request the weight is Bold (700) instead of the spec's
-       Medium (500). Shared viewport-anchored title clamp so every widget's
-       title resolves to the same px at any screen size (see the TARM/RR
-       titles for the rationale). Bounds = 0.97 × the 16–32px root range. */
-    font-size: clamp(15.5px, 1.1375vw, 31px);
+       Per project request the weight is Medium (500). Shared title clamp,
+       anchored on --dash-inline-size (the dashboard's visible content width;
+       spec §Widget Header / §Measurement Setup; falls back to 100vw when
+       unset). Bounds = 0.97 × the 16–32px root range. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 700;
+    font-weight: 500;
     line-height: 1.3;
     min-width: 0;
     overflow: hidden;
@@ -121,39 +121,13 @@
     white-space: nowrap;
 }
 
-.vas-aa-view {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    padding: 0.3125em 0.625em;
-    border-radius: 999em;
-    color: #0083DA;
-    font-size: 0.75em;
-    font-weight: 500;
-    font-family: inherit;
-    flex-shrink: 0;
-}
-
-    .vas-aa-view svg {
-        width: 0.875em;
-        height: 0.875em;
-        stroke: currentColor;
-    }
-
-    .vas-aa-view:hover {
-        background: rgba(0, 131, 218, 0.08);
-        color: #0069AE;
-    }
-
 /* Big percentage — success green to match the tint. */
 .vas-aa-metric {
+    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
     /* dashboard-widgets.md §"Widget Stat Values": canonical KPI stat —
-       1.75em, line-height 1.1. Per project request the weight is Bold
+       2em, line-height 1.1. Per project request the weight is Bold
        (700) instead of the spec's Medium (500). */
-    font-size: 1.75em;
+    font-size: 2em;
     font-weight: 700;
     color: #0B6B45;
     line-height: 1.1;
@@ -281,7 +255,7 @@
 .vas-aa-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, 1.1375vw, 31px);
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -485,7 +459,7 @@
 }
 
 .vas-aa-td-customer {
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
 }
 
@@ -502,7 +476,7 @@
 
 .vas-aa-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 500;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

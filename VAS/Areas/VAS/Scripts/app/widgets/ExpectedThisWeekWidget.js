@@ -40,6 +40,28 @@
 
 ; (function (VIS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VIS.ExpectedThisWeekWidget = function () {
 
         this.frame;
@@ -549,12 +571,6 @@
                 '</div>' +
                 '<span class="vas-etw-label">' + lbl("VIS_ExpectedThisWeek", "Expected this week") + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-etw-view">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M7 17 17 7"/><path d="M7 7h10v10"/>' +
-                '</svg>' +
-                '<span>' + lbl("VIS_View", "View") + '</span>' +
-                '</button>' +
                 '</div>' +
 
                 '<div class="vas-etw-metric">—</div>' +
@@ -577,11 +593,6 @@
                     e.preventDefault();
                     openDialog();
                 }
-            });
-
-            $card.find('.vas-etw-view').on('click', function (e) {
-                e.stopPropagation();
-                openDialog();
             });
 
             $root.append($card);
@@ -623,6 +634,9 @@
 
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.ExpectedThisWeekWidget.prototype.widgetSizeChange = function (height, width) { };

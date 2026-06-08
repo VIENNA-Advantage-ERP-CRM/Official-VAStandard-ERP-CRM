@@ -55,6 +55,29 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size
+       on :root equal to the dashboard container's current pixel width so the
+       title/subtitle clamps resolve against the DASHBOARD's visible content
+       area, not the viewport. A single document-level ResizeObserver serves
+       every widget (the var is global); without a marked container — or
+       without ResizeObserver — the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            /* Spec: write a PIXEL length — calc() needs a length, not a number. */
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     /* Standard Compiere tender-type codes mapped to short display strings.
        Custom values (e.g. UPI / NEFT / RTGS) are passed through unchanged. */
     var TENDER_TYPES = {
@@ -884,6 +907,10 @@
 
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Now that the root is in the DOM, self-wire the dashboard-width
+           CSS variable the title clamp reads (spec §Measurement Setup). */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_RecentReceiptsWidget.prototype.widgetSizeChange = function (height, width) { };
