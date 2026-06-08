@@ -1,6 +1,24 @@
 /**
  * Top Counterparties - Cash Journal
  * Purpose - Shows top net counterparties from cash journal lines.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Top Counterparties                   | VAS_054_TopCounterparties
+ *  2  | Last 30 Days                         | VAS_054_Last30Days
+ *  3  | All parties ->                       | VAS_054_AllParties
+ *  4  | No counterparties found              | VAS_054_NoData
+ *  5  | Unable to load top counterparties    | VAS_054_LoadError
+ *  6  | Unknown                              | VAS_054_Unknown
+ *  7  | Bank                                 | VAS_054_Bank
+ *  8  | Cashbook                             | VAS_054_Cashbook
+ *  9  | Customer                             | VAS_054_Customer
+ * 10  | Vendor                               | VAS_054_Vendor
+ * 11  | Other                                | VAS_054_Other
+ * 12  | Loading                              | VAS_054_Loading
+ * 13  | Session Expired                      | VAS_054_SessionExpired
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};

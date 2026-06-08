@@ -1,6 +1,28 @@
 /**
  * Approval Queue - Cash Journal
  * Purpose - Shows in-progress cash journals and latest workflow message.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Approval Queue                       | VAS_053_ApprovalQueue
+ *  2  | Pending                              | VAS_053_Pending
+ *  3  | View all ->                          | VAS_053_ViewAll
+ *  4  | Submitted by                         | VAS_053_SubmittedBy
+ *  5  | No in-progress cash journals         | VAS_053_NoData
+ *  6  | Unable to load approval queue        | VAS_053_LoadError
+ *  7  | Cash Journal                         | VAS_053_CashJournal
+ *  8  | High                                 | VAS_053_High
+ *  9  | Med                                  | VAS_053_Medium
+ * 10  | Low                                  | VAS_053_Low
+ * 11  | just now                             | VAS_053_JustNow
+ * 12  | ago                                  | VAS_053_Ago
+ * 13  | yesterday                            | VAS_053_Yesterday
+ * 14  | Loading                              | VAS_053_Loading
+ * 15  | Approve                              | VAS_053_Approve
+ * 16  | Reject                               | VAS_053_Reject
+ * 17  | Session Expired                      | VAS_053_SessionExpired
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};

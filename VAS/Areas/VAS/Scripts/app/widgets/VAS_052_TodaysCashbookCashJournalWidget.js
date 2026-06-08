@@ -1,6 +1,27 @@
 /**
  * Today's Cashbook - Cash Journal
  * Purpose - Shows today's cashbook entries from Cash Journal lines.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Today's Cashbook                     | VAS_052_TodaysCashbook
+ *  2  | entries                              | VAS_052_Entries
+ *  3  | + Entry                              | VAS_052_Entry
+ *  4  | Time                                 | VAS_052_Time
+ *  5  | Description                          | VAS_052_Description
+ *  6  | Category                             | VAS_052_Category
+ *  7  | Posted by                            | VAS_052_PostedBy
+ *  8  | In                                   | VAS_052_In
+ *  9  | Out                                  | VAS_052_Out
+ * 10  | Other                                | VAS_052_Other
+ * 11  | System                               | VAS_052_System
+ * 12  | Loading                              | VAS_052_Loading
+ * 13  | No data                              | VAS_052_NoData
+ * 14  | Unable to load today's cashbook      | VAS_052_LoadError
+ * 15  | Cash entry                           | VAS_052_CashEntry
+ * 16  | Session Expired                      | VAS_052_SessionExpired
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
@@ -100,12 +121,12 @@
                 'text': '0 ' + lbl('VAS_052_Entries', 'entries')
             });
 
-            var $action = $('<button>', {
-                'type': 'button',
-                'class': 'VAS_052_cashbook-action',
-                'id': 'VAS_052_cashbook-action-' + widgetId,
-                'text': lbl('VAS_052_Entry', '+ Entry')
-            });
+            //var $action = $('<button>', {
+            //    'type': 'button',
+            //    'class': 'VAS_052_cashbook-action',
+            //    'id': 'VAS_052_cashbook-action-' + widgetId,
+            //    'text': lbl('VAS_052_Entry', '+ Entry')
+            //});
 
             var $body = $('<div>', {
                 'class': 'VAS_052_cashbook-body'
@@ -133,7 +154,7 @@
             }).hide();
 
             $titleRow.append($icon).append($title).append($meta);
-            $header.append($titleRow).append($action);
+            $header.append($titleRow);
             $body.append($table);
             $card.append($busy).append($header).append($body).append($state);
             $root.append($card);

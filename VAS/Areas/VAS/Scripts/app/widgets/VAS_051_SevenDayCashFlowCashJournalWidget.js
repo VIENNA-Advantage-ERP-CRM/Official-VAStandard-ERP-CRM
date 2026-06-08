@@ -1,6 +1,20 @@
 /**
  * 7-Day Cash Flow - Cash Journal
  * Purpose - Shows cash in vs cash out for the last 7 days including today.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | 7-Day Cash Flow                      | VAS_051_SevenDayCashFlow
+ *  2  | IN VS OUT                            | VAS_051_InVsOut
+ *  3  | In                                   | VAS_051_CashIn
+ *  4  | Out                                  | VAS_051_CashOut
+ *  5  | Loading                              | VAS_051_Loading
+ *  6  | No data                              | VAS_051_NoData
+ *  7  | Unable to load seven day cash flow   | VAS_051_LoadError
+ *  8  | Last 7 days                          | VAS_051_Last7Days
+ *  9  | Session Expired                      | VAS_051_SessionExpired
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};

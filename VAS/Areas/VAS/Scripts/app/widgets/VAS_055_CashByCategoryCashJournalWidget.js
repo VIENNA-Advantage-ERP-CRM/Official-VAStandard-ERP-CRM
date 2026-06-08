@@ -13,6 +13,7 @@
  *  6  | Loading                              | VAS_055_Loading
  *  7  | No cash out today                    | VAS_055_NoData
  *  8  | Unable to load cash out by category  | VAS_055_LoadError
+ *  9  | Session Expired                      | VAS_055_SessionExpired
  * ─────────────────────────────────────────────────────────────────────
  */
 
