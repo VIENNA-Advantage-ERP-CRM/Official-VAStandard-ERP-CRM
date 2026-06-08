@@ -111,7 +111,7 @@
        clamp so every widget's title resolves to the same px at any dashboard
        width. Bounds = 0.97 × the 16–32px root range. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.3;
     overflow: hidden;

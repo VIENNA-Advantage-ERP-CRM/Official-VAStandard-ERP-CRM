@@ -122,7 +122,7 @@
     max-width: 100%;
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -322,7 +322,7 @@
 .vas-er-row-title {
     font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.25;
-    font-weight: 500;                /* Roboto Bold */
+    font-weight: 400;                /* Roboto Bold */
     color: #102C3F;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -347,7 +347,7 @@
     flex-shrink: 0;
     font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -437,7 +437,7 @@
     /* Spec page text: Roboto Medium, dark — shared viewport clamp
        (0.875 × the 16–32px root range). */
     font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

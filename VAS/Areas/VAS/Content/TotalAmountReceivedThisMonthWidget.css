@@ -114,7 +114,7 @@
        100vw when the var is unset. Bounds = 0.97 × the 16–32px root range. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.3;
     min-width: 0;
     overflow: hidden;
@@ -218,7 +218,8 @@
 
 .vas-tarm-dialog-card {
     position: relative;
-    width: min(53.75em, 100%);        /* max ~860px */
+    min-height: min(34em, 100%);
+    width: min(53.75em, 100%); /* max ~860px */
     /* Fixed dialog height so the modal does NOT fluctuate based on row count —
        header/footer stay put, body scrolls when there are more rows than fit,
        and the empty area below a partial page stays small. `min(...)` clamps
@@ -271,7 +272,7 @@
 .vas-tarm-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -413,7 +414,7 @@
 }
 
 .vas-tarm-td-customer {
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -423,7 +424,7 @@
 
 .vas-tarm-td-amount {
     text-align: right;
-    font-weight: 500;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     /* Keep amounts on one line and never let them ellipsis-truncate — the
@@ -436,7 +437,7 @@
 .vas-tarm-td-currency {
     text-align: center;
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.02em;
 }
 
@@ -556,7 +557,7 @@
     min-width: 3em;
     text-align: center;
     font-size: 0.875em;               /* 14px */
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

@@ -108,7 +108,7 @@
 .vas-oar-label {
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 500;
+    font-weight: 400;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -148,7 +148,7 @@
     max-width: 100%;
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -205,7 +205,7 @@
     width: min(62em, 100%);
     /* Tall enough for a full 10-row page so the body doesn't scroll on a full
        page; clamps to the viewport on short screens. */
-    height: min(40em, 100%);
+    height: min(34em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -252,7 +252,7 @@
 .vas-oar-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -384,7 +384,7 @@
 }
 
 .vas-oar-td-customer {
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -395,14 +395,14 @@
 .vas-oar-td-currency {
     text-align: center;
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.02em;
 }
 
 /* Amount: deep-green, right-aligned, full value — never ellipsis-clipped. */
 .vas-oar-td-amount {
     text-align: right;
-    font-weight: 500;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -489,7 +489,7 @@
     min-width: 3em;
     text-align: center;
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

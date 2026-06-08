@@ -92,7 +92,7 @@
        Header"): same resolved px in every widget at any screen size.
        Weight Medium (500) per project request. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     min-width: 0;
@@ -122,7 +122,7 @@
     max-width: 100%;
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

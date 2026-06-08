@@ -102,7 +102,7 @@
 .vas-msug-title {
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 500;
+    font-weight: 400;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -184,7 +184,7 @@
 .vas-msug-customer {
     /*font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0017188), 22.5px);*/
     font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     min-width: 0;
     overflow: hidden;
@@ -202,7 +202,7 @@
 .vas-msug-row-amount {
     /*font-size: clamp(15px, calc(var(--dash-inline-size, 100vw) * 0.0017188), 22.5px);*/
     font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
-    font-weight: 500;
+    font-weight: 400;
     color: #5F7283;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -282,7 +282,7 @@
     /* Shared viewport clamp — matches the sibling widgets' footer helpers. */
     font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     min-width: 0;
     overflow: hidden;
@@ -297,7 +297,7 @@
     align-items: center;
     gap: 0.375em;
     font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0101563), 19.5px);
-    font-weight: 500;
+    font-weight: 400;
     color: #106AB0;
     text-decoration: none;
     white-space: nowrap;
@@ -360,7 +360,7 @@
     text-align: center;
     /* Shared viewport clamp — matches the sibling widgets' pager text. */
     font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -415,6 +415,7 @@
 
 .vas-msug-dialog-card {
     position: relative;
+    min-height: 34em;
     width: min(55em, 100%);
     max-height: 100%;
     background: #FFFFFF;
@@ -437,7 +438,7 @@
 .vas-msug-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -509,7 +510,7 @@
 
 .vas-msug-banner-verdict {
     font-size: 0.9375em;
-    font-weight: 500;
+    font-weight: 400;
 }
 
 .vas-msug-dialog-body {
@@ -590,7 +591,7 @@
 .vas-msug-pane-value {
     font-size: 0.875em;
     color: #102C3F;
-    font-weight: 500;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     text-align: right;
     min-width: 0;
@@ -703,7 +704,7 @@
 
 .vas-msug-check-title {
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -734,7 +735,7 @@
     /* 0.875em of the viewport-anchored dialog base = the shared 14–28px
        token, so footer buttons match the family at every screen size. */
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     padding: 0.5em 1.125em;
     cursor: pointer;
 }
@@ -753,7 +754,7 @@
     /* 0.875em of the viewport-anchored dialog base = the shared 14–28px
        token, so footer buttons match the family at every screen size. */
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     padding: 0.5em 1.125em;
     cursor: pointer;
 }

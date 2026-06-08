@@ -106,7 +106,7 @@
        §Measurement Setup; falls back to 100vw when unset). Dark #102C3F;
        weight Medium (500) per project request. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
     overflow: hidden;
@@ -219,13 +219,13 @@
 .vas-rr-td-customer {
     /* Primary row title cell: same sm size as the other cells, bold + dark
        per the hierarchy rule (differentiate by weight/color, not size). */
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
 }
 
 .vas-rr-td-amount {
     text-align: right;
-    font-weight: 500;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     /* Amount column is the rightmost column and has a generous fixed
@@ -269,7 +269,7 @@
     padding: 0.25em 0.625em;
     border-radius: 999em;
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.3;
     background: #EDF2F6;
     color: #5F7283;
@@ -358,7 +358,7 @@
     /* Spec page text: Roboto Medium, dark — shared viewport clamp
        (0.875 × the 16–32px root range). */
     font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -428,6 +428,7 @@
 
 .vas-rr-dialog-card {
     position: relative;
+    min-height: 34em;
     width: 100%;
     /* Responsive width: grows with the viewport on big screens (was a flat
        45em, which collapsed to ~855px once the base font was reduced). min()
@@ -491,7 +492,7 @@
        the modal header matches it exactly; weight/color per the family
        dialog-title style. */
     font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.15;
     overflow: hidden;
@@ -562,7 +563,7 @@
     /* 0.8125em of the viewport-anchored dialog base = the shared 13–26px
        helper token, so the Print pill matches the family at every size. */
     font-size: 0.8125em;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1;
     cursor: pointer;
     flex-shrink: 0;
@@ -663,12 +664,12 @@
     font-size: 0.975em;
     color: #141414;
     margin-top: 0.1875em;
-    font-weight: 500;
+    font-weight: 400;
     word-break: break-word;
 }
 
     .vas-rr-d-value strong {
-        font-weight: 500;
+        font-weight: 400;
     }
 
 .vas-rr-d-value-mono {
@@ -853,7 +854,7 @@
 }
 
 .vas-rr-d-alloc-amt {
-    font-weight: 500;
+    font-weight: 400;
     color: #0B6B45;
 }
 

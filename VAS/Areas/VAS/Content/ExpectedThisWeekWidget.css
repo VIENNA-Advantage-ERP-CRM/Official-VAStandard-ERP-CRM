@@ -109,7 +109,7 @@
        Weight Medium (500) per project request. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     color: #102C3F;
-    font-weight: 500;
+    font-weight: 400;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -145,7 +145,7 @@
     max-width: 100%;
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -199,7 +199,8 @@
 
 .vas-etw-dialog-card {
     position: relative;
-    width: min(64em, 100%);           /* ~1024px on wide screens */
+    min-height: min(34em, 100%);
+    width: min(64em, 100%); /* ~1024px on wide screens */
     /* Fixed dialog height so it doesn't shrink (or grow) with row count —
        header/footer stay put, body scrolls when there are more rows than
        fit. Sized so the empty area below the last row stays small even on a
@@ -252,7 +253,7 @@
 .vas-etw-dialog-title {
     /* Shared viewport-anchored title clamp — matches the widget titles. */
     font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
@@ -394,20 +395,20 @@
 }
 
 .vas-etw-td-customer {
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
 }
 
 .vas-etw-td-currency {
     text-align: center;
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.02em;
 }
 
 .vas-etw-td-amount {
     text-align: right;
-    font-weight: 500;
+    font-weight: 400;
     color: #856404;                   /* amber to match design — image_1 */
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -528,7 +529,7 @@
     min-width: 3em;
     text-align: center;
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
