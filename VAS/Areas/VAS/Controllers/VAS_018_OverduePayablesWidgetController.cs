@@ -50,9 +50,7 @@ namespace VAS.Areas.VAS.Controllers
             result.SparklineData = new List<decimal>();
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
             int currentYear = now.Year;
             int currentMonth = now.Month;
@@ -77,7 +75,7 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -94,23 +92,26 @@ namespace VAS.Areas.VAS.Controllers
             // MRole is applied ONLY on C_Invoice alias "i" (primary physical table).
             // C_InvoicePaySchedule ps is a secondary join — MRole is NOT applied on it.
             string baseQuery = @"SELECT i.C_Invoice_ID, i.DateInvoiced,
-                            COALESCE(currencyConvert(COALESCE(ps.VA009_OpenAmnt, i.VA009_OpenAmount), i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt,
-                            COALESCE(ps.DueDate, i.DueDate) AS EffectiveDueDate
+                            CASE WHEN i.IsReturnTrx = 'N'
+                                 THEN COALESCE(currencyConvert(ps.DueAmt, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                 ELSE -COALESCE(currencyConvert(ps.DueAmt, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                 END AS OpenAmt,
+                            ps.DueDate AS EffectiveDueDate
                        FROM C_Invoice i
-                       LEFT OUTER JOIN C_InvoicePaySchedule ps ON (ps.C_Invoice_ID = i.C_Invoice_ID
-                                                                    AND ps.IsActive = 'Y'
-                                                                    AND ps.IsValid = 'Y')
+                      INNER JOIN C_InvoicePaySchedule ps ON (ps.C_Invoice_ID = i.C_Invoice_ID
+                                                              AND ps.IsActive = 'Y'
+                                                              AND ps.VA009_IsPaid = 'N'
+                                                              AND ps.DueAmt > 0)
                       WHERE i.IsSOTrx = 'N'
-                        AND i.IsReturnTrx = 'N'
+                        AND i.IsExpenseInvoice = 'N'
                         AND i.DocStatus IN ('CO', 'CL')
                         AND i.IsActive = 'Y'
-                        AND i.AD_Client_ID = @ClientID
-                        AND i.AD_Org_ID = @OrgID";
+                        AND i.AD_Client_ID = @ClientID";
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             // Outer query aggregates from the secured inline view.
-            // Overdue = effective due date is in the past and open amount > 0.
+            // Overdue = due date is in the past and DueAmt > 0 (unpaid schedule lines only).
             // AvgDpd = average days past due using EXTRACT arithmetic (year*365 + month*30 + day).
             strQuery = @"SELECT SUM(inv.OpenAmt) AS OverdueTotal,
                          SUM(CASE WHEN EXTRACT(YEAR FROM inv.DateInvoiced) = " + currentYear + @"
@@ -119,15 +120,14 @@ namespace VAS.Areas.VAS.Controllers
                          SUM(CASE WHEN EXTRACT(YEAR FROM inv.DateInvoiced) = " + lastMonthYear + @"
                                    AND EXTRACT(MONTH FROM inv.DateInvoiced) = " + lastMonthNum + @"
                               THEN inv.OpenAmt ELSE 0 END) AS LastMonthOverdue,
-                         COUNT(inv.C_Invoice_ID) AS InvoiceCount,
+                         COUNT(DISTINCT inv.C_Invoice_ID) AS InvoiceCount,
                          ROUND(AVG(
                              (" + currentYear + @" - EXTRACT(YEAR FROM inv.EffectiveDueDate)) * 365 +
                              (" + currentMonth + @" - EXTRACT(MONTH FROM inv.EffectiveDueDate)) * 30 +
                              (" + currentDay + @" - EXTRACT(DAY FROM inv.EffectiveDueDate))
                          )) AS AvgDpd
                     FROM (" + baseQuery + @") inv
-                   WHERE inv.OpenAmt > 0
-                     AND inv.EffectiveDueDate IS NOT NULL
+                   WHERE inv.EffectiveDueDate IS NOT NULL
                      AND (EXTRACT(YEAR FROM inv.EffectiveDueDate) * 12 + EXTRACT(MONTH FROM inv.EffectiveDueDate)) * 31
                          + EXTRACT(DAY FROM inv.EffectiveDueDate)
                          < ((" + currentYear + @" * 12 + " + currentMonth + @") * 31 + " + currentDay + @")";
@@ -154,8 +154,7 @@ namespace VAS.Areas.VAS.Controllers
                          EXTRACT(MONTH FROM inv.EffectiveDueDate) AS DueMonth,
                          SUM(inv.OpenAmt) AS MonthlyOverdue
                     FROM (" + baseQuery + @") inv
-                   WHERE inv.OpenAmt > 0
-                     AND inv.EffectiveDueDate IS NOT NULL
+                   WHERE inv.EffectiveDueDate IS NOT NULL
                      AND (EXTRACT(YEAR FROM inv.EffectiveDueDate) * 12 + EXTRACT(MONTH FROM inv.EffectiveDueDate))
                          >= (" + sparkYear + @" * 12 + " + sparkMonth + @")
                    GROUP BY EXTRACT(YEAR FROM inv.EffectiveDueDate), EXTRACT(MONTH FROM inv.EffectiveDueDate)

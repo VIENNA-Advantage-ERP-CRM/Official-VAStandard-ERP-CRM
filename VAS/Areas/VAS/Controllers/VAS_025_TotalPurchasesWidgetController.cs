@@ -49,9 +49,7 @@ namespace VAS.Areas.VAS.Controllers
             result.SparklineData = new List<decimal>();
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
             int currentYear = now.Year;
             int currentMonth = now.Month;
@@ -75,7 +73,7 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -91,22 +89,27 @@ namespace VAS.Areas.VAS.Controllers
             // AD_Client_ID and AD_Org_ID added explicitly; AddAccessSQL covers role-level access.
             strQuery = @"SELECT SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
                                     AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
-                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS MtdTotal,
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                    * CASE WHEN i.IsReturnTrx = 'Y' THEN -1 ELSE 1 END
+                               ELSE 0 END) AS MtdTotal,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
-                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS YtdTotal,
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                    * CASE WHEN i.IsReturnTrx = 'Y' THEN -1 ELSE 1 END
+                               ELSE 0 END) AS YtdTotal,
                          COUNT(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
                                     AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
                                THEN 1 ELSE NULL END) AS InvoiceCount,
                          SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + lastMonthYear + @"
                                     AND EXTRACT(MONTH FROM i.DateInvoiced) = " + lastMonthNum + @"
-                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS LastMonthTotal
+                               THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                    * CASE WHEN i.IsReturnTrx = 'Y' THEN -1 ELSE 1 END
+                               ELSE 0 END) AS LastMonthTotal
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
-                     AND i.IsReturnTrx = 'N'
+                     AND i.IsExpenseInvoice = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID ";
+                     AND i.AD_Client_ID = @ClientID";
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
@@ -128,14 +131,14 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = @"SELECT EXTRACT(YEAR FROM i.DateInvoiced) AS InvYear,
                          EXTRACT(MONTH FROM i.DateInvoiced) AS InvMonth,
-                         SUM(COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS MonthlyTotal
+                         SUM(COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                             * CASE WHEN i.IsReturnTrx = 'Y' THEN -1 ELSE 1 END) AS MonthlyTotal
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
-                     AND i.IsReturnTrx = 'N'
+                     AND i.IsExpenseInvoice = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
                      AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID
                      AND (EXTRACT(YEAR FROM i.DateInvoiced) * 12 + EXTRACT(MONTH FROM i.DateInvoiced))
                          >= (" + sparkYear + " * 12 + " + sparkMonth + @") ";
 

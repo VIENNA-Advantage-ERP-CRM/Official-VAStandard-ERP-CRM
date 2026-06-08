@@ -52,9 +52,7 @@ namespace VAS.Areas.VAS.Controllers
             };
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId    = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
 
             // Fiscal year start year: if current month >= April the FY started this calendar year.
@@ -74,7 +72,7 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -87,13 +85,18 @@ namespace VAS.Areas.VAS.Controllers
             // Round-trip 2 — CTE aggregation for current and previous FY monthly totals.
             // MRole applied to C_Invoice base query only (join-free to prevent AccessSqlParser OOM).
             // CTE alias MonthlyData is NOT a physical table — MRole is NOT applied to it.
-            string baseQuery = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal, i.DateAcct
+            string baseQuery = @"SELECT i.C_Invoice_ID,
+                           CASE WHEN i.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                ELSE -COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                                END AS GrandTotal,
+                           i.DateAcct
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
+                     AND i.IsExpenseInvoice = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID";
+                     AND i.AD_Client_ID = @ClientID";
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 

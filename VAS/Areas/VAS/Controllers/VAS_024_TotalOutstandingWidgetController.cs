@@ -50,9 +50,7 @@ namespace VAS.Areas.VAS.Controllers
             result.SparklineData = new List<decimal>();
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
             int currentYear = now.Year;
             int currentMonth = now.Month;
@@ -76,7 +74,7 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -91,25 +89,41 @@ namespace VAS.Areas.VAS.Controllers
             // out-of-memory errors. EXTRACT(YEAR/MONTH FROM col) works in Oracle and Postgres.
             // OpenAmt > 0 identifies invoices with a remaining unpaid balance.
             // AD_Client_ID and AD_Org_ID added explicitly; AddAccessSQL covers role-level access.
-            strQuery = @"SELECT SUM(COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS OutstandingTotal,
-                         SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + currentYear + @"
-                                   AND EXTRACT(MONTH FROM i.DateInvoiced) = " + currentMonth + @"
-                              THEN COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS CurrentMonthOutstanding,
-                         SUM(CASE WHEN EXTRACT(YEAR FROM i.DateInvoiced) = " + lastMonthYear + @"
-                                   AND EXTRACT(MONTH FROM i.DateInvoiced) = " + lastMonthNum + @"
-                              THEN COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) ELSE 0 END) AS LastMonthOutstanding,
-                         COUNT(i.C_Invoice_ID) AS InvoiceCount,
-                         COUNT(DISTINCT i.C_BPartner_ID) AS VendorCount
+            // Base query: join-free C_Invoice for MRole; C_InvoicePaySchedule joined in outer query.
+            string baseOutstanding = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.DateInvoiced, i.C_BPartner_ID, i.IsReturnTrx
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
-                     AND i.IsReturnTrx = 'N'
+                     AND i.IsExpenseInvoice = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
-                     AND i.VA009_OpenAmount > 0
                      AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID ";
+                     AND i.AD_Client_ID = @ClientID";
+            baseOutstanding = MRole.GetDefault(ctx).AddAccessSQL(baseOutstanding, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            strQuery = @"SELECT SUM(CASE WHEN b.IsReturnTrx = 'N'
+                                    THEN COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                    ELSE -COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                    END) AS OutstandingTotal,
+                         SUM(CASE WHEN EXTRACT(YEAR FROM b.DateInvoiced) = " + currentYear + @"
+                                   AND EXTRACT(MONTH FROM b.DateInvoiced) = " + currentMonth + @"
+                              THEN CASE WHEN b.IsReturnTrx = 'N'
+                                        THEN COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                        ELSE -COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                        END
+                              ELSE 0 END) AS CurrentMonthOutstanding,
+                         SUM(CASE WHEN EXTRACT(YEAR FROM b.DateInvoiced) = " + lastMonthYear + @"
+                                   AND EXTRACT(MONTH FROM b.DateInvoiced) = " + lastMonthNum + @"
+                              THEN CASE WHEN b.IsReturnTrx = 'N'
+                                        THEN COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                        ELSE -COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                        END
+                              ELSE 0 END) AS LastMonthOutstanding,
+                         COUNT(DISTINCT b.C_Invoice_ID) AS InvoiceCount,
+                         COUNT(DISTINCT b.C_BPartner_ID) AS VendorCount
+                    FROM (" + baseOutstanding + @") b
+                   INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = b.C_Invoice_ID)
+                   WHERE ips.IsActive = 'Y'
+                     AND ips.VA009_IsPaid = 'N'
+                     AND ips.DueAmt > 0";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -128,23 +142,21 @@ namespace VAS.Areas.VAS.Controllers
             int sparkYear = sevenMonthsAgo.Year;
             int sparkMonth = sevenMonthsAgo.Month;
 
-            strQuery = @"SELECT EXTRACT(YEAR FROM i.DateInvoiced) AS InvYear,
-                         EXTRACT(MONTH FROM i.DateInvoiced) AS InvMonth,
-                         SUM(COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)) AS MonthlyOutstanding
-                    FROM C_Invoice i
-                   WHERE i.IsSOTrx = 'N'
-                     AND i.IsReturnTrx = 'N'
-                     AND i.DocStatus IN ('CO', 'CL')
-                     AND i.VA009_OpenAmount > 0
-                     AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID
-                     AND (EXTRACT(YEAR FROM i.DateInvoiced) * 12 + EXTRACT(MONTH FROM i.DateInvoiced))
-                         >= (" + sparkYear + " * 12 + " + sparkMonth + @") ";
-
-            strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            strQuery += @" GROUP BY EXTRACT(YEAR FROM i.DateInvoiced), EXTRACT(MONTH FROM i.DateInvoiced)
-                           ORDER BY EXTRACT(YEAR FROM i.DateInvoiced), EXTRACT(MONTH FROM i.DateInvoiced)";
+            strQuery = @"SELECT EXTRACT(YEAR FROM b.DateInvoiced) AS InvYear,
+                         EXTRACT(MONTH FROM b.DateInvoiced) AS InvMonth,
+                         SUM(CASE WHEN b.IsReturnTrx = 'N'
+                                  THEN COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                  ELSE -COALESCE(currencyConvert(ips.DueAmt, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0)
+                                  END) AS MonthlyOutstanding
+                    FROM (" + baseOutstanding + @") b
+                   INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = b.C_Invoice_ID)
+                   WHERE ips.IsActive = 'Y'
+                     AND ips.VA009_IsPaid = 'N'
+                     AND ips.DueAmt > 0
+                     AND (EXTRACT(YEAR FROM b.DateInvoiced) * 12 + EXTRACT(MONTH FROM b.DateInvoiced))
+                         >= (" + sparkYear + " * 12 + " + sparkMonth + @")
+                   GROUP BY EXTRACT(YEAR FROM b.DateInvoiced), EXTRACT(MONTH FROM b.DateInvoiced)
+                   ORDER BY EXTRACT(YEAR FROM b.DateInvoiced), EXTRACT(MONTH FROM b.DateInvoiced)";
 
             DataSet sparkDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (sparkDs != null && sparkDs.Tables.Count > 0 && sparkDs.Tables[0].Rows.Count > 0)

@@ -21,8 +21,6 @@ namespace VAS.Areas.VAS.Controllers
     {
         string strQuery = "";
 
-        // Default DPO target in days. Can be made configurable via a parameter table later.
-        private const int DpoTargetDays = 30;
 
         [Authorize]
         public ActionResult Index()
@@ -52,11 +50,10 @@ namespace VAS.Areas.VAS.Controllers
         {
             AvgPaymentPeriodKpiResult result = new AvgPaymentPeriodKpiResult();
             result.SparklineData = new List<decimal>();
-            result.TargetDpo = DpoTargetDays;
+            result.TargetDpo    = 30;
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId = ctx.GetAD_Org_ID();
-            SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
             int currentYear = now.Year;
             int currentMonth = now.Month;
@@ -73,12 +70,66 @@ namespace VAS.Areas.VAS.Controllers
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
                      AND i.IsReturnTrx = 'N'
+                     AND i.IsExpenseInvoice = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID ";
+                     AND i.AD_Client_ID = @ClientID";
 
             baseInvoiceQuery = MRole.GetDefault(ctx).AddAccessSQL(baseInvoiceQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            // Step 0 — Dynamic target days: weighted-average contracted payment period
+            // for AP invoices actually paid in the last 30 days.
+            // Formula: SUM(DueAmt × (DueDate − DateInvoiced)) / SUM(DueAmt) per invoice,
+            //          then weighted by AllocatedAmount across all invoices.
+            // MRole applied only to C_Invoice inside baseInvoiceQuery (CTE aliases are not physical tables).
+            // Falls back to 30 days when no recent allocation data exists.
+            strQuery = @"WITH RecentAllocated AS (
+    SELECT inv.C_Invoice_ID,
+           inv.DateInvoiced,
+           SUM(al.Amount) AS AllocatedAmount
+      FROM (" + baseInvoiceQuery + @") inv
+     INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
+     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+     INNER JOIN C_Payment p ON (p.C_Payment_ID = al.C_Payment_ID)
+     WHERE al.IsActive = 'Y'
+       AND ah.IsActive = 'Y'
+       AND ah.DocStatus IN ('CO', 'CL')
+       AND ah.AD_Client_ID = @ClientID
+       AND CAST(ah.DateAcct AS DATE) >= TRUNC(CURRENT_DATE) - 30
+       AND CAST(ah.DateAcct AS DATE) <= TRUNC(CURRENT_DATE)
+       AND p.IsReceipt = 'N'
+       AND p.DocStatus IN ('CO', 'CL')
+       AND p.IsActive = 'Y'
+       AND al.C_Invoice_ID IS NOT NULL
+       AND al.C_Payment_ID IS NOT NULL
+     GROUP BY inv.C_Invoice_ID, inv.DateInvoiced
+),
+InvoiceTarget AS (
+    SELECT ra.C_Invoice_ID,
+           ra.AllocatedAmount,
+           ROUND(
+               SUM(ips.DueAmt * (CAST(ips.DueDate AS DATE) - CAST(ra.DateInvoiced AS DATE)))
+               / NULLIF(SUM(ips.DueAmt), 0)
+           , 0) AS InvoiceTargetDays
+      FROM RecentAllocated ra
+     INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = ra.C_Invoice_ID)
+     WHERE ips.IsActive = 'Y'
+       AND ips.DueAmt > 0
+     GROUP BY ra.C_Invoice_ID, ra.AllocatedAmount
+)
+SELECT ROUND(
+           SUM(AllocatedAmount * InvoiceTargetDays)
+           / NULLIF(SUM(AllocatedAmount), 0)
+       , 0) AS TargetDays
+  FROM InvoiceTarget";
+
+            DataSet dsTarget = DB.ExecuteDataset(strQuery, dataParams, null);
+            if (dsTarget != null && dsTarget.Tables.Count > 0 && dsTarget.Tables[0].Rows.Count > 0
+                && dsTarget.Tables[0].Rows[0]["TargetDays"] != DBNull.Value)
+            {
+                int dbTarget = Util.GetValueOfInt(dsTarget.Tables[0].Rows[0]["TargetDays"]);
+                if (dbTarget > 0) { result.TargetDpo = dbTarget; }
+            }
 
             // Step 1a — Current month DPO.
             // Wraps the secured inline view; allocation tables joined outside MRole scope.

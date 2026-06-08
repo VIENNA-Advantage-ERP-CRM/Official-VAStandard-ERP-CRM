@@ -53,9 +53,7 @@ namespace VAS.Areas.VAS.Controllers
             };
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId    = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
 
             // Indian fiscal year: April 1 – March 31
@@ -78,7 +76,7 @@ namespace VAS.Areas.VAS.Controllers
                      AND c.IsActive = 'Y'";
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -90,13 +88,18 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 2 — vendor spend aggregation for current FY and prior FY.
             // MRole on join-free C_Invoice base; C_BPartner + C_BP_Group joins in outer query.
-            string baseVendor = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal, i.C_BPartner_ID, i.DateInvoiced
+            string baseVendor = @"SELECT i.C_Invoice_ID,
+                       CASE WHEN i.IsReturnTrx = 'N'
+                            THEN COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                            ELSE -COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
+                            END AS GrandTotal,
+                       i.C_BPartner_ID, i.DateInvoiced
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID";
+                   AND i.AD_Client_ID = @ClientID";
             baseVendor = MRole.GetDefault(ctx).AddAccessSQL(baseVendor, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT bp.Name AS VendorName,

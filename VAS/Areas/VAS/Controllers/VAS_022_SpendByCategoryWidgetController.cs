@@ -53,9 +53,7 @@ namespace VAS.Areas.VAS.Controllers
             };
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId    = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now = DateTime.Now;
             int currentYear  = now.Year;
             int currentMonth = now.Month;
@@ -73,7 +71,7 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -86,19 +84,23 @@ namespace VAS.Areas.VAS.Controllers
             // Round-trip 2 — category aggregation for current month.
             // MRole applied only to C_Invoice base query (join-free) to avoid OOM in AccessSqlParser.
             // C_InvoiceLine, M_Product, M_Product_Category joins are done outside MRole scope.
-            string baseQuery = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID
+            string baseQuery = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.IsReturnTrx
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
+                     AND i.IsExpenseInvoice = 'N'
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
                      AND i.AD_Client_ID = @ClientID
-                     AND i.AD_Org_ID = @OrgID
                      AND EXTRACT(YEAR FROM i.DateAcct) = " + currentYear + @"
                      AND EXTRACT(MONTH FROM i.DateAcct) = " + currentMonth;
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT pc.Name AS CategoryName, SUM(COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)) AS TotalAmount
+            strQuery = @"SELECT pc.Name AS CategoryName,
+                       SUM(CASE WHEN base_i.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)
+                                ELSE -COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)
+                                END) AS TotalAmount
                   FROM (" + baseQuery + @") base_i
                  INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = base_i.C_Invoice_ID)
                  INNER JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
@@ -107,7 +109,10 @@ namespace VAS.Areas.VAS.Controllers
                    AND p.IsActive = 'Y'
                    AND pc.IsActive = 'Y'
                  GROUP BY pc.Name
-                HAVING SUM(COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)) > 0
+                HAVING SUM(CASE WHEN base_i.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)
+                                ELSE -COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)
+                                END) > 0
                  ORDER BY TotalAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);

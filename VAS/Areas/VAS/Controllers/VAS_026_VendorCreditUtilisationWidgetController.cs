@@ -53,9 +53,7 @@ namespace VAS.Areas.VAS.Controllers
             };
 
             int clientId = ctx.GetAD_Client_ID();
-            int orgId    = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
@@ -69,7 +67,7 @@ namespace VAS.Areas.VAS.Controllers
                      AND c.IsActive = 'Y'";
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -83,23 +81,29 @@ namespace VAS.Areas.VAS.Controllers
             // MRole applied to join-free C_Invoice base.
             // C_BPartner (with SO_CreditLimit > 0) drives the outer SELECT.
             // Open invoice totals are aggregated in a LEFT JOIN subquery.
-            string baseInv = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt
+            string baseInv = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.IsReturnTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
-                   AND i.IsReturnTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.VA009_OpenAmount > 0
-                   AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID";
+                   AND i.AD_Client_ID = @ClientID";
             baseInv = MRole.GetDefault(ctx).AddAccessSQL(baseInv, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT bp.Name AS VendorName,
                        bp.SO_CreditLimit AS CreditLimit,
                        COALESCE(inv_s.CreditUsed, 0) AS CreditUsed
                   FROM C_BPartner bp
-                   LEFT OUTER JOIN (SELECT v.C_BPartner_ID, SUM(v.OpenAmt) AS CreditUsed
+                   LEFT OUTER JOIN (SELECT v.C_BPartner_ID,
+                                           SUM(CASE WHEN v.IsReturnTrx = 'N'
+                                                    THEN COALESCE(currencyConvert(ips.DueAmt, v.C_Currency_ID, " + schemaCurrencyId + @", v.DateAcct, v.C_ConversionType_ID, v.AD_Client_ID, v.AD_Org_ID), 0)
+                                                    ELSE -COALESCE(currencyConvert(ips.DueAmt, v.C_Currency_ID, " + schemaCurrencyId + @", v.DateAcct, v.C_ConversionType_ID, v.AD_Client_ID, v.AD_Org_ID), 0)
+                                                    END) AS CreditUsed
                                       FROM (" + baseInv + @") v
+                                     INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = v.C_Invoice_ID)
+                                     WHERE ips.IsActive = 'Y'
+                                       AND ips.VA009_IsPaid = 'N'
+                                       AND ips.DueAmt > 0
                                      GROUP BY v.C_BPartner_ID) inv_s ON (inv_s.C_BPartner_ID = bp.C_BPartner_ID)
                  WHERE bp.IsVendor = 'Y'
                    AND bp.IsActive = 'Y'

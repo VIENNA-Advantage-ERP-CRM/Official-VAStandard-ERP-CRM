@@ -3,6 +3,21 @@
  * Purpose        : Real-Time Alerts Widget
  * Created Date   : 14 May 2026
  * Created by     : Humam Yousif
+ *
+ * AD_Message keys used in this file (add via System Messages):
+ *   VAS_021_PaymentOverdue        => "Payment overdue"
+ *   VAS_021_OneDayPastDue         => "1 day past due date"
+ *   VAS_021_DaysPastDue           => "days past due date"
+ *   VAS_021_InvAwaitingApproval   => "invoices awaiting approval"
+ *   VAS_021_BlockedApprovalQueue  => "blocked in approval queue"
+ *   VAS_021_GrnMismatch           => "GRN mismatch"
+ *   VAS_021_Invoices              => "invoices"
+ *   VAS_021_PendingReconciliation => "pending reconciliation"
+ *   VAS_021_DpoRising             => "DPO rising — currently "
+ *   VAS_021_Days                  => "days"
+ *   VAS_021_DpoTarget             => "Target 30d. Gap: "
+ *   VAS_021_InvoiceReceived       => "invoice received"
+ *   VAS_021_ReadyForApproval      => "ready for approval"
  ***********************************************************/
 using CoreLibrary.DataBase;
 using Newtonsoft.Json;
@@ -52,9 +67,7 @@ namespace VAS.Areas.VAS.Controllers
             };
 
             int clientId  = ctx.GetAD_Client_ID();
-            int orgId     = ctx.GetAD_Org_ID();
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", clientId) };
-            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId), new SqlParameter("@OrgID", orgId) };
+            SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
             DateTime now  = DateTime.Now;
             int todayInt  = (now.Year * 12 + now.Month) * 31 + now.Day;
 
@@ -70,7 +83,7 @@ namespace VAS.Areas.VAS.Controllers
                      AND c.IsActive = 'Y'";
             strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet cDs = DB.ExecuteDataset(strQuery, schemaParams, null);
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
             if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
@@ -82,26 +95,33 @@ namespace VAS.Areas.VAS.Controllers
 
             string sym = result.CurSymbol;
 
-            // Round-trip 2 — Top 2 overdue vendors by open amount
-            // MRole on join-free C_Invoice base; C_BPartner join and EXTRACT arithmetic in outer query.
-            string baseOverdue = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt, i.C_BPartner_ID, i.DueDate
+            // Round-trip 2 — Top 2 overdue vendors: unpaid DueAmt past due date from C_InvoicePaySchedule.
+            // MRole on join-free C_Invoice base; C_InvoicePaySchedule + C_BPartner joins in outer query.
+            string baseOverdue = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.C_BPartner_ID, i.IsReturnTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID
-                   AND i.VA009_OpenAmount > 0
-                   AND i.DueDate IS NOT NULL";
+                   AND i.AD_Client_ID = @ClientID";
             baseOverdue = MRole.GetDefault(ctx).AddAccessSQL(baseOverdue, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT bp.Name AS VendorName,
-                       SUM(ov.OpenAmt) AS OverdueAmt,
-                       COUNT(1) AS InvCount,
-                       (" + todayInt + @" - MIN((EXTRACT(YEAR FROM ov.DueDate) * 12 + EXTRACT(MONTH FROM ov.DueDate)) * 31 + EXTRACT(DAY FROM ov.DueDate))) AS MaxDaysLate
+                       SUM(CASE WHEN ov.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(ips.DueAmt, ov.C_Currency_ID, " + schemaCurrencyId + @", ov.DateAcct, ov.C_ConversionType_ID, ov.AD_Client_ID, ov.AD_Org_ID), 0)
+                                WHEN ov.IsReturnTrx = 'Y'
+                                THEN -COALESCE(currencyConvert(ips.DueAmt, ov.C_Currency_ID, " + schemaCurrencyId + @", ov.DateAcct, ov.C_ConversionType_ID, ov.AD_Client_ID, ov.AD_Org_ID), 0)
+                                ELSE 0 END) AS OverdueAmt,
+                       COUNT(DISTINCT ov.C_Invoice_ID) AS InvCount,
+                       (" + todayInt + @" - MIN(((EXTRACT(YEAR FROM ips.DueDate) * 12 + EXTRACT(MONTH FROM ips.DueDate)) * 31 + EXTRACT(DAY FROM ips.DueDate)))) AS MaxDaysLate
                   FROM (" + baseOverdue + @") ov
+                 INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = ov.C_Invoice_ID)
                  INNER JOIN C_BPartner bp ON (ov.C_BPartner_ID = bp.C_BPartner_ID)
-                 WHERE (EXTRACT(YEAR FROM ov.DueDate) * 12 + EXTRACT(MONTH FROM ov.DueDate)) * 31 + EXTRACT(DAY FROM ov.DueDate) < " + todayInt + @"
+                 WHERE ips.IsActive = 'Y'
+                   AND ips.VA009_IsPaid = 'N'
+                   AND ips.DueAmt > 0
+                   AND ips.DueDate IS NOT NULL
+                   AND ((EXTRACT(YEAR FROM ips.DueDate) * 12 + EXTRACT(MONTH FROM ips.DueDate)) * 31 + EXTRACT(DAY FROM ips.DueDate)) < " + todayInt + @"
                    AND bp.IsActive = 'Y'
                  GROUP BY bp.Name
                  ORDER BY OverdueAmt DESC";
@@ -116,29 +136,38 @@ namespace VAS.Areas.VAS.Controllers
                     string vendor   = Util.GetValueOfString(row["VendorName"]);
                     decimal amt     = Util.GetValueOfDecimal(row["OverdueAmt"]);
                     int daysLate    = Math.Max(0, Util.GetValueOfInt(row["MaxDaysLate"]));
-                    string dayLabel = daysLate == 1 ? "1 day past due date" : daysLate + " days past due date";
+                    string dayLabel = daysLate == 1
+                        ? Msg.GetMsg(ctx, "VAS_021_OneDayPastDue")
+                        : daysLate + " " + Msg.GetMsg(ctx, "VAS_021_DaysPastDue");
                     result.Alerts.Add(new AlertItem
                     {
                         Type     = "err",
                         Icon     = daysLate > 10 ? "🔴" : "⚠️",
-                        Title    = "Payment overdue — " + vendor,
+                        Title    = Msg.GetMsg(ctx, "VAS_021_PaymentOverdue") + " — " + vendor,
                         Subtitle = FormatAmount(amt, sym, result.StdPrecision) + " | " + dayLabel
                     });
                     rowCount++;
                 }
             }
 
-            // Round-trip 3 — Invoices pending approval (DocStatus = 'IP' = In Process / approval workflow)
-            string basePending = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal
+            // Round-trip 3 — Invoices pending approval (DocStatus = 'IP' = In Process / approval workflow).
+            // No C_InvoicePaySchedule join — in-process invoices have no payment schedule yet.
+            // GrandTotal with IsReturnTrx sign used as the blocked amount.
+            string basePending = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.GrandTotal, i.IsReturnTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus = 'IP'
                    AND i.IsActive = 'Y'
-                   AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID";
+                   AND i.AD_Client_ID = @ClientID";
             basePending = MRole.GetDefault(ctx).AddAccessSQL(basePending, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT COUNT(1) AS InvCount, SUM(p.GrandTotal) AS TotalAmt
+            strQuery = @"SELECT COUNT(1) AS InvCount,
+                       SUM(CASE WHEN p.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(p.GrandTotal, p.C_Currency_ID, " + schemaCurrencyId + @", p.DateAcct, p.C_ConversionType_ID, p.AD_Client_ID, p.AD_Org_ID), 0)
+                                WHEN p.IsReturnTrx = 'Y'
+                                THEN -COALESCE(currencyConvert(p.GrandTotal, p.C_Currency_ID, " + schemaCurrencyId + @", p.DateAcct, p.C_ConversionType_ID, p.AD_Client_ID, p.AD_Org_ID), 0)
+                                ELSE 0 END) AS TotalAmt
                   FROM (" + basePending + @") p";
 
             DataSet dsPending = DB.ExecuteDataset(strQuery, dataParams, null);
@@ -152,24 +181,30 @@ namespace VAS.Areas.VAS.Controllers
                     {
                         Type     = "warn",
                         Icon     = "📋",
-                        Title    = cnt + " invoices awaiting approval",
-                        Subtitle = FormatAmount(total, sym, result.StdPrecision) + " blocked in approval queue"
+                        Title    = cnt + " " + Msg.GetMsg(ctx, "VAS_021_InvAwaitingApproval"),
+                        Subtitle = FormatAmount(total, sym, result.StdPrecision) + " " + Msg.GetMsg(ctx, "VAS_021_BlockedApprovalQueue")
                     });
                 }
             }
 
             // Round-trip 4 — GRN mismatch: vendor invoice lines without a matching M_MatchInv record.
             // MRole on join-free C_Invoice base; C_InvoiceLine join and NOT EXISTS check in outer query.
-            string baseGRN = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID
+            // IsReturnTrx sign applied to LineNetAmt; no payment schedule needed (amount from invoice lines).
+            string baseGRN = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.IsReturnTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID";
+                   AND i.AD_Client_ID = @ClientID";
             baseGRN = MRole.GetDefault(ctx).AddAccessSQL(baseGRN, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT COUNT(DISTINCT base_i.C_Invoice_ID) AS InvCount, SUM(COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)) AS TotalAmt
+            strQuery = @"SELECT COUNT(DISTINCT base_i.C_Invoice_ID) AS InvCount,
+                       SUM(CASE WHEN base_i.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)
+                                WHEN base_i.IsReturnTrx = 'Y'
+                                THEN -COALESCE(currencyConvert(il.LineNetAmt, base_i.C_Currency_ID, " + schemaCurrencyId + @", base_i.DateAcct, base_i.C_ConversionType_ID, base_i.AD_Client_ID, base_i.AD_Org_ID), 0)
+                                ELSE 0 END) AS TotalAmt
                   FROM (" + baseGRN + @") base_i
                  INNER JOIN C_InvoiceLine il ON (il.C_Invoice_ID = base_i.C_Invoice_ID)
                  WHERE il.IsActive = 'Y'
@@ -187,28 +222,31 @@ namespace VAS.Areas.VAS.Controllers
                     {
                         Type     = "warn",
                         Icon     = "🔗",
-                        Title    = "GRN mismatch — " + cnt + " invoices",
-                        Subtitle = FormatAmount(total, sym, result.StdPrecision) + " pending reconciliation"
+                        Title    = Msg.GetMsg(ctx, "VAS_021_GrnMismatch") + " — " + cnt + Msg.GetMsg(ctx, "VAS_021_Invoices"),
+                        Subtitle = FormatAmount(total, sym, result.StdPrecision) + " " + Msg.GetMsg(ctx, "VAS_021_PendingReconciliation")
                     });
                 }
             }
 
-            // Round-trip 5 — DPO: average days open invoices have been outstanding this year.
-            // EXTRACT arithmetic is in the outer query; MRole sees only the clean base query.
-            string baseDPO = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.VA009_OpenAmount, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS OpenAmt, i.DateInvoiced
+            // Round-trip 5 — DPO: average days unpaid invoices have been outstanding this year.
+            // Joins C_InvoicePaySchedule to filter VA009_IsPaid = 'N'. EXTRACT arithmetic in outer query.
+            string baseDPO = @"SELECT i.C_Invoice_ID, i.DateInvoiced
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus IN ('CO', 'CL')
                    AND i.IsActive = 'Y'
-                   AND i.VA009_OpenAmount > 0
                    AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID
                    AND EXTRACT(YEAR FROM i.DateInvoiced) = " + now.Year;
             baseDPO = MRole.GetDefault(ctx).AddAccessSQL(baseDPO, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
             strQuery = @"SELECT AVG(" + todayInt + @" - ((EXTRACT(YEAR FROM d.DateInvoiced) * 12 + EXTRACT(MONTH FROM d.DateInvoiced)) * 31 + EXTRACT(DAY FROM d.DateInvoiced))) AS AvgDPO,
-                       COUNT(1) AS InvCount
-                  FROM (" + baseDPO + @") d";
+                       COUNT(DISTINCT d.C_Invoice_ID) AS InvCount
+                  FROM (" + baseDPO + @") d
+                 INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = d.C_Invoice_ID)
+                 WHERE ips.IsActive = 'Y'
+                   AND ips.VA009_IsPaid = 'N'
+                   AND ips.DueAmt > 0";
 
             DataSet dsDPO = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsDPO != null && dsDPO.Tables.Count > 0 && dsDPO.Tables[0].Rows.Count > 0)
@@ -226,43 +264,52 @@ namespace VAS.Areas.VAS.Controllers
                     {
                         Type     = aType,
                         Icon     = "📈",
-                        Title    = "DPO rising — currently " + dpoDays + " days",
-                        Subtitle = "Target 30d. Gap: " + gapStr + " days"
+                        Title    = Msg.GetMsg(ctx, "VAS_021_DpoRising") + dpoDays + Msg.GetMsg(ctx, "VAS_021_Days"),
+                        Subtitle = Msg.GetMsg(ctx, "VAS_021_DpoTarget") + gapStr + Msg.GetMsg(ctx, "VAS_021_Days")
                     });
                 }
             }
 
-            // Round-trip 6 — Most recent fully-posted vendor invoice from the last 7 days.
-            // C_BPartner join and EXTRACT date filter are in the outer query outside MRole scope.
+            // Round-trip 6 — Most recent vendor invoice from the last 7 days with unpaid DueAmt.
+            // Joins C_InvoicePaySchedule (VA009_IsPaid = 'N') + C_BPartner in outer query.
             int sevenDaysAgoInt = (now.AddDays(-7).Year * 12 + now.AddDays(-7).Month) * 31 + now.AddDays(-7).Day;
-            string baseReady = @"SELECT i.C_Invoice_ID, COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0) AS GrandTotal, i.C_BPartner_ID, i.DateAcct
+            string baseReady = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.C_BPartner_ID, i.IsReturnTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
                    AND i.DocStatus = 'CO'
                    AND i.IsActive = 'Y'
-                   AND i.VA009_OpenAmount = i.GrandTotal
-                   AND i.AD_Client_ID = @ClientID
-                   AND i.AD_Org_ID = @OrgID";
+                   AND i.AD_Client_ID = @ClientID";
             baseReady = MRole.GetDefault(ctx).AddAccessSQL(baseReady, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT bp.Name AS VendorName, r.GrandTotal
+            strQuery = @"SELECT bp.Name AS VendorName,
+                       SUM(CASE WHEN r.IsReturnTrx = 'N'
+                                THEN COALESCE(currencyConvert(ips.DueAmt, r.C_Currency_ID, " + schemaCurrencyId + @", r.DateAcct, r.C_ConversionType_ID, r.AD_Client_ID, r.AD_Org_ID), 0)
+                                WHEN r.IsReturnTrx = 'Y'
+                                THEN -COALESCE(currencyConvert(ips.DueAmt, r.C_Currency_ID, " + schemaCurrencyId + @", r.DateAcct, r.C_ConversionType_ID, r.AD_Client_ID, r.AD_Org_ID), 0)
+                                ELSE 0 END) AS DueAmt
                   FROM (" + baseReady + @") r
+                 INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = r.C_Invoice_ID)
                  INNER JOIN C_BPartner bp ON (r.C_BPartner_ID = bp.C_BPartner_ID)
-                 WHERE (EXTRACT(YEAR FROM r.DateAcct) * 12 + EXTRACT(MONTH FROM r.DateAcct)) * 31 + EXTRACT(DAY FROM r.DateAcct) >= " + sevenDaysAgoInt + @"
+                 WHERE ips.IsActive = 'Y'
+                   AND ips.VA009_IsPaid = 'N'
+                   AND ips.DueAmt > 0
+                   AND ((EXTRACT(YEAR FROM r.DateAcct) * 12 + EXTRACT(MONTH FROM r.DateAcct)) * 31 + EXTRACT(DAY FROM r.DateAcct)) >= " + sevenDaysAgoInt + @"
                    AND bp.IsActive = 'Y'
-                 ORDER BY (EXTRACT(YEAR FROM r.DateAcct) * 12 + EXTRACT(MONTH FROM r.DateAcct)) * 31 + EXTRACT(DAY FROM r.DateAcct) DESC";
+                 GROUP BY bp.Name
+                 ORDER BY MAX(((EXTRACT(YEAR FROM r.DateAcct) * 12 + EXTRACT(MONTH FROM r.DateAcct)) * 31 + EXTRACT(DAY FROM r.DateAcct))) DESC";
 
             DataSet dsReady = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsReady != null && dsReady.Tables.Count > 0 && dsReady.Tables[0].Rows.Count > 0)
             {
                 string vendor = Util.GetValueOfString(dsReady.Tables[0].Rows[0]["VendorName"]);
-                decimal amt   = Util.GetValueOfDecimal(dsReady.Tables[0].Rows[0]["GrandTotal"]);
+                decimal amt   = Util.GetValueOfDecimal(dsReady.Tables[0].Rows[0]["DueAmt"]);
                 result.Alerts.Add(new AlertItem
                 {
                     Type     = "ok",
                     Icon     = "✅",
-                    Title    = vendor + " invoice received",
-                    Subtitle = FormatAmount(amt, sym, result.StdPrecision) + " — ready for approval"
+                    Title    = vendor + " " + Msg.GetMsg(ctx, "VAS_021_InvoiceReceived"),
+                    Subtitle = FormatAmount(amt, sym, result.StdPrecision) + " — " + Msg.GetMsg(ctx, "VAS_021_ReadyForApproval")
                 });
             }
 
