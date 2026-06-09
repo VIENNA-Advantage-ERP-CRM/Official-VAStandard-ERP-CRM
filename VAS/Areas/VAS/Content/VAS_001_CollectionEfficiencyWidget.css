@@ -18,7 +18,7 @@
     width: 100%;
     height: 100%;
     container-type: inline-size;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-ce-root,
@@ -92,9 +92,9 @@
 
 .vas-ce-icon-wrap {
     /* Multi-line header (title + subtitle) → 2.25em per spec. */
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     border-radius: 0.5625em;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
     border: 0.0625em solid rgba(255, 255, 255, 0.9);
@@ -279,7 +279,7 @@
 }
 
 .vas-ce-dialog {
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
        0.88vw): dialog data matches widget data px and the whole em-sized
        dialog scales in proportion. 16px floor = unchanged small screens. */
@@ -478,7 +478,7 @@
 .vas-ce-d-th-amount, .vas-ce-d-td-amount { width: 12em; text-align: right; }
 
 .vas-ce-d-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     font-size: 0.8125em;
     color: #5F7283;
 }

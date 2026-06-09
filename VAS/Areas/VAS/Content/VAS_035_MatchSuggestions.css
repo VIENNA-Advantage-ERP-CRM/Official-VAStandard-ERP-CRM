@@ -11,7 +11,7 @@
     height: 100%;
     container-type: inline-size;
     position: relative;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-msug-root,
@@ -36,7 +36,7 @@
     /* Scales with the cell on large dashboards; cqi resolves against
        .vas-msug-root (container-type: inline-size). 6-col-wide footprint,
        so a gentler factor than the 1x1 KPI cards. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 24px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -92,7 +92,7 @@
 .vas-msug-title-group {
     display: flex;
     flex-direction: column;
-    gap: 0.125em;
+/*    gap: 0.125em;*/
     min-width: 0;
     flex: 1 1 auto;
 }
@@ -383,7 +383,7 @@
 }
 
 .vas-msug-dialog {
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     /* Viewport-anchored dialog base. The whole dialog is em-sized off this, so
        its base must track BOTH axes: 1.1733vw keeps dialog data == widget data
        px on wide screens, but min(…, 1.7vh) shrinks the base when the viewport
@@ -563,7 +563,7 @@
 }
 
 .vas-msug-pane-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     font-weight: 400;
     text-transform: none;
     letter-spacing: normal;

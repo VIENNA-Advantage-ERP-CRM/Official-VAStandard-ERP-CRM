@@ -19,7 +19,7 @@
     width: 100%;
     height: 100%;
     container-type: inline-size;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     color: #102C3F;
     display: flex;
     align-items: center;
@@ -91,7 +91,7 @@
     padding: 0 !important;
     margin: 0 !important;
     height: auto !important;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     font-size: 0.9375em;              /* 15px */
     line-height: normal;
     color: #102C3F;
@@ -128,7 +128,7 @@
 /* ── Autosuggest dropdown (mounted on body, fixed) ── */
 .vas-rsw-suggest {
     position: fixed;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     font-size: 1em;
     background: #FFFFFF;
     border: 0.0625em solid #E4EDF4;

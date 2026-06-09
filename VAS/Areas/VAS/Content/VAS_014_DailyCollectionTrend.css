@@ -12,7 +12,7 @@
     height: 100%;
     container-type: inline-size;
     position: relative;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-dct-root,
@@ -225,7 +225,7 @@
 
 .vas-dct-axis-label {
     fill: #748494;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     font-size: 0.6875em;
 }
 

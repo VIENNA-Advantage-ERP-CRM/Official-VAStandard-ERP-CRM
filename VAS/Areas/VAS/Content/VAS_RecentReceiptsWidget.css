@@ -17,7 +17,7 @@
     height: 100%;
     container-type: inline-size;
     position: relative;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-rr-root,
@@ -211,7 +211,7 @@
 .vas-rr-th-amount,      .vas-rr-td-amount      { width: 10em; text-align: right; }
 
 .vas-rr-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     color: #5F7283;
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);   /* xs — secondary metadata cell */
 }
@@ -400,7 +400,7 @@
 }
 
 .vas-rr-dialog {
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     /* Viewport-anchored dialog base. Lowered from the old 32px cap (text was
        too large) but kept responsive — grows with the viewport up to 22px on
        big screens so the modal scales up instead of looking tiny. */
@@ -673,7 +673,7 @@
     }
 
 .vas-rr-d-value-mono {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     font-weight: 400;
     font-size: 0.9375em;
     color: #141414;
@@ -788,7 +788,7 @@
     }
 
 .vas-rr-d-inv-no {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     /* Inherit the table cell's 0.875em so the invoice number reads at
        the same scale as the other line columns; the previous 0.8125em
        compounded with the parent and rendered visibly smaller. */
