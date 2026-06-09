@@ -179,17 +179,17 @@ namespace VIS.Controllers
                 SELECT Payment.C_Payment_ID AS Payment_ID,
                        Payment.DateTrx AS Trx_Date,
                        Payment.DocumentNo AS Document_No,
-                       BPartner.Name AS Customer_Name,
+                       COALESCE(BPartner.Name , N'') AS Customer_Name,
                        COALESCE(Bank.Name, BankAccount.Name) AS Bank_Name,
-                       COALESCE(BankAccount.AccountNo, '') AS Account_No,
+                       BankAccount.AccountNo AS Account_No,
                        Payment.PaymentAmount AS Pay_Amount,
                        Currency.ISO_Code AS Payment_Currency,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Payment_Currency_Symbol,
                        Currency.StdPrecision AS Std_Precision
                 FROM C_Payment Payment
-                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
-                LEFT OUTER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
-                LEFT OUTER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
+                LEFT JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
+                INNER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
+                INNER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
                 INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=Payment.C_Currency_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
