@@ -155,7 +155,7 @@ namespace VASLogic.Models
                                  AND PaymentAllocateDisplay.IsActive = 'Y'
                                  AND AllocInvoiceDisplay.IsActive = 'Y'
                            ),
-                           ''
+                           N''
                        ) AS Invoice_Document_No,
                        Count_Data.Total_Records
                 FROM Receipts
@@ -364,7 +364,7 @@ namespace VASLogic.Models
                        GLJournal.DocumentNo AS GL_Journal_Document_No,
                        GLJournal.DateAcct AS GL_Journal_Date,
                        (COALESCE(GLJournalLine.AmtSourceDr, 0) - COALESCE(GLJournalLine.AmtSourceCr, 0)) AS GL_Journal_Amount,
-                       COALESCE(Invoice.DocumentNo, RefPayment.DocumentNo, GLJournal.DocumentNo, '') AS Ref_Document_No,
+                       COALESCE(Invoice.DocumentNo, RefPayment.DocumentNo, GLJournal.DocumentNo, N'') AS Ref_Document_No,
                        COALESCE(Invoice.DateInvoiced, RefPayment.DateAcct, GLJournal.DateAcct) AS Ref_Document_Date,
                        COALESCE(
                            Invoice.GrandTotal,
