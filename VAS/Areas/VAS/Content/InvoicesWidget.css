@@ -2,7 +2,7 @@
     /* Always fill the dashboard cell width; height follows the host cell. */
     width: 100%;
     height: 100%;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     /* Positioning context for the absolute busy overlay. */
     position: relative;
 }
@@ -16,51 +16,64 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 14px;
+    border-radius: 0.875em;
     z-index: 999;
 }
 
 .vas-inv-card {
+    /* Card base unit: dashboard-width-anchored so the widget scales with the
+       dashboard's visible content area (design.md §Measurement Setup), with px bounds. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     box-sizing: border-box;
     background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
-    border: 2px solid #fff;
-    border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
+    border: 0.125em solid #fff;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15,61,97,0.06);
     overflow: hidden;
     height: 100%;
     display: flex;
     flex-direction: column;
+    padding: .875em;
 }
 
 .vas-inv-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 14px;
 }
 
 .vas-inv-header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.625em;
     min-width: 0;
 }
 
 .vas-inv-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: #EAF8FF;
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+}
+
+.vas-inv-icon svg {
+    width: 1.125em;
+    height: 1.125em;
 }
 
 .vas-inv-title {
-    font-size: 16px;
-    font-weight: 700;
+    /* Dashboard-width-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): resolves against --dash-inline-size, falling back to 100vw. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
@@ -74,11 +87,11 @@
     background: transparent;
     color: #1F83FF;
     font-family: inherit;
-    font-size: 13px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     font-weight: 600;
     cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 6px;
+    padding: 0.25em 0.375em;
+    border-radius: 0.375em;
     white-space: nowrap;
 }
 
@@ -91,18 +104,18 @@
 }
 
 .vas-inv-alert-banner {
-    margin: 0 16px 12px;
+    margin: 0 1em 0.75em;
     background: #FFF8E6;
-    border: 1px solid #F5C94E;
-    border-radius: 10px;
-    padding: 10px 14px;
+    border: 0.0625em solid #F5C94E;
+    border-radius: 0.625em;
+    padding: 0.625em 0.875em;
     align-items: flex-start;
-    gap: 10px;
+    gap: 0.625em;
 }
 
 .vas-inv-alert-icon {
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 0.125em;
 }
 
 .vas-inv-alert-text {
@@ -110,19 +123,19 @@
 }
 
 .vas-inv-dup-title {
-    font-size: 13px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     font-weight: 700;
     color: #7A4F00;
-    margin-bottom: 2px;
+    margin-bottom: 0.125em;
 }
 
 .vas-inv-dup-sub {
-    font-size: 12px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: #9A6500;
 }
 
 .vas-inv-table-wrap {
-    padding: 0 4px 4px;
+    padding: 0 0.25em 0.25em;
     flex: 1;
     /* min-height:0 lets this flex child shrink so only the list scrolls; without it a tall list
        would grow and push the footer pager out (design.md "Internal Content Must Not Resize The
@@ -135,8 +148,8 @@
 .vas-inv-table-head {
     display: grid;
     align-items: center;
-    padding: 6px 16px;
-    border-bottom: 1px solid #EDF2F6;
+    padding: 0.375em 1em;
+    border-bottom: 0.0625em solid #EDF2F6;
     /* Freeze the header at the top of the scrolling body. Opaque background so rows
        do not show through while scrolling underneath. */
     position: sticky;
@@ -146,39 +159,39 @@
 }
 
 .vas-inv-th {
-    font-size: 11px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 600;
     color: #748494;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
+    letter-spacing: 0.0375em;
+    /*text-transform: uppercase;*/
 }
 
 .vas-inv-th-customer {
-    font-size: 11px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 600;
     color: #748494;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    padding-left: 16px;
+    letter-spacing: 0.0375em;
+    /*text-transform: uppercase;*/
+    padding-left: 1em;
 }
 
 .vas-inv-row {
     display: grid;
     align-items: center;
-    padding: 13px 16px;
+    padding: 0.505em 1em;
     transition: background 0.15s;
 }
 
 .vas-inv-cell-id {
-    font-size: 13px;
-    font-weight: 700;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
     color: #102C3F;
 }
 
 .vas-inv-cell-customer {
-    font-size: 13px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #3D5166;
-    padding-left: 16px;
+    padding-left: 1em;
     /* Allow the cell to shrink inside the grid track instead of pushing other columns. */
     min-width: 0;
     line-height: 1.3;
@@ -193,22 +206,22 @@
 }
 
 .vas-inv-cell-due {
-    font-size: 13px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #5F7283;
 }
 
 .vas-inv-status-chip {
     display: inline-block;
-    padding: 4px 12px;
-    border-radius: 999px;
-    font-size: 12px;
+    padding: 0.25em 0.75em;
+    border-radius: 999em;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 600;
     white-space: nowrap;
 }
 
 .vas-inv-cell-amount {
-    font-size: 14px;
-    font-weight: 700;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
     color: #102C3F;
     text-align: right;
     white-space: nowrap;
@@ -225,14 +238,14 @@
 .vas-inv-review-btn {
     flex-shrink: 0;
     align-self: center;
-    border: 1px solid #E4D08A;
+    border: 0.0625em solid #E4D08A;
     background: #fff;
     color: #7A4F00;
     font-family: inherit;
-    font-size: 12px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 600;
-    padding: 6px 14px;
-    border-radius: 8px;
+    padding: 0.375em 0.875em;
+    border-radius: 0.5em;
     cursor: pointer;
     white-space: nowrap;
 }
@@ -243,7 +256,7 @@
 
 /* Row dividers are driven by a class, not inline styles. */
 .vas-inv-row-divided {
-    border-bottom: 1px solid #EDF2F6;
+    border-bottom: 0.0625em solid #EDF2F6;
 }
 
 .vas-inv-row:hover {
@@ -252,9 +265,9 @@
 
 /* Empty state when no attention rows are returned for the current page. */
 .vas-inv-nodata {
-    padding: 22px 16px;
+    padding: 1.375em 1em;
     text-align: center;
-    font-size: 13px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #748494;
 }
 
@@ -265,16 +278,16 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 10px 16px 14px;
-    border-top: 1px solid #EDF2F6;
+    gap: 0.75em;
+    padding: 0.625em 1em 0.875em;
+    border-top: 0.0625em solid #EDF2F6;
 }
 
 /* Left helper text — result range, muted. */
 .vas-inv-footer-info {
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     font-weight: 400;
-    font-size: 13px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -285,16 +298,16 @@
 .vas-inv-pager {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5em;
     flex-shrink: 0;
 }
 
 /* Rounded-square pager buttons (not circular): soft white surface, light border, blue icon. */
 .vas-inv-page-btn {
-    width: 32px;
-    height: 32px;
-    border: 1px solid #E4EDF4;
-    border-radius: 8px;
+    width: 2em;
+    height: 2em;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
     background: #FBFDFF;
     color: #0083DA;
     line-height: 1;
@@ -316,10 +329,10 @@
 }
 
 .vas-inv-page-text {
-    min-width: 48px;
+    min-width: 3em;
     text-align: center;
-    font-family: Roboto, sans-serif;
-    font-size: 14px;
+    /*font-family: Roboto, sans-serif;*/
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -353,8 +366,8 @@
     --vdup-radius-sm: 0.5rem;
     --vdup-radius-md: 0.875rem;
     --vdup-radius-lg: 1.125rem;
-    --vdup-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    --vdup-shadow-lift: 0 18px 48px rgba(15, 61, 97, 0.18);
+    --vdup-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    --vdup-shadow-lift: 0 1.125em 3em rgba(15, 61, 97, 0.18);
 
     position: fixed;
     inset: 0;
@@ -364,9 +377,9 @@
     justify-content: center;
     padding: clamp(0.75rem, 3vw, 2.5rem);
     background: rgba(0, 38, 64, 0.32);
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
-    font-family: Roboto, system-ui, -apple-system, sans-serif;
+    -webkit-backdrop-filter: blur(0.125em);
+    backdrop-filter: blur(0.125em);
+    /*font-family: Roboto, system-ui, -apple-system, sans-serif;*/
     color: var(--vdup-text);
 }
 
@@ -378,7 +391,7 @@
 
 .vas-dup-dialog {
     width: 100%;
-    max-width: 1180px;
+    max-width: 73.75em;
     max-height: 92vh;
     display: flex;
     flex-direction: column;
@@ -412,7 +425,7 @@
     justify-content: space-between;
     gap: 1rem;
     padding: 0.625rem 1.25rem;
-    border-bottom: 1px solid var(--vdup-border);
+    border-bottom: 0.0625em solid var(--vdup-border);
 }
 
 .vas-dup-header-left { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
@@ -426,14 +439,15 @@
     justify-content: center;
     border-radius: var(--vdup-radius-sm);
     background: linear-gradient(180deg, var(--vdup-active-bg), #FFFFFF);
-    border: 1px solid var(--vdup-pale-border);
+    border: 0.0625em solid var(--vdup-pale-border);
     color: var(--vdup-primary);
 }
 
 .vas-dup-header-icon svg { width: 1.125rem; height: 1.125rem; }
 .vas-dup-title-wrap { min-width: 0; }
-.vas-dup-title { font-size: 1rem; font-weight: 500; color: var(--vdup-text-strong); line-height: 1.2; }
-.vas-dup-subtitle { font-size: 0.75rem; color: var(--vdup-text-secondary); margin-top: 0.125rem; line-height: 1.2; }
+.vas-dup-title { font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px); font-weight: 500; color: var(--vdup-text-strong); line-height: 1.2; }
+/* Shared dashboard-width-anchored sm clamp — matches the widget subtitles. */
+.vas-dup-subtitle { font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px); color: var(--vdup-text-secondary); margin-top: 0.125rem; line-height: 1.2; }
 .vas-dup-header-right { display: flex; align-items: center; gap: 0.875rem; flex: 0 0 auto; }
 
 .vas-dup-close {
@@ -459,7 +473,7 @@
     display: flex;
     align-items: stretch;
     padding: 0 0.75rem;
-    border-bottom: 1px solid var(--vdup-border);
+    border-bottom: 0.0625em solid var(--vdup-border);
     overflow-x: auto;
 }
 
@@ -471,10 +485,10 @@
     padding: 0.75rem 1rem;
     background: #FFFFFF;
     border: none;
-    border-bottom: 2px solid transparent;
+    border-bottom: 0.125em solid transparent;
     font-family: inherit;
-    font-size: 0.875rem;
-    letter-spacing: 0.25px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    letter-spacing: 0.015625em;
     color: var(--vdup-text-strong);
     font-weight: 400;
     cursor: pointer;
@@ -488,18 +502,18 @@
     min-width: 1.75rem;
     height: 1.25rem;
     padding: 0 0.5rem;
-    border-radius: 999px;
+    border-radius: 999em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.6875rem;
+    font-size: clamp(10px, calc(var(--dash-inline-size, 100vw) * 0.0071), 20px);
     font-weight: 700;
     background: var(--vdup-active-bg);
     color: var(--vdup-primary);
 }
 
 .vas-dup-tab[aria-selected="true"] .vas-dup-tab-badge { background: var(--vdup-primary); color: #FFFFFF; }
-.vas-dup-tab-dot { width: 0.5rem; height: 0.5rem; border-radius: 999px; flex: 0 0 auto; background: var(--vdup-danger); }
+.vas-dup-tab-dot { width: 0.5rem; height: 0.5rem; border-radius: 999em; flex: 0 0 auto; background: var(--vdup-danger); }
 
 /* Legend */
 .vas-dup-legend {
@@ -510,13 +524,13 @@
     flex-wrap: wrap;
     padding: 0.625rem 1.25rem;
     background: var(--vdup-surface-2);
-    border-bottom: 1px solid var(--vdup-divider);
-    font-size: 0.75rem;
+    border-bottom: 0.0625em solid var(--vdup-divider);
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: var(--vdup-text-muted);
 }
 
 .vas-dup-legend-item { display: flex; align-items: center; gap: 0.375rem; }
-.vas-dup-legend-dot { width: 0.625rem; height: 0.625rem; border-radius: 999px; flex: 0 0 auto; }
+.vas-dup-legend-dot { width: 0.625rem; height: 0.625rem; border-radius: 999em; flex: 0 0 auto; }
 .vas-dup-legend-dot.match { background: #20A464; }
 .vas-dup-legend-dot.diff { background: var(--vdup-danger); }
 .vas-dup-legend-context { margin-left: auto; color: var(--vdup-text-secondary); font-weight: 500; }
@@ -529,7 +543,7 @@
     /* Reserve the vertical scrollbar gutter so its appearance never reflows the cards. */
     scrollbar-gutter: stable;
     padding: 1.25rem;
-    background: linear-gradient(180deg, #F7FBFF 0%, #FFFFFF 120px);
+    background: linear-gradient(180deg, #F7FBFF 0%, #FFFFFF 7.5em);
 }
 
 .vas-dup-panel { display: none; }
@@ -551,7 +565,7 @@
     flex-direction: column;
     overflow: hidden;
     background: #FFFFFF;
-    border: 1px solid var(--vdup-border);
+    border: 0.0625em solid var(--vdup-border);
     border-radius: var(--vdup-radius-md);
     box-shadow: var(--vdup-shadow);
 }
@@ -563,19 +577,19 @@
     gap: 0.75rem;
     padding: 0.875rem 1rem;
     background: linear-gradient(180deg, rgba(234, 248, 255, 0.7), rgba(255, 255, 255, 0.4));
-    border-bottom: 1px solid var(--vdup-divider);
+    border-bottom: 0.0625em solid var(--vdup-divider);
 }
 
-.vas-dup-card-no { font-size: 1.0625rem; font-weight: 700; color: var(--vdup-text); letter-spacing: 0.2px; }
-.vas-dup-card-date { font-size: 0.75rem; color: var(--vdup-text-secondary); margin-top: 0.125rem; }
+.vas-dup-card-no { font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px); font-weight: 700; color: var(--vdup-text); letter-spacing: 0.0125em; }
+.vas-dup-card-date { font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px); color: var(--vdup-text-secondary); margin-top: 0.125rem; }
 
 .vas-dup-pill {
-    font-size: 0.6875rem;
+    font-size: clamp(10px, calc(var(--dash-inline-size, 100vw) * 0.0071), 20px);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    /*text-transform: uppercase;*/
+    letter-spacing: 0.025em;
     padding: 0.3125rem 0.625rem;
-    border-radius: 999px;
+    border-radius: 999em;
     white-space: nowrap;
 }
 
@@ -588,13 +602,13 @@
     gap: 0.75rem;
     align-items: center;
     padding: 0.5rem 0;
-    border-bottom: 1px solid var(--vdup-divider);
+    border-bottom: 0.0625em solid var(--vdup-divider);
 }
 
 .vas-dup-field:last-child { border-bottom: none; }
 /* Label and value each stay on one line and trim with an ellipsis when the text is too long. */
 .vas-dup-field-label {
-    font-size: 0.75rem;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: var(--vdup-text-muted);
     line-height: 1.3;
     white-space: nowrap;
@@ -603,7 +617,7 @@
     min-width: 0;
 }
 .vas-dup-field-value {
-    font-size: 0.875rem;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: var(--vdup-text);
     font-weight: 500;
     line-height: 1.3;
@@ -627,7 +641,7 @@
     width: 0.5rem;
     height: 0.5rem;
     margin-left: 0.375rem;
-    border-radius: 999px;
+    border-radius: 999em;
     background: var(--vdup-danger);
 }
 
@@ -635,19 +649,19 @@
 /* flex:1 lets the line area absorb the slack so equal-height cards keep the total at the bottom. */
 .vas-dup-lines-wrap { padding: 0.25rem 1rem 1rem; flex: 1 1 auto; }
 .vas-dup-lines-title {
-    font-size: 0.75rem;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    /*text-transform: uppercase;*/
+    letter-spacing: 0.03125em;
     color: var(--vdup-text-muted);
     margin: 0.5rem 0;
 }
 
 .vas-dup-lines-note {
-    font-size: 0.8125rem;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: var(--vdup-text-muted);
     padding: 0.75rem;
-    border: 1px dashed var(--vdup-border);
+    border: 0.0625em dashed var(--vdup-border);
     border-radius: var(--vdup-radius-sm);
     background: var(--vdup-surface-2);
 }
@@ -659,12 +673,12 @@
     align-items: baseline;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    border-top: 1px solid var(--vdup-divider);
+    border-top: 0.0625em solid var(--vdup-divider);
     background: var(--vdup-surface-2);
 }
 
-.vas-dup-card-total .lbl { font-size: 0.75rem; color: var(--vdup-text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
-.vas-dup-card-total .val { font-size: 1.125rem; font-weight: 700; color: var(--vdup-text); }
+.vas-dup-card-total .lbl { font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px); color: var(--vdup-text-muted); /*text-transform: uppercase;*/ letter-spacing: 0.025em; }
+.vas-dup-card-total .val { font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px); font-weight: 700; color: var(--vdup-text); }
 
 /* Footer */
 .vas-dup-footer {
@@ -675,22 +689,22 @@
     gap: 0.75rem;
     flex-wrap: wrap;
     padding: 0.875rem 1.25rem;
-    border-top: 1px solid var(--vdup-border);
+    border-top: 0.0625em solid var(--vdup-border);
     background: #FFFFFF;
 }
 
-.vas-dup-footer-note { font-size: 0.8125rem; color: var(--vdup-text-secondary); display: flex; align-items: center; gap: 0.5rem; }
+.vas-dup-footer-note { font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px); color: var(--vdup-text-secondary); display: flex; align-items: center; gap: 0.5rem; }
 .vas-dup-footer-note svg { width: 1rem; height: 1rem; color: var(--vdup-warn-text); flex: 0 0 auto; }
 .vas-dup-actions { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
 
 .vas-dup-btn {
     font-family: inherit;
-    font-size: 0.875rem;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     font-weight: 500;
-    border-radius: 999px;
+    border-radius: 999em;
     padding: 0.5rem 1.125rem;
     cursor: pointer;
-    border: 1px solid transparent;
+    border: 0.0625em solid transparent;
     white-space: nowrap;
 }
 
@@ -702,7 +716,7 @@
 .vas-dup-btn.primary:hover { background: var(--vdup-primary); }
 
 /* Responsive */
-@media (max-width: 720px) {
+@media (max-width: 45em) {
     .vas-dup-field { grid-template-columns: 7rem 1fr; }
     .vas-dup-footer { justify-content: stretch; }
     .vas-dup-actions { width: 100%; }
@@ -710,7 +724,7 @@
     .vas-dup-legend-context { margin-left: 0; flex-basis: 100%; }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 30em) {
     .vas-dup-field { grid-template-columns: 1fr; gap: 0.125rem; }
     .vas-dup-tab { padding: 0.75rem 0.75rem; }
 }
@@ -726,7 +740,7 @@
     width: 0.5rem;
     height: 0.5rem;
     margin-left: 0.375rem;
-    border-radius: 999px;
+    border-radius: 999em;
     background: #20A464;
 }
 
@@ -746,24 +760,24 @@
     min-width: 36rem;
     table-layout: fixed;
     border-collapse: collapse;
-    font-size: 0.8125rem;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
 }
 
 .vas-dup-lines-table thead th {
     text-align: left;
     font-weight: 600;
     color: var(--vdup-text-muted);
-    font-size: 0.6875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    /*text-transform: uppercase;*/
+    letter-spacing: 0.025em;
     padding: 0.25rem 0.5rem;
-    border-bottom: 1px solid var(--vdup-divider);
+    border-bottom: 0.0625em solid var(--vdup-divider);
     white-space: nowrap;
 }
 
 .vas-dup-lines-table td {
     padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid var(--vdup-divider);
+    border-bottom: 0.0625em solid var(--vdup-divider);
     color: var(--vdup-text);
     vertical-align: top;
 }
@@ -784,7 +798,7 @@
 
 /* Smaller widths: compact the table (font + column widths) so it stays clean and needs less
    horizontal scrolling; the ellipsis + tooltip keep long values readable. */
-@media (max-width: 640px) {
+@media (max-width: 40em) {
     .vas-dup-lines-table { min-width: 28rem; font-size: 0.75rem; }
     .vas-dup-lines-table thead th { font-size: 0.625rem; padding: 0.25rem 0.375rem; }
     .vas-dup-lines-table td { padding: 0.3125rem 0.375rem; }
@@ -797,8 +811,8 @@
 }
 
 /* Matching lines get a green left rail, differing lines a red one. */
-.vas-dup-line.is-matching td:first-child { box-shadow: inset 3px 0 0 #20A464; }
-.vas-dup-line.is-differing td:first-child { box-shadow: inset 3px 0 0 var(--vdup-danger); }
+.vas-dup-line.is-matching td:first-child { box-shadow: inset 0.1875em 0 0 #20A464; }
+.vas-dup-line.is-differing td:first-child { box-shadow: inset 0.1875em 0 0 var(--vdup-danger); }
 
 /* Centered empty state when an invoice has no line items. */
 .vas-dup-lines-empty {
@@ -807,9 +821,9 @@
     justify-content: center;
     text-align: center;
     min-height: 4rem;
-    font-size: 0.8125rem;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: var(--vdup-text-muted);
-    border: 1px dashed var(--vdup-border);
+    border: 0.0625em dashed var(--vdup-border);
     border-radius: var(--vdup-radius-sm);
     background: var(--vdup-surface-2);
 }
@@ -832,7 +846,7 @@
 
 .vas-dup-sk-no { width: 6rem; height: 1rem; margin-bottom: 0.375rem; }
 .vas-dup-sk-date { width: 9rem; height: 0.75rem; }
-.vas-dup-sk-pill { width: 4rem; height: 1.25rem; border-radius: 999px; }
+.vas-dup-sk-pill { width: 4rem; height: 1.25rem; border-radius: 999em; }
 .vas-dup-sk-label { width: 6rem; height: 0.75rem; }
 .vas-dup-sk-value { width: 100%; height: 0.75rem; }
 .vas-dup-sk-lines { width: 100%; height: 5rem; }

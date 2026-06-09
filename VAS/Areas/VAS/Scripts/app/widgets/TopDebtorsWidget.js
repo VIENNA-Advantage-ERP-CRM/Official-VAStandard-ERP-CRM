@@ -5,19 +5,41 @@
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                              | Message Key                    | MsgText
  * ----+-----------------------------------------------------------+--------------------------------+-----------------------------------------------------------
- *  1  | Top Debtors                                               | VIS_TopDebtors                 | Highest Debtors
- *  2  | LARGEST UNPAID BALANCES                                   | VIS_LargestUnpaidBalances      | LARGEST UNPAID BALANCES
- *  3  | Chase all                                                 | VIS_ChaseAll                   | Chase all
- *  4  | days overdue                                              | VIS_DaysOverdue                | days overdue
- *  5  | Not yet overdue                                           | VIS_NotYetOverdue              | Not yet overdue
- *  6  | HIGH RISK                                                 | VIS_HighRisk                   | HIGH RISK
- *  7  | ON TRACK                                                  | VIS_OnTrack                    | ON TRACK
- *  8  | No data                                                   | VIS_NoData                     | No data
+ *  1  | Top Debtors                                               | VAS_061_TopDebtors             | Highest Debtors
+ *  2  | LARGEST UNPAID BALANCES                                   | VAS_061_LargestUnpaidBalances  | LARGEST UNPAID BALANCES
+ *  3  | Chase all                                                 | VAS_061_ChaseAll               | Chase all
+ *  4  | days overdue                                              | VAS_061_DaysOverdue            | days overdue
+ *  5  | Not yet overdue                                           | VAS_061_NotYetOverdue          | Not yet overdue
+ *  6  | HIGH RISK                                                 | VAS_061_HighRisk               | HIGH RISK
+ *  7  | ON TRACK                                                  | VAS_061_OnTrack                | ON TRACK
+ *  8  | No data                                                   | VAS_061_NoData                 | No data
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.TopDebtorsWidget = function () {
 
@@ -113,7 +135,7 @@
         function riskChip(daysOverdue) {
             var isHighRisk = daysOverdue > 0;
             var cls   = isHighRisk ? 'vas-td-chip-risk' : 'vas-td-chip-ontrack';
-            var label = isHighRisk ? lbl("VIS_HighRisk", 'HIGH RISK') : lbl("VIS_OnTrack", 'ON TRACK');
+            var label = isHighRisk ? lbl("VAS_061_HighRisk", 'HIGH RISK') : lbl("VAS_061_OnTrack", 'ON TRACK');
             return '<span class="vas-td-chip ' + cls + '">' + label + '</span>';
         }
 
@@ -130,7 +152,7 @@
             if (!rows || rows.length === 0) {
                 $listBody.append(
                     '<div class="vas-td-nodata">' +
-                        lbl("VIS_NoData", 'No data') +
+                        lbl("VAS_061_NoData", 'No data') +
                     '</div>'
                 );
                 return;
@@ -183,10 +205,10 @@
                         '</div>' +
                         '<div>' +
                             '<div class="vas-td-title">' +
-                                lbl("VIS_TopDebtors", 'Highest Debtors') +
+                                lbl("VAS_061_TopDebtors", 'Highest Debtors') +
                             '</div>' +
                             '<div class="vas-td-subtitle">' +
-                                lbl("VIS_LargestUnpaidBalances", 'LARGEST UNPAID BALANCES') +
+                                lbl("VAS_061_LargestUnpaidBalances", 'LARGEST UNPAID BALANCES') +
                             '</div>' +
                         '</div>' +
                     '</div>' +
@@ -231,6 +253,9 @@
         this.windowNo            = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.TopDebtorsWidget.prototype.widgetSizeChange = function (height, width) {};

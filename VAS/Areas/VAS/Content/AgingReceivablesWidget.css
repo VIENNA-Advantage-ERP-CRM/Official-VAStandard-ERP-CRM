@@ -1,9 +1,15 @@
 .vas-ar-root {
     height: 100%;
-    width:100%;
-    font-family: Roboto, sans-serif;
+    width: 100%;
     /* Positioning context for the absolute busy overlay below. */
     position: relative;
+    /* Enable cell-based @container queries on this widget. */
+    container-type: inline-size;
+}
+
+.vas-ar-root,
+.vas-ar-root * {
+    box-sizing: border-box;
 }
 
 /* Busy/loading overlay over the card while data is fetched (initial load + refresh);
@@ -15,34 +21,35 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 14px;
+    border-radius: 0.875em;
     z-index: 999;
 }
 
 .vas-ar-nodata {
     text-align: center;
-    padding: 16px;
-    color: #748494;
-    font-size: 12px;
+    padding: 1em;
+    color: #717182;
+    font-size: 0.8125em;
 }
 
 .vas-ar-bucket {
-    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375em;
 }
 
 .vas-ar-bucket-label-wrap {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    gap: 8px;
-    font-size: 12px;
-    margin-bottom: 4px;
+    gap: 0.75em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #102C3F;
 }
 
 .vas-ar-bucket-val {
-    font-weight: 600;
-    font-family: monospace;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -55,96 +62,124 @@
 }
 
 .vas-ar-bucket-track {
-    height: 8px;
-    background: #EDF2F6;
-    border-radius: 3px;
+    height: 0.4375em;
+    background: #E2EDE4;
+    border-radius: 999em;
+    overflow: hidden;
 }
 
 .vas-ar-bucket-bar {
     height: 100%;
-    border-radius: 3px;
+    border-radius: 999em;
     transition: width 0.8s ease-out;
 }
 
 .vas-ar-why-block {
-    font-size: 11px;
-    color: #748494;
-    margin-top: 6px;
-    line-height: 1.45;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    color: #717182;
+    margin-top: 0.375em;
+    line-height: 1.3;
     font-style: normal;
 }
 
 .vas-ar-why-pill {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25em;
     background: oklch(0.96 0.03 220);
-    padding: 1px 6px;
-    border-radius: 100px;
-    margin-inline-end: 6px;
-    font-family: monospace;
-    font-size: 9px;
+    padding: 0.0625em 0.375em;
+    border-radius: 6.25em;
+    margin-inline-end: 0.375em;
+    font-size: 0.5625em;
     color: oklch(0.45 0.15 220);
     letter-spacing: 0.05em;
     font-weight: bold;
 }
 
 .vas-ar-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 2px solid #fff;
-    border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    padding: 16px 18px 18px;
-    height: 100%;
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
+    gap: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 0.875em;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Card base font-size unit; resolves against the dashboard's visible width
+       (--dash-inline-size), falling back to the viewport when unset. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
 }
 
 .vas-ar-header {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin-bottom: 14px;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
 }
 
 .vas-ar-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     flex-shrink: 0;
-    background: #BAEAFB;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0C7DB4;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #0C7DB4;
+}
+
+.vas-ar-icon svg {
+    width: 1.125em;
+    height: 1.125em;
 }
 
 .vas-ar-title {
-    font-size: 14px;
-    font-weight: 700;
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
-    margin-bottom: 2px;
 }
 
 .vas-ar-subtitle {
-    font-size: 11px;
-    color: #748494;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    font-family: monospace;
+    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
+       the subtitle renders the same px in every widget at any screen size. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #717182;
+    line-height: 1.3;
 }
 
 .vas-ar-content-area {
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: 0.525em;
 }
 
 .vas-ar-loading {
     text-align: center;
-    color: #748494;
-    font-size: 12px;
+    color: #717182;
+    font-size: 0.8125em;
+}
+
+/* ── Cell-based responsive steps (reference list-card pattern) ── */
+@container (max-width: 18.75em) {
+    .vas-ar-card {
+        font-size: 0.875em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .vas-ar-card {
+        font-size: 0.75em;
+        padding: 0.875em;
+    }
 }

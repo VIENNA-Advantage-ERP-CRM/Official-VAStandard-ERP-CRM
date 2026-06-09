@@ -13,18 +13,40 @@
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                  | Message Key            | MsgText
  * ----+-----------------------------------------------+------------------------+----------------------------
- *  1  | Find invoices by customer, number, amount…    | VIS_InvoiceSearchPlaceholder | Find invoices by customer, number, amount or status…
- *  2  | {n} matches / {n} match                       | VIS_Matches / VIS_Match | matches / match
- *  3  | for                                           | VIS_For                | for
- *  4  | No invoices match                             | VIS_NoInvoicesMatch    | No invoices match
- *  5  | Searching…                                    | VIS_Searching          | Searching…
- *  6  | Clear                                         | VIS_Clear              | Clear
- *  -  | Status labels (DR/IP/CO/CL/AP/NA/WP/WC/RE/VO/IN) | VIS_StatusDraft etc. | Draft / In Progress / ...
+ *  1  | Find invoices by customer, number, amount…    | VAS_063_InvoiceSearchPlaceholder | Find invoices by customer, number, amount or status…
+ *  2  | {n} matches / {n} match                       | VAS_063_Matches / VAS_063_Match | matches / match
+ *  3  | for                                           | VAS_063_For            | for
+ *  4  | No invoices match                             | VAS_063_NoInvoicesMatch | No invoices match
+ *  5  | Searching…                                    | VAS_063_Searching      | Searching…
+ *  6  | Clear                                         | VAS_063_Clear          | Clear
+ *  -  | Status labels (DR/IP/CO/CL/AP/NA/WP/WC/RE/VO/IN) | VAS_063_StatusDraft etc. | Draft / In Progress / ...
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.SalesInvoiceCustomerSearchWidget = function () {
 
@@ -57,17 +79,17 @@
 
         /* Document-status chip colours (codes, not the attention buckets). */
         var STATUS = {
-            DR: { label: lbl('VIS_StatusDraft', 'Draft'), bg: '#EDEDED', color: '#505050' },
-            IP: { label: lbl('VIS_StatusInProgress', 'In Progress'), bg: '#FFF3CD', color: '#9A6500' },
-            CO: { label: lbl('VIS_StatusCompleted', 'Completed'), bg: '#CCEFDD', color: '#0C5D38' },
-            CL: { label: lbl('VIS_StatusClosed', 'Closed'), bg: '#DFF1FF', color: '#0E5DA8' },
-            AP: { label: lbl('VIS_StatusApproved', 'Approved'), bg: '#CCEFDD', color: '#0C5D38' },
-            NA: { label: lbl('VIS_StatusNotApproved', 'Not Approved'), bg: '#FFE8E8', color: '#C0392B' },
-            WP: { label: lbl('VIS_StatusWaitingPayment', 'Waiting Payment'), bg: '#FFF3CD', color: '#9A6500' },
-            WC: { label: lbl('VIS_StatusWaitingConfirm', 'Waiting Confirm'), bg: '#FFF3CD', color: '#9A6500' },
-            RE: { label: lbl('VIS_StatusReversed', 'Reversed'), bg: '#FFE8E8', color: '#C0392B' },
-            VO: { label: lbl('VIS_StatusVoided', 'Voided'), bg: '#FFE8E8', color: '#C0392B' },
-            IN: { label: lbl('VIS_StatusInvalid', 'Invalid'), bg: '#FFE8E8', color: '#C0392B' }
+            DR: { label: lbl('VAS_063_StatusDraft', 'Draft'), bg: '#EDEDED', color: '#505050' },
+            IP: { label: lbl('VAS_063_StatusInProgress', 'In Progress'), bg: '#FFF3CD', color: '#9A6500' },
+            CO: { label: lbl('VAS_063_StatusCompleted', 'Completed'), bg: '#CCEFDD', color: '#0C5D38' },
+            CL: { label: lbl('VAS_063_StatusClosed', 'Closed'), bg: '#DFF1FF', color: '#0E5DA8' },
+            AP: { label: lbl('VAS_063_StatusApproved', 'Approved'), bg: '#CCEFDD', color: '#0C5D38' },
+            NA: { label: lbl('VAS_063_StatusNotApproved', 'Not Approved'), bg: '#FFE8E8', color: '#C0392B' },
+            WP: { label: lbl('VAS_063_StatusWaitingPayment', 'Waiting Payment'), bg: '#FFF3CD', color: '#9A6500' },
+            WC: { label: lbl('VAS_063_StatusWaitingConfirm', 'Waiting Confirm'), bg: '#FFF3CD', color: '#9A6500' },
+            RE: { label: lbl('VAS_063_StatusReversed', 'Reversed'), bg: '#FFE8E8', color: '#C0392B' },
+            VO: { label: lbl('VAS_063_StatusVoided', 'Voided'), bg: '#FFE8E8', color: '#C0392B' },
+            IN: { label: lbl('VAS_063_StatusInvalid', 'Invalid'), bg: '#FFE8E8', color: '#C0392B' }
         };
 
         /* Avatar palette (cycles per row), matching the search-widget design. */
@@ -137,10 +159,10 @@
             $input = $(
                 '<input type="text" class="vas-sics-field" autocomplete="off" ' +
                 'role="combobox" aria-autocomplete="list" aria-expanded="false" ' +
-                'placeholder="' + escapeHtml(lbl('VIS_InvoiceSearchPlaceholder', 'Find invoices by customer, number, amount or status…')) + '">'
+                'placeholder="' + escapeHtml(lbl('VAS_063_InvoiceSearchPlaceholder', 'Find invoices by customer, number, amount or status…')) + '">'
             );
 
-            $clear = $('<button type="button" class="vas-sics-clear" aria-label="' + escapeHtml(lbl('VIS_Clear', 'Clear')) + '">' + clearSvg + '</button>');
+            $clear = $('<button type="button" class="vas-sics-clear" aria-label="' + escapeHtml(lbl('VAS_063_Clear', 'Clear')) + '">' + clearSvg + '</button>');
 
             $pill.append($input).append($clear);
             $zone.append($pill);
@@ -249,7 +271,7 @@
             if (!q) { closeSuggest(); return; }
 
             ensureSuggest();
-            $suggest.html('<div class="vas-sics-state">' + escapeHtml(lbl('VIS_Searching', 'Searching…')) + '</div>');
+            $suggest.html('<div class="vas-sics-state">' + escapeHtml(lbl('VAS_063_Searching', 'Searching…')) + '</div>');
             openSuggest();
 
             var mySeq = ++reqSeq;
@@ -277,13 +299,13 @@
             ensureSuggest();
 
             if (matches.length === 0) {
-                $suggest.html('<div class="vas-sics-empty">' + lbl('VIS_NoInvoicesMatch', 'No invoices match') + ' "<strong>' + escapeHtml(q) + '</strong>".</div>');
+                $suggest.html('<div class="vas-sics-empty">' + lbl('VAS_063_NoInvoicesMatch', 'No invoices match') + ' "<strong>' + escapeHtml(q) + '</strong>".</div>');
                 openSuggest();
                 return;
             }
 
-            var word = matches.length === 1 ? lbl('VIS_Match', 'match') : lbl('VIS_Matches', 'matches');
-            var html = '<div class="vas-sics-meta"><strong>' + matches.length + '</strong> ' + word + ' ' + lbl('VIS_For', 'for') + ' "' + escapeHtml(q) + '"</div>';
+            var word = matches.length === 1 ? lbl('VAS_063_Match', 'match') : lbl('VAS_063_Matches', 'matches');
+            var html = '<div class="vas-sics-meta"><strong>' + matches.length + '</strong> ' + word + ' ' + lbl('VAS_063_For', 'for') + ' "' + escapeHtml(q) + '"</div>';
 
             $.each(matches, function (i, r) {
                 var color = PALETTE[i % PALETTE.length];
@@ -362,6 +384,9 @@
         this.windowNo            = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.SalesInvoiceCustomerSearchWidget.prototype.widgetSizeChange = function (height, width) {};

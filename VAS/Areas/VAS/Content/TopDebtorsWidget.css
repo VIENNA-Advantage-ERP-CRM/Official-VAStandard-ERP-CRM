@@ -12,7 +12,7 @@
     width: 100%;
     height: 100%;
     container-type: inline-size;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     /* Positioning context for the absolute busy overlay below. */
     position: relative;
 }
@@ -32,7 +32,7 @@
 
 .vas-td-card {
     /* Base unit: every em below is relative to this value. */
-    font-size: 16px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     box-sizing: border-box;
     width: 100%;
     height: 100%;
@@ -40,10 +40,12 @@
     flex-direction: column;
     /* Glass widget surface (design.md §8) */
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 2px solid #fff;
-    border-radius: 0.875em;          /* 14px */
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em; /* 14px */
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
     overflow: hidden;
+    padding: .875em;
+    gap: .05em;
 }
 
 /* ── Header: icon + title/subtitle on the left, "Chase all" on the right ── */
@@ -51,9 +53,6 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5em;
-    /* Widget edge spacing: top 16 / sides 18 / 12 above the list */
-    padding: 1em 1.125em 0.75em;
     flex-shrink: 0;
 }
 
@@ -65,33 +64,38 @@
 }
 
 .vas-td-icon {
-    width: 2.25em;                   /* 36px */
-    height: 2.25em;
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     flex-shrink: 0;
-    border-radius: 0.5em;            /* 8px */
-    background: #EAF8FF;             /* light active blue surface */
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .vas-td-icon svg {
-    width: 1.125em;                  /* 18px */
+    width: 1.125em;
     height: 1.125em;
 }
 
 .vas-td-title {
-    font-size: 0.875em;              /* 14px */
-    font-weight: 700;
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
 
 .vas-td-subtitle {
-    font-size: 0.625em;              /* 10px */
-    color: #748494;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
+       the subtitle renders the same px in every widget at any screen size. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #717182;
     margin-top: 0.125em;
 }
 
@@ -104,7 +108,7 @@
 }
 
 .vas-td-chase-all {
-    font-size: 0.8125em;             /* 13px */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     font-weight: 600;
     color: #0083DA;
 }
@@ -114,19 +118,20 @@
     height: 0.875em;
 }
 
-/* ── Scrollable list body ── */
+/* ── List body — no scroll: the top-N rows fit within the card, with a little
+   breathing room below the last row so its chip never touches the edge. ── */
 .vas-td-list-body {
     flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
-    padding-bottom: 0.25em;
+    overflow-y: hidden;
+    padding-bottom: 0.75em;
 }
 
 .vas-td-list-row {
     display: flex;
     align-items: center;
     gap: 0.75em;                     /* 12px */
-    padding: 0.2em 1.125em;         /* 12px / 18px — aligns with header */
+    padding: 0.2em 0.125em;         /* 12px / 18px — aligns with header */
     transition: background 0.15s;
     cursor: pointer;
 }
@@ -141,14 +146,14 @@
 
 /* ── Avatar (cycled palette via vas-td-avatar-N classes) ── */
 .vas-td-avatar {
-    width: 2.25em;                   /* 36px */
-    height: 2.25em;
+    width: 2em;                      /* slightly smaller so all top-N rows fit */
+    height: 2em;
     border-radius: 50%;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.75em;               /* 12px */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 700;
     letter-spacing: 0.02em;
 }
@@ -167,8 +172,8 @@
 }
 
 .vas-td-name {
-    font-size: 0.875em;              /* 14px */
-    font-weight: 700;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
@@ -176,11 +181,11 @@
 }
 
 .vas-td-overdue-wrap {
-    margin-top: 0.125em;
+    margin-top: -0.325em;
 }
 
 .vas-td-overdue-label {
-    font-size: 0.75em;               /* 12px */
+    font-size: clamp(09px, calc(var(--dash-inline-size, 100vw) * 0.0083), 18px);
     color: #748494;
 }
 
@@ -194,8 +199,8 @@
 }
 
 .vas-td-amount {
-    font-size: 0.9375em;             /* 15px */
-    font-weight: 700;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -212,7 +217,7 @@
     display: inline-block;
     padding: 0.1875em 0.625em;       /* 3px 10px */
     border-radius: 999px;
-    font-size: 0.625em;              /* 10px */
+    font-size: clamp(10px, calc(var(--dash-inline-size, 100vw) * 0.0071), 13px);
     font-weight: 700;
     white-space: nowrap;
     letter-spacing: 0.04em;
@@ -226,15 +231,15 @@
     text-align: center;
     padding: 1.5em 1em;
     color: #748494;
-    font-size: 0.75em;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
 }
 
 /* ── Responsive: shrink the whole card by lowering its base font-size on
  *    narrow dashboard cells. Inner em sizing scales automatically. ── */
 @container (max-width: 300px) {
-    .vas-td-card { font-size: 14px; }
+    .vas-td-card { font-size: 0.875em; }
 }
 
 @container (max-width: 240px) {
-    .vas-td-card { font-size: 12px; }
+    .vas-td-card { font-size: 0.75em; }
 }
