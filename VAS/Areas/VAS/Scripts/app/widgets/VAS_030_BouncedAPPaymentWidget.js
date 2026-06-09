@@ -6,10 +6,9 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Bounced                              | VAS_030_MessageBounced
- *  2  | Action                               | VAS_030_MessageAction
- *  3  | Need re-issue                        | VAS_030_MessageNeedReissue
- *  4  | Loading                              | VAS_030_MessageLoading
- *  5  | No Data                              | VAS_030_MessageNoData
+ *  2  | Need re-issue                        | VAS_030_MessageNeedReissue
+ *  3  | Loading                              | VAS_030_MessageLoading
+ *  4  | No Data                              | VAS_030_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -67,15 +66,12 @@
 
             var $footer = $('<div class="vas-bounced-ap-payment-footer">');
 
-            var $badge = $('<div class="vas-bounced-ap-payment-badge">').text(
-                lbl('VAS_030_MessageAction', 'Action')
-            );
-
+     
             $description = $('<div class="vas-bounced-ap-payment-desc">').text(
                 lbl('VAS_030_MessageNeedReissue', 'Need re-issue')
             );
 
-            $footer.append($badge).append($description);
+            $footer.append($description);
             $card.append($header).append($body).append($footer);
             $root.empty().append($card);
         }

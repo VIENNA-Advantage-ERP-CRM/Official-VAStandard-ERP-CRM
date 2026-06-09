@@ -7,17 +7,16 @@
  * ----+--------------------------------------+--------------------------------
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
  *  2  | + New payment                        | VAS_032_MessageNewPayment
- *  3  | Review                               | VAS_032_MessageReview
- *  4  | {0} payments auto-matched to bills   | VAS_032_MessagePaymentsAutoMatchedToBills
- *  5  | Aura reconciled {0} based on amount + vendor | VAS_032_MessageAuraReconciledBasedOnAmountVendor
- *  6  | Date                                 | VAS_032_MessageDate
- *  7  | Vendor                               | VAS_032_MessageVendor
- *  8  | Method                               | VAS_032_MessageMethod
- *  9  | Ref                                  | VAS_032_MessageRef
- * 10  | Status                               | VAS_032_MessageStatus
- * 11  | Amount                               | VAS_032_MessageAmount
- * 12  | Loading                              | VAS_032_MessageLoading
- * 13  | No Data                              | VAS_032_MessageNoData
+ *  3  | {0} payments auto-matched to bills   | VAS_032_MessagePaymentsAutoMatchedToBills
+ *  4  | Aura reconciled {0} based on amount + vendor | VAS_032_MessageAuraReconciledBasedOnAmountVendor
+ *  5  | Date                                 | VAS_032_MessageDate
+ *  6  | Vendor                               | VAS_032_MessageVendor
+ *  7  | Method                               | VAS_032_MessageMethod
+ *  8  | Ref                                  | VAS_032_MessageRef
+ *  9  | Status                               | VAS_032_MessageStatus
+ * 10  | Amount                               | VAS_032_MessageAmount
+ * 11  | Loading                              | VAS_032_MessageLoading
+ * 12  | No Data                              | VAS_032_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -78,10 +77,9 @@
             var $bannerText = $('<div class="vas-recent-ap-payments-banner-text">');
             $bannerTitle = $('<div class="vas-recent-ap-payments-banner-title">');
             $bannerSub = $('<div class="vas-recent-ap-payments-banner-sub">');
-            var $review = $('<button type="button" class="vas-recent-ap-payments-review">').text(lbl('VAS_032_MessageReview', 'Review'));
 
             $bannerText.append($bannerTitle).append($bannerSub);
-            $banner.append($bannerIcon).append($bannerText).append($review);
+            $banner.append($bannerIcon).append($bannerText);
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
 
@@ -193,7 +191,7 @@
                 .append($('<td class="vas-recent-ap-payments-method-col">').append($('<span class="vas-recent-ap-payments-method">').text(payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
                 .append($('<td class="vas-recent-ap-payments-ref">').append($('<span class="vas-recent-ap-payments-cell-text">').text(payment.referenceNo || '')))
                 .append($('<td class="vas-recent-ap-payments-status-col">').append($('<span class="vas-recent-ap-payments-status">').addClass(statusClass).text(statusText)))
-                .append($('<td class="vas-recent-ap-payments-amount">').append($('<span class="vas-recent-ap-payments-cell-text">').text(formatCurrencyAmount(payment.amount, payment.currencySymbol, payment.currencyISO))));
+                .append($('<td class="vas-recent-ap-payments-amount">').append($('<span class="vas-recent-ap-payments-cell-text">').text(formatCurrencyAmount(payment.amount, payment.currencySymbol, payment.currencyISO, payment.stdPrecision))));
 
             return $row;
         }
@@ -239,22 +237,28 @@
             });
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {
             var numericValue = Number(value || 0);
-            var stdPrecision = 2;
+            var precision = Number(stdPrecision);
 
-            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            if (isNaN(precision) && VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                precision = Number(VIS.Env.getCtx().getStdPrecision());
             }
 
-            if (isNaN(stdPrecision) || stdPrecision < 0) {
-                stdPrecision = 2;
+            if (isNaN(precision) || precision < 0) {
+                precision = 2;
             }
 
-            return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
+            var amount = numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
             });
+
+            if (currencySymbol) {
+                return currencySymbol + amount;
+            }
+
+            return currencyISO ? amount + ' ' + currencyISO : amount;
         }
 
         function setLoading() {

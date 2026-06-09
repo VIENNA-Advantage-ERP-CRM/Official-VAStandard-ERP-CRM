@@ -173,28 +173,6 @@
     color: #5f7283;
 }
 
-.vas-recent-ap-payments-review {
-    flex: 0 1 auto;
-    min-width: 0;
-    max-width: 30%;
-    padding: 0.3125em 0.625em;
-    border-radius: 999em;
-    border: 0.0625em solid #bfe4ff;
-    background: #ffffff;
-    color: #0083da;
-    font-size: 0.6875em;
-    font-weight: 700;
-    line-height: 1.2;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-    .vas-recent-ap-payments-review:hover {
-        background: #f2f9ff;
-    }
-
 .vas-recent-ap-payments-table-wrap {
     flex: 1 1 auto;
     min-width: 0;
@@ -417,11 +395,6 @@
 
     .vas-recent-ap-payments-new {
         max-width: 30%;
-        padding: 0.25em 0.5em;
-    }
-
-    .vas-recent-ap-payments-review {
-        max-width: 28%;
         padding: 0.25em 0.5em;
     }
 
