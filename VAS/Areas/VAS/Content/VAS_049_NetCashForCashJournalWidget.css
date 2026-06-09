@@ -63,6 +63,36 @@
     color: #60748A;
 }
 
+.VAS_net-cash-cash-journal-header-actions {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.VAS_net-cash-cash-journal-action {
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #0078D4;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.VAS_net-cash-cash-journal-action:hover,
+.VAS_net-cash-cash-journal-action:focus {
+    color: #005A9E;
+    text-decoration: none;
+    outline: none;
+}
+
 .VAS_net-cash-cash-journal-date {
     flex-shrink: 0;
     max-width: 45%;
@@ -206,6 +236,10 @@
 
     .VAS_net-cash-cash-journal-date {
         padding: 0.25em 0.625em;
+    }
+
+    .VAS_net-cash-cash-journal-action {
+        display: none;
     }
 }
 

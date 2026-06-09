@@ -99,6 +99,58 @@
     color: #748494;
 }
 
+.VAS_053_approval-header-actions {
+    min-width: 0;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.VAS_053_approval-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+}
+
+.VAS_053_approval-page-btn {
+    width: 1.75em;
+    height: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 131, 218, 0.08);
+    color: #0083DA;
+    font: inherit;
+    font-size: 0.875em;
+    line-height: 1;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.VAS_053_approval-page-btn:hover:not(:disabled) {
+    background: rgba(0, 131, 218, 0.14);
+}
+
+.VAS_053_approval-page-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.VAS_053_approval-page-text {
+    min-width: 2.5em;
+    text-align: center;
+    font-size: 0.72em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #748494;
+}
+
 .VAS_053_approval-action {
     flex: 0 0 auto;
     padding: 0;
@@ -308,6 +360,7 @@
     inset: 0;
     z-index: 2;
     display: none;
+    pointer-events: none;
     align-items: center;
     justify-content: center;
     padding: 0.875em;
@@ -330,9 +383,16 @@
         gap: 0.375em;
     }
 
-    .VAS_053_approval-action,
     .VAS_053_approval-meta {
         display: none;
+    }
+
+    .VAS_053_approval-header-actions {
+        gap: 0.5em;
+    }
+
+    .VAS_053_approval-page-text {
+        min-width: 2.25em;
     }
 
     .VAS_053_approval-row {
@@ -349,6 +409,23 @@
         width: 1.75em;
         height: 1.75em;
         border-radius: 10px;
+    }
+
+    .VAS_053_approval-header {
+        gap: 0.5em;
+    }
+
+    .VAS_053_approval-header-actions {
+        gap: 0.375em;
+    }
+
+    .VAS_053_approval-page-btn {
+        width: 1.6em;
+        height: 1.6em;
+    }
+
+    .VAS_053_approval-page-text {
+        display: none;
     }
 
     .VAS_053_approval-row {

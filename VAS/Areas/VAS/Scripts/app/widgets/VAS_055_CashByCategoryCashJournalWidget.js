@@ -126,11 +126,7 @@
                 'class': 'VAS_055_cash-category-footer'
             });
 
-            var $why = $('<span>', {
-                'class': 'VAS_055_cash-category-why',
-                'id': 'VAS_055_cash-category-why-' + widgetId,
-                'text': lbl('VAS_055_Why', 'Why')
-            });
+         
 
             var $whyText = $('<span>', {
                 'class': 'VAS_055_cash-category-why-text',
@@ -145,7 +141,7 @@
 
             $titleRow.append($icon).append($title);
             $header.append($titleRow).append($meta);
-            $footer.append($why).append($whyText);
+            $footer.append($whyText);
             $card.append($busy).append($header).append($body).append($footer).append($state);
             $root.append($card);
         }

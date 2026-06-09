@@ -33,6 +33,9 @@
         var $root = null;
         var isDisposed = false;
         var ajaxRequest = null;
+        var pageNo = 1;
+        var pageSize = 3;
+        var totalPages = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -88,6 +91,46 @@
             if (show) { $busy.addClass('is-visible'); } else { $busy.removeClass('is-visible'); }
         }
 
+        function startWindowById(windowId) {
+            if (!windowId) {
+                return;
+            }
+
+            if (VIS.viewManager && VIS.viewManager.startWindow) {
+                VIS.viewManager.startWindow(windowId, null);
+            } else if (VIS.AEnv && VIS.AEnv.startWindow) {
+                VIS.AEnv.startWindow(windowId, null);
+            }
+        }
+
+        //function getWindowIdByName(windowName, callback) {
+        //    $.ajax({
+        //        url: VIS.Application.contextUrl + 'VAS/VAS_053_ApprovalQueueCashJournal/GetWindowIdByName',
+        //        type: 'GET',
+        //        dataType: 'json',
+        //        cache: false,
+        //        data: {
+        //            windowName: windowName
+        //        },
+        //        success: function (response) {
+        //            callback(safeNumber(response && response.windowId));
+        //        },
+        //        error: function () {
+        //            callback(0);
+        //        }
+        //    });
+        //}
+
+        //function openWindowByName(windowName, fallbackWindowId) {
+        //    getWindowIdByName(windowName, function (windowId) {
+        //        startWindowById(windowId || fallbackWindowId);
+        //    });
+        //}
+
+        //function openWorkFlow() {
+        //    openWindowByName('WorkFlow', 1000409);
+        //}
+
         function buildLayout() {
             var widgetId = $self.AD_UserHomeWidgetID;
 
@@ -136,11 +179,23 @@
                 'text': '0 ' + lbl('VAS_053_Pending', 'Pending')
             });
 
-            var $viewAll = $('<button>', {
-                'class': 'VAS_053_approval-action',
-                'type': 'button',
-                'id': 'VAS_053_approval-view-all-' + widgetId,
-                'text': lbl('VAS_053_ViewAll', 'View all ->')
+            //var $viewAll = $('<button>', {
+            //    'class': 'VAS_053_approval-action',
+            //    'type': 'button',
+            //    'id': 'VAS_053_approval-view-all-' + widgetId,
+            //    'text': lbl('VAS_053_ViewAll', 'View all ->')
+            //});
+
+            var $pager = $(
+                '<div class="VAS_053_approval-pager">' +
+                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-prev-' + widgetId + '" aria-label="Previous">&lsaquo;</button>' +
+                '<span class="VAS_053_approval-page-text" id="VAS_053_approval-page-text-' + widgetId + '"></span>' +
+                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-next-' + widgetId + '" aria-label="Next">&rsaquo;</button>' +
+                '</div>'
+            );
+
+            var $headerActions = $('<div>', {
+                'class': 'VAS_053_approval-header-actions'
             });
 
             var $body = $('<div>', {
@@ -154,9 +209,60 @@
             });
 
             $titleRow.append($icon).append($title).append($meta);
-            $header.append($titleRow).append($viewAll);
+            $headerActions.append($pager);
+            $header.append($titleRow).append($headerActions);
             $card.append($busy).append($header).append($body).append($state);
             $root.append($card);
+
+            bindEvents();
+            updatePager();
+        }
+
+        function bindEvents() {
+            //$root.on('click', '#VAS_053_approval-view-all-' + $self.AD_UserHomeWidgetID, function () {
+            //    openWorkFlow();
+            //});
+
+            $root.on('click', '#VAS_053_approval-prev-' + $self.AD_UserHomeWidgetID, function () {
+                if (pageNo <= 1 || totalPages <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                loadData();
+            });
+
+            $root.on('click', '#VAS_053_approval-next-' + $self.AD_UserHomeWidgetID, function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                loadData();
+            });
+        }
+
+        function updatePager() {
+            if (!$root) {
+                return;
+            }
+
+            var widgetId = $self.AD_UserHomeWidgetID;
+            var $prev = $root.find('#VAS_053_approval-prev-' + widgetId);
+            var $next = $root.find('#VAS_053_approval-next-' + widgetId);
+            var $pageText = $root.find('#VAS_053_approval-page-text-' + widgetId);
+
+            if ($pageText) {
+                $pageText.text(totalPages > 1 ? pageNo + ' / ' + totalPages : '');
+            }
+
+            if ($prev) {
+                $prev.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($next) {
+                $next.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
         }
 
         function setState(message) {
@@ -165,6 +271,8 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
+            totalPages = 0;
+            updatePager();
             $root.find('#VAS_053_approval-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_053_approval-list-' + widgetId).empty();
         }
@@ -178,10 +286,16 @@
             var items = data.items || [];
             var $list = $root.find('#VAS_053_approval-list-' + widgetId);
 
+            pageNo = safeNumber(data.pageNo) || pageNo;
+            totalPages = safeNumber(data.totalPages);
+            if (pageNo < 1) { pageNo = 1; }
+            if (totalPages > 0 && pageNo > totalPages) { pageNo = totalPages; }
+
             $root.find('#VAS_053_approval-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_053_approval-title-' + widgetId).text(data.title || lbl('VAS_053_ApprovalQueue', 'Approval Queue'));
             $root.find('#VAS_053_approval-meta-' + widgetId).text(safeNumber(data.pendingCount).toLocaleString(window.navigator.language) + ' ' + (data.pendingText || lbl('VAS_053_Pending', 'Pending')));
             $root.find('#VAS_053_approval-view-all-' + widgetId).text(data.viewAllText || lbl('VAS_053_ViewAll', 'View all ->'));
+            updatePager();
 
             $list.empty();
 
@@ -238,17 +352,17 @@
                     'class': 'VAS_053_approval-actions'
                 });
 
-                var $approve = $('<button>', {
-                    'type': 'button',
-                    'class': 'VAS_053_approval-btn VAS_053_approval-btn-approve',
-                    'aria-label': lbl('VAS_053_Approve', 'Approve')
-                }).html(getApproveIcon());
+                //var $approve = $('<button>', {
+                //    'type': 'button',
+                //    'class': 'VAS_053_approval-btn VAS_053_approval-btn-approve',
+                //    'aria-label': lbl('VAS_053_Approve', 'Approve')
+                //}).html(getApproveIcon());
 
-                var $reject = $('<button>', {
-                    'type': 'button',
-                    'class': 'VAS_053_approval-btn VAS_053_approval-btn-reject',
-                    'aria-label': lbl('VAS_053_Reject', 'Reject')
-                }).html(getRejectIcon());
+                //var $reject = $('<button>', {
+                //    'type': 'button',
+                //    'class': 'VAS_053_approval-btn VAS_053_approval-btn-reject',
+                //    'aria-label': lbl('VAS_053_Reject', 'Reject')
+                //}).html(getRejectIcon());
 
                 $top.append($title).append($priority);
                 $main.append($top).append($sub);
@@ -257,7 +371,7 @@
                     $main.append($message);
                 }
 
-                $actions.append($approve).append($reject);
+               // $actions.append($approve).append($reject);
                 $side.append($amount).append($actions);
                 $row.append($main).append($side);
                 $list.append($row);
@@ -279,6 +393,10 @@
                 url: VIS.Application.contextUrl + 'VAS/VAS_053_ApprovalQueueCashJournal/GetApprovalQueue',
                 type: 'GET',
                 dataType: 'json',
+                data: {
+                    pageNo: pageNo,
+                    pageSize: pageSize
+                },
                 cache: false,
                 success: function (response) {
                     if (isDisposed) {
@@ -316,6 +434,7 @@
         };
 
         this.refreshWidget = function () {
+            pageNo = 1;
             loadData();
         };
 
@@ -361,6 +480,19 @@
     };
 
     VAS.VAS_053_ApprovalQueueCashJournalWidget.prototype.widgetSizeChange = function (height, width) {
+    };
+
+    VAS.VAS_053_ApprovalQueueCashJournalWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener && typeof this.listener.widgetFirevalueChanged === "function") {
+            this.listener.widgetFirevalueChanged(value);
+        }
+        else if (this.getRoot && this.getRoot()) {
+            this.getRoot().trigger('widgetFirevalueChanged', value);
+        }
+    };
+
+    VAS.VAS_053_ApprovalQueueCashJournalWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_053_ApprovalQueueCashJournalWidget.prototype.dispose = function () {
