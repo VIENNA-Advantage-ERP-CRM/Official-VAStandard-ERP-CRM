@@ -491,7 +491,7 @@
                 paneRow(lbl("VAS_035_PaymentTerms", "Payment Terms"), data.PaymentTerms) +
                 paneRow(lbl("VAS_035_DueDate", "Due Date"), formatDate(data.DueDate)) +
                 paneRow(lbl("VAS_035_GrandTotal", "Grand Total"), grandTotal) +
-                paneRow(lbl("VAS_PaymentCurrency", "Currency"), data.InvoiceCurrency) +
+                paneRow(lbl("VAS_035_InvCurrency", "Currency"), data.InvoiceCurrency) +
                 paneRow(lbl("VAS_035_OpenAmount", "Open Amount"), openAmt, 'vas-msug-amount-open') +
                 '</div>';
 

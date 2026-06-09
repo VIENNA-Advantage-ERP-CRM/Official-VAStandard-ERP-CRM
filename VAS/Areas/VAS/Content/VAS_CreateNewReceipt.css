@@ -18,7 +18,7 @@
     height: 100%;
     overflow: hidden;           /* prevent card min-height from bleeding outside the cell */
     container-type: inline-size;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-cnr-root,

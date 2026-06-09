@@ -11,7 +11,7 @@
     height: 100%;
     container-type: inline-size;
     position: relative;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-unr-root,
@@ -167,7 +167,7 @@
 }
 
 .vas-unr-dialog {
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
     /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
        0.88vw): dialog data matches widget data px and the whole em-sized
        dialog scales in proportion. 16px floor = unchanged small screens. */
@@ -369,7 +369,7 @@
 }
 
 .vas-unr-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     color: #5F7283;
     font-size: 0.6875em;              /* xs — secondary metadata cell */
 }
