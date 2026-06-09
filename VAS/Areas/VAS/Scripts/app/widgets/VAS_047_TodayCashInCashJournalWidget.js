@@ -74,12 +74,18 @@
 
         /* ── State overlay ──────────────────────────────────────────── */
         function showState(show, message) {
+            var uid = $self.AD_UserHomeWidgetID;
             var $s = $root.find('#VAS-047-cj-state-' + $self.AD_UserHomeWidgetID);
 
             if (show) {
                 $s.text(message || '').addClass('is-visible');
+                $root.find('#VAS-047-cj-value-' + uid).text('');
+                $root.find('.VAS-047-today-cash-in-cash-journal-body').hide();
+                $root.find('.VAS-047-today-cash-in-cash-journal-footer').hide();
             } else {
                 $s.removeClass('is-visible').text('');
+                $root.find('.VAS-047-today-cash-in-cash-journal-body').show();
+                $root.find('.VAS-047-today-cash-in-cash-journal-footer').show();
             }
         }
 
@@ -151,6 +157,7 @@
         /* ── Render data into DOM ───────────────────────────────────── */
         function renderData(data) {
             var uid = $self.AD_UserHomeWidgetID;
+            showState(false, '');
             var mainMetric = Number(data.mainMetric || 0);
             var avgDailyAmount = Number(data.avgDailyAmount || 0);
             var deltaRaw = Number(data.deltaPercent || 0);

@@ -62,10 +62,10 @@
             var $busy = $root.find('#VAS_055_cash-category-busy-' + $self.AD_UserHomeWidgetID);
 
             if (show) {
-                $busy.show();
+                $busy.addClass('is-visible');
             }
             else {
-                $busy.hide();
+                $busy.removeClass('is-visible');
             }
         }
 
@@ -86,7 +86,7 @@
                 'class': 'VAS_055_cash-category-busy',
                 'id': 'VAS_055_cash-category-busy-' + widgetId,
                 'text': lbl('VAS_055_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_055_cash-category-header'
@@ -141,7 +141,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_055_cash-category-state',
                 'id': 'VAS_055_cash-category-state-' + widgetId
-            }).hide();
+            });
 
             $titleRow.append($icon).append($title);
             $header.append($titleRow).append($meta);
@@ -157,7 +157,7 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
 
-            $root.find('#VAS_055_cash-category-state-' + widgetId).text(message || '').show();
+            $root.find('#VAS_055_cash-category-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_055_cash-category-body-' + widgetId).empty();
         }
 
@@ -218,7 +218,7 @@
             var currencySymbol = data.currencySymbol || '';
             var currencyISO = data.currencyISO || data.currencyISOCode || '';
 
-            $root.find('#VAS_055_cash-category-state-' + widgetId).hide().text('');
+            $root.find('#VAS_055_cash-category-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_055_cash-category-title-' + widgetId).text(data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category'));
             $root.find('#VAS_055_cash-category-meta-' + widgetId).text(data.metaText || lbl('VAS_055_Today', 'Today'));
             $root.find('#VAS_055_cash-category-why-' + widgetId).text(data.whyLabel || lbl('VAS_055_Why', 'Why'));

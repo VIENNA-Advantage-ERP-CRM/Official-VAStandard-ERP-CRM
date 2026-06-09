@@ -85,7 +85,7 @@
 
         function showBusy(show) {
             var $busy = $root.find('#VAS_053_approval-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $busy.show(); } else { $busy.hide(); }
+            if (show) { $busy.addClass('is-visible'); } else { $busy.removeClass('is-visible'); }
         }
 
         function buildLayout() {
@@ -105,7 +105,7 @@
                 'class': 'VAS_053_approval-busy',
                 'id': 'VAS_053_approval-busy-' + widgetId,
                 'text': lbl('VAS_053_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_053_approval-header'
@@ -151,7 +151,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_053_approval-state',
                 'id': 'VAS_053_approval-state-' + widgetId
-            }).hide();
+            });
 
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow).append($viewAll);
@@ -165,7 +165,7 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            $root.find('#VAS_053_approval-state-' + widgetId).text(message || '').show();
+            $root.find('#VAS_053_approval-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_053_approval-list-' + widgetId).empty();
         }
 
@@ -178,7 +178,7 @@
             var items = data.items || [];
             var $list = $root.find('#VAS_053_approval-list-' + widgetId);
 
-            $root.find('#VAS_053_approval-state-' + widgetId).hide().text('');
+            $root.find('#VAS_053_approval-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_053_approval-title-' + widgetId).text(data.title || lbl('VAS_053_ApprovalQueue', 'Approval Queue'));
             $root.find('#VAS_053_approval-meta-' + widgetId).text(safeNumber(data.pendingCount).toLocaleString(window.navigator.language) + ' ' + (data.pendingText || lbl('VAS_053_Pending', 'Pending')));
             $root.find('#VAS_053_approval-view-all-' + widgetId).text(data.viewAllText || lbl('VAS_053_ViewAll', 'View all ->'));

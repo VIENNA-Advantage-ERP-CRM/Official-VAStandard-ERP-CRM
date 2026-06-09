@@ -56,7 +56,7 @@
 
         function showBusy(show) {
             var $busy = $root.find('#VAS_054_counterparties-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $busy.show(); } else { $busy.hide(); }
+            if (show) { $busy.addClass('is-visible'); } else { $busy.removeClass('is-visible'); }
         }
 
         function buildLayout() {
@@ -76,7 +76,7 @@
                 'class': 'VAS_054_counterparties-busy',
                 'id': 'VAS_054_counterparties-busy-' + widgetId,
                 'text': lbl('VAS_054_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_054_counterparties-header'
@@ -124,7 +124,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_054_counterparties-state',
                 'id': 'VAS_054_counterparties-state-' + widgetId
-            }).hide();
+            });
 
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow);
@@ -138,7 +138,7 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            $root.find('#VAS_054_counterparties-state-' + widgetId).text(message || '').show();
+            $root.find('#VAS_054_counterparties-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_054_counterparties-list-' + widgetId).empty();
         }
 
@@ -163,7 +163,7 @@
             var items = data.items || [];
             var $list = $root.find('#VAS_054_counterparties-list-' + widgetId);
 
-            $root.find('#VAS_054_counterparties-state-' + widgetId).hide().text('');
+            $root.find('#VAS_054_counterparties-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_054_counterparties-title-' + widgetId).text(data.title || lbl('VAS_054_TopCounterparties', 'Top Counterparties'));
             $root.find('#VAS_054_counterparties-meta-' + widgetId).text(data.metaText || lbl('VAS_054_Last30Days', 'Last 30 Days'));
             $root.find('#VAS_054_counterparties-action-' + widgetId).text(data.actionText || lbl('VAS_054_AllParties', 'All parties ->'));

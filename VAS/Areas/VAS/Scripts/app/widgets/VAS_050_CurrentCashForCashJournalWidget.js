@@ -55,7 +55,7 @@
 
         function showBusy(show) {
             var $b = $root.find('#VAS-gljtm-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $b.show(); } else { $b.hide(); }
+            if (show) { $b.addClass('is-visible'); } else { $b.removeClass('is-visible'); }
         }
 
         function safeNumber(value) {
@@ -135,7 +135,7 @@
                 'class': 'VAS_current-cash-cash-journal-busy',
                 'id': 'VAS-gljtm-busy-' + widgetId,
                 'text': lbl('VAS_050_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-row'
@@ -196,7 +196,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-state',
                 'id': 'VAS_050_current-cash-state-' + widgetId
-            }).hide();
+            });
 
             $delta.html(getTrendIcon(0)).append($deltaText);
             $footer.append($delta).append($description);
@@ -246,12 +246,13 @@
 
             $root.find('#VAS_050_current-cash-state-' + widgetId)
                 .text(message || '')
-                .show();
+                .addClass('is-visible');
 
             $root.find('#VAS_050_current-cash-value-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-value-positive VAS_current-cash-cash-journal-value-negative VAS_current-cash-cash-journal-value-neutral')
                 .addClass('VAS_current-cash-cash-journal-value-neutral')
-                .text(formatCurrencyAmount(0));
+                .text('')
+                .hide();
 
             $root.find('#VAS_050_current-cash-delta-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-delta-positive VAS_current-cash-cash-journal-delta-negative VAS_current-cash-cash-journal-delta-neutral')
@@ -259,11 +260,13 @@
                 .html(getTrendIcon(0))
                 .append($('<span>', {
                     'id': 'VAS_050_current-cash-delta-text-' + widgetId,
-                    'text': formatCurrencyAmount(0)
+                    'text': ''
                 }));
 
             $root.find('#VAS_050_current-cash-description-' + widgetId)
-                .text(getStatusText(0));
+                .text('');
+
+            $root.find('.VAS_current-cash-cash-journal-footer').hide();
         }
 
         function renderData(data) {
@@ -284,13 +287,16 @@
 
             renderCashBookOptions(data.cashBooks || []);
 
-            $root.find('#VAS_050_current-cash-state-' + widgetId).hide().text('');
+            $root.find('#VAS_050_current-cash-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_050_current-cash-title-' + widgetId).text(title);
 
             $root.find('#VAS_050_current-cash-value-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-value-positive VAS_current-cash-cash-journal-value-negative VAS_current-cash-cash-journal-value-neutral')
                 .addClass(valueClass)
-                .text(formatSignedAmount(balance, data.currencySymbol, data.currencyISO, false));
+                .text(formatSignedAmount(balance, data.currencySymbol, data.currencyISO, false))
+                .show();
+
+            $root.find('.VAS_current-cash-cash-journal-footer').show();
 
             $root.find('#VAS_050_current-cash-delta-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-delta-positive VAS_current-cash-cash-journal-delta-negative VAS_current-cash-cash-journal-delta-neutral')

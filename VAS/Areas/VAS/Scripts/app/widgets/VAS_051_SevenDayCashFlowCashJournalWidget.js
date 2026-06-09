@@ -44,10 +44,10 @@
             var $busy = $root.find('#VAS_051_cash-flow-busy-' + $self.AD_UserHomeWidgetID);
 
             if (show) {
-                $busy.show();
+                $busy.addClass('is-visible');
             }
             else {
-                $busy.hide();
+                $busy.removeClass('is-visible');
             }
         }
 
@@ -68,7 +68,7 @@
                 'class': 'VAS_051_cash-flow-busy',
                 'id': 'VAS_051_cash-flow-busy-' + widgetId,
                 'text': lbl('VAS_051_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_051_cash-flow-header'
@@ -122,7 +122,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_051_cash-flow-state',
                 'id': 'VAS_051_cash-flow-state-' + widgetId
-            }).hide();
+            });
 
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow).append($legend);
@@ -137,7 +137,7 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
 
-            $root.find('#VAS_051_cash-flow-state-' + widgetId).text(message || '').show();
+            $root.find('#VAS_051_cash-flow-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_051_cash-flow-body-' + widgetId).empty();
         }
 
@@ -198,7 +198,7 @@
             var items = data.items || [];
             var $body = $root.find('#VAS_051_cash-flow-body-' + widgetId);
 
-            $root.find('#VAS_051_cash-flow-state-' + widgetId).hide().text('');
+            $root.find('#VAS_051_cash-flow-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_051_cash-flow-title-' + widgetId).text(data.title || lbl('VAS_051_SevenDayCashFlow', '7-Day Cash Flow'));
             $root.find('#VAS_051_cash-flow-meta-' + widgetId).text(lbl('VAS_051_InVsOut', 'IN VS OUT'));
 

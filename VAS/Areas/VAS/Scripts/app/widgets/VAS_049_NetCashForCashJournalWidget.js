@@ -51,7 +51,7 @@
 
         function showBusy(show) {
             var $b = $root.find('#VAS-gljtm-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $b.show(); } else { $b.hide(); }
+            if (show) { $b.addClass('is-visible'); } else { $b.removeClass('is-visible'); }
         }
 
         function safeNumber(value) {
@@ -110,7 +110,7 @@
                 'class': 'VAS_net-cash-cash-journal-busy',
                 'id': 'VAS-gljtm-busy-' + widgetId,
                 'text': lbl('VAS_049_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_net-cash-cash-journal-row'
@@ -163,7 +163,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_net-cash-cash-journal-state',
                 'id': 'VAS_049_net-cash-state-' + widgetId
-            }).hide();
+            });
 
             $delta.append($icon).append($deltaText);
             $footer.append($delta).append($description);
@@ -181,22 +181,25 @@
 
             $root.find('#VAS_049_net-cash-state-' + widgetId)
                 .text(message || '')
-                .show();
+                .addClass('is-visible');
 
             $root.find('#VAS_049_net-cash-value-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-value-positive VAS_net-cash-cash-journal-value-negative VAS_net-cash-cash-journal-value-neutral')
                 .addClass('VAS_net-cash-cash-journal-value-neutral')
-                .text(formatSignedAmount(0));
+                .text('')
+                .hide();
 
             $root.find('#VAS_049_net-cash-delta-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-delta-positive VAS_net-cash-cash-journal-delta-negative VAS_net-cash-cash-journal-delta-neutral')
                 .addClass('VAS_net-cash-cash-journal-delta-neutral');
 
             $root.find('#VAS_049_net-cash-delta-text-' + widgetId)
-                .text(formatSignedAmount(0));
+                .text('');
 
             $root.find('#VAS_049_net-cash-description-' + widgetId)
-                .text(getStatusText(0));
+                .text('');
+
+            $root.find('.VAS_net-cash-cash-journal-footer').hide();
         }
 
         function renderData(data) {
@@ -212,14 +215,17 @@
             var valueClass = getStateClass(netAmount, 'VAS_net-cash-cash-journal-value');
             var deltaClass = getStateClass(deltaAmount, 'VAS_net-cash-cash-journal-delta');
 
-            $root.find('#VAS_049_net-cash-state-' + widgetId).hide().text('');
+            $root.find('#VAS_049_net-cash-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_049_net-cash-title-' + widgetId).text(title);
             $root.find('#VAS_049_net-cash-date-' + widgetId).text(dateText);
 
             $root.find('#VAS_049_net-cash-value-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-value-positive VAS_net-cash-cash-journal-value-negative VAS_net-cash-cash-journal-value-neutral')
                 .addClass(valueClass)
-                .text(formatSignedAmount(netAmount, data.currencySymbol, data.currencyISO));
+                .text(formatSignedAmount(netAmount, data.currencySymbol, data.currencyISO))
+                .show();
+
+            $root.find('.VAS_net-cash-cash-journal-footer').show();
 
             $root.find('#VAS_049_net-cash-delta-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-delta-positive VAS_net-cash-cash-journal-delta-negative VAS_net-cash-cash-journal-delta-neutral')

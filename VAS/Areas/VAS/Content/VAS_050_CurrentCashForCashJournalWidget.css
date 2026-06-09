@@ -204,23 +204,28 @@
     border-radius: 14px;
 }
 
+.VAS_current-cash-cash-journal-busy.is-visible {
+    display: flex;
+}
+
 .VAS_current-cash-cash-journal-state {
     position: absolute;
-    inset: auto 0.875em 0.875em 0.875em;
-    z-index: 1;
+    inset: 0;
+    z-index: 2;
     display: none;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0.5em 0.75em;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.10);
-    color: rgba(255, 255, 255, 0.68);
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    color: rgba(255, 255, 255, 0.72);
     font-size: 0.8125em;
-    line-height: 1.2;
-    font-weight: 400;
+    line-height: 1.35;
+    font-weight: 600;
     text-align: center;
+    border-radius: 14px;
+}
+
+.VAS_current-cash-cash-journal-state.is-visible {
+    display: flex;
 }
 
 @container (max-width: 18.75em) {

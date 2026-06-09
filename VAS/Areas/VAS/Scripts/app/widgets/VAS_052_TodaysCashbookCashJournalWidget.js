@@ -70,7 +70,7 @@
 
         function showBusy(show) {
             var $busy = $root.find('#VAS_052_cashbook-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $busy.show(); } else { $busy.hide(); }
+            if (show) { $busy.addClass('is-visible'); } else { $busy.removeClass('is-visible'); }
         }
 
         function buildLayout() {
@@ -90,7 +90,7 @@
                 'class': 'VAS_052_cashbook-busy',
                 'id': 'VAS_052_cashbook-busy-' + widgetId,
                 'text': lbl('VAS_052_Loading', 'Loading')
-            }).hide();
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_052_cashbook-header'
@@ -151,7 +151,7 @@
             var $state = $('<div>', {
                 'class': 'VAS_052_cashbook-state',
                 'id': 'VAS_052_cashbook-state-' + widgetId
-            }).hide();
+            });
 
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow);
@@ -166,7 +166,7 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            $root.find('#VAS_052_cashbook-state-' + widgetId).text(message || '').show();
+            $root.find('#VAS_052_cashbook-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_052_cashbook-rows-' + widgetId).empty();
         }
 
@@ -218,7 +218,7 @@
             var entries = data.entries || [];
             var $rows = $root.find('#VAS_052_cashbook-rows-' + widgetId);
 
-            $root.find('#VAS_052_cashbook-state-' + widgetId).hide().text('');
+            $root.find('#VAS_052_cashbook-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_052_cashbook-title-' + widgetId).text(data.title || lbl('VAS_052_TodaysCashbook', "Today's Cashbook"));
             $root.find('#VAS_052_cashbook-meta-' + widgetId).text(data.metaText || entries.length + ' ' + lbl('VAS_052_Entries', 'entries'));
             $root.find('#VAS_052_cashbook-action-' + widgetId).text(data.actionText || lbl('VAS_052_Entry', '+ Entry'));
