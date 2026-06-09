@@ -61,15 +61,12 @@
 
             var $footer = $('<div class="vas-finance-kpi-footer">');
 
-            var $badge = $('<div class="vas-finance-kpi-badge">').text(
-                lbl('VAS_027_messageWhy', 'WHY')
-            );
 
             var $description = $('<div class="vas-finance-kpi-desc">').text(
                 lbl('VAS_027_messageAPPaymentClearedWhy', "Of last month's AP payments reconciled")
             );
 
-            $footer.append($badge).append($description);
+            $footer.append($description);
 
             $card.append($header).append($body).append($footer);
 

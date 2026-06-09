@@ -6,11 +6,10 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Payment methods                      | VAS_033_MessagePaymentMethods
- *  2  | WHY                                  | VAS_033_MessageWhy
- *  3  | UPI is cheapest · shift sub-₹2L payments where possible | VAS_033_MessagePaymentMethodWhy
- *  4  | Loading                              | VAS_033_MessageLoading
- *  5  | No Data                              | VAS_033_MessageNoData
- *  6  | Not Specified                        | VAS_033_MessageNotSpecified
+ *  2  | UPI is cheapest · shift sub-₹2L payments where possible | VAS_033_MessagePaymentMethodWhy
+ *  3  | Loading                              | VAS_033_MessageLoading
+ *  4  | No Data                              | VAS_033_MessageNoData
+ *  5  | Not Specified                        | VAS_033_MessageNotSpecified
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -58,10 +57,10 @@
             $body = $('<div class="vas-payment-methods-body">');
 
             $foot = $('<div class="vas-payment-methods-foot">');
-            var $whyTag = $('<span class="vas-payment-methods-why-tag">').text(lbl('VAS_033_MessageWhy', 'WHY'));
+          
             var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'UPI is cheapest · shift sub-₹2L payments where possible'));
 
-            $foot.append($whyTag).append($whyText);
+            $foot.append($whyText);
 
             $card.append($head).append($body).append($foot);
             $root.empty().append($card);

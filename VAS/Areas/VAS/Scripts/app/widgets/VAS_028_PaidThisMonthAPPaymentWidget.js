@@ -10,13 +10,12 @@
 * ----+-----------------------------------------------------+------------------------------+-----------------------------------------------------
 *  1  | Paid this month                                     | VAS_028_MessagePaidThisMonth | Paid this month
 *  2  | Cash paid                                           | VAS_028_MessageCashPaid      | Cash paid
-*  3  | WHY                                                 | VAS_028_MessageWhy           | WHY
-*  4  | Paid to                                             | VAS_028_MessagePaidTo        | Paid to
-*  5  | vendor / vendors                                    | VAS_028_MessageVendor / VAS_028_MessageVendors | vendor / vendors
-*  6  | so far this month.                                  | VAS_028_MessageSoFarThisMonth | so far this month.
-*  7  | Loading                                             | VAS_028_MessageLoading       | Loading
-*  8  | No Data                                             | VAS_028_MessageNoData        | No Data
-*  9  | No payments this month.                             | VAS_028_MessageNoPaymentsThisMonth | No payments this month.
+*  3  | Paid to                                             | VAS_028_MessagePaidTo        | Paid to
+*  4  | vendor / vendors                                    | VAS_028_MessageVendor / VAS_028_MessageVendors | vendor / vendors
+*  5  | so far this month.                                  | VAS_028_MessageSoFarThisMonth | so far this month.
+*  6  | Loading                                             | VAS_028_MessageLoading       | Loading
+*  7  | No Data                                             | VAS_028_MessageNoData        | No Data
+*  8  | No payments this month.                             | VAS_028_MessageNoPaymentsThisMonth | No payments this month.
 * ──────────────────────────────────────────────────────────────────────────────────────
 */
 
@@ -93,16 +92,13 @@
 
             var $why = $('<div class="vas-ptm-why-wrap">');
 
-            var $pill = $('<span class="vas-ptm-why-pill">').text(
-                lbl('VAS_028_MessageWhy', 'WHY')
-            );
 
             $whyText = $('<span>')
                 .attr('id', 'vis-ptm-why-' + uid)
                 .addClass('vas-ptm-why-text')
                 .text(lbl('VAS_028_MessageLoading', 'Loading'));
 
-            $why.append($pill).append($whyText);
+            $why.append($whyText);
             $card.append($header).append($body).append($why);
             $root.empty().append($card);
 

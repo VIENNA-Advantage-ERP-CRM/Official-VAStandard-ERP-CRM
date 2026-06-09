@@ -6,11 +6,10 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Scheduled                            | VAS_029_MessageScheduled
- *  2  | WHY                                  | VAS_029_MessageWhy
- *  3  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
- *  4  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
- *  5  | Loading                              | VAS_029_MessageLoading
- *  6  | No Data                              | VAS_029_MessageNoData
+ *  2  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
+ *  3  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
+ *  4  | Loading                              | VAS_029_MessageLoading
+ *  5  | No Data                              | VAS_029_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -70,13 +69,11 @@
             $body.append($value);
 
             var $footer = $('<div class="vas-scheduled-ap-payment-footer">');
-            var $badge = $('<div class="vas-scheduled-ap-payment-badge">').text(
-                lbl('VAS_029_MessageWhy', 'WHY')
-            );
+         
 
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
 
-            $footer.append($badge).append($description);
+            $footer.append($description);
             $card.append($header).append($body).append($footer);
             $root.empty().append($card);
         }
