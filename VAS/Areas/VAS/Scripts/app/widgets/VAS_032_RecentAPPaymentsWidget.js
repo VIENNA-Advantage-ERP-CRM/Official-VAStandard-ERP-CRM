@@ -7,16 +7,14 @@
  * ----+--------------------------------------+--------------------------------
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
  *  2  | + New payment                        | VAS_032_MessageNewPayment
- *  3  | {0} payments auto-matched to bills   | VAS_032_MessagePaymentsAutoMatchedToBills
- *  4  | Aura reconciled {0} based on amount + vendor | VAS_032_MessageAuraReconciledBasedOnAmountVendor
- *  5  | Date                                 | VAS_032_MessageDate
- *  6  | Vendor                               | VAS_032_MessageVendor
- *  7  | Method                               | VAS_032_MessageMethod
- *  8  | Ref                                  | VAS_032_MessageRef
- *  9  | Status                               | VAS_032_MessageStatus
- * 10  | Amount                               | VAS_032_MessageAmount
- * 11  | Loading                              | VAS_032_MessageLoading
- * 12  | No Data                              | VAS_032_MessageNoData
+ *  3  | Date                                 | VAS_032_MessageDate
+ *  4  | Vendor                               | VAS_032_MessageVendor
+ *  5  | Method                               | VAS_032_MessageMethod
+ *  6  | Ref                                  | VAS_032_MessageRef
+ *  7  | Status                               | VAS_032_MessageStatus
+ *  8  | Amount                               | VAS_032_MessageAmount
+ *  9  | Loading                              | VAS_032_MessageLoading
+ * 10  | No Data                              | VAS_032_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -129,29 +127,9 @@
                 return;
             }
 
-            renderBanner(data);
             renderTable(payments);
         }
 
-        function renderBanner(data) {
-            var count = Number(data.autoMatchedCount || 0);
-            var refs = $.isArray(data.autoMatchedRefs) ? data.autoMatchedRefs.join(', ') : '';
-
-            if (count <= 0) {
-                $banner.hide();
-                return;
-            }
-
-            $banner.show();
-
-            $bannerTitle.text(
-                lbl('VAS_032_MessagePaymentsAutoMatchedToBills', '{0} payments auto-matched to bills').replace('{0}', count.toLocaleString(window.navigator.language))
-            );
-
-            $bannerSub.text(
-                lbl('VAS_032_MessageAuraReconciledBasedOnAmountVendor', 'Aura reconciled {0} based on amount + vendor').replace('{0}', refs || count.toLocaleString(window.navigator.language))
-            );
-        }
 
         function renderTable(payments) {
             var $table = $('<table class="vas-recent-ap-payments-table">');

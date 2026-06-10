@@ -91,16 +91,16 @@
             $strong = $('<div class="vas-reconciliation-status-strong">');
             $subText = $('<div class="vas-reconciliation-status-subtext">');
 
-            var $action = $('<button type="button" class="vas-reconciliation-status-action">');
-            var $actionIcon = $(
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-                '<line x1="7" y1="17" x2="17" y2="7"></line>' +
-                '<polyline points="7 7 17 7 17 17"></polyline>' +
-                '</svg>'
-            );
+            //var $action = $('<button type="button" class="vas-reconciliation-status-action">');
+            //var $actionIcon = $(
+            //    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+            //    '<line x1="7" y1="17" x2="17" y2="7"></line>' +
+            //    '<polyline points="7 7 17 7 17 17"></polyline>' +
+            //    '</svg>'
+            //);
 
-            $action.append(document.createTextNode(lbl('VAS_046_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
-            $meta.append($strong).append($subText).append($action);
+            //$action.append(document.createTextNode(lbl('VAS_046_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
+            $meta.append($strong).append($subText);
 
             $body.append($donut).append($meta);
             $state = $('<div class="vas-reconciliation-status-state">').hide();

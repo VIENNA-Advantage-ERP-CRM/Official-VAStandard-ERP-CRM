@@ -71,7 +71,7 @@
             setLoading();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_031_UpcomingAPRunsWidget/GetUpcomingAPRuns',
+                url: VIS.Application.contextUrl + 'VAS_033_UpcomingAPRunsWidget/GetUpcomingAPRuns',
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
@@ -120,7 +120,7 @@
             var paymentMethodName = run.paymentMethodName || lbl('VAS_031_MessageNotSpecified', 'Not Specified');
             var paymentCount = Number(run.paymentCount || 0);
             var amount = Number(run.totalAmount || 0);
-            var dueDateText = formatDate(run.dueDate);
+            var dueDateText = run.dueDateText || formatDate(run.dueDate);
             var titleText = getRunTitle(paymentMethodName, run.vendorName, paymentCount);
             var metaText = dueDateText + ' · ' + paymentCount.toLocaleString(window.navigator.language) + ' ' + getPaymentLabel(paymentCount);
             var barClass = getPaymentMethodClass(paymentMethodName);
@@ -130,7 +130,7 @@
             var $info = $('<div class="vas-upcoming-ap-runs-info">');
             var $title = $('<div class="vas-upcoming-ap-runs-run-title">').text(titleText);
             var $meta = $('<div class="vas-upcoming-ap-runs-meta">').text(metaText);
-            var $amount = $('<span class="vas-upcoming-ap-runs-amount">').text(formatCurrencyAmount(amount, run.currencySymbol, run.currencyISO));
+            var $amount = $('<span class="vas-upcoming-ap-runs-amount">').text(formatCurrencyAmount(amount, run.currencySymbol, run.currencyISO, run.stdPrecision));
 
             $info.append($title).append($meta);
             $row.append($bar).append($info).append($amount);
@@ -181,6 +181,11 @@
 
             var date = new Date(value);
 
+            if (typeof value === 'string' && value.indexOf('/Date(') === 0) {
+                var timestamp = Number(value.replace(/[^0-9-]/g, ''));
+                date = new Date(timestamp);
+            }
+
             if (isNaN(date.getTime())) {
                 return value;
             }
@@ -192,22 +197,28 @@
             });
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {
             var numericValue = Number(value || 0);
-            var stdPrecision = 2;
+            var precision = Number(stdPrecision);
 
-            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            if (isNaN(precision) && VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                precision = Number(VIS.Env.getCtx().getStdPrecision());
             }
 
-            if (isNaN(stdPrecision) || stdPrecision < 0) {
-                stdPrecision = 2;
+            if (isNaN(precision) || precision < 0) {
+                precision = 2;
             }
 
-            return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
+            var amount = numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
             });
+
+            if (currencySymbol) {
+                return currencySymbol + amount;
+            }
+
+            return currencyISO ? amount + ' ' + currencyISO : amount;
         }
 
         function setLoading() {

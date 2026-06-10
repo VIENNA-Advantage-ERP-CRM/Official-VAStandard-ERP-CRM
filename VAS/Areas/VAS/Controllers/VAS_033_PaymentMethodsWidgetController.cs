@@ -13,16 +13,21 @@ namespace VAS.Controllers
     /*
      * Labels / Message Keys
      * 1 | Payment methods                                        | VAS_033_MessagePaymentMethods
-     * 2 | WHY                                                    | VAS_033_MessageWhy
-     * 3 | UPI is cheapest - shift sub-2L payments where possible | VAS_033_MessagePaymentMethodWhy
-     * 4 | Not Specified                                          | VAS_033_MessageNotSpecified
+     * 2 | UPI is cheapest - shift sub-2L payments where possible | VAS_033_MessagePaymentMethodWhy
+     * 3 | Not Specified                                          | VAS_033_MessageNotSpecified
      */
     public class VAS_033_PaymentMethodsWidgetController : Controller
     {
+        private const string PeriodFilterMonth = "MONTH";
+        private const string PeriodFilterYTD = "YTD";
+
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetPaymentMethods()
         {
+
+            string periodFilter = PeriodFilterMonth;
+
             if (Session["ctx"] == null)
             {
                 return Json(new
@@ -38,8 +43,15 @@ namespace VAS.Controllers
             try
             {
                 DateTime today = DateTime.Today;
-                DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
-                DateTime dateTo = dateFrom.AddMonths(1);
+
+                if (string.IsNullOrEmpty(periodFilter))
+                {
+                    periodFilter = PeriodFilterMonth;
+                }
+
+                periodFilter = periodFilter.ToUpper();
+
+                bool isYTD = periodFilter == PeriodFilterYTD;
 
                 bool hasPaymentMethod = HasPaymentMethodColumn();
                 bool hasPaymentMethodName = hasPaymentMethod && HasPaymentMethodNameColumn();
@@ -72,7 +84,7 @@ namespace VAS.Controllers
                     }
                 }
 
-                string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
+                string dateSql = GetDatabaseDate(today);
 
                 string schemaCurrencySql = @"
                     SELECT ClientInfo.AD_Client_ID,
@@ -84,71 +96,109 @@ namespace VAS.Controllers
                                ELSE Currency.ISO_Code
                            END AS Cur_Symbol
                     FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                    INNER JOIN C_Currency Currency
-                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
+                    INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+                    INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+                    WHERE ClientInfo.AD_Client_ID = " + ctx.GetAD_Client_ID();
 
-                string baseSql = @"
-                    SELECT
-                        " + paymentMethodSelect + @" AS PaymentMethodName,
-                        COUNT(1) AS PaymentCount,
-                        ROUND(
-                            COALESCE(
-                                SUM(
-                                    CASE
-                                        WHEN p.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(p.PayAmt, 0)
-                                        ELSE CurrencyConvert(
-                                            COALESCE(p.PayAmt, 0),
-                                            p.C_Currency_ID,
-                                            SchemaCurrency.C_Currency_ID,
-                                            p.DateAcct,
-                                            p.C_ConversionType_ID,
-                                            p.AD_Client_ID,
-                                            p.AD_Org_ID
-                                        )
-                                    END
-                                ),
-                                0
-                            ),
-                            MAX(SchemaCurrency.StdPrecision)
-                        ) AS PaymentAmount
+                string currentPeriodSql = @"
+                    SELECT Period.C_Period_ID,
+                           Period.C_Year_ID,
+                           Period.StartDate,
+                           Period.EndDate
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+                    INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
+                    WHERE ClientInfo.IsActive = 'Y'
+                    AND ClientInfo.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
+                    AND " + dateSql + @" BETWEEN Period.StartDate AND Period.EndDate";
+
+                string periodRangeSql;
+
+                if (isYTD)
+                {
+                    periodRangeSql = @"
+                    SELECT MIN(Period.StartDate) AS StartDate,
+                           MAX(CurrentPeriod.EndDate) AS EndDate
+                    FROM CurrentPeriod CurrentPeriod
+                    INNER JOIN C_Period Period ON (Period.C_Year_ID = CurrentPeriod.C_Year_ID)
+                    WHERE Period.StartDate <= CurrentPeriod.EndDate";
+                }
+                else
+                {
+                    periodRangeSql = @"
+                    SELECT CurrentPeriod.StartDate,
+                           CurrentPeriod.EndDate
+                    FROM CurrentPeriod CurrentPeriod";
+                }
+
+                string paymentBaseSql = @"
+                    SELECT " + paymentMethodSelect + @" AS PaymentMethodName,
+                           COUNT(1) AS PaymentCount,
+                           ROUND(
+                               COALESCE(
+                                   SUM(
+                                       CASE
+                                           WHEN p.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(p.PayAmt, 0)
+                                           ELSE CurrencyConvert(
+                                               COALESCE(p.PayAmt, 0),
+                                               p.C_Currency_ID,
+                                               SchemaCurrency.C_Currency_ID,
+                                               p.DateAcct,
+                                               p.C_ConversionType_ID,
+                                               p.AD_Client_ID,
+                                               p.AD_Org_ID
+                                           )
+                                       END
+                                   ),
+                                   0
+                               ),
+                               MAX(SchemaCurrency.StdPrecision)
+                           ) AS PaymentAmount
                     FROM C_Payment p
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON SchemaCurrency.AD_Client_ID = p.AD_Client_ID
+                    INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID = p.AD_Client_ID)
                     " + paymentMethodJoin + @"
+                    INNER JOIN PeriodRange PeriodRange ON (p.DateAcct BETWEEN PeriodRange.StartDate AND PeriodRange.EndDate)
                     WHERE p.IsActive = 'Y'
                     AND p.IsReceipt = 'N'
-                    AND p.DocStatus IN ('CO', 'CL')
-                    "
-                    + dateFilter + @"
-                ";
+                    AND p.DocStatus IN ('CO', 'CL')";
 
-                baseSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    baseSql,
+                /*
+                 * MRole Rule:
+                 * Apply role access only on the main physical table alias.
+                 * Main physical table: C_Payment p
+                 *
+                 * Do not apply MRole on:
+                 * - Final WITH query
+                 * - SchemaCurrency CTE
+                 * - CurrentPeriod CTE
+                 * - PeriodRange CTE
+                 * - VA009_PaymentMethod pm join alias
+                 */
+                paymentBaseSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    paymentBaseSql,
                     "p",
                     MRole.SQL_FULLYQUALIFIED,
                     MRole.SQL_RO
                 );
 
-                string paymentMethodsSql = @"
-                    SELECT
-                        PaymentMethodName,
-                        PaymentCount,
-                        PaymentAmount
-                    FROM (
-                        " + baseSql + @"
-                        GROUP BY " + paymentMethodGroupBy + @"
-                    ) x
-                    ORDER BY PaymentAmount DESC";
-
                 string sql = @"
                     WITH SchemaCurrency AS (
                         " + schemaCurrencySql + @"
+                    ),
+                    CurrentPeriod AS (
+                        " + currentPeriodSql + @"
+                    ),
+                    PeriodRange AS (
+                        " + periodRangeSql + @"
                     )
-                    " + paymentMethodsSql;
+                    SELECT PaymentData.PaymentMethodName,
+                           PaymentData.PaymentCount,
+                           PaymentData.PaymentAmount
+                    FROM (" + paymentBaseSql + @"
+                        GROUP BY " + paymentMethodGroupBy + @"
+                    ) PaymentData
+                    ORDER BY PaymentData.PaymentAmount DESC";
 
-         
                 dr = DB.ExecuteReader(sql);
 
                 List<PaymentMethodSummary> rows = new List<PaymentMethodSummary>();
@@ -195,14 +245,16 @@ namespace VAS.Controllers
                     });
                 }
 
+                DateRangeResult dateRange = GetPeriodDateRange(ctx, today, isYTD);
+
                 return Json(new
                 {
                     title = GetMsg(ctx, "VAS_033_MessagePaymentMethods", "Payment methods"),
-                    why = GetMsg(ctx, "VAS_033_MessageWhy", "WHY"),
                     description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "UPI is cheapest · shift sub-₹2L payments where possible"),
                     totalAmount = totalAmount,
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(dateTo.AddDays(-1)),
+                    dateFrom = FormatDate(dateRange.DateFrom),
+                    dateTo = FormatDate(dateRange.DateTo),
+                    periodFilter = isYTD ? PeriodFilterYTD : PeriodFilterMonth,
                     methods = methods
                 }, JsonRequestBehavior.AllowGet);
             }
@@ -230,8 +282,7 @@ namespace VAS.Controllers
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
                 WHERE t.TableName = 'C_Payment'
-                AND c.ColumnName = 'VA009_PaymentMethod_ID'
-            ";
+                AND c.ColumnName = 'VA009_PaymentMethod_ID'";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
@@ -243,8 +294,7 @@ namespace VAS.Controllers
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
                 WHERE t.TableName = 'VA009_PaymentMethod'
-                AND c.ColumnName = 'Name'
-            ";
+                AND c.ColumnName = 'Name'";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
@@ -256,29 +306,93 @@ namespace VAS.Controllers
                 FROM AD_Table t
                 INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
                 WHERE t.TableName = 'VA009_PaymentMethod'
-                AND c.ColumnName = 'Value'
-            ";
+                AND c.ColumnName = 'Value'";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private DateRangeResult GetPeriodDateRange(Ctx ctx, DateTime dateAcct, bool isYTD)
         {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
+            string dateSql = GetDatabaseDate(dateAcct);
+
+            string sql;
+
+            if (isYTD)
+            {
+                sql = @"
+                    WITH CurrentPeriod AS (
+                        SELECT Period.C_Year_ID,
+                               Period.EndDate
+                        FROM AD_ClientInfo ClientInfo
+                        INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+                        INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
+                        WHERE ClientInfo.IsActive = 'Y'
+                        AND ClientInfo.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
+                        AND " + dateSql + @" BETWEEN Period.StartDate AND Period.EndDate
+                    )
+                    SELECT MIN(Period.StartDate) AS DateFrom,
+                           MAX(CurrentPeriod.EndDate) AS DateTo
+                    FROM CurrentPeriod CurrentPeriod
+                    INNER JOIN C_Period Period ON (Period.C_Year_ID = CurrentPeriod.C_Year_ID)
+                    WHERE Period.StartDate <= CurrentPeriod.EndDate";
+            }
+            else
+            {
+                sql = @"
+                    SELECT Period.StartDate AS DateFrom,
+                           Period.EndDate AS DateTo
+                    FROM AD_ClientInfo ClientInfo
+                    INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+                    INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
+                    WHERE ClientInfo.IsActive = 'Y'
+                    AND ClientInfo.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
+                    AND " + dateSql + @" BETWEEN Period.StartDate AND Period.EndDate";
+            }
+
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql);
+
+                if (dr.Read())
+                {
+                    return new DateRangeResult
+                    {
+                        DateFrom = Util.GetValueOfDateTime(dr["DateFrom"]) ?? DateTime.Now,
+                        DateTo = Util.GetValueOfDateTime(dr["DateTo"]) ?? DateTime.Now
+                    };
+                }
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+
+            DateTime fallbackDateFrom = new DateTime(dateAcct.Year, dateAcct.Month, 1);
+            DateTime fallbackDateTo = fallbackDateFrom.AddMonths(1).AddDays(-1);
+
+            return new DateRangeResult
+            {
+                DateFrom = fallbackDateFrom,
+                DateTo = fallbackDateTo
+            };
+        }
+
+        private string GetDatabaseDate(DateTime date)
+        {
+            string dateText = FormatDate(date);
 
             if (DB.IsOracle())
             {
-                return @"
-                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
-                ";
+                return "TO_DATE('" + dateText + "', 'YYYY-MM-DD')";
             }
 
-            return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
-            ";
+            return "DATE '" + dateText + "'";
         }
 
         private string FormatDate(DateTime date)
@@ -289,6 +403,7 @@ namespace VAS.Controllers
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
+
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;
@@ -299,6 +414,12 @@ namespace VAS.Controllers
             public string PaymentMethodName { get; set; }
             public int PaymentCount { get; set; }
             public decimal PaymentAmount { get; set; }
+        }
+
+        private class DateRangeResult
+        {
+            public DateTime DateFrom { get; set; }
+            public DateTime DateTo { get; set; }
         }
     }
 }
