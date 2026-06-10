@@ -166,12 +166,7 @@
             var percentage = Number(data.matchedPercentage);
             var manualCount = Number(data.manualMatchCount || 0);
 
-            if (isNaN(percentage) || percentage <= 0) {
-                setNoData();
-                return;
-            }
-
-            if (percentage < 0) {
+            if (isNaN(percentage) || percentage < 0) {
                 percentage = 0;
             }
 
