@@ -148,7 +148,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     border-bottom: 1px solid rgba(228, 237, 244, 0.72);
-    text-align: left;
+    text-align: left !important;
 }
 
 .VAS_052_cashbook-table th {
