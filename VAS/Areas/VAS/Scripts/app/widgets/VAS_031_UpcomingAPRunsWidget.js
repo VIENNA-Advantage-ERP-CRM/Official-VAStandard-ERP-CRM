@@ -125,7 +125,7 @@
         function renderData(data) {
             var runs = $.isArray(data.runs)
                 ? $.grep(data.runs, function (run) {
-                    var amount = Number(run.totalAmount || 0);
+                    var amount = Number(pickRunValue(run, 'totalAmount', 'amount') || 0);
                     var paymentCount = Number(run.paymentCount || 0);
 
                     return (!isNaN(amount) && amount > 0) || (!isNaN(paymentCount) && paymentCount > 0);
@@ -148,23 +148,45 @@
         function createRunRow(run) {
             var paymentMethodName = run.paymentMethodName || lbl('VAS_031_MessageNotSpecified', 'Not Specified');
             var paymentCount = Number(run.paymentCount || 0);
-            var amount = Number(run.totalAmount || 0);
-            var dueDateText = run.dueDateText || formatDate(run.dueDate);
+            var amount = Number(pickRunValue(run, 'totalAmount', 'amount') || 0);
+            var dueDateText = pickRunValue(run, 'dueDateText', 'runDateText') || formatDate(pickRunValue(run, 'dueDate', 'runDate'));
             var titleText = getRunTitle(paymentMethodName, run.vendorName, paymentCount);
-            var metaText = dueDateText + ' · ' + paymentCount.toLocaleString(window.navigator.language) + ' ' + getPaymentLabel(paymentCount);
+            var metaParts = [];
             var barClass = getPaymentMethodClass(paymentMethodName);
+
+            if (dueDateText) {
+                metaParts.push(dueDateText);
+            }
+
+            metaParts.push(paymentCount.toLocaleString(window.navigator.language) + ' ' + getPaymentLabel(paymentCount));
 
             var $row = $('<div class="vas-upcoming-ap-runs-row">');
             var $bar = $('<span class="vas-upcoming-ap-runs-bar">').addClass(barClass);
             var $info = $('<div class="vas-upcoming-ap-runs-info">');
             var $title = $('<div class="vas-upcoming-ap-runs-run-title">').text(titleText);
-            var $meta = $('<div class="vas-upcoming-ap-runs-meta">').text(metaText);
+            var $meta = $('<div class="vas-upcoming-ap-runs-meta">').text(metaParts.join(' · '));
             var $amount = $('<span class="vas-upcoming-ap-runs-amount">').text(formatCurrencyAmount(amount, run.currencySymbol, run.currencyISO, run.stdPrecision));
 
             $info.append($title).append($meta);
             $row.append($bar).append($info).append($amount);
 
             return $row;
+        }
+
+        function pickRunValue(run, camelName, fallbackName) {
+            if (!run) {
+                return null;
+            }
+
+            if (run[camelName] !== undefined && run[camelName] !== null && run[camelName] !== '') {
+                return run[camelName];
+            }
+
+            if (run[fallbackName] !== undefined && run[fallbackName] !== null && run[fallbackName] !== '') {
+                return run[fallbackName];
+            }
+
+            return null;
         }
 
         function getRunTitle(paymentMethodName, vendorName, paymentCount) {
