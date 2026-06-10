@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -25,73 +26,45 @@ namespace VAS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
+
+            if (ctx == null)
+            {
+                return Json(new
+                {
+                    error = "Session Expired",
+                    errorText = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
             IDataReader dr = null;
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
-                DateTime dateTo = dateFrom.AddMonths(1);
+                SqlQueryData queryData = BuildReconciliationStatusSql(ctx);
 
-                string dateFilter = GetDateFilter("p.DateAcct", dateFrom, dateTo);
-
-                string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID
-                    INNER JOIN C_Currency Currency
-                        ON AcctSchema.C_Currency_ID = Currency.C_Currency_ID";
-
-                string reconciliationSql = @"
-                    SELECT
-                        COUNT(1) AS TotalPayments,
-                        SUM(
-                            CASE
-                                WHEN COALESCE(p.IsReconciled, 'N') = 'Y'
-                                THEN 1
-                                ELSE 0
-                            END
-                        ) AS MatchedPayments
-                    FROM C_Payment p
-                    WHERE p.IsActive = 'Y'
-                    AND p.IsReceipt = 'N'
-                    AND p.DocStatus IN ('CO', 'CL')
-                    "
-                    + dateFilter + @"
-                ";
-
-                reconciliationSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    reconciliationSql,
-                    "p",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
-
-                string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    )
-                    " + reconciliationSql;
-
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 int totalPayments = 0;
                 int matchedPayments = 0;
                 int manualMatchCount = 0;
                 decimal matchedPercentage = 0;
+                DateTime? dateFrom = null;
+                DateTime? dateTo = null;
 
-                if (dr.Read())
+                if (dr != null && dr.Read())
                 {
                     totalPayments = Util.GetValueOfInt(dr["TotalPayments"]);
                     matchedPayments = Util.GetValueOfInt(dr["MatchedPayments"]);
+
+                    if (dr["DateFrom"] != DBNull.Value)
+                    {
+                        dateFrom = Util.GetValueOfDateTime(dr["DateFrom"]);
+                    }
+
+                    if (dr["DateTo"] != DBNull.Value)
+                    {
+                        dateTo = Util.GetValueOfDateTime(dr["DateTo"]);
+                    }
                 }
 
                 if (totalPayments > 0)
@@ -109,15 +82,16 @@ namespace VAS.Controllers
                     totalPayments = totalPayments,
                     manualMatchCount = manualMatchCount,
                     matchedPercentage = matchedPercentage,
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(dateTo.AddDays(-1))
+                    dateFrom = dateFrom.HasValue ? FormatDate(dateFrom.Value) : "",
+                    dateTo = dateTo.HasValue ? FormatDate(dateTo.Value) : ""
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
             {
                 return Json(new
                 {
-                    error = ex.Message
+                    error = ex.Message,
+                    errorText = ex.Message
                 }, JsonRequestBehavior.AllowGet);
             }
             finally
@@ -130,23 +104,72 @@ namespace VAS.Controllers
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private SqlQueryData BuildReconciliationStatusSql(Ctx ctx)
         {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
+            string periodRangeSql = @"
+PeriodRange AS
+(
+SELECT
+MIN(Period.StartDate) AS DateFrom,
+MAX(Period.EndDate) AS DateTo,
+CAST(MAX(Period.EndDate) AS TIMESTAMP) + INTERVAL '1' DAY AS DateToExclusive
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND CAST(CURRENT_TIMESTAMP AS TIMESTAMP) >= CAST(Period.StartDate AS TIMESTAMP)
+AND CAST(CURRENT_TIMESTAMP AS TIMESTAMP) < CAST(Period.EndDate AS TIMESTAMP) + INTERVAL '1' DAY
+)";
 
-            if (DB.IsOracle())
+            string paymentFilteredSql = @"
+SELECT
+Payment.C_Payment_ID,
+Payment.IsReconciled,
+Payment.DateAcct
+FROM C_Payment Payment
+WHERE Payment.IsActive = 'Y'
+AND Payment.IsReceipt = 'N'
+AND Payment.DocStatus IN ('CO', 'CL')";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_Payment Payment.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             */
+            paymentFilteredSql = MRole.GetDefault(ctx).AddAccessSQL(
+                paymentFilteredSql,
+                "Payment",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string sql = @"
+WITH " + periodRangeSql + @",
+PaymentFiltered AS
+(
+" + paymentFilteredSql + @"
+)
+SELECT
+COUNT(Payment.C_Payment_ID) AS TotalPayments,
+COALESCE(SUM(CASE WHEN COALESCE(Payment.IsReconciled, 'N') = 'Y' THEN 1 ELSE 0 END), 0) AS MatchedPayments,
+MIN(PeriodRange.DateFrom) AS DateFrom,
+MAX(PeriodRange.DateTo) AS DateTo
+FROM PaymentFiltered Payment
+INNER JOIN PeriodRange ON (Payment.DateAcct >= PeriodRange.DateFrom AND Payment.DateAcct < PeriodRange.DateToExclusive)";
+
+            SqlParameter[] parameters = new SqlParameter[]
             {
-                return @"
-                    AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-                    AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')
-                ";
-            }
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
 
-            return @"
-                AND " + columnName + @" >= DATE '" + dateFromText + @"'
-                AND " + columnName + @" < DATE '" + dateToText + @"'
-            ";
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
         }
 
         private string FormatDate(DateTime date)
@@ -157,9 +180,16 @@ namespace VAS.Controllers
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
+
             return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
                 ? msg
                 : fallback;
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }

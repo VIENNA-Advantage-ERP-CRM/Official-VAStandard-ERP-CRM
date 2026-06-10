@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -25,7 +25,8 @@ namespace VAS.Controllers
     public class VAS_030_BouncedAPPaymentWidgetController : Controller
     {
         /// <summary>
-        /// Gets outgoing AP payments marked as bounced during the current calendar month.
+        /// Gets outgoing AP payments marked as bounced during the current financial period.
+        /// Period is based on C_Period calendar linked with AD_ClientInfo.
         /// </summary>
         /// <returns>Bounced AP payment count and reporting date range.</returns>
         [AjaxAuthorizeAttribute]
@@ -56,40 +57,27 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateFrom = new DateTime(today.Year, today.Month, 1);
-                DateTime dateTo = dateFrom.AddMonths(1);
-                int adClientId = ctx.GetAD_Client_ID();
-                string executionStatusFilter = HasPaymentExecutionStatusColumn()
-                    ? @"
-AND COALESCE(p.VA009_ExecutionStatus,'')='B'"
-                    : string.Empty;
+                SqlQueryData queryData = BuildBouncedAPPaymentsSql(ctx);
 
-                string sql = @"
-SELECT
-    COUNT(1) AS BouncedPaymentCount
-FROM C_Payment p
-WHERE p.IsActive='Y'
-AND p.AD_Client_ID=" + adClientId + @"
-AND p.IsReceipt='N'
-AND p.DateAcct>=" + GetDateValue(dateFrom) + @"
-AND p.DateAcct<" + GetDateValue(dateTo) + @"
-" + executionStatusFilter;
-
-                sql = MRole.GetDefault(ctx).AddAccessSQL(
-                    sql,
-                    "p",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
-
-                dr = DB.ExecuteReader(sql);
+                dr = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 int bouncedPaymentCount = 0;
+                DateTime? dateFrom = null;
+                DateTime? dateTo = null;
 
                 if (dr != null && dr.Read())
                 {
                     bouncedPaymentCount = Util.GetValueOfInt(dr["BouncedPaymentCount"]);
+
+                    if (dr["DateFrom"] != DBNull.Value)
+                    {
+                        dateFrom = Util.GetValueOfDateTime(dr["DateFrom"]);
+                    }
+
+                    if (dr["DateTo"] != DBNull.Value)
+                    {
+                        dateTo = Util.GetValueOfDateTime(dr["DateTo"]);
+                    }
                 }
 
                 return Json(new
@@ -99,8 +87,8 @@ AND p.DateAcct<" + GetDateValue(dateTo) + @"
                     description = GetMsg(ctx, "VAS_030_MessageNeedReissue", "Need re-issue"),
                     value = bouncedPaymentCount,
                     bouncedPaymentCount = bouncedPaymentCount,
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(dateTo.AddDays(-1))
+                    dateFrom = dateFrom.HasValue ? FormatDate(dateFrom.Value) : "",
+                    dateTo = dateTo.HasValue ? FormatDate(dateTo.Value) : ""
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -121,27 +109,88 @@ AND p.DateAcct<" + GetDateValue(dateTo) + @"
             }
         }
 
-        private string GetDateValue(DateTime date)
+        private SqlQueryData BuildBouncedAPPaymentsSql(Ctx ctx)
         {
-            string dateText = date.ToString("yyyy-MM-dd");
+            string bouncedStatusFilter = HasPaymentExecutionStatusColumn()
+                ? "AND Payment.VA009_ExecutionStatus = 'B'"
+                : "AND 1 = 2";
 
-            if (DB.IsOracle())
+            string periodRangeSql = @"
+PeriodRange AS
+(
+SELECT
+MIN(Period.StartDate) AS DateFrom,
+MAX(Period.EndDate) AS DateTo,
+MAX(CAST(Period.EndDate AS TIMESTAMP) + INTERVAL '1' DAY) AS DateToExclusive
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND CAST(CURRENT_TIMESTAMP AS TIMESTAMP) >= CAST(Period.StartDate AS TIMESTAMP)
+AND CAST(CURRENT_TIMESTAMP AS TIMESTAMP) < CAST(Period.EndDate AS TIMESTAMP) + INTERVAL '1' DAY
+)";
+
+            string paymentAccessSql = @"
+SELECT
+Payment.C_Payment_ID,
+Payment.DateAcct
+FROM C_Payment Payment
+WHERE Payment.IsActive = 'Y'
+AND Payment.IsReceipt = 'N'
+" + bouncedStatusFilter;
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_Payment Payment.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             */
+            paymentAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                paymentAccessSql,
+                "Payment",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string paymentFilteredSql = @"
+PaymentFiltered AS
+(
+" + paymentAccessSql + @"
+)";
+
+            string sql = @"
+WITH " + periodRangeSql + @",
+" + paymentFilteredSql + @"
+SELECT
+COUNT(Payment.C_Payment_ID) AS BouncedPaymentCount,
+MIN(PeriodRange.DateFrom) AS DateFrom,
+MAX(PeriodRange.DateTo) AS DateTo
+FROM PaymentFiltered Payment
+INNER JOIN PeriodRange ON (Payment.DateAcct >= PeriodRange.DateFrom AND Payment.DateAcct < PeriodRange.DateToExclusive)";
+
+            SqlParameter[] parameters = new SqlParameter[]
             {
-                return "TO_DATE('" + dateText + "', 'YYYY-MM-DD')";
-            }
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
 
-            return "'" + dateText + "'";
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
         }
 
         private bool HasPaymentExecutionStatusColumn()
         {
             string sql = @"
-                SELECT COUNT(1)
-                FROM AD_Table t
-                INNER JOIN AD_Column c ON (t.AD_Table_ID = c.AD_Table_ID)
-                WHERE t.TableName = 'C_Payment'
-                AND c.ColumnName = 'VA009_ExecutionStatus'
-            ";
+SELECT
+COUNT(1)
+FROM AD_Table TableData
+INNER JOIN AD_Column ColumnData ON (TableData.AD_Table_ID = ColumnData.AD_Table_ID)
+WHERE TableData.TableName = 'C_Payment'
+AND ColumnData.ColumnName = 'VA009_ExecutionStatus'";
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
@@ -170,6 +219,12 @@ AND p.DateAcct<" + GetDateValue(dateTo) + @"
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }
