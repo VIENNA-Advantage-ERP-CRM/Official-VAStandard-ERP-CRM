@@ -17,30 +17,30 @@
         box-sizing: border-box;
     }
 
-.vas-ptm-ap-root .vas-ptm-ap-busy,
-.vas-ptm-ap-root .vas-ptm-ap-state {
+.vas-ptm-ap-root .vas-ptm-busy,
+.vas-ptm-ap-root .vas-ptm-state-message {
     position: absolute;
     inset: 0;
-    z-index: 10;
+    z-index: 2;
     display: none;
     align-items: center;
     justify-content: center;
     padding: 0.875em;
     border-radius: 14px;
+    text-align: center;
     color: #5f7283;
     font-family: Roboto, Arial, sans-serif;
-    font-size: 0.8125em !important;
+    font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
-    text-align: center;
 }
 
-.vas-ptm-ap-root .vas-ptm-ap-busy.is-visible,
-.vas-ptm-ap-root .vas-ptm-ap-state.is-visible {
+.vas-ptm-ap-root .vas-ptm-busy.is-visible,
+.vas-ptm-ap-root .vas-ptm-state-message.is-visible {
     display: flex;
 }
 
-.vas-ptm-card {
+.vas-ptm-ap-root .vas-ptm-card {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -59,7 +59,7 @@
     position: relative;
 }
 
-.vas-ptm-header {
+.vas-ptm-ap-root .vas-ptm-header {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
@@ -69,7 +69,7 @@
     overflow: hidden;
 }
 
-.vas-ptm-icon {
+.vas-ptm-ap-root .vas-ptm-icon {
     flex: 0 0 auto;
     width: 2em;
     height: 2em;
@@ -82,7 +82,7 @@
     color: #019d89;
 }
 
-    .vas-ptm-icon svg {
+    .vas-ptm-ap-root .vas-ptm-icon svg {
         width: 1em;
         height: 1em;
         display: block;
@@ -94,13 +94,13 @@
         stroke-linejoin: round;
     }
 
-.vas-ptm-header-text {
+.vas-ptm-ap-root .vas-ptm-header-text {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
 }
 
-.vas-ptm-title {
+.vas-ptm-ap-root .vas-ptm-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -111,7 +111,7 @@
     color: #102c3f;
 }
 
-.vas-ptm-subtitle {
+.vas-ptm-ap-root .vas-ptm-subtitle {
     min-width: 0;
     margin-top: 0.125em;
     overflow: hidden;
@@ -125,7 +125,7 @@
     color: #748494;
 }
 
-.vas-ptm-body {
+.vas-ptm-ap-root .vas-ptm-body {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
@@ -134,7 +134,7 @@
     overflow: hidden;
 }
 
-.vas-ptm-metric {
+.vas-ptm-ap-root .vas-ptm-metric {
     display: block;
     width: 100%;
     min-width: 0;
@@ -150,7 +150,7 @@
     color: #019d89;
 }
 
-.vas-ptm-why-wrap {
+.vas-ptm-ap-root .vas-ptm-why-wrap {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
@@ -161,7 +161,7 @@
     color: #5f7283;
 }
 
-.vas-ptm-why-pill {
+.vas-ptm-ap-root .vas-ptm-why-pill {
     flex: 0 1 auto;
     display: inline-flex;
     align-items: center;
@@ -182,7 +182,7 @@
     text-transform: uppercase;
 }
 
-.vas-ptm-why-text {
+.vas-ptm-ap-root .vas-ptm-why-text {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -196,81 +196,81 @@
     line-clamp: 2;
 }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-card {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-card {
     padding: 0.75em;
     gap: 0.375em;
 }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-icon {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-icon {
     width: 1.75em;
     height: 1.75em;
     border-radius: 10px;
 }
 
-    .vas-ptm-root.vas-ptm-compact .vas-ptm-icon svg {
+    .vas-ptm-ap-root.vas-ptm-compact .vas-ptm-icon svg {
         width: 0.875em;
         height: 0.875em;
     }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-metric {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-metric {
     font-size: 1.375em;
 }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-why-text {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-why-text {
     -webkit-line-clamp: 1;
     line-clamp: 1;
 }
 
 @container (max-width: 300px) {
-    .vas-ptm-card {
+    .vas-ptm-ap-root .vas-ptm-card {
         padding: 0.75em;
         gap: 0.375em;
     }
 
-    .vas-ptm-title {
+    .vas-ptm-ap-root .vas-ptm-title {
         font-size: 0.8125em;
     }
 
-    .vas-ptm-subtitle {
+    .vas-ptm-ap-root .vas-ptm-subtitle {
         font-size: 0.625em;
     }
 
-    .vas-ptm-metric {
+    .vas-ptm-ap-root .vas-ptm-metric {
         font-size: 1.375em;
     }
 }
 
 @container (max-width: 220px) {
-    .vas-ptm-card {
+    .vas-ptm-ap-root .vas-ptm-card {
         padding: 0.625em;
         gap: 0.3125em;
     }
 
-    .vas-ptm-icon {
+    .vas-ptm-ap-root .vas-ptm-icon {
         width: 1.625em;
         height: 1.625em;
         border-radius: 10px;
     }
 
-        .vas-ptm-icon svg {
+        .vas-ptm-ap-root .vas-ptm-icon svg {
             width: 0.8125em;
             height: 0.8125em;
         }
 
-    .vas-ptm-title {
+    .vas-ptm-ap-root .vas-ptm-title {
         font-size: 0.75em;
     }
 
-    .vas-ptm-subtitle {
+    .vas-ptm-ap-root .vas-ptm-subtitle {
         font-size: 0.5625em;
     }
 
-    .vas-ptm-metric {
+    .vas-ptm-ap-root .vas-ptm-metric {
         font-size: 1.375em;
     }
 
-    .vas-ptm-why-pill,
-    .vas-ptm-why-text {
+    .vas-ptm-ap-root .vas-ptm-why-pill,
+    .vas-ptm-ap-root .vas-ptm-why-text {
         font-size: 0.625em;
     }
 }

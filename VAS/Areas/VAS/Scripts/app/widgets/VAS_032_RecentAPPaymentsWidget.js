@@ -67,26 +67,12 @@
             $titleWrap.append($iconBox).append($title);
             $head.append($titleWrap);
 
-            $banner = $('<div class="vas-recent-ap-payments-banner">');
-            var $bannerIcon = $(
-                '<div class="vas-recent-ap-payments-banner-icon">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-                '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>' +
-                '</svg>' +
-                '</div>'
-            );
-            var $bannerText = $('<div class="vas-recent-ap-payments-banner-text">');
-            $bannerTitle = $('<div class="vas-recent-ap-payments-banner-title">');
-            $bannerSub = $('<div class="vas-recent-ap-payments-banner-sub">');
-
-            $bannerText.append($bannerTitle).append($bannerSub);
-            $banner.append($bannerIcon).append($bannerText);
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
             $busy = $('<div class="vas-recent-ap-payments-busy">').text(lbl('VAS_032_MessageLoading', 'Loading'));
             $state = $('<div class="vas-recent-ap-payments-state-message">');
 
-            $card.append($head).append($banner).append($tableWrap).append($busy).append($state);
+            $card.append($head).append($tableWrap).append($busy).append($state);
             $root.empty().append($card);
         }
 

@@ -119,8 +119,8 @@
             $card.append($header).append($body).append($why);
             $root.empty().append($card);
 
-            $busy = $('<div class="vas-ptm-ap-busy">').text(lbl('VAS_028_MessageLoading', 'Loading'));
-            $state = $('<div class="vas-ptm-ap-state">');
+            $busy = $('<div class="vas-ptm-busy">').text(lbl('VAS_028_MessageLoading', 'Loading'));
+            $state = $('<div class="vas-ptm-state-message">');
 
             $card.append($busy).append($state);
         }
