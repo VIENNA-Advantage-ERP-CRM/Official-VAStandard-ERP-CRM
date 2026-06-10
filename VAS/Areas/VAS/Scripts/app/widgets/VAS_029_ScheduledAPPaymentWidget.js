@@ -29,6 +29,9 @@
         var $value = null;
         var $description = null;
         var $body = null;
+        var $footer = null;
+        var $busy = null;
+        var $state = null;
 
         var groups = [];
         var groupIndex = 0;
@@ -68,13 +71,16 @@
             $value = $('<div class="vas-scheduled-ap-payment-value">');
             $body.append($value);
 
-            var $footer = $('<div class="vas-scheduled-ap-payment-footer">');
+            $footer = $('<div class="vas-scheduled-ap-payment-footer">');
          
 
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
 
             $footer.append($description);
-            $card.append($header).append($body).append($footer);
+            $busy = $('<div class="vas-scheduled-ap-payment-busy">').text(lbl('VAS_029_MessageLoading', 'Loading'));
+            $state = $('<div class="vas-scheduled-ap-payment-state-message">');
+
+            $card.append($header).append($body).append($footer).append($busy).append($state);
             $root.empty().append($card);
         }
 
@@ -84,7 +90,8 @@
             }
 
             stopRotation();
-            setLoading();
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_029_ScheduledAPPaymentWidget/GetScheduledAPPaymentThisWeek',
@@ -99,7 +106,7 @@
                     var data = normalizeResponse(response);
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
@@ -107,7 +114,12 @@
                 },
                 error: function () {
                     if (!isDisposed) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
                     }
                 }
             });
@@ -127,7 +139,17 @@
         }
 
         function renderData(data) {
-            groups = $.isArray(data.groups) ? data.groups : [];
+            groups = $.isArray(data.groups)
+                ? $.grep(data.groups, function (group) {
+                    var amount = Number(group.value);
+
+                    if (isNaN(amount)) {
+                        amount = Number(group.scheduledAmount);
+                    }
+
+                    return !isNaN(amount) && amount > 0;
+                })
+                : [];
             groupIndex = 0;
 
             if (groups.length > 0) {
@@ -147,6 +169,8 @@
                 return;
             }
 
+            showState(false, '');
+
             $value.text(formatCurrencyAmount(
                 totalAmount,
                 data.currencySymbol || data.symbol,
@@ -156,8 +180,6 @@
             $description.text(
                 data.description || lbl('VAS_029_MessageScheduledForPaymentThisWeek', 'Scheduled for payment this week')
             );
-
-            $body.removeClass('vas-scheduled-ap-payment-state');
         }
 
         function renderGroup(group, data) {
@@ -172,10 +194,12 @@
                 amount = Number(group.scheduledAmount);
             }
 
-            if (isNaN(amount)) {
+            if (isNaN(amount) || amount <= 0) {
                 setNoData();
                 return;
             }
+
+            showState(false, '');
 
             var precision = normalizePrecision(group.precision || data.precision);
             var paymentMethodName = group.paymentMethodName || lbl('VAS_029_MessageNotSpecified', 'Not Specified');
@@ -192,7 +216,6 @@
             ));
 
             $description.text(footerText);
-            $body.removeClass('vas-scheduled-ap-payment-state');
         }
 
         function startRotation(data) {
@@ -272,32 +295,32 @@
             return stdPrecision;
         }
 
-        function setLoading() {
-            if ($value) {
-                $value.text(lbl('VAS_029_MessageLoading', 'Loading'));
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
             }
+        }
 
-            if ($description) {
-                $description.text('');
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
             }
 
             if ($body) {
-                $body.addClass('vas-scheduled-ap-payment-state');
+                $body.toggle(!show);
+            }
+
+            if ($footer) {
+                $footer.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($value) {
-                $value.text(lbl('VAS_029_MessageNoData', 'No Data'));
-            }
-
             if ($description) {
                 $description.text('');
             }
 
-            if ($body) {
-                $body.addClass('vas-scheduled-ap-payment-state');
-            }
+            showState(true, lbl('VAS_029_MessageNoData', 'No Data'));
         }
 
         this.refreshData = function () {
@@ -318,6 +341,9 @@
             $value = null;
             $description = null;
             $body = null;
+            $footer = null;
+            $busy = null;
+            $state = null;
             groups = [];
         };
     };

@@ -28,6 +28,9 @@
         var $value = null;
         var $description = null;
         var $body = null;
+        var $footer = null;
+        var $busy = null;
+        var $state = null;
         var isDisposed = false;
 
         function lbl(key, fallback) {
@@ -64,7 +67,7 @@
             $value = $('<div class="vas-bounced-ap-payment-value">');
             $body.append($value);
 
-            var $footer = $('<div class="vas-bounced-ap-payment-footer">');
+            $footer = $('<div class="vas-bounced-ap-payment-footer">');
 
      
             $description = $('<div class="vas-bounced-ap-payment-desc">').text(
@@ -72,7 +75,10 @@
             );
 
             $footer.append($description);
-            $card.append($header).append($body).append($footer);
+            $busy = $('<div class="vas-bounced-ap-payment-busy">').text(lbl('VAS_030_MessageLoading', 'Loading'));
+            $state = $('<div class="vas-bounced-ap-payment-state-message">');
+
+            $card.append($header).append($body).append($footer).append($busy).append($state);
             $root.empty().append($card);
         }
 
@@ -81,7 +87,8 @@
                 return;
             }
 
-            setLoading();
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_030_BouncedAPPaymentWidget/GetBouncedAPPayments',
@@ -96,7 +103,7 @@
                     var data = normalizeResponse(response);
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
@@ -104,7 +111,12 @@
                 },
                 error: function () {
                     if (!isDisposed) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
                     }
                 }
             });
@@ -130,18 +142,17 @@
                 count = Number(data.bouncedPaymentCount);
             }
 
-            if (isNaN(count)) {
+            if (isNaN(count) || count <= 0) {
                 setNoData();
                 return;
             }
 
+            showState(false, '');
             $value.text(formatCount(count));
 
             if ($description && data.description) {
                 $description.text(data.description);
             }
-
-            $body.removeClass('vas-bounced-ap-payment-state');
         }
 
         function formatCount(value) {
@@ -151,24 +162,28 @@
             });
         }
 
-        function setLoading() {
-            if ($value) {
-                $value.text(lbl('VAS_030_MessageLoading', 'Loading'));
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
             }
 
             if ($body) {
-                $body.addClass('vas-bounced-ap-payment-state');
+                $body.toggle(!show);
+            }
+
+            if ($footer) {
+                $footer.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($value) {
-                $value.text(lbl('VAS_030_MessageNoData', 'No Data'));
-            }
-
-            if ($body) {
-                $body.addClass('vas-bounced-ap-payment-state');
-            }
+            showState(true, lbl('VAS_030_MessageNoData', 'No Data'));
         }
 
         this.refreshData = function () {
@@ -188,6 +203,9 @@
             $value = null;
             $description = null;
             $body = null;
+            $footer = null;
+            $busy = null;
+            $state = null;
         };
     };
 

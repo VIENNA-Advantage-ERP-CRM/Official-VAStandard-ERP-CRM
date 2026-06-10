@@ -7,7 +7,8 @@
     container-type: inline-size;
     contain: layout style;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(0.875rem, 1.4cqi, 1.25rem);
+    font-size: clamp(16px, 1.4cqi, 24px);
+    position: relative;
     overflow: hidden;
 }
 
@@ -27,11 +28,12 @@
     overflow: hidden;
     padding: 0.875em;
     gap: 0.5em;
-    border: 0.125em solid #ffffff;
-    border-radius: 0.875em;
+    border: 2px solid #ffffff;
+    border-radius: 14px;
     background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
+    position: relative;
 }
 
 .vas-finance-kpi-header {
@@ -51,8 +53,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 0.0625em solid rgba(255, 255, 255, 0.95);
-    border-radius: 0.625em;
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.90);
     color: #0083da;
 }
@@ -94,10 +96,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: clamp(1.5em, 7.5cqi, 2.125em);
+    font-size: 1.375em;
     font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.035em;
+    line-height: 1.1;
+    letter-spacing: 0;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
 }
@@ -121,8 +123,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
-    border: 0.0625em solid rgba(0, 131, 218, 0.15);
-    border-radius: 0.25em;
+    border: 1px solid rgba(0, 131, 218, 0.15);
+    border-radius: 4px;
     background: rgba(255, 255, 255, 0.85);
     color: #0083da;
     font-size: 0.6875em;
@@ -153,6 +155,29 @@
     color: #5f7283;
 }
 
+.vas-finance-kpi-busy,
+.vas-finance-kpi-state-message {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    border-radius: 14px;
+    text-align: center;
+    color: #5f7283;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.vas-finance-kpi-busy.is-visible,
+.vas-finance-kpi-state-message.is-visible {
+    display: flex;
+}
+
 .vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-card {
     padding: 0.75em;
     gap: 0.375em;
@@ -161,7 +186,7 @@
 .vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-icon-box {
     width: 1.75em;
     height: 1.75em;
-    border-radius: 0.5625em;
+    border-radius: 10px;
 }
 
 .vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-icon {
@@ -170,7 +195,7 @@
 }
 
 .vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-value {
-    font-size: clamp(1.375em, 7cqi, 1.75em);
+    font-size: 1.375em;
 }
 
 .vas-finance-kpi-root.vas-finance-kpi-compact .vas-finance-kpi-desc {
@@ -187,7 +212,7 @@
     .vas-finance-kpi-icon-box {
         width: 1.625em;
         height: 1.625em;
-        border-radius: 0.5em;
+        border-radius: 10px;
     }
 
     .vas-finance-kpi-icon {
@@ -200,7 +225,7 @@
     }
 
     .vas-finance-kpi-value {
-        font-size: clamp(1.25em, 8cqi, 1.625em);
+        font-size: 1.375em;
     }
 
     .vas-finance-kpi-badge,

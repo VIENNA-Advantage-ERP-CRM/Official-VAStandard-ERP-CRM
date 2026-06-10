@@ -30,10 +30,12 @@
         var $card;
         var $body;
         var $state;
+        var $busy;
         var $progress;
         var $percent;
         var $strong;
         var $subText;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -103,14 +105,20 @@
             $meta.append($strong).append($subText);
 
             $body.append($donut).append($meta);
-            $state = $('<div class="vas-reconciliation-status-state">').hide();
+            $state = $('<div class="vas-reconciliation-status-state">');
+            $busy = $('<div class="vas-reconciliation-status-busy">').text(lbl('VAS_046_Loading', 'Loading'));
 
-            $card.append($head).append($body).append($state);
+            $card.append($head).append($body).append($busy).append($state);
             $root.empty().append($card);
         }
 
         function loadData() {
-            setLoading();
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_046_ReconciliationStatusWidget/GetReconciliationStatus',
@@ -118,6 +126,10 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
                     var data = response;
 
                     if (typeof response === 'string') {
@@ -125,20 +137,27 @@
                             data = JSON.parse(response);
                         }
                         catch (e) {
-                            setNoData();
+                            showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                             return;
                         }
                     }
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
                 }
             });
         }
@@ -147,7 +166,7 @@
             var percentage = Number(data.matchedPercentage);
             var manualCount = Number(data.manualMatchCount || 0);
 
-            if (isNaN(percentage)) {
+            if (isNaN(percentage) || percentage <= 0) {
                 setNoData();
                 return;
             }
@@ -162,8 +181,7 @@
 
             var percentageText = formatPercentage(percentage);
 
-            $state.hide();
-            $body.show();
+            showState(false, '');
 
             $percent.text(percentageText);
             $progress.attr('stroke-dasharray', percentage + ' 100');
@@ -206,24 +224,24 @@
             return stdPrecision;
         }
 
-        function setLoading() {
-            if ($body) {
-                $body.hide();
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
             }
 
-            if ($state) {
-                $state.text(lbl('VAS_046_Loading', 'Loading')).show();
+            if ($body) {
+                $body.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($body) {
-                $body.hide();
-            }
-
-            if ($state) {
-                $state.text(lbl('VAS_046_NoData', 'No Data')).show();
-            }
+            showState(true, lbl('VAS_046_NoData', 'No Data'));
         }
 
         this.refreshWidget = function () {
@@ -235,10 +253,12 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
             $root.remove();
             $card = null;
             $body = null;
             $state = null;
+            $busy = null;
             $progress = null;
             $percent = null;
             $strong = null;

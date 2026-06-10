@@ -28,6 +28,9 @@
         var $root = $('<div class="vas-upcoming-ap-runs-root">');
         var $card;
         var $body;
+        var $busy;
+        var $state;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -62,13 +65,20 @@
             $head.append($headLeft);
 
             $body = $('<div class="vas-upcoming-ap-runs-body">');
+            $busy = $('<div class="vas-upcoming-ap-runs-busy">').text(lbl('VAS_031_MessageLoading', 'Loading'));
+            $state = $('<div class="vas-upcoming-ap-runs-state-message">');
 
-            $card.append($head).append($body);
+            $card.append($head).append($body).append($busy).append($state);
             $root.empty().append($card);
         }
 
         function loadData() {
-            setLoading();
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_033_UpcomingAPRunsWidget/GetUpcomingAPRuns',
@@ -76,6 +86,10 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
                     var data = response;
 
                     if (typeof response === 'string') {
@@ -83,32 +97,47 @@
                             data = JSON.parse(response);
                         }
                         catch (e) {
-                            setNoData();
+                            showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                             return;
                         }
                     }
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
                 }
             });
         }
 
         function renderData(data) {
-            var runs = $.isArray(data.runs) ? data.runs : [];
+            var runs = $.isArray(data.runs)
+                ? $.grep(data.runs, function (run) {
+                    var amount = Number(run.totalAmount || 0);
+                    var paymentCount = Number(run.paymentCount || 0);
+
+                    return (!isNaN(amount) && amount > 0) || (!isNaN(paymentCount) && paymentCount > 0);
+                })
+                : [];
 
             if (runs.length === 0) {
                 setNoData();
                 return;
             }
 
+            showState(false, '');
             $body.empty();
 
             for (var i = 0; i < runs.length && i < 3; i++) {
@@ -221,16 +250,24 @@
             return currencyISO ? amount + ' ' + currencyISO : amount;
         }
 
-        function setLoading() {
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
+            }
+
             if ($body) {
-                $body.empty().append($('<div class="vas-upcoming-ap-runs-state">').text(lbl('VAS_031_MessageLoading', 'Loading')));
+                $body.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($body) {
-                $body.empty().append($('<div class="vas-upcoming-ap-runs-state">').text(lbl('VAS_031_MessageNoData', 'No Data')));
-            }
+            showState(true, lbl('VAS_031_MessageNoData', 'No Data'));
         }
 
         this.refreshWidget = function () {
@@ -242,9 +279,12 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
             $root.remove();
             $card = null;
             $body = null;
+            $busy = null;
+            $state = null;
         };
     };
 

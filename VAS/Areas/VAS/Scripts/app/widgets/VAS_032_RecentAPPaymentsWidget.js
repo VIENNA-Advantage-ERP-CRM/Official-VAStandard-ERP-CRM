@@ -34,6 +34,9 @@
         var $bannerTitle;
         var $bannerSub;
         var $tableWrap;
+        var $busy;
+        var $state;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -80,13 +83,20 @@
             $banner.append($bannerIcon).append($bannerText);
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
+            $busy = $('<div class="vas-recent-ap-payments-busy">').text(lbl('VAS_032_MessageLoading', 'Loading'));
+            $state = $('<div class="vas-recent-ap-payments-state-message">');
 
-            $card.append($head).append($banner).append($tableWrap);
+            $card.append($head).append($banner).append($tableWrap).append($busy).append($state);
             $root.empty().append($card);
         }
 
         function loadData() {
-            setLoading();
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_032_RecentAPPaymentsWidget/GetRecentAPPayments',
@@ -94,6 +104,10 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
                     var data = response;
 
                     if (typeof response === 'string') {
@@ -101,26 +115,39 @@
                             data = JSON.parse(response);
                         }
                         catch (e) {
-                            setNoData();
+                            showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                             return;
                         }
                     }
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
                 }
             });
         }
 
         function renderData(data) {
-            var payments = $.isArray(data.payments) ? data.payments : [];
+            var payments = $.isArray(data.payments)
+                ? $.grep(data.payments, function (payment) {
+                    var amount = Number(payment.amount || 0);
+
+                    return !isNaN(amount) && amount > 0;
+                })
+                : [];
 
             if (payments.length === 0) {
                 setNoData();
@@ -132,6 +159,8 @@
 
 
         function renderTable(payments) {
+            showState(false, '');
+
             var $table = $('<table class="vas-recent-ap-payments-table">');
             var $thead = $('<thead>');
             var $headerRow = $('<tr>');
@@ -239,24 +268,28 @@
             return currencyISO ? amount + ' ' + currencyISO : amount;
         }
 
-        function setLoading() {
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
+            }
+
             if ($banner) {
-                $banner.hide();
+                $banner.toggle(!show);
             }
 
             if ($tableWrap) {
-                $tableWrap.empty().append($('<div class="vas-recent-ap-payments-state">').text(lbl('VAS_032_MessageLoading', 'Loading')));
+                $tableWrap.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($banner) {
-                $banner.hide();
-            }
-
-            if ($tableWrap) {
-                $tableWrap.empty().append($('<div class="vas-recent-ap-payments-state">').text(lbl('VAS_032_MessageNoData', 'No Data')));
-            }
+            showState(true, lbl('VAS_032_MessageNoData', 'No Data'));
         }
 
         this.refreshWidget = function () {
@@ -268,12 +301,15 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
             $root.remove();
             $card = null;
             $banner = null;
             $bannerTitle = null;
             $bannerSub = null;
             $tableWrap = null;
+            $busy = null;
+            $state = null;
         };
     };
 

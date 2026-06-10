@@ -32,10 +32,13 @@
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
 
-        var $root = $('<div class="vas-ptm-root">');
+        var $root = $('<div class="vas-ptm-root vas-ptm-ap-root">');
         var $metricEl = null;
         var $whyText = null;
+        var $body = null;
+        var $why = null;
         var $busy = null;
+        var $state = null;
         var isDisposed = false;
 
         function lbl(key, fallback) {
@@ -45,7 +48,21 @@
 
         function showBusy(show) {
             if ($busy && $busy.length) {
-                $busy.css('visibility', show ? 'visible' : 'hidden');
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state && $state.length) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
+            }
+
+            if ($body) {
+                $body.toggle(!show);
+            }
+
+            if ($why) {
+                $why.toggle(!show);
             }
         }
 
@@ -81,7 +98,7 @@
             $headerText.append($title).append($subtitle);
             $header.append($icon).append($headerText);
 
-            var $body = $('<div class="vas-ptm-body">');
+            $body = $('<div class="vas-ptm-body">');
 
             $metricEl = $('<div>')
                 .attr('id', 'vis-ptm-metric-' + uid)
@@ -90,7 +107,7 @@
 
             $body.append($metricEl);
 
-            var $why = $('<div class="vas-ptm-why-wrap">');
+            $why = $('<div class="vas-ptm-why-wrap">');
 
 
             $whyText = $('<span>')
@@ -102,16 +119,10 @@
             $card.append($header).append($body).append($why);
             $root.empty().append($card);
 
-            $busy = $(
-                '<div class="vas-ptm-busy">' +
-                '<div class="vis-busyindicatorinnerwrap">' +
-                '<i class="vis_widgetloader"></i>' +
-                '</div>' +
-                '</div>'
-            );
+            $busy = $('<div class="vas-ptm-ap-busy">').text(lbl('VAS_028_MessageLoading', 'Loading'));
+            $state = $('<div class="vas-ptm-ap-state">');
 
-            $busy.css('visibility', 'hidden');
-            $root.append($busy);
+            $card.append($busy).append($state);
         }
 
         function loadData() {
@@ -120,6 +131,7 @@
             }
 
             showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_028_PaidThisMonthAPPaymentWidget/GetPaidThisMonth',
@@ -134,7 +146,7 @@
                     var data = normalizeResponse(response);
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
@@ -142,7 +154,7 @@
                 },
                 error: function () {
                     if (!isDisposed) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                     }
                 },
                 complete: function () {
@@ -177,10 +189,12 @@
                 amount = Number(data.totalPaidAmount);
             }
 
-            if (isNaN(amount)) {
+            if (isNaN(amount) || amount <= 0) {
                 setNoData();
                 return;
             }
+
+            showState(false, '');
 
             var symbol = data.currencySymbol || data.symbol || '';
             var precision = normalizePrecision(data.precision);
@@ -262,8 +276,10 @@
             }
 
             if ($whyText) {
-                $whyText.text(lbl('VAS_028_MessageNoData', 'No Data'));
+                $whyText.text('');
             }
+
+            showState(true, lbl('VAS_028_MessageNoData', 'No Data'));
         }
 
         this.refreshData = function () {
@@ -281,7 +297,10 @@
 
             $metricEl = null;
             $whyText = null;
+            $body = null;
+            $why = null;
             $busy = null;
+            $state = null;
         };
     };
 

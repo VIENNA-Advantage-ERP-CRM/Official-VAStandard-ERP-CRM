@@ -7,7 +7,8 @@
     container-type: inline-size;
     contain: layout style;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(0.875rem, 1.4cqi, 1.25rem);
+    font-size: clamp(16px, 1.4cqi, 24px);
+    position: relative;
     overflow: hidden;
 }
 
@@ -26,11 +27,12 @@
     flex-direction: column;
     padding: 0.875em;
     gap: 0.5em;
-    border-radius: 0.875em;
-    border: 0.125em solid #ffffff;
+    border-radius: 14px;
+    border: 2px solid #ffffff;
     background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
+    position: relative;
 }
 
 .vas-payment-methods-head {
@@ -51,8 +53,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 0.0625em solid rgba(255, 255, 255, 0.95);
-    border-radius: 0.625em;
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.90);
     color: #0083da;
 }
@@ -138,7 +140,7 @@
     width: 100%;
     height: 0.375em;
     overflow: hidden;
-    border-radius: 999em;
+    border-radius: 999px;
     background: #edf2f6;
 }
 
@@ -176,7 +178,7 @@
     align-items: center;
     gap: 0.5em;
     padding-top: 0.625em;
-    border-top: 0.0625em solid #edf2f6;
+    border-top: 1px solid #edf2f6;
     overflow: hidden;
     color: #586575;
 }
@@ -189,7 +191,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
-    border: 0.0625em solid rgba(0, 131, 218, 0.15);
+    border: 1px solid rgba(0, 131, 218, 0.15);
     border-radius: 999em;
     background: rgba(0, 131, 218, 0.08);
     color: #0083da;
@@ -226,6 +228,29 @@
     color: #748494;
 }
 
+.vas-payment-methods-busy,
+.vas-payment-methods-state-message {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    border-radius: 14px;
+    text-align: center;
+    color: #5f7283;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.vas-payment-methods-busy.is-visible,
+.vas-payment-methods-state-message.is-visible {
+    display: flex;
+}
+
 .vas-payment-methods-root.vas-payment-methods-compact .vas-payment-methods-card {
     padding: 0.75em;
     gap: 0.375em;
@@ -235,7 +260,7 @@
     width: 1.75em;
     height: 1.75em;
     min-width: 1.75em;
-    border-radius: 0.5625em;
+    border-radius: 10px;
 }
 
 .vas-payment-methods-root.vas-payment-methods-compact .vas-payment-methods-icon {
@@ -290,7 +315,7 @@
         width: 1.625em;
         height: 1.625em;
         min-width: 1.625em;
-        border-radius: 0.5em;
+        border-radius: 10px;
     }
 
     .vas-payment-methods-icon {

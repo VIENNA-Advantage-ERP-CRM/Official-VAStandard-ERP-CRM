@@ -24,6 +24,9 @@
         var $card = null;
         var $value = null;
         var $body = null;
+        var $footer = null;
+        var $busy = null;
+        var $state = null;
         var isDisposed = false;
 
         function lbl(key, fallback) {
@@ -59,7 +62,7 @@
 
             $body.append($value);
 
-            var $footer = $('<div class="vas-finance-kpi-footer">');
+            $footer = $('<div class="vas-finance-kpi-footer">');
 
 
             var $description = $('<div class="vas-finance-kpi-desc">').text(
@@ -68,7 +71,10 @@
 
             $footer.append($description);
 
-            $card.append($header).append($body).append($footer);
+            $busy = $('<div class="vas-finance-kpi-busy">').text(lbl('VAS_027_messageLoading', 'Loading'));
+            $state = $('<div class="vas-finance-kpi-state-message">');
+
+            $card.append($header).append($body).append($footer).append($busy).append($state);
 
             $root.empty().append($card);
         }
@@ -78,7 +84,8 @@
                 return;
             }
 
-            setState(lbl('VAS_027_messageLoading', 'Loading'), true);
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_027_ClearedAPPaymentWidget/GetClearedAPPayment',
@@ -94,7 +101,7 @@
                     var data = normalizeResponse(response);
 
                     if (!data || data.error) {
-                        setState(lbl('VAS_027_messageNoData', 'No Data'), true);
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
@@ -103,7 +110,13 @@
 
                 error: function () {
                     if (!isDisposed) {
-                        setState(lbl('VAS_027_messageNoData', 'No Data'), true);
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
                     }
                 }
             });
@@ -129,14 +142,15 @@
                 percentage = Number(data.clearedPercentage);
             }
 
-            if (isNaN(percentage)) {
-                setState(lbl('VAS_027_messageNoData', 'No Data'), true);
+            if (isNaN(percentage) || percentage <= 0) {
+                showState(true, lbl('VAS_027_messageNoData', 'No Data'));
                 return;
             }
 
             percentage = Math.max(0, Math.min(percentage, 100));
 
-            setState(formatPercent(percentage, data.precision), false);
+            showState(false, '');
+            $value.text(formatPercent(percentage, data.precision));
         }
 
         function formatPercent(value, precision) {
@@ -158,13 +172,23 @@
             return stdPrecision;
         }
 
-        function setState(text, isStateText) {
-            if ($value) {
-                $value.text(text);
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
             }
 
             if ($body) {
-                $body.toggleClass('vas-finance-kpi-state', !!isStateText);
+                $body.toggle(!show);
+            }
+
+            if ($footer) {
+                $footer.toggle(!show);
             }
         }
 
@@ -189,6 +213,9 @@
             $card = null;
             $value = null;
             $body = null;
+            $footer = null;
+            $busy = null;
+            $state = null;
         };
     };
 
