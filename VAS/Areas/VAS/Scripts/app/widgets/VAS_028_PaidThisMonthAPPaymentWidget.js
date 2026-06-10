@@ -116,13 +116,11 @@
                 .text(lbl('VAS_028_MessageLoading', 'Loading'));
 
             $why.append($whyText);
-            $card.append($header).append($body).append($why);
-            $root.empty().append($card);
-
             $busy = $('<div class="vas-ptm-busy">').text(lbl('VAS_028_MessageLoading', 'Loading'));
             $state = $('<div class="vas-ptm-state-message">');
 
-            $card.append($busy).append($state);
+            $card.append($header).append($body).append($why).append($busy).append($state);
+            $root.empty().append($card);
         }
 
         function loadData() {

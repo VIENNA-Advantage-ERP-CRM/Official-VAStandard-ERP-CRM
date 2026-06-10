@@ -56,9 +56,7 @@
 
             $body = $('<div class="vas-finance-kpi-body">');
 
-            $value = $('<div class="vas-finance-kpi-value">').text(
-                lbl('VAS_027_messageLoading', 'Loading')
-            );
+            $value = $('<div class="vas-finance-kpi-value">').text('');
 
             $body.append($value);
 
