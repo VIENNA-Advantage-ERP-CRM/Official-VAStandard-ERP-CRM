@@ -7,11 +7,10 @@
  * ----+--------------------------------------+--------------------------------
  *  1  | Upcoming runs                        | VAS_031_MessageUpcomingRuns
  *  2  | Next 7 days                          | VAS_031_MessageNext7Days
- *  3  | Batch                                | VAS_031_MessageBatch
- *  4  | payment                              | VAS_031_MessagePayment
- *  5  | payments                             | VAS_031_MessagePayments
- *  6  | Loading                              | VAS_031_MessageLoading
- *  7  | No Data                              | VAS_031_MessageNoData
+ *  3  | payment                              | VAS_031_MessagePayment
+ *  4  | payments                             | VAS_031_MessagePayments
+ *  5  | Loading                              | VAS_031_MessageLoading
+ *  6  | No Data                              | VAS_031_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -194,7 +193,7 @@
                 return paymentMethodName + ' · ' + vendorName;
             }
 
-            return paymentMethodName + ' ' + lbl('VAS_031_MessageBatch', 'Batch');
+            return paymentMethodName ;
         }
 
         function getPaymentLabel(paymentCount) {
