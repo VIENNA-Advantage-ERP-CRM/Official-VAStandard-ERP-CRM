@@ -215,6 +215,10 @@
     border-radius: 14px; /* match card radius */
 }
 
+.VAS-047-today-cash-in-cash-journal-busy {
+    background: rgba(234, 247, 240, 0.82);
+    backdrop-filter: blur(3px);
+}
     /* JS adds .is-visible to show the overlay */
     .VAS-047-today-cash-in-cash-journal-state.is-visible,
     .VAS-047-today-cash-in-cash-journal-busy.is-visible {

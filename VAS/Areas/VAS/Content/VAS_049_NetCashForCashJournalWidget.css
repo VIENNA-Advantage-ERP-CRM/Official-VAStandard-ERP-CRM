@@ -192,7 +192,8 @@
     z-index: 2;
     display: none;
     align-items: center;
-    justify-content: center;
+    justify-content: center !important;
+    align-content: center !important;
     padding: 0.875em;
     background: rgba(255, 255, 255, 0.74);
     color: #60748A;
