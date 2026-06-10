@@ -40,7 +40,7 @@
     display: flex;
 }
 
-.vas-ptm-ap-root .vas-ptm-card {
+.vas-ptm-ap-root .vas-ptmonth-card {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -59,7 +59,7 @@
     position: relative;
 }
 
-.vas-ptm-ap-root .vas-ptm-header {
+.vas-ptm-ap-root .vas-ptmonth-header {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
@@ -196,7 +196,7 @@
     line-clamp: 2;
 }
 
-.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-card {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptmonth-card {
     padding: 0.75em;
     gap: 0.375em;
 }
@@ -222,7 +222,7 @@
 }
 
 @container (max-width: 300px) {
-    .vas-ptm-ap-root .vas-ptm-card {
+    .vas-ptm-ap-root .vas-ptmonth-card {
         padding: 0.75em;
         gap: 0.375em;
     }
@@ -241,7 +241,7 @@
 }
 
 @container (max-width: 220px) {
-    .vas-ptm-ap-root .vas-ptm-card {
+    .vas-ptm-ap-root .vas-ptmonth-card {
         padding: 0.625em;
         gap: 0.3125em;
     }

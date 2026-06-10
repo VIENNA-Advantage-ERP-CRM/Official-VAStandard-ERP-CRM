@@ -74,8 +74,8 @@
         function createWidget() {
             var uid = self.AD_UserHomeWidgetID || 'ptm';
 
-            var $card = $('<div class="vas-ptm-card">');
-            var $header = $('<div class="vas-ptm-header">');
+            var $card = $('<div class="vas-ptmonth-card">');
+            var $header = $('<div class="vas-ptmonth-header">');
 
             var $icon = $(
                 '<div class="vas-ptm-icon">' +
