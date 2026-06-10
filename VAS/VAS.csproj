@@ -332,6 +332,7 @@
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateNewReceipt.css" />
+    <Content Include="Areas\VAS\Content\VAS_CreateARInvoice.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_041_GLJournalEntriesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_045_GLJournalPendingWidget.css" />
@@ -440,6 +441,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_010_CashGlCashInWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_064_CreateARInvoice.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_003_OnAccountReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_011_UnreconciledReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_012_TodayReceipts.js" />

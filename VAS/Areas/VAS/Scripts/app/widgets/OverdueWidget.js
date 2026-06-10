@@ -5,21 +5,43 @@
  *            large bold metric in danger red, WHY pill with count + explanatory copy.
  *
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
- *  #  | Current Text                  | Message Key              | MsgText
- * ----+-------------------------------+--------------------------+------------------------
- *  1  | Overdue                       | VIS_OverDue              | Overdue
- *  2  | Past due date                 | VIS_PastDueDate          | Past Due Date
- *  3  | WHY                           | VIS_Why                  | WHY
- *  4  | Past due date · loading…      | VIS_PastDueDateLoading   | Past due date · loading…
- *  5  | chase these first.            | VIS_ChaseFirst           | chase these first.
- *  6  | No overdue invoices.          | VIS_NoOverdueInvoices    | No overdue invoices.
- *  7  | Past due date ·               | VIS_PastDueDatePrefix    | Past due date ·
- *  8  | invoice / invoices            | VIS_Invoice / VIS_Invoices | invoice / invoices
+ *  #  | Current Text                  | Message Key                | MsgText
+ * ----+-------------------------------+----------------------------+------------------------
+ *  1  | Overdue                       | VAS_059_Overdue            | Overdue
+ *  2  | Past due date                 | VAS_059_PastDueDate         | Past Due Date
+ *  3  | WHY                           | VAS_059_Why                | WHY
+ *  4  | Past due date · loading…      | VAS_059_PastDueDateLoading | Past due date · loading…
+ *  5  | chase these first.            | VAS_059_ChaseFirst         | chase these first.
+ *  6  | No overdue invoices.          | VAS_059_NoOverdueInvoices  | No overdue invoices.
+ *  7  | Past due date ·               | VAS_059_PastDueDatePrefix  | Past due date ·
+ *  8  | invoice / invoices            | VAS_059_Invoice / VAS_059_Invoices | invoice / invoices
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.OverdueWidget = function () {
 
@@ -102,12 +124,12 @@
             }
             if ($whyText) {
                 var invoiceLabel = count !== 1
-                    ? lbl("VIS_Invoices", 'invoices')
-                    : lbl("VIS_Invoice", 'invoice');
+                    ? lbl("VAS_059_Invoices", 'invoices')
+                    : lbl("VAS_059_Invoice", 'invoice');
                 var countStr = count > 0
-                    ? count + ' ' + invoiceLabel + ' · ' + lbl("VIS_ChaseFirst", 'chase these first.')
-                    : lbl("VIS_NoOverdueInvoices", 'No overdue invoices.');
-                $whyText.text(lbl("VIS_PastDueDatePrefix", 'Past due date ·') + ' ' + countStr);
+                    ? count + ' ' + invoiceLabel + ' · ' + lbl("VAS_059_ChaseFirst", 'chase these first.')
+                    : lbl("VAS_059_NoOverdueInvoices", 'No overdue invoices.');
+                $whyText.text(lbl("VAS_059_PastDueDatePrefix", 'Past due date ·') + ' ' + countStr);
             }
         }
 
@@ -135,8 +157,8 @@
                 '</div>' +
 
                 '<div>' +
-                '<div id="VIS_Overdue" class="vas-ovd-title">' + lbl("VIS_OverDue", 'Overdue') + '</div>' +
-                '<div class="vas-ovd-subtitle">' + lbl("VIS_PastDueDate", 'Past due date') + '</div>' +
+                '<div id="VIS_Overdue" class="vas-ovd-title">' + lbl("VAS_059_Overdue", 'Overdue') + '</div>' +
+                '<div class="vas-ovd-subtitle">' + lbl("VAS_059_PastDueDate", 'Past due date') + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -154,12 +176,12 @@
             );
 
             var $pill = $(
-                /*'<span class="vas-ovd-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
+                /*'<span class="vas-ovd-why-pill">' + lbl("VAS_059_Why", 'WHY') + '</span>'*/
             );
 
             $whyText = $(
                 '<span id="vis-ovd-why-' + uid + '" class="vas-ovd-why-text">' +
-                lbl("VIS_PastDueDateLoading", 'Past due date · loading…') +
+                lbl("VAS_059_PastDueDateLoading", 'Past due date · loading…') +
                 '</span>'
             );
 
@@ -199,6 +221,9 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.OverdueWidget.prototype.widgetSizeChange = function (height, width) { };

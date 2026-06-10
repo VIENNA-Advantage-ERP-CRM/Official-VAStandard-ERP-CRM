@@ -1,31 +1,44 @@
 /* ─────────────────────────────────────────────────────────────────────────
  * Sales Invoice Customer Search Widget — full-width (1x9) type-ahead search.
- * Per the approved search-widget design + design.md "Full-Width Dashboard
- * Search Widget": the search pill IS the widget (no card wrapper), floats on
- * the app gradient with equal gutters left & right, sits vertically centered,
- * and the outer widget stays transparent. The autosuggest dropdown is mounted
- * on <body> (fixed, anchored to the pill) so the dashboard cell cannot clip it.
- * All selectors are namespaced vas-sics-* to avoid collisions.
+ * Mirrors VAS_ReceiptSearch per design.md "Full-Width Dashboard Search
+ * Widget": the search pill IS the widget (no card wrapper), floats on the app
+ * gradient with equal gutters left & right, sits vertically centered, and the
+ * outer widget stays transparent. The autosuggest dropdown is mounted on
+ * <body> (fixed, anchored to the pill) so the dashboard cell cannot clip it.
+ *
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` on .vas-sics-esw resolves to clamp(16px, var(--dash-inline-size)*0.0125,
+ * 24px) — the dashboard-cell-width-anchored base that scales the whole widget.
+ * container-type: inline-size on .vas-sics-root drives the @container queries.
+ * `1em` on the body-mounted suggest dropdown stays at 16px (viewport-relative).
+ * Namespaced vas-sics-*.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .vas-sics-root {
     width: 100%;
     height: 100%;
-    font-family: Roboto, sans-serif;
+    container-type: inline-size;
     color: #102C3F;
-    /* Vertically centered band; transparent so the app gradient shows through. */
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
 }
 
-/* Gutter band — equal empty space left & right; pill floats centered. */
+    .vas-sics-root,
+    .vas-sics-root * {
+        box-sizing: border-box;
+    }
+
+/* Gutter band — equal empty space left & right; pill floats centered.
+   font-size clamp anchors the whole widget to the dashboard cell width via
+   --dash-inline-size (written by the widget's ResizeObserver bootstrap); falls
+   back to 100vw when unset. Same coefficient as VAS_ReceiptSearch (1x9). */
 .vas-sics-esw {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 24px);
     width: 100%;
-    max-width: 1500px;
-    --vas-sics-gutter: 9.7%;
-    padding: 0 var(--vas-sics-gutter);
+    max-width: 93.75em;               /* ~1500px */
+    padding: 0 9.7%;
     margin: 0 auto;
 }
 
@@ -38,32 +51,32 @@
 .vas-sics-input {
     display: flex;
     align-items: center;
-    gap: 12px;
-    height: 56px;
-    padding: 0 14px 0 20px;
-    /* pale tinted glass: faint blue → faint green, matching the app gradient pickup */
-    background: linear-gradient(100deg,
-        rgb(240, 248, 255) 0%,
-        rgb(244, 250, 253) 50%,
-        rgb(247, 252, 247) 100%);
-    /* soft light edge + bright top highlight, no hard border */
-    border: 1px solid rgba(255, 255, 255, 0.85);
+    gap: 0.75em;
+    height: 3em;                      /* 56px */
+    padding: 0 0.875em 0 1.25em;
+    /* Shared neutral glass surface (design.md): default widget glass, no tint. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.0625em solid rgba(255, 255, 255, 0.85);
     border-top-color: rgba(255, 255, 255, 0.95);
-    border-radius: 16px;
-    box-shadow: 0 12px 28px rgba(15, 61, 97, 0.07),
-                0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    border-radius: 1em;               /* 16px */
+    box-shadow: 0 0.75em 1.75em rgba(15, 61, 97, 0.07),
+                0 0.0625em 0 rgba(255, 255, 255, 0.6) inset;
     transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-.vas-sics-input:focus-within {
-    border-color: #BFE4FF;
-    box-shadow: 0 12px 30px rgba(0, 131, 218, 0.13),
-                0 1px 0 rgba(255, 255, 255, 0.6) inset;
+
+    .vas-sics-input:focus-within {
+        border-color: #BFE4FF;
+        box-shadow: 0 0.75em 1.875em rgba(0, 131, 218, 0.13),
+                    0 0.0625em 0 rgba(255, 255, 255, 0.6) inset;
+    }
+
+.vas-sics-search-icon {
+    color: #0083DA;
+    flex-shrink: 0;
 }
 
-.vas-sics-search-icon { color: #0083DA; flex-shrink: 0; }
-
-/* High specificity + !important to defeat the global core <input> styling (white background,
-   border, radius, inner padding) so the field reads as part of the seamless glass pill. */
+/* High specificity + !important to defeat the global core <input> styling so
+   the field reads as part of the seamless glass pill. */
 .vas-sics-input .vas-sics-field,
 .vas-sics-input .vas-sics-field:focus {
     flex: 1 1 0%;
@@ -76,104 +89,182 @@
     padding: 0 !important;
     margin: 0 !important;
     height: auto !important;
-    font-family: Roboto, sans-serif;
-    font-size: 15px;
+    font-size: 0.9375em;              /* 15px */
     line-height: normal;
     color: #102C3F;
 }
-.vas-sics-input .vas-sics-field::placeholder { color: #788692; }
+
+    .vas-sics-input .vas-sics-field::placeholder {
+        color: #788692;
+    }
 
 .vas-sics-clear {
-    width: 32px; height: 32px;
+    width: 2em;                       /* 32px */
+    height: 2em;
     flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    border: none; background: none; cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    cursor: pointer;
     color: #748494;
     border-radius: 50%;
     visibility: hidden;
     transition: background 150ms ease;
 }
-.vas-sics-clear:hover { background: #F4F7FA; }
-.vas-sics-clear.is-visible { visibility: visible; }
+
+    .vas-sics-clear:hover {
+        background: #F4F7FA;
+    }
+
+    .vas-sics-clear.is-visible {
+        visibility: visible;
+    }
 
 /* ── Autosuggest dropdown (mounted on body, fixed) ── */
 .vas-sics-suggest {
     position: fixed;
+    font-size: 1em;
     background: #FFFFFF;
-    border: 1px solid #E4EDF4;
-    border-radius: 14px;
-    box-shadow: 0 16px 36px rgba(15, 61, 97, 0.16);
-    padding: 6px;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.875em;           /* 14px */
+    box-shadow: 0 1em 2.25em rgba(15, 61, 97, 0.16);
+    padding: 0.375em;
     z-index: 1000;
     display: none;
-    max-height: 420px;
+    max-height: 26.25em;              /* ~420px */
     overflow-y: auto;
-    font-family: Roboto, sans-serif;
 }
-.vas-sics-suggest.is-open { display: block; }
-.vas-sics-suggest::-webkit-scrollbar { width: 6px; }
-.vas-sics-suggest::-webkit-scrollbar-thumb { background: rgba(15, 61, 97, 0.15); border-radius: 3px; }
+
+    .vas-sics-suggest.is-open {
+        display: block;
+    }
+
+    .vas-sics-suggest::-webkit-scrollbar {
+        width: 0.375em;
+    }
+
+    .vas-sics-suggest::-webkit-scrollbar-thumb {
+        background: rgba(15, 61, 97, 0.15);
+        border-radius: 0.1875em;
+    }
 
 .vas-sics-meta {
-    font-size: 11px; color: #748494;
-    padding: 8px 12px 6px; letter-spacing: 0.2px;
+    font-size: 0.6875em;              /* 11px */
+    color: #748494;
+    padding: 0.5em 0.75em 0.375em;
+    letter-spacing: 0.0125em;
 }
-.vas-sics-meta strong { color: #102C3F; font-weight: 700; }
+
+    .vas-sics-meta strong {
+        color: #102C3F;
+        font-weight: 700;
+    }
 
 .vas-sics-line {
     display: grid;
-    grid-template-columns: 34px 1fr;
+    grid-template-columns: 2.125em 1fr;
     align-items: center;
-    gap: 12px;
-    padding: 9px 12px;
-    border-radius: 10px;
+    gap: 0.75em;
+    padding: 0.5625em 0.75em;
+    border-radius: 0.625em;
     cursor: pointer;
     transition: background 120ms ease;
 }
-.vas-sics-line:hover,
-.vas-sics-line.is-cursor { background: #F4F9FE; }
+
+    .vas-sics-line:hover,
+    .vas-sics-line.is-cursor {
+        background: #F4F9FE;
+    }
 
 .vas-sics-avatar {
-    width: 34px; height: 34px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: #FFFFFF; font-size: 12px; font-weight: 700;
+    width: 2.125em;                   /* 34px */
+    height: 2.125em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-size: 0.75em;                /* 12px */
+    font-weight: 700;
     flex-shrink: 0;
 }
-.vas-sics-info { min-width: 0; }
-.vas-sics-name {
-    font-size: 14px; font-weight: 700; color: #102C3F;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+
+.vas-sics-info {
+    min-width: 0;
 }
-.vas-sics-name mark,
-.vas-sics-rowmeta mark { background: #FFF3DA; color: #9A6500; padding: 0 1px; border-radius: 2px; }
+
+.vas-sics-name {
+    font-size: 0.875em;               /* 14px */
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+    .vas-sics-name mark,
+    .vas-sics-rowmeta mark {
+        background: #FFF3DA;
+        color: #9A6500;
+        padding: 0 0.0625em;
+        border-radius: 0.125em;
+    }
 
 /* Inline text flow so "docNo · amount · status · date" reads as one line and trims cleanly. */
 .vas-sics-rowmeta {
-    font-size: 12px; color: #748494;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    margin-top: 2px;
+    font-size: 0.75em;                /* 12px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.125em;
 }
+
 .vas-sics-dot {
     display: inline-block;
-    width: 7px; height: 7px;
+    width: 0.4375em;                  /* 7px */
+    height: 0.4375em;
     border-radius: 50%;
-    margin-inline-end: 6px;
+    margin-inline-end: 0.375em;
     vertical-align: middle;
 }
-.vas-sics-cur { margin-inline-end: 0.08em; }
+
+.vas-sics-cur {
+    margin-inline-end: 0.08em;
+}
 
 .vas-sics-state,
 .vas-sics-empty {
     text-align: center;
-    padding: 26px 20px;
+    padding: 1.625em 1.25em;
     color: #748494;
-    font-size: 13px;
+    font-size: 0.8125em;              /* 13px */
 }
-.vas-sics-empty strong { color: #102C3F; }
 
-/* small-screen safety */
-@media (max-width: 720px) {
-    .vas-sics-esw { --vas-sics-gutter: 16px; }
-    .vas-sics-input { height: 50px; }
-    .vas-sics-field { font-size: 14px; }
+    .vas-sics-empty strong {
+        color: #102C3F;
+    }
+
+/* Narrow-cell safety — container-based (matches the cqi font anchor) so the
+   height responds to the dashboard CELL width, not the viewport. Fires when the
+   widget cell is narrow (sidebar + right panel open, or a small screen). */
+@container (max-width: 45em) {        /* narrow cell (~720px) */
+    .vas-sics-esw {
+        padding: 0 1em;
+    }
+    .vas-sics-input {
+        height: 3.125em;
+    }
+    .vas-sics-input .vas-sics-field {
+        font-size: 0.875em;
+    }
+}
+
+/* Very narrow cell — keep the pill a usable height and tighten further. */
+@container (max-width: 26em) {        /* ~420px */
+    .vas-sics-input {
+        height: 2.875em;
+    }
 }
