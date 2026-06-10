@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
+using System.Data.SqlClient;
 using System.Web.Mvc;
+using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -36,118 +37,11 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateFrom = today.AddDays(-6);
-                DateTime dateTo = today.AddDays(1);
+                SqlQueryData queryData = BuildSevenDayCashFlowSql(ctx);
 
-                string dateFilter = GetDateFilter("CashHeader.StatementDate", dateFrom, dateTo);
+                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
-                string rawCashFlowSql = @"
-                    SELECT CashHeader.StatementDate,
-                           CashHeader.DateAcct,
-                           CashHeader.AD_Client_ID,
-                           CashHeader.AD_Org_ID,
-                           CashBook.C_Currency_ID AS CashBookCurrency_ID,
-                           CashLine.Amount
-                    FROM C_CashLine CashLine
-                    INNER JOIN C_Cash CashHeader
-                        ON (CashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-                    INNER JOIN C_CashBook CashBook
-                        ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
-                    WHERE CashLine.IsActive='Y'
-                    AND CashHeader.IsActive='Y'
-                    AND CashBook.IsActive='Y'
-                    AND CashHeader.DocStatus IN ('CO','CL')
-                    " + dateFilter;
-
-                rawCashFlowSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    rawCashFlowSql,
-                    "CashLine",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
-
-                string dayExpression = GetDayExpression("RawCashFlow.StatementDate");
-
-                string convertedAmountExpression = @"
-                    CASE
-                        WHEN RawCashFlow.CashBookCurrency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(RawCashFlow.Amount, 0)
-                        ELSE CurrencyConvert(
-                            COALESCE(RawCashFlow.Amount, 0),
-                            RawCashFlow.CashBookCurrency_ID,
-                            SchemaCurrency.C_Currency_ID,
-                            RawCashFlow.DateAcct,
-                            0,
-                            RawCashFlow.AD_Client_ID,
-                            RawCashFlow.AD_Org_ID
-                        )
-                    END";
-
-                string sql = @"
-                    SELECT " + dayExpression + @" AS CashFlowDate,
-                           ROUND(
-                               COALESCE(SUM(
-                                   CASE
-                                       WHEN " + convertedAmountExpression + @" > 0 THEN " + convertedAmountExpression + @"
-                                       ELSE 0
-                                   END
-                               ), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS CashInAmount,
-                           ROUND(
-                               COALESCE(SUM(
-                                   CASE
-                                       WHEN " + convertedAmountExpression + @" < 0 THEN 0 - (" + convertedAmountExpression + @")
-                                       ELSE 0
-                                   END
-                               ), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS CashOutAmount,
-                           ROUND(
-                               COALESCE(SUM(" + convertedAmountExpression + @"), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS NetAmount,
-                           COUNT(1) AS LineCount,
-                           COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
-                           MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
-                           MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
-                           MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
-                    FROM (" + rawCashFlowSql.Trim() + @") RawCashFlow
-                    INNER JOIN (SELECT ClientInfo.AD_Client_ID,
-                               AcctSchema.C_Currency_ID AS C_Currency_ID,
-                               Curr.StdPrecision,
-                               Curr.ISO_Code,
-                               CASE
-                                   WHEN Curr.CurSymbol IS NOT NULL THEN Curr.CurSymbol
-                                   ELSE Curr.ISO_Code
-                               END AS Cur_Symbol
-                        FROM AD_ClientInfo ClientInfo
-                        INNER JOIN C_AcctSchema AcctSchema
-                            ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                        INNER JOIN C_Currency Curr
-                            ON (AcctSchema.C_Currency_ID=Curr.C_Currency_ID)
-                    ) SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID=RawCashFlow.AD_Client_ID)
-                    GROUP BY " + dayExpression + @"
-                    ORDER BY " + dayExpression;
-
-                Dictionary<string, CashFlowDay> dayMap = new Dictionary<string, CashFlowDay>();
-
-                for (int index = 0; index < 7; index++)
-                {
-                    DateTime day = dateFrom.AddDays(index);
-                    string key = FormatDate(day);
-
-                    dayMap[key] = new CashFlowDay
-                    {
-                        CashFlowDate = key,
-                        DayLabel = day.ToString("ddd"),
-                        CashInAmount = 0,
-                        CashOutAmount = 0,
-                        NetAmount = 0,
-                        LineCount = 0
-                    };
-                }
+                List<object> items = new List<object>();
 
                 int stdPrecision = 2;
                 int currencyId = 0;
@@ -159,16 +53,14 @@ namespace VAS.Controllers
                 decimal totalNet = 0;
                 int totalLineCount = 0;
 
-                reader = DB.ExecuteReader(sql, null, null);
+                DateTime? dateFrom = null;
+                DateTime? dateTo = null;
 
-                while (reader.Read())
+                while (reader != null && reader.Read())
                 {
-                    string cashFlowDate = FormatDbDate(reader["CashFlowDate"]);
-
-                    if (!dayMap.ContainsKey(cashFlowDate))
-                    {
-                        continue;
-                    }
+                    DateTime cashFlowDateValue = Util.GetValueOfDateTime(reader["CashFlowDate"]) ?? DateTime.Now;
+                    string cashFlowDate = FormatDate(cashFlowDateValue);
+                    string dayLabel = cashFlowDateValue.ToString("ddd");
 
                     decimal cashInAmount = GetDecimal(reader, "CashInAmount");
                     decimal cashOutAmount = GetDecimal(reader, "CashOutAmount");
@@ -180,37 +72,30 @@ namespace VAS.Controllers
                     currencyISO = GetString(reader, "CurrencyISO");
                     currencySymbol = GetString(reader, "CurrencySymbol");
 
-                    dayMap[cashFlowDate].CashInAmount = cashInAmount;
-                    dayMap[cashFlowDate].CashOutAmount = cashOutAmount;
-                    dayMap[cashFlowDate].NetAmount = netAmount;
-                    dayMap[cashFlowDate].LineCount = lineCount;
+                    if (!dateFrom.HasValue)
+                    {
+                        dateFrom = cashFlowDateValue;
+                    }
+
+                    dateTo = cashFlowDateValue;
 
                     totalCashIn += cashInAmount;
                     totalCashOut += cashOutAmount;
                     totalNet += netAmount;
                     totalLineCount += lineCount;
-                }
-
-                List<object> items = new List<object>();
-
-                for (int index = 0; index < 7; index++)
-                {
-                    DateTime day = dateFrom.AddDays(index);
-                    string key = FormatDate(day);
-                    CashFlowDay cashFlowDay = dayMap[key];
 
                     items.Add(new
                     {
-                        date = cashFlowDay.CashFlowDate,
-                        dayLabel = cashFlowDay.DayLabel,
-                        cashInAmount = cashFlowDay.CashInAmount,
-                        cashOutAmount = cashFlowDay.CashOutAmount,
-                        netAmount = cashFlowDay.NetAmount,
-                        lineCount = cashFlowDay.LineCount,
-                        tooltip = cashFlowDay.DayLabel + " " + cashFlowDay.CashFlowDate
-                            + " | In: " + cashFlowDay.CashInAmount.ToString()
-                            + " | Out: " + cashFlowDay.CashOutAmount.ToString()
-                            + " | Net: " + cashFlowDay.NetAmount.ToString()
+                        date = cashFlowDate,
+                        dayLabel = dayLabel,
+                        cashInAmount = cashInAmount,
+                        cashOutAmount = cashOutAmount,
+                        netAmount = netAmount,
+                        lineCount = lineCount,
+                        tooltip = dayLabel + " " + cashFlowDate
+                            + " | In: " + cashInAmount.ToString()
+                            + " | Out: " + cashOutAmount.ToString()
+                            + " | Net: " + netAmount.ToString()
                     });
                 }
 
@@ -220,8 +105,8 @@ namespace VAS.Controllers
                     error = string.Empty,
                     title = GetMsg(ctx, "VAS_051_SevenDayCashFlow", "7-Day Cash Flow"),
                     metaText = GetMsg(ctx, "VAS_051_Last7Days", "Last 7 days"),
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(today),
+                    dateFrom = dateFrom.HasValue ? FormatDate(dateFrom.Value) : "",
+                    dateTo = dateTo.HasValue ? FormatDate(dateTo.Value) : "",
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
                     cCurrencyId = currencyId,
@@ -252,32 +137,209 @@ namespace VAS.Controllers
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private SqlQueryData BuildSevenDayCashFlowSql(Ctx ctx)
         {
-            return @"
-                AND " + columnName + @" >= " + ToSqlDate(dateFrom) + @"
-                AND " + columnName + @" < " + ToSqlDate(dateTo);
+            string todayDateSql = GetTodayDateSql();
+            string cashFlowDateSql = GetDateOnlySql("CashFlowDays.CashFlowDate");
+
+            string dateRangeSql = @"
+DateRange AS
+(
+SELECT
+" + todayDateSql + @" AS TodayDate,
+CAST(" + todayDateSql + @" - 6 AS TIMESTAMP) AS DateFrom,
+CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS DateTo
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string dateSeedSql = @"
+DateSeed AS
+(
+SELECT 0 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+UNION ALL
+SELECT 1 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+UNION ALL
+SELECT 2 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+UNION ALL
+SELECT 3 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+UNION ALL
+SELECT 4 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+UNION ALL
+SELECT 5 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+UNION ALL
+SELECT 6 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashFlowDaysSql = @"
+CashFlowDays AS
+(
+SELECT
+CAST(DateRange.TodayDate - (6 - DateSeed.DayOffset) AS DATE) AS CashFlowDate,
+CAST(DateRange.TodayDate - (6 - DateSeed.DayOffset) AS TIMESTAMP) AS DateStart,
+CAST(DateRange.TodayDate - (6 - DateSeed.DayOffset) + 1 AS TIMESTAMP) AS DateEnd,
+DateSeed.DayOffset
+FROM DateRange DateRange
+INNER JOIN DateSeed DateSeed ON (1 = 1)
+)";
+
+            string schemaCurrencySql = @"
+SchemaCurrency AS
+(
+SELECT
+ClientInfo.AD_Client_ID,
+AcctSchema.C_Currency_ID AS C_Currency_ID,
+Currency.StdPrecision,
+TRIM(CAST(Currency.ISO_Code AS CHAR(255))) AS ISO_Code,
+CASE WHEN Currency.CurSymbol IS NOT NULL THEN TRIM(CAST(Currency.CurSymbol AS CHAR(255))) ELSE TRIM(CAST(Currency.ISO_Code AS CHAR(255))) END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashLineAccessSql = @"
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.C_Cash_ID,
+CashLine.Amount
+FROM C_CashLine CashLine
+WHERE CashLine.IsActive = 'Y'";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_CashLine CashLine.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             * Do not apply MRole on a query that already contains INNER JOIN.
+             */
+            cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashLineAccessSql,
+                "CashLine",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string cashLineAccessCteSql = @"
+CashLineAccess AS
+(
+" + cashLineAccessSql + @"
+)";
+
+            string cashDataSql = @"
+CashData AS
+(
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.Amount,
+CashHeader.C_Cash_ID,
+CashHeader.StatementDate,
+CashHeader.DateAcct,
+CashHeader.AD_Client_ID,
+CashHeader.AD_Org_ID,
+CashBook.C_Currency_ID AS CashBookCurrency_ID
+FROM CashLineAccess CashLine
+INNER JOIN C_Cash CashHeader ON (CashLine.C_Cash_ID = CashHeader.C_Cash_ID)
+INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID = CashBook.C_CashBook_ID)
+INNER JOIN DateRange DateRange ON (CAST(CashHeader.StatementDate AS TIMESTAMP) >= DateRange.DateFrom AND CAST(CashHeader.StatementDate AS TIMESTAMP) < DateRange.DateTo)
+WHERE CashHeader.IsActive = 'Y'
+AND CashBook.IsActive = 'Y'
+AND CashHeader.DocStatus IN ('CO', 'CL')
+)";
+
+            string convertedAmountExpression = @"
+CASE WHEN CashData.C_CashLine_ID IS NULL THEN 0 WHEN CashData.CashBookCurrency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashData.Amount, 0) ELSE CurrencyConvert(COALESCE(CashData.Amount, 0), CashData.CashBookCurrency_ID, SchemaCurrency.C_Currency_ID, CashData.DateAcct, 0, CashData.AD_Client_ID, CashData.AD_Org_ID) END";
+
+            string cashFlowDataSql = @"
+CashFlowData AS
+(
+SELECT
+" + cashFlowDateSql + @" AS CashFlowDate,
+CashFlowDays.DayOffset,
+ROUND(
+COALESCE(
+SUM(
+CASE WHEN " + convertedAmountExpression + @" > 0 THEN " + convertedAmountExpression + @" ELSE 0 END
+),
+0
+),
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
+) AS CashInAmount,
+ROUND(
+COALESCE(
+SUM(
+CASE WHEN " + convertedAmountExpression + @" < 0 THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END
+),
+0
+),
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
+) AS CashOutAmount,
+ROUND(
+COALESCE(SUM(" + convertedAmountExpression + @"), 0),
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
+) AS NetAmount,
+COUNT(CashData.C_CashLine_ID) AS LineCount,
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
+MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
+FROM CashFlowDays CashFlowDays
+INNER JOIN SchemaCurrency SchemaCurrency ON (1 = 1)
+LEFT OUTER JOIN CashData CashData ON (CashData.AD_Client_ID = SchemaCurrency.AD_Client_ID AND CAST(CashData.StatementDate AS TIMESTAMP) >= CashFlowDays.DateStart AND CAST(CashData.StatementDate AS TIMESTAMP) < CashFlowDays.DateEnd)
+GROUP BY " + cashFlowDateSql + @", CashFlowDays.DayOffset
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + dateSeedSql + @",
+" + cashFlowDaysSql + @",
+" + schemaCurrencySql + @",
+" + cashLineAccessCteSql + @",
+" + cashDataSql + @",
+" + cashFlowDataSql + @"
+SELECT
+CashFlowData.CashFlowDate,
+CashFlowData.CashInAmount,
+CashFlowData.CashOutAmount,
+CashFlowData.NetAmount,
+CashFlowData.LineCount,
+CashFlowData.StdPrecision,
+CashFlowData.C_Currency_ID,
+CashFlowData.CurrencyISO,
+CashFlowData.CurrencySymbol
+FROM CashFlowData CashFlowData
+ORDER BY CashFlowData.DayOffset";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
         }
 
-        private string ToSqlDate(DateTime date)
+        private string GetTodayDateSql()
         {
-            DateTime day = date.Date;
-
             if (DB.IsOracle())
             {
-                return "TO_DATE('"
-                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                    + "','YYYY-MM-DD')";
+                return "TRUNC(CURRENT_DATE)";
             }
 
-            return DB.TO_DATE(day, true);
+            return "CURRENT_DATE";
         }
 
-        private string GetDayExpression(string columnName)
+        private string GetDateOnlySql(string columnName)
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(" + columnName + ")";
+                return "CAST(TRUNC(" + columnName + ") AS DATE)";
             }
 
             return "CAST(" + columnName + " AS DATE)";
@@ -286,23 +348,6 @@ namespace VAS.Controllers
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");
-        }
-
-        private string FormatDbDate(object value)
-        {
-            if (value == null || value == DBNull.Value)
-            {
-                return string.Empty;
-            }
-
-            DateTime dateValue;
-
-            if (DateTime.TryParse(value.ToString(), out dateValue))
-            {
-                return FormatDate(dateValue);
-            }
-
-            return string.Empty;
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)
@@ -355,14 +400,10 @@ namespace VAS.Controllers
             return value.ToString();
         }
 
-        private class CashFlowDay
+        private class SqlQueryData
         {
-            public string CashFlowDate { get; set; }
-            public string DayLabel { get; set; }
-            public decimal CashInAmount { get; set; }
-            public decimal CashOutAmount { get; set; }
-            public decimal NetAmount { get; set; }
-            public int LineCount { get; set; }
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }

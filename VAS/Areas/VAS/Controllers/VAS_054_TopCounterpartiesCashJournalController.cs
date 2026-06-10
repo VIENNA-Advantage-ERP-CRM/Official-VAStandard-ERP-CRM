@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
+using System.Data.SqlClient;
 using System.Web.Mvc;
+using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -38,127 +39,9 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateFrom = today.AddDays(-29);
-                DateTime dateTo = today.AddDays(1);
-                string dateFilter = GetDateFilter("CashHeader.StatementDate", dateFrom, dateTo);
+                SqlQueryData queryData = BuildTopCounterpartiesSql(ctx);
 
-                string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                    INNER JOIN C_Currency Currency
-                        ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
-
-                string convertedAmountExpression = @"
-                    CASE
-                        WHEN CashHeader.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(CashLine.Amount, 0)
-                        ELSE CurrencyConvert(
-                            COALESCE(CashLine.Amount, 0),
-                            CashHeader.C_Currency_ID,
-                            SchemaCurrency.C_Currency_ID,
-                            CashHeader.DateAcct,
-                            0,
-                            CashHeader.AD_Client_ID,
-                            CashHeader.AD_Org_ID
-                        )
-                    END";
-
-                string lineSql = @"
-                    SELECT CASE
-                               WHEN CashLine.C_BPartner_ID IS NOT NULL AND CashLine.C_BPartner_ID > 0 THEN 'BP'
-                               WHEN CashLine.C_CashBook_ID IS NOT NULL AND CashLine.C_CashBook_ID > 0 THEN 'CASHBOOK'
-                               WHEN CashLine.C_BankAccount_ID IS NOT NULL AND CashLine.C_BankAccount_ID > 0 THEN 'BANK'
-                               ELSE 'OTHER'
-                           END AS CounterpartyType,
-                           CASE
-                               WHEN CashLine.C_BPartner_ID IS NOT NULL AND CashLine.C_BPartner_ID > 0 THEN CashLine.C_BPartner_ID
-                               WHEN CashLine.C_CashBook_ID IS NOT NULL AND CashLine.C_CashBook_ID > 0 THEN CashLine.C_CashBook_ID
-                               WHEN CashLine.C_BankAccount_ID IS NOT NULL AND CashLine.C_BankAccount_ID > 0 THEN CashLine.C_BankAccount_ID
-                               ELSE 0
-                           END AS Counterparty_ID,
-                           CASE
-                               WHEN CashLine.C_BPartner_ID IS NOT NULL AND CashLine.C_BPartner_ID > 0 THEN BPartner.Name
-                               WHEN CashLine.C_CashBook_ID IS NOT NULL AND CashLine.C_CashBook_ID > 0 THEN LineCashBook.Name
-                               WHEN CashLine.C_BankAccount_ID IS NOT NULL AND CashLine.C_BankAccount_ID > 0 THEN COALESCE(Bank.Name, BankAccount.AccountNo)
-                               ELSE COALESCE(CashLine.Description, CashHeader.DocumentNo)
-                           END AS CounterpartyName,
-                           CashLine.CashType,
-                           CashLine.Amount,
-                           " + convertedAmountExpression + @" AS ConvertedAmount,
-                           CashHeader.StatementDate,
-                           COALESCE(SchemaCurrency.StdPrecision, 2) AS StdPrecision,
-                           SchemaCurrency.C_Currency_ID AS C_Currency_ID,
-                           SchemaCurrency.ISO_Code AS CurrencyISO,
-                           SchemaCurrency.Cur_Symbol AS CurrencySymbol
-                    FROM C_CashLine CashLine
-                    INNER JOIN C_Cash CashHeader
-                        ON (CashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
-                    LEFT OUTER JOIN C_BPartner BPartner
-                        ON (CashLine.C_BPartner_ID=BPartner.C_BPartner_ID)
-                    LEFT OUTER JOIN C_CashBook LineCashBook
-                        ON (CashLine.C_CashBook_ID=LineCashBook.C_CashBook_ID)
-                    LEFT OUTER JOIN C_BankAccount BankAccount
-                        ON (CashLine.C_BankAccount_ID=BankAccount.C_BankAccount_ID)
-                    LEFT OUTER JOIN C_Bank Bank
-                        ON (BankAccount.C_Bank_ID=Bank.C_Bank_ID)
-                    WHERE CashLine.IsActive='Y'
-                    AND CashHeader.IsActive='Y'
-                    AND CashHeader.DocStatus IN ('CO','CL')"
-                    + dateFilter;
-
-                lineSql = MRole.GetDefault(ctx).AddAccessSQL(lineSql, "CashLine", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                string aggregateSql = @"
-                    SELECT CounterpartyLines.CounterpartyType,
-                           CounterpartyLines.Counterparty_ID,
-                           MAX(CounterpartyLines.CounterpartyName) AS CounterpartyName,
-                           SUM(CounterpartyLines.ConvertedAmount) AS NetAmount,
-                           SUM(CASE WHEN CounterpartyLines.ConvertedAmount > 0 THEN CounterpartyLines.ConvertedAmount ELSE 0 END) AS InAmount,
-                           SUM(CASE WHEN CounterpartyLines.ConvertedAmount < 0 THEN 0 - CounterpartyLines.ConvertedAmount ELSE 0 END) AS OutAmount,
-                           COUNT(1) AS EntryCount,
-                           MAX(CounterpartyLines.StdPrecision) AS StdPrecision,
-                           MAX(CounterpartyLines.C_Currency_ID) AS C_Currency_ID,
-                           MAX(CounterpartyLines.CurrencyISO) AS CurrencyISO,
-                           MAX(CounterpartyLines.CurrencySymbol) AS CurrencySymbol
-                    FROM CounterpartyLines CounterpartyLines
-                    GROUP BY CounterpartyLines.CounterpartyType,
-                             CounterpartyLines.Counterparty_ID";
-
-                string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    ),
-                    CounterpartyLines AS (
-                        " + lineSql + @"
-                    ),
-                    CounterpartyTotals AS (
-                        " + aggregateSql + @"
-                    )
-                    SELECT CounterpartyTotals.CounterpartyType,
-                           CounterpartyTotals.Counterparty_ID,
-                           CounterpartyTotals.CounterpartyName,
-                           CounterpartyTotals.NetAmount,
-                           CounterpartyTotals.InAmount,
-                           CounterpartyTotals.OutAmount,
-                           CounterpartyTotals.EntryCount,
-                           CounterpartyTotals.StdPrecision,
-                           CounterpartyTotals.C_Currency_ID,
-                           CounterpartyTotals.CurrencyISO,
-                           CounterpartyTotals.CurrencySymbol
-                    FROM CounterpartyTotals CounterpartyTotals
-                    ORDER BY ABS(CounterpartyTotals.NetAmount) DESC,
-                             CounterpartyTotals.EntryCount DESC";
+                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 List<object> items = new List<object>();
                 int totalCounterparties = 0;
@@ -166,12 +49,22 @@ namespace VAS.Controllers
                 int currencyId = 0;
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
+                string dateFrom = string.Empty;
+                string dateTo = string.Empty;
 
-                reader = DB.ExecuteReader(sql, null, null);
-
-                while (reader.Read())
+                while (reader != null && reader.Read())
                 {
                     totalCounterparties++;
+
+                    if (string.IsNullOrEmpty(dateFrom))
+                    {
+                        dateFrom = FormatDbDate(reader["DateFrom"]);
+                    }
+
+                    if (string.IsNullOrEmpty(dateTo))
+                    {
+                        dateTo = FormatDbDate(reader["DateTo"]);
+                    }
 
                     if (items.Count >= 5)
                     {
@@ -217,8 +110,8 @@ namespace VAS.Controllers
                     metaText = GetMsg(ctx, "VAS_054_Last30Days", "Last 30 Days"),
                     actionText = GetMsg(ctx, "VAS_054_AllParties", "All parties ->"),
                     noDataText = GetMsg(ctx, "VAS_054_NoData", "No counterparties found"),
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(today),
+                    dateFrom = dateFrom,
+                    dateTo = dateTo,
                     totalCounterparties = totalCounterparties,
                     cCurrencyId = currencyId,
                     currencyISO = currencyISO,
@@ -247,31 +140,184 @@ namespace VAS.Controllers
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private SqlQueryData BuildTopCounterpartiesSql(Ctx ctx)
         {
-            return @"
-                AND " + columnName + @" >= " + ToSqlDate(dateFrom) + @"
-                AND " + columnName + @" < " + ToSqlDate(dateTo) + @"
-            ";
+            string todayDateSql = GetTodayDateSql();
+
+            string dateRangeSql = @"
+DateRange AS
+(
+SELECT
+CAST(" + todayDateSql + @" - 29 AS TIMESTAMP) AS DateFrom,
+CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS DateToExclusive,
+" + todayDateSql + @" AS DateTo
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string schemaCurrencySql = @"
+SchemaCurrency AS
+(
+SELECT
+ClientInfo.AD_Client_ID,
+AcctSchema.C_Currency_ID AS C_Currency_ID,
+Currency.StdPrecision,
+TRIM(CAST(Currency.ISO_Code AS CHAR(255))) AS ISO_Code,
+CASE WHEN Currency.CurSymbol IS NOT NULL THEN TRIM(CAST(Currency.CurSymbol AS CHAR(255))) ELSE TRIM(CAST(Currency.ISO_Code AS CHAR(255))) END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashLineAccessSql = @"
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.C_Cash_ID,
+CashLine.C_BPartner_ID,
+CashLine.C_CashBook_ID,
+CashLine.C_BankAccount_ID,
+CashLine.Description,
+CashLine.Amount
+FROM C_CashLine CashLine
+WHERE CashLine.IsActive = 'Y'";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_CashLine CashLine.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             * Do not apply MRole on a query that already contains INNER JOIN.
+             */
+            cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashLineAccessSql,
+                "CashLine",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string cashLineAccessSqlCte = @"
+CashLineAccess AS
+(
+" + cashLineAccessSql + @"
+)";
+
+            string convertedAmountExpression = @"
+CASE WHEN CashHeader.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashLine.Amount, 0) ELSE CurrencyConvert(COALESCE(CashLine.Amount, 0), CashHeader.C_Currency_ID, SchemaCurrency.C_Currency_ID, CashHeader.DateAcct, 0, CashHeader.AD_Client_ID, CashHeader.AD_Org_ID) END";
+
+            string counterpartyLinesSql = @"
+CounterpartyLines AS
+(
+SELECT
+CASE WHEN CashLine.C_BPartner_ID IS NOT NULL AND CashLine.C_BPartner_ID > 0 THEN 'BP' WHEN CashLine.C_CashBook_ID IS NOT NULL AND CashLine.C_CashBook_ID > 0 THEN 'CASHBOOK' WHEN CashLine.C_BankAccount_ID IS NOT NULL AND CashLine.C_BankAccount_ID > 0 THEN 'BANK' ELSE 'OTHER' END AS CounterpartyType,
+CASE WHEN CashLine.C_BPartner_ID IS NOT NULL AND CashLine.C_BPartner_ID > 0 THEN CashLine.C_BPartner_ID WHEN CashLine.C_CashBook_ID IS NOT NULL AND CashLine.C_CashBook_ID > 0 THEN CashLine.C_CashBook_ID WHEN CashLine.C_BankAccount_ID IS NOT NULL AND CashLine.C_BankAccount_ID > 0 THEN CashLine.C_BankAccount_ID ELSE 0 END AS Counterparty_ID,
+CASE WHEN CashLine.C_BPartner_ID IS NOT NULL AND CashLine.C_BPartner_ID > 0 THEN BPartner.Name WHEN CashLine.C_CashBook_ID IS NOT NULL AND CashLine.C_CashBook_ID > 0 THEN LineCashBook.Name WHEN CashLine.C_BankAccount_ID IS NOT NULL AND CashLine.C_BankAccount_ID > 0 THEN COALESCE(Bank.Name, BankAccount.AccountNo) ELSE COALESCE(CashLine.Description, CashHeader.DocumentNo) END AS CounterpartyName,
+" + convertedAmountExpression + @" AS ConvertedAmount,
+CashHeader.StatementDate,
+COALESCE(SchemaCurrency.StdPrecision, 2) AS StdPrecision,
+SchemaCurrency.C_Currency_ID AS C_Currency_ID,
+SchemaCurrency.ISO_Code AS CurrencyISO,
+SchemaCurrency.Cur_Symbol AS CurrencySymbol
+FROM CashLineAccess CashLine
+INNER JOIN C_Cash CashHeader ON (CashLine.C_Cash_ID = CashHeader.C_Cash_ID)
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID = CashHeader.AD_Client_ID)
+INNER JOIN DateRange DateRange ON (CAST(CashHeader.StatementDate AS TIMESTAMP) >= DateRange.DateFrom AND CAST(CashHeader.StatementDate AS TIMESTAMP) < DateRange.DateToExclusive)
+LEFT OUTER JOIN C_BPartner BPartner ON (CashLine.C_BPartner_ID = BPartner.C_BPartner_ID)
+LEFT OUTER JOIN C_CashBook LineCashBook ON (CashLine.C_CashBook_ID = LineCashBook.C_CashBook_ID)
+LEFT OUTER JOIN C_BankAccount BankAccount ON (CashLine.C_BankAccount_ID = BankAccount.C_BankAccount_ID)
+LEFT OUTER JOIN C_Bank Bank ON (BankAccount.C_Bank_ID = Bank.C_Bank_ID)
+WHERE CashHeader.IsActive = 'Y'
+AND CashHeader.DocStatus IN ('CO', 'CL')
+)";
+
+            string counterpartyTotalsSql = @"
+CounterpartyTotals AS
+(
+SELECT
+CounterpartyLines.CounterpartyType,
+CounterpartyLines.Counterparty_ID,
+MAX(CounterpartyLines.CounterpartyName) AS CounterpartyName,
+ROUND(SUM(CounterpartyLines.ConvertedAmount), COALESCE(MAX(CounterpartyLines.StdPrecision), 2)) AS NetAmount,
+ROUND(SUM(CASE WHEN CounterpartyLines.ConvertedAmount > 0 THEN CounterpartyLines.ConvertedAmount ELSE 0 END), COALESCE(MAX(CounterpartyLines.StdPrecision), 2)) AS InAmount,
+ROUND(SUM(CASE WHEN CounterpartyLines.ConvertedAmount < 0 THEN 0 - CounterpartyLines.ConvertedAmount ELSE 0 END), COALESCE(MAX(CounterpartyLines.StdPrecision), 2)) AS OutAmount,
+COUNT(1) AS EntryCount,
+MAX(CounterpartyLines.StdPrecision) AS StdPrecision,
+MAX(CounterpartyLines.C_Currency_ID) AS C_Currency_ID,
+MAX(CounterpartyLines.CurrencyISO) AS CurrencyISO,
+MAX(CounterpartyLines.CurrencySymbol) AS CurrencySymbol
+FROM CounterpartyLines CounterpartyLines
+GROUP BY CounterpartyLines.CounterpartyType, CounterpartyLines.Counterparty_ID
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + schemaCurrencySql + @",
+" + cashLineAccessSqlCte + @",
+" + counterpartyLinesSql + @",
+" + counterpartyTotalsSql + @"
+SELECT
+CounterpartyTotals.CounterpartyType,
+CounterpartyTotals.Counterparty_ID,
+CounterpartyTotals.CounterpartyName,
+CounterpartyTotals.NetAmount,
+CounterpartyTotals.InAmount,
+CounterpartyTotals.OutAmount,
+CounterpartyTotals.EntryCount,
+CounterpartyTotals.StdPrecision,
+CounterpartyTotals.C_Currency_ID,
+CounterpartyTotals.CurrencyISO,
+CounterpartyTotals.CurrencySymbol,
+DateRange.DateFrom AS DateFrom,
+DateRange.DateTo AS DateTo
+FROM CounterpartyTotals CounterpartyTotals
+INNER JOIN DateRange DateRange ON (1 = 1)
+ORDER BY ABS(CounterpartyTotals.NetAmount) DESC, CounterpartyTotals.EntryCount DESC";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
         }
 
-        private string ToSqlDate(DateTime date)
+        private string GetTodayDateSql()
         {
-            DateTime day = date.Date;
-
             if (DB.IsOracle())
             {
-                return "TO_DATE('"
-                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                    + "','YYYY-MM-DD')";
+                return "TRUNC(CURRENT_DATE)";
             }
 
-            return DB.TO_DATE(day, true);
+            return "CURRENT_DATE";
         }
 
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");
+        }
+
+        private string FormatDbDate(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return string.Empty;
+            }
+
+            DateTime dateValue;
+
+            if (DateTime.TryParse(value.ToString(), out dateValue))
+            {
+                return FormatDate(dateValue);
+            }
+
+            return string.Empty;
         }
 
         private string GetTypeText(Ctx ctx, string counterpartyType, decimal netAmount)
@@ -396,6 +442,12 @@ namespace VAS.Controllers
             }
 
             return value.ToString();
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }

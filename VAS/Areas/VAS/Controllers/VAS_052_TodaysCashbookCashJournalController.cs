@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Globalization;
 using System.Web.Mvc;
+using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -39,132 +39,28 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateTo = today.AddDays(1);
-                string dateFilter = GetDateFilter("CashHeader.StatementDate", today, dateTo);
+                SqlQueryData queryData = BuildTodaysCashbookSql(ctx, cashBookId);
 
-                string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                    INNER JOIN C_Currency Currency
-                        ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
-
-                string convertedAmountExpression = @"
-                    CASE
-                        WHEN CashHeader.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(CashLine.Amount, 0)
-                        ELSE CurrencyConvert(
-                            COALESCE(CashLine.Amount, 0),
-                            CashHeader.C_Currency_ID,
-                            SchemaCurrency.C_Currency_ID,
-                            CashHeader.DateAcct,
-                            0,
-                            CashHeader.AD_Client_ID,
-                            CashHeader.AD_Org_ID
-                        )
-                    END";
-
-                string cashLineSql = @"
-                    SELECT CashLine.C_CashLine_ID,
-                           CashLine.Created,
-                           CashLine.Description,
-                           CashLine.Amount,
-                           ROUND(
-                               " + convertedAmountExpression + @",
-                               COALESCE(SchemaCurrency.StdPrecision, 2)
-                           ) AS ConvertedAmount,
-                           CashHeader.C_CashBook_ID,
-                           CashBook.Name AS CashBookName,
-                           Charge.Name AS CategoryName,
-                           CreatedByUser.Name AS PostedBy,
-                           COALESCE(SchemaCurrency.StdPrecision, 2) AS StdPrecision,
-                           SchemaCurrency.C_Currency_ID AS C_Currency_ID,
-                           SchemaCurrency.ISO_Code AS CurrencyISO,
-                           SchemaCurrency.Cur_Symbol AS CurrencySymbol
-                    FROM C_CashLine CashLine
-                    INNER JOIN C_Cash CashHeader
-                        ON (CashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-                    INNER JOIN C_CashBook CashBook
-                        ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
-                    LEFT OUTER JOIN C_Charge Charge
-                        ON (CashLine.C_Charge_ID=Charge.C_Charge_ID)
-                    LEFT OUTER JOIN AD_User CreatedByUser
-                        ON (CashLine.CreatedBy=CreatedByUser.AD_User_ID)
-                    WHERE CashLine.IsActive='Y'
-                    AND CashHeader.IsActive='Y'
-                    AND CashBook.IsActive='Y'
-                    AND CashHeader.DocStatus IN ('CO','CL')"
-                    + dateFilter;
-
-                if (cashBookId > 0)
-                {
-                    cashLineSql += @"
-                    AND CashHeader.C_CashBook_ID=@CashBookId";
-                }
-
-                cashLineSql = MRole.GetDefault(ctx).AddAccessSQL(cashLineSql, "CashLine", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    ),
-                    CashRows AS (
-                        " + cashLineSql + @"
-                    )
-                    SELECT CashRows.C_CashLine_ID,
-                           CashRows.Created,
-                           CashRows.Description,
-                           CashRows.ConvertedAmount,
-                           CashRows.C_CashBook_ID,
-                           CashRows.CashBookName,
-                           CashRows.CategoryName,
-                           CashRows.PostedBy,
-                           CashRows.StdPrecision,
-                           CashRows.C_Currency_ID,
-                           CashRows.CurrencyISO,
-                           CashRows.CurrencySymbol
-                    FROM CashRows CashRows
-                    ORDER BY CashRows.Created DESC,
-                             CashRows.C_CashLine_ID DESC";
+                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 List<object> entries = new List<object>();
                 List<object> cashBooks = new List<object>();
                 HashSet<int> cashBookIds = new HashSet<int>();
+
                 int stdPrecision = 2;
                 int currencyId = 0;
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
                 int totalEntries = 0;
 
-                SqlParameter[] parameters = null;
-
-                if (cashBookId > 0)
-                {
-                    parameters = new SqlParameter[]
-                    {
-                        new SqlParameter("@CashBookId", cashBookId)
-                    };
-                }
-
-                reader = DB.ExecuteReader(sql, parameters, null);
-
-                while (reader.Read())
+                while (reader != null && reader.Read())
                 {
                     int rowCashBookId = GetInt(reader, "C_CashBook_ID");
 
                     if (!cashBookIds.Contains(rowCashBookId))
                     {
                         cashBookIds.Add(rowCashBookId);
+
                         cashBooks.Add(new
                         {
                             cCashBookId = rowCashBookId,
@@ -180,6 +76,7 @@ namespace VAS.Controllers
                     }
 
                     decimal amount = GetDecimal(reader, "ConvertedAmount");
+
                     stdPrecision = GetInt(reader, "StdPrecision", stdPrecision);
                     currencyId = GetInt(reader, "C_Currency_ID", currencyId);
                     currencyISO = GetString(reader, "CurrencyISO");
@@ -233,31 +130,156 @@ namespace VAS.Controllers
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private SqlQueryData BuildTodaysCashbookSql(Ctx ctx, int cashBookId)
         {
-            return @"
-                AND " + columnName + @" >= " + ToSqlDate(dateFrom) + @"
-                AND " + columnName + @" < " + ToSqlDate(dateTo) + @"
-            ";
-        }
+            string todayDateSql = GetTodayDateSql();
 
-        private string ToSqlDate(DateTime date)
-        {
-            DateTime day = date.Date;
+            string cashBookFilter = string.Empty;
 
-            if (DB.IsOracle())
+            if (cashBookId > 0)
             {
-                return "TO_DATE('"
-                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                    + "','YYYY-MM-DD')";
+                cashBookFilter = @"
+AND CashHeader.C_CashBook_ID = @CashBookId";
             }
 
-            return DB.TO_DATE(day, true);
+            string dateRangeSql = @"
+DateRange AS
+(
+SELECT
+CAST(" + todayDateSql + @" AS TIMESTAMP) AS TodayStart,
+CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS TodayEnd
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string schemaCurrencySql = @"
+SchemaCurrency AS
+(
+SELECT
+ClientInfo.AD_Client_ID,
+AcctSchema.C_Currency_ID AS C_Currency_ID,
+Currency.StdPrecision,
+TRIM(CAST(Currency.ISO_Code AS CHAR(255))) AS ISO_Code,
+CASE WHEN Currency.CurSymbol IS NOT NULL THEN TRIM(CAST(Currency.CurSymbol AS CHAR(255))) ELSE TRIM(CAST(Currency.ISO_Code AS CHAR(255))) END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashLineAccessSql = @"
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.C_Cash_ID,
+CashLine.Created,
+CashLine.CreatedBy,
+CashLine.Description,
+CashLine.Amount,
+CashLine.C_Charge_ID
+FROM C_CashLine CashLine
+WHERE CashLine.IsActive = 'Y'";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_CashLine CashLine.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             * Do not apply MRole on a query that already contains INNER JOIN.
+             */
+            cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashLineAccessSql,
+                "CashLine",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string cashLineAccessSqlCte = @"
+CashLineAccess AS
+(
+" + cashLineAccessSql + @"
+)";
+
+            string convertedAmountExpression = @"
+CASE WHEN CashHeader.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashLine.Amount, 0) ELSE CurrencyConvert(COALESCE(CashLine.Amount, 0), CashHeader.C_Currency_ID, SchemaCurrency.C_Currency_ID, CashHeader.DateAcct, 0, CashHeader.AD_Client_ID, CashHeader.AD_Org_ID) END";
+
+            string cashRowsSql = @"
+CashRows AS
+(
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.Created,
+CashLine.Description,
+CashLine.Amount,
+ROUND(" + convertedAmountExpression + @", COALESCE(SchemaCurrency.StdPrecision, 2)) AS ConvertedAmount,
+CashHeader.C_CashBook_ID,
+CashBook.Name AS CashBookName,
+Charge.Name AS CategoryName,
+CreatedByUser.Name AS PostedBy,
+COALESCE(SchemaCurrency.StdPrecision, 2) AS StdPrecision,
+SchemaCurrency.C_Currency_ID AS C_Currency_ID,
+SchemaCurrency.ISO_Code AS CurrencyISO,
+SchemaCurrency.Cur_Symbol AS CurrencySymbol
+FROM CashLineAccess CashLine
+INNER JOIN C_Cash CashHeader ON (CashLine.C_Cash_ID = CashHeader.C_Cash_ID)
+INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID = CashBook.C_CashBook_ID)
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID = CashHeader.AD_Client_ID)
+INNER JOIN DateRange DateRange ON (CAST(CashHeader.StatementDate AS TIMESTAMP) >= DateRange.TodayStart AND CAST(CashHeader.StatementDate AS TIMESTAMP) < DateRange.TodayEnd)
+LEFT OUTER JOIN C_Charge Charge ON (CashLine.C_Charge_ID = Charge.C_Charge_ID)
+LEFT OUTER JOIN AD_User CreatedByUser ON (CashLine.CreatedBy = CreatedByUser.AD_User_ID)
+WHERE CashHeader.IsActive = 'Y'
+AND CashBook.IsActive = 'Y'
+AND CashHeader.DocStatus IN ('CO', 'CL')" + cashBookFilter + @"
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + schemaCurrencySql + @",
+" + cashLineAccessSqlCte + @",
+" + cashRowsSql + @"
+SELECT
+CashRows.C_CashLine_ID,
+CashRows.Created,
+CashRows.Description,
+CashRows.ConvertedAmount,
+CashRows.C_CashBook_ID,
+CashRows.CashBookName,
+CashRows.CategoryName,
+CashRows.PostedBy,
+CashRows.StdPrecision,
+CashRows.C_Currency_ID,
+CashRows.CurrencyISO,
+CashRows.CurrencySymbol
+FROM CashRows CashRows
+ORDER BY CashRows.Created DESC, CashRows.C_CashLine_ID DESC";
+
+            List<SqlParameter> parameters = new List<SqlParameter>
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            if (cashBookId > 0)
+            {
+                parameters.Add(new SqlParameter("@CashBookId", cashBookId));
+            }
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters.ToArray()
+            };
         }
 
-        private string FormatDate(DateTime date)
+        private string GetTodayDateSql()
         {
-            return date.ToString("yyyy-MM-dd");
+            if (DB.IsOracle())
+            {
+                return "TRUNC(CURRENT_DATE)";
+            }
+
+            return "CURRENT_DATE";
         }
 
         private string FormatTime(object value)
@@ -374,6 +396,12 @@ namespace VAS.Controllers
             }
 
             return value.ToString();
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }

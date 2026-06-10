@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Data;
-using System.Globalization;
+using System.Data.SqlClient;
 using System.Web.Mvc;
+using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
-using VIS.Controllers;
 
 namespace VAS.Controllers
 {
@@ -39,113 +39,9 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Now.Date;
-                DateTime dateFrom = today;
-                DateTime dateTo = today.AddDays(1);
-                DateTime averageDateFrom = today.AddDays(-7);
+                SqlQueryData queryData = BuildTodayCashInSql(ctx);
 
-                string dateFilter = GetDateFilter("c.StatementDate", dateFrom, dateTo);
-                string averageDateFilter = GetDateFilter("c.StatementDate", averageDateFrom, today);
-
-                string schemaCurrencySql = @"
-                    SELECT ClientInfo.AD_Client_ID,
-                           AcctSchema.C_Currency_ID AS C_Currency_ID,
-                           Currency.StdPrecision,
-                           Currency.ISO_Code AS ISO_Code,
-                           CASE
-                               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-                               ELSE Currency.ISO_Code
-                           END AS Cur_Symbol
-                    FROM AD_ClientInfo ClientInfo
-                    INNER JOIN C_AcctSchema AcctSchema
-                        ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
-                    INNER JOIN C_Currency Currency
-                        ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)";
-
-                string mainSql = @"
-                    SELECT ROUND(
-                               COALESCE(SUM(
-                                   CASE
-                                       WHEN c.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(cl.Amount, 0)
-                                       ELSE CurrencyConvert(
-                                           COALESCE(cl.Amount, 0),
-                                           c.C_Currency_ID,
-                                           SchemaCurrency.C_Currency_ID,
-                                           c.StatementDate,
-                                           0,
-                                           c.AD_Client_ID,
-                                           c.AD_Org_ID
-                                       )
-                                   END
-                               ), 0),
-                               COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-                           ) AS MainMetric,
-                           MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
-                           MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
-                           MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol,
-                           COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
-                           COUNT(cl.C_CashLine_ID) AS RecordCount
-                    FROM C_Cash c
-                    INNER JOIN C_CashLine cl
-                        ON (c.C_Cash_ID = cl.C_Cash_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID = c.AD_Client_ID)
-                    WHERE c.IsActive = 'Y'
-                    AND cl.IsActive = 'Y'
-                    AND c.DocStatus IN ('CO','CL')
-                    AND cl.Amount > 0
-                    " + dateFilter;
-
-                mainSql = MRole.GetDefault(ctx).AddAccessSQL(mainSql, "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-                string dailySql = @"
-                    SELECT " + TruncColumn("c.StatementDate") + @" AS CashDate,
-                           SUM(
-                               CASE
-                                   WHEN c.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(cl.Amount, 0)
-                                   ELSE CurrencyConvert(
-                                       COALESCE(cl.Amount, 0),
-                                       c.C_Currency_ID,
-                                       SchemaCurrency.C_Currency_ID,
-                                       c.StatementDate,
-                                       0,
-                                       c.AD_Client_ID,
-                                       c.AD_Org_ID
-                                   )
-                               END
-                           ) AS DailyAmount
-                    FROM C_Cash c
-                    INNER JOIN C_CashLine cl
-                        ON (c.C_Cash_ID = cl.C_Cash_ID)
-                    INNER JOIN SchemaCurrency SchemaCurrency
-                        ON (SchemaCurrency.AD_Client_ID = c.AD_Client_ID)
-                    WHERE c.IsActive = 'Y'
-                    AND cl.IsActive = 'Y'
-                    AND c.DocStatus IN ('CO','CL')
-                    AND cl.Amount > 0
-                    " + averageDateFilter;
-
-                dailySql = MRole.GetDefault(ctx).AddAccessSQL(dailySql, "c", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                dailySql += " GROUP BY " + TruncColumn("c.StatementDate");
-
-                string sql = @"
-                    WITH SchemaCurrency AS (
-                        " + schemaCurrencySql + @"
-                    ),
-                    TodayData AS (
-                        " + mainSql + @"
-                    ),
-                    DailyTotals AS (
-                        " + dailySql + @"
-                    )
-                    SELECT TodayData.MainMetric,
-                           TodayData.C_Currency_ID,
-                           TodayData.CurrencyISO,
-                           TodayData.CurrencySymbol,
-                           TodayData.StdPrecision,
-                           TodayData.RecordCount,
-                           COALESCE((SELECT AVG(DailyTotals.DailyAmount) FROM DailyTotals), 0) AS AvgDailyAmount
-                    FROM TodayData";
+                dr = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 decimal mainMetric = 0;
                 decimal avgDailyAmount = 0;
@@ -154,44 +50,27 @@ namespace VAS.Controllers
                 string currencyISO = "";
                 string currencySymbol = "";
                 int stdPrecision = 2;
+                DateTime? dateFrom = null;
+                DateTime? dateTo = null;
 
-                dr = DB.ExecuteReader(sql, null, null);
-
-                if (dr.Read())
+                if (dr != null && dr.Read())
                 {
-                    if (dr["MainMetric"] != DBNull.Value)
+                    mainMetric = Util.GetValueOfDecimal(dr["MainMetric"]);
+                    avgDailyAmount = Util.GetValueOfDecimal(dr["AvgDailyAmount"]);
+                    recordCount = Util.GetValueOfInt(dr["RecordCount"]);
+                    currencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
+                    currencyISO = Util.GetValueOfString(dr["CurrencyISO"]);
+                    currencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]);
+                    stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+
+                    if (dr["DateFrom"] != DBNull.Value)
                     {
-                        mainMetric = Convert.ToDecimal(dr["MainMetric"]);
+                        dateFrom = Util.GetValueOfDateTime(dr["DateFrom"]);
                     }
 
-                    if (dr["RecordCount"] != DBNull.Value)
+                    if (dr["DateTo"] != DBNull.Value)
                     {
-                        recordCount = Convert.ToInt32(dr["RecordCount"]);
-                    }
-
-                    if (dr["AvgDailyAmount"] != DBNull.Value)
-                    {
-                        avgDailyAmount = Convert.ToDecimal(dr["AvgDailyAmount"]);
-                    }
-
-                    if (dr["C_Currency_ID"] != DBNull.Value)
-                    {
-                        currencyId = Convert.ToInt32(dr["C_Currency_ID"]);
-                    }
-
-                    if (dr["CurrencyISO"] != DBNull.Value)
-                    {
-                        currencyISO = Convert.ToString(dr["CurrencyISO"]);
-                    }
-
-                    if (dr["CurrencySymbol"] != DBNull.Value)
-                    {
-                        currencySymbol = Convert.ToString(dr["CurrencySymbol"]);
-                    }
-
-                    if (dr["StdPrecision"] != DBNull.Value)
-                    {
-                        stdPrecision = Convert.ToInt32(dr["StdPrecision"]);
+                        dateTo = Util.GetValueOfDateTime(dr["DateTo"]);
                     }
                 }
 
@@ -199,6 +78,7 @@ namespace VAS.Controllers
                 avgDailyAmount = Math.Round(avgDailyAmount, stdPrecision);
 
                 int deltaPercent = 0;
+
                 if (avgDailyAmount > 0)
                 {
                     deltaPercent = Convert.ToInt32(Math.Round(((mainMetric - avgDailyAmount) / avgDailyAmount) * 100, 0, MidpointRounding.AwayFromZero));
@@ -216,8 +96,8 @@ namespace VAS.Controllers
                     description = GetMsg(ctx, "VAS_047_TodayCashInDesc", "Total cash received in cash journal today"),
                     badgeText = GetMsg(ctx, "VAS_047_Today", "Today"),
                     noDataText = GetMsg(ctx, "VAS_047_NoCashInToday", "No cash in today"),
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(dateTo.AddDays(-1)),
+                    dateFrom = dateFrom.HasValue ? FormatDate(dateFrom.Value) : "",
+                    dateTo = dateTo.HasValue ? FormatDate(dateTo.Value) : "",
                     cCurrencyId = currencyId,
                     currencyISO = currencyISO,
                     currencyISOCode = currencyISO,
@@ -246,53 +126,188 @@ namespace VAS.Controllers
             }
         }
 
-        /// <summary>
-        /// Builds database-specific half-open date range filter.
-        /// </summary>
-        /// <param name="columnName">Date column name with table alias.</param>
-        /// <param name="dateFrom">Inclusive start date.</param>
-        /// <param name="dateTo">Exclusive end date.</param>
-        /// <returns>SQL date filter.</returns>
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private SqlQueryData BuildTodayCashInSql(Ctx ctx)
         {
-            return @"
-                AND " + columnName + @" >= " + ToSqlDate(dateFrom) + @"
-                AND " + columnName + @" < " + ToSqlDate(dateTo) + @"
-            ";
+            string todayDateSql = GetTodayDateSql();
+            string cashDateSql = GetDateOnlySql("CashData.StatementDate");
+
+            string dateRangeSql = @"
+DateRange AS
+(
+SELECT
+" + todayDateSql + @" AS TodayDate,
+CAST(" + todayDateSql + @" AS TIMESTAMP) AS TodayStart,
+CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS TodayEnd,
+CAST(" + todayDateSql + @" - 7 AS TIMESTAMP) AS AverageStart,
+CAST(" + todayDateSql + @" AS TIMESTAMP) AS AverageEnd
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string schemaCurrencySql = @"
+SchemaCurrency AS
+(
+SELECT
+ClientInfo.AD_Client_ID,
+AcctSchema.C_Currency_ID AS C_Currency_ID,
+Currency.StdPrecision,
+TRIM(CAST(Currency.ISO_Code AS CHAR(255))) AS ISO_Code,
+CASE WHEN Currency.CurSymbol IS NOT NULL THEN TRIM(CAST(Currency.CurSymbol AS CHAR(255))) ELSE TRIM(CAST(Currency.ISO_Code AS CHAR(255))) END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashAccessSql = @"
+SELECT
+CashJournal.C_Cash_ID,
+CashJournal.AD_Client_ID,
+CashJournal.AD_Org_ID,
+CashJournal.C_Currency_ID,
+CashJournal.StatementDate
+FROM C_Cash CashJournal
+WHERE CashJournal.IsActive = 'Y'
+AND CashJournal.DocStatus IN ('CO', 'CL')";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_Cash CashJournal.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             * Do not apply MRole on a query that already contains INNER JOIN,
+             * because MRole parser can generate invalid aliases like Cash INNER.C_Cash_ID.
+             */
+            cashAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashAccessSql,
+                "CashJournal",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string cashAccessCteSql = @"
+CashAccess AS
+(
+" + cashAccessSql + @"
+)";
+
+            string cashFilteredSql = @"
+CashFiltered AS
+(
+SELECT
+CashJournal.C_Cash_ID,
+CashJournal.AD_Client_ID,
+CashJournal.AD_Org_ID,
+CashJournal.C_Currency_ID,
+CashJournal.StatementDate,
+CashLine.C_CashLine_ID,
+CashLine.Amount
+FROM CashAccess CashJournal
+INNER JOIN C_CashLine CashLine ON (CashJournal.C_Cash_ID = CashLine.C_Cash_ID)
+WHERE CashLine.IsActive = 'Y'
+AND CashLine.Amount > 0
+)";
+
+            string todayDataSql = @"
+TodayData AS
+(
+SELECT
+ROUND(
+COALESCE(
+SUM(
+CASE WHEN CashData.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashData.Amount, 0) ELSE CurrencyConvert(COALESCE(CashData.Amount, 0), CashData.C_Currency_ID, SchemaCurrency.C_Currency_ID, CashData.StatementDate, 0, CashData.AD_Client_ID, CashData.AD_Org_ID) END
+),
+0
+),
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
+) AS MainMetric,
+MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol,
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
+COUNT(CashData.C_CashLine_ID) AS RecordCount
+FROM SchemaCurrency SchemaCurrency
+INNER JOIN DateRange DateRange ON (1 = 1)
+LEFT OUTER JOIN CashFiltered CashData ON (CashData.AD_Client_ID = SchemaCurrency.AD_Client_ID AND CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.TodayStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.TodayEnd)
+)";
+
+            string dailyTotalsSql = @"
+DailyTotals AS
+(
+SELECT
+" + cashDateSql + @" AS CashDate,
+SUM(
+CASE WHEN CashData.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashData.Amount, 0) ELSE CurrencyConvert(COALESCE(CashData.Amount, 0), CashData.C_Currency_ID, SchemaCurrency.C_Currency_ID, CashData.StatementDate, 0, CashData.AD_Client_ID, CashData.AD_Org_ID) END
+) AS DailyAmount
+FROM CashFiltered CashData
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID = CashData.AD_Client_ID)
+INNER JOIN DateRange DateRange ON (CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.AverageStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.AverageEnd)
+GROUP BY " + cashDateSql + @"
+)";
+
+            string averageDataSql = @"
+AverageData AS
+(
+SELECT
+COALESCE(AVG(DailyTotals.DailyAmount), 0) AS AvgDailyAmount
+FROM DailyTotals DailyTotals
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + schemaCurrencySql + @",
+" + cashAccessCteSql + @",
+" + cashFilteredSql + @",
+" + todayDataSql + @",
+" + dailyTotalsSql + @",
+" + averageDataSql + @"
+SELECT
+TodayData.MainMetric,
+TodayData.C_Currency_ID,
+TodayData.CurrencyISO,
+TodayData.CurrencySymbol,
+TodayData.StdPrecision,
+TodayData.RecordCount,
+AverageData.AvgDailyAmount,
+DateRange.TodayDate AS DateFrom,
+DateRange.TodayDate AS DateTo
+FROM TodayData TodayData
+INNER JOIN AverageData AverageData ON (1 = 1)
+INNER JOIN DateRange DateRange ON (1 = 1)";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
         }
 
-        /// <summary>
-        /// Formats a server-computed date as a typed database date literal.
-        /// </summary>
-        /// <param name="date">Date value.</param>
-        /// <returns>Database-specific date literal.</returns>
-        private string ToSqlDate(DateTime date)
+        private string GetTodayDateSql()
         {
-            DateTime day = date.Date;
-
             if (DB.IsOracle())
             {
-                return "TO_DATE('"
-                    + day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
-                    + "','YYYY-MM-DD')";
+                return "TRUNC(CURRENT_DATE)";
             }
 
-            return DB.TO_DATE(day, true);
+            return "CURRENT_DATE";
         }
 
-        /// <summary>
-        /// Returns a database-specific expression for grouping by calendar day.
-        /// </summary>
-        /// <param name="columnExpression">Date column expression.</param>
-        /// <returns>Truncated date expression.</returns>
-        private string TruncColumn(string columnExpression)
+        private string GetDateOnlySql(string columnName)
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(" + columnExpression + ")";
+                return "CAST(TRUNC(" + columnName + ") AS DATE)";
             }
 
-            return "CAST(" + columnExpression + " AS DATE)";
+            return "CAST(" + columnName + " AS DATE)";
         }
 
         /// <summary>
@@ -316,12 +331,18 @@ namespace VAS.Controllers
         {
             string msg = Msg.GetMsg(ctx, key);
 
-            if (string.IsNullOrEmpty(msg) || msg == key)
+            if (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]")
             {
                 return fallback;
             }
 
             return msg;
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }

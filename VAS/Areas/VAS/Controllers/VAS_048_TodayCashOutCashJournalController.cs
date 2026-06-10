@@ -1,6 +1,8 @@
 using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Web.Mvc;
+using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -34,77 +36,9 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateFrom = today;
-                DateTime dateTo = today.AddDays(1);
-                DateTime sevenDayFrom = today.AddDays(-7);
-                DateTime sevenDayTo = today;
+                SqlQueryData queryData = BuildTodayCashOutSql(ctx);
 
-                string todayFromSql = ToSqlDate(dateFrom);
-                string todayToSql = ToSqlDate(dateTo);
-                string sevenDayFromSql = ToSqlDate(sevenDayFrom);
-                string sevenDayToSql = ToSqlDate(sevenDayTo);
-
-                string filteredCashLineSql = @"
-SELECT CashLine.C_CashLine_ID,
-CashLine.C_Cash_ID,
-CashLine.Amount
-FROM C_CashLine CashLine
-WHERE CashLine.IsActive='Y'
-AND CashLine.Amount < 0";
-
-                filteredCashLineSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    filteredCashLineSql,
-                    "CashLine",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
-
-                string schemaCurrencySql = @"
-SELECT ClientInfo.AD_Client_ID,
-AcctSchema.C_Currency_ID AS C_Currency_ID,
-Currency.StdPrecision,
-Currency.ISO_Code AS ISO_Code,
-CASE
-WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-ELSE Currency.ISO_Code
-END AS Cur_Symbol
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
-
-                string convertedAmountExpression = @"
-CASE
-WHEN CashBook.C_Currency_ID=SchemaCurrency.C_Currency_ID THEN COALESCE(FilteredCashLine.Amount,0)
-ELSE CurrencyConvert(COALESCE(FilteredCashLine.Amount,0),CashBook.C_Currency_ID,SchemaCurrency.C_Currency_ID,CashHeader.DateAcct,0,CashHeader.AD_Client_ID,CashHeader.AD_Org_ID)
-END";
-
-                string todayCondition = @"
-CashHeader.StatementDate >= " + todayFromSql + @"
-AND CashHeader.StatementDate < " + todayToSql;
-
-                string sevenDayCondition = @"
-CashHeader.StatementDate >= " + sevenDayFromSql + @"
-AND CashHeader.StatementDate < " + sevenDayToSql;
-
-                string sql = @"
-SELECT ROUND(COALESCE(SUM(CASE WHEN " + todayCondition + @" THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END),0),COALESCE(MAX(SchemaCurrency.StdPrecision),2)) AS TodayAmount,
-COUNT(CASE WHEN " + todayCondition + @" THEN FilteredCashLine.C_CashLine_ID ELSE NULL END) AS DisbursementCount,
-ROUND(COALESCE(SUM(CASE WHEN " + sevenDayCondition + @" THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END),0),COALESCE(MAX(SchemaCurrency.StdPrecision),2)) AS SevenDayAmount,
-COUNT(CASE WHEN " + sevenDayCondition + @" THEN FilteredCashLine.C_CashLine_ID ELSE NULL END) AS SevenDayDisbursementCount,
-COALESCE(MAX(SchemaCurrency.StdPrecision),2) AS StdPrecision,
-MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
-MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
-MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
-FROM (" + filteredCashLineSql + @") FilteredCashLine
-INNER JOIN C_Cash CashHeader ON (FilteredCashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
-INNER JOIN (" + schemaCurrencySql + @") SchemaCurrency ON (SchemaCurrency.AD_Client_ID=CashHeader.AD_Client_ID)
-WHERE CashHeader.IsActive='Y'
-AND CashBook.IsActive='Y'
-AND CashHeader.DocStatus IN ('CO','CL')
-AND CashHeader.StatementDate >= " + sevenDayFromSql + @"
-AND CashHeader.StatementDate < " + todayToSql;
+                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 decimal todayAmount = 0;
                 decimal sevenDayAmount = 0;
@@ -115,10 +49,10 @@ AND CashHeader.StatementDate < " + todayToSql;
                 int currencyId = 0;
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
+                DateTime? dateFrom = null;
+                DateTime? dateTo = null;
 
-                reader = DB.ExecuteReader(sql, null, null);
-
-                if (reader.Read())
+                if (reader != null && reader.Read())
                 {
                     todayAmount = GetDecimal(reader, "TodayAmount");
                     sevenDayAmount = GetDecimal(reader, "SevenDayAmount");
@@ -128,6 +62,16 @@ AND CashHeader.StatementDate < " + todayToSql;
                     currencyId = GetInt(reader, "C_Currency_ID");
                     currencyISO = GetString(reader, "CurrencyISO");
                     currencySymbol = GetString(reader, "CurrencySymbol");
+
+                    if (reader["DateFrom"] != DBNull.Value)
+                    {
+                        dateFrom = Util.GetValueOfDateTime(reader["DateFrom"]);
+                    }
+
+                    if (reader["DateTo"] != DBNull.Value)
+                    {
+                        dateTo = Util.GetValueOfDateTime(reader["DateTo"]);
+                    }
                 }
 
                 sevenDayAverage = Math.Round(sevenDayAmount / 7, stdPrecision);
@@ -141,42 +85,18 @@ AND CashHeader.StatementDate < " + todayToSql;
 
                 bool hasData = disbursementCount > 0;
 
-                if (!hasData)
-                {
-                    return Json(new
-                    {
-                        success = true,
-                        error = string.Empty,
-                        hasData = false,
-                        title = GetMsg(ctx, "VAS_048_CashOut", "Cash out"),
-                        mainMetric = 0,
-                        mainMetricText = "0",
-                        description = GetMsg(ctx, "VAS_048_VsSevenDayAvg", "vs 7-day avg"),
-                        badgeText = GetMsg(ctx, "VAS_048_Today", "Today"),
-                        dateFrom = FormatDate(dateFrom),
-                        dateTo = FormatDate(dateTo.AddDays(-1)),
-                        currencyISO = currencyISO,
-                        currencySymbol = currencySymbol,
-                        cCurrencyId = currencyId,
-                        stdPrecision = stdPrecision,
-                        deltaPercent = deltaPercent,
-                        sevenDayAverage = sevenDayAverage,
-                        disbursementCount = disbursementCount,
-                        sevenDayDisbursementCount = sevenDayDisbursementCount
-                    }, JsonRequestBehavior.AllowGet);
-                }
-
                 return Json(new
                 {
                     success = true,
                     error = string.Empty,
+                    hasData = hasData,
                     title = GetMsg(ctx, "VAS_048_CashOut", "Cash out"),
-                    mainMetric = todayAmount,
-                    mainMetricText = todayAmount.ToString(),
+                    mainMetric = hasData ? todayAmount : 0,
+                    mainMetricText = hasData ? todayAmount.ToString() : "0",
                     description = GetMsg(ctx, "VAS_048_VsSevenDayAvg", "vs 7-day avg"),
                     badgeText = GetMsg(ctx, "VAS_048_Today", "Today"),
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(dateTo.AddDays(-1)),
+                    dateFrom = dateFrom.HasValue ? FormatDate(dateFrom.Value) : "",
+                    dateTo = dateTo.HasValue ? FormatDate(dateTo.Value) : "",
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
                     cCurrencyId = currencyId,
@@ -184,8 +104,7 @@ AND CashHeader.StatementDate < " + todayToSql;
                     deltaPercent = deltaPercent,
                     sevenDayAverage = sevenDayAverage,
                     disbursementCount = disbursementCount,
-                    sevenDayDisbursementCount = sevenDayDisbursementCount,
-                    hasData = true
+                    sevenDayDisbursementCount = sevenDayDisbursementCount
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception)
@@ -207,16 +126,166 @@ AND CashHeader.StatementDate < " + todayToSql;
             }
         }
 
-        private string ToSqlDate(DateTime date)
+        private SqlQueryData BuildTodayCashOutSql(Ctx ctx)
         {
-            string dateText = FormatDate(date);
+            string todayDateSql = GetTodayDateSql();
 
+            string dateRangeSql = @"
+DateRange AS
+(
+SELECT
+" + todayDateSql + @" AS TodayDate,
+CAST(" + todayDateSql + @" AS TIMESTAMP) AS TodayStart,
+CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS TodayEnd,
+CAST(" + todayDateSql + @" - 7 AS TIMESTAMP) AS SevenDayStart,
+CAST(" + todayDateSql + @" AS TIMESTAMP) AS SevenDayEnd
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string schemaCurrencySql = @"
+SchemaCurrency AS
+(
+SELECT
+ClientInfo.AD_Client_ID,
+AcctSchema.C_Currency_ID AS C_Currency_ID,
+Currency.StdPrecision,
+TRIM(CAST(Currency.ISO_Code AS CHAR(255))) AS ISO_Code,
+CASE WHEN Currency.CurSymbol IS NOT NULL THEN TRIM(CAST(Currency.CurSymbol AS CHAR(255))) ELSE TRIM(CAST(Currency.ISO_Code AS CHAR(255))) END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashLineAccessSql = @"
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.C_Cash_ID,
+CashLine.Amount
+FROM C_CashLine CashLine
+WHERE CashLine.IsActive = 'Y'
+AND CashLine.Amount < 0";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_CashLine CashLine.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             * Do not apply MRole on a query that already contains joins.
+             */
+            cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashLineAccessSql,
+                "CashLine",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string cashLineAccessCteSql = @"
+CashLineAccess AS
+(
+" + cashLineAccessSql + @"
+)";
+
+            string cashDataSql = @"
+CashData AS
+(
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.Amount,
+CashHeader.C_Cash_ID,
+CashHeader.AD_Client_ID,
+CashHeader.AD_Org_ID,
+CashHeader.StatementDate,
+CashHeader.DateAcct,
+CashBook.C_Currency_ID
+FROM CashLineAccess CashLine
+INNER JOIN C_Cash CashHeader ON (CashLine.C_Cash_ID = CashHeader.C_Cash_ID)
+INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID = CashBook.C_CashBook_ID)
+WHERE CashHeader.IsActive = 'Y'
+AND CashBook.IsActive = 'Y'
+AND CashHeader.DocStatus IN ('CO', 'CL')
+)";
+
+            string convertedAmountExpression = @"
+CASE WHEN CashData.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashData.Amount, 0) ELSE CurrencyConvert(COALESCE(CashData.Amount, 0), CashData.C_Currency_ID, SchemaCurrency.C_Currency_ID, CashData.DateAcct, 0, CashData.AD_Client_ID, CashData.AD_Org_ID) END";
+
+            string cashOutDataSql = @"
+CashOutData AS
+(
+SELECT
+ROUND(
+COALESCE(
+SUM(
+CASE WHEN CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.TodayStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.TodayEnd THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END
+),
+0
+),
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
+) AS TodayAmount,
+COUNT(CASE WHEN CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.TodayStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.TodayEnd THEN CashData.C_CashLine_ID ELSE NULL END) AS DisbursementCount,
+ROUND(
+COALESCE(
+SUM(
+CASE WHEN CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.SevenDayStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.SevenDayEnd THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END
+),
+0
+),
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
+) AS SevenDayAmount,
+COUNT(CASE WHEN CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.SevenDayStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.SevenDayEnd THEN CashData.C_CashLine_ID ELSE NULL END) AS SevenDayDisbursementCount,
+COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
+MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
+FROM SchemaCurrency SchemaCurrency
+INNER JOIN DateRange DateRange ON (1 = 1)
+LEFT OUTER JOIN CashData CashData ON (CashData.AD_Client_ID = SchemaCurrency.AD_Client_ID AND CAST(CashData.StatementDate AS TIMESTAMP) >= DateRange.SevenDayStart AND CAST(CashData.StatementDate AS TIMESTAMP) < DateRange.TodayEnd)
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + schemaCurrencySql + @",
+" + cashLineAccessCteSql + @",
+" + cashDataSql + @",
+" + cashOutDataSql + @"
+SELECT
+CashOutData.TodayAmount,
+CashOutData.DisbursementCount,
+CashOutData.SevenDayAmount,
+CashOutData.SevenDayDisbursementCount,
+CashOutData.StdPrecision,
+CashOutData.C_Currency_ID,
+CashOutData.CurrencyISO,
+CashOutData.CurrencySymbol,
+DateRange.TodayDate AS DateFrom,
+DateRange.TodayDate AS DateTo
+FROM CashOutData CashOutData
+INNER JOIN DateRange DateRange ON (1 = 1)";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
+        }
+
+        private string GetTodayDateSql()
+        {
             if (DB.IsOracle())
             {
-                return "TO_DATE('" + dateText + "','YYYY-MM-DD')";
+                return "TRUNC(CURRENT_DATE)";
             }
 
-            return "DATE '" + dateText + "'";
+            return "CURRENT_DATE";
         }
 
         private string FormatDate(DateTime date)
@@ -272,6 +341,12 @@ AND CashHeader.StatementDate < " + todayToSql;
             }
 
             return value.ToString();
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }

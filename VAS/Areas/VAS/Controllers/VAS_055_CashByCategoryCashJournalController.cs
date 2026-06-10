@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Web.Mvc;
+using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
 using VAdvantage.Utility;
@@ -36,10 +37,6 @@ namespace VAS.Controllers
 
             try
             {
-                DateTime today = DateTime.Today;
-                DateTime dateTo = today.AddDays(1);
-                string dateFilter = GetDateFilter("CashHeader.StatementDate", today, dateTo);
-
                 string language = Env.GetAD_Language(ctx);
 
                 if (string.IsNullOrEmpty(language))
@@ -47,63 +44,32 @@ namespace VAS.Controllers
                     language = "en_US";
                 }
 
-                string filteredCashLineSql = @"
-SELECT CashLine.C_CashLine_ID,
-CashLine.C_Cash_ID,
-CashLine.Amount,
-CashLine.CashType
-FROM C_CashLine CashLine
-WHERE CashLine.IsActive='Y'
-AND CashLine.Amount < 0";
+                SqlQueryData queryData = BuildTodayCashOutByCategorySql(ctx, language);
 
-                filteredCashLineSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    filteredCashLineSql,
-                    "CashLine",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
-
-                string sql = @"
-SELECT RawCashOut.CashType AS CategoryName,
-ROUND(COALESCE(SUM(0 - COALESCE(RawCashOut.Amount,0)),0),2) AS CashOutAmount,
-COUNT(RawCashOut.C_CashLine_ID) AS LineCount
-FROM (SELECT FilteredCashLine.C_CashLine_ID,
-FilteredCashLine.Amount,
-CashTypeList.Name AS CashType
-FROM (" + filteredCashLineSql + @") FilteredCashLine
-INNER JOIN C_Cash CashHeader ON (FilteredCashLine.C_Cash_ID=CashHeader.C_Cash_ID)
-INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
-LEFT OUTER JOIN (SELECT RefList.Value,
-COALESCE(RefListTrl.Name,RefList.Name) AS Name
-FROM AD_Reference ReferenceInfo
-INNER JOIN AD_Ref_List RefList ON (ReferenceInfo.AD_Reference_ID=RefList.AD_Reference_ID)
-LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON (RefList.AD_Ref_List_ID=RefListTrl.AD_Ref_List_ID AND RefListTrl.AD_Language=@AD_Language)
-WHERE ReferenceInfo.Name=@ReferenceName
-AND ReferenceInfo.IsActive='Y'
-AND RefList.IsActive='Y') CashTypeList ON (CashTypeList.Value=FilteredCashLine.CashType)
-WHERE CashHeader.IsActive='Y'
-AND CashBook.IsActive='Y'
-AND CashHeader.DocStatus IN ('CO','CL')
-" + dateFilter + @") RawCashOut
-GROUP BY RawCashOut.CashType
-ORDER BY CashOutAmount DESC";
-
-                SqlParameter[] parameters = new SqlParameter[2];
-                parameters[0] = new SqlParameter("@AD_Language", language);
-                parameters[1] = new SqlParameter("@ReferenceName", "C_Cash Trx Type");
+                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 List<CategoryCashOut> categories = new List<CategoryCashOut>();
 
                 int totalLineCount = 0;
                 decimal totalCashOut = 0;
+                string dateTo = string.Empty;
 
-                reader = DB.ExecuteReader(sql, parameters, null);
-
-                while (reader.Read())
+                while (reader != null && reader.Read())
                 {
+                    if (string.IsNullOrEmpty(dateTo))
+                    {
+                        dateTo = FormatDbDate(reader["DateTo"]);
+                    }
+
+                    int lineCount = GetInt(reader, "LineCount");
+
+                    if (lineCount <= 0)
+                    {
+                        continue;
+                    }
+
                     string categoryName = GetString(reader, "CategoryName");
                     decimal cashOutAmount = GetDecimal(reader, "CashOutAmount");
-                    int lineCount = GetInt(reader, "LineCount");
 
                     if (string.IsNullOrWhiteSpace(categoryName))
                     {
@@ -175,7 +141,7 @@ ORDER BY CashOutAmount DESC";
                     whyLabel = GetMsg(ctx, "VAS_055_Why", "Why"),
                     whyText = GetMsg(ctx, "VAS_055_WhyText", "Grouped by cash type for today."),
                     noDataText = GetMsg(ctx, "VAS_055_NoData", "No cash out today"),
-                    dateTo = FormatDate(today),
+                    dateTo = dateTo,
                     items = items,
                     totalCashOut = totalCashOut,
                     hasData = totalLineCount > 0
@@ -200,26 +166,154 @@ ORDER BY CashOutAmount DESC";
             }
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private SqlQueryData BuildTodayCashOutByCategorySql(Ctx ctx, string language)
         {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
+            string todayDateSql = GetTodayDateSql();
 
+            string dateRangeSql = @"
+DateRange AS
+(
+SELECT
+" + todayDateSql + @" AS TodayDate,
+CAST(" + todayDateSql + @" AS TIMESTAMP) AS TodayStart,
+CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS TodayEnd
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+            string cashLineAccessSql = @"
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.C_Cash_ID,
+CashLine.Amount,
+CashLine.CashType
+FROM C_CashLine CashLine
+WHERE CashLine.IsActive = 'Y'
+AND CashLine.Amount < 0";
+
+            /*
+             * MRole Handling:
+             * Apply MRole only on the main physical table C_CashLine CashLine.
+             * Do not apply MRole on the final WITH query.
+             * Do not apply MRole on CTE aliases.
+             * Do not apply MRole on joined aliases.
+             * Do not apply MRole on a query that already contains INNER JOIN.
+             */
+            cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashLineAccessSql,
+                "CashLine",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string cashLineAccessCteSql = @"
+CashLineAccess AS
+(
+" + cashLineAccessSql + @"
+)";
+
+            string cashTypeListSql = @"
+CashTypeList AS
+(
+SELECT
+RefList.Value,
+COALESCE(RefListTrl.Name, RefList.Name) AS Name
+FROM AD_Reference ReferenceInfo
+INNER JOIN AD_Ref_List RefList ON (ReferenceInfo.AD_Reference_ID = RefList.AD_Reference_ID)
+LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON (RefList.AD_Ref_List_ID = RefListTrl.AD_Ref_List_ID AND RefListTrl.AD_Language = @AD_Language)
+WHERE ReferenceInfo.Name = @ReferenceName
+AND ReferenceInfo.IsActive = 'Y'
+AND RefList.IsActive = 'Y'
+)";
+
+            string rawCashOutSql = @"
+RawCashOut AS
+(
+SELECT
+CashLine.C_CashLine_ID,
+CashLine.Amount,
+CashTypeList.Name AS CashType
+FROM CashLineAccess CashLine
+INNER JOIN C_Cash CashHeader ON (CashLine.C_Cash_ID = CashHeader.C_Cash_ID)
+INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID = CashBook.C_CashBook_ID)
+INNER JOIN DateRange DateRange ON (CAST(CashHeader.StatementDate AS TIMESTAMP) >= DateRange.TodayStart AND CAST(CashHeader.StatementDate AS TIMESTAMP) < DateRange.TodayEnd)
+LEFT OUTER JOIN CashTypeList CashTypeList ON (CashTypeList.Value = CashLine.CashType)
+WHERE CashHeader.IsActive = 'Y'
+AND CashBook.IsActive = 'Y'
+AND CashHeader.DocStatus IN ('CO', 'CL')
+)";
+
+            string categoryTotalsSql = @"
+CategoryTotals AS
+(
+SELECT
+RawCashOut.CashType AS CategoryName,
+ROUND(COALESCE(SUM(0 - COALESCE(RawCashOut.Amount, 0)), 0), 2) AS CashOutAmount,
+COUNT(RawCashOut.C_CashLine_ID) AS LineCount
+FROM RawCashOut RawCashOut
+GROUP BY RawCashOut.CashType
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + cashLineAccessCteSql + @",
+" + cashTypeListSql + @",
+" + rawCashOutSql + @",
+" + categoryTotalsSql + @"
+SELECT
+CategoryTotals.CategoryName,
+COALESCE(CategoryTotals.CashOutAmount, 0) AS CashOutAmount,
+COALESCE(CategoryTotals.LineCount, 0) AS LineCount,
+DateRange.TodayDate AS DateTo
+FROM DateRange DateRange
+LEFT OUTER JOIN CategoryTotals CategoryTotals ON (1 = 1)
+ORDER BY CategoryTotals.CashOutAmount DESC";
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@AD_Language", language),
+                new SqlParameter("@ReferenceName", "C_Cash Trx Type")
+            };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
+        }
+
+        private string GetTodayDateSql()
+        {
             if (DB.IsOracle())
             {
-                return @"
-AND " + columnName + @" >= TO_DATE('" + dateFromText + @"','YYYY-MM-DD')
-AND " + columnName + @" < TO_DATE('" + dateToText + @"','YYYY-MM-DD')";
+                return "TRUNC(CURRENT_DATE)";
             }
 
-            return @"
-AND " + columnName + @" >= DATE '" + dateFromText + @"'
-AND " + columnName + @" < DATE '" + dateToText + @"'";
+            return "CURRENT_DATE";
         }
 
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");
+        }
+
+        private string FormatDbDate(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return string.Empty;
+            }
+
+            DateTime dateValue;
+
+            if (DateTime.TryParse(value.ToString(), out dateValue))
+            {
+                return FormatDate(dateValue);
+            }
+
+            return string.Empty;
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)
@@ -277,6 +371,12 @@ AND " + columnName + @" < DATE '" + dateToText + @"'";
             public string CategoryName { get; set; }
             public decimal CashOutAmount { get; set; }
             public int LineCount { get; set; }
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql { get; set; }
+            public SqlParameter[] Parameters { get; set; }
         }
     }
 }
