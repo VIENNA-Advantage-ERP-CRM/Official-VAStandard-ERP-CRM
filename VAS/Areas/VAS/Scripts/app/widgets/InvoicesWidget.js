@@ -11,43 +11,65 @@
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                              | Message Key                    | MsgText
  * ----+-----------------------------------------------------------+--------------------------------+-----------------------------------------------------------
- *  1  | Invoices needing your attention                           | VIS_InvoicesNeedingAttention   | Invoices needing your attention
- *  2  | INVOICE                                                   | VIS_Invoice                    | INVOICE
- *  3  | CUSTOMER                                                  | VIS_Customer                   | CUSTOMER
+ *  1  | Invoices needing your attention                           | VAS_062_InvoicesNeedingAttention | Invoices needing your attention
+ *  2  | Invoice                                                   | VAS_062_Invoice                | INVOICE
+ *  3  | Customer                                                  | VAS_062_Customer               | CUSTOMER
  *  4  | DUE                                                       | VAS_Date                       | Date
- *  5  | STATUS                                                    | VIS_Status                     | STATUS
- *  6  | AMOUNT                                                    | VIS_Amount                     | AMOUNT
- *  6d | Overdue                                                   | VIS_Overdue                    | Overdue
- *  6e | Due soon                                                  | VIS_DueSoon                    | Due soon
- *  6f | Sent (category)                                           | VIS_Sent                       | Sent
- *  6f1| Email sent (Sent row, e-mail done)                        | VIS_EmailSent                  | Email sent
- *  6f2| Not sent (Sent row, e-mail pending)                       | VIS_EmailNotSent               | Not sent
- *  6g | Today                                                     | VIS_Today                      | Today
- *  6h | No data                                                   | VIS_NoData                     | No data
- *  6i | Previous / Next (pager)                                   | VIS_Previous / VIS_Next        | Previous / Next
- *  6j | Showing {from}–{to} of {total} (pager helper)             | VIS_Showing / VIS_Of           | Showing / of
- *  6a | + New invoice                                             | VIS_NewInvoice                 | New invoice
- *  6b | Review                                                    | VIS_Review                     | Review
- *  6c | {n} duplicate suspected based on Amount and Customer      | VIS_DuplicateSuspectedBased    | duplicate suspected based on Amount and Customer
- *  -  | Review-dialog keys (English fallbacks via lbl): VIS_DupBannerSub, VIS_DuplicateInvoiceReview,
- *     | VIS_DuplicateSets, VIS_SwitchTabsReview, VIS_MatchingField, VIS_DifferingField, VIS_PotentialDup,
- *     | VIS_DoubleBill, VIS_TripleBill, VIS_Newer, VIS_Newest, VIS_Original, VIS_Issued, VIS_Organization,
- *     | VIS_CustomerName, VIS_InvoiceDate, VIS_SalesOrderNo, VIS_DeliveryOrder, VIS_PaymentTerm,
- *     | VIS_DeliveryLocation, VIS_LineItems, VIS_NoLineItems, VIS_Product, VIS_AttributeSet, VIS_Charge,
- *     | VIS_Qty, VIS_UnitPrice, VIS_Amount, VIS_GrandTotal,
- *     | VIS_ReverseNewerInvoice, VIS_KeepBoth, VIS_Close, VIS_Confirm, VIS_Error, VIS_DupFooterNote
- *  7  | Duplicate suspected: ...                                  | VIS_DuplicateSuspected         | Duplicate suspected:
- *  8  | matches ... amount + customer                             | VIS_MatchesAmountCustomer      | matches {0} amount + customer
- *  9  | duplicate pairs suspected — ... customers affected        | VIS_DuplicatePairsSuspected    | duplicate pairs suspected
- * 10  | customers affected                                        | VIS_CustomersAffected          | customers affected
- * 11  | Same customer, same ... amount, issued ... days apart     | VIS_SameCustomerSameAmount     | Same customer, same {0} amount, issued {1} days apart
- * 12  | Same customer and amount ordered within 7 days            | VIS_SameCustomerWithin7Days    | Same customer and amount ordered within 7 days — review the list below
- *  -  | Status labels (DR/IP/CO/CL/AP/NA/WP/WC/RE/VO/IN)        | VIS_StatusDraft etc.           | Draft / In Progress / Completed / ...
+ *  5  | Status                                                    | VAS_062_Status                 | STATUS
+ *  6  | Amount                                                    | VAS_062_Amount                 | AMOUNT
+ *  6d | Overdue                                                   | VAS_062_Overdue                | Overdue
+ *  6e | Due soon                                                  | VAS_DueSoon                    | Due Soon
+ *  6f | Sent (category)                                           | VAS_062_Sent                   | Sent
+ *  6f1| Email sent (Sent row, e-mail done)                        | VAS_062_EmailSent              | Email sent
+ *  6f2| Not sent (Sent row, e-mail pending)                       | VAS_062_EmailNotSent           | Not sent
+ *  6g | Today                                                     | VAS_062_Today                  | Today
+ *  6h | No data                                                   | VAS_062_NoData                 | No data
+ *  6i | Previous / Next (pager)                                   | VAS_Previous / VAS_Next        | Previous / Next
+ *  6j | Showing {from}–{to} of {total} (pager helper)             | VAS_Showing / VAS_Of           | Showing / of
+ *  6a | + New invoice                                             | VAS_062_NewInvoice             | New invoice
+ *  6b | Review                                                    | VAS_062_Review                 | Review
+ *  6c | {n} duplicate suspected based on Amount and Customer      | VAS_062_DuplicateSuspectedBased | duplicate suspected based on Amount and Customer
+ *  -  | Review-dialog keys (English fallbacks via lbl): VAS_062_DupBannerSub, VAS_062_DuplicateInvoiceReview,
+ *     | VAS_062_DuplicateSets, VAS_062_SwitchTabsReview, VAS_062_MatchingField, VAS_062_DifferingField, VAS_062_PotentialDup,
+ *     | VAS_062_DoubleBill, VAS_062_TripleBill, VAS_062_Newer, VAS_062_Newest, VAS_062_Original, VAS_062_Issued, VAS_062_Organization,
+ *     | VAS_062_CustomerName, VAS_062_InvoiceDate, VAS_062_SalesOrderNo, VAS_062_DeliveryOrder, VAS_062_PaymentTerm,
+ *     | VAS_062_DeliveryLocation, VAS_062_LineItems, VAS_062_NoLineItems, VAS_062_Product, VAS_062_AttributeSet, VAS_062_Charge,
+ *     | VAS_062_Qty, VAS_062_UnitPrice, VAS_062_Amount, VAS_062_GrandTotal,
+ *     | VAS_062_ReverseNewerInvoice, VAS_062_KeepBoth, VAS_Close, VAS_062_Confirm, VAS_062_ErrorOccurred, VAS_062_DupFooterNote
+ *  7  | Duplicate suspected: ...                                  | VAS_062_DuplicateSuspected     | Duplicate suspected:
+ *  8  | matches ... amount + customer                             | VAS_062_MatchesAmountCustomer  | matches {0} amount + customer
+ *  9  | duplicate pairs suspected — ... customers affected        | VAS_062_DuplicatePairsSuspected | duplicate pairs suspected
+ * 10  | customers affected                                        | VAS_062_CustomersAffected      | customers affected
+ * 11  | Same customer, same ... amount, issued ... days apart     | VAS_062_SameCustomerSameAmount | Same customer, same {0} amount, issued {1} days apart
+ * 12  | Same customer and amount ordered within 7 days            | VAS_062_SameCustomerWithin7Days | Same customer and amount ordered within 7 days — review the list below
+ *  -  | Status labels (DR/IP/CO/CL/AP/NA/WP/WC/RE/VO/IN)        | VAS_062_StatusDraft etc.       | Draft / In Progress / Completed / ...
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.InvoicesWidget = function () {
 
@@ -108,31 +130,31 @@
         /* Attention-status chips (keyed by the backend attention_status text), per design.md §8.
            These are distinct from the document-status codes in STATUS_CONFIG below. */
         var ATTENTION_STATUS = {
-            'Overdue': { key: 'VIS_Overdue', fallback: 'Overdue', bg: '#FAD7D7', color: '#8F2D2D' },
-            'Due soon': { key: 'VIS_DueSoon', fallback: 'Due soon', bg: '#FCEFC7', color: '#9A6500' },
-            'Sent': { key: 'VIS_Sent', fallback: 'Sent', bg: '#D9ECFF', color: '#0E5DA8' }
+            'Overdue': { key: 'VAS_062_Overdue', fallback: 'Overdue', bg: '#FAD7D7', color: '#8F2D2D' },
+            'Due soon': { key: 'VAS_DueSoon', fallback: 'Due soon', bg: '#FCEFC7', color: '#9A6500' },
+            'Sent': { key: 'VAS_062_Sent', fallback: 'Sent', bg: '#D9ECFF', color: '#0E5DA8' }
         };
 
         /* Email-state chips for the 'Sent' category: completed invoices now appear whether or not the
            invoice e-mail has gone out. 'Y' = already e-mailed (done, green); otherwise the e-mail is
            still pending (amber, needs action). */
         var SENT_EMAIL_STATUS = {
-            'Y': { key: 'VIS_EmailSent', fallback: 'Email sent', bg: '#CCEFDD', color: '#0C5D38' },
-            'N': { key: 'VIS_EmailNotSent', fallback: 'Not sent', bg: '#FCEFC7', color: '#9A6500' }
+            'Y': { key: 'VAS_062_EmailSent', fallback: 'Email sent', bg: '#CCEFDD', color: '#0C5D38' },
+            'N': { key: 'VAS_062_EmailNotSent', fallback: 'Not sent', bg: '#FCEFC7', color: '#9A6500' }
         };
 
         var STATUS_CONFIG = {
-            DR: { label: lbl("VIS_StatusDraft", 'Draft'), bg: '#EDEDED', color: '#505050' },
-            IP: { label: lbl("VIS_StatusInProgress", 'In Progress'), bg: '#FFF3CD', color: '#9A6500' },
-            CO: { label: lbl("VIS_StatusCompleted", 'Completed'), bg: '#CCEFDD', color: '#0C5D38' },
-            CL: { label: lbl("VIS_StatusClosed", 'Closed'), bg: '#DFF1FF', color: '#0E5DA8' },
-            AP: { label: lbl("VIS_StatusApproved", 'Approved'), bg: '#CCEFDD', color: '#0C5D38' },
-            NA: { label: lbl("VIS_StatusNotApproved", 'Not Approved'), bg: '#FFE8E8', color: '#C0392B' },
-            WP: { label: lbl("VIS_StatusWaitingPayment", 'Waiting Payment'), bg: '#FFF3CD', color: '#9A6500' },
-            WC: { label: lbl("VIS_StatusWaitingConfirm", 'Waiting Confirm'), bg: '#FFF3CD', color: '#9A6500' },
-            RE: { label: lbl("VIS_StatusReversed", 'Reversed'), bg: '#FFE8E8', color: '#C0392B' },
-            VO: { label: lbl("VIS_StatusVoided", 'Voided'), bg: '#FFE8E8', color: '#C0392B' },
-            IN: { label: lbl("VIS_StatusInvalid", 'Invalid'), bg: '#FFE8E8', color: '#C0392B' }
+            DR: { label: lbl("VAS_062_StatusDraft", 'Draft'), bg: '#EDEDED', color: '#505050' },
+            IP: { label: lbl("VAS_062_StatusInProgress", 'In Progress'), bg: '#FFF3CD', color: '#9A6500' },
+            CO: { label: lbl("VAS_062_StatusCompleted", 'Completed'), bg: '#CCEFDD', color: '#0C5D38' },
+            CL: { label: lbl("VAS_062_StatusClosed", 'Closed'), bg: '#DFF1FF', color: '#0E5DA8' },
+            AP: { label: lbl("VAS_062_StatusApproved", 'Approved'), bg: '#CCEFDD', color: '#0C5D38' },
+            NA: { label: lbl("VAS_062_StatusNotApproved", 'Not Approved'), bg: '#FFE8E8', color: '#C0392B' },
+            WP: { label: lbl("VAS_062_StatusWaitingPayment", 'Waiting Payment'), bg: '#FFF3CD', color: '#9A6500' },
+            WC: { label: lbl("VAS_062_StatusWaitingConfirm", 'Waiting Confirm'), bg: '#FFF3CD', color: '#9A6500' },
+            RE: { label: lbl("VAS_062_StatusReversed", 'Reversed'), bg: '#FFE8E8', color: '#C0392B' },
+            VO: { label: lbl("VAS_062_StatusVoided", 'Voided'), bg: '#FFE8E8', color: '#C0392B' },
+            IN: { label: lbl("VAS_062_StatusInvalid", 'Invalid'), bg: '#FFE8E8', color: '#C0392B' }
         };
 
         /* ── Initialize ── */
@@ -222,8 +244,8 @@
                         /* Group the pairs into duplicate sets (one per customer) for the
                            Review dialog, and headline the banner with the set count. */
                         reviewSets = buildSets(pairs);
-                        var title = reviewSets.length + ' ' + lbl("VIS_DuplicateSuspectedBased", 'duplicate suspected based on Amount and Customer');
-                        var sub = lbl("VIS_DupBannerSub", 'Same customer and amount — open Review to compare.');
+                        var title = reviewSets.length + ' ' + lbl("VAS_062_DuplicateSuspectedBased", 'duplicate suspected based on Amount and Customer');
+                        var sub = lbl("VAS_062_DupBannerSub", 'Same customer and amount — open Review to compare.');
                         $alertBanner.find('.vis-inv-dup-title').text(title);
                         $alertBanner.find('.vis-inv-dup-sub').text(sub);
                         $alertBanner.css('display', 'flex');
@@ -258,11 +280,11 @@
                 '<polyline points="10 9 9 9 8 9"/>' +
                 '</svg>' +
                 '</div>' +
-                '<span class="vas-inv-title">' + lbl("VIS_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
+                '<span class="vas-inv-title">' + lbl("VAS_062_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
                 '</div>' +
                 /* Right: open a new invoice on the same screen */
                 '<button type="button" id="vis-inv-newbtn-' + $self.AD_UserHomeWidgetID + '" class="vas-inv-newbtn">' +
-                '<span class="vas-inv-newbtn-plus">+</span> ' + lbl("VIS_NewInvoice", 'New invoice') +
+                '<span class="vas-inv-newbtn-plus">+</span> ' + lbl("VAS_062_NewInvoice", 'New Invoice') +
                 '</button>' +
                 '</div>'
             );
@@ -280,7 +302,7 @@
                 '<div class="vis-inv-dup-sub vas-inv-dup-sub"></div>' +
                 '</div>' +
                 '<button type="button" id="vis-inv-review-' + $self.AD_UserHomeWidgetID + '" class="vas-inv-review-btn">' +
-                lbl("VIS_Review", 'Review') +
+                lbl("VAS_062_Review", 'Review') +
                 '</button>' +
                 '</div>'
             );
@@ -291,11 +313,11 @@
             /* Table header row — frozen above the scrolling body (CSS sticky). */
             var $tableHead = $(
                 '<div class="vas-inv-table-head" style="grid-template-columns:' + COL_TMPL + ';">' +
-                '<span class="vas-inv-th">' + lbl("VIS_Invoice", 'INVOICE') + '</span>' +
-                '<span class="vas-inv-th-customer">' + lbl("VIS_Customer", 'CUSTOMER') + '</span>' +
+                '<span class="vas-inv-th">' + lbl("VAS_062_Invoice", 'Invoice') + '</span>' +
+                '<span class="vas-inv-th-customer">' + lbl("VAS_062_Customer", 'Customer') + '</span>' +
                 '<span class="vas-inv-th">' + lbl("VAS_Date", 'Date') + '</span>' +
-                '<span class="vas-inv-th">' + lbl("VIS_Status", 'STATUS') + '</span>' +
-                '<span class="vas-inv-th">' + lbl("VIS_Amount", 'AMOUNT') + '</span>' +
+                '<span class="vas-inv-th">' + lbl("VAS_062_Status", 'Status') + '</span>' +
+                '<span class="vas-inv-th">' + lbl("VAS_062_Amount", 'Amount') + '</span>' +
                 '</div>'
             );
 
@@ -314,9 +336,9 @@
                 '<div class="vas-inv-footer" style="display:none;">' +
                 '<span class="vas-inv-footer-info"></span>' +
                 '<div class="vas-inv-pager">' +
-                '<button type="button" class="vas-inv-page-btn vas-inv-prev" aria-label="' + escapeHtml(lbl("VIS_Previous", 'Previous')) + '">' + chevL + '</button>' +
+                '<button type="button" class="vas-inv-page-btn vas-inv-prev" aria-label="' + escapeHtml(lbl("VAS_Previous", 'Previous')) + '">' + chevL + '</button>' +
                 '<span class="vas-inv-page-text"></span>' +
-                '<button type="button" class="vas-inv-page-btn vas-inv-next" aria-label="' + escapeHtml(lbl("VIS_Next", 'Next')) + '">' + chevR + '</button>' +
+                '<button type="button" class="vas-inv-page-btn vas-inv-next" aria-label="' + escapeHtml(lbl("VAS_Next", 'Next')) + '">' + chevR + '</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -349,7 +371,7 @@
             if (isNaN(d.getTime())) { return escapeHtml(value); }
             var now = new Date();
             if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
-                return escapeHtml(lbl("VIS_Today", 'Today'));
+                return escapeHtml(lbl("VAS_062_Today", 'Today'));
             }
             return escapeHtml(d.toLocaleDateString(window.navigator.language, { day: '2-digit', month: 'short' }));
         }
@@ -383,7 +405,7 @@
             $tableBody.empty();
 
             if (!INVOICES || INVOICES.length === 0) {
-                $tableBody.append('<div class="vas-inv-nodata">' + escapeHtml(lbl("VIS_NoData", 'No data')) + '</div>');
+                $tableBody.append('<div class="vas-inv-nodata">' + escapeHtml(lbl("VAS_062_NoData", 'No data')) + '</div>');
                 return;
             }
 
@@ -419,14 +441,14 @@
         function updatePager() {
             /* Right pager: "X of N" between the arrows. */
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VIS_Of", 'of') + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_Of", 'of') + ' ' + totalPages) : '');
             }
             /* Left helper: "Showing X–Y of Z" result range. */
             if ($pageInfo) {
                 if (totalRecords > 0) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VIS_Showing", 'Showing') + ' ' + from + '–' + to + ' ' + lbl("VIS_Of", 'of') + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_Showing", 'Showing') + ' ' + from + '–' + to + ' ' + lbl("VAS_Of", 'of') + ' ' + totalRecords);
                 } else {
                     $pageInfo.text('');
                 }
@@ -579,8 +601,8 @@
         }
 
         function billWord(n) {
-            if (n === 2) return lbl("VIS_DoubleBill", 'double-bill');
-            if (n === 3) return lbl("VIS_TripleBill", 'triple-bill');
+            if (n === 2) return lbl("VAS_062_DoubleBill", 'double-bill');
+            if (n === 3) return lbl("VAS_062_TripleBill", 'triple-bill');
             return n + '×-bill';
         }
 
@@ -641,7 +663,7 @@
            ellipsis and carry a title tooltip. Amounts are plain numbers (no currency). */
         function buildLineTable(inv) {
             if (!inv.lines || inv.lines.length === 0) {
-                return '<div class="vas-dup-lines-empty">' + escapeHtml(lbl("VIS_NoLineItems", 'No line items.')) + '</div>';
+                return '<div class="vas-dup-lines-empty">' + escapeHtml(lbl("VAS_062_NoLineItems", 'No line items.')) + '</div>';
             }
             var body = '';
             $.each(inv.lines, function (_, ln) {
@@ -660,12 +682,12 @@
             });
             return '<div class="vas-dup-lines-scroll"><table class="vas-dup-lines-table">' +
                 '<thead><tr>' +
-                '<th class="vas-dup-line-trunc">' + lbl("VIS_Product", 'Product') + '</th>' +
-                '<th class="vas-dup-line-trunc">' + lbl("VIS_AttributeSet", 'Attribute Set') + '</th>' +
-                '<th class="vas-dup-line-trunc">' + lbl("VIS_Charge", 'Charge') + '</th>' +
-                '<th class="vas-dup-line-num">' + lbl("VIS_Qty", 'Qty') + '</th>' +
-                '<th class="vas-dup-line-num">' + lbl("VIS_UnitPrice", 'Unit Price') + '</th>' +
-                '<th class="vas-dup-line-num">' + lbl("VIS_Amount", 'Amount') + '</th>' +
+                '<th class="vas-dup-line-trunc">' + lbl("VAS_062_Product", 'Product') + '</th>' +
+                '<th class="vas-dup-line-trunc">' + lbl("VAS_062_AttributeSet", 'Attribute Set') + '</th>' +
+                '<th class="vas-dup-line-trunc">' + lbl("VAS_062_Charge", 'Charge') + '</th>' +
+                '<th class="vas-dup-line-num">' + lbl("VAS_062_Qty", 'Qty') + '</th>' +
+                '<th class="vas-dup-line-num">' + lbl("VAS_062_UnitPrice", 'Unit Price') + '</th>' +
+                '<th class="vas-dup-line-num">' + lbl("VAS_062_Amount", 'Amount') + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table></div>';
         }
 
@@ -673,9 +695,9 @@
         function buildDetailCard(inv, total, sameLocation) {
             var dash = '<span class="vas-dup-dash">—</span>';
             var role = inv.panelRole;
-            var ageLabel = role === 'Newer' ? (total > 2 ? lbl("VIS_Newest", 'Newest') : lbl("VIS_Newer", 'Newer'))
-                : (role === 'Original' ? lbl("VIS_Original", 'Original') : '');
-            var dateLine = lbl("VIS_Issued", 'Issued') + ' ' + escapeHtml(inv.date || '—') + (ageLabel ? ' · ' + ageLabel : '');
+            var ageLabel = role === 'Newer' ? (total > 2 ? lbl("VAS_062_Newest", 'Newest') : lbl("VAS_062_Newer", 'Newer'))
+                : (role === 'Original' ? lbl("VAS_062_Original", 'Original') : '');
+            var dateLine = lbl("VAS_062_Issued", 'Issued') + ' ' + escapeHtml(inv.date || '—') + (ageLabel ? ' · ' + ageLabel : '');
             function val(v) { return v ? escapeHtml(v) : dash; }
             var totalState = inv.isSameGrandTotal === 'Y' ? ' is-match' : (inv.isSameGrandTotal === 'N' ? ' is-diff' : '');
 
@@ -686,19 +708,19 @@
                 statusPill(inv.docStatus) +
                 '</div>' +
                 '<div class="vas-dup-fields">' +
-                fieldRow(lbl("VIS_Organization", 'Organization'), val(inv.org), null, inv.org) +
-                fieldRow(lbl("VIS_CustomerName", 'Customer Name'), val(inv.customer), flagState(inv.isSameCustomer), inv.customer) +
-                fieldRow(lbl("VIS_InvoiceDate", 'Invoice Date'), val(inv.date), flagState(inv.isSameInvoiceDate), inv.date) +
-                fieldRow(lbl("VIS_SalesOrderNo", 'Sales Order No.'), val(inv.salesOrderNo), null, inv.salesOrderNo) +
-                fieldRow(lbl("VIS_DeliveryOrder", 'Delivery Order'), val(inv.deliveryOrderNo), null, inv.deliveryOrderNo) +
-                fieldRow(lbl("VIS_PaymentTerm", 'Payment Term'), val(inv.paymentTerm), flagState(inv.isSamePaymentTerm), inv.paymentTerm) +
-                fieldRow(lbl("VIS_DeliveryLocation", 'Delivery Location'), val(inv.deliveryLocation), sameLocation ? 'match' : 'diff', inv.deliveryLocation) +
+                fieldRow(lbl("VAS_062_Organization", 'Organization'), val(inv.org), null, inv.org) +
+                fieldRow(lbl("VAS_062_CustomerName", 'Customer Name'), val(inv.customer), flagState(inv.isSameCustomer), inv.customer) +
+                fieldRow(lbl("VAS_062_InvoiceDate", 'Invoice Date'), val(inv.date), flagState(inv.isSameInvoiceDate), inv.date) +
+                fieldRow(lbl("VAS_062_SalesOrderNo", 'Sales Order No.'), val(inv.salesOrderNo), null, inv.salesOrderNo) +
+                fieldRow(lbl("VAS_062_DeliveryOrder", 'Delivery Order'), val(inv.deliveryOrderNo), null, inv.deliveryOrderNo) +
+                fieldRow(lbl("VAS_062_PaymentTerm", 'Payment Term'), val(inv.paymentTerm), flagState(inv.isSamePaymentTerm), inv.paymentTerm) +
+                fieldRow(lbl("VAS_062_DeliveryLocation", 'Delivery Location'), val(inv.deliveryLocation), sameLocation ? 'match' : 'diff', inv.deliveryLocation) +
                 '</div>' +
                 '<div class="vas-dup-lines-wrap">' +
-                '<div class="vas-dup-lines-title">' + lbl("VIS_LineItems", 'Line items') + '</div>' +
+                '<div class="vas-dup-lines-title">' + lbl("VAS_062_LineItems", 'Line items') + '</div>' +
                 buildLineTable(inv) +
                 '</div>' +
-                '<div class="vas-dup-card-total"><span class="lbl">' + lbl("VIS_GrandTotal", 'Grand total') + '</span>' +
+                '<div class="vas-dup-card-total"><span class="lbl">' + lbl("VAS_062_GrandTotal", 'Grand total') + '</span>' +
                 '<span class="val' + totalState + '">' + moneyIso(inv.grandTotal, inv.currencyIso) + '</span></div>' +
                 '</div>';
         }
@@ -707,7 +729,7 @@
         function renderDetailCards(set) {
             var invs = set.detail || [];
             if (invs.length === 0) {
-                return '<div class="vas-dup-lines-empty">' + escapeHtml(lbl("VIS_NoData", 'No data')) + '</div>';
+                return '<div class="vas-dup-lines-empty">' + escapeHtml(lbl("VAS_062_NoData", 'No data')) + '</div>';
             }
             /* Delivery location is "same" only when every compared invoice shares it. */
             var locs = {};
@@ -728,8 +750,8 @@
             return '<div class="vas-dup-card vas-dup-card-skeleton" aria-hidden="true">' +
                 '<div class="vas-dup-card-head"><div><div class="vas-dup-sk vas-dup-sk-no"></div><div class="vas-dup-sk vas-dup-sk-date"></div></div><span class="vas-dup-sk vas-dup-sk-pill"></span></div>' +
                 '<div class="vas-dup-fields">' + fields + '</div>' +
-                '<div class="vas-dup-lines-wrap"><div class="vas-dup-lines-title">' + lbl("VIS_LineItems", 'Line items') + '</div><div class="vas-dup-sk vas-dup-sk-lines"></div></div>' +
-                '<div class="vas-dup-card-total"><span class="lbl">' + lbl("VIS_GrandTotal", 'Grand total') + '</span><span class="vas-dup-sk vas-dup-sk-total"></span></div>' +
+                '<div class="vas-dup-lines-wrap"><div class="vas-dup-lines-title">' + lbl("VAS_062_LineItems", 'Line items') + '</div><div class="vas-dup-sk vas-dup-sk-lines"></div></div>' +
+                '<div class="vas-dup-card-total"><span class="lbl">' + lbl("VAS_062_GrandTotal", 'Grand total') + '</span><span class="vas-dup-sk vas-dup-sk-total"></span></div>' +
                 '</div>';
         }
 
@@ -761,7 +783,7 @@
                 panelsHtml += buildPanel(i, set.invoices.length);
             });
 
-            var subtitle = sets.length + ' ' + lbl("VIS_DuplicateSets", 'duplicate sets') + ' · ' + lbl("VIS_SwitchTabsReview", 'switch tabs to review each');
+            var subtitle = sets.length + ' ' + lbl("VAS_062_DuplicateSets", 'duplicate sets') + ' · ' + lbl("VAS_062_SwitchTabsReview", 'switch tabs to review each');
 
             var overlay = $(
                 '<div class="vas-dup-overlay" role="dialog" aria-modal="true">' +
@@ -770,24 +792,24 @@
                 '<div class="vas-dup-header-left">' +
                 '<span class="vas-dup-header-icon">' + boxSvg + '</span>' +
                 '<div class="vas-dup-title-wrap">' +
-                '<div class="vas-dup-title">' + lbl("VIS_DuplicateInvoiceReview", 'Duplicate Invoice Review') + '</div>' +
+                '<div class="vas-dup-title">' + lbl("VAS_062_DuplicateInvoiceReview", 'Duplicate Invoice Review') + '</div>' +
                 '<div class="vas-dup-subtitle">' + subtitle + '</div>' +
                 '</div></div>' +
                 '<div class="vas-dup-header-right">' +
-                '<button class="vas-dup-close" type="button" aria-label="' + escapeHtml(lbl("VIS_Close", 'Close')) + '">' + closeSvg + '</button>' +
+                '<button class="vas-dup-close" type="button" aria-label="' + escapeHtml(lbl("VAS_Close", 'Close')) + '">' + closeSvg + '</button>' +
                 '</div></div>' +
                 '<div class="vas-dup-tabs" role="tablist">' + tabsHtml + '</div>' +
                 '<div class="vas-dup-legend">' +
-                '<span class="vas-dup-legend-item"><span class="vas-dup-legend-dot match"></span> ' + lbl("VIS_MatchingField", 'Matching field') + '</span>' +
-                '<span class="vas-dup-legend-item"><span class="vas-dup-legend-dot diff"></span> ' + lbl("VIS_DifferingField", 'Differing field') + '</span>' +
+                '<span class="vas-dup-legend-item"><span class="vas-dup-legend-dot match"></span> ' + lbl("VAS_062_MatchingField", 'Matching field') + '</span>' +
+                '<span class="vas-dup-legend-item"><span class="vas-dup-legend-dot diff"></span> ' + lbl("VAS_062_DifferingField", 'Differing field') + '</span>' +
                 '<span class="vas-dup-legend-context"></span>' +
                 '</div>' +
                 '<div class="vas-dup-body">' + panelsHtml + '</div>' +
                 '<div class="vas-dup-footer">' +
                 '<div class="vas-dup-footer-note">' + infoSvg + '<span></span></div>' +
                 '<div class="vas-dup-actions">' +
-                '<button class="vas-dup-btn danger" type="button" data-dup-act="void">' + lbl("VIS_ReverseNewerInvoice", 'Reverse newer invoice') + '</button>' +
-                '<button class="vas-dup-btn primary" type="button" data-dup-act="keep">' + lbl("VIS_KeepBoth", 'Keep both') + '</button>' +
+                '<button class="vas-dup-btn danger" type="button" data-dup-act="void">' + lbl("VAS_062_ReverseNewerInvoice", 'Reverse newer invoice') + '</button>' +
+                '<button class="vas-dup-btn primary" type="button" data-dup-act="keep">' + lbl("VAS_062_KeepBoth", 'Keep both') + '</button>' +
                 '</div></div>' +
                 /* Busy overlay shown while a footer action (Keep both / Reverse) is in flight; reuses
                    the core spinner classes. */
@@ -807,8 +829,8 @@
             function applyMeta(i) {
                 var s = sets[i];
                 if (!s) return;
-                $ctx.html(escapeHtml(s.customer || '') + ' · <b>' + lbl("VIS_PotentialDup", 'potential') + ' ' + billWord(s.invoices.length) + ' ' + money(s.amount, s.curSymbol) + '</b>');
-                $note.text(lbl("VIS_DupFooterNote", 'Header amounts match — review the invoices before deciding.'));
+                $ctx.html(escapeHtml(s.customer || '') + ' · <b>' + lbl("VAS_062_PotentialDup", 'potential') + ' ' + billWord(s.invoices.length) + ' ' + money(s.amount, s.curSymbol) + '</b>');
+                $note.text(lbl("VAS_062_DupFooterNote", 'Header amounts match — review the invoices before deciding.'));
             }
 
             /* Lazily fetch + render a set's line-level detail the first time its tab is shown. */
@@ -826,7 +848,7 @@
                 fetchDetail(set, function (ok) {
                     /* The dialog may have been closed before the response arrived. */
                     if (!$review || $panel.closest('body').length === 0) return;
-                    $grid.html(ok ? renderDetailCards(set) : '<div class="vas-dup-lines-empty">' + escapeHtml(lbl("VIS_NoData", 'No data')) + '</div>');
+                    $grid.html(ok ? renderDetailCards(set) : '<div class="vas-dup-lines-empty">' + escapeHtml(lbl("VAS_062_NoData", 'No data')) + '</div>');
                     $panel.attr('data-rendered', '1');
                 });
             }
@@ -856,14 +878,14 @@
             /* Show a backend error message (raw text) using the core dialog. The ("", false, text)
                form renders the literal text rather than treating it as a message key. */
             function showError(data) {
-                var txt = (data && data.error) ? data.error : lbl("VIS_Error", 'An error occurred.');
+                var txt = (data && data.error) ? data.error : lbl("VAS_062_ErrorOccurred", 'An error occurred.');
                 VIS.ADialog.error("", false, txt, "");
             }
 
             /* Keep the header subtitle's set count in sync after a tab is removed. */
             function updateSubtitle() {
                 if ($subtitle && $subtitle.length) {
-                    $subtitle.text(sets.length + ' ' + lbl("VIS_DuplicateSets", 'duplicate sets') + ' · ' + lbl("VIS_SwitchTabsReview", 'switch tabs to review each'));
+                    $subtitle.text(sets.length + ' ' + lbl("VAS_062_DuplicateSets", 'duplicate sets') + ' · ' + lbl("VAS_062_SwitchTabsReview", 'switch tabs to review each'));
                 }
             }
 
@@ -945,7 +967,7 @@
                fetch it first if the tab's detail has not loaded yet. */
             function doReverseNewer(set) {
                 if (!set) { return; }
-                VIS.ADialog.confirm("VIS_ReverseNewerInvoice", true, "", lbl("VIS_Confirm", 'Confirm'), function (ok) {
+                VIS.ADialog.confirm("VAS_062_ReverseNewerInvoice", true, "", lbl("VAS_062_Confirm", 'Confirm'), function (ok) {
                     if (!ok) { return; }
                     if (set.loaded) { reverseNewer(set); return; }
                     setBusy(true);
@@ -1038,6 +1060,9 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.InvoicesWidget.prototype.widgetSizeChange = function (height, width) { };

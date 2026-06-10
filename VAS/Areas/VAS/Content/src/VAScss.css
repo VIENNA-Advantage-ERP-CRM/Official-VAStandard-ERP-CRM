@@ -28,6 +28,7 @@
 @import "../VAS_010_CashGlCashInWidget.css";
 
 @import "../VAS_CreateNewReceipt.css";
+@import "../VAS_CreateARInvoice.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";

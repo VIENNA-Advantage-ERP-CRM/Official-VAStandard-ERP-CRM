@@ -7,23 +7,45 @@
  *           Amounts are prefixed with the base (accounting-schema) currency symbol.
  *
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
- *  #  | Current Text                                          | Message Key            | MsgText
- * ----+-------------------------------------------------------+------------------------+------------------------------------------------------
- *  1  | Aging Receivables                                     | VIS_AgingReceivables   | Aging Receivables
- *  2  | Who owes, how old                                     | VIS_WhoOwesHowOld      | Who owes, how old
- *  3  | Not yet due                                           | VIS_NotYetDue          | Not yet due
- *  4  | 1–30 days late                                        | VIS_Days1_30           | 1–30 days late
- *  5  | 31–60 days                                            | VIS_Days31_60          | 31–60 days
- *  6  | 61–90 days                                            | VIS_Days61_90          | 61–90 days
- *  7  | 90+ days                                              | VIS_Days90Plus         | 90+ days
- *  8  | WHY                                                   | VIS_Why                | WHY
- *  9  | Older invoices are harder to collect. Focus on the…   | VIS_AgingWhyText       | Older invoices are harder to collect. Focus on the 61+ buckets.
- *  11 | No data                                               | VIS_NoData             | No data
+ *  #  | Current Text                                          | Message Key              | MsgText
+ * ----+-------------------------------------------------------+--------------------------+----------------------------------------------------
+ *  1  | Aging Receivables                                     | VAS_060_AgingReceivables | Aging Receivables
+ *  2  | Who owes, how old                                     | VAS_060_WhoOwesHowOld    | Who owes, how old
+ *  3  | Not yet due                                           | VAS_060_NotYetDue        | Not yet due
+ *  4  | 1–30 days late                                        | VAS_060_Days1_30         | 1–30 days late
+ *  5  | 31–60 days                                            | VAS_060_Days31_60        | 31–60 days
+ *  6  | 61–90 days                                            | VAS_060_Days61_90        | 61–90 days
+ *  7  | 90+ days                                              | VAS_060_Days90Plus       | 90+ days
+ *  8  | WHY                                                   | VAS_060_Why              | WHY
+ *  9  | Older invoices are harder to collect. Focus on the…   | VAS_060_AgingWhyText     | Older invoices are harder to collect. Focus on the 61+ buckets.
+ *  11 | No data                                               | VAS_060_NoData           | No data
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     /* Bucket bar colours (green → red as overdue age increases). */
     var BUCKET_COLORS = {
@@ -130,7 +152,7 @@
             $contentArea.empty();
 
             if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
-                $contentArea.append('<div class="vas-ar-nodata">' + lbl("VIS_NoData", 'No data') + '</div>');
+                $contentArea.append('<div class="vas-ar-nodata">' + lbl("VAS_060_NoData", 'No data') + '</div>');
                 return;
             }
 
@@ -148,16 +170,16 @@
             if (maxVal <= 0) maxVal = 1;
 
             var html = '';
-            html += buildBucket(lbl("VIS_NotYetDue", 'Not yet due'), notDue, BUCKET_COLORS.notDue, maxVal);
-            html += buildBucket(lbl("VIS_Days1_30", '1–30 days late'), days1_30, BUCKET_COLORS.days1_30, maxVal);
-            html += buildBucket(lbl("VIS_Days31_60", '31–60 days'), days31_60, BUCKET_COLORS.days31_60, maxVal);
-            html += buildBucket(lbl("VIS_Days61_90", '61–90 days'), days61_90, BUCKET_COLORS.days61_90, maxVal);
-            html += buildBucket(lbl("VIS_Days90Plus", '90+ days'), days90Plus, BUCKET_COLORS.days90Plus, maxVal);
+            html += buildBucket(lbl("VAS_060_NotYetDue", 'Not yet due'), notDue, BUCKET_COLORS.notDue, maxVal);
+            html += buildBucket(lbl("VAS_060_Days1_30", '1–30 days late'), days1_30, BUCKET_COLORS.days1_30, maxVal);
+            html += buildBucket(lbl("VAS_060_Days31_60", '31–60 days'), days31_60, BUCKET_COLORS.days31_60, maxVal);
+            html += buildBucket(lbl("VAS_060_Days61_90", '61–90 days'), days61_90, BUCKET_COLORS.days61_90, maxVal);
+            html += buildBucket(lbl("VAS_060_Days90Plus", '90+ days'), days90Plus, BUCKET_COLORS.days90Plus, maxVal);
 
             // WHY block
             html += '<div class="vas-ar-why-block">' +
-               /* '<span class="vas-ar-why-pill">' + lbl("VIS_Why", "WHY") + '</span>' +*/
-                lbl("VIS_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
+               /* '<span class="vas-ar-why-pill">' + lbl("VAS_060_Why", "WHY") + '</span>' +*/
+                lbl("VAS_060_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
                 '</div>';
 
             $contentArea.append(html);
@@ -181,8 +203,8 @@
                 '</svg>' +
                 '</div>' +
                 '<div>' +
-                '<div class="vas-ar-title">' + lbl("VIS_AgingReceivables", 'Aging Receivables') + '</div>' +
-                '<div class="vas-ar-subtitle">' + lbl("VIS_WhoOwesHowOld", 'Who owes, how old') + '</div>' +
+                '<div class="vas-ar-title">' + lbl("VAS_060_AgingReceivables", 'Aging Receivables') + '</div>' +
+                '<div class="vas-ar-subtitle">' + lbl("VAS_060_WhoOwesHowOld", 'Who owes, how old') + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -225,6 +247,9 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.AgingReceivablesWidget.prototype.widgetSizeChange = function (height, width) { };
