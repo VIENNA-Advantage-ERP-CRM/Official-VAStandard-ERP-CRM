@@ -12,12 +12,13 @@
  ******************************************************/
 
 using System;
-using System.Text;
 using System.Data;
+using System.Text;
 using VAdvantage.Classes;
-using VAdvantage.Utility;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
+using VAdvantage.Model;
+using VAdvantage.Utility;
 
 namespace ModelLibrary.Model
 {
@@ -87,10 +88,68 @@ namespace ModelLibrary.Model
                 plannedAmt = Decimal.Round(plannedAmt, GetCurPrecision(), MidpointRounding.AwayFromZero);
             }
             SetPlannedAmt(plannedAmt);
-
+            //	Planned Margin
+            if (Is_ValueChanged("M_Product_ID") 
+                || Is_ValueChanged("PlannedQty") || Is_ValueChanged("PlannedPrice"))
+            {
+                if (GetM_Product_ID() != 0)
+                {
+                    Decimal marginEach = Decimal.Subtract(GetPlannedPrice(), GetLimitPrice());
+                    SetPlannedMarginAmt(Decimal.Round(Decimal.Multiply(marginEach, GetPlannedQty()), GetCurPrecision()));
+                }
+                
+            }
             return true;
         }
+        public Decimal GetLimitPrice()
+        {
+            Decimal limitPrice = GetPlannedPrice();
+            if (GetM_Product_ID() == 0)
+                return limitPrice;
+            if (GetOpportunity() == null)
+                return limitPrice;
+            bool isSOTrx = true;
+            MProduct prd = new MProduct(GetCtx(), GetM_Product_ID(), null);
+            MProductPricing pp = new MProductPricing(GetAD_Client_ID(), GetAD_Org_ID(),
+                GetM_Product_ID(), _parent.GetC_BPartner_ID(), GetPlannedQty(), isSOTrx);
+            pp.SetM_PriceList_ID(_parent.GetM_PriceList_ID());
+            pp.SetM_PriceList_Version_ID(_parent.GetM_PriceList_Version_ID());
 
+            // Get Price according to Attribute set instance if selected on Project line
+            if (Get_ColumnIndex("M_AttributeSetInstance_ID") >= 0)
+            {
+                pp.SetM_AttributeSetInstance_ID(GetM_AttributeSetInstance_ID());
+            }
+
+            pp.SetC_UOM_ID(prd.GetC_UOM_ID());
+            if (pp.CalculatePrice())
+                limitPrice = pp.GetPriceLimit();
+            return limitPrice;
+        }
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (!success)
+                return success;
+
+            UpdateHeader();
+            return success;
+        }
+        protected override bool AfterDelete(bool success)
+        {
+            if (!success)
+                return success;
+
+            UpdateHeader();
+            return success;
+        }
+        private void UpdateHeader()
+        {
+                //Used transaction because total was not updating on header
+                MOpportunity prj = new MOpportunity(GetCtx(), GetVAS_Opportunity_ID(), Get_TrxName());
+                decimal plnAmt = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.PlannedAmt),0)  FROM vas_opplines pl WHERE pl.IsActive = 'Y' AND pl.VAS_Opportunity_ID =" + GetVAS_Opportunity_ID(), null, Get_TrxName()));
+                prj.SetPlannedAmt(plnAmt);
+                prj.Save();
+        }
         /// <summary>
         /// Get Line No. Alias kept so callers written against MProjectLine.GetLine()
         /// (e.g. VAS_GenerateQuotation) work unchanged against the VAS_LineNo column.
