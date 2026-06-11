@@ -57,6 +57,7 @@ import "../model/calloutteamforecast.js";
 import "../model/callouttimeexpense.js";
 import "../model/calloutInvRevaluation.js";
 import "../model/VAS_CalloutContract.js";
+import "../model/VAS_CalloutOpportunity.js";
 import "../model/calloutTerm.js";
 import "../app/forms/PoReceiptTabPanel.js";
 import "../app/forms/InvoiceTaxTabPanel.js";

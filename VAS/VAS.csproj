@@ -491,6 +491,7 @@
     <Content Include="Areas\VAS\Scripts\model\calloutTerm.js" />
     <Content Include="Areas\VAS\Scripts\model\callouttimeexpense.js" />
     <Content Include="Areas\VAS\Scripts\model\VAS_CalloutContract.js" />
+    <Content Include="Areas\VAS\Scripts\model\VAS_CalloutOpportunity.js" />
     <Content Include="Areas\VAS\Scripts\react\index.jsx" />
     <Content Include="Areas\VAS\Scripts\src\reactjs.js" />
     <Content Include="Areas\VAS\Scripts\src\VASjs.js" />

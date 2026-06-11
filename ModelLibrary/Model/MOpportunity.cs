@@ -19,6 +19,7 @@ using System.Data;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
+using VAdvantage.Model;
 using VAdvantage.Utility;
 using ViennaAdvantage.Model;
 
@@ -44,6 +45,32 @@ namespace ModelLibrary.Model
         /// <param name="trxName">transaction</param>
         public MOpportunity(Ctx ctx, DataRow rs, Trx trxName) : base(ctx, rs, trxName)
         {
+        }
+        protected override bool BeforeSave(bool newRecord)
+        {
+            if (GetAD_User_ID() == -1)  //	Summary Project in Dimensions
+                SetAD_User_ID(0);
+
+            //	Set Currency
+            if (Is_ValueChanged("M_PriceList_Version_ID") && GetM_PriceList_Version_ID() != 0)
+            {
+                MPriceList pl = MPriceList.Get(GetCtx(), GetM_PriceList_ID(), null);
+                if (pl != null && pl.Get_ID() != 0)
+                    SetC_Currency_ID(pl.GetC_Currency_ID());
+            }
+            return true;
+        }
+        protected override bool AfterSave(bool newRecord, bool success)
+        {
+            if (GetC_Campaign_ID() != 0 && success)
+            {
+                //Used transaction because total was not updating on header
+                MCampaign cam = new MCampaign(GetCtx(), GetC_Campaign_ID(), Get_TrxName());
+                decimal plnAmt = Util.GetValueOfDecimal(DB.ExecuteScalar("SELECT COALESCE(SUM(pl.PlannedAmt),0)  FROM VAS_Opportunity pl WHERE pl.IsActive = 'Y' AND pl.C_Campaign_ID = " + GetC_Campaign_ID(), null, Get_TrxName()));
+                cam.SetCosts(plnAmt);
+                cam.Save();
+            }
+            return base.AfterSave(newRecord, success);
         }
 
         /// <summary>
