@@ -159,15 +159,15 @@
 }
 
 .vas-payment-methods-fill-upi {
-    background: linear-gradient(90deg, #8b7cff, #5f4aa6);
+    background: linear-gradient(90deg, #019d89, #0b6b45);
 }
 
 .vas-payment-methods-fill-card {
-    background: linear-gradient(90deg, #f0b055, #d78b10);
+    background: linear-gradient(90deg, #d78b10, #9a6500);
 }
 
 .vas-payment-methods-fill-cheque {
-    background: linear-gradient(90deg, #e78989, #d14545);
+    background: linear-gradient(90deg, #d14545, #a33f3f);
 }
 
 .vas-payment-methods-foot {

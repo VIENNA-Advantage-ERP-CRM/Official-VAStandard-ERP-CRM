@@ -324,18 +324,18 @@
     }
 
 .vas-recent-ap-payments-status-cleared {
-    background: #ccefdd;
-    color: #0c5d38;
+    background: rgba(1, 157, 137, 0.14);
+    color: #0b6b45;
 }
 
 .vas-recent-ap-payments-status-intransit {
-    background: #feeec8;
-    color: #8c5a06;
+    background: rgba(215, 139, 16, 0.16);
+    color: #9a6500;
 }
 
 .vas-recent-ap-payments-status-bounced {
-    background: #fad7d7;
-    color: #8f2d2d;
+    background: rgba(209, 69, 69, 0.16);
+    color: #a33f3f;
 }
 
 .vas-recent-ap-payments-state {

@@ -10,13 +10,14 @@
     font-size: clamp(16px, 1.4cqi, 24px);
     position: relative;
     overflow: hidden;
-    --vas-bounced-bg: #111a2b;
-    --vas-bounced-border: #2d374c;
-    --vas-bounced-panel: #303647;
-    --vas-bounced-panel-border: #596173;
-    --vas-bounced-text: #ffffff;
-    --vas-bounced-muted: #b8bdc7;
-    --vas-bounced-accent: #f4b7b7;
+    --vas-bounced-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    --vas-bounced-border: #ffffff;
+    --vas-bounced-panel: rgba(255, 255, 255, 0.90);
+    --vas-bounced-panel-border: #e4edf4;
+    --vas-bounced-text: #102c3f;
+    --vas-bounced-muted: #5f7283;
+    --vas-bounced-accent: #d14545;
+    --vas-bounced-accent-strong: #a33f3f;
 }
 
     .vas-bounced-ap-payment-root,
@@ -38,7 +39,7 @@
     border: 2px solid var(--vas-bounced-border);
     border-radius: 14px;
     background: var(--vas-bounced-bg);
-    box-shadow: 0 10px 24px rgba(17, 26, 43, 0.18);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: var(--vas-bounced-text);
     position: relative;
 }
@@ -60,7 +61,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid var(--vas-bounced-panel-border);
+    border: 1px solid rgba(255, 255, 255, 0.95);
     border-radius: 10px;
     background: var(--vas-bounced-panel);
     color: var(--vas-bounced-accent);
@@ -87,7 +88,7 @@
     font-size: 0.875em;
     font-weight: 700;
     line-height: 1.2;
-    color: var(--vas-bounced-text);
+    color: var(--vas-bounced-accent-strong);
 }
 
 .vas-bounced-ap-payment-body {
@@ -112,7 +113,7 @@
     line-height: 1.1;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
-    color: var(--vas-bounced-text);
+    color: var(--vas-bounced-accent-strong);
 }
 
 .vas-bounced-ap-payment-footer {
@@ -136,7 +137,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
-    border: 2px solid var(--vas-bounced-panel-border);
+    border: 1px solid rgba(209, 69, 69, 0.18);
     border-radius: 4px;
     background: var(--vas-bounced-panel);
     color: var(--vas-bounced-accent);

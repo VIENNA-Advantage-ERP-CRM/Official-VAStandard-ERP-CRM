@@ -216,7 +216,7 @@
     gap: 0.375em;
     border: none;
     border-radius: 999px;
-    background: #0f1b2d;
+    background: #002640;
     color: #ffffff;
     font-size: 0.75em;
     font-weight: 500;
@@ -226,7 +226,7 @@
 }
 
     .vas-reconciliation-status-action:hover {
-        background: #002640;
+        background: #1f83ff;
         transform: translateY(-0.0625em);
     }
 
