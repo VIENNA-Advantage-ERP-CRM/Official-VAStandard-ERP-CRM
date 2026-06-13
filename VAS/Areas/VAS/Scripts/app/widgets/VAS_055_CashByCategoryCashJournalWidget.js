@@ -42,9 +42,26 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+        function firstText() {
+            for (var i = 0; i < arguments.length; i++) {
+                if (arguments[i] !== null && arguments[i] !== undefined) {
+                    var value = String(arguments[i]).trim();
+
+                    if (value) {
+                        return value;
+                    }
+                }
+            }
+
+            return '';
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, currencyId, precision) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
+            var symbol = firstText(currencySymbol);
+            var iso = firstText(currencyISO);
+            var id = firstText(currencyId);
 
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
@@ -52,11 +69,15 @@
             });
             var sign = numericValue < 0 ? '-' : '';
 
-            if (currencySymbol) {
-                return sign + currencySymbol + amount;
+            if (symbol) {
+                return sign + symbol + ' ' + amount;
             }
 
-            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+            if (iso) {
+                return sign + iso + ' ' + amount;
+            }
+
+            return id ? sign + '#' + id + ' ' + amount : sign + amount;
         }
 
         function showBusy(show) {
@@ -162,15 +183,18 @@
             $root.find('#VAS_055_cash-category-body-' + widgetId).empty();
         }
 
-        function createRow(item, index, currencySymbol, currencyISO, precisionFallback) {
+        function createRow(item, index, currencySymbol, currencyISO, currencyId, precisionFallback) {
             var percent = Math.max(0, Math.min(100, safeNumber(item.percent)));
             var amount = safeNumber(item.cashOutAmount);
-            var precision = item.stdPrecision || precisionFallback;
+            var precision = item.stdPrecision || item.StdPrecision || precisionFallback;
+            var rowCurrencySymbol = firstText(item.currencySymbol, item.CurrencySymbol, item.symbol, item.Symbol, currencySymbol);
+            var rowCurrencyISO = firstText(item.currencyISO, item.CurrencyISO, item.currencyISOCode, item.CurrencyISOCode, currencyISO);
+            var rowCurrencyId = firstText(item.cCurrencyId, item.C_Currency_ID, item.CCurrencyId, currencyId);
             var colorClass = item.colorClass || 'VAS_055_cash-category-bar-' + ((index % 3) + 1);
 
             var $row = $('<div>', {
                 'class': 'VAS_055_cash-category-row',
-                'title': (item.name || lbl('VAS_055_Other', 'Other')) + ' · ' + formatCurrencyAmount(amount, currencySymbol, currencyISO, precision)
+                'title': (item.name || lbl('VAS_055_Other', 'Other')) + ' · ' + formatCurrencyAmount(amount, rowCurrencySymbol, rowCurrencyISO, rowCurrencyId, precision)
             });
 
             var $rowTop = $('<div>', {
@@ -196,7 +220,7 @@
 
             var $amount = $('<span>', {
                 'class': 'VAS_055_cash-category-amount',
-                'text': formatCurrencyAmount(amount, currencySymbol, currencyISO, precision)
+                'text': formatCurrencyAmount(amount, rowCurrencySymbol, rowCurrencyISO, rowCurrencyId, precision)
             });
 
             var $track = $('<div>', {
@@ -227,8 +251,10 @@
             var widgetId = $self.AD_UserHomeWidgetID;
             var items = data.items || [];
             var $body = $root.find('#VAS_055_cash-category-body-' + widgetId);
-            var currencySymbol = data.currencySymbol || '';
-            var currencyISO = data.currencyISO || data.currencyISOCode || '';
+            var currencySymbol = firstText(data.currencySymbol, data.CurrencySymbol, data.symbol, data.Symbol);
+            var currencyISO = firstText(data.currencyISO, data.CurrencyISO, data.currencyISOCode, data.CurrencyISOCode);
+            var currencyId = firstText(data.cCurrencyId, data.C_Currency_ID, data.CCurrencyId);
+            var precision = data.stdPrecision || data.StdPrecision;
 
             $root.find('#VAS_055_cash-category-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_055_cash-category-title-' + widgetId).text(data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category'));
@@ -244,7 +270,7 @@
             }
 
             $.each(items.slice(0, 3), function (index, item) {
-                $body.append(createRow(item, index, item.currencySymbol || currencySymbol, item.currencyISO || currencyISO, data.stdPrecision));
+                $body.append(createRow(item, index, currencySymbol, currencyISO, currencyId, precision));
             });
         }
 
