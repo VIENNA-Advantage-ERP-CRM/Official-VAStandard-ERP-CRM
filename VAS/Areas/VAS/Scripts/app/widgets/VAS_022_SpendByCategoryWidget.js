@@ -12,6 +12,7 @@
  *   VAS_022_Crore              => "Cr"
  *   VAS_022_Lakh               => "L"
  *   VAS_022_Thousand           => "K"
+ *   VAS_022_NoData             => "No spend data for this month"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -115,6 +116,25 @@
             if (_currentView === 'pie') { drawDonut(data); } else { drawBar(data); }
         }
 
+        /* ---- No-data overlay helper ---- */
+        function setNoData(el, show) {
+            var wrap = el ? el.parentElement : null;
+            if (!wrap) { return; }
+            var prev = wrap.querySelector('.vas-sbcwdg-nodata');
+            if (show) {
+                el.style.display = 'none';
+                if (!prev) {
+                    var msg = document.createElement('div');
+                    msg.className   = 'vas-sbcwdg-nodata';
+                    msg.textContent = VIS.Msg.getMsg('VAS_022_NoData') || 'No spend data for this month';
+                    wrap.appendChild(msg);
+                }
+            } else {
+                el.style.display = '';
+                if (prev) { wrap.removeChild(prev); }
+            }
+        }
+
         /* ---- Chart.js Horizontal Bar ---- */
         function drawBar(data) {
             if (typeof Chart === 'undefined') { return; }
@@ -126,7 +146,8 @@
             var cats = (data && data.Categories) || [];
             var sym  = (data && data.CurSymbol)  || '';
             var n    = cats.length;
-            if (!n) { return; }
+            if (!n) { setNoData(el, true); return; }
+            setNoData(el, false);
 
             var catNames   = cats.map(function (c) { return c.Name; });
             var catAmounts = cats.map(function (c) { return c.Amount; });
@@ -195,7 +216,8 @@
             var cats = (data && data.Categories) || [];
             var sym  = (data && data.CurSymbol)  || '';
             var n    = cats.length;
-            if (!n) { return; }
+            if (!n) { setNoData(el, true); return; }
+            setNoData(el, false);
 
             var total = 0;
             for (var ti = 0; ti < n; ti++) { total += cats[ti].Amount; }

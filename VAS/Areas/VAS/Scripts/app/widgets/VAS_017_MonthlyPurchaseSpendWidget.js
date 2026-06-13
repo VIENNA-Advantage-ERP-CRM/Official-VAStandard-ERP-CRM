@@ -205,9 +205,15 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     layout: { padding: { top: 4, right: 8 } },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
                     plugins: {
                         legend: { display: false },   /* custom HTML legend in header */
                         tooltip: {
+                            mode: 'index',
+                            intersect: false,
                             callbacks: {
                                 label: function (ctx) {
                                     if (ctx.raw === null) { return null; }

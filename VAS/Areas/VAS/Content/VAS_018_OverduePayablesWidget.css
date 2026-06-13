@@ -23,7 +23,7 @@
     justify-content: space-between;
     height: 100%;
     padding: 1.14em 1.14em 1.28em;
-    background: linear-gradient(148deg, rgba(255, 242, 218, .9), rgba(255, 255, 255, .6));
+    background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.49));
     border-radius: 12px;
     box-sizing: border-box;
     position: relative;
@@ -152,3 +152,6 @@
 @media (max-width: 320px) {
     .vas-opwdg-container { font-size: 9px; }
 }
+@media (min-width: 1600px) { .vas-opwdg-container { font-size: 16px; } }
+@media (min-width: 1920px) { .vas-opwdg-container { font-size: 18px; } }
+@media (min-width: 2560px) { .vas-opwdg-container { font-size: 21px; } }
