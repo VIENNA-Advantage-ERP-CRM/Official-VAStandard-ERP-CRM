@@ -25,7 +25,7 @@ namespace VAS.Controllers
     public class VAS_030_BouncedAPPaymentWidgetController : Controller
     {
         /// <summary>
-        /// Gets outgoing AP payments marked as bounced during the current financial period.
+        /// Gets outgoing AP payments marked as bounced or rejected during the current financial period.
         /// Period is based on C_Period calendar linked with AD_ClientInfo.
         /// </summary>
         /// <returns>Bounced AP payment count and reporting date range.</returns>
@@ -112,7 +112,7 @@ namespace VAS.Controllers
         private SqlQueryData BuildBouncedAPPaymentsSql(Ctx ctx)
         {
             string bouncedStatusFilter = HasPaymentExecutionStatusColumn()
-                ? "AND Payment.VA009_ExecutionStatus = 'B'"
+                ? "AND Payment.VA009_ExecutionStatus IN ('" + X_C_Payment.VA009_EXECUTIONSTATUS_Bounced + "', '" + X_C_Payment.VA009_EXECUTIONSTATUS_Rejected + "')"
                 : "AND 1 = 2";
 
             string periodRangeSql = @"
@@ -164,11 +164,14 @@ PaymentFiltered AS
 WITH " + periodRangeSql + @",
 " + paymentFilteredSql + @"
 SELECT
-COUNT(Payment.C_Payment_ID) AS BouncedPaymentCount,
+COUNT(DISTINCT Payment.C_Payment_ID) AS BouncedPaymentCount,
 MIN(PeriodRange.DateFrom) AS DateFrom,
 MAX(PeriodRange.DateTo) AS DateTo
 FROM PaymentFiltered Payment
-INNER JOIN PeriodRange ON (Payment.DateAcct >= PeriodRange.DateFrom AND Payment.DateAcct < PeriodRange.DateToExclusive)";
+INNER JOIN PeriodRange ON (
+    Payment.DateAcct >= PeriodRange.DateFrom
+    AND Payment.DateAcct < PeriodRange.DateToExclusive
+)";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
