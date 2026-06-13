@@ -38,27 +38,28 @@
             return text && text !== '[' + key + ']' ? text : fallback;
         }
 
+        function getPrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
+        }
+
         /* ── Amount formatter ───────────────────────────────────────── */
-        function formatCurrencyAmount(value, currencyISO) {
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
-            var stdPrecision = 2;
+            var stdPrecision = getPrecision(precision);
 
-            try {
-                if (VIS && VIS.Env && VIS.Env.getCtx &&
-                    typeof VIS.Env.getCtx().getStdPrecision === 'function') {
-                    stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
-                }
-            } catch (e) {
-            }
-
-            if (isNaN(stdPrecision) || stdPrecision < 0) {
-                stdPrecision = 2;
-            }
-
-            return numericValue.toLocaleString(window.navigator.language, {
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+            var sign = numericValue < 0 ? '-' : '';
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         /* ── Loading overlay ────────────────────────────────────────── */
@@ -167,7 +168,7 @@
                 deltaRaw = Math.round(((mainMetric - avgDailyAmount) / avgDailyAmount) * 100);
             }
 
-            var formatted = formatCurrencyAmount(mainMetric, data.currencyISO);
+            var formatted = formatCurrencyAmount(mainMetric, data.currencySymbol, data.currencyISO, data.stdPrecision);
             $root.find('#VAS-047-cj-value-' + uid).text(formatted);
 
             var isPositive = (deltaRaw >= 0);

@@ -46,10 +46,6 @@
         function getPrecision(data) {
             var stdPrecision = Number(data && data.stdPrecision);
 
-            if (isNaN(stdPrecision) && VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
-            }
-
             return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
@@ -57,15 +53,23 @@
             var numericValue = safeNumber(value);
             var precision = getPrecision(data);
             var symbol = data && data.currencySymbol ? data.currencySymbol : '';
+            var iso = data && (data.currencyISO || data.currencyISOCode) ? (data.currencyISO || data.currencyISOCode) : '';
 
             if (numericValue === 0) {
                 return '-';
             }
 
-            return symbol + numericValue.toLocaleString(window.navigator.language, {
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
+            var sign = numericValue < 0 ? '-' : '';
+
+            if (symbol) {
+                return sign + symbol + amount;
+            }
+
+            return iso ? sign + amount + ' ' + iso : sign + amount;
         }
 
         function showBusy(show) {

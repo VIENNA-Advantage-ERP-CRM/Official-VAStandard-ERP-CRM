@@ -43,15 +43,24 @@
         function formatAmount(item) {
             var precision = Number(item && item.stdPrecision);
             var symbol = item && item.currencySymbol ? item.currencySymbol : '';
+            var iso = item && item.currencyISO ? item.currencyISO : '';
 
             if (isNaN(precision) || precision < 0) {
                 precision = 2;
             }
 
-            return symbol + safeNumber(item && item.displayAmount).toLocaleString(window.navigator.language, {
+            var numericValue = safeNumber(item && item.displayAmount);
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
+            var sign = numericValue < 0 ? '-' : '';
+
+            if (symbol) {
+                return sign + symbol + amount;
+            }
+
+            return iso ? sign + amount + ' ' + iso : sign + amount;
         }
 
         function showBusy(show) {

@@ -134,10 +134,37 @@
     color: #102C3F;
 }
 
+.VAS_055_cash-category-metrics {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 48%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.125em;
+    overflow: hidden;
+}
+
 .VAS_055_cash-category-percent {
-    flex: 0 0 auto;
+    display: block;
+    max-width: 100%;
     text-align: right;
     font-size: 0.875em;
+}
+
+.VAS_055_cash-category-amount {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #60748A;
 }
 
 .VAS_055_cash-category-track {
@@ -274,7 +301,8 @@
     }
 
     .VAS_055_cash-category-name,
-    .VAS_055_cash-category-percent {
+    .VAS_055_cash-category-percent,
+    .VAS_055_cash-category-amount {
         font-size: 0.875em;
     }
 
@@ -303,7 +331,8 @@
     }
 
     .VAS_055_cash-category-name,
-    .VAS_055_cash-category-percent {
+    .VAS_055_cash-category-percent,
+    .VAS_055_cash-category-amount {
         font-size: 0.75em;
     }
 

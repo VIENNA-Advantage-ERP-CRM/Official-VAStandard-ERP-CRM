@@ -36,6 +36,31 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
+        function getPrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return stdPrecision;
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = safeNumber(value);
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: getPrecision(precision),
+                maximumFractionDigits: getPrecision(precision)
+            });
+            var sign = numericValue < 0 ? '-' : '';
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
         function showBusy(show) {
             if (!$root) {
                 return;
@@ -141,9 +166,12 @@
             $root.find('#VAS_051_cash-flow-body-' + widgetId).empty();
         }
 
-        function createDayColumn(item, maxAmount) {
+        function createDayColumn(item, maxAmount, data) {
             var cashIn = safeNumber(item.cashInAmount);
             var cashOut = safeNumber(item.cashOutAmount);
+            var currencySymbol = item.currencySymbol || data.currencySymbol;
+            var currencyISO = item.currencyISO || data.currencyISO;
+            var precision = item.stdPrecision || data.stdPrecision;
 
             var inHeight = maxAmount > 0 ? Math.round((cashIn / maxAmount) * 100) : 0;
             var outHeight = maxAmount > 0 ? Math.round((cashOut / maxAmount) * 100) : 0;
@@ -156,10 +184,9 @@
                 outHeight = 0;
             }
 
-            var tooltip = item.tooltip ||
-                ((item.dayLabel || '') + ' ' + (item.date || '') +
-                    ' | In: ' + cashIn +
-                    ' | Out: ' + cashOut);
+            var tooltip = (item.dayLabel || '') + ' ' + (item.date || '') +
+                ' | In: ' + formatCurrencyAmount(cashIn, currencySymbol, currencyISO, precision) +
+                ' | Out: ' + formatCurrencyAmount(cashOut, currencySymbol, currencyISO, precision);
 
             var $column = $('<div>', {
                 'class': 'VAS_051_cash-flow-day',
@@ -220,7 +247,7 @@
             });
 
             $.each(items.slice(0, 7), function (index, item) {
-                $body.append(createDayColumn(item, maxAmount));
+                $body.append(createDayColumn(item, maxAmount, data));
             });
         }
 

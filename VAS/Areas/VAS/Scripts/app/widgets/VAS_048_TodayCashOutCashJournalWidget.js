@@ -30,22 +30,27 @@
             return text && text !== key && text !== '[' + key + ']' ? text : fallback;
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+        function getPrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
-            var stdPrecision = 2;
+            var stdPrecision = getPrecision(precision);
 
-            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
-            }
-
-            if (isNaN(stdPrecision) || stdPrecision < 0) {
-                stdPrecision = 2;
-            }
-
-            return numericValue.toLocaleString(window.navigator.language, {
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+            var sign = numericValue < 0 ? '-' : '';
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         function showBusy(show) {
@@ -184,7 +189,7 @@
             $root.find('#VAS_048_today-cash-out-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_048_today-cash-out-title-' + widgetId).text(title);
             $root.find('#VAS_048_today-cash-out-date-' + widgetId).text(dateText);
-            $root.find('#VAS_048_today-cash-out-value-' + widgetId).text(formatCurrencyAmount(amount, data.currencySymbol, data.currencyISO)).show();
+            $root.find('#VAS_048_today-cash-out-value-' + widgetId).text(formatCurrencyAmount(amount, data.currencySymbol, data.currencyISO, data.stdPrecision)).show();
             $root.find('.VAS_today-cash-out-cash-journal-footer').show();
             $root.find('#VAS_048_today-cash-out-delta-text-' + widgetId).text(formatPercent(deltaPercent));
             $root.find('#VAS_048_today-cash-out-description-' + widgetId).text(footerText);

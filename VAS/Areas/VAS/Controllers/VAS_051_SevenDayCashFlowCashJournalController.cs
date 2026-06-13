@@ -92,6 +92,9 @@ namespace VAS.Controllers
                         cashOutAmount = cashOutAmount,
                         netAmount = netAmount,
                         lineCount = lineCount,
+                        currencyISO = currencyISO,
+                        currencySymbol = currencySymbol,
+                        stdPrecision = stdPrecision,
                         tooltip = dayLabel + " " + cashFlowDate
                             + " | In: " + cashInAmount.ToString()
                             + " | Out: " + cashOutAmount.ToString()
