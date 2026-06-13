@@ -3,18 +3,17 @@
  * Purpose - Shows the latest outgoing AP payments with vendor, payment method, invoice/order reference, status, and amount.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
+ *   Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
- *  2  | + New payment                        | VAS_032_MessageNewPayment
- *  3  | Date                                 | VAS_032_MessageDate
- *  4  | Vendor                               | VAS_032_MessageVendor
- *  5  | Method                               | VAS_032_MessageMethod
- *  6  | Ref                                  | VAS_032_MessageRef
- *  7  | Status                               | VAS_032_MessageStatus
- *  8  | Amount                               | VAS_032_MessageAmount
- *  9  | Loading                              | VAS_032_MessageLoading
- * 10  | No Data                              | VAS_032_MessageNoData
+ *  2  | Date                                 | VAS_032_MessageDate
+ *  3  | Vendor                               | VAS_032_MessageVendor
+ *  4  | Method                               | VAS_032_MessageMethod
+ *  5  | Ref                                  | VAS_032_MessageRef
+ *  6  | Status                               | VAS_032_MessageStatus
+ *  7  | Amount                               | VAS_032_MessageAmount
+ *  8  | Loading                              | VAS_032_MessageLoading
+ *  9  | No Data                              | VAS_032_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -34,9 +33,18 @@
         var $bannerTitle;
         var $bannerSub;
         var $tableWrap;
+        var $pager;
+        var $pagerPrev;
+        var $pagerNext;
+        var $pagerText;
         var $busy;
         var $state;
+
         var isDisposed = false;
+        var paymentsData = [];
+        var pageNo = 1;
+        var pageSize = 7;
+        var totalPages = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -62,11 +70,18 @@
             );
 
             var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_032_MessageRecentPayments', 'Recent payments'));
-            
+
+            $pager = $('<div class="vas-recent-ap-payments-pager">');
+            $pagerPrev = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">‹</button>');
+            $pagerText = $('<span class="vas-recent-ap-payments-page-text">');
+            $pagerNext = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">›</button>');
+
+            $pager.append($pagerPrev).append($pagerText).append($pagerNext);
+
             $iconBox.append($icon);
             $titleWrap.append($iconBox).append($title);
-            $head.append($titleWrap);
 
+            $head.append($titleWrap).append($pager);
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
             $busy = $('<div class="vas-recent-ap-payments-busy">').text(lbl('VAS_032_MessageLoading', 'Loading'));
@@ -74,6 +89,24 @@
 
             $card.append($head).append($tableWrap).append($busy).append($state);
             $root.empty().append($card);
+
+            $pagerPrev.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                renderPage();
+            });
+
+            $pagerNext.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                renderPage();
+            });
         }
 
         function loadData() {
@@ -127,7 +160,7 @@
         }
 
         function renderData(data) {
-            var payments = $.isArray(data.payments)
+            paymentsData = $.isArray(data.payments)
                 ? $.grep(data.payments, function (payment) {
                     var amount = Number(payment.amount || 0);
 
@@ -135,14 +168,38 @@
                 })
                 : [];
 
-            if (payments.length === 0) {
+            if (paymentsData.length === 0) {
                 setNoData();
                 return;
             }
 
-            renderTable(payments);
+            pageNo = 1;
+            totalPages = Math.ceil(paymentsData.length / pageSize);
+            renderPage();
         }
 
+        function renderPage() {
+            if (!paymentsData || paymentsData.length === 0) {
+                setNoData();
+                return;
+            }
+
+            totalPages = Math.max(1, Math.ceil(paymentsData.length / pageSize));
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
+            }
+
+            var startIndex = (pageNo - 1) * pageSize;
+            var pagePayments = paymentsData.slice(startIndex, startIndex + pageSize);
+
+            renderTable(pagePayments);
+            updatePager();
+        }
 
         function renderTable(payments) {
             showState(false, '');
@@ -164,12 +221,35 @@
 
             var $tbody = $('<tbody>');
 
-            for (var i = 0; i < payments.length && i < 7; i++) {
+            for (var i = 0; i < payments.length; i++) {
                 $tbody.append(createPaymentRow(payments[i]));
             }
 
             $table.append($tbody);
             $tableWrap.empty().append($table);
+        }
+
+        function updatePager() {
+            if (!$pager) {
+                return;
+            }
+
+            if ($pagerText) {
+                if (totalPages > 1) {
+                    $pagerText.text(pageNo + ' / ' + totalPages);
+                }
+                else {
+                    $pagerText.text('');
+                }
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($pagerNext) {
+                $pagerNext.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
         }
 
         function createPaymentRow(payment) {
@@ -179,12 +259,35 @@
             var statusText = payment.statusName || getStatusText(payment.statusType);
 
             $row
-                .append($('<td class="vas-recent-ap-payments-date">').append($('<span class="vas-recent-ap-payments-cell-text">').text(formatDate(payment.paymentDate))))
-                .append($('<td class="vas-recent-ap-payments-vendor">').append($('<span class="vas-recent-ap-payments-cell-text">').text(payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
-                .append($('<td class="vas-recent-ap-payments-method-col">').append($('<span class="vas-recent-ap-payments-method">').text(payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
-                .append($('<td class="vas-recent-ap-payments-ref">').append($('<span class="vas-recent-ap-payments-cell-text">').text(payment.referenceNo || '')))
-                .append($('<td class="vas-recent-ap-payments-status-col">').append($('<span class="vas-recent-ap-payments-status">').addClass(statusClass).text(statusText)))
-                .append($('<td class="vas-recent-ap-payments-amount">').append($('<span class="vas-recent-ap-payments-cell-text">').text(formatCurrencyAmount(payment.amount, payment.currencySymbol, payment.currencyISO, payment.stdPrecision))));
+                .append($('<td class="vas-recent-ap-payments-date">')
+                    .append($('<span class="vas-recent-ap-payments-cell-text">')
+                        .text(formatDate(payment.paymentDate))))
+
+                .append($('<td class="vas-recent-ap-payments-vendor">')
+                    .append($('<span class="vas-recent-ap-payments-cell-text">')
+                        .text(payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
+
+                .append($('<td class="vas-recent-ap-payments-method-col">')
+                    .append($('<span class="vas-recent-ap-payments-method">')
+                        .text(payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
+
+                .append($('<td class="vas-recent-ap-payments-ref">')
+                    .append($('<span class="vas-recent-ap-payments-cell-text">')
+                        .text(payment.referenceNo || '')))
+
+                .append($('<td class="vas-recent-ap-payments-status-col">')
+                    .append($('<span class="vas-recent-ap-payments-status">')
+                        .addClass(statusClass)
+                        .text(statusText)))
+
+                .append($('<td class="vas-recent-ap-payments-amount">')
+                    .append($('<span class="vas-recent-ap-payments-cell-text">')
+                        .text(formatCurrencyAmount(
+                            payment.amount,
+                            payment.currencySymbol,
+                            payment.currencyISO,
+                            payment.stdPrecision
+                        ))));
 
             return $row;
         }
@@ -275,6 +378,14 @@
         }
 
         function setNoData() {
+            totalPages = 0;
+            pageNo = 1;
+
+            if ($tableWrap) {
+                $tableWrap.empty();
+            }
+
+            updatePager();
             showState(true, lbl('VAS_032_MessageNoData', 'No Data'));
         }
 
@@ -294,6 +405,10 @@
             $bannerTitle = null;
             $bannerSub = null;
             $tableWrap = null;
+            $pager = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
             $busy = null;
             $state = null;
         };

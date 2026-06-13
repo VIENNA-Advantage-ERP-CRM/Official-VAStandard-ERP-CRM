@@ -45,7 +45,7 @@ namespace VAS.Controllers
                 {
                     List<object> runs = new List<object>();
 
-                    while (dr.Read() && runs.Count < 7)
+                    while (dr.Read() && runs.Count < 30)
                     {
                         DateTime? runDate = Util.GetValueOfDateTime(dr["RunDate"]);
                         int paymentCount = Util.GetValueOfInt(dr["PaymentCount"]);

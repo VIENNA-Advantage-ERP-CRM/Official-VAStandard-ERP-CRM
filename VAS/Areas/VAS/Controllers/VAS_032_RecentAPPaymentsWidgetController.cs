@@ -47,7 +47,7 @@ namespace VAS.Controllers
                     List<string> autoMatchedRefs = new List<string>();
                     int autoMatchedCount = 0;
 
-                    while (dr.Read() && payments.Count < 7)
+                    while (dr.Read() && payments.Count < 30)
                     {
                         AddPaymentRow(ctx, dr, payments, autoMatchedRefs, ref autoMatchedCount);
                     }

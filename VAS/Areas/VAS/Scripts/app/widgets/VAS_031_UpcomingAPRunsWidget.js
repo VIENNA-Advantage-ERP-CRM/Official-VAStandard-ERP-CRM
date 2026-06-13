@@ -27,9 +27,18 @@
         var $root = $('<div class="vas-upcoming-ap-runs-root">');
         var $card;
         var $body;
+        var $pager;
+        var $pagerPrev;
+        var $pagerNext;
+        var $pagerText;
         var $busy;
         var $state;
+
         var isDisposed = false;
+        var runsData = [];
+        var pageNo = 1;
+        var pageSize = 3;
+        var totalPages = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -47,6 +56,7 @@
             var $head = $('<div class="vas-upcoming-ap-runs-head">');
             var $headLeft = $('<div class="vas-upcoming-ap-runs-head-left">');
             var $titleRow = $('<div class="vas-upcoming-ap-runs-title-row">');
+
             var $iconBox = $('<span class="vas-upcoming-ap-runs-icon-box">');
             var $icon = $(
                 '<svg class="vas-upcoming-ap-runs-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
@@ -58,10 +68,18 @@
             var $title = $('<div class="vas-upcoming-ap-runs-title">').text(lbl('VAS_031_MessageUpcomingRuns', 'Upcoming runs'));
             var $sub = $('<div class="vas-upcoming-ap-runs-sub">').text(lbl('VAS_031_MessageNext7Days', 'Next 7 days'));
 
+            $pager = $('<div class="vas-upcoming-ap-runs-pager">');
+            $pagerPrev = $('<button type="button" class="vas-upcoming-ap-runs-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">‹</button>');
+            $pagerText = $('<span class="vas-upcoming-ap-runs-page-text">');
+            $pagerNext = $('<button type="button" class="vas-upcoming-ap-runs-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">›</button>');
+
+            $pager.append($pagerPrev).append($pagerText).append($pagerNext);
+
             $iconBox.append($icon);
             $titleRow.append($iconBox).append($title);
             $headLeft.append($titleRow).append($sub);
-            $head.append($headLeft);
+
+            $head.append($headLeft).append($pager);
 
             $body = $('<div class="vas-upcoming-ap-runs-body">');
             $busy = $('<div class="vas-upcoming-ap-runs-busy">').text(lbl('VAS_031_MessageLoading', 'Loading'));
@@ -69,6 +87,24 @@
 
             $card.append($head).append($body).append($busy).append($state);
             $root.empty().append($card);
+
+            $pagerPrev.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                renderPage();
+            });
+
+            $pagerNext.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                renderPage();
+            });
         }
 
         function loadData() {
@@ -122,7 +158,7 @@
         }
 
         function renderData(data) {
-            var runs = $.isArray(data.runs)
+            runsData = $.isArray(data.runs)
                 ? $.grep(data.runs, function (run) {
                     var amount = Number(pickRunValue(run, 'totalAmount', 'amount') || 0);
                     var paymentCount = Number(run.paymentCount || 0);
@@ -131,16 +167,65 @@
                 })
                 : [];
 
-            if (runs.length === 0) {
+            if (runsData.length === 0) {
                 setNoData();
                 return;
+            }
+
+            pageNo = 1;
+            totalPages = Math.ceil(runsData.length / pageSize);
+            renderPage();
+        }
+
+        function renderPage() {
+            if (!runsData || runsData.length === 0) {
+                setNoData();
+                return;
+            }
+
+            totalPages = Math.max(1, Math.ceil(runsData.length / pageSize));
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
             }
 
             showState(false, '');
             $body.empty();
 
-            for (var i = 0; i < runs.length && i < 3; i++) {
-                $body.append(createRunRow(runs[i]));
+            var startIndex = (pageNo - 1) * pageSize;
+            var pageItems = runsData.slice(startIndex, startIndex + pageSize);
+
+            for (var i = 0; i < pageItems.length; i++) {
+                $body.append(createRunRow(pageItems[i]));
+            }
+
+            updatePager();
+        }
+
+        function updatePager() {
+            if (!$pager) {
+                return;
+            }
+
+            if ($pagerText) {
+                if (totalPages > 1) {
+                    $pagerText.text(pageNo + ' / ' + totalPages);
+                }
+                else {
+                    $pagerText.text('');
+                }
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($pagerNext) {
+                $pagerNext.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
             }
         }
 
@@ -193,7 +278,7 @@
                 return paymentMethodName + ' · ' + vendorName;
             }
 
-            return paymentMethodName ;
+            return paymentMethodName;
         }
 
         function getPaymentLabel(paymentCount) {
@@ -288,6 +373,10 @@
         }
 
         function setNoData() {
+            totalPages = 0;
+            pageNo = 1;
+
+            updatePager();
             showState(true, lbl('VAS_031_MessageNoData', 'No Data'));
         }
 
@@ -304,6 +393,10 @@
             $root.remove();
             $card = null;
             $body = null;
+            $pager = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
             $busy = null;
             $state = null;
         };

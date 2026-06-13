@@ -29,7 +29,7 @@
     gap: 0.5em;
     border-radius: 14px;
     border: 2px solid #ffffff;
-    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
@@ -87,6 +87,48 @@
     font-weight: 600;
     line-height: 1.2;
     color: #102c3f;
+}
+
+.vas-recent-ap-payments-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex-shrink: 0;
+}
+
+.vas-recent-ap-payments-page-btn {
+    width: 1.75em;
+    height: 1.75em;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 131, 218, 0.08);
+    color: #0083DA;
+    font-size: 1em;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+}
+
+    .vas-recent-ap-payments-page-btn:hover:not(:disabled) {
+        background: rgba(0, 131, 218, 0.14);
+    }
+
+    .vas-recent-ap-payments-page-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+
+.vas-recent-ap-payments-page-text {
+    min-width: 2.5em;
+    text-align: center;
+    font-size: 0.72em;
+    color: #748494;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .vas-recent-ap-payments-new {
@@ -370,10 +412,10 @@
     line-height: 1.35;
 }
 
-.vas-recent-ap-payments-busy.is-visible,
-.vas-recent-ap-payments-state-message.is-visible {
-    display: flex;
-}
+    .vas-recent-ap-payments-busy.is-visible,
+    .vas-recent-ap-payments-state-message.is-visible {
+        display: flex;
+    }
 
 .vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-card {
     padding: 0.75em;
@@ -401,6 +443,11 @@
 
 .vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-table td {
     padding: 0.5em 0.4375em;
+}
+
+.vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-page-btn {
+    width: 1.75em;
+    height: 1.75em;
 }
 
 @container (max-width: 620px) {
@@ -492,4 +539,18 @@
         .vas-recent-ap-payments-state {
             font-size: 0.6875em;
         }
+
+    .vas-recent-ap-payments-page-text {
+        font-size: 0.7em;
+        min-width: 2.5em;
+    }
+
+    .vas-recent-ap-payments-page-btn {
+        width: 1.625em;
+        height: 1.625em;
+    }
+
+    .vas-recent-ap-payments-pager {
+        gap: 0.25em;
+    }
 }
