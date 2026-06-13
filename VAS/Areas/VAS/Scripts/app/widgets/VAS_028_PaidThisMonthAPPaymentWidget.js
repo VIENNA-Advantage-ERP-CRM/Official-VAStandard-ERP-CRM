@@ -270,7 +270,7 @@
 
         function setNoData() {
             if ($metricEl) {
-                $metricEl.text('—');
+                $metricEl.text(' ');
             }
 
             if ($whyText) {

@@ -95,7 +95,6 @@ namespace VAS.Controllers
                 {
                     title = GetMsg(ctx, "VAS_028_MessagePaidThisMonth", "Paid this month"),
                     subtitle = GetMsg(ctx, "VAS_028_MessageCashPaid", "Cash paid"),
-                    badge = GetMsg(ctx, "VAS_028_MessageWhy", "WHY"),
                     description = GetMsg(ctx, "VAS_028_MessageOutgoingPaymentsPostedSoFar", "Outgoing payments posted so far"),
                     value = paidThisMonth,
                     paidThisMonth = paidThisMonth,

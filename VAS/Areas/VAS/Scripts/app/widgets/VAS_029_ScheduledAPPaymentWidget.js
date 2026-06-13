@@ -174,6 +174,7 @@
             $value.text(formatCurrencyAmount(
                 totalAmount,
                 data.currencySymbol || data.symbol,
+                data.currencyISO,
                 data.precision
             ));
 
@@ -212,6 +213,7 @@
             $value.text(formatCurrencyAmount(
                 amount,
                 group.currencySymbol || data.currencySymbol || data.symbol,
+                group.currencyISO || data.currencyISO,
                 precision
             ));
 
@@ -248,12 +250,17 @@
             }
         }
 
-        function formatCurrencyAmount(value, currencySymbol, precision) {
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var sign = numericValue < 0 ? '-' : '';
             var absValue = Math.abs(numericValue);
+            var amount = formatAmount(absValue, normalizePrecision(precision));
 
-            return sign + (currencySymbol || '') + formatAmount(absValue, normalizePrecision(precision));
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         function formatAmount(value, precision) {

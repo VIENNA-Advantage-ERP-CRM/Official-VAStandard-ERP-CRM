@@ -14,7 +14,7 @@ namespace VAS.Controllers
     /*
      * Labels / Message Keys
      * 1 | Payment methods                                        | VAS_033_MessagePaymentMethods
-     * 2 | UPI is cheapest - shift sub-2L payments where possible | VAS_033_MessagePaymentMethodWhy
+     * 2 | UPI is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
      * 3 | Not Specified                                          | VAS_033_MessageNotSpecified
      */
     public class VAS_033_PaymentMethodsWidgetController : Controller
@@ -67,16 +67,36 @@ namespace VAS.Controllers
 
                 List<PaymentMethodSummary> rows = new List<PaymentMethodSummary>();
                 decimal totalAmount = 0;
+                int cCurrencyId = 0;
+                int stdPrecision = 2;
+                string currencyISO = string.Empty;
+                string currencySymbol = string.Empty;
 
                 while (dr != null && dr.Read())
                 {
                     decimal paymentAmount = Util.GetValueOfDecimal(dr["PaymentAmount"]);
+                    int rowCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
+                    int rowPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                    string rowCurrencyISO = Util.GetValueOfString(dr["CurrencyISO"]);
+                    string rowCurrencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]);
+
+                    if (cCurrencyId == 0)
+                    {
+                        cCurrencyId = rowCurrencyId;
+                        stdPrecision = rowPrecision;
+                        currencyISO = rowCurrencyISO;
+                        currencySymbol = rowCurrencySymbol;
+                    }
 
                     rows.Add(new PaymentMethodSummary
                     {
                         PaymentMethodName = Util.GetValueOfString(dr["PaymentMethodName"]),
                         PaymentCount = Util.GetValueOfInt(dr["PaymentCount"]),
-                        PaymentAmount = paymentAmount
+                        PaymentAmount = paymentAmount,
+                        CCurrencyId = rowCurrencyId,
+                        StdPrecision = rowPrecision,
+                        CurrencyISO = rowCurrencyISO,
+                        CurrencySymbol = rowCurrencySymbol
                     });
 
                     totalAmount += paymentAmount;
@@ -105,6 +125,11 @@ namespace VAS.Controllers
                         paymentMethodName = paymentMethodName,
                         paymentCount = row.PaymentCount,
                         paymentAmount = row.PaymentAmount,
+                        cCurrencyId = row.CCurrencyId,
+                        stdPrecision = row.StdPrecision,
+                        currencyISO = row.CurrencyISO,
+                        currencySymbol = row.CurrencySymbol,
+                        symbol = row.CurrencySymbol,
                         percentage = percentage
                     });
                 }
@@ -114,8 +139,13 @@ namespace VAS.Controllers
                 return Json(new
                 {
                     title = GetMsg(ctx, "VAS_033_MessagePaymentMethods", "Payment methods"),
-                    description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "UPI is cheapest · shift sub-₹2L payments where possible"),
+                    description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "UPI is cheapest - shift small payments where possible"),
                     totalAmount = totalAmount,
+                    cCurrencyId = cCurrencyId,
+                    stdPrecision = stdPrecision,
+                    currencyISO = currencyISO,
+                    currencySymbol = currencySymbol,
+                    symbol = currencySymbol,
                     dateFrom = dateRange != null && dateRange.DateFrom.HasValue ? FormatDate(dateRange.DateFrom.Value) : "",
                     dateTo = dateRange != null && dateRange.DateTo.HasValue ? FormatDate(dateRange.DateTo.Value) : "",
                     periodFilter = isYTD ? PeriodFilterYTD : PeriodFilterMonth,
@@ -138,7 +168,6 @@ namespace VAS.Controllers
                 }
             }
         }
-
         private SqlQueryData BuildPaymentMethodsSql(Ctx ctx, bool isYTD)
         {
             bool hasPaymentMethod = HasPaymentMethodColumn();
@@ -146,36 +175,65 @@ namespace VAS.Controllers
             bool hasPaymentMethodValue = hasPaymentMethod && HasPaymentMethodValueColumn();
             bool hasPaymentRule = HasPaymentRuleColumn();
 
-            string paymentMethodSelect = GetEmptyTextSql();
-            string paymentMethodGroupBy = GetEmptyTextSql();
-            string paymentMethodJoin = string.Empty;
+            string paymentMethodNameSelect = GetEmptyTextSql();
+            string paymentMethodListSql = string.Empty;
+            string paymentJoinCondition = string.Empty;
 
             if (hasPaymentMethod)
             {
-                paymentMethodJoin = @"
-LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON (Payment.VA009_PaymentMethod_ID = PaymentMethod.VA009_PaymentMethod_ID)";
+                //if (hasPaymentMethodName)
+                //{
+                //    paymentMethodNameSelect = GetTextSql("PaymentMethod.Name");
+                //}
+                //else if (hasPaymentMethodValue)
+                //{
+                //    paymentMethodNameSelect = GetTextSql("PaymentMethod.Value");
+                //}
+                //else
+                //{
+                //    paymentMethodNameSelect = GetTextSql("PaymentMethod.VA009_PaymentMethod_ID");
+                //}
 
-                if (hasPaymentMethodName)
-                {
-                    paymentMethodSelect = GetTextSql("PaymentMethod.Name");
-                    paymentMethodGroupBy = GetTextSql("PaymentMethod.Name");
-                }
-                else if (hasPaymentMethodValue)
-                {
-                    paymentMethodSelect = GetTextSql("PaymentMethod.Value");
-                    paymentMethodGroupBy = GetTextSql("PaymentMethod.Value");
-                }
-                else if (hasPaymentRule)
-                {
-                    paymentMethodSelect = GetTextSql("Payment.PaymentRule");
-                    paymentMethodGroupBy = GetTextSql("Payment.PaymentRule");
-                    paymentMethodJoin = string.Empty;
-                }
+                paymentMethodListSql = @"
+PaymentMethodList AS
+(
+SELECT
+PaymentMethod.VA009_PaymentMethod_ID,
+PaymentMethod.VA009_Name AS PaymentMethodName
+FROM VA009_PaymentMethod PaymentMethod
+WHERE PaymentMethod.IsActive = 'Y'
+AND PaymentMethod.AD_Client_ID IN (0, @AD_Client_ID)
+)";
+
+                paymentJoinCondition = "Payment.VA009_PaymentMethod_ID = PaymentMethodList.VA009_PaymentMethod_ID";
             }
             else if (hasPaymentRule)
             {
-                paymentMethodSelect = GetTextSql("Payment.PaymentRule");
-                paymentMethodGroupBy = GetTextSql("Payment.PaymentRule");
+                paymentMethodListSql = @"
+PaymentMethodList AS
+(
+SELECT DISTINCT
+Payment.PaymentRule AS PaymentRule,
+" + GetTextSql("Payment.PaymentRule") + @" AS PaymentMethodName
+FROM C_Payment Payment
+WHERE Payment.IsActive = 'Y'
+AND Payment.PaymentRule IS NOT NULL
+)";
+
+                paymentJoinCondition = "Payment.PaymentRule = PaymentMethodList.PaymentRule";
+            }
+            else
+            {
+                paymentMethodListSql = @"
+PaymentMethodList AS
+(
+SELECT
+CAST(NULL AS CHAR(1)) AS PaymentMethodName
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.AD_Client_ID = @AD_Client_ID
+)";
+
+                paymentJoinCondition = "1 = 1";
             }
 
             string schemaCurrencySql = @"
@@ -186,7 +244,10 @@ ClientInfo.AD_Client_ID,
 AcctSchema.C_Currency_ID AS C_Currency_ID,
 Currency.StdPrecision,
 " + GetTextSql("Currency.ISO_Code") + @" AS ISO_Code,
-CASE WHEN Currency.CurSymbol IS NOT NULL THEN " + GetTextSql("Currency.CurSymbol") + @" ELSE " + GetTextSql("Currency.ISO_Code") + @" END AS Cur_Symbol
+CASE
+    WHEN Currency.CurSymbol IS NOT NULL THEN " + GetTextSql("Currency.CurSymbol") + @"
+    ELSE " + GetTextSql("Currency.ISO_Code") + @"
+END AS Cur_Symbol
 FROM AD_ClientInfo ClientInfo
 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
 INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
@@ -249,9 +310,9 @@ Payment.C_Currency_ID,
 Payment.C_ConversionType_ID,
 Payment.DateAcct,
 Payment.PayAmt"
-+ (hasPaymentRule ? @",
+        + (hasPaymentRule ? @",
 Payment.PaymentRule" : string.Empty)
-+ (hasPaymentMethod ? @",
+        + (hasPaymentMethod ? @",
 Payment.VA009_PaymentMethod_ID" : string.Empty) + @"
 FROM C_Payment Payment
 WHERE Payment.IsActive = 'Y'
@@ -275,39 +336,72 @@ PaymentFiltered AS
 PaymentData AS
 (
 SELECT
-" + paymentMethodSelect + @" AS PaymentMethodName,
-COUNT(1) AS PaymentCount,
+PaymentMethodList.PaymentMethodName AS PaymentMethodName,
+
+COUNT(Payment.C_Payment_ID) AS PaymentCount,
+
 ROUND(
 COALESCE(
 SUM(
-CASE WHEN Payment.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(Payment.PayAmt, 0) ELSE CurrencyConvert(COALESCE(Payment.PayAmt, 0), Payment.C_Currency_ID, SchemaCurrency.C_Currency_ID, Payment.DateAcct, Payment.C_ConversionType_ID, Payment.AD_Client_ID, Payment.AD_Org_ID) END
+CASE
+    WHEN Payment.C_Payment_ID IS NULL THEN 0
+    WHEN Payment.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(Payment.PayAmt, 0)
+    ELSE CurrencyConvert(
+        COALESCE(Payment.PayAmt, 0),
+        Payment.C_Currency_ID,
+        SchemaCurrency.C_Currency_ID,
+        Payment.DateAcct,
+        Payment.C_ConversionType_ID,
+        Payment.AD_Client_ID,
+        Payment.AD_Org_ID
+    )
+END
 ),
 0
 ),
 MAX(SchemaCurrency.StdPrecision)
-) AS PaymentAmount
-FROM PaymentFiltered Payment
-INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID = Payment.AD_Client_ID)
-INNER JOIN PeriodRange PeriodRange ON (Payment.DateAcct >= PeriodRange.StartDate AND Payment.DateAcct < PeriodRange.EndDateExclusive)" + paymentMethodJoin + @"
-GROUP BY " + paymentMethodGroupBy + @"
+) AS PaymentAmount,
+
+MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
+MAX(SchemaCurrency.StdPrecision) AS StdPrecision,
+MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
+MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
+
+FROM PaymentMethodList PaymentMethodList
+INNER JOIN SchemaCurrency SchemaCurrency ON (1 = 1)
+INNER JOIN PeriodRange PeriodRange ON (1 = 1)
+
+LEFT OUTER JOIN PaymentFiltered Payment ON (
+    " + paymentJoinCondition + @"
+    AND Payment.DateAcct >= PeriodRange.StartDate
+    AND Payment.DateAcct < PeriodRange.EndDateExclusive
+)
+
+GROUP BY
+PaymentMethodList.PaymentMethodName
 )";
 
             string sql = @"
 WITH " + schemaCurrencySql + @",
 " + currentPeriodSql + @",
 " + periodRangeSql + @",
+" + paymentMethodListSql + @",
 " + paymentFilteredSql + @",
 " + paymentDataSql + @"
 SELECT
 PaymentData.PaymentMethodName,
 PaymentData.PaymentCount,
-PaymentData.PaymentAmount
+PaymentData.PaymentAmount,
+PaymentData.C_Currency_ID,
+PaymentData.StdPrecision,
+PaymentData.CurrencyISO,
+PaymentData.CurrencySymbol
 FROM PaymentData PaymentData
-ORDER BY PaymentData.PaymentAmount DESC";
+ORDER BY PaymentData.PaymentAmount DESC, PaymentData.PaymentMethodName ASC";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
             return new SqlQueryData
@@ -316,7 +410,7 @@ ORDER BY PaymentData.PaymentAmount DESC";
                 Parameters = parameters
             };
         }
-
+   
         private DateRangeResult GetPeriodDateRange(Ctx ctx, bool isYTD)
         {
             string currentPeriodSql = @"
@@ -485,6 +579,10 @@ AND ColumnData.ColumnName = 'Value'";
             public string PaymentMethodName { get; set; }
             public int PaymentCount { get; set; }
             public decimal PaymentAmount { get; set; }
+            public int CCurrencyId { get; set; }
+            public int StdPrecision { get; set; }
+            public string CurrencyISO { get; set; }
+            public string CurrencySymbol { get; set; }
         }
 
         private class DateRangeResult

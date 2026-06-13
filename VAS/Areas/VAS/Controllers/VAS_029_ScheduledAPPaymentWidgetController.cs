@@ -123,7 +123,6 @@ namespace VAS.Controllers
                 return Json(new
                 {
                     title = GetMsg(ctx, "VAS_029_MessageScheduled", "Scheduled"),
-                    badge = GetMsg(ctx, "VAS_029_MessageWhy", "WHY"),
                     description = GetMsg(ctx, "VAS_029_MessageScheduledForPaymentThisWeek", "Scheduled for payment this week"),
                     value = scheduledAmountThisWeek,
                     scheduledAmountThisWeek = scheduledAmountThisWeek,

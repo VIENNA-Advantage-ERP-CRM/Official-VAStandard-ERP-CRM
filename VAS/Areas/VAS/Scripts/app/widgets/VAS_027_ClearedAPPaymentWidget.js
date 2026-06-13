@@ -4,10 +4,9 @@
  *
  * Labels / Message Keys
  * 1 | Cleared                                | VAS_027_messageCleared
- * 2 | WHY                                    | VAS_027_messageWhy
- * 3 | Of last month's AP payments reconciled | VAS_027_messageAPPaymentClearedWhy
- * 4 | Loading                                | VAS_027_messageLoading
- * 5 | No Data                                | VAS_027_messageNoData
+ * 2 | Of last month's AP payments reconciled | VAS_027_messageAPPaymentClearedWhy
+ * 3 | Loading                                | VAS_027_messageLoading
+ * 4 | No Data                                | VAS_027_messageNoData
  */
 
 ; VAS = window.VAS || {};

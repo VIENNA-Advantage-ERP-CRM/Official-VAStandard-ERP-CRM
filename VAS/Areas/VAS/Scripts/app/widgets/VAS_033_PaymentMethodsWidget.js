@@ -6,7 +6,7 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Payment methods                      | VAS_033_MessagePaymentMethods
- *  2  | UPI is cheapest · shift sub-₹2L payments where possible | VAS_033_MessagePaymentMethodWhy
+ *  2  | UPI is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
  *  3  | Loading                              | VAS_033_MessageLoading
  *  4  | No Data                              | VAS_033_MessageNoData
  *  5  | Not Specified                        | VAS_033_MessageNotSpecified
@@ -61,7 +61,7 @@
 
             $foot = $('<div class="vas-payment-methods-foot">');
           
-            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'UPI is cheapest · shift sub-₹2L payments where possible'));
+            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'UPI is cheapest - shift small payments where possible'));
 
             $foot.append($whyText);
             $busy = $('<div class="vas-payment-methods-busy">').text(lbl('VAS_033_MessageLoading', 'Loading'));
@@ -124,9 +124,7 @@
         function renderData(data) {
             var methods = $.isArray(data.methods)
                 ? $.grep(data.methods, function (method) {
-                    var percentage = Number(method.percentage || 0);
-
-                    return !isNaN(percentage) && percentage > 0;
+                    return method != null;
                 })
                 : [];
 
@@ -139,10 +137,11 @@
             $body.empty();
             $foot.show();
 
-            for (var i = 0; i < methods.length && i < 4; i++) {
+            for (var i = 0; i < methods.length; i++) {
                 $body.append(createMethodRow(methods[i]));
             }
         }
+
 
         function createMethodRow(method) {
             var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
@@ -159,13 +158,21 @@
             var $row = $('<div class="vas-payment-methods-row">');
             var $top = $('<div class="vas-payment-methods-row-top">');
             var $name = $('<span class="vas-payment-methods-name">').text(methodName);
+            var $metrics = $('<span class="vas-payment-methods-metrics">');
             var $percent = $('<span class="vas-payment-methods-percent">').text(formatPercentage(percentage));
+            var $amount = $('<span class="vas-payment-methods-amount">').text(formatCurrencyAmount(
+                method.paymentAmount,
+                method.currencySymbol || method.symbol,
+                method.currencyISO,
+                method.stdPrecision
+            ));
             var $track = $('<div class="vas-payment-methods-track">');
             var $fill = $('<div class="vas-payment-methods-fill">').addClass(getMethodClass(methodName));
 
             $fill.css('width', percentage + '%');
 
-            $top.append($name).append($percent);
+            $metrics.append($percent).append($amount);
+            $top.append($name).append($metrics);
             $track.append($fill);
             $row.append($top).append($track);
 
@@ -204,14 +211,22 @@
             }) + '%';
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
-            var stdPrecision = getStdPrecision();
+            var stdPrecision = normalizePrecision(precision);
+            var sign = numericValue < 0 ? '-' : '';
+            var absValue = Math.abs(numericValue);
 
-            return numericValue.toLocaleString(window.navigator.language, {
+            var amount = absValue.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         function getStdPrecision() {
@@ -226,6 +241,16 @@
             }
 
             return stdPrecision;
+        }
+
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = getStdPrecision();
+            }
+
+            return Math.min(stdPrecision, 2);
         }
 
         function showBusy(show) {

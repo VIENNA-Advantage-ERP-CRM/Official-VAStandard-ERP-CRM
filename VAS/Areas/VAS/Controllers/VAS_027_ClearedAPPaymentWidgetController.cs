@@ -80,7 +80,6 @@ namespace VAS.Controllers
                 return Json(new
                 {
                     title = GetMsg(ctx, "VAS_027_messageCleared", "Cleared"),
-                    badge = GetMsg(ctx, "VAS_027_messageWhy", "WHY"),
                     description = GetMsg(ctx, "VAS_027_messageAPPaymentClearedWhy", "Of last month's AP payments reconciled"),
                     value = clearedPercentage,
                     clearedPercentage = clearedPercentage,
