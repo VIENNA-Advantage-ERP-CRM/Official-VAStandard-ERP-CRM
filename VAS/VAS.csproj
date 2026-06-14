@@ -151,6 +151,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Areas\VAS\Content\ExpectedReceiptsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_030_BouncedAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_027_ClearedAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_028_PaidThisMonthAPPaymentWidget.css" />
@@ -235,14 +236,12 @@
     <Compile Include="Areas\VAS\Controllers\OverdueController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_045_GLJournalPendingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_042_GLJournalVolumeWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_011_UnreconciledReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_012_TodayReceiptsController.cs" />
@@ -251,7 +250,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_015_OutstandingVsReceivedController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_035_MatchSuggestionsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RecentReceiptsController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_SentEmailDocController.cs" />
     <Compile Include="Areas\VAS\Controllers\OrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\PaymentAllocationController.cs" />

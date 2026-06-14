@@ -66,7 +66,6 @@
                 +   '<span class="VAS-gljp-pct">%</span>'
                 + '</div>'
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_039_Why', 'Why') + '</span>'
                 +   '<span class="kpi-why-text">' + lbl('VAS_039_PostedDocuments', 'Posted documents.') + '</span>'
                 + '</div>'
                 + '</div>';

@@ -25,6 +25,16 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    cursor: pointer;
+}
+
+.VAS-glje-root .kpi:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+}
+
+.VAS-glje-root .kpi:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: 2px;
 }
 
 /* Blue-tint variant — pale info palette from the design system */
@@ -60,7 +70,7 @@
 .VAS-glje-root .w-title {
     flex: 1;
     font-size: 0.8125em;
-    font-weight: 400;
+    font-weight: 600;
     color: #5F7283;
     letter-spacing: 0.015em;
     white-space: nowrap;
@@ -85,6 +95,12 @@
     color: #0083DA;
 }
 
+.VAS-glje-zoom svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
 /* ── KPI value (the large count number) ─────────────────────────────────── */
 .VAS-glje-root .kpi-value {
     font-size: 2.125em;
@@ -98,11 +114,7 @@
 .VAS-glje-root .kpi-why {
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
-    background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
-    padding: 0.45em 0.6em;
-    border: 1px solid rgba(0, 131, 218, 0.12);
 }
 
 .VAS-glje-root .kpi-why-label {
@@ -173,4 +185,964 @@ html[dir="rtl"] .VAS-glje-root .w-head {
 
 html[dir="rtl"] .VAS-glje-root .kpi-why {
     flex-direction: row-reverse;
+}
+
+.VAS-glje-body-lock {
+    overflow: hidden;
+}
+
+.VAS-glje-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+    font-size: 16px;
+}
+
+.VAS-glje-dialog,
+.VAS-glje-dialog * {
+    box-sizing: border-box;
+}
+
+.VAS-glje-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(3, 31, 49, 0.54);
+    backdrop-filter: blur(0.125em);
+}
+
+.VAS-glje-dialog-card {
+    position: relative;
+    width: min(84em, 100%);
+    height: min(47em, 100%);
+    background: #FFFFFF;
+    border-radius: 1.5em;
+    box-shadow: 0 1.5em 3.5em rgba(3, 31, 49, 0.28);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.VAS-glje-dialog-head {
+    display: flex;
+    align-items: center;
+    gap: 1.25em;
+    padding: 2em 2.25em 1.75em;
+    border-bottom: 1px solid #E6EEF5;
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4em;
+    height: 4em;
+    border-radius: 0.875em;
+    color: #FFFFFF;
+    background: linear-gradient(180deg, #1F8FFF 0%, #0878DE 100%);
+    box-shadow: 0 0.8em 1.4em rgba(0, 131, 218, 0.25);
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-icon svg {
+    width: 1.75em;
+    height: 1.75em;
+    stroke: currentColor;
+}
+
+.VAS-glje-dialog-title-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
+.VAS-glje-dialog-title {
+    font-size: 1.625em;
+    font-weight: 700;
+    color: #171717;
+    line-height: 1.2;
+}
+
+.VAS-glje-dialog-sub {
+    margin-top: 0.4em;
+    font-size: 1.15em;
+    color: #5F7283;
+    line-height: 1.3;
+}
+
+.VAS-glje-dialog-close {
+    width: 2.25em;
+    height: 2.25em;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #6C7C8C;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.VAS-glje-dialog-close:hover {
+    background: #F3F7FB;
+    color: #102C3F;
+}
+
+.VAS-glje-dialog-body {
+    flex: 1;
+    min-height: 0;
+    padding: 1.75em 2.25em;
+    position: relative;
+    overflow: hidden;
+}
+
+.VAS-glje-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.68);
+    z-index: 5;
+}
+
+.VAS-glje-table-wrap {
+    height: 100%;
+    overflow: auto;
+    border: 1px solid #E6EEF5;
+    border-radius: 0.875em;
+}
+
+.VAS-glje-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.VAS-glje-dialog-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #F5F8FB;
+    color: #718398;
+    font-size: 0.95em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #E6EEF5;
+    white-space: nowrap;
+}
+
+.VAS-glje-dialog-table tbody td {
+    padding: 1.15em 1.25em;
+    border-bottom: 1px solid #E6EEF5;
+    color: #102C3F;
+    font-size: 1.05em;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-glje-dialog-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.VAS-glje-dialog-table tbody tr:hover td {
+    background: #F8FBFE;
+}
+
+.VAS-glje-entry-row {
+    cursor: pointer;
+}
+
+.VAS-glje-dialog-table th:nth-child(1),
+.VAS-glje-dialog-table td:nth-child(1) {
+    width: 11em;
+}
+
+.VAS-glje-dialog-table th:nth-child(2),
+.VAS-glje-dialog-table td:nth-child(2) {
+    width: 10em;
+}
+
+.VAS-glje-dialog-table th:nth-child(4),
+.VAS-glje-dialog-table td:nth-child(4) {
+    width: 12em;
+}
+
+.VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table th:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(6) {
+    width: 11em;
+    text-align: right;
+}
+
+.VAS-glje-doc,
+.VAS-glje-date {
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-glje-desc {
+    color: #102C3F;
+}
+
+.VAS-glje-amt {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-glje-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    padding: 0.45em 0.85em;
+    border-radius: 999px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.VAS-glje-pill span {
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.VAS-glje-pill-draft {
+    background: #EEF2F7;
+    color: #5F7283;
+}
+
+.VAS-glje-pill-posted {
+    background: #E2F5EE;
+    color: #087A50;
+}
+
+.VAS-glje-pill-submit {
+    background: #E5F2FC;
+    color: #0878BE;
+}
+
+.VAS-glje-pill-pending,
+.VAS-glje-pill-returned {
+    background: #FFF0D7;
+    color: #A76500;
+}
+
+.VAS-glje-pill-voided {
+    background: #F1F3F5;
+    color: #6C7C8C;
+}
+
+.VAS-glje-dialog-empty {
+    height: 100%;
+    min-height: 12em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #748494;
+}
+
+.VAS-glje-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 1.5em 2.25em 1.9em;
+    border-top: 1px solid #E6EEF5;
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-total {
+    color: #718398;
+    font-size: 1.05em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.VAS-glje-dialog-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-glje-export,
+.VAS-glje-close-primary {
+    min-width: 7.2em;
+    height: 3.4em;
+    border-radius: 0.75em;
+    font-size: 1em;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.VAS-glje-export {
+    background: #FFFFFF;
+    border: 1px solid #DDE7F0;
+    color: #5F7283;
+}
+
+.VAS-glje-export:hover {
+    background: #F8FBFE;
+}
+
+.VAS-glje-close-primary {
+    background: #087EDB;
+    border: 1px solid #087EDB;
+    color: #FFFFFF;
+    box-shadow: 0 0.8em 1.35em rgba(0, 131, 218, 0.22);
+}
+
+.VAS-glje-close-primary:hover {
+    background: #006FC4;
+}
+
+@media (max-width: 48em) {
+    .VAS-glje-dialog {
+        padding: 0;
+    }
+
+    .VAS-glje-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .VAS-glje-dialog-head,
+    .VAS-glje-dialog-body,
+    .VAS-glje-dialog-footer {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+
+    .VAS-glje-dialog-footer {
+        flex-wrap: wrap;
+    }
+
+    .VAS-glje-dialog-actions {
+        width: 100%;
+    }
+
+    .VAS-glje-export,
+    .VAS-glje-close-primary {
+        flex: 1;
+    }
+}
+
+/* OAR-aligned drill-down modal skin. Keep GL blue accent, reuse the same modal sizing,
+   spacing, table density, typography, and footer proportions from VAS_003. */
+.VAS-glje-body-lock {
+    overflow: hidden;
+}
+
+.VAS-glje-dialog {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+.VAS-glje-dialog,
+.VAS-glje-dialog * {
+    box-sizing: border-box;
+}
+
+.VAS-glje-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.VAS-glje-dialog-card {
+    position: relative;
+    width: min(62em, 100%);
+    height: min(34em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.VAS-glje-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF8FF);
+    border: 0.0625em solid #BFE4FF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: none;
+}
+
+.VAS-glje-dialog-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+    stroke: currentColor;
+}
+
+.VAS-glje-dialog-title-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-glje-dialog-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.VAS-glje-dialog-sub {
+    margin-top: 0.125em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #748494;
+    line-height: 1.3;
+}
+
+.VAS-glje-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-close svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
+.VAS-glje-dialog-close:hover {
+    background: #F3F7FB;
+    color: #102C3F;
+}
+
+.VAS-glje-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+.VAS-glje-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.VAS-glje-table-wrap {
+    height: 100%;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+}
+
+.VAS-glje-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+}
+
+.VAS-glje-dialog-table thead th {
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #748494;
+    text-align: left;
+    padding: 0.875em 0.75em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.VAS-glje-dialog-table tbody td {
+    padding: 0.875em 0.75em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    font-size: 0.75em;
+    color: #102C3F;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-glje-dialog-table tbody tr:hover td {
+    background: #F8FBFE;
+}
+
+.VAS-glje-dialog-table th:nth-child(1),
+.VAS-glje-dialog-table td:nth-child(1) {
+    width: 8em;
+}
+
+.VAS-glje-dialog-table th:nth-child(2),
+.VAS-glje-dialog-table td:nth-child(2) {
+    width: 8em;
+}
+
+.VAS-glje-dialog-table th:nth-child(4),
+.VAS-glje-dialog-table td:nth-child(4) {
+    width: 8em;
+}
+
+.VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table th:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(6) {
+    width: 9.5em;
+    text-align: right;
+}
+
+.VAS-glje-doc {
+    color: #5F7283;
+    font-size: 0.6875em;
+}
+
+.VAS-glje-date {
+    color: #748494;
+}
+
+.VAS-glje-desc {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.VAS-glje-amt {
+    text-align: right;
+    font-weight: 400;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.VAS-glje-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.75em;
+    font-weight: 500;
+    padding: 0.2em 0.55em;
+    border-radius: 999px;
+    white-space: nowrap;
+    letter-spacing: 0.01em;
+    line-height: 1.4;
+}
+
+.VAS-glje-pill span {
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.VAS-glje-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;
+    background: #FFFFFF;
+}
+
+.VAS-glje-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.VAS-glje-dialog-total {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.VAS-glje-dialog-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.VAS-glje-export,
+.VAS-glje-close-primary {
+    height: 2.25em;
+    min-width: 5.75em;
+    border-radius: 0.5em;
+    padding: 0 1em;
+    font-size: 0.875em;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.VAS-glje-export {
+    background: #FBFDFF;
+    border: 0.0625em solid #E4EDF4;
+    color: #5F7283;
+}
+
+.VAS-glje-export:hover {
+    background: #F3F7FB;
+}
+
+.VAS-glje-close-primary {
+    background: #0083DA;
+    border: 0.0625em solid #0083DA;
+    color: #FFFFFF;
+    box-shadow: none;
+}
+
+.VAS-glje-close-primary:hover {
+    background: #0075C3;
+}
+
+@media (max-width: 40em) {
+    .VAS-glje-dialog {
+        padding: 0;
+    }
+
+    .VAS-glje-dialog-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .VAS-glje-dialog-table thead th,
+    .VAS-glje-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    .VAS-glje-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .VAS-glje-dialog-total {
+        flex: 1 1 100%;
+        order: 2;
+        text-align: center;
+    }
+
+    .VAS-glje-dialog-actions {
+        order: 1;
+        margin: 0 auto;
+    }
+}
+
+.VAS-glje-detail-dialog {
+    z-index: 10020;
+}
+
+.VAS-glje-detail-card {
+    height: min(43em, 100%);
+}
+
+.VAS-glje-detail-body {
+    padding: 1.125em;
+    overflow: auto;
+}
+
+.VAS-glje-detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25em;
+    min-height: 100%;
+    padding-bottom: 0.25em;
+}
+
+.VAS-glje-detail-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.15em 1.75em;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.75em;
+    padding: 1.125em 1.25em;
+    background: #FFFFFF;
+}
+
+.VAS-glje-detail-summary div {
+    min-width: 0;
+}
+
+.VAS-glje-detail-summary > div > span,
+.VAS-glje-detail-section-title,
+.VAS-glje-created-strip > div > span {
+    display: block;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.VAS-glje-detail-summary > div > strong {
+    display: block;
+    margin-top: 0.45em;
+    color: #000000;
+    font-size: 0.95em;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS-glje-detail-summary .VAS-glje-pill {
+    display: inline-flex;
+    width: auto;
+    max-width: max-content;
+    text-transform: none;
+    letter-spacing: 0.01em;
+}
+
+.VAS-glje-detail-summary .VAS-glje-pill span {
+    display: inline-block;
+    width: 0.45em;
+    height: 0.45em;
+    min-width: 0.45em;
+    border-radius: 50%;
+    background: currentColor;
+    letter-spacing: 0;
+}
+
+.VAS-glje-detail-description {
+    grid-column: 1 / -1;
+}
+
+.VAS-glje-detail-lines-wrap {
+    overflow: auto;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.75em;
+    background: #FFFFFF;
+}
+
+.VAS-glje-detail-lines {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+    min-width: 58em;
+}
+
+.VAS-glje-detail-lines th {
+    background: #F5F8FB;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0.875em 0.75em;
+    border-bottom: 0.0625em solid #E4EDF4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-glje-detail-lines td {
+    padding: 0.875em 0.75em;
+    color: #001D32;
+    font-size: 0.75em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-glje-detail-lines tbody tr:hover td {
+    background: #F8FBFE;
+}
+
+.VAS-glje-detail-lines tfoot td {
+    background: #F5F8FB;
+    font-weight: 600;
+    border-bottom: 0;
+}
+
+.VAS-glje-detail-lines th:nth-child(4),
+.VAS-glje-detail-lines td:nth-child(4),
+.VAS-glje-detail-lines th:nth-child(5),
+.VAS-glje-detail-lines td:nth-child(5) {
+    width: 12em;
+}
+
+.VAS-glje-detail-lines th:nth-child(6),
+.VAS-glje-detail-lines td:nth-child(6),
+.VAS-glje-detail-lines th:nth-child(7),
+.VAS-glje-detail-lines td:nth-child(7) {
+    width: 7em;
+}
+
+.VAS-glje-detail-lines th:nth-child(1),
+.VAS-glje-detail-lines td:nth-child(1) {
+    width: 18em;
+}
+
+.VAS-glje-detail-lines th:nth-child(2),
+.VAS-glje-detail-lines th:nth-child(3),
+.VAS-glje-detail-lines td:nth-child(2),
+.VAS-glje-detail-lines td:nth-child(3) {
+    width: 7em;
+    text-align: right;
+}
+
+.VAS-glje-created-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    background: #EAF4FF;
+    border-radius: 0.75em;
+    padding: 0.9em 1.125em;
+    color: #001D32;
+    margin-top: 0.1em;
+}
+
+.VAS-glje-created-strip strong {
+    color: #000000;
+    font-weight: 700;
+}
+
+.VAS-glje-avatar {
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 50%;
+    background: #4268E8;
+    color: #FFFFFF !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875em !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+@media (max-width: 40em) {
+    .VAS-glje-detail-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .VAS-glje-detail-lines {
+        min-width: 56em;
+    }
+}
+
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-glje-root {
+    container-type: inline-size;
+}
+
+.VAS-glje-root .kpi {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+}
+
+.VAS-glje-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS-glje-root .kpi-value {
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.VAS-glje-root .kpi-why-text {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-glje-root .kpi,
+.VAS-glje-root .kpi.kpi-blue {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-glje-root .w-title,
+.VAS-glje-root .kpi-value {
+    color: #102C3F;
+}
+
+.VAS-glje-root .w-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #0083DA;
+}
+
+.VAS-glje-root .kpi-why-label,
+.VAS-glje-zoom:hover {
+    color: #0083DA;
+}
+
+.VAS-glje-root .kpi-why-text,
+.VAS-glje-zoom {
+    color: #748494;
 }

@@ -101,7 +101,6 @@
                 + '</div>'
 
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_038_Why', 'Why') + '</span>'
                 +   '<span class="kpi-why-text" id="VAS-gljtc-why-' + id + '">&mdash;</span>'
                 + '</div>'
 
@@ -142,7 +141,7 @@
                             $curPrefix.text(data.CurSymbol || data.ISOCode || '');
                             var fmt = formatAmount(data.Total, data.StdPrecision);
                             $mainNum.text(fmt.main);
-                            $decimalNum.text('.' + fmt.decimal);
+                            $decimalNum.text(fmt.decimal ? '.' + fmt.decimal : '');
                             $whyText.text(
                                 lbl('VAS_038_SumCreditLines', 'Sum of credit lines across the same')
                                 + ' ' + data.JournalCount + ' '

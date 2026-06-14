@@ -61,7 +61,7 @@
 .VAS-gljp-root .w-title {
     flex: 1;
     font-size: 0.8125em;
-    font-weight: 400;
+    font-weight: 600;
     color: #5F7283;
     letter-spacing: 0.015em;
     white-space: nowrap;
@@ -120,11 +120,7 @@
 .VAS-gljp-root .kpi-why {
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
-    background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
-    padding: 0.45em 0.6em;
-    border: 1px solid rgba(1, 157, 137, 0.15);
 }
 
 .VAS-gljp-root .kpi-why-label {
@@ -195,4 +191,61 @@ html[dir="rtl"] .VAS-gljp-root .w-head {
 
 html[dir="rtl"] .VAS-gljp-root .kpi-why {
     flex-direction: row-reverse;
+}
+
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-gljp-root {
+    container-type: inline-size;
+}
+
+.VAS-gljp-root .kpi {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+}
+
+.VAS-gljp-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS-gljp-root .kpi-value,
+.VAS-gljp-root .VAS-gljp-num {
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.VAS-gljp-root .kpi-why-text {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-gljp-root .kpi,
+.VAS-gljp-root .kpi.kpi-cream {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-gljp-root .w-title,
+.VAS-gljp-root .kpi-value {
+    color: #102C3F;
+}
+
+.VAS-gljp-root .w-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #019D89;
+}
+
+.VAS-gljp-root .kpi-value.success,
+.VAS-gljp-root .VAS-gljp-num,
+.VAS-gljp-root .kpi-why-label {
+    color: #019D89;
+}
+
+.VAS-gljp-root .kpi-why-text {
+    color: #748494;
 }

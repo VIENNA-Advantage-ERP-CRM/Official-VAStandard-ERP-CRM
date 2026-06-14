@@ -104,7 +104,6 @@
                 + '</div>'
 
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_040_Status', 'Status') + '</span>'
                 +   '<span class="kpi-why-text VAS-gljnd-status" id="VAS-gljnd-status-' + id + '">&mdash;</span>'
                 + '</div>'
 
@@ -147,7 +146,7 @@
 
                             var fmt = formatAmount(data.NetDiff, data.StdPrecision);
                             $mainNum.text(fmt.main);
-                            $decimalNum.text('.' + fmt.decimal);
+                            $decimalNum.text(fmt.decimal ? '.' + fmt.decimal : '');
 
                             // Colour the value block and status based on balance
                             $valueWrap.removeClass('VAS-gljnd-balanced VAS-gljnd-unbalanced');

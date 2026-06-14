@@ -105,7 +105,6 @@
 
                 // ── Why section ─────────────────────────────────────────────
                 + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_037_Why', 'Why') + '</span>'
                 +   '<span class="kpi-why-text" id="VAS-gljtd-why-' + id + '">&mdash;</span>'
                 + '</div>'
 
@@ -152,7 +151,7 @@
                             // Format and split amount
                             var fmt = formatAmount(data.Total, data.StdPrecision);
                             $mainNum.text(fmt.main);
-                            $decimalNum.text('.' + fmt.decimal);
+                            $decimalNum.text(fmt.decimal ? '.' + fmt.decimal : '');
 
                             // Why text
                             $whyText.text(

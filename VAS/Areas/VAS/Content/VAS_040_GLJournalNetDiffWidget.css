@@ -59,7 +59,7 @@
 /* Title label */
 .VAS-gljnd-root .w-title {
     font-size: 0.8125em;
-    font-weight: 400;
+    font-weight: 600;
     color: #5F7283;
     letter-spacing: 0.015em;
     white-space: nowrap;
@@ -160,11 +160,7 @@
 .VAS-gljnd-root .kpi-why {
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
-    background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
-    padding: 0.45em 0.6em;
-    border: 1px solid rgba(0, 131, 218, 0.12);
 }
 
 .VAS-gljnd-root .kpi-why-label {
@@ -252,4 +248,70 @@ html[dir="rtl"] .VAS-gljnd-drcr {
 
 html[dir="rtl"] .VAS-gljnd-root .kpi-why {
     flex-direction: row-reverse;
+}
+
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-gljnd-root {
+    container-type: inline-size;
+}
+
+.VAS-gljnd-root .kpi {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+}
+
+.VAS-gljnd-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS-gljnd-main {
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.VAS-gljnd-root .kpi-why-text {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-gljnd-root .kpi,
+.VAS-gljnd-root .kpi.kpi-teal {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-gljnd-root .w-title,
+.VAS-gljnd-root .kpi-value {
+    color: #102C3F;
+}
+
+.VAS-gljnd-root .w-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #0083DA;
+}
+
+.VAS-gljnd-root .kpi-value.VAS-gljnd-balanced,
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
+    color: #019D89;
+}
+
+.VAS-gljnd-root .kpi-value.VAS-gljnd-unbalanced,
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-warn {
+    color: #D78B10;
+}
+
+.VAS-gljnd-root .kpi-why-label {
+    color: #0083DA;
+}
+
+.VAS-gljnd-prefix,
+.VAS-gljnd-decimal,
+.VAS-gljnd-root .kpi-why-text {
+    color: #748494;
 }
