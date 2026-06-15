@@ -152,6 +152,8 @@
         }
 
         function loadData() {
+            showLoading();
+
             $.ajax({
                 url: baseUrl + 'VAS/VAS_043_GLJournalTopMovementWidget/GetTopMovement',
                 type     : 'GET',
@@ -176,6 +178,15 @@
                     showBusy(false);
                 }
             });
+        }
+
+        function showLoading() {
+            var id = $self.AD_UserHomeWidgetID;
+
+            totalPages = 0;
+            $root.find('#VAS-gljtm-body-' + id).html(
+                '<div class="VAS-gljtm-loading">' + esc(lbl('VIS_Loading', 'Loading...')) + '</div>'
+            );
         }
 
         function renderBars(data) {

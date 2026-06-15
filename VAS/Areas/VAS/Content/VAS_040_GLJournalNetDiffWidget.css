@@ -298,7 +298,7 @@ html[dir="rtl"] .VAS-gljnd-root .kpi-why {
 
 .VAS-gljnd-root .kpi-value.VAS-gljnd-balanced,
 .VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
-    color: #019D89;
+    color: #748494 !important;
 }
 
 .VAS-gljnd-root .kpi-value.VAS-gljnd-unbalanced,
