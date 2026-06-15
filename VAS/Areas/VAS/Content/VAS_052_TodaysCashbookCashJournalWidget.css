@@ -32,7 +32,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.875em;
+    gap: 0.625em;
     padding: 0.875em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -41,6 +41,7 @@
     color: #102C3F;
 }
 
+/* Header */
 .VAS_052_cashbook-header {
     display: flex;
     align-items: center;
@@ -55,26 +56,38 @@
     align-items: center;
     gap: 0.625em;
     min-width: 0;
+    max-width: 100%;
 }
 
+/* Strong icon control to prevent oversized SVG issue */
 .VAS_052_cashbook-icon {
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    width: 1.75em !important;
+    height: 1.75em !important;
+    min-width: 1.75em !important;
+    max-width: 1.75em !important;
+    max-height: 1.75em !important;
+    flex: 0 0 1.75em !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
     border: 1px solid #E4EDF4;
     border-radius: 0.375em;
     background: rgba(0, 131, 218, 0.08);
     color: #4F83D8;
 }
 
-.VAS_052_cashbook-icon svg {
-    width: 1em;
-    height: 1em;
-}
+    .VAS_052_cashbook-icon svg {
+        width: 1em !important;
+        height: 1em !important;
+        min-width: 1em !important;
+        min-height: 1em !important;
+        max-width: 1em !important;
+        max-height: 1em !important;
+        display: block !important;
+        flex: 0 0 auto !important;
+        stroke: currentColor;
+    }
 
 .VAS_052_cashbook-title {
     min-width: 0;
@@ -83,7 +96,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 400;
+    font-weight: 500;
     letter-spacing: 0;
     color: #102C3F;
 }
@@ -115,6 +128,7 @@
     padding: 0;
 }
 
+/* Body */
 .VAS_052_cashbook-body {
     flex: 1 1 auto;
     min-width: 0;
@@ -124,57 +138,61 @@
     scrollbar-width: thin;
 }
 
-.VAS_052_cashbook-body::-webkit-scrollbar {
-    width: 0.375em;
-}
+    .VAS_052_cashbook-body::-webkit-scrollbar {
+        width: 0.375em;
+        height: 0.375em;
+    }
 
-.VAS_052_cashbook-body::-webkit-scrollbar-track {
-    background: transparent;
-}
+    .VAS_052_cashbook-body::-webkit-scrollbar-track {
+        background: transparent;
+    }
 
-.VAS_052_cashbook-body::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(16, 44, 63, 0.18);
-}
+    .VAS_052_cashbook-body::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(16, 44, 63, 0.18);
+    }
 
+/* Table */
 .VAS_052_cashbook-table {
     width: 100%;
     min-width: 46em;
     border-collapse: collapse;
     table-layout: fixed;
+    margin: 0;
 }
 
-.VAS_052_cashbook-table th,
-.VAS_052_cashbook-table td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    border-bottom: 1px solid rgba(228, 237, 244, 0.72);
-    text-align: left !important;
-}
+    .VAS_052_cashbook-table th,
+    .VAS_052_cashbook-table td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        border-bottom: 1px solid rgba(228, 237, 244, 0.72);
+        text-align: left !important;
+        vertical-align: middle;
+    }
 
-.VAS_052_cashbook-table th {
-    padding: 0 0.75em 0.75em;
-    color: #748494;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.75em;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
+    .VAS_052_cashbook-table th {
+        padding: 0 0.75em 0.6em;
+        color: #748494;
+        font-family: Roboto, Arial, sans-serif;
+        font-size: 0.75em;
+        line-height: 1.2;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
 
-.VAS_052_cashbook-table td {
-    padding: 0.875em 0.75em;
-    color: #60748A;
-    font-size: 0.8125em;
-    line-height: 1.2;
-    font-weight: 400;
-}
+    .VAS_052_cashbook-table td {
+        padding: 0.625em 0.75em;
+        color: #60748A;
+        font-size: 0.8125em;
+        line-height: 1.2;
+        font-weight: 400;
+    }
 
-.VAS_052_cashbook-table tbody tr:last-child td {
-    border-bottom: 0;
-}
+    .VAS_052_cashbook-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
 
 .VAS_052_cashbook-col-time {
     width: 6em;
@@ -194,9 +212,10 @@
 }
 
 .VAS_052_cashbook-col-amount {
-    width: 6em;
+    width: 7em;
     text-align: right !important;
     font-weight: 800 !important;
+    font-variant-numeric: tabular-nums;
 }
 
 .VAS_052_cashbook-in {
@@ -242,6 +261,77 @@
     color: #3B7DD8;
 }
 
+/* Pagination Footer */
+.VAS_052_cashbook-footer {
+    flex-shrink: 0;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-top: 0.25em;
+    padding-top: 0.55em;
+    border-top: 1px solid rgba(212, 225, 234, 0.66);
+}
+
+.VAS_052_cashbook-footer-info {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72em;
+    line-height: 1.2;
+    color: #748494;
+}
+
+.VAS_052_cashbook-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.VAS_052_cashbook-page-btn {
+    width: 2em;
+    height: 2em;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+    .VAS_052_cashbook-page-btn svg {
+        width: 0.85em;
+        height: 0.85em;
+        stroke: currentColor;
+    }
+
+    .VAS_052_cashbook-page-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .VAS_052_cashbook-page-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+        opacity: 0.75;
+    }
+
+.VAS_052_cashbook-page-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.78em;
+    line-height: 1.2;
+    color: #102C3F;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Busy */
 .VAS_052_cashbook-busy {
     position: absolute;
     inset: 0;
@@ -259,10 +349,11 @@
     border-radius: 14px;
 }
 
-.VAS_052_cashbook-busy.is-visible {
-    display: flex;
-}
+    .VAS_052_cashbook-busy.is-visible {
+        display: flex;
+    }
 
+/* State / No data */
 .VAS_052_cashbook-state {
     position: absolute;
     inset: 0;
@@ -277,37 +368,71 @@
     font-weight: 600;
     text-align: center;
     border-radius: 14px;
+    pointer-events: none;
 }
 
-.VAS_052_cashbook-state.is-visible {
-    display: flex;
-}
+    .VAS_052_cashbook-state.is-visible {
+        display: flex;
+    }
 
+/* Responsive */
 @container (max-width: 38em) {
     .VAS_052_cashbook-card {
         padding: 0.75em;
-        gap: 0.375em;
+        gap: 0.5em;
         border-radius: 12px;
     }
 
     .VAS_052_cashbook-meta {
         display: none;
     }
+
+    .VAS_052_cashbook-table {
+        min-width: 42em;
+    }
 }
 
 @container (max-width: 26em) {
     .VAS_052_cashbook-card {
         padding: 0.625em;
-        gap: 0.25em;
+        gap: 0.375em;
     }
 
     .VAS_052_cashbook-icon {
-        width: 1.75em;
-        height: 1.75em;
-        border-radius: 0.375em;
+        width: 1.75em !important;
+        height: 1.75em !important;
+        min-width: 1.75em !important;
+        max-width: 1.75em !important;
+        max-height: 1.75em !important;
     }
+
+        .VAS_052_cashbook-icon svg {
+            width: 1em !important;
+            height: 1em !important;
+            max-width: 1em !important;
+            max-height: 1em !important;
+        }
 
     .VAS_052_cashbook-action {
         display: none;
+    }
+
+    .VAS_052_cashbook-table {
+        min-width: 38em;
+    }
+
+    .VAS_052_cashbook-footer {
+        gap: 0.5em;
+        margin-top: 0.25em;
+        padding-top: 0.5em;
+    }
+
+    .VAS_052_cashbook-footer-info {
+        font-size: 0.68em;
+    }
+
+    .VAS_052_cashbook-page-btn {
+        width: 1.85em;
+        height: 1.85em;
     }
 }

@@ -21,7 +21,7 @@ namespace VAS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetTodaysCashbook(int cashBookId = 0)
+        public JsonResult GetTodaysCashbook(int cashBookId = 0, int pageNo = 1, int pageSize = 6)
         {
             Ctx ctx = Session["ctx"] as Ctx;
 
@@ -35,11 +35,24 @@ namespace VAS.Controllers
                 }, JsonRequestBehavior.AllowGet);
             }
 
+            if (pageNo <= 0)
+            {
+                pageNo = 1;
+            }
+
+            if (pageSize <= 0)
+            {
+                pageSize = 6;
+            }
+
+            int startRow = ((pageNo - 1) * pageSize) + 1;
+            int endRow = pageNo * pageSize;
+
             IDataReader reader = null;
 
             try
             {
-                SqlQueryData queryData = BuildTodaysCashbookSql(ctx, cashBookId);
+                SqlQueryData queryData = BuildTodaysCashbookSql(ctx, cashBookId, startRow, endRow);
 
                 reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
@@ -55,6 +68,8 @@ namespace VAS.Controllers
 
                 while (reader != null && reader.Read())
                 {
+                    totalEntries = GetInt(reader, "TotalRecords", totalEntries);
+
                     int rowCashBookId = GetInt(reader, "C_CashBook_ID");
 
                     if (!cashBookIds.Contains(rowCashBookId))
@@ -66,13 +81,6 @@ namespace VAS.Controllers
                             cCashBookId = rowCashBookId,
                             name = GetString(reader, "CashBookName")
                         });
-                    }
-
-                    totalEntries++;
-
-                    if (entries.Count >= 6)
-                    {
-                        continue;
                     }
 
                     decimal amount = GetDecimal(reader, "ConvertedAmount");
@@ -108,15 +116,20 @@ namespace VAS.Controllers
                     stdPrecision = stdPrecision,
                     cashBooks = cashBooks,
                     entries = entries,
+                    totalEntries = totalEntries,
+                    totalRecords = totalEntries,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalEntries / pageSize)),
+                    pageNo = pageNo,
+                    pageSize = pageSize,
                     hasData = totalEntries > 0
                 }, JsonRequestBehavior.AllowGet);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 return Json(new
                 {
                     success = false,
-                    error = GetMsg(ctx, "VAS_052_LoadError", "Unable to load today's cashbook"),
+                    error = ex.Message,
                     hasData = false
                 }, JsonRequestBehavior.AllowGet);
             }
@@ -130,7 +143,7 @@ namespace VAS.Controllers
             }
         }
 
-        private SqlQueryData BuildTodaysCashbookSql(Ctx ctx, int cashBookId)
+        private SqlQueryData BuildTodaysCashbookSql(Ctx ctx, int cashBookId, int startRow, int endRow)
         {
             string todayDateSql = GetTodayDateSql();
 
@@ -150,7 +163,7 @@ CAST(" + todayDateSql + @" AS TIMESTAMP) AS TodayStart,
 CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS TodayEnd
 FROM AD_ClientInfo ClientInfo
 WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND ClientInfo.AD_Client_ID = @AD_Client_ID_DateRange
 )";
 
             string schemaCurrencySql = @"
@@ -166,7 +179,7 @@ FROM AD_ClientInfo ClientInfo
 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
 INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
 WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND ClientInfo.AD_Client_ID = @AD_Client_ID_SchemaCurrency
 )";
 
             string cashLineAccessSql = @"
@@ -232,13 +245,14 @@ LEFT OUTER JOIN AD_User CreatedByUser ON (CashLine.CreatedBy = CreatedByUser.AD_
 WHERE CashHeader.IsActive = 'Y'
 AND CashBook.IsActive = 'Y'
 AND CashHeader.DocStatus IN ('CO', 'CL')" + cashBookFilter + @"
-)";
-
-            string sql = @"
-WITH " + dateRangeSql + @",
-" + schemaCurrencySql + @",
-" + cashLineAccessSqlCte + @",
-" + cashRowsSql + @"
+),
+CountData AS
+(
+SELECT COUNT(1) AS TotalRecords
+FROM CashRows CashRows
+),
+PagedRows AS
+(
 SELECT
 CashRows.C_CashLine_ID,
 CashRows.Created,
@@ -251,19 +265,50 @@ CashRows.PostedBy,
 CashRows.StdPrecision,
 CashRows.C_Currency_ID,
 CashRows.CurrencyISO,
-CashRows.CurrencySymbol
+CashRows.CurrencySymbol,
+CountData.TotalRecords,
+ROW_NUMBER() OVER (ORDER BY CashRows.Created DESC, CashRows.C_CashLine_ID DESC) AS RowNo
 FROM CashRows CashRows
-ORDER BY CashRows.Created DESC, CashRows.C_CashLine_ID DESC";
+CROSS JOIN CountData CountData
+)";
+
+            string sql = @"
+WITH " + dateRangeSql + @",
+" + schemaCurrencySql + @",
+" + cashLineAccessSqlCte + @",
+" + cashRowsSql + @"
+SELECT
+PagedRows.C_CashLine_ID,
+PagedRows.Created,
+PagedRows.Description,
+PagedRows.ConvertedAmount,
+PagedRows.C_CashBook_ID,
+PagedRows.CashBookName,
+PagedRows.CategoryName,
+PagedRows.PostedBy,
+PagedRows.StdPrecision,
+PagedRows.C_Currency_ID,
+PagedRows.CurrencyISO,
+PagedRows.CurrencySymbol,
+PagedRows.TotalRecords
+FROM PagedRows PagedRows
+WHERE PagedRows.RowNo >= @StartRow
+AND PagedRows.RowNo <= @EndRow
+ORDER BY PagedRows.RowNo";
 
             List<SqlParameter> parameters = new List<SqlParameter>
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                new SqlParameter("@AD_Client_ID_DateRange", ctx.GetAD_Client_ID()),
+                new SqlParameter("@AD_Client_ID_SchemaCurrency", ctx.GetAD_Client_ID())
             };
 
             if (cashBookId > 0)
             {
                 parameters.Add(new SqlParameter("@CashBookId", cashBookId));
             }
+
+            parameters.Add(new SqlParameter("@StartRow", startRow));
+            parameters.Add(new SqlParameter("@EndRow", endRow));
 
             return new SqlQueryData
             {

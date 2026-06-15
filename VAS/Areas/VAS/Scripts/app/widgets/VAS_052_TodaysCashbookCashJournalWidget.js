@@ -1,27 +1,6 @@
 /**
  * Today's Cashbook - Cash Journal
  * Purpose - Shows today's cashbook entries from Cash Journal lines.
- *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Today's Cashbook                     | VAS_052_TodaysCashbook
- *  2  | entries                              | VAS_052_Entries
- *  3  | + Entry                              | VAS_052_Entry
- *  4  | Time                                 | VAS_052_Time
- *  5  | Description                          | VAS_052_Description
- *  6  | Category                             | VAS_052_Category
- *  7  | Posted by                            | VAS_052_PostedBy
- *  8  | In                                   | VAS_052_In
- *  9  | Out                                  | VAS_052_Out
- * 10  | Other                                | VAS_052_Other
- * 11  | System                               | VAS_052_System
- * 12  | Loading                              | VAS_052_Loading
- * 13  | No data                              | VAS_052_NoData
- * 14  | Unable to load today's cashbook      | VAS_052_LoadError
- * 15  | Cash entry                           | VAS_052_CashEntry
- * 16  | Session Expired                      | VAS_052_SessionExpired
- * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
@@ -33,6 +12,17 @@
         var isDisposed = false;
         var ajaxRequest = null;
 
+        var $footer = null;
+        var $pageInfo = null;
+        var $prevBtn = null;
+        var $nextBtn = null;
+        var $pageText = null;
+
+        var pageNo = 1;
+        var pageSize = 6;
+        var totalPages = 0;
+        var totalRecords = 0;
+
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
             return text && text !== key && text !== '[' + key + ']' ? text : fallback;
@@ -41,6 +31,44 @@
         function safeNumber(value) {
             var numberValue = Number(value || 0);
             return isNaN(numberValue) ? 0 : numberValue;
+        }
+
+        function parseResponse(response) {
+            var data = response;
+
+            if (data && data.d) {
+                data = data.d;
+            }
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e1) {
+                    return {
+                        success: false,
+                        error: data
+                    };
+                }
+            }
+
+            if (data && data.d) {
+                data = data.d;
+            }
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e2) {
+                    return {
+                        success: false,
+                        error: data
+                    };
+                }
+            }
+
+            return data;
         }
 
         function getPrecision(data) {
@@ -63,6 +91,7 @@
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
+
             var sign = numericValue < 0 ? '-' : '';
 
             if (symbol) {
@@ -73,12 +102,34 @@
         }
 
         function showBusy(show) {
+            if (!$root) {
+                return;
+            }
+
             var $busy = $root.find('#VAS_052_cashbook-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $busy.addClass('is-visible'); } else { $busy.removeClass('is-visible'); }
+
+            if (show) {
+                $busy.addClass('is-visible');
+            }
+            else {
+                $busy.removeClass('is-visible');
+            }
         }
 
         function buildLayout() {
             var widgetId = $self.AD_UserHomeWidgetID;
+
+            var chevL =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>';
+
+            var chevR =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>';
 
             $root = $('<div>', {
                 'class': 'VAS_052_cashbook-root',
@@ -125,13 +176,6 @@
                 'text': '0 ' + lbl('VAS_052_Entries', 'entries')
             });
 
-            //var $action = $('<button>', {
-            //    'type': 'button',
-            //    'class': 'VAS_052_cashbook-action',
-            //    'id': 'VAS_052_cashbook-action-' + widgetId,
-            //    'text': lbl('VAS_052_Entry', '+ Entry')
-            //});
-
             var $body = $('<div>', {
                 'class': 'VAS_052_cashbook-body'
             });
@@ -144,23 +188,75 @@
                 '<th>' + lbl('VAS_052_Description', 'Description') + '</th>' +
                 '<th>' + lbl('VAS_052_Category', 'Category') + '</th>' +
                 '<th>' + lbl('VAS_052_PostedBy', 'Posted by') + '</th>' +
-                '<th class="">' + lbl('VAS_052_In', 'In') + '</th>' +
-                '<th class="">' + lbl('VAS_052_Out', 'Out') + '</th>' +
+                '<th>' + lbl('VAS_052_In', 'In') + '</th>' +
+                '<th>' + lbl('VAS_052_Out', 'Out') + '</th>' +
                 '</tr>' +
                 '</thead>' +
                 '<tbody id="VAS_052_cashbook-rows-' + widgetId + '"></tbody>' +
                 '</table>'
             );
 
+            $footer = $('<div>', {
+                'class': 'VAS_052_cashbook-footer',
+                'style': 'display:none;'
+            });
+
+            $pageInfo = $('<span>', {
+                'class': 'VAS_052_cashbook-footer-info'
+            });
+
+            var $pager = $('<div>', {
+                'class': 'VAS_052_cashbook-pager'
+            });
+
+            $prevBtn = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_052_cashbook-page-btn VAS_052_cashbook-prev',
+                'aria-label': lbl('VAS_Previous', 'Previous'),
+                'html': chevL
+            });
+
+            $pageText = $('<span>', {
+                'class': 'VAS_052_cashbook-page-text'
+            });
+
+            $nextBtn = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_052_cashbook-page-btn VAS_052_cashbook-next',
+                'aria-label': lbl('VAS_Next', 'Next'),
+                'html': chevR
+            });
+
             var $state = $('<div>', {
                 'class': 'VAS_052_cashbook-state',
                 'id': 'VAS_052_cashbook-state-' + widgetId
             });
 
+            $prevBtn.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                loadData();
+            });
+
+            $nextBtn.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                loadData();
+            });
+
+            $pager.append($prevBtn).append($pageText).append($nextBtn);
+            $footer.append($pageInfo).append($pager);
+
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow);
             $body.append($table);
-            $card.append($busy).append($header).append($body).append($state);
+            $card.append($busy).append($header).append($body).append($footer).append($state);
             $root.append($card);
         }
 
@@ -170,8 +266,64 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
+
+            totalRecords = 0;
+            totalPages = 0;
+
             $root.find('#VAS_052_cashbook-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_052_cashbook-rows-' + widgetId).empty();
+
+            updatePager();
+        }
+
+        function clearState() {
+            if (!$root) {
+                return;
+            }
+
+            var widgetId = $self.AD_UserHomeWidgetID;
+
+            $root.find('#VAS_052_cashbook-state-' + widgetId).removeClass('is-visible').text('');
+        }
+
+        function updatePager() {
+            if ($pageText) {
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+            }
+
+            if ($pageInfo) {
+                if (totalRecords > 0) {
+                    var from = (pageNo - 1) * pageSize + 1;
+                    var to = Math.min(pageNo * pageSize, totalRecords);
+
+                    $pageInfo.text(
+                        lbl('VAS_Showing', 'Showing') +
+                        ' ' +
+                        from +
+                        '–' +
+                        to +
+                        ' ' +
+                        lbl('VAS_Of', 'of') +
+                        ' ' +
+                        totalRecords
+                    );
+                }
+                else {
+                    $pageInfo.text('');
+                }
+            }
+
+            if ($prevBtn) {
+                $prevBtn.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($nextBtn) {
+                $nextBtn.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
+
+            if ($footer) {
+                $footer.css('display', totalPages > 1 ? 'flex' : 'none');
+            }
         }
 
         function createEntryRow(entry, data) {
@@ -219,13 +371,18 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            var entries = data.entries || [];
+            var entries = data.entries || data.Entries || [];
             var $rows = $root.find('#VAS_052_cashbook-rows-' + widgetId);
 
-            $root.find('#VAS_052_cashbook-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_052_cashbook-title-' + widgetId).text(data.title || lbl('VAS_052_TodaysCashbook', "Today's Cashbook"));
-            $root.find('#VAS_052_cashbook-meta-' + widgetId).text(data.metaText || entries.length + ' ' + lbl('VAS_052_Entries', 'entries'));
-            $root.find('#VAS_052_cashbook-action-' + widgetId).text(data.actionText || lbl('VAS_052_Entry', '+ Entry'));
+            pageNo = safeNumber(data.pageNo || data.PageNo) > 0 ? safeNumber(data.pageNo || data.PageNo) : pageNo;
+            pageSize = safeNumber(data.pageSize || data.PageSize) > 0 ? safeNumber(data.pageSize || data.PageSize) : pageSize;
+            totalRecords = safeNumber(data.totalRecords || data.TotalRecords || data.totalEntries || data.TotalEntries);
+            totalPages = pageSize > 0 ? Math.ceil(totalRecords / pageSize) : 0;
+
+            clearState();
+
+            $root.find('#VAS_052_cashbook-title-' + widgetId).text(data.title || data.Title || lbl('VAS_052_TodaysCashbook', "Today's Cashbook"));
+            $root.find('#VAS_052_cashbook-meta-' + widgetId).text(data.metaText || data.MetaText || totalRecords + ' ' + lbl('VAS_052_Entries', 'entries'));
 
             $rows.empty();
 
@@ -235,7 +392,10 @@
 
             if (data.hasData === false || entries.length === 0) {
                 setState(lbl('VAS_052_NoData', 'No data'));
+                return;
             }
+
+            updatePager();
         }
 
         function loadData() {
@@ -254,26 +414,37 @@
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
+                data: {
+                    pageNo: pageNo,
+                    pageSize: pageSize
+                },
                 success: function (response) {
                     if (isDisposed) {
                         return;
                     }
 
-                    if (!response) {
+                    var data = parseResponse(response);
+
+                    if (!data) {
                         setState(lbl('VAS_052_LoadError', "Unable to load today's cashbook"));
                         return;
                     }
 
-                    if (response.success === false || response.error) {
-                        setState(response.error || lbl('VAS_052_LoadError', "Unable to load today's cashbook"));
+                    if (data.success === false || data.error) {
+                        setState(data.error || lbl('VAS_052_LoadError', "Unable to load today's cashbook"));
                         return;
                     }
 
-                    renderData(response);
+                    renderData(data);
                 },
-                error: function () {
+                error: function (xhr, status, errorThrown) {
                     if (!isDisposed) {
-                        setState(lbl('VAS_052_LoadError', "Unable to load today's cashbook"));
+                        if (xhr && xhr.responseText) {
+                            setState(xhr.responseText);
+                        }
+                        else {
+                            setState(errorThrown || status || lbl('VAS_052_LoadError', "Unable to load today's cashbook"));
+                        }
                     }
                 },
                 complete: function () {
@@ -290,6 +461,7 @@
         };
 
         this.refreshWidget = function () {
+            pageNo = 1;
             loadData();
         };
 
