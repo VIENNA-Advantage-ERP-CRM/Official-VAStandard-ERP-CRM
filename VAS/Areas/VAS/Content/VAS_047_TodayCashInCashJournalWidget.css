@@ -255,3 +255,18 @@
         font-size: 0.625em;
     }
 }
+
+/* Align card surface with the dashboard widget standard */
+.VAS-047-today-cash-in-cash-journal-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-047-today-cash-in-cash-journal-busy {
+    background: rgba(255, 255, 255, 0.74);
+}
+
+.VAS-047-today-cash-in-cash-journal-period {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+}

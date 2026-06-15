@@ -204,5 +204,15 @@
     }
 }
 
+/* Align card surface with the dashboard widget standard */
+.VAS_today-cash-out-cash-journal-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS_today-cash-out-cash-journal-date {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+}
 
 
