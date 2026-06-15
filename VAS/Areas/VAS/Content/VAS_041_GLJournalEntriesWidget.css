@@ -217,7 +217,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 .VAS-glje-dialog-card {
     position: relative;
     width: min(84em, 100%);
-    height: min(47em, 100%);
+    height: min(34em, 100%);
     background: #FFFFFF;
     border-radius: 1.5em;
     box-shadow: 0 1.5em 3.5em rgba(3, 31, 49, 0.28);

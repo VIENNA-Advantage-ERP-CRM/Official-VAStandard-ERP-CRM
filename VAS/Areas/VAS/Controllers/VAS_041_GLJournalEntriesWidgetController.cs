@@ -12,51 +12,6 @@ namespace VAS.Controllers
 {
     public class VAS_041_GLJournalEntriesWidgetController : Controller
     {
-        private class SchemaInfo
-        {
-            public int AcctSchemaId { get; set; }
-            public string AcctSchemaName { get; set; }
-            public string CurSymbol { get; set; }
-            public string ISOCode { get; set; }
-            public int StdPrecision { get; set; }
-        }
-
-        private SchemaInfo GetPrimarySchema(Ctx ctx)
-        {
-            SchemaInfo info = new SchemaInfo
-            {
-                AcctSchemaId = 0,
-                AcctSchemaName = "",
-                CurSymbol = "",
-                ISOCode = "",
-                StdPrecision = 2
-            };
-
-            string schemaSql = "SELECT C_AcctSchema.C_AcctSchema_ID, C_AcctSchema.Name,"
-                             + " C_Currency.CurSymbol, C_Currency.ISO_Code, C_Currency.StdPrecision"
-                             + " FROM C_AcctSchema"
-                             + " INNER JOIN C_Currency ON (C_AcctSchema.C_Currency_ID=C_Currency.C_Currency_ID)"
-                             + " WHERE C_AcctSchema.IsActive='Y'"
-                             + " AND C_AcctSchema.AD_Client_ID=@ClientID";
-
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", ctx.GetAD_Client_ID()) };
-            DataSet schemaDs = DB.ExecuteDataset(schemaSql, schemaParams, null);
-            if (schemaDs != null && schemaDs.Tables[0].Rows.Count > 0)
-            {
-                info.AcctSchemaId = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["C_AcctSchema_ID"]);
-                info.AcctSchemaName = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["Name"]);
-                info.CurSymbol = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["CurSymbol"]);
-                info.ISOCode = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["ISO_Code"]);
-                info.StdPrecision = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["StdPrecision"]);
-            }
-
-            return info;
-        }
-
-        /// <summary>
-        /// Returns the count of actual GL Journal entries (PostingType='A')
-        /// posted in the current calendar month, together with month labels.
-        /// </summary>
         public JsonResult GetMonthlyEntryCount()
         {
             if (Session["ctx"] == null)
@@ -65,47 +20,56 @@ namespace VAS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            SchemaInfo schema = GetPrimarySchema(ctx);
-            DateTime today = DateTime.Now.Date;
-            int currentMonth = today.Month;
-            int currentYear = today.Year;
-            int entryCount = 0;
 
-            string sql = "SELECT COUNT(GL_Journal.GL_Journal_ID) AS EntryCount FROM GL_Journal"
-                       + " WHERE GL_Journal.PostingType = 'A'"
-                       + " AND GL_Journal.IsActive = 'Y'"
-                       + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID"
-                       + " AND EXTRACT(MONTH FROM GL_Journal.DateAcct) = @CurrentMonth"
-                       + " AND EXTRACT(YEAR FROM GL_Journal.DateAcct) = @CurrentYear";
+            string sql = @"
+WITH SchemaCurrency AS (
+" + BuildSchemaCurrencySql() + @"
+),
+PeriodRange AS (
+" + BuildPeriodRangeSql() + @"
+),
+ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "GL_Journal.PostingType = 'A'") + @"
+)
+SELECT COUNT(ProtectedJournal.GL_Journal_ID) AS EntryCount,
+       MAX(PeriodRange.MonthDateFrom) AS MonthDateFrom
+FROM PeriodRange PeriodRange
+INNER JOIN SchemaCurrency SchemaCurrency
+    ON (SchemaCurrency.AD_Client_ID = PeriodRange.AD_Client_ID)
+LEFT OUTER JOIN ProtectedJournal ProtectedJournal
+    ON (ProtectedJournal.AD_Client_ID = SchemaCurrency.AD_Client_ID
+    AND ProtectedJournal.C_AcctSchema_ID = SchemaCurrency.C_AcctSchema_ID
+    AND ProtectedJournal.DateAcct >= PeriodRange.MonthDateFrom
+    AND ProtectedJournal.DateAcct < " + GetDateToExclusiveExpression("PeriodRange.MonthDateTo") + @")";
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            SqlParameter[] sqlParams =
+            SqlParameter[] parameters =
             {
-                new SqlParameter("@AcctSchemaID", schema.AcctSchemaId),
-                new SqlParameter("@CurrentMonth", currentMonth),
-                new SqlParameter("@CurrentYear",  currentYear)
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
-            DataSet ds = DB.ExecuteDataset(sql, sqlParams, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+
+            int entryCount = 0;
+            DateTime? monthDateFrom = null;
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
-                entryCount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["EntryCount"]);
+                DataRow row = ds.Tables[0].Rows[0];
+                entryCount = Util.GetValueOfInt(row["EntryCount"]);
+                monthDateFrom = Util.GetValueOfDateTime(row["MonthDateFrom"]);
             }
 
-            var result = new
+            DateTime displayDate = monthDateFrom.HasValue ? monthDateFrom.Value : DateTime.Now;
+
+            return Json(JsonConvert.SerializeObject(new
             {
                 EntryCount = entryCount,
-                MonthName  = today.ToString("MMMM"),
-                MonthAbbr  = today.ToString("MMM"),
-                Year       = today.Year
-            };
-
-            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+                MonthName = displayDate.ToString("MMMM"),
+                MonthAbbr = displayDate.ToString("MMM"),
+                Year = displayDate.Year
+            }), JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>
-        /// Returns GL Journal entries for the current month for the drill-down popup.
-        /// </summary>
         public JsonResult GetMonthlyEntries()
         {
             if (Session["ctx"] == null)
@@ -114,80 +78,140 @@ namespace VAS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            SchemaInfo schema = GetPrimarySchema(ctx);
-            DateTime today = DateTime.Now.Date;
-            int currentMonth = today.Month;
-            int currentYear = today.Year;
 
-            string sqlBase = "SELECT GL_Journal.GL_Journal_ID,"
-                           + " GL_Journal.DocumentNo,"
-                           + " GL_Journal.DateAcct,"
-                           + " GL_Journal.Description,"
-                           + " GL_Journal.DocStatus,"
-                           + " AD_Ref_List.Name AS DocStatusName,"
-                           + " COALESCE(SUM(GL_JournalLine.AmtAcctDr),0) AS TotalDebit,"
-                           + " COALESCE(SUM(GL_JournalLine.AmtAcctCr),0) AS TotalCredit"
-                           + " FROM GL_Journal"
-                           + " LEFT OUTER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID=GL_JournalLine.GL_Journal_ID"
-                           + " AND GL_JournalLine.IsActive='Y')"
-                           + " LEFT OUTER JOIN AD_Ref_List ON (AD_Ref_List.AD_Reference_ID=131"
-                           + " AND AD_Ref_List.Value=GL_Journal.DocStatus"
-                           + " AND AD_Ref_List.IsActive='Y')"
-                           + " WHERE GL_Journal.PostingType='A'"
-                           + " AND GL_Journal.IsActive='Y'"
-                           + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID"
-                           + " AND EXTRACT(MONTH FROM GL_Journal.DateAcct)=@CurrentMonth"
-                           + " AND EXTRACT(YEAR FROM GL_Journal.DateAcct)=@CurrentYear";
+            string sql = @"
+WITH SchemaCurrency AS (
+" + BuildSchemaCurrencySql() + @"
+),
+PeriodRange AS (
+" + BuildPeriodRangeSql() + @"
+),
+ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "GL_Journal.PostingType = 'A'") + @"
+),
+JournalData AS (
+    SELECT ProtectedJournal.GL_Journal_ID,
+           ProtectedJournal.DocumentNo,
+           ProtectedJournal.DateAcct,
+           ProtectedJournal.Description,
+           ProtectedJournal.DocStatus,
+           ProtectedJournal.AD_Client_ID,
+           ProtectedJournal.C_AcctSchema_ID
+    FROM PeriodRange PeriodRange
+    INNER JOIN SchemaCurrency SchemaCurrency
+        ON (SchemaCurrency.AD_Client_ID = PeriodRange.AD_Client_ID)
+    INNER JOIN ProtectedJournal ProtectedJournal
+        ON (ProtectedJournal.AD_Client_ID = SchemaCurrency.AD_Client_ID
+        AND ProtectedJournal.C_AcctSchema_ID = SchemaCurrency.C_AcctSchema_ID
+        AND ProtectedJournal.DateAcct >= PeriodRange.MonthDateFrom
+        AND ProtectedJournal.DateAcct < " + GetDateToExclusiveExpression("PeriodRange.MonthDateTo") + @")
+),
+JournalTotals AS (
+    SELECT JournalData.GL_Journal_ID,
+           JournalData.DocumentNo,
+           JournalData.DateAcct,
+           JournalData.Description,
+           JournalData.DocStatus,
+           AD_Ref_List.Name AS DocStatusName,
+           ROUND(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS TotalDebit,
+           ROUND(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS TotalCredit,
+           MAX(SchemaCurrency.Cur_Symbol) AS CurSymbol,
+           MAX(SchemaCurrency.ISO_Code) AS ISOCode,
+           COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision
+    FROM JournalData JournalData
+    INNER JOIN SchemaCurrency SchemaCurrency
+        ON (SchemaCurrency.AD_Client_ID = JournalData.AD_Client_ID
+        AND SchemaCurrency.C_AcctSchema_ID = JournalData.C_AcctSchema_ID)
+    LEFT OUTER JOIN GL_JournalLine GL_JournalLine
+        ON (JournalData.GL_Journal_ID = GL_JournalLine.GL_Journal_ID
+        AND GL_JournalLine.IsActive = 'Y')
+    LEFT OUTER JOIN AD_Ref_List AD_Ref_List
+        ON (AD_Ref_List.AD_Reference_ID = 131
+        AND AD_Ref_List.Value = JournalData.DocStatus
+        AND AD_Ref_List.IsActive = 'Y')
+    GROUP BY JournalData.GL_Journal_ID,
+             JournalData.DocumentNo,
+             JournalData.DateAcct,
+             JournalData.Description,
+             JournalData.DocStatus,
+             AD_Ref_List.Name
+)
+SELECT JournalTotals.GL_Journal_ID,
+       JournalTotals.DocumentNo,
+       JournalTotals.DateAcct,
+       JournalTotals.Description,
+       JournalTotals.DocStatus,
+       JournalTotals.DocStatusName,
+       JournalTotals.TotalDebit,
+       JournalTotals.TotalCredit,
+       JournalTotals.CurSymbol,
+       JournalTotals.ISOCode,
+       JournalTotals.StdPrecision
+FROM JournalTotals JournalTotals
+ORDER BY JournalTotals.DateAcct DESC,
+         JournalTotals.GL_Journal_ID DESC
+FETCH FIRST 100 ROWS ONLY";
 
-            sqlBase = MRole.GetDefault(ctx).AddAccessSQL(
-                sqlBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            string sql = sqlBase
-                       + " GROUP BY GL_Journal.GL_Journal_ID, GL_Journal.DocumentNo,"
-                       + " GL_Journal.DateAcct, GL_Journal.Description,"
-                       + " GL_Journal.DocStatus, AD_Ref_List.Name"
-                       + " ORDER BY GL_Journal.DateAcct DESC, GL_Journal.GL_Journal_ID DESC"
-                       + " FETCH FIRST 100 ROWS ONLY";
-
-            SqlParameter[] mainParams =
+            SqlParameter[] parameters =
             {
-                new SqlParameter("@AcctSchemaID", schema.AcctSchemaId),
-                new SqlParameter("@CurrentMonth", currentMonth),
-                new SqlParameter("@CurrentYear", currentYear)
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
-            DataSet ds = DB.ExecuteDataset(sql, mainParams, null);
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
             List<object> entries = new List<object>();
             decimal totalDebit = 0m;
             decimal totalCredit = 0m;
+            string curSymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
+            DateTime? monthDate = null;
 
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 foreach (DataRow row in ds.Tables[0].Rows)
                 {
-                    decimal debit = Decimal.Round(
-                        Util.GetValueOfDecimal(row["TotalDebit"]), schema.StdPrecision, MidpointRounding.AwayFromZero);
-                    decimal credit = Decimal.Round(
-                        Util.GetValueOfDecimal(row["TotalCredit"]), schema.StdPrecision, MidpointRounding.AwayFromZero);
+                    stdPrecision = Util.GetValueOfInt(row["StdPrecision"]);
+
+                    if (stdPrecision < 0)
+                    {
+                        stdPrecision = 2;
+                    }
+
+                    decimal debit = Util.GetValueOfDecimal(row["TotalDebit"]);
+                    decimal credit = Util.GetValueOfDecimal(row["TotalCredit"]);
 
                     totalDebit += debit;
                     totalCredit += credit;
 
                     string statusName = Util.GetValueOfString(row["DocStatusName"]);
                     string docStatus = Util.GetValueOfString(row["DocStatus"]);
-                    if (string.IsNullOrEmpty(statusName)) { statusName = docStatus; }
 
-                    string dateAcctStr = "";
-                    if (row["DateAcct"] != DBNull.Value)
+                    if (string.IsNullOrEmpty(statusName))
                     {
-                        dateAcctStr = Convert.ToDateTime(row["DateAcct"]).ToString("dd MMM yyyy");
+                        statusName = docStatus;
                     }
+
+                    string dateAcctText = "";
+                    DateTime? dateAcct = Util.GetValueOfDateTime(row["DateAcct"]);
+
+                    if (dateAcct.HasValue)
+                    {
+                        dateAcctText = dateAcct.Value.ToString("dd MMM yyyy");
+
+                        if (!monthDate.HasValue)
+                        {
+                            monthDate = dateAcct.Value;
+                        }
+                    }
+
+                    curSymbol = Util.GetValueOfString(row["CurSymbol"]);
+                    isoCode = Util.GetValueOfString(row["ISOCode"]);
 
                     entries.Add(new
                     {
                         GL_Journal_ID = Util.GetValueOfInt(row["GL_Journal_ID"]),
                         DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
-                        DateAcct = dateAcctStr,
+                        DateAcct = dateAcctText,
                         Description = Util.GetValueOfString(row["Description"]),
                         DocStatus = docStatus,
                         StatusName = statusName,
@@ -197,24 +221,23 @@ namespace VAS.Controllers
                 }
             }
 
+            DateTime displayDate = monthDate.HasValue ? monthDate.Value : DateTime.Now;
+
             return Json(JsonConvert.SerializeObject(new
             {
                 Entries = entries,
                 TotalCount = entries.Count,
-                TotalDebit = Decimal.Round(totalDebit, schema.StdPrecision, MidpointRounding.AwayFromZero),
-                TotalCredit = Decimal.Round(totalCredit, schema.StdPrecision, MidpointRounding.AwayFromZero),
-                MonthName = today.ToString("MMMM"),
-                MonthAbbr = today.ToString("MMM"),
-                Year = today.Year,
-                CurSymbol = schema.CurSymbol,
-                ISOCode = schema.ISOCode,
-                StdPrecision = schema.StdPrecision
+                TotalDebit = Decimal.Round(totalDebit, stdPrecision, MidpointRounding.AwayFromZero),
+                TotalCredit = Decimal.Round(totalCredit, stdPrecision, MidpointRounding.AwayFromZero),
+                MonthName = displayDate.ToString("MMMM"),
+                MonthAbbr = displayDate.ToString("MMM"),
+                Year = displayDate.Year,
+                CurSymbol = curSymbol,
+                ISOCode = isoCode,
+                StdPrecision = stdPrecision
             }), JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>
-        /// Returns a single GL Journal with its accounting lines for the second drill-down popup.
-        /// </summary>
         public JsonResult GetJournalEntryDetail(int journalId)
         {
             if (Session["ctx"] == null)
@@ -223,106 +246,203 @@ namespace VAS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            SchemaInfo schema = GetPrimarySchema(ctx);
 
-            string headerBase = "SELECT GL_Journal.GL_Journal_ID,"
-                              + " GL_Journal.DocumentNo,"
-                              + " GL_Journal.DateAcct,"
-                              + " GL_Journal.Description,"
-                              + " GL_Journal.DocStatus,"
-                              + " GL_Journal.Created,"
-                              + " AD_Ref_List.Name AS DocStatusName,"
-                              + " AD_User.Name AS CreatedByName,"
-                              + " COALESCE(SUM(GL_JournalLine.AmtAcctDr),0) AS TotalDebit,"
-                              + " COALESCE(SUM(GL_JournalLine.AmtAcctCr),0) AS TotalCredit"
-                              + " FROM GL_Journal"
-                              + " LEFT OUTER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID=GL_JournalLine.GL_Journal_ID"
-                              + " AND GL_JournalLine.IsActive='Y')"
-                              + " LEFT OUTER JOIN AD_Ref_List ON (AD_Ref_List.AD_Reference_ID=131"
-                              + " AND AD_Ref_List.Value=GL_Journal.DocStatus"
-                              + " AND AD_Ref_List.IsActive='Y')"
-                              + " LEFT OUTER JOIN AD_User ON (GL_Journal.CreatedBy=AD_User.AD_User_ID)"
-                              + " WHERE GL_Journal.GL_Journal_ID=@JournalID"
-                              + " AND GL_Journal.IsActive='Y'"
-                              + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";
+            string headerSql = @"
+WITH ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "GL_Journal.GL_Journal_ID = @JournalID") + @"
+),
+SchemaCurrency AS (
+    SELECT AcctSchema.AD_Client_ID,
+           AcctSchema.C_AcctSchema_ID,
+           AcctSchema.Name AS AcctSchemaName,
+           Currency.StdPrecision,
+           Currency.ISO_Code AS ISO_Code,
+           CASE
+               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+               ELSE Currency.ISO_Code
+           END AS Cur_Symbol
+    FROM C_AcctSchema AcctSchema
+    INNER JOIN C_Currency Currency
+        ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+    WHERE AcctSchema.IsActive = 'Y'
+    AND AcctSchema.AD_Client_ID = @AD_Client_ID
+)
+SELECT ProtectedJournal.GL_Journal_ID,
+       ProtectedJournal.DocumentNo,
+       ProtectedJournal.DateAcct,
+       ProtectedJournal.Description,
+       ProtectedJournal.DocStatus,
+       ProtectedJournal.Created,
+       AD_Ref_List.Name AS DocStatusName,
+       AD_User.Name AS CreatedByName,
+       ROUND(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS TotalDebit,
+       ROUND(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS TotalCredit,
+       MAX(SchemaCurrency.Cur_Symbol) AS CurSymbol,
+       MAX(SchemaCurrency.ISO_Code) AS ISOCode,
+       COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
+       MAX(SchemaCurrency.AcctSchemaName) AS AccountingBook
+FROM ProtectedJournal ProtectedJournal
+INNER JOIN SchemaCurrency SchemaCurrency
+    ON (SchemaCurrency.AD_Client_ID = ProtectedJournal.AD_Client_ID
+    AND SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
+LEFT OUTER JOIN GL_JournalLine GL_JournalLine
+    ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID
+    AND GL_JournalLine.IsActive = 'Y')
+LEFT OUTER JOIN AD_Ref_List AD_Ref_List
+    ON (AD_Ref_List.AD_Reference_ID = 131
+    AND AD_Ref_List.Value = ProtectedJournal.DocStatus
+    AND AD_Ref_List.IsActive = 'Y')
+LEFT OUTER JOIN AD_User AD_User
+    ON (ProtectedJournal.CreatedBy = AD_User.AD_User_ID)
+GROUP BY ProtectedJournal.GL_Journal_ID,
+         ProtectedJournal.DocumentNo,
+         ProtectedJournal.DateAcct,
+         ProtectedJournal.Description,
+         ProtectedJournal.DocStatus,
+         ProtectedJournal.Created,
+         AD_Ref_List.Name,
+         AD_User.Name";
 
-            headerBase = MRole.GetDefault(ctx).AddAccessSQL(
-                headerBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            string headerSql = headerBase
-                             + " GROUP BY GL_Journal.GL_Journal_ID, GL_Journal.DocumentNo,"
-                             + " GL_Journal.DateAcct, GL_Journal.Description,"
-                             + " GL_Journal.DocStatus, GL_Journal.Created,"
-                             + " AD_Ref_List.Name, AD_User.Name";
-
-            SqlParameter[] headerParams =
+            SqlParameter[] parameters =
             {
-                new SqlParameter("@JournalID", journalId),
-                new SqlParameter("@AcctSchemaID", schema.AcctSchemaId)
-            };
+        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+        new SqlParameter("@JournalID", journalId)
+    };
 
-            DataSet headerDs = DB.ExecuteDataset(headerSql, headerParams, null);
-            if (headerDs == null || headerDs.Tables[0].Rows.Count == 0)
+            DataSet headerDs = DB.ExecuteDataset(headerSql, parameters, null);
+
+            if (headerDs == null || headerDs.Tables.Count == 0 || headerDs.Tables[0].Rows.Count == 0)
             {
-                return Json(JsonConvert.SerializeObject(new { error = true }), JsonRequestBehavior.AllowGet);
+                return Json(JsonConvert.SerializeObject(new
+                {
+                    error = true,
+                    errorText = "Journal details not found"
+                }), JsonRequestBehavior.AllowGet);
             }
 
             DataRow headerRow = headerDs.Tables[0].Rows[0];
-            string docStatus = Util.GetValueOfString(headerRow["DocStatus"]);
-            string statusName = Util.GetValueOfString(headerRow["DocStatusName"]);
-            if (string.IsNullOrEmpty(statusName)) { statusName = docStatus; }
 
-            string dateAcctStr = "";
-            if (headerRow["DateAcct"] != DBNull.Value)
+            int stdPrecision = Util.GetValueOfInt(headerRow["StdPrecision"]);
+
+            if (stdPrecision < 0)
             {
-                dateAcctStr = Convert.ToDateTime(headerRow["DateAcct"]).ToString("dd MMM yyyy");
+                stdPrecision = 2;
             }
 
-            string createdStr = "";
-            if (headerRow["Created"] != DBNull.Value)
-            {
-                createdStr = Convert.ToDateTime(headerRow["Created"]).ToString("dd MMM yyyy");
-            }
+            string linesSql = @"
+WITH ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "GL_Journal.GL_Journal_ID = @JournalID") + @"
+)
+SELECT GL_JournalLine.GL_JournalLine_ID,
+       GL_JournalLine.Line,
+       GL_JournalLine.C_ValidCombination_ID,
+       ValidCombination.Account_ID,
+       AccountValue.Value AS AccountCode,
+       AccountValue.Name AS AccountName,
+       GL_JournalLine.AmtAcctDr,
+       GL_JournalLine.AmtAcctCr,
+       CostCenterValue.Value AS CostCenterCode,
+       CostCenterValue.Name AS CostCenterName,
+       BPartner.Name AS BPartnerName,
+       Product.Name AS ProductName,
+       Project.Name AS ProjectName
+FROM ProtectedJournal ProtectedJournal
+INNER JOIN GL_JournalLine GL_JournalLine
+    ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID)
+LEFT OUTER JOIN C_ValidCombination ValidCombination
+    ON (GL_JournalLine.C_ValidCombination_ID = ValidCombination.C_ValidCombination_ID)
+LEFT OUTER JOIN C_ElementValue AccountValue
+    ON (ValidCombination.Account_ID = AccountValue.C_ElementValue_ID)
+LEFT OUTER JOIN C_ElementValue CostCenterValue
+    ON (ValidCombination.User1_ID = CostCenterValue.C_ElementValue_ID)
+LEFT OUTER JOIN C_BPartner BPartner
+    ON (ValidCombination.C_BPartner_ID = BPartner.C_BPartner_ID)
+LEFT OUTER JOIN M_Product Product
+    ON (ValidCombination.M_Product_ID = Product.M_Product_ID)
+LEFT OUTER JOIN C_Project Project
+    ON (ValidCombination.C_Project_ID = Project.C_Project_ID)
+WHERE GL_JournalLine.IsActive = 'Y'
+ORDER BY GL_JournalLine.Line,
+         GL_JournalLine.GL_JournalLine_ID";
 
-            decimal totalDebit = Decimal.Round(
-                Util.GetValueOfDecimal(headerRow["TotalDebit"]), schema.StdPrecision, MidpointRounding.AwayFromZero);
-            decimal totalCredit = Decimal.Round(
-                Util.GetValueOfDecimal(headerRow["TotalCredit"]), schema.StdPrecision, MidpointRounding.AwayFromZero);
-
-            string linesSql = "SELECT GL_JournalLine.GL_JournalLine_ID,"
-                            + " C_ElementValue.Value AS AccountCode,"
-                            + " C_ElementValue.Name AS AccountName,"
-                            + " GL_JournalLine.AmtAcctDr,"
-                            + " GL_JournalLine.AmtAcctCr"
-                            + " FROM GL_JournalLine"
-                            + " INNER JOIN C_ElementValue ON (GL_JournalLine.Account_ID=C_ElementValue.C_ElementValue_ID)"
-                            + " WHERE GL_JournalLine.GL_Journal_ID=@JournalID"
-                            + " AND GL_JournalLine.IsActive='Y'"
-                            + " ORDER BY GL_JournalLine.Line, GL_JournalLine.GL_JournalLine_ID";
-
-            SqlParameter[] lineParams = { new SqlParameter("@JournalID", journalId) };
-            DataSet lineDs = DB.ExecuteDataset(linesSql, lineParams, null);
+            DataSet lineDs = DB.ExecuteDataset(linesSql, parameters, null);
             List<object> lines = new List<object>();
 
-            if (lineDs != null && lineDs.Tables[0].Rows.Count > 0)
+            if (lineDs != null && lineDs.Tables.Count > 0 && lineDs.Tables[0].Rows.Count > 0)
             {
                 foreach (DataRow row in lineDs.Tables[0].Rows)
                 {
+                    string accountCode = Util.GetValueOfString(row["AccountCode"]);
+                    string accountName = Util.GetValueOfString(row["AccountName"]);
+
+                    if (string.IsNullOrEmpty(accountCode))
+                    {
+                        accountCode = Util.GetValueOfString(row["Account_ID"]);
+                    }
+
+                    if (string.IsNullOrEmpty(accountCode))
+                    {
+                        accountCode = Util.GetValueOfString(row["C_ValidCombination_ID"]);
+                    }
+
+                    if (string.IsNullOrEmpty(accountName))
+                    {
+                        accountName = "-";
+                    }
+
+                    string costCenter = "-";
+                    string costCenterCode = Util.GetValueOfString(row["CostCenterCode"]);
+                    string costCenterName = Util.GetValueOfString(row["CostCenterName"]);
+
+                    if (!string.IsNullOrEmpty(costCenterCode) && !string.IsNullOrEmpty(costCenterName))
+                    {
+                        costCenter = costCenterCode + " · " + costCenterName;
+                    }
+                    else if (!string.IsNullOrEmpty(costCenterCode))
+                    {
+                        costCenter = costCenterCode;
+                    }
+                    else if (!string.IsNullOrEmpty(costCenterName))
+                    {
+                        costCenter = costCenterName;
+                    }
+
+                    string bPartner = Util.GetValueOfString(row["BPartnerName"]);
+                    string product = Util.GetValueOfString(row["ProductName"]);
+                    string project = Util.GetValueOfString(row["ProjectName"]);
+
                     lines.Add(new
                     {
-                        AccountCode = Util.GetValueOfString(row["AccountCode"]),
-                        AccountName = Util.GetValueOfString(row["AccountName"]),
+                        AccountCode = accountCode,
+                        AccountName = accountName,
                         Debit = Decimal.Round(
-                            Util.GetValueOfDecimal(row["AmtAcctDr"]), schema.StdPrecision, MidpointRounding.AwayFromZero),
+                            Util.GetValueOfDecimal(row["AmtAcctDr"]),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        ),
                         Credit = Decimal.Round(
-                            Util.GetValueOfDecimal(row["AmtAcctCr"]), schema.StdPrecision, MidpointRounding.AwayFromZero),
-                        CostCenter = "-",
-                        BPartner = "-",
-                        Product = "-",
-                        Project = "-"
+                            Util.GetValueOfDecimal(row["AmtAcctCr"]),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        ),
+                        CostCenter = string.IsNullOrEmpty(costCenter) ? "-" : costCenter,
+                        BPartner = string.IsNullOrEmpty(bPartner) ? "-" : bPartner,
+                        Product = string.IsNullOrEmpty(product) ? "-" : product,
+                        Project = string.IsNullOrEmpty(project) ? "-" : project
                     });
                 }
             }
+
+            string docStatus = Util.GetValueOfString(headerRow["DocStatus"]);
+            string statusName = Util.GetValueOfString(headerRow["DocStatusName"]);
+
+            if (string.IsNullOrEmpty(statusName))
+            {
+                statusName = docStatus;
+            }
+
+            DateTime? dateAcct = Util.GetValueOfDateTime(headerRow["DateAcct"]);
+            DateTime? created = Util.GetValueOfDateTime(headerRow["Created"]);
 
             return Json(JsonConvert.SerializeObject(new
             {
@@ -330,27 +450,34 @@ namespace VAS.Controllers
                 {
                     GL_Journal_ID = Util.GetValueOfInt(headerRow["GL_Journal_ID"]),
                     DocumentNo = Util.GetValueOfString(headerRow["DocumentNo"]),
-                    DateAcct = dateAcctStr,
+                    DateAcct = dateAcct.HasValue ? dateAcct.Value.ToString("dd MMM yyyy") : "",
                     Description = Util.GetValueOfString(headerRow["Description"]),
                     DocStatus = docStatus,
                     StatusName = statusName,
-                    TotalDebit = totalDebit,
-                    TotalCredit = totalCredit,
-                    AccountingBook = (string.IsNullOrEmpty(schema.AcctSchemaName) ? "Primary" : schema.AcctSchemaName),
+                    TotalDebit = Decimal.Round(
+                        Util.GetValueOfDecimal(headerRow["TotalDebit"]),
+                        stdPrecision,
+                        MidpointRounding.AwayFromZero
+                    ),
+                    TotalCredit = Decimal.Round(
+                        Util.GetValueOfDecimal(headerRow["TotalCredit"]),
+                        stdPrecision,
+                        MidpointRounding.AwayFromZero
+                    ),
+                    AccountingBook = string.IsNullOrEmpty(Util.GetValueOfString(headerRow["AccountingBook"]))
+                        ? "Primary"
+                        : Util.GetValueOfString(headerRow["AccountingBook"]),
                     CreatedByName = Util.GetValueOfString(headerRow["CreatedByName"]),
-                    CreatedDate = createdStr
+                    CreatedDate = created.HasValue ? created.Value.ToString("dd MMM yyyy") : ""
                 },
                 Lines = lines,
-                CurSymbol = schema.CurSymbol,
-                ISOCode = schema.ISOCode,
-                StdPrecision = schema.StdPrecision
+                LineCount = lines.Count,
+                CurSymbol = Util.GetValueOfString(headerRow["CurSymbol"]),
+                ISOCode = Util.GetValueOfString(headerRow["ISOCode"]),
+                StdPrecision = stdPrecision
             }), JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>
-        /// Returns the count of GL Journal documents that are not yet posted
-        /// (DocStatus IN Draft/Complete/Closed AND Posted = 'N').
-        /// </summary>
         public JsonResult GetUnpostedCount()
         {
             if (Session["ctx"] == null)
@@ -358,18 +485,24 @@ namespace VAS.Controllers
                 return Json("", JsonRequestBehavior.AllowGet);
             }
 
-            Ctx ctx          = Session["ctx"] as Ctx;
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            string sql = @"
+WITH ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "GL_Journal.Posted = 'N' AND GL_Journal.DocStatus NOT IN ('VO')") + @"
+)
+SELECT COUNT(ProtectedJournal.GL_Journal_ID) AS UnpostedCount
+FROM ProtectedJournal ProtectedJournal";
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
             int unpostedCount = 0;
 
-            string sql = "SELECT COUNT(GL_Journal_ID) AS UnpostedCount FROM GL_Journal"
-                       + " WHERE Posted = 'N'"
-                       + " AND DocStatus NOT IN ('VO')"
-                       + " AND IsActive = 'Y'";
-
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 unpostedCount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["UnpostedCount"]);
             }
@@ -377,9 +510,6 @@ namespace VAS.Controllers
             return Json(JsonConvert.SerializeObject(new { UnpostedCount = unpostedCount }), JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>
-        /// Returns unposted GL Journal documents for the VAS_036 drill-down popup.
-        /// </summary>
         public JsonResult GetUnpostedEntries()
         {
             if (Session["ctx"] == null)
@@ -388,70 +518,108 @@ namespace VAS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-            SchemaInfo schema = GetPrimarySchema(ctx);
 
-            string sqlBase = "SELECT GL_Journal.GL_Journal_ID,"
-                           + " GL_Journal.DocumentNo,"
-                           + " GL_Journal.DateAcct,"
-                           + " GL_Journal.Description,"
-                           + " GL_Journal.DocStatus,"
-                           + " AD_Ref_List.Name AS DocStatusName,"
-                           + " COALESCE(SUM(GL_JournalLine.AmtAcctDr),0) AS TotalDebit,"
-                           + " COALESCE(SUM(GL_JournalLine.AmtAcctCr),0) AS TotalCredit"
-                           + " FROM GL_Journal"
-                           + " LEFT OUTER JOIN GL_JournalLine ON (GL_Journal.GL_Journal_ID=GL_JournalLine.GL_Journal_ID"
-                           + " AND GL_JournalLine.IsActive='Y')"
-                           + " LEFT OUTER JOIN AD_Ref_List ON (AD_Ref_List.AD_Reference_ID=131"
-                           + " AND AD_Ref_List.Value=GL_Journal.DocStatus"
-                           + " AND AD_Ref_List.IsActive='Y')"
-                           + " WHERE GL_Journal.Posted='N'"
-                           + " AND GL_Journal.DocStatus NOT IN ('VO')"
-                           + " AND GL_Journal.IsActive='Y'"
-                           + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";
+            string sql = @"
+WITH SchemaCurrency AS (
+" + BuildSchemaCurrencySql() + @"
+),
+ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "GL_Journal.Posted = 'N' AND GL_Journal.DocStatus NOT IN ('VO')") + @"
+),
+JournalTotals AS (
+    SELECT ProtectedJournal.GL_Journal_ID,
+           ProtectedJournal.DocumentNo,
+           ProtectedJournal.DateAcct,
+           ProtectedJournal.Description,
+           ProtectedJournal.DocStatus,
+           AD_Ref_List.Name AS DocStatusName,
+           ROUND(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS TotalDebit,
+           ROUND(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS TotalCredit,
+           MAX(SchemaCurrency.Cur_Symbol) AS CurSymbol,
+           MAX(SchemaCurrency.ISO_Code) AS ISOCode,
+           COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision
+    FROM ProtectedJournal ProtectedJournal
+    INNER JOIN SchemaCurrency SchemaCurrency
+        ON (SchemaCurrency.AD_Client_ID = ProtectedJournal.AD_Client_ID
+        AND SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
+    LEFT OUTER JOIN GL_JournalLine GL_JournalLine
+        ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID
+        AND GL_JournalLine.IsActive = 'Y')
+    LEFT OUTER JOIN AD_Ref_List AD_Ref_List
+        ON (AD_Ref_List.AD_Reference_ID = 131
+        AND AD_Ref_List.Value = ProtectedJournal.DocStatus
+        AND AD_Ref_List.IsActive = 'Y')
+    GROUP BY ProtectedJournal.GL_Journal_ID,
+             ProtectedJournal.DocumentNo,
+             ProtectedJournal.DateAcct,
+             ProtectedJournal.Description,
+             ProtectedJournal.DocStatus,
+             AD_Ref_List.Name
+)
+SELECT JournalTotals.GL_Journal_ID,
+       JournalTotals.DocumentNo,
+       JournalTotals.DateAcct,
+       JournalTotals.Description,
+       JournalTotals.DocStatus,
+       JournalTotals.DocStatusName,
+       JournalTotals.TotalDebit,
+       JournalTotals.TotalCredit,
+       JournalTotals.CurSymbol,
+       JournalTotals.ISOCode,
+       JournalTotals.StdPrecision
+FROM JournalTotals JournalTotals
+ORDER BY JournalTotals.DateAcct DESC,
+         JournalTotals.GL_Journal_ID DESC
+FETCH FIRST 100 ROWS ONLY";
 
-            sqlBase = MRole.GetDefault(ctx).AddAccessSQL(
-                sqlBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
 
-            string sql = sqlBase
-                       + " GROUP BY GL_Journal.GL_Journal_ID, GL_Journal.DocumentNo,"
-                       + " GL_Journal.DateAcct, GL_Journal.Description,"
-                       + " GL_Journal.DocStatus, AD_Ref_List.Name"
-                       + " ORDER BY GL_Journal.DateAcct DESC, GL_Journal.GL_Journal_ID DESC"
-                       + " FETCH FIRST 100 ROWS ONLY";
-
-            SqlParameter[] sqlParams = { new SqlParameter("@AcctSchemaID", schema.AcctSchemaId) };
-            DataSet ds = DB.ExecuteDataset(sql, sqlParams, null);
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
             List<object> entries = new List<object>();
             decimal totalDebit = 0m;
             decimal totalCredit = 0m;
+            string curSymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
 
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 foreach (DataRow row in ds.Tables[0].Rows)
                 {
-                    decimal debit = Decimal.Round(
-                        Util.GetValueOfDecimal(row["TotalDebit"]), schema.StdPrecision, MidpointRounding.AwayFromZero);
-                    decimal credit = Decimal.Round(
-                        Util.GetValueOfDecimal(row["TotalCredit"]), schema.StdPrecision, MidpointRounding.AwayFromZero);
+                    stdPrecision = Util.GetValueOfInt(row["StdPrecision"]);
+
+                    if (stdPrecision < 0)
+                    {
+                        stdPrecision = 2;
+                    }
+
+                    decimal debit = Util.GetValueOfDecimal(row["TotalDebit"]);
+                    decimal credit = Util.GetValueOfDecimal(row["TotalCredit"]);
 
                     totalDebit += debit;
                     totalCredit += credit;
 
                     string statusName = Util.GetValueOfString(row["DocStatusName"]);
                     string docStatus = Util.GetValueOfString(row["DocStatus"]);
-                    if (string.IsNullOrEmpty(statusName)) { statusName = docStatus; }
 
-                    string dateAcctStr = "";
-                    if (row["DateAcct"] != DBNull.Value)
+                    if (string.IsNullOrEmpty(statusName))
                     {
-                        dateAcctStr = Convert.ToDateTime(row["DateAcct"]).ToString("dd MMM yyyy");
+                        statusName = docStatus;
                     }
+
+                    DateTime? dateAcct = Util.GetValueOfDateTime(row["DateAcct"]);
+
+                    curSymbol = Util.GetValueOfString(row["CurSymbol"]);
+                    isoCode = Util.GetValueOfString(row["ISOCode"]);
 
                     entries.Add(new
                     {
                         GL_Journal_ID = Util.GetValueOfInt(row["GL_Journal_ID"]),
                         DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
-                        DateAcct = dateAcctStr,
+                        DateAcct = dateAcct.HasValue ? dateAcct.Value.ToString("dd MMM yyyy") : "",
                         Description = Util.GetValueOfString(row["Description"]),
                         DocStatus = docStatus,
                         StatusName = statusName,
@@ -465,18 +633,14 @@ namespace VAS.Controllers
             {
                 Entries = entries,
                 TotalCount = entries.Count,
-                TotalDebit = Decimal.Round(totalDebit, schema.StdPrecision, MidpointRounding.AwayFromZero),
-                TotalCredit = Decimal.Round(totalCredit, schema.StdPrecision, MidpointRounding.AwayFromZero),
-                CurSymbol = schema.CurSymbol,
-                ISOCode = schema.ISOCode,
-                StdPrecision = schema.StdPrecision
+                TotalDebit = Decimal.Round(totalDebit, stdPrecision, MidpointRounding.AwayFromZero),
+                TotalCredit = Decimal.Round(totalCredit, stdPrecision, MidpointRounding.AwayFromZero),
+                CurSymbol = curSymbol,
+                ISOCode = isoCode,
+                StdPrecision = stdPrecision
             }), JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>
-        /// Returns the percentage of posted documents across GL_Journal and GL_JournalBatch.
-        /// PostedCount / TotalCount * 100, rounded to the nearest integer.
-        /// </summary>
         public JsonResult GetPostedPercentage()
         {
             if (Session["ctx"] == null)
@@ -486,35 +650,121 @@ namespace VAS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
-            string sql = "SELECT SUM(CASE WHEN GL_Journal.Posted = 'Y' THEN 1 ELSE 0 END) AS PostedCount,"
-                       + " COUNT(1) AS TotalCount"
-                       + " FROM GL_Journal"
-                       + " WHERE GL_Journal.IsActive = 'Y'";
+            string sql = @"
+WITH ProtectedJournal AS (
+" + BuildProtectedJournalSql(ctx, "1 = 1") + @"
+)
+SELECT SUM(CASE WHEN ProtectedJournal.Posted = 'Y' THEN 1 ELSE 0 END) AS PostedCount,
+       COUNT(1) AS TotalCount
+FROM ProtectedJournal ProtectedJournal";
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
 
+            DataSet ds = DB.ExecuteDataset(sql, parameters, null);
             int postedCount = 0;
-            int totalCount  = 0;
+            int totalCount = 0;
 
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
             {
                 postedCount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["PostedCount"]);
-                totalCount  = Util.GetValueOfInt(ds.Tables[0].Rows[0]["TotalCount"]);
+                totalCount = Util.GetValueOfInt(ds.Tables[0].Rows[0]["TotalCount"]);
             }
 
             int percentage = totalCount > 0
                 ? (int)Math.Round((double)postedCount / totalCount * 100)
                 : 0;
 
-            var result = new
+            return Json(JsonConvert.SerializeObject(new
             {
                 PostedCount = postedCount,
-                TotalCount  = totalCount,
-                Percentage  = percentage
-            };
+                TotalCount = totalCount,
+                Percentage = percentage
+            }), JsonRequestBehavior.AllowGet);
+        }
 
-            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        private string BuildSchemaCurrencySql()
+        {
+            return @"
+SELECT ClientInfo.AD_Client_ID,
+       AcctSchema.C_AcctSchema_ID,
+       AcctSchema.Name AS AcctSchemaName,
+       AcctSchema.C_Currency_ID AS C_Currency_ID,
+       Currency.StdPrecision,
+       Currency.ISO_Code AS ISO_Code,
+       CASE
+           WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+           ELSE Currency.ISO_Code
+       END AS Cur_Symbol
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_AcctSchema AcctSchema
+    ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+INNER JOIN C_Currency Currency
+    ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND AcctSchema.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID";
+        }
+
+        private string BuildPeriodRangeSql()
+        {
+            return @"
+SELECT ClientInfo.AD_Client_ID,
+       CurrentPeriod.StartDate AS MonthDateFrom,
+       CurrentPeriod.EndDate AS MonthDateTo,
+       (SELECT MIN(PeriodYTD.StartDate) FROM C_Period PeriodYTD WHERE PeriodYTD.C_Year_ID = CurrentPeriod.C_Year_ID AND PeriodYTD.IsActive = 'Y') AS YTDDateFrom,
+       CurrentPeriod.EndDate AS YTDDateTo
+FROM AD_ClientInfo ClientInfo
+INNER JOIN C_Year YearData
+    ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+INNER JOIN C_Period CurrentPeriod
+    ON (CurrentPeriod.C_Year_ID = YearData.C_Year_ID)
+WHERE ClientInfo.IsActive = 'Y'
+AND CurrentPeriod.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND CURRENT_DATE >= CurrentPeriod.StartDate
+AND CURRENT_DATE < " + GetDateToExclusiveExpression("CurrentPeriod.EndDate");
+        }
+
+        private string BuildProtectedJournalSql(Ctx ctx, string extraWhere)
+        {
+            string sql = @"
+SELECT GL_Journal.GL_Journal_ID,
+       GL_Journal.AD_Client_ID,
+       GL_Journal.AD_Org_ID,
+       GL_Journal.C_AcctSchema_ID,
+       GL_Journal.DocumentNo,
+       GL_Journal.DateAcct,
+       GL_Journal.Description,
+       GL_Journal.DocStatus,
+       GL_Journal.Posted,
+       GL_Journal.Created,
+       GL_Journal.CreatedBy
+FROM GL_Journal GL_Journal
+WHERE GL_Journal.IsActive = 'Y'
+AND GL_Journal.AD_Client_ID = @AD_Client_ID
+AND " + extraWhere;
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql,
+                "GL_Journal",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            return sql;
+        }
+
+        private string GetDateToExclusiveExpression(string dateColumn)
+        {
+            if (DB.IsOracle())
+            {
+                return dateColumn + " + 1";
+            }
+
+            return dateColumn + " + INTERVAL '1 day'";
         }
     }
 }

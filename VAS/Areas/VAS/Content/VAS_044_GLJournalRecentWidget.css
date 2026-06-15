@@ -447,7 +447,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 .VAS-gljr-detail-card {
     position: relative;
     width: min(62em, 100%);
-    height: min(43em, 100%);
+    height: min(34em,100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
