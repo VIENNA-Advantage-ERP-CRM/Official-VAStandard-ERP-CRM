@@ -91,11 +91,9 @@
                 lbl('VAS_028_MessagePaidThisMonth', 'Paid this month')
             );
 
-            var $subtitle = $('<div class="vas-ptm-subtitle">').text(
-                lbl('VAS_028_MessageCashPaid', 'Cash paid')
-            );
+        
 
-            $headerText.append($title).append($subtitle);
+            $headerText.append($title);
             $header.append($icon).append($headerText);
 
             $body = $('<div class="vas-ptm-body">');
