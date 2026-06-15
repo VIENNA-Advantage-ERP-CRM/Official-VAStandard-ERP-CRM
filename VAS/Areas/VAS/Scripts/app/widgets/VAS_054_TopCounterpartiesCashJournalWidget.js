@@ -1,24 +1,6 @@
 /**
  * Top Counterparties - Cash Journal
  * Purpose - Shows top net counterparties from cash journal lines.
- *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Top Counterparties                   | VAS_054_TopCounterparties
- *  2  | Last 30 Days                         | VAS_054_Last30Days
- *  3  | All parties ->                       | VAS_054_AllParties
- *  4  | No counterparties found              | VAS_054_NoData
- *  5  | Unable to load top counterparties    | VAS_054_LoadError
- *  6  | Unknown                              | VAS_054_Unknown
- *  7  | Bank                                 | VAS_054_Bank
- *  8  | Cashbook                             | VAS_054_Cashbook
- *  9  | Customer                             | VAS_054_Customer
- * 10  | Vendor                               | VAS_054_Vendor
- * 11  | Other                                | VAS_054_Other
- * 12  | Loading                              | VAS_054_Loading
- * 13  | Session Expired                      | VAS_054_SessionExpired
- * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
@@ -26,9 +8,25 @@
 ; (function (VAS, $) {
     VAS.VAS_054_TopCounterpartiesCashJournalWidget = function () {
         var $self = this;
+
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
+
         var $root = null;
         var isDisposed = false;
         var ajaxRequest = null;
+
+        var $footer = null;
+        var $pageInfo = null;
+        var $prevBtn = null;
+        var $nextBtn = null;
+        var $pageText = null;
+
+        var pageNo = 1;
+        var pageSize = 5;
+        var totalPages = 0;
+        var totalRecords = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -38,6 +36,40 @@
         function safeNumber(value) {
             var numberValue = Number(value || 0);
             return isNaN(numberValue) ? 0 : numberValue;
+        }
+
+        function parseResponse(response) {
+            var data = response;
+
+            if (data && data.d) {
+                data = data.d;
+            }
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e1) {
+                    return {
+                        success: false,
+                        error: data
+                    };
+                }
+            }
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e2) {
+                    return {
+                        success: false,
+                        error: data
+                    };
+                }
+            }
+
+            return data;
         }
 
         function formatAmount(item) {
@@ -50,10 +82,12 @@
             }
 
             var numericValue = safeNumber(item && item.displayAmount);
+
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
+
             var sign = numericValue < 0 ? '-' : '';
 
             if (symbol) {
@@ -64,12 +98,35 @@
         }
 
         function showBusy(show) {
-            var $busy = $root.find('#VAS_054_counterparties-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $busy.addClass('is-visible'); } else { $busy.removeClass('is-visible'); }
+            if (!$root) {
+                return;
+            }
+
+            var widgetId = $self.AD_UserHomeWidgetID;
+            var $busy = $root.find('#VAS_054_counterparties-busy-' + widgetId);
+
+            if (show) {
+                $busy.addClass('is-visible');
+            }
+            else {
+                $busy.removeClass('is-visible');
+            }
         }
 
         function buildLayout() {
             var widgetId = $self.AD_UserHomeWidgetID;
+
+            var chevL =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>';
+
+            var chevR =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>';
 
             $root = $('<div>', {
                 'class': 'VAS_054_counterparties-root',
@@ -97,7 +154,8 @@
 
             var $icon = $(
                 '<span class="VAS_054_counterparties-icon">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                 '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>' +
                 '<circle cx="9" cy="7" r="4"></circle>' +
                 '<path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>' +
@@ -118,13 +176,6 @@
                 'text': lbl('VAS_054_Last30Days', 'Last 30 Days')
             });
 
-            //var $action = $('<button>', {
-            //    'class': 'VAS_054_counterparties-action',
-            //    'type': 'button',
-            //    'id': 'VAS_054_counterparties-action-' + widgetId,
-            //    'text': lbl('VAS_054_AllParties', 'All parties ->')
-            //});
-
             var $list = $('<div>', {
                 'class': 'VAS_054_counterparties-list',
                 'id': 'VAS_054_counterparties-list-' + widgetId
@@ -135,9 +186,68 @@
                 'id': 'VAS_054_counterparties-state-' + widgetId
             });
 
+            $footer = $('<div>', {
+                'class': 'VAS_054_counterparties-footer',
+                'style': 'display:none;'
+            });
+
+            $pageInfo = $('<span>', {
+                'class': 'VAS_054_counterparties-footer-info'
+            });
+
+            var $pager = $('<div>', {
+                'class': 'VAS_054_counterparties-pager'
+            });
+
+            $prevBtn = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_054_counterparties-page-btn VAS_054_counterparties-prev',
+                'aria-label': lbl('VAS_Previous', 'Previous'),
+                'html': chevL
+            });
+
+            $pageText = $('<span>', {
+                'class': 'VAS_054_counterparties-page-text'
+            });
+
+            $nextBtn = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_054_counterparties-page-btn VAS_054_counterparties-next',
+                'aria-label': lbl('VAS_Next', 'Next'),
+                'html': chevR
+            });
+
+            $prevBtn.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                loadData();
+            });
+
+            $nextBtn.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                loadData();
+            });
+
+            $pager.append($prevBtn).append($pageText).append($nextBtn);
+            $footer.append($pageInfo).append($pager);
+
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow);
-            $card.append($busy).append($header).append($list).append($state);
+
+            $card
+                .append($busy)
+                .append($header)
+                .append($list)
+                .append($footer)
+                .append($state);
+
             $root.append($card);
         }
 
@@ -147,8 +257,69 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            $root.find('#VAS_054_counterparties-state-' + widgetId).text(message || '').addClass('is-visible');
+
+            totalRecords = 0;
+            totalPages = 0;
+
+            $root.find('#VAS_054_counterparties-state-' + widgetId)
+                .text(message || '')
+                .addClass('is-visible');
+
             $root.find('#VAS_054_counterparties-list-' + widgetId).empty();
+
+            updatePager();
+        }
+
+        function clearState() {
+            if (!$root) {
+                return;
+            }
+
+            var widgetId = $self.AD_UserHomeWidgetID;
+
+            $root.find('#VAS_054_counterparties-state-' + widgetId)
+                .removeClass('is-visible')
+                .text('');
+        }
+
+        function updatePager() {
+            if ($pageText) {
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+            }
+
+            if ($pageInfo) {
+                if (totalRecords > 0) {
+                    var from = (pageNo - 1) * pageSize + 1;
+                    var to = Math.min(pageNo * pageSize, totalRecords);
+
+                    $pageInfo.text(
+                        lbl('VAS_Showing', 'Showing') +
+                        ' ' +
+                        from +
+                        '–' +
+                        to +
+                        ' ' +
+                        lbl('VAS_Of', 'of') +
+                        ' ' +
+                        totalRecords
+                    );
+                }
+                else {
+                    $pageInfo.text('');
+                }
+            }
+
+            if ($prevBtn) {
+                $prevBtn.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($nextBtn) {
+                $nextBtn.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
+
+            if ($footer) {
+                $footer.css('display', totalPages > 1 ? 'flex' : 'none');
+            }
         }
 
         function buildSparkline(trend) {
@@ -158,7 +329,8 @@
                     ? '2,10 12,10 22,10 32,10 42,10 52,10 62,10'
                     : '2,14 12,11 22,13 32,8 42,10 52,6 62,4';
 
-            return '<svg class="VAS_054_counterparties-sparkline VAS_054_counterparties-sparkline-' + (trend || 'flat') + '" viewBox="0 0 64 20" preserveAspectRatio="none" aria-hidden="true">' +
+            return '<svg class="VAS_054_counterparties-sparkline VAS_054_counterparties-sparkline-' + (trend || 'flat') + '" ' +
+                'viewBox="0 0 64 20" preserveAspectRatio="none" aria-hidden="true">' +
                 '<polyline points="' + points + '"></polyline>' +
                 '</svg>';
         }
@@ -172,10 +344,18 @@
             var items = data.items || [];
             var $list = $root.find('#VAS_054_counterparties-list-' + widgetId);
 
-            $root.find('#VAS_054_counterparties-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_054_counterparties-title-' + widgetId).text(data.title || lbl('VAS_054_TopCounterparties', 'Top Counterparties'));
-            $root.find('#VAS_054_counterparties-meta-' + widgetId).text(data.metaText || lbl('VAS_054_Last30Days', 'Last 30 Days'));
-            $root.find('#VAS_054_counterparties-action-' + widgetId).text(data.actionText || lbl('VAS_054_AllParties', 'All parties ->'));
+            pageNo = safeNumber(data.pageNo) > 0 ? safeNumber(data.pageNo) : pageNo;
+            pageSize = safeNumber(data.pageSize) > 0 ? safeNumber(data.pageSize) : pageSize;
+            totalRecords = safeNumber(data.totalRecords || data.totalCounterparties);
+            totalPages = pageSize > 0 ? Math.ceil(totalRecords / pageSize) : 0;
+
+            clearState();
+
+            $root.find('#VAS_054_counterparties-title-' + widgetId)
+                .text(data.title || lbl('VAS_054_TopCounterparties', 'Top Counterparties'));
+
+            $root.find('#VAS_054_counterparties-meta-' + widgetId)
+                .text(data.metaText || lbl('VAS_054_Last30Days', 'Last 30 Days'));
 
             $list.empty();
 
@@ -219,9 +399,18 @@
                     'text': formatAmount(item)
                 });
 
-                $row.append($avatar).append($name).append($chip).append($count).append($spark).append($amount);
+                $row
+                    .append($avatar)
+                    .append($name)
+                    .append($chip)
+                    .append($count)
+                    .append($spark)
+                    .append($amount);
+
                 $list.append($row);
             });
+
+            updatePager();
         }
 
         function loadData() {
@@ -238,29 +427,49 @@
             ajaxRequest = $.ajax({
                 url: VIS.Application.contextUrl + 'VAS/VAS_054_TopCounterpartiesCashJournal/GetTopCounterparties',
                 type: 'GET',
-                dataType: 'json',
                 cache: false,
+                data: {
+                    pageNo: pageNo,
+                    pageSize: pageSize
+                },
                 success: function (response) {
                     if (isDisposed) {
                         return;
                     }
 
-                    if (!response) {
-                        setState(lbl('VAS_054_LoadError', 'Unable to load top counterparties'));
+                    var data = parseResponse(response);
+
+                    if (!data) {
+                        setState('Empty response');
                         return;
                     }
 
-                    if (response.success === false || response.error) {
-                        setState(response.error || lbl('VAS_054_LoadError', 'Unable to load top counterparties'));
+                    if (data.success === false || data.error) {
+                        setState(data.error || lbl('VAS_054_LoadError', 'Unable to load top counterparties'));
                         return;
                     }
 
-                    renderData(response);
+                    renderData(data);
                 },
-                error: function () {
-                    if (!isDisposed) {
-                        setState(lbl('VAS_054_LoadError', 'Unable to load top counterparties'));
+                error: function (xhr, status, errorThrown) {
+                    if (isDisposed) {
+                        return;
                     }
+
+                    var msg = '';
+
+                    if (xhr && xhr.responseText) {
+                        msg = xhr.responseText;
+                    }
+                    else if (errorThrown) {
+                        msg = errorThrown;
+                    }
+                    else {
+                        msg = status || lbl('VAS_054_LoadError', 'Unable to load top counterparties');
+                    }
+
+                    console.log('VAS_054 AJAX error:', status, errorThrown, xhr);
+                    setState(msg);
                 },
                 complete: function () {
                     if (!isDisposed && $root) {
@@ -276,6 +485,7 @@
         };
 
         this.refreshWidget = function () {
+            pageNo = 1;
             loadData();
         };
 
@@ -293,7 +503,6 @@
 
             ajaxRequest = null;
             $root = null;
-            $self = null;
         };
 
         this.getRoot = function () {
@@ -332,4 +541,7 @@
 
         this.frame = null;
     };
+
+    VAS.VAS_054_TopCounterpartiesCashJournal = VAS.VAS_054_TopCounterpartiesCashJournalWidget;
+
 })(VAS, jQuery);

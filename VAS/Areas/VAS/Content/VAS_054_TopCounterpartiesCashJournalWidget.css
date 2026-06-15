@@ -71,10 +71,10 @@
     color: #4F83D8;
 }
 
-.VAS_054_counterparties-icon svg {
-    width: 1em;
-    height: 1em;
-}
+    .VAS_054_counterparties-icon svg {
+        width: 1em;
+        height: 1em;
+    }
 
 .VAS_054_counterparties-title {
     min-width: 0;
@@ -132,9 +132,9 @@
     border-top: 1px solid rgba(212, 225, 234, 0.66);
 }
 
-.VAS_054_counterparties-row:first-child {
-    border-top: 0;
-}
+    .VAS_054_counterparties-row:first-child {
+        border-top: 0;
+    }
 
 .VAS_054_counterparties-avatar {
     width: 1.75em;
@@ -233,12 +233,12 @@
     overflow: visible;
 }
 
-.VAS_054_counterparties-sparkline polyline {
-    fill: none;
-    stroke-width: 2.5;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
+    .VAS_054_counterparties-sparkline polyline {
+        fill: none;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
 
 .VAS_054_counterparties-sparkline-up polyline {
     stroke: #519B67;
@@ -283,9 +283,9 @@
     border-radius: 14px;
 }
 
-.VAS_054_counterparties-busy.is-visible {
-    display: flex;
-}
+    .VAS_054_counterparties-busy.is-visible {
+        display: flex;
+    }
 
 .VAS_054_counterparties-state {
     position: absolute;
@@ -303,8 +303,76 @@
     border-radius: 14px;
 }
 
-.VAS_054_counterparties-state.is-visible {
+    .VAS_054_counterparties-state.is-visible {
+        display: flex;
+    }
+
+/* Pagination Footer */
+.VAS_054_counterparties-footer {
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-top: 0.5em;
+    padding-top: 0.6em;
+    border-top: 1px solid rgba(212, 225, 234, 0.66);
+}
+
+.VAS_054_counterparties-footer-info {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72em;
+    line-height: 1.2;
+    color: #748494;
+}
+
+.VAS_054_counterparties-pager {
     display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.VAS_054_counterparties-page-btn {
+    width: 2em;
+    height: 2em;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+    .VAS_054_counterparties-page-btn svg {
+        width: 0.85em;
+        height: 0.85em;
+        stroke: currentColor;
+    }
+
+    .VAS_054_counterparties-page-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .VAS_054_counterparties-page-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.VAS_054_counterparties-page-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.78em;
+    line-height: 1.2;
+    color: #102C3F;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
 }
 
 @container (max-width: 38em) {
@@ -338,5 +406,20 @@
         width: 1.75em;
         height: 1.75em;
         border-radius: 0.375em;
+    }
+
+    .VAS_054_counterparties-footer {
+        gap: 0.5em;
+        margin-top: 0.375em;
+        padding-top: 0.5em;
+    }
+
+    .VAS_054_counterparties-footer-info {
+        font-size: 0.68em;
+    }
+
+    .VAS_054_counterparties-page-btn {
+        width: 1.85em;
+        height: 1.85em;
     }
 }

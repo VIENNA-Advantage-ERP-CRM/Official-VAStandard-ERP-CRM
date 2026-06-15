@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -21,32 +22,46 @@ namespace VAS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetTopCounterparties()
+        public JsonResult GetTopCounterparties(int pageNo = 1, int pageSize = 5)
         {
             Ctx ctx = Session["ctx"] as Ctx;
 
             if (ctx == null)
             {
-                return Json(new
+                var sessionResult = new
                 {
                     success = false,
                     error = "Session Expired",
                     hasData = false
-                }, JsonRequestBehavior.AllowGet);
+                };
+
+                return Json(JsonConvert.SerializeObject(sessionResult), JsonRequestBehavior.AllowGet);
             }
 
+            if (pageNo <= 0)
+            {
+                pageNo = 1;
+            }
+
+            if (pageSize <= 0)
+            {
+                pageSize = 5;
+            }
+
+            int offset = (pageNo - 1) * pageSize;
             IDataReader reader = null;
 
             try
             {
-                SqlQueryData queryData = BuildTopCounterpartiesSql(ctx);
-
+                SqlQueryData queryData = BuildTopCounterpartiesSql(ctx, offset, pageSize);
                 reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 List<object> items = new List<object>();
+
                 int totalCounterparties = 0;
                 int stdPrecision = 2;
                 int currencyId = 0;
+
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
                 string dateFrom = string.Empty;
@@ -54,7 +69,7 @@ namespace VAS.Controllers
 
                 while (reader != null && reader.Read())
                 {
-                    totalCounterparties++;
+                    totalCounterparties = GetInt(reader, "TotalRecords", totalCounterparties);
 
                     if (string.IsNullOrEmpty(dateFrom))
                     {
@@ -66,14 +81,10 @@ namespace VAS.Controllers
                         dateTo = FormatDbDate(reader["DateTo"]);
                     }
 
-                    if (items.Count >= 5)
-                    {
-                        continue;
-                    }
-
                     decimal netAmount = GetDecimal(reader, "NetAmount");
                     decimal inAmount = GetDecimal(reader, "InAmount");
                     decimal outAmount = GetDecimal(reader, "OutAmount");
+
                     string counterpartyType = GetString(reader, "CounterpartyType");
                     string counterpartyName = GetString(reader, "CounterpartyName");
 
@@ -86,7 +97,9 @@ namespace VAS.Controllers
                     {
                         counterpartyType = counterpartyType,
                         counterpartyId = GetInt(reader, "Counterparty_ID"),
-                        name = string.IsNullOrWhiteSpace(counterpartyName) ? GetMsg(ctx, "VAS_054_Unknown", "Unknown") : counterpartyName,
+                        name = string.IsNullOrWhiteSpace(counterpartyName)
+                            ? GetMsg(ctx, "VAS_054_Unknown", "Unknown")
+                            : counterpartyName,
                         initials = GetInitials(counterpartyName),
                         typeText = GetTypeText(ctx, counterpartyType, netAmount),
                         typeClass = GetTypeClass(counterpartyType, netAmount),
@@ -102,33 +115,46 @@ namespace VAS.Controllers
                     });
                 }
 
-                return Json(new
+                var result = new
                 {
                     success = true,
                     error = string.Empty,
+
                     title = GetMsg(ctx, "VAS_054_TopCounterparties", "Top Counterparties"),
                     metaText = GetMsg(ctx, "VAS_054_Last30Days", "Last 30 Days"),
                     actionText = GetMsg(ctx, "VAS_054_AllParties", "All parties ->"),
                     noDataText = GetMsg(ctx, "VAS_054_NoData", "No counterparties found"),
+
                     dateFrom = dateFrom,
                     dateTo = dateTo,
+
                     totalCounterparties = totalCounterparties,
+                    totalRecords = totalCounterparties,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalCounterparties / pageSize)),
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+
                     cCurrencyId = currencyId,
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
                     stdPrecision = stdPrecision,
+
                     items = items,
                     hasData = totalCounterparties > 0
-                }, JsonRequestBehavior.AllowGet);
+                };
+
+                return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return Json(new
+                var errorResult = new
                 {
                     success = false,
-                    error = GetMsg(ctx, "VAS_054_LoadError", "Unable to load top counterparties"),
+                    error = ex.Message,
                     hasData = false
-                }, JsonRequestBehavior.AllowGet);
+                };
+
+                return Json(JsonConvert.SerializeObject(errorResult), JsonRequestBehavior.AllowGet);
             }
             finally
             {
@@ -140,7 +166,7 @@ namespace VAS.Controllers
             }
         }
 
-        private SqlQueryData BuildTopCounterpartiesSql(Ctx ctx)
+        private SqlQueryData BuildTopCounterpartiesSql(Ctx ctx, int offset, int pageSize)
         {
             string todayDateSql = GetTodayDateSql();
 
@@ -153,7 +179,7 @@ CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS DateToExclusive,
 " + todayDateSql + @" AS DateTo
 FROM AD_ClientInfo ClientInfo
 WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND ClientInfo.AD_Client_ID = @AD_Client_ID_DateRange
 )";
 
             string schemaCurrencySql = @"
@@ -169,7 +195,7 @@ FROM AD_ClientInfo ClientInfo
 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
 INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
 WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+AND ClientInfo.AD_Client_ID = @AD_Client_ID_SchemaCurrency
 )";
 
             string cashLineAccessSql = @"
@@ -187,10 +213,6 @@ WHERE CashLine.IsActive = 'Y'";
             /*
              * MRole Handling:
              * Apply MRole only on the main physical table C_CashLine CashLine.
-             * Do not apply MRole on the final WITH query.
-             * Do not apply MRole on CTE aliases.
-             * Do not apply MRole on joined aliases.
-             * Do not apply MRole on a query that already contains INNER JOIN.
              */
             cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 cashLineAccessSql,
@@ -250,6 +272,11 @@ MAX(CounterpartyLines.CurrencyISO) AS CurrencyISO,
 MAX(CounterpartyLines.CurrencySymbol) AS CurrencySymbol
 FROM CounterpartyLines CounterpartyLines
 GROUP BY CounterpartyLines.CounterpartyType, CounterpartyLines.Counterparty_ID
+),
+CountData AS
+(
+SELECT COUNT(1) AS TotalRecords
+FROM CounterpartyTotals CounterpartyTotals
 )";
 
             string sql = @"
@@ -271,14 +298,20 @@ CounterpartyTotals.C_Currency_ID,
 CounterpartyTotals.CurrencyISO,
 CounterpartyTotals.CurrencySymbol,
 DateRange.DateFrom AS DateFrom,
-DateRange.DateTo AS DateTo
+DateRange.DateTo AS DateTo,
+CountData.TotalRecords
 FROM CounterpartyTotals CounterpartyTotals
 INNER JOIN DateRange DateRange ON (1 = 1)
-ORDER BY ABS(CounterpartyTotals.NetAmount) DESC, CounterpartyTotals.EntryCount DESC";
+CROSS JOIN CountData CountData
+ORDER BY ABS(CounterpartyTotals.NetAmount) DESC, CounterpartyTotals.EntryCount DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                new SqlParameter("@AD_Client_ID_DateRange", ctx.GetAD_Client_ID()),
+                new SqlParameter("@AD_Client_ID_SchemaCurrency", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Offset", offset),
+                new SqlParameter("@PageSize", pageSize)
             };
 
             return new SqlQueryData
@@ -391,45 +424,19 @@ ORDER BY ABS(CounterpartyTotals.NetAmount) DESC, CounterpartyTotals.EntryCount D
                 return parts[0].Substring(0, Math.Min(2, parts[0].Length)).ToUpperInvariant();
             }
 
-            return (parts[0].Substring(0, 1) + parts[parts.Length - 1].Substring(0, 1)).ToUpperInvariant();
+            return (parts[0].Substring(0, 1) + parts[1].Substring(0, 1)).ToUpperInvariant();
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
-            string msg = Msg.GetMsg(ctx, key);
+            string message = Msg.GetMsg(ctx, key);
 
-            if (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]")
+            if (string.IsNullOrEmpty(message) || message == key || message == "[" + key + "]")
             {
                 return fallback;
             }
 
-            return msg;
-        }
-
-        private decimal GetDecimal(IDataReader reader, string columnName)
-        {
-            object value = reader[columnName];
-
-            if (value == null || value == DBNull.Value)
-            {
-                return 0;
-            }
-
-            decimal result;
-            return decimal.TryParse(value.ToString(), out result) ? result : 0;
-        }
-
-        private int GetInt(IDataReader reader, string columnName, int fallback = 0)
-        {
-            object value = reader[columnName];
-
-            if (value == null || value == DBNull.Value)
-            {
-                return fallback;
-            }
-
-            int result;
-            return int.TryParse(value.ToString(), out result) ? result : fallback;
+            return message;
         }
 
         private string GetString(IDataReader reader, string columnName)
@@ -442,6 +449,30 @@ ORDER BY ABS(CounterpartyTotals.NetAmount) DESC, CounterpartyTotals.EntryCount D
             }
 
             return value.ToString();
+        }
+
+        private int GetInt(IDataReader reader, string columnName, int defaultValue = 0)
+        {
+            object value = reader[columnName];
+
+            if (value == null || value == DBNull.Value)
+            {
+                return defaultValue;
+            }
+
+            return Util.GetValueOfInt(value);
+        }
+
+        private decimal GetDecimal(IDataReader reader, string columnName)
+        {
+            object value = reader[columnName];
+
+            if (value == null || value == DBNull.Value)
+            {
+                return 0;
+            }
+
+            return Util.GetValueOfDecimal(value);
         }
 
         private class SqlQueryData
