@@ -332,64 +332,43 @@ html[dir="rtl"] .VAS-gljtm-row-head {
 .VAS-gljtm-pager {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75em;
+    justify-content: center;
+    gap: 0.35em;
+    flex-shrink: 0;
     margin-top: 0.75em;
     padding-top: 0.625em;
     border-top: 1px solid #EDF2F6;
 }
 
-.VAS-gljtm-page-helper {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.6875em;
-    color: #748494;
-}
-
-.VAS-gljtm-page-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    flex-shrink: 0;
-}
-
 .VAS-gljtm-page-btn {
-    width: 1.5em;
-    height: 1.5em;
+    width: 1.75em;
+    height: 1.75em;
     padding: 0;
-    border: 1px solid #E4EDF4;
-    border-radius: 0.375em;
-    background: #FBFDFF;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(0, 131, 218, 0.08);
     color: #0083DA;
+    font-size: 1em;
+    font-weight: 700;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
-.VAS-gljtm-page-btn svg {
-    width: 0.875em;
-    height: 0.875em;
-    stroke: currentColor;
-}
-
 .VAS-gljtm-page-btn:hover:not(:disabled) {
-    background: #EAF8FF;
-    border-color: #BFE4FF;
+    background: rgba(0, 131, 218, 0.14);
 }
 
 .VAS-gljtm-page-btn:disabled {
-    color: #B8C6D2;
+    opacity: 0.35;
     cursor: default;
 }
 
 .VAS-gljtm-page-text {
-    min-width: 2.75em;
+    min-width: 2.5em;
     text-align: center;
-    font-size: 0.75em;
-    font-weight: 400;
-    color: #102C3F;
+    font-size: 0.72em;
+    color: #748494;
     white-space: nowrap;
 }

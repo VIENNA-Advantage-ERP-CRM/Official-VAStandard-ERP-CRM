@@ -54,15 +54,8 @@ namespace VAS.Controllers
             {
                 bool isYtd = string.Compare(period, "ytd", StringComparison.OrdinalIgnoreCase) == 0;
 
-                if (pageNo <= 0)
-                {
-                    pageNo = 1;
-                }
-
                 int pageSize = 5;
                 int topLimit = 10;
-                int startRow = ((pageNo - 1) * pageSize) + 1;
-                int endRow = pageNo * pageSize;
 
                 string periodStartExpression = isYtd
                     ? "CurrentPeriod.YearStart"
@@ -236,14 +229,11 @@ SELECT TopMovement.AccountCode,
        10 AS TopLimit,
        5 AS PageSize
 FROM TopMovement TopMovement
-WHERE TopMovement.RowNo BETWEEN @StartRow AND @EndRow
 ORDER BY TopMovement.RowNo";
 
                 SqlParameter[] parameters =
                 {
-                    new SqlParameter("@ClientID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@StartRow", startRow),
-                    new SqlParameter("@EndRow", endRow)
+                    new SqlParameter("@ClientID", ctx.GetAD_Client_ID())
                 };
 
                 dr = DB.ExecuteReader(sql, parameters, null);

@@ -45,7 +45,11 @@
         var $self        = this;
         var $root        = $('<div class="VAS-gljtm-root">');
         var activePeriod = 'month';
+        var currentData  = null;
         var pageNo       = 1;
+        var pageSize     = 5;
+        var totalPages   = 0;
+        var refreshTimer = null;
         var baseUrl      = VIS.Application.contextUrl;
 
         this.Initalize = function () {
@@ -53,7 +57,7 @@
             createBusyIndicator();
             showBusy(true);
             loadData();
-            setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
+            refreshTimer = setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {
@@ -105,6 +109,46 @@
                 showBusy(true);
                 loadData();
             });
+
+            $root.on('click', '.VAS-gljtm-page-prev', function () {
+                if (pageNo <= 1) { return; }
+                pageNo -= 1;
+                renderBars(currentData || {});
+            });
+
+            $root.on('click', '.VAS-gljtm-page-next', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) { return; }
+                pageNo += 1;
+                renderBars(currentData || {});
+            });
+        }
+
+        function normalizeResponse(result) {
+            if (!result) {
+                return null;
+            }
+
+            if (result.d) {
+                result = result.d;
+            }
+
+            if (typeof result === 'string') {
+                try {
+                    result = JSON.parse(result);
+                } catch (e1) {
+                    return null;
+                }
+            }
+
+            if (typeof result === 'string') {
+                try {
+                    result = JSON.parse(result);
+                } catch (e2) {
+                    return null;
+                }
+            }
+
+            return result;
         }
 
         function loadData() {
@@ -113,18 +157,18 @@
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
-                data     : { period: activePeriod, pageNo: pageNo },
+                data     : { period: activePeriod },
                 success  : function (result) {
-                    try {
-                        var data = JSON.parse(result);
-                        if (data && data.Accounts) {
-                            renderBars(data);
-                        } else {
-                            showError();
-                        }
-                    } catch (e) {
+                    var data = normalizeResponse(result);
+
+                    if (data && data.Accounts) {
+                        currentData = data;
+                        pageNo = 1;
+                        renderBars(data);
+                    } else {
                         showError();
                     }
+
                     showBusy(false);
                 },
                 error: function () {
@@ -140,15 +184,34 @@
             var sym      = esc(data.currencySymbol || data.CurSymbol || data.currencyISO || data.ISOCode || '');
             var prec     = data.stdPrecision || data.StdPrecision;
             var $body    = $root.find('#VAS-gljtm-body-' + id);
+            var serverPageSize = parseInt(data.PageSize || data.pageSize || pageSize, 10);
+
+            if (!isNaN(serverPageSize) && serverPageSize > 0) {
+                pageSize = serverPageSize;
+            }
 
             if (accounts.length === 0) {
                 $body.html('<div class="VAS-gljtm-empty">' + lbl('VIS_NoData', 'No data available.') + '</div>');
+                totalPages = 0;
+                updatePager();
                 return;
             }
 
+            totalPages = Math.ceil(accounts.length / pageSize);
+
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
+            }
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            var start = (pageNo - 1) * pageSize;
+            var pageAccounts = accounts.slice(start, start + pageSize);
             var html = '<div class="VAS-gljtm-list">';
-            for (var i = 0; i < accounts.length; i++) {
-                var a       = accounts[i];
+            for (var i = 0; i < pageAccounts.length; i++) {
+                var a       = pageAccounts[i];
                 var fillCls = 'VAS-gljtm-fill' + (a.IsCredit ? ' VAS-gljtm-fill-cr' : '');
                 var valStr  = sym + fmtAmt(a.NetMovement, prec);
                 var rowInfo = esc((a.AccountCode || '') + ' ' + (a.AccountName || '')
@@ -170,45 +233,32 @@
                     +   '</div>';
             }
             html += '</div>';
-            html += renderPager(data);
+            html += renderPager();
             $body.html(html);
-            $body.find('.VAS-gljtm-page-prev').on('click', function () {
-                if (pageNo <= 1) { return; }
-                pageNo -= 1;
-                showBusy(true);
-                loadData();
-            });
-            $body.find('.VAS-gljtm-page-next').on('click', function () {
-                var totalPages = parseInt(data.TotalPages || data.totalPages || 0, 10);
-                if (!totalPages || pageNo >= totalPages) { return; }
-                pageNo += 1;
-                showBusy(true);
-                loadData();
-            });
+            updatePager();
         }
 
-        function renderPager(data) {
-            var totalPages = parseInt(data.TotalPages || data.totalPages || 0, 10);
-            var totalCount = parseInt(data.TotalCount || data.totalCount || 0, 10);
-            if (totalPages <= 1 && totalCount <= 5) { return ''; }
-
-            var pageText = pageNo + ' / ' + (totalPages || 1);
-            var helper = Math.min(totalCount, 10) + ' ' + lbl('VAS_043_TopRecords', 'top records');
-
+        function renderPager() {
             return '<div class="VAS-gljtm-pager">'
-                + '<span class="VAS-gljtm-page-helper">' + esc(helper) + '</span>'
-                + '<div class="VAS-gljtm-page-actions">'
-                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-prev"'
-                + (pageNo <= 1 ? ' disabled' : '') + ' aria-label="' + esc(lbl('VAS_Previous', 'Previous')) + '">'
-                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>'
-                + '</button>'
-                + '<span class="VAS-gljtm-page-text">' + esc(pageText) + '</span>'
-                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-next"'
-                + (totalPages && pageNo >= totalPages ? ' disabled' : '') + ' aria-label="' + esc(lbl('VAS_Next', 'Next')) + '">'
-                + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>'
-                + '</button>'
-                + '</div>'
+                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-prev" aria-label="' + esc(lbl('VIS_Previous', 'Previous')) + '">&#8249;</button>'
+                + '<span class="VAS-gljtm-page-text"></span>'
+                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-next" aria-label="' + esc(lbl('VIS_Next', 'Next')) + '">&#8250;</button>'
                 + '</div>';
+        }
+
+        function updatePager() {
+            var $pageText = $root.find('.VAS-gljtm-page-text');
+            var $prevBtn = $root.find('.VAS-gljtm-page-prev');
+            var $nextBtn = $root.find('.VAS-gljtm-page-next');
+
+            if (totalPages > 1) {
+                $pageText.text(pageNo + ' / ' + totalPages);
+            } else {
+                $pageText.text('');
+            }
+
+            $prevBtn.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            $nextBtn.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
         }
 
         function showError() {
@@ -216,11 +266,25 @@
             $root.find('#VAS-gljtm-body-' + id).html(
                 '<div class="VAS-gljtm-empty">' + lbl('VIS_Error', 'Error loading data.') + '</div>'
             );
+            totalPages = 0;
+            updatePager();
         }
 
         this.refreshWidget    = function () { showBusy(true); loadData(); };
         this.getRoot          = function () { return $root; };
-        this.disposeComponent = function () { $root.remove(); };
+        this.disposeComponent = function () {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+
+            if ($root) {
+                $root.off();
+                $root.remove();
+            }
+
+            currentData = null;
+        };
     };
 
     VAS.VAS_043_GLJournalTopMovementWidget.prototype.refreshWidget = function () {
