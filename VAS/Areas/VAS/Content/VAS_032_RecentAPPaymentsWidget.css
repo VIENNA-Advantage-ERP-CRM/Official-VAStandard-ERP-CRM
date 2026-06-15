@@ -57,14 +57,14 @@
 
 .vas-recent-ap-payments-icon-box {
     flex: 0 0 auto;
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    border-radius: 10px;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
     background: rgba(255, 255, 255, 0.90);
     color: #0083da;
 }
@@ -84,7 +84,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.875em;
-    font-weight: 600;
+    font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
 }
@@ -422,7 +422,13 @@
     gap: 0.375em;
 }
 
-.vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-icon-box,
+.vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-icon-box {
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    border-radius: 0.375em;
+}
+
 .vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-banner-icon {
     width: 1.75em;
     height: 1.75em;
@@ -507,7 +513,7 @@
         width: 1.625em;
         height: 1.625em;
         min-width: 1.625em;
-        border-radius: 10px;
+        border-radius: 0.375em;
     }
 
     .vas-recent-ap-payments-icon {

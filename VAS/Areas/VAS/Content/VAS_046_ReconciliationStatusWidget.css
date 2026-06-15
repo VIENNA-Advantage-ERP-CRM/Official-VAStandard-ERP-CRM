@@ -56,11 +56,11 @@
 
 .vas-reconciliation-status-icon-box {
     flex: 0 0 auto;
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border: 1px solid rgba(255, 255, 255, 0.95);
-    border-radius: 10px;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -81,7 +81,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.875em;
-    font-weight: 600;
+    font-weight: 400;
     line-height: 1.2;
     letter-spacing: 0;
     color: #102c3f;
@@ -282,9 +282,10 @@
     }
 
     .vas-reconciliation-status-icon-box {
-        width: 2em;
-        height: 2em;
-        border-radius: 10px;
+        width: 1.75em;
+        height: 1.75em;
+        min-width: 1.75em;
+        border-radius: 0.375em;
     }
 
     .vas-reconciliation-status-icon {
@@ -418,10 +419,10 @@
 }
 
 .vas-reconciliation-status-icon-box {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 10px;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    border-radius: 0.375em;
 }
 
 .vas-reconciliation-status-icon,
