@@ -58,13 +58,15 @@
 }
 
 .VAS_055_cash-category-icon {
-    width: 2em;
-    height: 2em;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
     background: rgba(79, 131, 216, 0.08);
     color: #4F83D8;
 }
@@ -81,7 +83,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 600;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -285,7 +287,7 @@
     .VAS_055_cash-category-icon {
         width: 1.75em;
         height: 1.75em;
-        border-radius: 10px;
+        border-radius: 0.375em;
     }
 
     .VAS_055_cash-category-title {

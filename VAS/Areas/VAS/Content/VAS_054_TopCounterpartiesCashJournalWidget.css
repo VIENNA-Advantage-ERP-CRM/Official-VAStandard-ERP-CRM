@@ -58,13 +58,15 @@
 }
 
 .VAS_054_counterparties-icon {
-    width: 2em;
-    height: 2em;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 12px;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
     background: rgba(0, 131, 218, 0.08);
     color: #4F83D8;
 }
@@ -81,7 +83,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 400;
     letter-spacing: 0;
     color: #102C3F;
 }
@@ -335,6 +337,6 @@
     .VAS_054_counterparties-icon {
         width: 1.75em;
         height: 1.75em;
-        border-radius: 10px;
+        border-radius: 0.375em;
     }
 }
