@@ -140,11 +140,48 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.08em;
     color: #087246;
     font-size: 1.375em; /* xl token — corrected from 2.125em */
-    line-height: 1.1;
+    line-height: 1;
     font-weight: 700;
     letter-spacing: 0;
+}
+
+.VAS-047-today-cash-in-cash-journal-value .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.18em;
+    font-size: 0.45em;
+    line-height: 1;
+    font-weight: 500;
+    color: #3F9A78;
+}
+
+.VAS-047-today-cash-in-cash-journal-value .VAS-cash-amount-prefix:empty,
+.VAS-047-today-cash-in-cash-journal-value .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS-047-today-cash-in-cash-journal-value .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    font-weight: 800;
+    color: #087246;
+}
+
+.VAS-047-today-cash-in-cash-journal-value .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.84em;
+    font-size: 0.54em;
+    line-height: 1;
+    font-weight: 500;
+    color: #6DAE99;
 }
 
 /* ── Footer row ───────────────────────────────────────────────────────── */

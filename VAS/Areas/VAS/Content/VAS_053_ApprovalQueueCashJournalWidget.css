@@ -292,10 +292,49 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: right;
+    display: inline-flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 0.06em;
     font-size: 0.8125em;
-    line-height: 1.2;
+    line-height: 1;
     font-weight: 800;
     color: #102C3F;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.08em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.78;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-prefix:empty,
+.VAS_053_approval-amount .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    color: currentColor;
+}
+
+.VAS_053_approval-amount .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.26em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.66;
 }
 
 .VAS_053_approval-actions {

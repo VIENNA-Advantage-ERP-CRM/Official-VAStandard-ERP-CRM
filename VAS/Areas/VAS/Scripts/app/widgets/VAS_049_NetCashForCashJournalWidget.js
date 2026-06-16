@@ -37,21 +37,24 @@
             return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            return currencySymbol || currencyISO || '';
+        }
+
+        function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
-
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-            var sign = numericValue < 0 ? '-' : '';
+            var decimalMatch = amount.match(/([.,]\d+)$/);
 
-            if (currencySymbol) {
-                return sign + currencySymbol + amount;
-            }
-
-            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+            return {
+                prefix: signPrefix + getCurrencyLabel(currencySymbol, currencyISO),
+                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
+                decimal: decimalMatch ? decimalMatch[1] : ''
+            };
         }
 
         function showBusy(show) {
@@ -64,10 +67,23 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
-        function formatSignedAmount(value, currencySymbol, currencyISO, precision) {
+        function getSignPrefix(value) {
             var numberValue = safeNumber(value);
-            var sign = numberValue > 0 ? '+' : numberValue < 0 ? '−' : '';
-            return sign + formatCurrencyAmount(Math.abs(numberValue), currencySymbol, currencyISO, precision);
+            return numberValue > 0 ? '+' : numberValue < 0 ? '−' : '';
+        }
+
+        function formatSignedAmount(value, currencySymbol, currencyISO, precision) {
+            var parts = getAmountParts(Math.abs(safeNumber(value)), currencySymbol, currencyISO, precision, getSignPrefix(value));
+            return parts.prefix + parts.main + parts.decimal;
+        }
+
+        function renderSignedAmount($target, value, currencySymbol, currencyISO, precision) {
+            var parts = getAmountParts(Math.abs(safeNumber(value)), currencySymbol, currencyISO, precision, getSignPrefix(value));
+
+            $target.empty()
+                .append($('<span>', { 'class': 'VAS-cash-amount-prefix', 'text': parts.prefix }))
+                .append($('<span>', { 'class': 'VAS-cash-amount-main', 'text': parts.main }))
+                .append($('<span>', { 'class': 'VAS-cash-amount-decimal', 'text': parts.decimal }));
         }
 
         function getStatusText(value) {
@@ -135,9 +151,10 @@
 
             var $value = $('<div>', {
                 'class': 'VAS_net-cash-cash-journal-value VAS_net-cash-cash-journal-value-neutral',
-                'id': 'VAS_049_net-cash-value-' + widgetId,
-                'text': formatSignedAmount(0)
+                'id': 'VAS_049_net-cash-value-' + widgetId
             });
+
+            renderSignedAmount($value, 0);
 
             var $footer = $('<div>', {
                 'class': 'VAS_net-cash-cash-journal-footer'
@@ -227,8 +244,8 @@
             $root.find('#VAS_049_net-cash-value-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-value-positive VAS_net-cash-cash-journal-value-negative VAS_net-cash-cash-journal-value-neutral')
                 .addClass(valueClass)
-                .text(formatSignedAmount(netAmount, data.currencySymbol, data.currencyISO, data.stdPrecision))
                 .show();
+            renderSignedAmount($root.find('#VAS_049_net-cash-value-' + widgetId), netAmount, data.currencySymbol, data.currencyISO, data.stdPrecision);
 
             $root.find('.VAS_net-cash-cash-journal-footer').show();
 

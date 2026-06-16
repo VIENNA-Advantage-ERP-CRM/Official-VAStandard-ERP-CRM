@@ -57,6 +57,26 @@
             return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            return currencySymbol || currencyISO || '';
+        }
+
+        function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = getPrecision(precision);
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+            var decimalMatch = amount.match(/([.,]\d+)$/);
+
+            return {
+                prefix: signPrefix + getCurrencyLabel(currencySymbol, currencyISO),
+                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
+                decimal: decimalMatch ? decimalMatch[1] : ''
+            };
+        }
+
         function showBusy(show) {
             var $b = $root.find('#VAS-gljtm-busy-' + $self.AD_UserHomeWidgetID);
             if (show) { $b.addClass('is-visible'); } else { $b.removeClass('is-visible'); }
@@ -78,6 +98,24 @@
             }
 
             return sign + formatCurrencyAmount(Math.abs(numberValue), currencySymbol, currencyISO, precision);
+        }
+
+        function renderSignedAmount($target, value, currencySymbol, currencyISO, precision, showPositiveSign) {
+            var numberValue = safeNumber(value);
+            var sign = '';
+
+            if (numberValue < 0) {
+                sign = '−';
+            } else if (numberValue > 0 && showPositiveSign === true) {
+                sign = '+';
+            }
+
+            var parts = getAmountParts(Math.abs(numberValue), currencySymbol, currencyISO, precision, sign);
+
+            $target.empty()
+                .append($('<span>', { 'class': 'VAS-cash-amount-prefix', 'text': parts.prefix }))
+                .append($('<span>', { 'class': 'VAS-cash-amount-main', 'text': parts.main }))
+                .append($('<span>', { 'class': 'VAS-cash-amount-decimal', 'text': parts.decimal }));
         }
 
         function getStatusText(balance) {
@@ -173,9 +211,10 @@
 
             var $value = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-value VAS_current-cash-cash-journal-value-neutral',
-                'id': 'VAS_050_current-cash-value-' + widgetId,
-                'text': formatCurrencyAmount(0)
+                'id': 'VAS_050_current-cash-value-' + widgetId
             });
+
+            renderSignedAmount($value, 0);
 
             var $footer = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-footer'
@@ -297,8 +336,8 @@
             $root.find('#VAS_050_current-cash-value-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-value-positive VAS_current-cash-cash-journal-value-negative VAS_current-cash-cash-journal-value-neutral')
                 .addClass(valueClass)
-                .text(formatSignedAmount(balance, data.currencySymbol, data.currencyISO, data.stdPrecision, false))
                 .show();
+            renderSignedAmount($root.find('#VAS_050_current-cash-value-' + widgetId), balance, data.currencySymbol, data.currencyISO, data.stdPrecision, false);
 
             $root.find('.VAS_current-cash-cash-journal-footer').show();
 

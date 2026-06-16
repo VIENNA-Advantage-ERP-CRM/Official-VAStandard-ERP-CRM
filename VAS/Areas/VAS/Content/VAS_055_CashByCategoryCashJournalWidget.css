@@ -155,7 +155,10 @@
 }
 
 .VAS_055_cash-category-amount {
-    display: block;
+    display: inline-flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 0.06em;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
@@ -163,10 +166,45 @@
     white-space: nowrap;
     text-align: right;
     font-size: 0.6875em;
-    line-height: 1.2;
+    line-height: 1;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: #60748A;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.08em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.78;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-prefix:empty,
+.VAS_055_cash-category-amount .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    color: currentColor;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.26em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.66;
 }
 
 .VAS_055_cash-category-track {

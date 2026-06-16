@@ -217,6 +217,43 @@
     font-variant-numeric: tabular-nums;
 }
 
+.VAS_052_cashbook-col-amount .VAS-cash-amount-prefix {
+    display: inline-block;
+    margin-right: 0.14em;
+    vertical-align: top;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.78;
+}
+
+.VAS_052_cashbook-col-amount .VAS-cash-amount-prefix:empty,
+.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_052_cashbook-col-amount .VAS-cash-amount-main {
+    display: inline-block;
+    max-width: 4.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: baseline;
+    font-size: 1em;
+    line-height: 1;
+    color: currentColor;
+}
+
+.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
+    display: inline-block;
+    margin-left: 0.02em;
+    font-size: 0.72em;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.66;
+}
+
 .VAS_052_cashbook-in {
     color: #356F4F !important;
 }

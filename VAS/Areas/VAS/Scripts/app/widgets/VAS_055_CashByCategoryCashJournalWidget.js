@@ -80,6 +80,37 @@
             return id ? sign + '#' + id + ' ' + amount : sign + amount;
         }
 
+        function renderCurrencyAmount($target, value, currencySymbol, currencyISO, currencyId, precision) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = getPrecision(precision);
+            var prefix = firstText(currencySymbol, currencyISO);
+            var id = firstText(currencyId);
+
+            if (!prefix && id) {
+                prefix = '#' + id;
+            }
+
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+            var decimalMatch = amount.match(/([.,]\d+)$/);
+
+            $target.empty()
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-prefix',
+                    'text': (numericValue < 0 ? '-' : '') + prefix
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-main',
+                    'text': decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-decimal',
+                    'text': decimalMatch ? decimalMatch[1] : ''
+                }));
+        }
+
         function showBusy(show) {
             if (!$root) {
                 return;
@@ -219,9 +250,10 @@
             });
 
             var $amount = $('<span>', {
-                'class': 'VAS_055_cash-category-amount',
-                'text': formatCurrencyAmount(amount, rowCurrencySymbol, rowCurrencyISO, rowCurrencyId, precision)
+                'class': 'VAS_055_cash-category-amount'
             });
+
+            renderCurrencyAmount($amount, amount, rowCurrencySymbol, rowCurrencyISO, rowCurrencyId, precision);
 
             var $track = $('<div>', {
                 'class': 'VAS_055_cash-category-track',

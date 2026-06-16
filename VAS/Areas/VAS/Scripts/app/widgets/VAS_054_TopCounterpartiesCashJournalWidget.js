@@ -97,6 +97,37 @@
             return iso ? sign + amount + ' ' + iso : sign + amount;
         }
 
+        function renderAmount($target, item) {
+            var precision = Number(item && item.stdPrecision);
+            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
+            var iso = item && item.currencyISO ? item.currencyISO : '';
+
+            if (isNaN(precision) || precision < 0) {
+                precision = 2;
+            }
+
+            var numericValue = safeNumber(item && item.displayAmount);
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+            var decimalMatch = amount.match(/([.,]\d+)$/);
+
+            $target.empty()
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-prefix',
+                    'text': (numericValue < 0 ? '-' : '') + (symbol || iso)
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-main',
+                    'text': decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-decimal',
+                    'text': decimalMatch ? decimalMatch[1] : ''
+                }));
+        }
+
         function showBusy(show) {
             if (!$root) {
                 return;
@@ -396,8 +427,10 @@
 
                 var $amount = $('<span>', {
                     'class': 'VAS_054_counterparties-amount',
-                    'text': formatAmount(item)
+                    'title': formatAmount(item)
                 });
+
+                renderAmount($amount, item);
 
                 $row
                     .append($avatar)

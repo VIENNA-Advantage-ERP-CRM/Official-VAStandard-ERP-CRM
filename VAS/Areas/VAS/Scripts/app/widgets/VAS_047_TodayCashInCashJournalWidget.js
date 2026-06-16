@@ -45,21 +45,43 @@
         }
 
         /* ── Amount formatter ───────────────────────────────────────── */
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            return currencySymbol || currencyISO || '';
+        }
+
+        function getAmountParts(value, precision) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
-
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-            var sign = numericValue < 0 ? '-' : '';
+            var decimalMatch = amount.match(/([.,]\d+)$/);
 
-            if (currencySymbol) {
-                return sign + currencySymbol + amount;
-            }
+            return {
+                sign: numericValue < 0 ? '-' : '',
+                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
+                decimal: decimalMatch ? decimalMatch[1] : ''
+            };
+        }
 
-            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        function renderCurrencyAmount($target, value, currencySymbol, currencyISO, precision) {
+            var parts = getAmountParts(value, precision);
+            var prefix = parts.sign + getCurrencyLabel(currencySymbol, currencyISO);
+
+            $target.empty()
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-prefix',
+                    'text': prefix
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-main',
+                    'text': parts.main
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-decimal',
+                    'text': parts.decimal
+                }));
         }
 
         /* ── Loading overlay ────────────────────────────────────────── */
@@ -168,8 +190,7 @@
                 deltaRaw = Math.round(((mainMetric - avgDailyAmount) / avgDailyAmount) * 100);
             }
 
-            var formatted = formatCurrencyAmount(mainMetric, data.currencySymbol, data.currencyISO, data.stdPrecision);
-            $root.find('#VAS-047-cj-value-' + uid).text(formatted);
+            renderCurrencyAmount($root.find('#VAS-047-cj-value-' + uid), mainMetric, data.currencySymbol, data.currencyISO, data.stdPrecision);
 
             var isPositive = (deltaRaw >= 0);
             var absPct = Math.abs(deltaRaw);

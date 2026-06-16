@@ -101,6 +101,44 @@
             return iso ? sign + amount + ' ' + iso : sign + amount;
         }
 
+        function getCurrencyLabel(data) {
+            if (data && data.currencySymbol) {
+                return data.currencySymbol;
+            }
+
+            return data && (data.currencyISO || data.currencyISOCode) ? (data.currencyISO || data.currencyISOCode) : '';
+        }
+
+        function renderCurrencyAmount($target, value, data) {
+            var numericValue = safeNumber(value);
+
+            if (numericValue === 0) {
+                $target.text('-');
+                return;
+            }
+
+            var precision = getPrecision(data);
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: precision,
+                maximumFractionDigits: precision
+            });
+            var decimalMatch = amount.match(/([.,]\d+)$/);
+
+            $target.empty()
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-prefix',
+                    'text': (numericValue < 0 ? '-' : '') + getCurrencyLabel(data)
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-main',
+                    'text': decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount
+                }))
+                .append($('<span>', {
+                    'class': 'VAS-cash-amount-decimal',
+                    'text': decimalMatch ? decimalMatch[1] : ''
+                }));
+        }
+
         function showBusy(show) {
             if (!$root) {
                 return;
@@ -352,15 +390,16 @@
                 'text': entry.postedBy || lbl('VAS_052_System', 'System')
             }).appendTo($row);
 
-            $('<td>', {
-                'class': 'VAS_052_cashbook-col-amount VAS_052_cashbook-in',
-                'text': formatCurrencyAmount(entry.cashInAmount, data)
+            var $cashIn = $('<td>', {
+                'class': 'VAS_052_cashbook-col-amount VAS_052_cashbook-in'
             }).appendTo($row);
 
-            $('<td>', {
-                'class': 'VAS_052_cashbook-col-amount VAS_052_cashbook-out',
-                'text': formatCurrencyAmount(entry.cashOutAmount, data)
+            var $cashOut = $('<td>', {
+                'class': 'VAS_052_cashbook-col-amount VAS_052_cashbook-out'
             }).appendTo($row);
+
+            renderCurrencyAmount($cashIn, entry.cashInAmount, data);
+            renderCurrencyAmount($cashOut, entry.cashOutAmount, data);
 
             return $row;
         }

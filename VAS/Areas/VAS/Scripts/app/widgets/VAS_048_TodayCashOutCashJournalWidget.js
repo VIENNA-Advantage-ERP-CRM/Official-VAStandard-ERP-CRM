@@ -36,21 +36,33 @@
             return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            return currencySymbol || currencyISO || '';
+        }
+
+        function getAmountParts(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
-
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-            var sign = numericValue < 0 ? '-' : '';
+            var decimalMatch = amount.match(/([.,]\d+)$/);
 
-            if (currencySymbol) {
-                return sign + currencySymbol + amount;
-            }
+            return {
+                prefix: (numericValue < 0 ? '-' : '') + getCurrencyLabel(currencySymbol, currencyISO),
+                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
+                decimal: decimalMatch ? decimalMatch[1] : ''
+            };
+        }
 
-            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        function renderCurrencyAmount($target, value, currencySymbol, currencyISO, precision) {
+            var parts = getAmountParts(value, currencySymbol, currencyISO, precision);
+
+            $target.empty()
+                .append($('<span>', { 'class': 'VAS-cash-amount-prefix', 'text': parts.prefix }))
+                .append($('<span>', { 'class': 'VAS-cash-amount-main', 'text': parts.main }))
+                .append($('<span>', { 'class': 'VAS-cash-amount-decimal', 'text': parts.decimal }));
         }
 
         function showBusy(show) {
@@ -109,9 +121,10 @@
 
             var $value = $('<div>', {
                 'class': 'VAS_today-cash-out-cash-journal-value',
-                'id': 'VAS_048_today-cash-out-value-' + widgetId,
-                'text': formatCurrencyAmount(0)
+                'id': 'VAS_048_today-cash-out-value-' + widgetId
             });
+
+            renderCurrencyAmount($value, 0);
 
             var $footer = $('<div>', {
                 'class': 'VAS_today-cash-out-cash-journal-footer'
@@ -189,7 +202,8 @@
             $root.find('#VAS_048_today-cash-out-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_048_today-cash-out-title-' + widgetId).text(title);
             $root.find('#VAS_048_today-cash-out-date-' + widgetId).text(dateText);
-            $root.find('#VAS_048_today-cash-out-value-' + widgetId).text(formatCurrencyAmount(amount, data.currencySymbol, data.currencyISO, data.stdPrecision)).show();
+            renderCurrencyAmount($root.find('#VAS_048_today-cash-out-value-' + widgetId), amount, data.currencySymbol, data.currencyISO, data.stdPrecision);
+            $root.find('#VAS_048_today-cash-out-value-' + widgetId).show();
             $root.find('.VAS_today-cash-out-cash-journal-footer').show();
             $root.find('#VAS_048_today-cash-out-delta-text-' + widgetId).text(formatPercent(deltaPercent));
             $root.find('#VAS_048_today-cash-out-description-' + widgetId).text(footerText);

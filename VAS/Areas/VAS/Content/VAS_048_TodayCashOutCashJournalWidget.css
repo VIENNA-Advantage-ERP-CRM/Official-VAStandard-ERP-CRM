@@ -86,12 +86,47 @@
     white-space: nowrap;
     flex: 1 1 auto;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    gap: 0.08em;
     font-size: 1.375em;
-    line-height: 1.1;
+    line-height: 1;
     letter-spacing: 0;
     font-weight: 700;
     color: #A94747;
+}
+
+.VAS_today-cash-out-cash-journal-value .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.18em;
+    font-size: 0.45em;
+    line-height: 1;
+    font-weight: 500;
+    color: #B96B6B;
+}
+
+.VAS_today-cash-out-cash-journal-value .VAS-cash-amount-prefix:empty,
+.VAS_today-cash-out-cash-journal-value .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_today-cash-out-cash-journal-value .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    font-weight: 800;
+    color: #A94747;
+}
+
+.VAS_today-cash-out-cash-journal-value .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.84em;
+    font-size: 0.54em;
+    line-height: 1;
+    font-weight: 500;
+    color: #C98888;
 }
 
 .VAS_today-cash-out-cash-journal-footer {

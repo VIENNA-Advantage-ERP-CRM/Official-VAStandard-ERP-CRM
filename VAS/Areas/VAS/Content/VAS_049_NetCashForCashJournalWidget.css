@@ -117,12 +117,49 @@
     white-space: nowrap;
     flex: 1 1 auto;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    gap: 0.08em;
     font-size: 1.375em;
-    line-height: 1.1;
+    line-height: 1;
     letter-spacing: 0;
     font-weight: 700;
     color: #005487;
+}
+
+.VAS_net-cash-cash-journal-value .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.18em;
+    font-size: 0.45em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.76;
+}
+
+.VAS_net-cash-cash-journal-value .VAS-cash-amount-prefix:empty,
+.VAS_net-cash-cash-journal-value .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_net-cash-cash-journal-value .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    font-weight: 800;
+    color: currentColor;
+}
+
+.VAS_net-cash-cash-journal-value .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.84em;
+    font-size: 0.54em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.62;
 }
 
 .VAS_net-cash-cash-journal-value-positive {
