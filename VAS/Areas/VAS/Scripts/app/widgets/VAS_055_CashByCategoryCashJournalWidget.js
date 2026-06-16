@@ -26,6 +26,18 @@
         var isDisposed = false;
         var ajaxRequest = null;
 
+        var $footer = null;
+        var $pageInfo = null;
+        var $pager = null;
+        var $prevBtn = null;
+        var $nextBtn = null;
+        var $pageText = null;
+
+        var pageNo = 1;
+        var pageSize = 3;
+        var totalPages = 0;
+        var totalRecords = 0;
+
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
             return text && text !== key && text !== '[' + key + ']' ? text : fallback;
@@ -129,6 +141,18 @@
         function buildLayout() {
             var widgetId = $self.AD_UserHomeWidgetID;
 
+            var chevL =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>';
+
+            var chevR =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>';
+
             $root = $('<div>', {
                 'class': 'VAS_055_cash-category-root',
                 'id': 'VAS_055_cash-category-root-' + widgetId
@@ -179,11 +203,13 @@
                 'id': 'VAS_055_cash-category-body-' + widgetId
             });
 
-            var $footer = $('<div>', {
+            $footer = $('<div>', {
                 'class': 'VAS_055_cash-category-footer'
             });
 
-         
+            var $footerText = $('<div>', {
+                'class': 'VAS_055_cash-category-footer-text'
+            });
 
             var $whyText = $('<span>', {
                 'class': 'VAS_055_cash-category-why-text',
@@ -191,14 +217,61 @@
                 'text': lbl('VAS_055_WhyText', 'Grouped by cash type for today.')
             });
 
+            $pageInfo = $('<span>', {
+                'class': 'VAS_055_cash-category-footer-info'
+            });
+
+            $pager = $('<div>', {
+                'class': 'VAS_055_cash-category-pager',
+                'style': 'display:none;'
+            });
+
+            $prevBtn = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_055_cash-category-page-btn VAS_055_cash-category-prev',
+                'aria-label': lbl('VAS_Previous', 'Previous'),
+                'html': chevL
+            });
+
+            $pageText = $('<span>', {
+                'class': 'VAS_055_cash-category-page-text'
+            });
+
+            $nextBtn = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_055_cash-category-page-btn VAS_055_cash-category-next',
+                'aria-label': lbl('VAS_Next', 'Next'),
+                'html': chevR
+            });
+
+            $prevBtn.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                loadData();
+            });
+
+            $nextBtn.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                loadData();
+            });
+
             var $state = $('<div>', {
                 'class': 'VAS_055_cash-category-state',
                 'id': 'VAS_055_cash-category-state-' + widgetId
             });
 
+            $pager.append($prevBtn).append($pageText).append($nextBtn);
+            $footerText.append($whyText).append($pageInfo);
             $titleRow.append($icon).append($title);
             $header.append($titleRow).append($meta);
-            $footer.append($whyText);
+            $footer.append($footerText).append($pager);
             $card.append($busy).append($header).append($body).append($footer).append($state);
             $root.append($card);
         }
@@ -210,8 +283,53 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
 
+            totalRecords = 0;
+            totalPages = 0;
+
             $root.find('#VAS_055_cash-category-state-' + widgetId).text(message || '').addClass('is-visible');
             $root.find('#VAS_055_cash-category-body-' + widgetId).empty();
+
+            updatePager();
+        }
+
+        function updatePager() {
+            if ($pageText) {
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+            }
+
+            if ($pageInfo) {
+                if (totalRecords > 0) {
+                    var from = (pageNo - 1) * pageSize + 1;
+                    var to = Math.min(pageNo * pageSize, totalRecords);
+
+                    $pageInfo.text(
+                        lbl('VAS_Showing', 'Showing') +
+                        ' ' +
+                        from +
+                        '-' +
+                        to +
+                        ' ' +
+                        lbl('VAS_Of', 'of') +
+                        ' ' +
+                        totalRecords
+                    );
+                }
+                else {
+                    $pageInfo.text('');
+                }
+            }
+
+            if ($prevBtn) {
+                $prevBtn.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($nextBtn) {
+                $nextBtn.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
+
+            if ($pager) {
+                $pager.css('display', totalPages > 1 ? 'inline-flex' : 'none');
+            }
         }
 
         function createRow(item, index, currencySymbol, currencyISO, currencyId, precisionFallback) {
@@ -288,6 +406,13 @@
             var currencyId = firstText(data.cCurrencyId, data.C_Currency_ID, data.CCurrencyId);
             var precision = data.stdPrecision || data.StdPrecision;
 
+            pageNo = safeNumber(data.pageNo) > 0 ? safeNumber(data.pageNo) : pageNo;
+            pageSize = safeNumber(data.pageSize) > 0 ? safeNumber(data.pageSize) : pageSize;
+            totalRecords = safeNumber(data.totalRecords);
+            totalPages = safeNumber(data.totalPages) > 0
+                ? safeNumber(data.totalPages)
+                : (pageSize > 0 ? Math.ceil(totalRecords / pageSize) : 0);
+
             $root.find('#VAS_055_cash-category-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_055_cash-category-title-' + widgetId).text(data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category'));
             $root.find('#VAS_055_cash-category-meta-' + widgetId).text(data.metaText || lbl('VAS_055_Today', 'Today'));
@@ -301,9 +426,11 @@
                 return;
             }
 
-            $.each(items.slice(0, 3), function (index, item) {
+            $.each(items, function (index, item) {
                 $body.append(createRow(item, index, currencySymbol, currencyISO, currencyId, precision));
             });
+
+            updatePager();
         }
 
         function loadData() {
@@ -322,6 +449,10 @@
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
+                data: {
+                    pageNo: pageNo,
+                    pageSize: pageSize
+                },
                 success: function (response) {
                     if (isDisposed) {
                         return;
@@ -358,6 +489,7 @@
         };
 
         this.refreshWidget = function () {
+            pageNo = 1;
             loadData();
         };
 

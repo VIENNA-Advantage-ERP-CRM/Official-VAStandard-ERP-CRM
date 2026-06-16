@@ -19,7 +19,7 @@ namespace VAS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetTodayCashOutByCategory()
+        public JsonResult GetTodayCashOutByCategory(int pageNo = 1, int pageSize = 3)
         {
             Ctx ctx = Session["ctx"] as Ctx;
 
@@ -33,6 +33,17 @@ namespace VAS.Controllers
                 }, JsonRequestBehavior.AllowGet);
             }
 
+            if (pageNo <= 0)
+            {
+                pageNo = 1;
+            }
+
+            if (pageSize <= 0)
+            {
+                pageSize = 3;
+            }
+
+            int offset = (pageNo - 1) * pageSize;
             IDataReader reader = null;
 
             try
@@ -44,13 +55,14 @@ namespace VAS.Controllers
                     language = "en_US";
                 }
 
-                SqlQueryData queryData = BuildTodayCashOutByCategorySql(ctx, language);
+                SqlQueryData queryData = BuildTodayCashOutByCategorySql(ctx, language, offset, pageSize);
 
                 reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
 
                 List<CategoryCashOut> categories = new List<CategoryCashOut>();
 
                 int totalLineCount = 0;
+                int totalRecords = 0;
                 decimal totalCashOut = 0;
                 int stdPrecision = 2;
                 int currencyId = 0;
@@ -64,6 +76,10 @@ namespace VAS.Controllers
                     {
                         dateTo = FormatDbDate(reader["DateTo"]);
                     }
+
+                    totalRecords = GetInt(reader, "TotalRecords", totalRecords);
+                    totalLineCount = GetInt(reader, "TotalLineCount", totalLineCount);
+                    totalCashOut = GetDecimal(reader, "TotalCashOut");
 
                     int lineCount = GetInt(reader, "LineCount");
 
@@ -84,9 +100,6 @@ namespace VAS.Controllers
                         categoryName = GetMsg(ctx, "VAS_055_Other", "Other");
                     }
 
-                    totalLineCount += lineCount;
-                    totalCashOut += cashOutAmount;
-
                     categories.Add(new CategoryCashOut
                     {
                         CategoryName = categoryName,
@@ -95,36 +108,11 @@ namespace VAS.Controllers
                     });
                 }
 
-                List<CategoryCashOut> displayCategories = new List<CategoryCashOut>();
-
-                for (int index = 0; index < categories.Count && index < 2; index++)
-                {
-                    displayCategories.Add(categories[index]);
-                }
-
-                if (categories.Count > 2)
-                {
-                    CategoryCashOut otherCategory = new CategoryCashOut
-                    {
-                        CategoryName = GetMsg(ctx, "VAS_055_Other", "Other"),
-                        CashOutAmount = 0,
-                        LineCount = 0
-                    };
-
-                    for (int index = 2; index < categories.Count; index++)
-                    {
-                        otherCategory.CashOutAmount += categories[index].CashOutAmount;
-                        otherCategory.LineCount += categories[index].LineCount;
-                    }
-
-                    displayCategories.Add(otherCategory);
-                }
-
                 List<object> items = new List<object>();
 
-                for (int index = 0; index < displayCategories.Count; index++)
+                for (int index = 0; index < categories.Count; index++)
                 {
-                    CategoryCashOut category = displayCategories[index];
+                    CategoryCashOut category = categories[index];
 
                     decimal percent = totalCashOut > 0
                         ? Math.Round((category.CashOutAmount / totalCashOut) * 100, 0)
@@ -156,6 +144,10 @@ namespace VAS.Controllers
                     dateTo = dateTo,
                     items = items,
                     totalCashOut = totalCashOut,
+                    totalRecords = totalRecords,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize)),
+                    pageNo = pageNo,
+                    pageSize = pageSize,
                     cCurrencyId = currencyId,
                     currencyISO = currencyISO,
                     currencySymbol = currencySymbol,
@@ -182,7 +174,7 @@ namespace VAS.Controllers
             }
         }
 
-        private SqlQueryData BuildTodayCashOutByCategorySql(Ctx ctx, string language)
+        private SqlQueryData BuildTodayCashOutByCategorySql(Ctx ctx, string language, int offset, int pageSize)
         {
             string todayDateSql = GetTodayDateSql();
 
@@ -296,6 +288,28 @@ MAX(RawCashOut.CurrencyISO) AS CurrencyISO,
 MAX(RawCashOut.CurrencySymbol) AS CurrencySymbol
 FROM RawCashOut RawCashOut
 GROUP BY RawCashOut.CashType
+),
+CountData AS
+(
+SELECT
+COUNT(1) AS TotalRecords,
+COALESCE(SUM(CategoryTotals.CashOutAmount), 0) AS TotalCashOut,
+COALESCE(SUM(CategoryTotals.LineCount), 0) AS TotalLineCount
+FROM CategoryTotals CategoryTotals
+),
+PagedCategoryTotals AS
+(
+SELECT
+CategoryTotals.CategoryName,
+CategoryTotals.CashOutAmount,
+CategoryTotals.LineCount,
+CategoryTotals.StdPrecision,
+CategoryTotals.C_Currency_ID,
+CategoryTotals.CurrencyISO,
+CategoryTotals.CurrencySymbol
+FROM CategoryTotals CategoryTotals
+ORDER BY CategoryTotals.CashOutAmount DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY
 )";
 
             string sql = @"
@@ -313,17 +327,22 @@ COALESCE(CategoryTotals.StdPrecision, SchemaCurrency.StdPrecision, 2) AS StdPrec
 COALESCE(CategoryTotals.C_Currency_ID, SchemaCurrency.C_Currency_ID, 0) AS C_Currency_ID,
 COALESCE(CategoryTotals.CurrencyISO, SchemaCurrency.ISO_Code, '') AS CurrencyISO,
 COALESCE(CategoryTotals.CurrencySymbol, SchemaCurrency.Cur_Symbol, '') AS CurrencySymbol,
-DateRange.TodayDate AS DateTo
+DateRange.TodayDate AS DateTo,
+CountData.TotalRecords,
+CountData.TotalCashOut,
+CountData.TotalLineCount
 FROM DateRange DateRange
 INNER JOIN SchemaCurrency SchemaCurrency ON (1 = 1)
-LEFT OUTER JOIN CategoryTotals CategoryTotals ON (1 = 1)
-ORDER BY CategoryTotals.CashOutAmount DESC";
+CROSS JOIN CountData CountData
+LEFT OUTER JOIN PagedCategoryTotals CategoryTotals ON (1 = 1)";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@AD_Language", language),
-                new SqlParameter("@ReferenceName", "C_Cash Trx Type")
+                new SqlParameter("@ReferenceName", "C_Cash Trx Type"),
+                new SqlParameter("@Offset", offset),
+                new SqlParameter("@PageSize", pageSize)
             };
 
             return new SqlQueryData
