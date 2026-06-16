@@ -207,7 +207,7 @@
 
             var $label = $('<div>', {
                 'class': 'VAS_051_cash-flow-day-label',
-                'text': (item.dayLabel || '').toUpperCase()
+                'text': item.dayLabel || ''
             });
 
             $bars.append($inBar).append($outBar);

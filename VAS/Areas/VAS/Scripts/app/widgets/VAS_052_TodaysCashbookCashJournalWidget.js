@@ -211,7 +211,7 @@
             var $meta = $('<span>', {
                 'class': 'VAS_052_cashbook-meta',
                 'id': 'VAS_052_cashbook-meta-' + widgetId,
-                'text': '0 ' + lbl('VAS_052_Entries', 'entries')
+                'text': '0 ' + lbl('VAS_052_Entries', 'Entries')
             });
 
             var $body = $('<div>', {
