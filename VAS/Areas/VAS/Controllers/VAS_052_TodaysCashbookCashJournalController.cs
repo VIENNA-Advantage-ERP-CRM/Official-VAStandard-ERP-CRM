@@ -42,7 +42,7 @@ namespace VAS.Controllers
 
             if (pageSize <= 0)
             {
-                pageSize = 6;
+                pageSize = 4;
             }
 
             int startRow = ((pageNo - 1) * pageSize) + 1;
