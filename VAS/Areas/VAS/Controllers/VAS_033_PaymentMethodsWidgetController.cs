@@ -14,7 +14,7 @@ namespace VAS.Controllers
     /*
      * Labels / Message Keys
      * 1 | Payment methods                                        | VAS_033_MessagePaymentMethods
-     * 2 | UPI is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
+     * 2 | Upi is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
      * 3 | Not Specified                                          | VAS_033_MessageNotSpecified
      */
     public class VAS_033_PaymentMethodsWidgetController : Controller
@@ -139,7 +139,7 @@ namespace VAS.Controllers
                 return Json(new
                 {
                     title = GetMsg(ctx, "VAS_033_MessagePaymentMethods", "Payment methods"),
-                    description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "UPI is cheapest - shift small payments where possible"),
+                    description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "Upi is cheapest - shift small payments where possible"),
                     totalAmount = totalAmount,
                     cCurrencyId = cCurrencyId,
                     stdPrecision = stdPrecision,

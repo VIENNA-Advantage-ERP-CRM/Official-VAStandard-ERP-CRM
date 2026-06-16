@@ -107,11 +107,11 @@ namespace VAS.Controllers
                 }
             }
         }
-
         private SqlQueryData BuildClearedAPPaymentSql(Ctx ctx)
         {
             string currentDateSql = GetCurrentDateSql();
-            string dateToExclusiveSql = GetDateToExclusiveSql("PeriodRange.DateTo");
+            string currentPeriodDateToExclusiveSql = GetDateToExclusiveSql("Period.EndDate");
+            string periodRangeDateToExclusiveSql = GetDateToExclusiveSql("PeriodRange.DateTo");
 
             string currentPeriodSql = @"
 CurrentPeriod AS
@@ -125,7 +125,8 @@ INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID
 INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
 WHERE ClientInfo.IsActive = 'Y'
 AND ClientInfo.AD_Client_ID = @AD_Client_ID
-AND " + currentDateSql + @" BETWEEN Period.StartDate AND Period.EndDate
+AND " + currentDateSql + @" >= Period.StartDate
+AND " + currentDateSql + @" < " + currentPeriodDateToExclusiveSql + @"
 )";
 
             string periodRangeSql = @"
@@ -138,7 +139,15 @@ FROM CurrentPeriod CurrentPeriod
 INNER JOIN C_Year PreviousYear ON (PreviousYear.C_Calendar_ID = CurrentPeriod.C_Calendar_ID)
 INNER JOIN C_Period PreviousPeriod ON (PreviousPeriod.C_Year_ID = PreviousYear.C_Year_ID)
 WHERE PreviousPeriod.EndDate < CurrentPeriod.StartDate
-AND NOT EXISTS (SELECT 1 FROM C_Year LookupYear INNER JOIN C_Period LookupPeriod ON (LookupPeriod.C_Year_ID = LookupYear.C_Year_ID) WHERE LookupYear.C_Calendar_ID = CurrentPeriod.C_Calendar_ID AND LookupPeriod.EndDate < CurrentPeriod.StartDate AND LookupPeriod.EndDate > PreviousPeriod.EndDate)
+AND NOT EXISTS
+(
+SELECT 1
+FROM C_Year LookupYear
+INNER JOIN C_Period LookupPeriod ON (LookupPeriod.C_Year_ID = LookupYear.C_Year_ID)
+WHERE LookupYear.C_Calendar_ID = CurrentPeriod.C_Calendar_ID
+AND LookupPeriod.EndDate < CurrentPeriod.StartDate
+AND LookupPeriod.EndDate > PreviousPeriod.EndDate
+)
 )";
 
             string paymentAccessSql = @"
@@ -174,11 +183,15 @@ COALESCE(SUM(CASE WHEN Payment.IsReconciled = 'Y' THEN 1 ELSE 0 END), 0) AS Clea
 MIN(PeriodRange.DateFrom) AS DateFrom,
 MAX(PeriodRange.DateTo) AS DateTo
 FROM PaymentFiltered Payment
-INNER JOIN PeriodRange PeriodRange ON (Payment.DateTrx >= PeriodRange.DateFrom AND Payment.DateTrx < " + dateToExclusiveSql + @")";
+INNER JOIN PeriodRange PeriodRange ON
+(
+    Payment.DateTrx >= PeriodRange.DateFrom
+    AND Payment.DateTrx < " + periodRangeDateToExclusiveSql + @"
+)";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
             };
 
             return new SqlQueryData
@@ -192,7 +205,7 @@ INNER JOIN PeriodRange PeriodRange ON (Payment.DateTrx >= PeriodRange.DateFrom A
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE)";
+                return "CAST(CURRENT_DATE AS DATE)";
             }
 
             return "CURRENT_DATE";
@@ -202,7 +215,7 @@ INNER JOIN PeriodRange PeriodRange ON (Payment.DateTrx >= PeriodRange.DateFrom A
         {
             return "CAST(" + columnName + " AS DATE) + 1";
         }
-
+    
         private string FormatDate(DateTime date)
         {
             return date.ToString("yyyy-MM-dd");

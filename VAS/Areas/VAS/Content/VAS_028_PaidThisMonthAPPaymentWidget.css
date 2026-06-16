@@ -57,6 +57,17 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+}
+
+.vas-ptm-ap-root .vas-ptmonth-card:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+}
+
+.vas-ptm-ap-root .vas-ptmonth-card:focus-visible {
+    outline: 2px solid #0083da;
+    outline-offset: 2px;
 }
 
 .vas-ptm-ap-root .vas-ptmonth-header {
@@ -121,7 +132,6 @@
     font-weight: 400;
     line-height: 1.3;
     letter-spacing: 0.02em;
-    text-transform: uppercase;
     color: #748494;
 }
 
@@ -179,7 +189,6 @@
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: 0.075em;
-    text-transform: uppercase;
 }
 
 .vas-ptm-ap-root .vas-ptm-why-text {
@@ -272,5 +281,409 @@
     .vas-ptm-ap-root .vas-ptm-why-pill,
     .vas-ptm-ap-root .vas-ptm-why-text {
         font-size: 0.625em;
+    }
+}
+
+.vas-ptm-body-lock {
+    overflow: hidden;
+}
+
+.vas-ptm-dialog,
+.vas-ptm-dialog * {
+    box-sizing: border-box;
+}
+
+.vas-ptm-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+}
+
+.vas-ptm-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-ptm-dialog-card {
+    position: relative;
+    width: min(90em, 100%);
+    height: min(46em, 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 1em;
+    background: #ffffff;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    color: #102c3f;
+}
+
+.vas-ptm-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1.25em 2em;
+    border-bottom: 1px solid #edf2f6;
+    flex-shrink: 0;
+}
+
+.vas-ptm-dialog-icon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #bfe4ff;
+    border-radius: 0.5em;
+    background: #eef8ff;
+    color: #0083da;
+}
+
+.vas-ptm-dialog-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vas-ptm-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-ptm-dialog-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.125em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #102c3f;
+}
+
+.vas-ptm-dialog-subtitle {
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    line-height: 1.3;
+    color: #667386;
+}
+
+.vas-ptm-dialog-close {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #1f2933;
+    cursor: pointer;
+}
+
+.vas-ptm-dialog-close svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-ptm-dialog-close:hover {
+    background: #f3f7fb;
+}
+
+.vas-ptm-dialog-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25em;
+    padding: 1.25em 2em;
+    border-bottom: 1px solid #edf2f6;
+    background: #fbfdff;
+    flex-shrink: 0;
+}
+
+.vas-ptm-dialog-summary div {
+    min-width: 0;
+}
+
+.vas-ptm-dialog-summary span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #748494;
+}
+
+.vas-ptm-dialog-summary strong {
+    display: block;
+    margin-top: 0.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.25em;
+    line-height: 1.15;
+    font-weight: 800;
+    color: #102c3f;
+}
+
+.vas-ptm-dialog-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.5em;
+}
+
+.vas-ptm-dialog-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.68);
+    color: #60748a;
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-ptm-dialog-busy.is-visible {
+    display: flex;
+}
+
+.vas-ptm-dialog-table {
+    width: 100%;
+    min-width: 72em;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.vas-ptm-dialog-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 1em 0.75em;
+    border-bottom: 1px solid #edf2f6;
+    background: #ffffff;
+    color: #748494;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.vas-ptm-dialog-table td {
+    padding: 0.875em 0.75em;
+    border-bottom: 1px solid #edf2f6;
+    color: #102c3f;
+    font-size: 0.875em;
+    line-height: 1.2;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ptm-dialog-table tbody tr:hover td {
+    background: #f8fbfe;
+}
+
+.vas-ptm-td-doc {
+    width: 10em;
+    font-family: "Roboto Mono", "Roboto", monospace;
+    font-weight: 700;
+}
+
+.vas-ptm-td-date {
+    width: 9em;
+    color: #60748a !important;
+}
+
+.vas-ptm-td-vendor {
+    width: 14em;
+    font-weight: 700;
+}
+
+.vas-ptm-td-bank {
+    width: 13em;
+    color: #60748a !important;
+}
+
+.vas-ptm-td-currency {
+    width: 6em;
+    color: #60748a !important;
+}
+
+.vas-ptm-th-amount,
+.vas-ptm-td-amount {
+    width: 9em;
+    text-align: right !important;
+}
+
+.vas-ptm-td-amount {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-ptm-td-method {
+    width: 8em;
+    color: #60748a !important;
+}
+
+.vas-ptm-td-status {
+    width: 8em;
+}
+
+.vas-ptm-dialog-status {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.3125em 0.75em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    line-height: 1.1;
+    font-weight: 700;
+}
+
+.vas-ptm-dialog-status::before {
+    content: "";
+    width: 0.45em;
+    height: 0.45em;
+    margin-right: 0.4em;
+    border-radius: 999px;
+    background: currentColor;
+    flex: 0 0 auto;
+}
+
+.vas-ptm-dialog-status-cleared {
+    background: #cbf0dc;
+    color: #006c47;
+}
+
+.vas-ptm-dialog-status-intransit {
+    background: #fff0c2;
+    color: #8a5a00;
+}
+
+.vas-ptm-dialog-status-bounced {
+    background: #ffe1e1;
+    color: #a33333;
+}
+
+.vas-ptm-dialog-empty {
+    padding: 2.5em 1em !important;
+    text-align: center;
+    color: #748494 !important;
+}
+
+.vas-ptm-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.875em 2em;
+    border-top: 1px solid #edf2f6;
+    background: #fbfdff;
+    flex-shrink: 0;
+}
+
+.vas-ptm-pager-helper {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125em;
+}
+
+.vas-ptm-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75em;
+    flex-shrink: 0;
+}
+
+.vas-ptm-pager-btn {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083da;
+    cursor: pointer;
+    font: inherit;
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+}
+
+.vas-ptm-pager-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.vas-ptm-pager-btn:disabled {
+    color: #b8c6d2;
+    background: rgba(255, 255, 255, 0.64);
+    cursor: default;
+}
+
+.vas-ptm-pager-text {
+    min-width: 4.25em;
+    text-align: center;
+    color: #102c3f;
+    font-size: 1em;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 48em) {
+    .vas-ptm-dialog {
+        padding: 0;
+    }
+
+    .vas-ptm-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-ptm-dialog-header,
+    .vas-ptm-dialog-summary,
+    .vas-ptm-dialog-footer {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+
+    .vas-ptm-dialog-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vas-ptm-dialog-body {
+        padding: 0 0.75em;
     }
 }

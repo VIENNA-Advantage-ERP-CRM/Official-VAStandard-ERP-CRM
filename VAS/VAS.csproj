@@ -228,6 +228,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_033_PaymentMethodsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_032_RecentAPPaymentsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_046_ReconciliationStatusWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_056_AutoAllocatedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_031_UpcomingAPRunsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\ReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\TotalAmountReceivedThisMonthController.cs" />
@@ -406,6 +407,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_030_BouncedAPPaymentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_056_AutoAllocatedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_027_ClearedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_046_ReconciliationStatusWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />

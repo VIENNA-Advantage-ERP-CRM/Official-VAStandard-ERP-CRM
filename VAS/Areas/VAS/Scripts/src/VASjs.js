@@ -119,6 +119,7 @@ import "../app/widgets/VAS_029_ScheduledAPPaymentWidget.js";
 import "../app/widgets/VAS_030_BouncedAPPaymentWidget.js";
 import "../app/widgets/VAS_031_UpcomingAPRunsWidget.js";
 import "../app/widgets/VAS_032_RecentAPPaymentsWidget.js";
+import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 
 
 import "../app/widgets/VAS_033_PaymentMethodsWidget.js";

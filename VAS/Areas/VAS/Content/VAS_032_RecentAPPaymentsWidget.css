@@ -92,16 +92,16 @@
 .vas-recent-ap-payments-pager {
     display: flex;
     align-items: center;
-    gap: 0.35em;
+    gap: 0.5em;
     flex-shrink: 0;
 }
 
 .vas-recent-ap-payments-page-btn {
-    width: 1.75em;
-    height: 1.75em;
-    border: 0;
-    border-radius: 999px;
-    background: rgba(0, 131, 218, 0.08);
+    width: 1.5em;
+    height: 1.5em;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.375em;
+    background: rgba(255, 255, 255, 0.78);
     color: #0083DA;
     font-size: 1em;
     font-weight: 700;
@@ -111,24 +111,29 @@
     justify-content: center;
     line-height: 1;
     padding: 0;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
 }
 
     .vas-recent-ap-payments-page-btn:hover:not(:disabled) {
-        background: rgba(0, 131, 218, 0.14);
+        background: #eaf8ff;
+        border-color: #9ed1ff;
     }
 
     .vas-recent-ap-payments-page-btn:disabled {
-        opacity: 0.35;
+        color: #b8c6d2;
+        background: rgba(255, 255, 255, 0.58);
         cursor: default;
     }
 
 .vas-recent-ap-payments-page-text {
-    min-width: 2.5em;
+    min-width: 3.75em;
     text-align: center;
-    font-size: 0.72em;
-    color: #748494;
-    font-weight: 600;
+    font-size: 0.875em;
+    color: #102c3f;
+    font-weight: 500;
+    line-height: 1.2;
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .vas-recent-ap-payments-new {
@@ -260,7 +265,6 @@
         font-weight: 500;
         line-height: 1.2;
         letter-spacing: 0.0625em;
-        text-transform: uppercase;
         text-align: left;
     }
 
@@ -452,8 +456,8 @@
 }
 
 .vas-recent-ap-payments-root.vas-recent-ap-payments-compact .vas-recent-ap-payments-page-btn {
-    width: 1.75em;
-    height: 1.75em;
+    width: 1.5em;
+    height: 1.5em;
 }
 
 @container (max-width: 620px) {
@@ -547,16 +551,16 @@
         }
 
     .vas-recent-ap-payments-page-text {
-        font-size: 0.7em;
-        min-width: 2.5em;
+        font-size: 0.75em;
+        min-width: 3.25em;
     }
 
     .vas-recent-ap-payments-page-btn {
-        width: 1.625em;
-        height: 1.625em;
+        width: 1.5em;
+        height: 1.5em;
     }
 
     .vas-recent-ap-payments-pager {
-        gap: 0.25em;
+        gap: 0.375em;
     }
 }

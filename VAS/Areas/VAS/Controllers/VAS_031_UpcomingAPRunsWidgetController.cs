@@ -17,7 +17,7 @@ namespace VAS.Controllers
      * 2 | Next 7 days   | VAS_033_MessageNext7Days
      * 3 | payment       | VAS_033_MessagePayment
      * 4 | payments      | VAS_033_MessagePayments
-     * 5 | YTD           | VAS_033_MessageYTD
+     * 5 | Ytd           | VAS_033_MessageYTD
      * 6 | Month         | VAS_033_MessageMonth
      */
     public class VAS_033_UpcomingAPRunsWidgetController : Controller
@@ -279,15 +279,15 @@ AND p.DateTrx < " + GetNext7DateSql();
 
             if (dateFilter == "YTD")
             {
-                return GetMsg(ctx, "VAS_033_MessageYTD", "YTD");
+                return GetMsg(ctx, "VAS_033_MessageYTD", "Ytd");
             }
 
             if (dateFilter == "MONTH")
             {
-                return GetMsg(ctx, "VAS_033_MessageMonth", "MONTH");
+                return GetMsg(ctx, "VAS_033_MessageMonth", "Month");
             }
 
-            return GetMsg(ctx, "VAS_033_MessageNext7Days", "NEXT 7 DAYS");
+            return GetMsg(ctx, "VAS_033_MessageNext7Days", "Next 7 Days");
         }
 
         private string GetPaymentCountText(Ctx ctx, int paymentCount)

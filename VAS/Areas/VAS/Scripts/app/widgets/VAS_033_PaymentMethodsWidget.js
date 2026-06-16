@@ -6,7 +6,7 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Payment methods                      | VAS_033_MessagePaymentMethods
- *  2  | UPI is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
+ *  2  | Upi is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
  *  3  | Loading                              | VAS_033_MessageLoading
  *  4  | No Data                              | VAS_033_MessageNoData
  *  5  | Not Specified                        | VAS_033_MessageNotSpecified
@@ -61,7 +61,7 @@
 
             $foot = $('<div class="vas-payment-methods-foot">');
           
-            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'UPI is cheapest - shift small payments where possible'));
+            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'Upi is cheapest - shift small payments where possible'));
 
             $foot.append($whyText);
             $busy = $('<div class="vas-payment-methods-busy">').text(lbl('VAS_033_MessageLoading', 'Loading'));

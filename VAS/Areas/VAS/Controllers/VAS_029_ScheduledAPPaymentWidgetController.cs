@@ -14,8 +14,6 @@ namespace VAS.Controllers
     /// <summary>
     /// Module Name : VAS Dashboard
     /// Purpose     : Provides scheduled AP payment KPI widget data grouped by payment method.
-    /// Chronological development:
-    ///   <EmployeeCode>   Created Date
     /// </summary>
     /*
      * Labels / Message Keys
@@ -27,9 +25,8 @@ namespace VAS.Controllers
     public class VAS_029_ScheduledAPPaymentWidgetController : Controller
     {
         /// <summary>
-        /// Gets AP invoice schedule amounts due in the current week, grouped by payment method.
+        /// Gets AP invoice schedule amounts due in the next 7 days, grouped by payment method.
         /// </summary>
-        /// <returns>Scheduled AP payment amounts, currency, precision and grouped payment method rows.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetScheduledAPPaymentThisWeek()
@@ -246,13 +243,6 @@ AND Invoice.AD_Client_ID = @AD_Client_ID
 AND Invoice.IsSOTrx = 'N'
 AND Invoice.DocStatus IN ('CO', 'CL')";
 
-            /*
-             * MRole Handling:
-             * Apply MRole only on the main physical table C_Invoice Invoice.
-             * Do not apply MRole on the final WITH query.
-             * Do not apply MRole on CTE aliases.
-             * Do not apply MRole on joined aliases.
-             */
             invoiceAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 invoiceAccessSql,
                 "Invoice",
@@ -278,7 +268,37 @@ SchemaCurrency.Cur_Symbol AS CurrencySymbol,
 SchemaCurrency.StdPrecision,
 " + paymentMethodIdSelect + @" AS PaymentMethod_ID,
 " + paymentMethodNameSelect + @" AS PaymentMethodName,
-CASE WHEN COALESCE(Invoice.IsReturnTrx, 'N') = 'Y' THEN -CurrencyConvert(COALESCE(InvoicePaySchedule.DueAmt, 0), Invoice.C_Currency_ID, SchemaCurrency.C_Currency_ID, Invoice.DateAcct, Invoice.C_ConversionType_ID, Invoice.AD_Client_ID, Invoice.AD_Org_ID) ELSE CurrencyConvert(COALESCE(InvoicePaySchedule.DueAmt, 0), Invoice.C_Currency_ID, SchemaCurrency.C_Currency_ID, Invoice.DateAcct, Invoice.C_ConversionType_ID, Invoice.AD_Client_ID, Invoice.AD_Org_ID) END AS ScheduledAmount,
+CASE
+WHEN COALESCE(Invoice.IsReturnTrx, 'N') = 'Y'
+THEN
+    -CASE
+        WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID
+        THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+        ELSE CurrencyConvert(
+            COALESCE(InvoicePaySchedule.DueAmt, 0),
+            Invoice.C_Currency_ID,
+            SchemaCurrency.C_Currency_ID,
+            Invoice.DateAcct,
+            Invoice.C_ConversionType_ID,
+            Invoice.AD_Client_ID,
+            Invoice.AD_Org_ID
+        )
+    END
+ELSE
+    CASE
+        WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID
+        THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+        ELSE CurrencyConvert(
+            COALESCE(InvoicePaySchedule.DueAmt, 0),
+            Invoice.C_Currency_ID,
+            SchemaCurrency.C_Currency_ID,
+            Invoice.DateAcct,
+            Invoice.C_ConversionType_ID,
+            Invoice.AD_Client_ID,
+            Invoice.AD_Org_ID
+        )
+    END
+END AS ScheduledAmount,
 WeekRange.DateFrom,
 WeekRange.DateTo
 FROM InvoiceFiltered Invoice
@@ -331,30 +351,30 @@ ORDER BY ScheduledAmount DESC";
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE, 'IW')";
+                return "TRUNC(CURRENT_DATE)";
             }
 
-            return "DATE_TRUNC('week', CURRENT_DATE)";
+            return "CURRENT_DATE";
         }
 
         private string GetWeekEndExclusiveSql()
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE, 'IW') + 7";
+                return "TRUNC(CURRENT_DATE) + 7";
             }
 
-            return "DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '7 days'";
+            return "CURRENT_DATE + INTERVAL '7 days'";
         }
 
         private string GetWeekEndDisplaySql()
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE, 'IW') + 6";
+                return "TRUNC(CURRENT_DATE) + 6";
             }
 
-            return "DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days'";
+            return "CURRENT_DATE + INTERVAL '6 days'";
         }
 
         private string GetTextSql(string columnName)
@@ -419,13 +439,6 @@ AND ColumnData.ColumnName = 'Value'";
             return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
         }
 
-        /// <summary>
-        /// Gets translated message text by key with fallback.
-        /// </summary>
-        /// <param name="ctx">User context.</param>
-        /// <param name="key">Message key.</param>
-        /// <param name="fallback">Fallback text.</param>
-        /// <returns>Translated or fallback message text.</returns>
         private string GetMsg(Ctx ctx, string key, string fallback)
         {
             string msg = Msg.GetMsg(ctx, key);
@@ -435,11 +448,6 @@ AND ColumnData.ColumnName = 'Value'";
                 : fallback;
         }
 
-        /// <summary>
-        /// Formats date values returned to the widget.
-        /// </summary>
-        /// <param name="date">Date value.</param>
-        /// <returns>Date formatted as yyyy-MM-dd.</returns>
         private string FormatDate(DateTime? date)
         {
             return date.HasValue ? date.Value.ToString("yyyy-MM-dd") : "";

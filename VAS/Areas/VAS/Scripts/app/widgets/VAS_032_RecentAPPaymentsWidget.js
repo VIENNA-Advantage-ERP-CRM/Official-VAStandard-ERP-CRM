@@ -236,7 +236,7 @@
 
             if ($pagerText) {
                 if (totalPages > 1) {
-                    $pagerText.text(pageNo + ' / ' + totalPages);
+                    $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
                 }
                 else {
                     $pagerText.text('');
