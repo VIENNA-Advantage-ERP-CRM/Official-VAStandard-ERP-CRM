@@ -278,7 +278,7 @@
                             var id = $self.AD_UserHomeWidgetID;
                             // Update sub-label: "APR 1 – 18 · Count vs Value"
                             $root.find('#VAS-gljv-sub-' + id).text(
-                                (data.PeriodLabel || '').toUpperCase()
+                                (data.PeriodLabel || '')
                                 + ' · '
                                 + lbl('VAS_042_CountVsValue', 'Count vs Value')
                             );

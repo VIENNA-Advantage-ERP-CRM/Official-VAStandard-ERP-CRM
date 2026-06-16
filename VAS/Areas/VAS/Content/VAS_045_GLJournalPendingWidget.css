@@ -67,7 +67,6 @@
     font-weight: 500;
     color: #748494;
     letter-spacing: 0.03em;
-    text-transform: uppercase;
     margin-left: auto;
     white-space: nowrap;
 }
@@ -180,7 +179,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-transform: uppercase;
     letter-spacing: 0.02em;
 }
 
@@ -496,7 +494,6 @@ html[dir="rtl"] .VAS-gljpq-item {
     font-size: 0.75em;
     font-weight: 400;
     letter-spacing: 0.12em;
-    text-transform: uppercase;
     white-space: nowrap;
 }
 
@@ -537,7 +534,6 @@ html[dir="rtl"] .VAS-gljpq-item {
     font-size: 0.75em;
     font-weight: 400;
     letter-spacing: 0.1em;
-    text-transform: uppercase;
     text-align: left;
     padding: 0.875em 0.75em;
     border-bottom: 0.0625em solid #E4EDF4;
@@ -665,7 +661,6 @@ html[dir="rtl"] .VAS-gljpq-item {
     font-size: 0.875em !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
-    text-transform: uppercase;
     flex-shrink: 0;
 }
 

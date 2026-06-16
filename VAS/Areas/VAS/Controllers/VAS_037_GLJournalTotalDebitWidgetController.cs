@@ -209,7 +209,7 @@ LEFT OUTER JOIN JournalData JournalData
                     CurSymbol = curSymbol,
                     ISOCode = isoCode,
                     StdPrecision = stdPrecision,
-                    MonthAbbr = DateTime.Now.ToString("MMM").ToUpper()
+                    MonthAbbr = DateTime.Now.ToString("MMM")
                 };
             }
             catch (Exception ex)
@@ -338,7 +338,7 @@ LEFT OUTER JOIN JournalData JournalData
                     CurSymbol = curSymbol,
                     ISOCode = isoCode,
                     StdPrecision = stdPrecision,
-                    MonthAbbr = DateTime.Now.ToString("MMM").ToUpper()
+                    MonthAbbr = DateTime.Now.ToString("MMM")
                 };
             }
             catch (Exception ex)

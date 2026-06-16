@@ -121,7 +121,6 @@
     font-size: 0.6875em;
     font-weight: 700;
     color: #0083DA;
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
     flex-shrink: 0;
@@ -337,7 +336,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     font-size: 0.95em;
     font-weight: 700;
     letter-spacing: 0.12em;
-    text-transform: uppercase;
     text-align: left;
     padding: 1em 1.25em;
     border-bottom: 1px solid #E6EEF5;
@@ -934,7 +932,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     font-size: 0.75em;
     font-weight: 400;
     letter-spacing: 0.12em;
-    text-transform: uppercase;
     white-space: nowrap;
 }
 
@@ -993,7 +990,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     font-size: 0.75em;
     font-weight: 400;
     letter-spacing: 0.1em;
-    text-transform: uppercase;
     text-align: left;
     padding: 0.875em 0.75em;
     border-bottom: 0.0625em solid #E4EDF4;
@@ -1077,7 +1073,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     font-size: 0.875em !important;
     font-weight: 700 !important;
     letter-spacing: 0 !important;
-    text-transform: uppercase;
     flex-shrink: 0;
 }
 
