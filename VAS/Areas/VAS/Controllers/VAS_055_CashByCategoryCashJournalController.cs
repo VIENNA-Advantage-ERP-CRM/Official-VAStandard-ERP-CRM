@@ -40,7 +40,7 @@ namespace VAS.Controllers
 
             if (pageSize <= 0)
             {
-                pageSize = 3;
+                pageSize = 2;
             }
 
             int offset = (pageNo - 1) * pageSize;
