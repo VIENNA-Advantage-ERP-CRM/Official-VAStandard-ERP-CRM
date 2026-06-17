@@ -39,34 +39,46 @@ namespace VAS.Controllers
 
                 int totalPayments = 0;
                 int clearedPayments = 0;
-
                 decimal clearedPercentage = 0;
 
                 DateTime? dateFrom = null;
                 DateTime? dateTo = null;
 
-                if (dr != null && dr.Read())
+                if (
+                    dr != null &&
+                    dr.Read()
+                )
                 {
-                    totalPayments = Util.GetValueOfInt(
-                        dr["TotalPayments"]
-                    );
-
-                    clearedPayments = Util.GetValueOfInt(
-                        dr["ClearedPayments"]
-                    );
-
-                    if (dr["DateFrom"] != DBNull.Value)
-                    {
-                        dateFrom = Util.GetValueOfDateTime(
-                            dr["DateFrom"]
+                    totalPayments =
+                        Util.GetValueOfInt(
+                            dr["TotalPayments"]
                         );
+
+                    clearedPayments =
+                        Util.GetValueOfInt(
+                            dr["ClearedPayments"]
+                        );
+
+                    if (
+                        dr["DateFrom"] !=
+                        DBNull.Value
+                    )
+                    {
+                        dateFrom =
+                            Util.GetValueOfDateTime(
+                                dr["DateFrom"]
+                            );
                     }
 
-                    if (dr["DateTo"] != DBNull.Value)
+                    if (
+                        dr["DateTo"] !=
+                        DBNull.Value
+                    )
                     {
-                        dateTo = Util.GetValueOfDateTime(
-                            dr["DateTo"]
-                        );
+                        dateTo =
+                            Util.GetValueOfDateTime(
+                                dr["DateTo"]
+                            );
                     }
                 }
 
@@ -80,42 +92,48 @@ namespace VAS.Controllers
                     );
                 }
 
-                return Json(new
-                {
-                    title = GetMsg(
-                        ctx,
-                        "VAS_027_messageCleared",
-                        "Cleared"
-                    ),
+                return Json(
+                    new
+                    {
+                        title = GetMsg(
+                            ctx,
+                            "VAS_027_messageCleared",
+                            "Cleared"
+                        ),
 
-                    description = GetMsg(
-                        ctx,
-                        "VAS_027_messageAPPaymentClearedWhy",
-                        "Of last month's AP payments reconciled"
-                    ),
+                        description = GetMsg(
+                            ctx,
+                            "VAS_027_messageAPPaymentClearedWhy",
+                            "Of last month's AP payments reconciled"
+                        ),
 
-                    value = clearedPercentage,
-                    clearedPercentage = clearedPercentage,
-                    totalPayments = totalPayments,
-                    clearedPayments = clearedPayments,
-                    precision = 2,
+                        value = clearedPercentage,
+                        clearedPercentage = clearedPercentage,
+                        totalPayments = totalPayments,
+                        clearedPayments = clearedPayments,
+                        precision = 2,
 
-                    dateFrom = dateFrom.HasValue
-                        ? FormatDate(dateFrom.Value)
-                        : "",
+                        dateFrom = dateFrom.HasValue
+                            ? FormatDate(dateFrom.Value)
+                            : "",
 
-                    dateTo = dateTo.HasValue
-                        ? FormatDate(dateTo.Value)
-                        : ""
-                }, JsonRequestBehavior.AllowGet);
+                        dateTo = dateTo.HasValue
+                            ? FormatDate(dateTo.Value)
+                            : ""
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    error = ex.Message,
-                    errorText = ex.Message
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        error = ex.Message,
+                        errorText = ex.Message
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             finally
             {
@@ -144,7 +162,7 @@ namespace VAS.Controllers
 
             if (pageSize <= 0)
             {
-                pageSize = 5;
+                pageSize = 25;
             }
 
             if (pageSize > 100)
@@ -183,6 +201,14 @@ DISTINCT PaymentsData.C_Currency_ID
 ) AS CurrencyCount
 FROM PaymentsData PaymentsData";
 
+            SqlParameter[] parameters =
+            {
+                new SqlParameter(
+                    "@AD_Client_ID",
+                    ctx.GetAD_Client_ID()
+                )
+            };
+
             List<object> rows =
                 new List<object>();
 
@@ -208,13 +234,9 @@ FROM PaymentsData PaymentsData";
 
             try
             {
-                /*
-                 * نقرأ الـ Summary أولاً، بعدها نصحح pageNo
-                 * حتى لا نطلب صفحة خارج عدد الصفحات المتوفر.
-                 */
                 summaryReader = DB.ExecuteReader(
                     summarySql,
-                    null,
+                    parameters,
                     null
                 );
 
@@ -223,9 +245,10 @@ FROM PaymentsData PaymentsData";
                     summaryReader.Read()
                 )
                 {
-                    totalRecords = Util.GetValueOfInt(
-                        summaryReader["TotalRecords"]
-                    );
+                    totalRecords =
+                        Util.GetValueOfInt(
+                            summaryReader["TotalRecords"]
+                        );
 
                     totalAmount =
                         Util.GetValueOfDecimal(
@@ -328,11 +351,12 @@ CURRENT_DATE AS CurrentDate
 FROM NumberedData NumberedData
 WHERE NumberedData.RowNumber >= " + startRow + @"
 AND NumberedData.RowNumber <= " + endRow + @"
-ORDER BY NumberedData.RowNumber";
+ORDER BY
+NumberedData.RowNumber";
 
                 rowsReader = DB.ExecuteReader(
                     rowsSql,
-                    null,
+                    parameters,
                     null
                 );
 
@@ -448,39 +472,41 @@ ORDER BY NumberedData.RowNumber";
                             rowPrecision;
                     }
 
-                    rows.Add(new
-                    {
-                        paymentId =
-                            Util.GetValueOfInt(
-                                rowsReader["Payment_ID"]
-                            ),
+                    rows.Add(
+                        new
+                        {
+                            paymentId =
+                                Util.GetValueOfInt(
+                                    rowsReader["Payment_ID"]
+                                ),
 
-                        date = trxDate.HasValue
-                            ? trxDate.Value.ToString(
-                                "yyyy-MM-dd",
-                                CultureInfo.InvariantCulture
-                            )
-                            : "",
+                            date = trxDate.HasValue
+                                ? trxDate.Value.ToString(
+                                    "yyyy-MM-dd",
+                                    CultureInfo.InvariantCulture
+                                )
+                                : "",
 
-                        paymentNo = documentNo,
-                        vendor = vendor,
-                        bankName = bankName,
-                        accountNo = accountNo,
-                        amount = amount,
-                        currencyIso = currencyIso,
-                        curSymbol = currencySymbol,
-                        stdPrecision = rowPrecision,
-                        method = paymentMethod,
+                            paymentNo = documentNo,
+                            vendor = vendor,
+                            bankName = bankName,
+                            accountNo = accountNo,
+                            amount = amount,
+                            currencyIso = currencyIso,
+                            curSymbol = currencySymbol,
+                            stdPrecision = rowPrecision,
+                            method = paymentMethod,
 
-                        whyUnreconciled =
-                            GetUnreconciledReason(
-                                currentDate,
-                                trxDate,
-                                documentNo,
-                                bankName,
-                                accountNo
-                            )
-                    });
+                            whyUnreconciled =
+                                GetUnreconciledReason(
+                                    currentDate,
+                                    trxDate,
+                                    documentNo,
+                                    bankName,
+                                    accountNo
+                                )
+                        }
+                    );
                 }
 
                 int oldestDays = oldestDate.HasValue
@@ -503,8 +529,7 @@ ORDER BY NumberedData.RowNumber";
                                 100M /
                                 totalRecords,
                                 0,
-                                MidpointRounding
-                                    .AwayFromZero
+                                MidpointRounding.AwayFromZero
                             )
                         )
                         : 0;
@@ -512,46 +537,54 @@ ORDER BY NumberedData.RowNumber";
                 bool hasMixedCurrencies =
                     currencyCount > 1;
 
-                return Json(new
-                {
-                    rows = rows,
-                    pageNo = pageNo,
-                    pageSize = pageSize,
-                    totalRecords = totalRecords,
-                    totalPages = totalPages,
+                return Json(
+                    new
+                    {
+                        rows = rows,
+                        pageNo = pageNo,
+                        pageSize = pageSize,
+                        totalRecords = totalRecords,
+                        totalPages = totalPages,
 
-                    totalAmount = hasMixedCurrencies
-                        ? 0
-                        : Math.Round(
-                            totalAmount,
-                            summaryPrecision,
-                            MidpointRounding.AwayFromZero
-                        ),
+                        totalAmount = hasMixedCurrencies
+                            ? 0
+                            : Math.Round(
+                                totalAmount,
+                                summaryPrecision,
+                                MidpointRounding.AwayFromZero
+                            ),
 
-                    currencyIso = hasMixedCurrencies
-                        ? ""
-                        : summaryCurrencyIso,
+                        currencyIso = hasMixedCurrencies
+                            ? ""
+                            : summaryCurrencyIso,
 
-                    curSymbol = hasMixedCurrencies
-                        ? ""
-                        : summaryCurrencySymbol,
+                        curSymbol = hasMixedCurrencies
+                            ? ""
+                            : summaryCurrencySymbol,
 
-                    stdPrecision = summaryPrecision,
-                    hasMixedCurrencies =
-                        hasMixedCurrencies,
-                    oldestDays = oldestDays,
-                    autoMatchRate = autoMatchRate
-                }, JsonRequestBehavior.AllowGet);
+                        stdPrecision = summaryPrecision,
+
+                        hasMixedCurrencies =
+                            hasMixedCurrencies,
+
+                        oldestDays = oldestDays,
+                        autoMatchRate = autoMatchRate
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    error = ex.Message,
-                    errorText = ex.Message,
-                    summarySql = summarySql,
-                    rowsSql = rowsSql
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        error = ex.Message,
+                        errorText = ex.Message,
+                        summarySql = summarySql,
+                        rowsSql = rowsSql
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             finally
             {
@@ -710,8 +743,8 @@ PeriodRange.DateTo + 1
         }
 
         private string BuildUnreconciledPaymentAccessSql(
-          Ctx ctx
-      )
+            Ctx ctx
+        )
         {
             string paymentRoleSql = @"
 SELECT
@@ -741,32 +774,31 @@ Payment.IsReconciled IS NULL
 OR CAST(
 Payment.IsReconciled AS VARCHAR2(1)
 ) = 'N'
-)";
-
-            paymentRoleSql = MRole.GetDefault(ctx).AddAccessSQL(
-                paymentRoleSql,
-                "Payment",
-                MRole.SQL_FULLYQUALIFIED,
-                MRole.SQL_RO
-            );
-
-            string sql = @"
-WITH CurrentPeriod AS
+)
+AND EXISTS
 (
 SELECT
-YearData.C_Calendar_ID,
-Period.StartDate,
-Period.EndDate
+1
 FROM AD_ClientInfo ClientInfo
-INNER JOIN C_Year YearData ON
+INNER JOIN C_Year CurrentYear ON
 (
-YearData.C_Calendar_ID =
+CurrentYear.C_Calendar_ID =
 ClientInfo.C_Calendar_ID
 )
-INNER JOIN C_Period Period ON
+INNER JOIN C_Period CurrentPeriod ON
 (
-Period.C_Year_ID =
-YearData.C_Year_ID
+CurrentPeriod.C_Year_ID =
+CurrentYear.C_Year_ID
+)
+INNER JOIN C_Year PreviousYear ON
+(
+PreviousYear.C_Calendar_ID =
+CurrentYear.C_Calendar_ID
+)
+INNER JOIN C_Period PreviousPeriod ON
+(
+PreviousPeriod.C_Year_ID =
+PreviousYear.C_Year_ID
 )
 WHERE CAST(
 ClientInfo.IsActive AS VARCHAR2(1)
@@ -774,82 +806,41 @@ ClientInfo.IsActive AS VARCHAR2(1)
 AND ClientInfo.AD_Client_ID =
 @AD_Client_ID
 AND CURRENT_DATE >=
-Period.StartDate
-AND CURRENT_DATE <
-Period.EndDate + 1
-),
-PreviousPeriodEnd AS
-(
-SELECT
-MAX(Period.EndDate) AS DateTo
-FROM CurrentPeriod CurrentPeriod
-INNER JOIN C_Year YearData ON
-(
-YearData.C_Calendar_ID =
-CurrentPeriod.C_Calendar_ID
-)
-INNER JOIN C_Period Period ON
-(
-Period.C_Year_ID =
-YearData.C_Year_ID
-)
-WHERE Period.EndDate <
 CurrentPeriod.StartDate
-),
-PeriodRange AS
+AND CURRENT_DATE <
+CurrentPeriod.EndDate + 1
+AND PreviousPeriod.EndDate =
 (
 SELECT
-Period.StartDate AS DateFrom,
-Period.EndDate AS DateTo
-FROM CurrentPeriod CurrentPeriod
+MAX(PeriodData.EndDate)
+FROM C_Period PeriodData
 INNER JOIN C_Year YearData ON
 (
-YearData.C_Calendar_ID =
-CurrentPeriod.C_Calendar_ID
-)
-INNER JOIN C_Period Period ON
-(
-Period.C_Year_ID =
+PeriodData.C_Year_ID =
 YearData.C_Year_ID
 )
-INNER JOIN PreviousPeriodEnd PreviousPeriodEnd ON
-(
-PreviousPeriodEnd.DateTo =
-Period.EndDate
+WHERE YearData.C_Calendar_ID =
+CurrentYear.C_Calendar_ID
+AND PeriodData.EndDate <
+CurrentPeriod.StartDate
 )
-),
-PaymentRoleData AS
-(
-" + paymentRoleSql + @"
-)
-SELECT
-PaymentRoleData.C_Payment_ID,
-PaymentRoleData.DateTrx,
-PaymentRoleData.DocumentNo,
-PaymentRoleData.C_BPartner_ID,
-PaymentRoleData.C_BankAccount_ID,
-PaymentRoleData.C_Currency_ID,
-PaymentRoleData.VA009_PaymentMethod_ID,
-PaymentRoleData.PayAmt
-FROM PaymentRoleData PaymentRoleData
-INNER JOIN PeriodRange PeriodRange ON
-(
-PaymentRoleData.DateTrx >=
-PeriodRange.DateFrom
-AND PaymentRoleData.DateTrx <
-PeriodRange.DateTo + 1
+AND Payment.DateTrx >=
+PreviousPeriod.StartDate
+AND Payment.DateTrx <
+PreviousPeriod.EndDate + 1
 )";
 
-            SqlParameter[] parameters =
-            {
-        new SqlParameter(
-            "@AD_Client_ID",
-            ctx.GetAD_Client_ID()
-        )
-    };
+            paymentRoleSql =
+                MRole.GetDefault(ctx).AddAccessSQL(
+                    paymentRoleSql,
+                    "Payment",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
-            return sql;
+            return paymentRoleSql;
         }
+
         private string BuildPaymentsDataSql(
             string paymentAccessSql
         )
@@ -994,11 +985,14 @@ PaymentAccess.VA009_PaymentMethod_ID
 
         private JsonResult GetSessionExpiredResult()
         {
-            return Json(new
-            {
-                error = "Session Expired",
-                errorText = "Session Expired"
-            }, JsonRequestBehavior.AllowGet);
+            return Json(
+                new
+                {
+                    error = "Session Expired",
+                    errorText = "Session Expired"
+                },
+                JsonRequestBehavior.AllowGet
+            );
         }
 
         private string FormatDate(

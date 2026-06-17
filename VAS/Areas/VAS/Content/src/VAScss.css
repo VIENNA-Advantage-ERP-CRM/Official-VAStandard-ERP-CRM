@@ -65,5 +65,7 @@
 @import "../VAS_045_GLJournalPendingWidget.css";
 @import "../VAS_056_AutoAllocatedAPPaymentWidget.css";
 
+@import "../VAS_072_MatchSuggestionAPPayment.css";
+
 @import "../SalesInvoiceCustomerSearchWidget.css";
 

@@ -167,5 +167,7 @@ import "../app/widgets/VAS_042_GLJournalVolumeWidget.js";
 import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
+import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
+
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
 

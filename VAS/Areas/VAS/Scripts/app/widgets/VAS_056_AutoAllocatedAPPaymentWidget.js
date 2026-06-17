@@ -1263,16 +1263,7 @@
                 classPrefix +
                 'footer">' +
 
-                '<span class="' +
-                classPrefix +
-                'badge">' +
-                escapeHtml(
-                    lbl(
-                        "VAS_Last30Days",
-                        "Last 30 days"
-                    )
-                ) +
-                "</span>" +
+               
 
                 '<span class="' +
                 classPrefix +

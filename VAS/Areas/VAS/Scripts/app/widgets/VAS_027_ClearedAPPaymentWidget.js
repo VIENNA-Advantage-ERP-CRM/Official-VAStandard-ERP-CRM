@@ -44,7 +44,7 @@
         var rowsLoading = false;
 
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 25;
         var totalPages = 0;
         var totalRecords = 0;
 
