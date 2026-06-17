@@ -39,6 +39,7 @@
         var $payDialogNotice;
         var $payDialogGrid;
         var $payDialogSave;
+        var $payDialogSaveLabel;
         var $payDialogBusy;
 
         var isDisposed = false;
@@ -322,7 +323,7 @@
                 $payDialogGrid.empty();
             }
 
-            setPayDialogBusy(true);
+            setPayDialogBusy(true, false);
             $payDialog.show();
             $('body').addClass('vas-upcoming-ap-runs-body-lock');
 
@@ -400,7 +401,7 @@
                     showPayError(lbl('VAS_ErrorLoading', 'Could not load data'));
                 },
                 complete: function () {
-                    setPayDialogBusy(false);
+                    setPayDialogBusy(false, false);
                 }
             });
         }
@@ -583,7 +584,7 @@
             }
 
             saveInProgress = true;
-            setPayDialogBusy(true);
+            setPayDialogBusy(true, true);
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_033_UpcomingAPRunsWidget/CreateUpcomingAPPayment',
@@ -608,7 +609,7 @@
                     }
 
                     saveInProgress = false;
-                    setPayDialogBusy(false);
+                    setPayDialogBusy(false, true);
                     closePayDialog();
                     loadData();
                 },
@@ -618,7 +619,7 @@
                 complete: function () {
                     if (saveInProgress) {
                         saveInProgress = false;
-                        setPayDialogBusy(false);
+                        setPayDialogBusy(false, true);
                     }
                 }
             });
@@ -657,15 +658,26 @@
             }
         }
 
-        function setPayDialogBusy(show) {
-            saveInProgress = !!show;
+        function setPayDialogBusy(show, isSaving) {
+            var busy = !!show;
+            var saving = !!isSaving && busy;
 
             if ($payDialogBusy) {
-                $payDialogBusy.toggleClass('is-visible', !!show);
+                $payDialogBusy
+                    .text(saving ? lbl('VAS_031_MessageSaving', 'Saving') : lbl('VAS_031_MessageLoadingDetails', 'Loading payment details'))
+                    .toggleClass('is-visible', busy);
             }
 
             if ($payDialogSave) {
-                $payDialogSave.prop('disabled', !!show);
+                $payDialogSave
+                    .prop('disabled', busy)
+                    .toggleClass('is-loading', saving);
+            }
+
+            if ($payDialogSaveLabel) {
+                $payDialogSaveLabel.text(saving
+                    ? lbl('VAS_031_MessageSaving', 'Saving')
+                    : lbl('VAS_031_MessageSavePayment', 'Save payment'));
             }
 
             if ($payDialogNotice) {
@@ -703,7 +715,11 @@
                 '<span>' + escapeHtml(lbl('VAS_031_MessageGeneratedFromUpcoming', 'Generated from Upcoming · 7 days')) + '</span>' +
                 '<div class="vas-upcoming-ap-runs-pay-footer-actions">' +
                 '<button type="button" class="vas-upcoming-ap-runs-pay-cancel">' + escapeHtml(lbl('VAS_Cancel', 'Cancel')) + '</button>' +
-                '<button type="button" class="vas-upcoming-ap-runs-pay-save">✓ ' + escapeHtml(lbl('VAS_031_MessageSavePayment', 'Save payment')) + '</button>' +
+                '<button type="button" class="vas-upcoming-ap-runs-pay-save">' +
+                '<span class="vas-upcoming-ap-runs-save-spinner" aria-hidden="true"></span>' +
+                '<span class="vas-upcoming-ap-runs-save-check" aria-hidden="true">✓</span>' +
+                '<span class="vas-upcoming-ap-runs-save-label">' + escapeHtml(lbl('VAS_031_MessageSavePayment', 'Save payment')) + '</span>' +
+                '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
@@ -715,6 +731,7 @@
             $payDialogNotice = $payDialog.find('.vas-upcoming-ap-runs-pay-notice');
             $payDialogGrid = $payDialog.find('.vas-upcoming-ap-runs-pay-grid');
             $payDialogSave = $payDialog.find('.vas-upcoming-ap-runs-pay-save');
+            $payDialogSaveLabel = $payDialog.find('.vas-upcoming-ap-runs-save-label');
             $payDialogBusy = $payDialog.find('.vas-upcoming-ap-runs-pay-busy');
 
             $payDialog.find('.vas-upcoming-ap-runs-pay-close, .vas-upcoming-ap-runs-pay-cancel').on('click', function () {
@@ -901,6 +918,7 @@
             $payDialogNotice = null;
             $payDialogGrid = null;
             $payDialogSave = null;
+            $payDialogSaveLabel = null;
             $payDialogBusy = null;
         };
     };

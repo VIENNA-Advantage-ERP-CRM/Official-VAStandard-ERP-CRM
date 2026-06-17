@@ -1,4 +1,5 @@
-﻿/******************************************************
+﻿
+/******************************************************
  * Module Name    : VAS
  * Purpose        : AP Payment Match Suggestions Widget
  * Chronological  : Development
@@ -10,6 +11,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Globalization;
 using System.Linq;
 using System.Web.Mvc;
@@ -44,23 +46,20 @@ namespace VAS.Controllers
             if (ctx == null)
             {
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = "Session Expired",
-                            errorText = "Session Expired"
-                        }),
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = "Session Expired",
+                        errorText = "Session Expired",
+                        hasData = false
+                    }),
                     JsonRequestBehavior.AllowGet
                 );
             }
 
             try
             {
-                pageNo = Math.Max(
-                    1,
-                    pageNo
-                );
+                pageNo = Math.Max(1, pageNo);
 
                 pageSize = Math.Max(
                     1,
@@ -216,20 +215,23 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_072_LoadError",
+                        "Could not load AP payment match suggestions"
+                    );
+
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = ex.Message,
-                            errorText = GetMessage(
-                                ctx,
-                                "VAS_072_LoadError",
-                                "Could not load AP payment match suggestions"
-                            )
-                        }),
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = errorMessage,
+                        errorText = errorMessage,
+                        hasData = false
+                    }),
                     JsonRequestBehavior.AllowGet
                 );
             }
@@ -247,13 +249,32 @@ namespace VAS.Controllers
             if (ctx == null)
             {
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = "Session Expired",
-                            errorText = "Session Expired"
-                        }),
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = "Session Expired",
+                        errorText = "Session Expired"
+                    }),
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+
+            if (
+                paymentId <= 0 ||
+                invoiceId <= 0 ||
+                payScheduleId <= 0
+            )
+            {
+                return Json(
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = GetMsg(
+                            ctx,
+                            "FillMandatory",
+                            "Mandatory values are missing"
+                        )
+                    }),
                     JsonRequestBehavior.AllowGet
                 );
             }
@@ -277,22 +298,21 @@ namespace VAS.Controllers
                             item.PaymentId == paymentId &&
                             item.InvoiceId == invoiceId &&
                             item.InvoicePayScheduleId ==
-                                payScheduleId
+                            payScheduleId
                     );
 
                 if (row == null)
                 {
                     return Json(
-                        JsonConvert.SerializeObject(
-                            new
-                            {
-                                success = false,
-                                error = GetMessage(
-                                    ctx,
-                                    "VIS_NoRecordFound",
-                                    "No record found"
-                                )
-                            }),
+                        JsonConvert.SerializeObject(new
+                        {
+                            success = false,
+                            error = GetMsg(
+                                ctx,
+                                "VIS_NoRecordFound",
+                                "No record found"
+                            )
+                        }),
                         JsonRequestBehavior.AllowGet
                     );
                 }
@@ -437,30 +457,27 @@ namespace VAS.Controllers
                 };
 
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = true,
-                            error = "",
-                            detail = detail
-                        }),
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = true,
+                        error = "",
+                        detail = detail
+                    }),
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = ex.Message,
-                            errorText = GetMessage(
-                                ctx,
-                                "VAS_072_LoadDetailError",
-                                "Could not load match details"
-                            )
-                        }),
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = GetMsg(
+                            ctx,
+                            "VAS_072_LoadDetailError",
+                            "Could not load match details"
+                        )
+                    }),
                     JsonRequestBehavior.AllowGet
                 );
             }
@@ -479,13 +496,12 @@ namespace VAS.Controllers
             if (ctx == null)
             {
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = "Session Expired",
-                            message = "Session Expired"
-                        })
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = "Session Expired",
+                        message = "Session Expired"
+                    })
                 );
             }
 
@@ -498,18 +514,17 @@ namespace VAS.Controllers
                 );
 
             return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        success =
-                            result.Success,
+                JsonConvert.SerializeObject(new
+                {
+                    success =
+                        result.Success,
 
-                        documentNo =
-                            result.DocumentNo,
+                    documentNo =
+                        result.DocumentNo,
 
-                        message =
-                            result.Message
-                    })
+                    message =
+                        result.Message
+                })
             );
         }
 
@@ -523,13 +538,12 @@ namespace VAS.Controllers
             if (ctx == null)
             {
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = "Session Expired",
-                            message = "Session Expired"
-                        })
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = "Session Expired",
+                        message = "Session Expired"
+                    })
                 );
             }
 
@@ -596,7 +610,7 @@ namespace VAS.Controllers
 
                 string message =
                     success
-                        ? GetMessage(
+                        ? GetMsg(
                             ctx,
                             "VAS_072_ApplySuccess",
                             "Allocation completed successfully"
@@ -604,7 +618,7 @@ namespace VAS.Controllers
                         " (" +
                         appliedCount +
                         ")"
-                        : GetMessage(
+                        : GetMsg(
                             ctx,
                             "VAS_072_ApplyError",
                             "Could not complete allocation"
@@ -616,32 +630,33 @@ namespace VAS.Controllers
                         );
 
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = success,
-                            appliedCount =
-                                appliedCount,
-                            failedCount =
-                                errors.Count,
-                            message = message
-                        })
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = success,
+                        appliedCount =
+                            appliedCount,
+                        failedCount =
+                            errors.Count,
+                        message = message
+                    })
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_072_ApplyError",
+                        "Could not complete allocation"
+                    );
+
                 return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = ex.Message,
-                            message = GetMessage(
-                                ctx,
-                                "VAS_072_ApplyError",
-                                "Could not complete allocation"
-                            )
-                        })
+                    JsonConvert.SerializeObject(new
+                    {
+                        success = false,
+                        error = errorMessage,
+                        message = errorMessage
+                    })
                 );
             }
         }
@@ -664,9 +679,10 @@ namespace VAS.Controllers
             }
 
             /*
-             * This query contains no runtime SQL parameters.
-             * MRole is applied only to the physical C_Payment query
-             * before the query is inserted into AccessiblePayments.
+             * MRole is applied independently to each primary
+             * physical table.
+             *
+             * It is not applied to CTE aliases or to the final query.
              */
             string paymentAccessSql = @"
 SELECT
@@ -674,60 +690,16 @@ Payment.AD_Client_ID,
 Payment.AD_Org_ID,
 Payment.C_Payment_ID,
 Payment.C_BPartner_ID,
-Payment.DocumentNo AS PaymentDocumentNo,
-Payment.DateAcct AS PaymentDateAcct,
-Payment.C_Currency_ID AS PaymentCurrencyId,
-COALESCE(
+Payment.DocumentNo,
+Payment.DateAcct,
+Payment.C_Currency_ID,
 Payment.C_ConversionType_ID,
-0
-) AS PaymentConversionTypeId,
-ABS(
-COALESCE(
 Payment.PayAmt,
-0
-)
-) AS PaymentOriginalAmount,
-BusinessPartner.Name AS VendorName,
-PaymentMethod.VA009_Name AS PaymentMethod,
-COALESCE(
 Payment.TrxNo,
-Payment.CheckNo
-) AS ReferenceNo,
-Bank.Name AS BankName,
-BankAccount.AccountNo AS AccountNo,
-PaymentCurrency.ISO_Code AS PaymentCurrencyISOCode,
-CASE
-WHEN PaymentCurrency.CurSymbol IS NOT NULL
-THEN PaymentCurrency.CurSymbol
-ELSE PaymentCurrency.ISO_Code
-END AS PaymentCurrencySymbol,
-PaymentCurrency.StdPrecision AS PaymentPrecision
-FROM C_Payment Payment
-INNER JOIN C_BPartner BusinessPartner ON
-(
-BusinessPartner.C_BPartner_ID=
-Payment.C_BPartner_ID
-)
-INNER JOIN C_Currency PaymentCurrency ON
-(
-PaymentCurrency.C_Currency_ID=
-Payment.C_Currency_ID
-)
-LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
-(
-PaymentMethod.VA009_PaymentMethod_ID=
-Payment.VA009_PaymentMethod_ID
-)
-LEFT OUTER JOIN C_BankAccount BankAccount ON
-(
-BankAccount.C_BankAccount_ID=
+Payment.CheckNo,
+Payment.VA009_PaymentMethod_ID,
 Payment.C_BankAccount_ID
-)
-LEFT OUTER JOIN C_Bank Bank ON
-(
-Bank.C_Bank_ID=
-BankAccount.C_Bank_ID
-)
+FROM C_Payment Payment
 WHERE Payment.IsActive='Y'
 AND Payment.Processed='Y'
 AND Payment.IsReceipt='N'
@@ -747,10 +719,35 @@ AND Payment.DateAcct<CURRENT_DATE+1";
                         MRole.SQL_RO
                     );
 
-            /*
-             * Oracle requires FROM DUAL for a SELECT without a table.
-             * PostgreSQL does not use DUAL.
-             */
+            string invoiceAccessSql = @"
+SELECT
+Invoice.AD_Client_ID,
+Invoice.AD_Org_ID,
+Invoice.C_Invoice_ID,
+Invoice.C_BPartner_ID,
+Invoice.DocumentNo,
+Invoice.DateInvoiced,
+Invoice.DateAcct,
+Invoice.C_Currency_ID,
+Invoice.GrandTotal,
+Invoice.C_PaymentTerm_ID
+FROM C_Invoice Invoice
+WHERE Invoice.IsActive='Y'
+AND Invoice.Processed='Y'
+AND Invoice.IsSOTrx='N'
+AND Invoice.DocStatus IN ('CO','CL')
+AND COALESCE(Invoice.IsPaid,'N')='N'
+AND COALESCE(Invoice.IsReturnTrx,'N')='N'";
+
+            invoiceAccessSql =
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        invoiceAccessSql,
+                        "Invoice",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
+
             string parameterSource =
                 DB.IsPostgreSQL()
                     ? ""
@@ -760,52 +757,12 @@ AND Payment.DateAcct<CURRENT_DATE+1";
 WITH QueryParameters AS
 (
 SELECT
-";
-
-            sql += ToSqlInt(
-                    ctx.GetAD_Client_ID()
-                ) +
-                @" AS AD_Client_ID,
-" +
-                ToSqlInt(
-                    Math.Max(
-                        0,
-                        paymentId
-                    )
-                ) +
-                @" AS C_Payment_ID,
-" +
-                ToSqlInt(
-                    Math.Max(
-                        0,
-                        invoiceId
-                    )
-                ) +
-                @" AS C_Invoice_ID,
-" +
-                ToSqlInt(
-                    Math.Max(
-                        0,
-                        payScheduleId
-                    )
-                ) +
-                @" AS C_InvoicePaySchedule_ID,
-" +
-                ToSqlInt(
-                    Math.Max(
-                        0,
-                        offsetRows
-                    )
-                ) +
-                @" AS OffsetRows,
-" +
-                ToSqlInt(
-                    Math.Max(
-                        0,
-                        pageSize
-                    )
-                ) +
-                @" AS PageSize" +
+@AD_Client_ID AS AD_Client_ID,
+@C_Payment_ID AS C_Payment_ID,
+@C_Invoice_ID AS C_Invoice_ID,
+@C_InvoicePaySchedule_ID AS C_InvoicePaySchedule_ID,
+@OffsetRows AS OffsetRows,
+@PageSize AS PageSize" +
                 parameterSource +
                 @"
 ),
@@ -814,13 +771,13 @@ SchemaCurrency AS
 SELECT
 ClientInfo.AD_Client_ID,
 AcctSchema.C_Currency_ID AS SchemaCurrencyId,
-Currency.ISO_Code AS SchemaCurrencyISOCode,
+Currency.ISO_Code AS SchemaCurrencyISO,
 CASE
 WHEN Currency.CurSymbol IS NOT NULL
 THEN Currency.CurSymbol
 ELSE Currency.ISO_Code
 END AS SchemaCurrencySymbol,
-Currency.StdPrecision AS SchemaStdPrecision
+Currency.StdPrecision AS SchemaPrecision
 FROM AD_ClientInfo ClientInfo
 INNER JOIN C_AcctSchema AcctSchema ON
 (
@@ -832,78 +789,77 @@ INNER JOIN C_Currency Currency ON
 Currency.C_Currency_ID=
 AcctSchema.C_Currency_ID
 )
-INNER JOIN QueryParameters QueryParameters ON
-(1=1)
+CROSS JOIN QueryParameters QueryParameters
 WHERE ClientInfo.IsActive='Y'
 AND ClientInfo.AD_Client_ID=
 QueryParameters.AD_Client_ID
-),
-PaymentAllocated AS
-(
-SELECT
-AllocationLine.C_Payment_ID,
-SUM(
-ABS(
-COALESCE(
-AllocationLine.Amount,
-0
-)
-)
-) AS PaymentAllocatedAmount
-FROM C_AllocationLine AllocationLine
-INNER JOIN C_AllocationHdr AllocationHeader ON
-(
-AllocationHeader.C_AllocationHdr_ID=
-AllocationLine.C_AllocationHdr_ID
-)
-WHERE AllocationLine.IsActive='Y'
-AND AllocationHeader.IsActive='Y'
-AND AllocationHeader.DocStatus IN ('CO','CL')
-AND AllocationLine.C_Payment_ID IS NOT NULL
-GROUP BY
-AllocationLine.C_Payment_ID
 ),
 AccessiblePayments AS
 (
 " + paymentAccessSql + @"
 ),
-MainPayments AS
+PaymentRecords AS
 (
 SELECT
 AccessiblePayments.AD_Client_ID,
 AccessiblePayments.AD_Org_ID,
 AccessiblePayments.C_Payment_ID,
 AccessiblePayments.C_BPartner_ID,
-AccessiblePayments.PaymentDocumentNo,
-AccessiblePayments.PaymentDateAcct,
-AccessiblePayments.PaymentCurrencyId,
-AccessiblePayments.PaymentConversionTypeId,
-AccessiblePayments.PaymentOriginalAmount,
+AccessiblePayments.DocumentNo AS PaymentDocNo,
+AccessiblePayments.DateAcct AS PaymentDateAcct,
+AccessiblePayments.C_Currency_ID AS PaymentCurrencyId,
 COALESCE(
-PaymentAllocated.PaymentAllocatedAmount,
+AccessiblePayments.C_ConversionType_ID,
 0
-) AS PaymentAllocatedAmount,
-AccessiblePayments.PaymentOriginalAmount-
+) AS PaymentConversionTypeId,
+ABS(
 COALESCE(
-PaymentAllocated.PaymentAllocatedAmount,
+AccessiblePayments.PayAmt,
 0
-) AS PaymentOpenAmount,
-AccessiblePayments.VendorName,
-AccessiblePayments.PaymentMethod,
-AccessiblePayments.ReferenceNo,
-AccessiblePayments.BankName,
-AccessiblePayments.AccountNo,
-AccessiblePayments.PaymentCurrencyISOCode,
-AccessiblePayments.PaymentCurrencySymbol,
-AccessiblePayments.PaymentPrecision
-FROM AccessiblePayments AccessiblePayments
-INNER JOIN QueryParameters QueryParameters ON
-(1=1)
-LEFT OUTER JOIN PaymentAllocated PaymentAllocated ON
-(
-PaymentAllocated.C_Payment_ID=
-AccessiblePayments.C_Payment_ID
 )
+) AS PaymentOriginalAmt,
+BusinessPartner.Name AS VendorName,
+PaymentMethod.VA009_Name AS PaymentMethod,
+COALESCE(
+AccessiblePayments.TrxNo,
+AccessiblePayments.CheckNo
+) AS ReferenceNo,
+Bank.Name AS BankName,
+BankAccount.AccountNo AS AccountNo,
+PaymentCurrency.ISO_Code AS PaymentCurrencyISO,
+CASE
+WHEN PaymentCurrency.CurSymbol IS NOT NULL
+THEN PaymentCurrency.CurSymbol
+ELSE PaymentCurrency.ISO_Code
+END AS PaymentCurrencySymbol,
+PaymentCurrency.StdPrecision AS PaymentPrecision
+FROM AccessiblePayments AccessiblePayments
+INNER JOIN C_BPartner BusinessPartner ON
+(
+BusinessPartner.C_BPartner_ID=
+AccessiblePayments.C_BPartner_ID
+)
+INNER JOIN C_Currency PaymentCurrency ON
+(
+PaymentCurrency.C_Currency_ID=
+AccessiblePayments.C_Currency_ID
+)
+LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
+(
+PaymentMethod.VA009_PaymentMethod_ID=
+AccessiblePayments.VA009_PaymentMethod_ID
+)
+LEFT OUTER JOIN C_BankAccount BankAccount ON
+(
+BankAccount.C_BankAccount_ID=
+AccessiblePayments.C_BankAccount_ID
+)
+LEFT OUTER JOIN C_Bank Bank ON
+(
+Bank.C_Bank_ID=
+BankAccount.C_Bank_ID
+)
+CROSS JOIN QueryParameters QueryParameters
 WHERE AccessiblePayments.AD_Client_ID=
 QueryParameters.AD_Client_ID
 AND
@@ -912,72 +868,83 @@ QueryParameters.C_Payment_ID=0
 OR AccessiblePayments.C_Payment_ID=
 QueryParameters.C_Payment_ID
 )
-AND
+),
+PaymentAmounts AS
 (
-AccessiblePayments.PaymentOriginalAmount-
+SELECT
+PaymentRecords.AD_Client_ID,
+PaymentRecords.AD_Org_ID,
+PaymentRecords.C_Payment_ID,
+PaymentRecords.C_BPartner_ID,
+PaymentRecords.PaymentDocNo,
+PaymentRecords.PaymentDateAcct,
+PaymentRecords.PaymentCurrencyId,
+PaymentRecords.PaymentConversionTypeId,
+PaymentRecords.PaymentOriginalAmt,
+CASE
+WHEN PaymentRecords.PaymentOriginalAmt>
+ABS(
 COALESCE(
-PaymentAllocated.PaymentAllocatedAmount,
+ALLOCPAYMENTAVAILABLE(
+PaymentRecords.C_Payment_ID
+),
+0
+)
+)
+THEN PaymentRecords.PaymentOriginalAmt-
+ABS(
+COALESCE(
+ALLOCPAYMENTAVAILABLE(
+PaymentRecords.C_Payment_ID
+),
+0
+)
+)
+ELSE 0
+END AS PaymentAllocatedAmt,
+ABS(
+COALESCE(
+ALLOCPAYMENTAVAILABLE(
+PaymentRecords.C_Payment_ID
+),
+0
+)
+) AS PaymentOpenAmt,
+PaymentRecords.VendorName,
+PaymentRecords.PaymentMethod,
+PaymentRecords.ReferenceNo,
+PaymentRecords.BankName,
+PaymentRecords.AccountNo,
+PaymentRecords.PaymentCurrencyISO,
+PaymentRecords.PaymentCurrencySymbol,
+PaymentRecords.PaymentPrecision
+FROM PaymentRecords PaymentRecords
+WHERE ABS(
+COALESCE(
+ALLOCPAYMENTAVAILABLE(
+PaymentRecords.C_Payment_ID
+),
 0
 )
 )>0
 ),
-InvoiceAllocated AS
+AccessibleInvoices AS
 (
-SELECT
-AllocationLine.C_InvoicePaySchedule_ID,
-SUM(
-ABS(
-COALESCE(
-AllocationLine.Amount,
-0
-)
-)
-+
-ABS(
-COALESCE(
-AllocationLine.DiscountAmt,
-0
-)
-)
-+
-ABS(
-COALESCE(
-AllocationLine.WriteOffAmt,
-0
-)
-)
-) AS InvoiceAllocatedAmount
-FROM C_AllocationLine AllocationLine
-INNER JOIN C_AllocationHdr AllocationHeader ON
-(
-AllocationHeader.C_AllocationHdr_ID=
-AllocationLine.C_AllocationHdr_ID
-)
-WHERE AllocationLine.IsActive='Y'
-AND AllocationHeader.IsActive='Y'
-AND AllocationHeader.DocStatus IN ('CO','CL')
-AND AllocationLine.C_InvoicePaySchedule_ID IS NOT NULL
-GROUP BY
-AllocationLine.C_InvoicePaySchedule_ID
+" + invoiceAccessSql + @"
 ),
-OpenInvoices AS
+InvoiceRecords AS
 (
 SELECT
-Invoice.AD_Client_ID,
-Invoice.AD_Org_ID,
-Invoice.C_Invoice_ID,
-Invoice.C_BPartner_ID,
-Invoice.DocumentNo AS InvoiceDocumentNo,
-Invoice.DateInvoiced AS InvoiceDate,
-Invoice.C_Currency_ID AS InvoiceCurrencyId,
-InvoiceCurrency.ISO_Code AS InvoiceCurrencyISOCode,
-CASE
-WHEN InvoiceCurrency.CurSymbol IS NOT NULL
-THEN InvoiceCurrency.CurSymbol
-ELSE InvoiceCurrency.ISO_Code
-END AS InvoiceCurrencySymbol,
-InvoiceCurrency.StdPrecision AS InvoicePrecision,
-PaymentTerm.Name AS PaymentTerms,
+AccessibleInvoices.AD_Client_ID,
+AccessibleInvoices.AD_Org_ID,
+AccessibleInvoices.C_Invoice_ID,
+AccessibleInvoices.C_BPartner_ID,
+AccessibleInvoices.DocumentNo AS InvoiceDocNo,
+AccessibleInvoices.DateInvoiced AS InvoiceDate,
+AccessibleInvoices.DateAcct AS InvoiceDateAcct,
+AccessibleInvoices.C_Currency_ID AS InvoiceCurrencyId,
+AccessibleInvoices.GrandTotal,
+AccessibleInvoices.C_PaymentTerm_ID,
 InvoicePaySchedule.C_InvoicePaySchedule_ID,
 InvoicePaySchedule.DueDate,
 ABS(
@@ -985,56 +952,43 @@ COALESCE(
 InvoicePaySchedule.DueAmt,
 0
 )
-) AS InvoiceOriginalAmount,
-COALESCE(
-InvoiceAllocated.InvoiceAllocatedAmount,
-0
-) AS InvoiceAllocatedAmount,
+) AS InvoiceOriginalAmt,
 ABS(
 COALESCE(
-InvoicePaySchedule.DueAmt,
+InvoiceOpen(
+AccessibleInvoices.C_Invoice_ID,
+InvoicePaySchedule.C_InvoicePaySchedule_ID
+),
 0
 )
-)-
-COALESCE(
-InvoiceAllocated.InvoiceAllocatedAmount,
-0
-) AS InvoiceOpenAmount
-FROM C_Invoice Invoice
+) AS InvoiceOpenAmt,
+InvoiceCurrency.ISO_Code AS InvoiceCurrencyISO,
+CASE
+WHEN InvoiceCurrency.CurSymbol IS NOT NULL
+THEN InvoiceCurrency.CurSymbol
+ELSE InvoiceCurrency.ISO_Code
+END AS InvoiceCurrencySymbol,
+InvoiceCurrency.StdPrecision AS InvoicePrecision,
+PaymentTerm.Name AS PaymentTerms
+FROM AccessibleInvoices AccessibleInvoices
 INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
 (
 InvoicePaySchedule.C_Invoice_ID=
-Invoice.C_Invoice_ID
+AccessibleInvoices.C_Invoice_ID
 )
 INNER JOIN C_Currency InvoiceCurrency ON
 (
 InvoiceCurrency.C_Currency_ID=
-Invoice.C_Currency_ID
+AccessibleInvoices.C_Currency_ID
 )
 LEFT OUTER JOIN C_PaymentTerm PaymentTerm ON
 (
 PaymentTerm.C_PaymentTerm_ID=
-Invoice.C_PaymentTerm_ID
+AccessibleInvoices.C_PaymentTerm_ID
 )
-LEFT OUTER JOIN InvoiceAllocated InvoiceAllocated ON
-(
-InvoiceAllocated.C_InvoicePaySchedule_ID=
-InvoicePaySchedule.C_InvoicePaySchedule_ID
-)
-INNER JOIN QueryParameters QueryParameters ON
-(1=1)
-WHERE Invoice.IsActive='Y'
-AND Invoice.Processed='Y'
-AND Invoice.IsSOTrx='N'
-AND Invoice.DocStatus IN ('CO','CL')
-AND COALESCE(
-Invoice.IsPaid,
-'N'
-)='N'
-AND COALESCE(
-Invoice.IsReturnTrx,
-'N'
-)='N'
+CROSS JOIN QueryParameters QueryParameters
+WHERE AccessibleInvoices.AD_Client_ID=
+QueryParameters.AD_Client_ID
 AND InvoicePaySchedule.IsActive='Y'
 AND COALESCE(
 InvoicePaySchedule.IsValid,
@@ -1044,12 +998,10 @@ AND COALESCE(
 InvoicePaySchedule.VA009_IsPaid,
 'N'
 )='N'
-AND Invoice.AD_Client_ID=
-QueryParameters.AD_Client_ID
 AND
 (
 QueryParameters.C_Invoice_ID=0
-OR Invoice.C_Invoice_ID=
+OR AccessibleInvoices.C_Invoice_ID=
 QueryParameters.C_Invoice_ID
 )
 AND
@@ -1058,282 +1010,579 @@ QueryParameters.C_InvoicePaySchedule_ID=0
 OR InvoicePaySchedule.C_InvoicePaySchedule_ID=
 QueryParameters.C_InvoicePaySchedule_ID
 )
-AND
+),
+InvoiceAmounts AS
 (
-ABS(
-COALESCE(
-InvoicePaySchedule.DueAmt,
-0
-)
-)-
-COALESCE(
-InvoiceAllocated.InvoiceAllocatedAmount,
-0
-)
-)>0
+SELECT
+InvoiceRecords.AD_Client_ID,
+InvoiceRecords.AD_Org_ID,
+InvoiceRecords.C_Invoice_ID,
+InvoiceRecords.C_BPartner_ID,
+InvoiceRecords.InvoiceDocNo,
+InvoiceRecords.InvoiceDate,
+InvoiceRecords.InvoiceDateAcct,
+InvoiceRecords.InvoiceCurrencyId,
+InvoiceRecords.C_InvoicePaySchedule_ID,
+InvoiceRecords.DueDate,
+InvoiceRecords.InvoiceOriginalAmt,
+CASE
+WHEN InvoiceRecords.InvoiceOriginalAmt>
+InvoiceRecords.InvoiceOpenAmt
+THEN InvoiceRecords.InvoiceOriginalAmt-
+InvoiceRecords.InvoiceOpenAmt
+ELSE 0
+END AS InvoiceAllocatedAmt,
+InvoiceRecords.InvoiceOpenAmt,
+InvoiceRecords.InvoiceCurrencyISO,
+InvoiceRecords.InvoiceCurrencySymbol,
+InvoiceRecords.InvoicePrecision,
+InvoiceRecords.PaymentTerms
+FROM InvoiceRecords InvoiceRecords
+WHERE InvoiceRecords.InvoiceOpenAmt>0
 ),
 CandidateRows AS
 (
 SELECT
-MainPayments.AD_Client_ID,
-MainPayments.AD_Org_ID,
-MainPayments.C_Payment_ID,
-MainPayments.C_BPartner_ID,
-MainPayments.PaymentDocumentNo,
-MainPayments.PaymentDateAcct,
-MainPayments.PaymentCurrencyId,
-MainPayments.PaymentConversionTypeId,
-MainPayments.PaymentOriginalAmount,
-MainPayments.PaymentAllocatedAmount,
-MainPayments.PaymentOpenAmount,
-MainPayments.VendorName,
-MainPayments.PaymentMethod,
-MainPayments.ReferenceNo,
-MainPayments.BankName,
-MainPayments.AccountNo,
-MainPayments.PaymentCurrencyISOCode,
-MainPayments.PaymentCurrencySymbol,
-MainPayments.PaymentPrecision,
-OpenInvoices.C_Invoice_ID,
-OpenInvoices.C_InvoicePaySchedule_ID,
-OpenInvoices.InvoiceDocumentNo,
-OpenInvoices.InvoiceDate,
-OpenInvoices.DueDate,
-OpenInvoices.PaymentTerms,
-OpenInvoices.InvoiceCurrencyId,
-OpenInvoices.InvoiceCurrencyISOCode,
-OpenInvoices.InvoiceCurrencySymbol,
-OpenInvoices.InvoicePrecision,
-OpenInvoices.InvoiceOriginalAmount,
-OpenInvoices.InvoiceAllocatedAmount,
-OpenInvoices.InvoiceOpenAmount,
+PaymentAmounts.AD_Client_ID,
+PaymentAmounts.AD_Org_ID,
+PaymentAmounts.C_Payment_ID,
+PaymentAmounts.C_BPartner_ID,
+PaymentAmounts.PaymentDocNo,
+PaymentAmounts.PaymentDateAcct,
+PaymentAmounts.PaymentCurrencyId,
+PaymentAmounts.PaymentConversionTypeId,
+PaymentAmounts.PaymentOriginalAmt,
+PaymentAmounts.PaymentAllocatedAmt,
+PaymentAmounts.PaymentOpenAmt,
+PaymentAmounts.VendorName,
+PaymentAmounts.PaymentMethod,
+PaymentAmounts.ReferenceNo,
+PaymentAmounts.BankName,
+PaymentAmounts.AccountNo,
+PaymentAmounts.PaymentCurrencyISO,
+PaymentAmounts.PaymentCurrencySymbol,
+PaymentAmounts.PaymentPrecision,
+InvoiceAmounts.C_Invoice_ID,
+InvoiceAmounts.C_InvoicePaySchedule_ID,
+InvoiceAmounts.InvoiceDocNo,
+InvoiceAmounts.InvoiceDate,
+InvoiceAmounts.DueDate,
+InvoiceAmounts.PaymentTerms,
+InvoiceAmounts.InvoiceCurrencyId,
+InvoiceAmounts.InvoiceCurrencyISO,
+InvoiceAmounts.InvoiceCurrencySymbol,
+InvoiceAmounts.InvoicePrecision,
+InvoiceAmounts.InvoiceOriginalAmt,
+InvoiceAmounts.InvoiceAllocatedAmt,
+InvoiceAmounts.InvoiceOpenAmt,
 CASE
-WHEN OpenInvoices.InvoiceCurrencyId=
-MainPayments.PaymentCurrencyId
-THEN OpenInvoices.InvoiceOpenAmount
+WHEN InvoiceAmounts.InvoiceCurrencyId=
+PaymentAmounts.PaymentCurrencyId
+THEN InvoiceAmounts.InvoiceOpenAmt
 ELSE COALESCE(
 CurrencyConvert(
-OpenInvoices.InvoiceOpenAmount,
-OpenInvoices.InvoiceCurrencyId,
-MainPayments.PaymentCurrencyId,
-MainPayments.PaymentDateAcct,
-MainPayments.PaymentConversionTypeId,
-MainPayments.AD_Client_ID,
-MainPayments.AD_Org_ID
+InvoiceAmounts.InvoiceOpenAmt,
+InvoiceAmounts.InvoiceCurrencyId,
+PaymentAmounts.PaymentCurrencyId,
+PaymentAmounts.PaymentDateAcct,
+PaymentAmounts.PaymentConversionTypeId,
+PaymentAmounts.AD_Client_ID,
+PaymentAmounts.AD_Org_ID
 ),
 0
 )
-END AS InvoiceOpenAmountPaymentCurrency
-FROM MainPayments MainPayments
-INNER JOIN OpenInvoices OpenInvoices ON
+END AS InvoiceOpenPayAmt
+FROM PaymentAmounts PaymentAmounts
+INNER JOIN InvoiceAmounts InvoiceAmounts ON
 (
-OpenInvoices.AD_Client_ID=
-MainPayments.AD_Client_ID
-AND OpenInvoices.C_BPartner_ID=
-MainPayments.C_BPartner_ID
+InvoiceAmounts.AD_Client_ID=
+PaymentAmounts.AD_Client_ID
+AND InvoiceAmounts.C_BPartner_ID=
+PaymentAmounts.C_BPartner_ID
+AND
+(
+InvoiceAmounts.AD_Org_ID=
+PaymentAmounts.AD_Org_ID
+OR InvoiceAmounts.AD_Org_ID=0
+OR PaymentAmounts.AD_Org_ID=0
+)
 )
 ),
-ScoredCandidates AS
+CandidateMetrics AS
 (
 SELECT
 CandidateRows.AD_Client_ID,
 CandidateRows.AD_Org_ID,
 CandidateRows.C_Payment_ID,
 CandidateRows.C_BPartner_ID,
-CandidateRows.PaymentDocumentNo,
+CandidateRows.PaymentDocNo,
 CandidateRows.PaymentDateAcct,
 CandidateRows.PaymentCurrencyId,
 CandidateRows.PaymentConversionTypeId,
-CandidateRows.PaymentOriginalAmount,
-CandidateRows.PaymentAllocatedAmount,
-CandidateRows.PaymentOpenAmount,
+CandidateRows.PaymentOriginalAmt,
+CandidateRows.PaymentAllocatedAmt,
+CandidateRows.PaymentOpenAmt,
 CandidateRows.VendorName,
 CandidateRows.PaymentMethod,
 CandidateRows.ReferenceNo,
 CandidateRows.BankName,
 CandidateRows.AccountNo,
-CandidateRows.PaymentCurrencyISOCode,
+CandidateRows.PaymentCurrencyISO,
 CandidateRows.PaymentCurrencySymbol,
 CandidateRows.PaymentPrecision,
 CandidateRows.C_Invoice_ID,
 CandidateRows.C_InvoicePaySchedule_ID,
-CandidateRows.InvoiceDocumentNo,
+CandidateRows.InvoiceDocNo,
 CandidateRows.InvoiceDate,
 CandidateRows.DueDate,
 CandidateRows.PaymentTerms,
 CandidateRows.InvoiceCurrencyId,
-CandidateRows.InvoiceCurrencyISOCode,
+CandidateRows.InvoiceCurrencyISO,
 CandidateRows.InvoiceCurrencySymbol,
 CandidateRows.InvoicePrecision,
-CandidateRows.InvoiceOriginalAmount,
-CandidateRows.InvoiceAllocatedAmount,
-CandidateRows.InvoiceOpenAmount,
-CandidateRows.InvoiceOpenAmountPaymentCurrency,
+CandidateRows.InvoiceOriginalAmt,
+CandidateRows.InvoiceAllocatedAmt,
+CandidateRows.InvoiceOpenAmt,
+CandidateRows.InvoiceOpenPayAmt,
 ABS(
-CandidateRows.PaymentOpenAmount-
-CandidateRows.InvoiceOpenAmountPaymentCurrency
-) AS DifferenceAmount,
+CandidateRows.PaymentOpenAmt-
+CandidateRows.InvoiceOpenPayAmt
+) AS DifferenceAmt,
 CASE
-WHEN ABS(
-CandidateRows.PaymentOpenAmount-
-CandidateRows.InvoiceOpenAmountPaymentCurrency
-)<=" +
+WHEN CandidateRows.InvoiceOpenPayAmt=0
+THEN 100
+ELSE
+ABS(
+CandidateRows.PaymentOpenAmt-
+CandidateRows.InvoiceOpenPayAmt
+)*100/
+ABS(
+CandidateRows.InvoiceOpenPayAmt
+)
+END AS DifferencePct,
+CASE
+WHEN CandidateRows.DueDate IS NULL
+THEN 999999
+ELSE ABS(
+CAST(
+CandidateRows.PaymentDateAcct AS DATE
+)-
+CAST(
+CandidateRows.DueDate AS DATE
+)
+)
+END AS DateGapDays
+FROM CandidateRows CandidateRows
+WHERE CandidateRows.PaymentOpenAmt>0
+AND CandidateRows.InvoiceOpenPayAmt>0
+),
+CandidateScores AS
+(
+SELECT
+CandidateMetrics.AD_Client_ID,
+CandidateMetrics.AD_Org_ID,
+CandidateMetrics.C_Payment_ID,
+CandidateMetrics.C_BPartner_ID,
+CandidateMetrics.PaymentDocNo,
+CandidateMetrics.PaymentDateAcct,
+CandidateMetrics.PaymentCurrencyId,
+CandidateMetrics.PaymentConversionTypeId,
+CandidateMetrics.PaymentOriginalAmt,
+CandidateMetrics.PaymentAllocatedAmt,
+CandidateMetrics.PaymentOpenAmt,
+CandidateMetrics.VendorName,
+CandidateMetrics.PaymentMethod,
+CandidateMetrics.ReferenceNo,
+CandidateMetrics.BankName,
+CandidateMetrics.AccountNo,
+CandidateMetrics.PaymentCurrencyISO,
+CandidateMetrics.PaymentCurrencySymbol,
+CandidateMetrics.PaymentPrecision,
+CandidateMetrics.C_Invoice_ID,
+CandidateMetrics.C_InvoicePaySchedule_ID,
+CandidateMetrics.InvoiceDocNo,
+CandidateMetrics.InvoiceDate,
+CandidateMetrics.DueDate,
+CandidateMetrics.PaymentTerms,
+CandidateMetrics.InvoiceCurrencyId,
+CandidateMetrics.InvoiceCurrencyISO,
+CandidateMetrics.InvoiceCurrencySymbol,
+CandidateMetrics.InvoicePrecision,
+CandidateMetrics.InvoiceOriginalAmt,
+CandidateMetrics.InvoiceAllocatedAmt,
+CandidateMetrics.InvoiceOpenAmt,
+CandidateMetrics.InvoiceOpenPayAmt,
+CandidateMetrics.DifferenceAmt,
+CandidateMetrics.DifferencePct,
+CandidateMetrics.DateGapDays,
+10+
+CASE
+WHEN CandidateMetrics.DifferenceAmt<=" +
                 AmountTolerance.ToString(
                     CultureInfo.InvariantCulture
                 ) +
                 @"
-THEN 'HIGH'
-WHEN CandidateRows.InvoiceOpenAmountPaymentCurrency>0
-AND
-(
-ABS(
-CandidateRows.PaymentOpenAmount-
-CandidateRows.InvoiceOpenAmountPaymentCurrency
-)*100/
-CandidateRows.InvoiceOpenAmountPaymentCurrency
-)<=" +
+THEN 70
+WHEN CandidateMetrics.DifferencePct<=" +
                 HighPercentageThreshold.ToString(
                     CultureInfo.InvariantCulture
                 ) +
                 @"
-THEN 'HIGH'
-ELSE 'REVIEW'
-END AS MatchConfidence,
-ROW_NUMBER() OVER
-(
-PARTITION BY CandidateRows.C_Payment_ID
-ORDER BY
-ABS(
-CandidateRows.PaymentOpenAmount-
-CandidateRows.InvoiceOpenAmountPaymentCurrency
+THEN 60
+WHEN CandidateMetrics.DifferencePct<=" +
+                ReviewPercentageThreshold.ToString(
+                    CultureInfo.InvariantCulture
+                ) +
+                @"
+THEN 35
+ELSE 10
+END+
+CASE
+WHEN CandidateMetrics.DateGapDays<=7
+THEN 20
+WHEN CandidateMetrics.DateGapDays<=" +
+                DateWindowDays +
+                @"
+THEN 10
+ELSE 0
+END AS MatchScore
+FROM CandidateMetrics CandidateMetrics
 ),
-CandidateRows.DueDate,
-CandidateRows.InvoiceDocumentNo,
-CandidateRows.C_InvoicePaySchedule_ID
-) AS MatchRank
-FROM CandidateRows CandidateRows
-WHERE CandidateRows.InvoiceOpenAmountPaymentCurrency>0
-),
-BestMatches AS
+ClassifiedCandidates AS
 (
 SELECT
-ScoredCandidates.AD_Client_ID,
-ScoredCandidates.AD_Org_ID,
-ScoredCandidates.C_Payment_ID,
-ScoredCandidates.C_BPartner_ID,
-ScoredCandidates.PaymentDocumentNo,
-ScoredCandidates.PaymentDateAcct,
-ScoredCandidates.PaymentCurrencyId,
-ScoredCandidates.PaymentConversionTypeId,
-ScoredCandidates.PaymentOriginalAmount,
-ScoredCandidates.PaymentAllocatedAmount,
-ScoredCandidates.PaymentOpenAmount,
-ScoredCandidates.VendorName,
-ScoredCandidates.PaymentMethod,
-ScoredCandidates.ReferenceNo,
-ScoredCandidates.BankName,
-ScoredCandidates.AccountNo,
-ScoredCandidates.PaymentCurrencyISOCode,
-ScoredCandidates.PaymentCurrencySymbol,
-ScoredCandidates.PaymentPrecision,
-ScoredCandidates.C_Invoice_ID,
-ScoredCandidates.C_InvoicePaySchedule_ID,
-ScoredCandidates.InvoiceDocumentNo,
-ScoredCandidates.InvoiceDate,
-ScoredCandidates.DueDate,
-ScoredCandidates.PaymentTerms,
-ScoredCandidates.InvoiceCurrencyId,
-ScoredCandidates.InvoiceCurrencyISOCode,
-ScoredCandidates.InvoiceCurrencySymbol,
-ScoredCandidates.InvoicePrecision,
-ScoredCandidates.InvoiceOriginalAmount,
-ScoredCandidates.InvoiceAllocatedAmount,
-ScoredCandidates.InvoiceOpenAmount,
-ScoredCandidates.InvoiceOpenAmountPaymentCurrency,
-ScoredCandidates.DifferenceAmount,
-ScoredCandidates.MatchConfidence,
+CandidateScores.AD_Client_ID,
+CandidateScores.AD_Org_ID,
+CandidateScores.C_Payment_ID,
+CandidateScores.C_BPartner_ID,
+CandidateScores.PaymentDocNo,
+CandidateScores.PaymentDateAcct,
+CandidateScores.PaymentCurrencyId,
+CandidateScores.PaymentConversionTypeId,
+CandidateScores.PaymentOriginalAmt,
+CandidateScores.PaymentAllocatedAmt,
+CandidateScores.PaymentOpenAmt,
+CandidateScores.VendorName,
+CandidateScores.PaymentMethod,
+CandidateScores.ReferenceNo,
+CandidateScores.BankName,
+CandidateScores.AccountNo,
+CandidateScores.PaymentCurrencyISO,
+CandidateScores.PaymentCurrencySymbol,
+CandidateScores.PaymentPrecision,
+CandidateScores.C_Invoice_ID,
+CandidateScores.C_InvoicePaySchedule_ID,
+CandidateScores.InvoiceDocNo,
+CandidateScores.InvoiceDate,
+CandidateScores.DueDate,
+CandidateScores.PaymentTerms,
+CandidateScores.InvoiceCurrencyId,
+CandidateScores.InvoiceCurrencyISO,
+CandidateScores.InvoiceCurrencySymbol,
+CandidateScores.InvoicePrecision,
+CandidateScores.InvoiceOriginalAmt,
+CandidateScores.InvoiceAllocatedAmt,
+CandidateScores.InvoiceOpenAmt,
+CandidateScores.InvoiceOpenPayAmt,
+CandidateScores.DifferenceAmt,
+CandidateScores.DifferencePct,
+CandidateScores.DateGapDays,
+CandidateScores.MatchScore,
 CASE
-WHEN ScoredCandidates.PaymentOpenAmount<
-ScoredCandidates.InvoiceOpenAmountPaymentCurrency
-THEN ScoredCandidates.PaymentOpenAmount
-ELSE ScoredCandidates.InvoiceOpenAmountPaymentCurrency
-END AS ReadyAmount
-FROM ScoredCandidates ScoredCandidates
-WHERE ScoredCandidates.MatchRank=1
+WHEN CandidateScores.MatchScore>=80
+THEN 'HIGH'
+WHEN CandidateScores.MatchScore>=55
+THEN 'REVIEW'
+ELSE 'LOW'
+END AS MatchConfidence
+FROM CandidateScores CandidateScores
+),
+PaymentRanked AS
+(
+SELECT
+ClassifiedCandidates.AD_Client_ID,
+ClassifiedCandidates.AD_Org_ID,
+ClassifiedCandidates.C_Payment_ID,
+ClassifiedCandidates.C_BPartner_ID,
+ClassifiedCandidates.PaymentDocNo,
+ClassifiedCandidates.PaymentDateAcct,
+ClassifiedCandidates.PaymentCurrencyId,
+ClassifiedCandidates.PaymentConversionTypeId,
+ClassifiedCandidates.PaymentOriginalAmt,
+ClassifiedCandidates.PaymentAllocatedAmt,
+ClassifiedCandidates.PaymentOpenAmt,
+ClassifiedCandidates.VendorName,
+ClassifiedCandidates.PaymentMethod,
+ClassifiedCandidates.ReferenceNo,
+ClassifiedCandidates.BankName,
+ClassifiedCandidates.AccountNo,
+ClassifiedCandidates.PaymentCurrencyISO,
+ClassifiedCandidates.PaymentCurrencySymbol,
+ClassifiedCandidates.PaymentPrecision,
+ClassifiedCandidates.C_Invoice_ID,
+ClassifiedCandidates.C_InvoicePaySchedule_ID,
+ClassifiedCandidates.InvoiceDocNo,
+ClassifiedCandidates.InvoiceDate,
+ClassifiedCandidates.DueDate,
+ClassifiedCandidates.PaymentTerms,
+ClassifiedCandidates.InvoiceCurrencyId,
+ClassifiedCandidates.InvoiceCurrencyISO,
+ClassifiedCandidates.InvoiceCurrencySymbol,
+ClassifiedCandidates.InvoicePrecision,
+ClassifiedCandidates.InvoiceOriginalAmt,
+ClassifiedCandidates.InvoiceAllocatedAmt,
+ClassifiedCandidates.InvoiceOpenAmt,
+ClassifiedCandidates.InvoiceOpenPayAmt,
+ClassifiedCandidates.DifferenceAmt,
+ClassifiedCandidates.DifferencePct,
+ClassifiedCandidates.DateGapDays,
+ClassifiedCandidates.MatchScore,
+ClassifiedCandidates.MatchConfidence,
+ROW_NUMBER() OVER
+(
+PARTITION BY ClassifiedCandidates.C_Payment_ID
+ORDER BY
+ClassifiedCandidates.MatchScore DESC,
+ClassifiedCandidates.DifferenceAmt,
+ClassifiedCandidates.DateGapDays,
+ClassifiedCandidates.DueDate,
+ClassifiedCandidates.InvoiceDocNo,
+ClassifiedCandidates.C_InvoicePaySchedule_ID
+) AS PaymentRank
+FROM ClassifiedCandidates ClassifiedCandidates
+),
+BestPerPayment AS
+(
+SELECT
+PaymentRanked.AD_Client_ID,
+PaymentRanked.AD_Org_ID,
+PaymentRanked.C_Payment_ID,
+PaymentRanked.C_BPartner_ID,
+PaymentRanked.PaymentDocNo,
+PaymentRanked.PaymentDateAcct,
+PaymentRanked.PaymentCurrencyId,
+PaymentRanked.PaymentConversionTypeId,
+PaymentRanked.PaymentOriginalAmt,
+PaymentRanked.PaymentAllocatedAmt,
+PaymentRanked.PaymentOpenAmt,
+PaymentRanked.VendorName,
+PaymentRanked.PaymentMethod,
+PaymentRanked.ReferenceNo,
+PaymentRanked.BankName,
+PaymentRanked.AccountNo,
+PaymentRanked.PaymentCurrencyISO,
+PaymentRanked.PaymentCurrencySymbol,
+PaymentRanked.PaymentPrecision,
+PaymentRanked.C_Invoice_ID,
+PaymentRanked.C_InvoicePaySchedule_ID,
+PaymentRanked.InvoiceDocNo,
+PaymentRanked.InvoiceDate,
+PaymentRanked.DueDate,
+PaymentRanked.PaymentTerms,
+PaymentRanked.InvoiceCurrencyId,
+PaymentRanked.InvoiceCurrencyISO,
+PaymentRanked.InvoiceCurrencySymbol,
+PaymentRanked.InvoicePrecision,
+PaymentRanked.InvoiceOriginalAmt,
+PaymentRanked.InvoiceAllocatedAmt,
+PaymentRanked.InvoiceOpenAmt,
+PaymentRanked.InvoiceOpenPayAmt,
+PaymentRanked.DifferenceAmt,
+PaymentRanked.DifferencePct,
+PaymentRanked.DateGapDays,
+PaymentRanked.MatchScore,
+PaymentRanked.MatchConfidence
+FROM PaymentRanked PaymentRanked
+WHERE PaymentRanked.PaymentRank=1
+AND PaymentRanked.MatchConfidence IN ('HIGH','REVIEW')
+),
+ScheduleRanked AS
+(
+SELECT
+BestPerPayment.AD_Client_ID,
+BestPerPayment.AD_Org_ID,
+BestPerPayment.C_Payment_ID,
+BestPerPayment.C_BPartner_ID,
+BestPerPayment.PaymentDocNo,
+BestPerPayment.PaymentDateAcct,
+BestPerPayment.PaymentCurrencyId,
+BestPerPayment.PaymentConversionTypeId,
+BestPerPayment.PaymentOriginalAmt,
+BestPerPayment.PaymentAllocatedAmt,
+BestPerPayment.PaymentOpenAmt,
+BestPerPayment.VendorName,
+BestPerPayment.PaymentMethod,
+BestPerPayment.ReferenceNo,
+BestPerPayment.BankName,
+BestPerPayment.AccountNo,
+BestPerPayment.PaymentCurrencyISO,
+BestPerPayment.PaymentCurrencySymbol,
+BestPerPayment.PaymentPrecision,
+BestPerPayment.C_Invoice_ID,
+BestPerPayment.C_InvoicePaySchedule_ID,
+BestPerPayment.InvoiceDocNo,
+BestPerPayment.InvoiceDate,
+BestPerPayment.DueDate,
+BestPerPayment.PaymentTerms,
+BestPerPayment.InvoiceCurrencyId,
+BestPerPayment.InvoiceCurrencyISO,
+BestPerPayment.InvoiceCurrencySymbol,
+BestPerPayment.InvoicePrecision,
+BestPerPayment.InvoiceOriginalAmt,
+BestPerPayment.InvoiceAllocatedAmt,
+BestPerPayment.InvoiceOpenAmt,
+BestPerPayment.InvoiceOpenPayAmt,
+BestPerPayment.DifferenceAmt,
+BestPerPayment.DifferencePct,
+BestPerPayment.DateGapDays,
+BestPerPayment.MatchScore,
+BestPerPayment.MatchConfidence,
+ROW_NUMBER() OVER
+(
+PARTITION BY BestPerPayment.C_InvoicePaySchedule_ID
+ORDER BY
+BestPerPayment.MatchScore DESC,
+BestPerPayment.DifferenceAmt,
+BestPerPayment.DateGapDays,
+BestPerPayment.PaymentDateAcct,
+BestPerPayment.C_Payment_ID
+) AS ScheduleRank
+FROM BestPerPayment BestPerPayment
+),
+UniqueMatches AS
+(
+SELECT
+ScheduleRanked.AD_Client_ID,
+ScheduleRanked.AD_Org_ID,
+ScheduleRanked.C_Payment_ID,
+ScheduleRanked.C_BPartner_ID,
+ScheduleRanked.PaymentDocNo,
+ScheduleRanked.PaymentDateAcct,
+ScheduleRanked.PaymentCurrencyId,
+ScheduleRanked.PaymentConversionTypeId,
+ScheduleRanked.PaymentOriginalAmt,
+ScheduleRanked.PaymentAllocatedAmt,
+ScheduleRanked.PaymentOpenAmt,
+ScheduleRanked.VendorName,
+ScheduleRanked.PaymentMethod,
+ScheduleRanked.ReferenceNo,
+ScheduleRanked.BankName,
+ScheduleRanked.AccountNo,
+ScheduleRanked.PaymentCurrencyISO,
+ScheduleRanked.PaymentCurrencySymbol,
+ScheduleRanked.PaymentPrecision,
+ScheduleRanked.C_Invoice_ID,
+ScheduleRanked.C_InvoicePaySchedule_ID,
+ScheduleRanked.InvoiceDocNo,
+ScheduleRanked.InvoiceDate,
+ScheduleRanked.DueDate,
+ScheduleRanked.PaymentTerms,
+ScheduleRanked.InvoiceCurrencyId,
+ScheduleRanked.InvoiceCurrencyISO,
+ScheduleRanked.InvoiceCurrencySymbol,
+ScheduleRanked.InvoicePrecision,
+ScheduleRanked.InvoiceOriginalAmt,
+ScheduleRanked.InvoiceAllocatedAmt,
+ScheduleRanked.InvoiceOpenAmt,
+ScheduleRanked.InvoiceOpenPayAmt,
+ScheduleRanked.DifferenceAmt,
+ScheduleRanked.DifferencePct,
+ScheduleRanked.DateGapDays,
+ScheduleRanked.MatchScore,
+ScheduleRanked.MatchConfidence,
+CASE
+WHEN ScheduleRanked.PaymentOpenAmt<
+ScheduleRanked.InvoiceOpenPayAmt
+THEN ScheduleRanked.PaymentOpenAmt
+ELSE ScheduleRanked.InvoiceOpenPayAmt
+END AS ReadyAmt
+FROM ScheduleRanked ScheduleRanked
+WHERE ScheduleRanked.ScheduleRank=1
 ),
 AccountingRows AS
 (
 SELECT
-BestMatches.AD_Client_ID,
-BestMatches.AD_Org_ID,
-BestMatches.C_Payment_ID,
-BestMatches.C_BPartner_ID,
-BestMatches.PaymentDocumentNo,
-BestMatches.PaymentDateAcct,
-BestMatches.PaymentCurrencyId,
-BestMatches.PaymentConversionTypeId,
-BestMatches.PaymentOriginalAmount,
-BestMatches.PaymentAllocatedAmount,
-BestMatches.PaymentOpenAmount,
-BestMatches.VendorName,
-BestMatches.PaymentMethod,
-BestMatches.ReferenceNo,
-BestMatches.BankName,
-BestMatches.AccountNo,
-BestMatches.PaymentCurrencyISOCode,
-BestMatches.PaymentCurrencySymbol,
-BestMatches.PaymentPrecision,
-BestMatches.C_Invoice_ID,
-BestMatches.C_InvoicePaySchedule_ID,
-BestMatches.InvoiceDocumentNo,
-BestMatches.InvoiceDate,
-BestMatches.DueDate,
-BestMatches.PaymentTerms,
-BestMatches.InvoiceCurrencyId,
-BestMatches.InvoiceCurrencyISOCode,
-BestMatches.InvoiceCurrencySymbol,
-BestMatches.InvoicePrecision,
-BestMatches.InvoiceOriginalAmount,
-BestMatches.InvoiceAllocatedAmount,
-BestMatches.InvoiceOpenAmount,
-BestMatches.InvoiceOpenAmountPaymentCurrency,
-BestMatches.DifferenceAmount,
-BestMatches.MatchConfidence,
-BestMatches.ReadyAmount,
+UniqueMatches.AD_Client_ID,
+UniqueMatches.AD_Org_ID,
+UniqueMatches.C_Payment_ID,
+UniqueMatches.C_BPartner_ID,
+UniqueMatches.PaymentDocNo,
+UniqueMatches.PaymentDateAcct,
+UniqueMatches.PaymentCurrencyId,
+UniqueMatches.PaymentConversionTypeId,
+UniqueMatches.PaymentOriginalAmt,
+UniqueMatches.PaymentAllocatedAmt,
+UniqueMatches.PaymentOpenAmt,
+UniqueMatches.VendorName,
+UniqueMatches.PaymentMethod,
+UniqueMatches.ReferenceNo,
+UniqueMatches.BankName,
+UniqueMatches.AccountNo,
+UniqueMatches.PaymentCurrencyISO,
+UniqueMatches.PaymentCurrencySymbol,
+UniqueMatches.PaymentPrecision,
+UniqueMatches.C_Invoice_ID,
+UniqueMatches.C_InvoicePaySchedule_ID,
+UniqueMatches.InvoiceDocNo,
+UniqueMatches.InvoiceDate,
+UniqueMatches.DueDate,
+UniqueMatches.PaymentTerms,
+UniqueMatches.InvoiceCurrencyId,
+UniqueMatches.InvoiceCurrencyISO,
+UniqueMatches.InvoiceCurrencySymbol,
+UniqueMatches.InvoicePrecision,
+UniqueMatches.InvoiceOriginalAmt,
+UniqueMatches.InvoiceAllocatedAmt,
+UniqueMatches.InvoiceOpenAmt,
+UniqueMatches.InvoiceOpenPayAmt,
+UniqueMatches.DifferenceAmt,
+UniqueMatches.DifferencePct,
+UniqueMatches.DateGapDays,
+UniqueMatches.MatchScore,
+UniqueMatches.MatchConfidence,
+UniqueMatches.ReadyAmt,
 CASE
-WHEN BestMatches.PaymentCurrencyId=
+WHEN UniqueMatches.PaymentCurrencyId=
 SchemaCurrency.SchemaCurrencyId
-THEN BestMatches.ReadyAmount
+THEN UniqueMatches.ReadyAmt
 ELSE COALESCE(
 CurrencyConvert(
-BestMatches.ReadyAmount,
-BestMatches.PaymentCurrencyId,
+UniqueMatches.ReadyAmt,
+UniqueMatches.PaymentCurrencyId,
 SchemaCurrency.SchemaCurrencyId,
-BestMatches.PaymentDateAcct,
-BestMatches.PaymentConversionTypeId,
-BestMatches.AD_Client_ID,
-BestMatches.AD_Org_ID
+UniqueMatches.PaymentDateAcct,
+UniqueMatches.PaymentConversionTypeId,
+UniqueMatches.AD_Client_ID,
+UniqueMatches.AD_Org_ID
 ),
 0
 )
-END AS AccountingAmount
-FROM BestMatches BestMatches
+END AS AccountingAmt
+FROM UniqueMatches UniqueMatches
 INNER JOIN SchemaCurrency SchemaCurrency ON
 (
 SchemaCurrency.AD_Client_ID=
-BestMatches.AD_Client_ID
+UniqueMatches.AD_Client_ID
 )
 ),
 SummaryData AS
 (
 SELECT
 COUNT(*) AS TotalRecords,
+ROUND(
 COALESCE(
 SUM(
-AccountingRows.AccountingAmount
+AccountingRows.AccountingAmt
 ),
 0
-) AS TotalAccountingAmount,
+),
+COALESCE(
+MAX(
+SchemaCurrency.SchemaPrecision
+),
+2
+)
+) AS TotalAccountingAmt,
 COALESCE(
 SUM(
 CASE
@@ -1345,6 +1594,7 @@ END
 0
 ) AS HighConfidenceCount
 FROM AccountingRows AccountingRows
+CROSS JOIN SchemaCurrency SchemaCurrency
 ),
 NumberedRows AS
 (
@@ -1353,39 +1603,39 @@ AccountingRows.AD_Client_ID,
 AccountingRows.AD_Org_ID,
 AccountingRows.C_Payment_ID,
 AccountingRows.C_BPartner_ID,
-AccountingRows.PaymentDocumentNo,
+AccountingRows.PaymentDocNo,
 AccountingRows.PaymentDateAcct,
 AccountingRows.PaymentCurrencyId,
 AccountingRows.PaymentConversionTypeId,
-AccountingRows.PaymentOriginalAmount,
-AccountingRows.PaymentAllocatedAmount,
-AccountingRows.PaymentOpenAmount,
+AccountingRows.PaymentOriginalAmt,
+AccountingRows.PaymentAllocatedAmt,
+AccountingRows.PaymentOpenAmt,
 AccountingRows.VendorName,
 AccountingRows.PaymentMethod,
 AccountingRows.ReferenceNo,
 AccountingRows.BankName,
 AccountingRows.AccountNo,
-AccountingRows.PaymentCurrencyISOCode,
+AccountingRows.PaymentCurrencyISO,
 AccountingRows.PaymentCurrencySymbol,
 AccountingRows.PaymentPrecision,
 AccountingRows.C_Invoice_ID,
 AccountingRows.C_InvoicePaySchedule_ID,
-AccountingRows.InvoiceDocumentNo,
+AccountingRows.InvoiceDocNo,
 AccountingRows.InvoiceDate,
 AccountingRows.DueDate,
 AccountingRows.PaymentTerms,
 AccountingRows.InvoiceCurrencyId,
-AccountingRows.InvoiceCurrencyISOCode,
+AccountingRows.InvoiceCurrencyISO,
 AccountingRows.InvoiceCurrencySymbol,
 AccountingRows.InvoicePrecision,
-AccountingRows.InvoiceOriginalAmount,
-AccountingRows.InvoiceAllocatedAmount,
-AccountingRows.InvoiceOpenAmount,
-AccountingRows.InvoiceOpenAmountPaymentCurrency,
-AccountingRows.DifferenceAmount,
+AccountingRows.InvoiceOriginalAmt,
+AccountingRows.InvoiceAllocatedAmt,
+AccountingRows.InvoiceOpenAmt,
+AccountingRows.InvoiceOpenPayAmt,
+AccountingRows.ReadyAmt,
+AccountingRows.AccountingAmt,
+AccountingRows.MatchScore,
 AccountingRows.MatchConfidence,
-AccountingRows.ReadyAmount,
-AccountingRows.AccountingAmount,
 ROW_NUMBER() OVER
 (
 ORDER BY
@@ -1394,10 +1644,11 @@ WHEN AccountingRows.MatchConfidence='HIGH'
 THEN 1
 ELSE 2
 END,
-AccountingRows.DifferenceAmount,
+AccountingRows.MatchScore DESC,
+AccountingRows.DifferenceAmt,
 AccountingRows.PaymentDateAcct DESC,
 AccountingRows.C_Payment_ID
-) AS ResultRowNumber
+) AS ResultRowNo
 FROM AccountingRows AccountingRows
 ),
 PagedRows AS
@@ -1407,51 +1658,50 @@ NumberedRows.AD_Client_ID,
 NumberedRows.AD_Org_ID,
 NumberedRows.C_Payment_ID,
 NumberedRows.C_BPartner_ID,
-NumberedRows.PaymentDocumentNo,
+NumberedRows.PaymentDocNo,
 NumberedRows.PaymentDateAcct,
 NumberedRows.PaymentCurrencyId,
 NumberedRows.PaymentConversionTypeId,
-NumberedRows.PaymentOriginalAmount,
-NumberedRows.PaymentAllocatedAmount,
-NumberedRows.PaymentOpenAmount,
+NumberedRows.PaymentOriginalAmt,
+NumberedRows.PaymentAllocatedAmt,
+NumberedRows.PaymentOpenAmt,
 NumberedRows.VendorName,
 NumberedRows.PaymentMethod,
 NumberedRows.ReferenceNo,
 NumberedRows.BankName,
 NumberedRows.AccountNo,
-NumberedRows.PaymentCurrencyISOCode,
+NumberedRows.PaymentCurrencyISO,
 NumberedRows.PaymentCurrencySymbol,
 NumberedRows.PaymentPrecision,
 NumberedRows.C_Invoice_ID,
 NumberedRows.C_InvoicePaySchedule_ID,
-NumberedRows.InvoiceDocumentNo,
+NumberedRows.InvoiceDocNo,
 NumberedRows.InvoiceDate,
 NumberedRows.DueDate,
 NumberedRows.PaymentTerms,
 NumberedRows.InvoiceCurrencyId,
-NumberedRows.InvoiceCurrencyISOCode,
+NumberedRows.InvoiceCurrencyISO,
 NumberedRows.InvoiceCurrencySymbol,
 NumberedRows.InvoicePrecision,
-NumberedRows.InvoiceOriginalAmount,
-NumberedRows.InvoiceAllocatedAmount,
-NumberedRows.InvoiceOpenAmount,
-NumberedRows.InvoiceOpenAmountPaymentCurrency,
-NumberedRows.DifferenceAmount,
+NumberedRows.InvoiceOriginalAmt,
+NumberedRows.InvoiceAllocatedAmt,
+NumberedRows.InvoiceOpenAmt,
+NumberedRows.InvoiceOpenPayAmt,
+NumberedRows.ReadyAmt,
+NumberedRows.AccountingAmt,
+NumberedRows.MatchScore,
 NumberedRows.MatchConfidence,
-NumberedRows.ReadyAmount,
-NumberedRows.AccountingAmount,
-NumberedRows.ResultRowNumber
+NumberedRows.ResultRowNo
 FROM NumberedRows NumberedRows
-INNER JOIN QueryParameters QueryParameters ON
-(1=1)
+CROSS JOIN QueryParameters QueryParameters
 WHERE
 (
 QueryParameters.PageSize=0
 OR
 (
-NumberedRows.ResultRowNumber>
+NumberedRows.ResultRowNo>
 QueryParameters.OffsetRows
-AND NumberedRows.ResultRowNumber<=
+AND NumberedRows.ResultRowNo<=
 (
 QueryParameters.OffsetRows+
 QueryParameters.PageSize
@@ -1461,64 +1711,121 @@ QueryParameters.PageSize
 )
 SELECT
 SchemaCurrency.SchemaCurrencyId,
-SchemaCurrency.SchemaCurrencyISOCode,
+SchemaCurrency.SchemaCurrencyISO,
 SchemaCurrency.SchemaCurrencySymbol,
-SchemaCurrency.SchemaStdPrecision,
+SchemaCurrency.SchemaPrecision,
 SummaryData.TotalRecords,
-SummaryData.TotalAccountingAmount,
+SummaryData.TotalAccountingAmt,
 SummaryData.HighConfidenceCount,
 PagedRows.C_Payment_ID,
 PagedRows.C_BPartner_ID,
-PagedRows.PaymentDocumentNo,
+PagedRows.PaymentDocNo,
 PagedRows.PaymentDateAcct,
 PagedRows.PaymentCurrencyId,
 PagedRows.PaymentConversionTypeId,
-PagedRows.PaymentOriginalAmount,
-PagedRows.PaymentAllocatedAmount,
-PagedRows.PaymentOpenAmount,
+PagedRows.PaymentOriginalAmt,
+PagedRows.PaymentAllocatedAmt,
+PagedRows.PaymentOpenAmt,
 PagedRows.VendorName,
 PagedRows.PaymentMethod,
 PagedRows.ReferenceNo,
 PagedRows.BankName,
 PagedRows.AccountNo,
-PagedRows.PaymentCurrencyISOCode,
+PagedRows.PaymentCurrencyISO,
 PagedRows.PaymentCurrencySymbol,
 PagedRows.PaymentPrecision,
 PagedRows.C_Invoice_ID,
 PagedRows.C_InvoicePaySchedule_ID,
-PagedRows.InvoiceDocumentNo,
+PagedRows.InvoiceDocNo,
 PagedRows.InvoiceDate,
 PagedRows.DueDate,
 PagedRows.PaymentTerms,
 PagedRows.InvoiceCurrencyId,
-PagedRows.InvoiceCurrencyISOCode,
+PagedRows.InvoiceCurrencyISO,
 PagedRows.InvoiceCurrencySymbol,
 PagedRows.InvoicePrecision,
-PagedRows.InvoiceOriginalAmount,
-PagedRows.InvoiceAllocatedAmount,
-PagedRows.InvoiceOpenAmount,
-PagedRows.InvoiceOpenAmountPaymentCurrency,
-PagedRows.ReadyAmount,
-PagedRows.AccountingAmount,
+PagedRows.InvoiceOriginalAmt,
+PagedRows.InvoiceAllocatedAmt,
+PagedRows.InvoiceOpenAmt,
+PagedRows.InvoiceOpenPayAmt,
+PagedRows.ReadyAmt,
+PagedRows.AccountingAmt,
+PagedRows.MatchScore,
 PagedRows.MatchConfidence,
-PagedRows.ResultRowNumber
+PagedRows.ResultRowNo
 FROM SchemaCurrency SchemaCurrency
-INNER JOIN SummaryData SummaryData ON
-(1=1)
+CROSS JOIN SummaryData SummaryData
 LEFT OUTER JOIN PagedRows PagedRows ON
 (1=1)
 ORDER BY
-PagedRows.ResultRowNumber";
+PagedRows.ResultRowNo";
+
+            /*
+             * Placeholder count: 6
+             * Parameter count:   6
+             *
+             * Each placeholder occurs exactly once
+             * inside QueryParameters.
+             */
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@C_Payment_ID",
+                        Math.Max(
+                            0,
+                            paymentId
+                        )
+                    ),
+
+                    new SqlParameter(
+                        "@C_Invoice_ID",
+                        Math.Max(
+                            0,
+                            invoiceId
+                        )
+                    ),
+
+                    new SqlParameter(
+                        "@C_InvoicePaySchedule_ID",
+                        Math.Max(
+                            0,
+                            payScheduleId
+                        )
+                    ),
+
+                    new SqlParameter(
+                        "@OffsetRows",
+                        Math.Max(
+                            0,
+                            offsetRows
+                        )
+                    ),
+
+                    new SqlParameter(
+                        "@PageSize",
+                        Math.Max(
+                            0,
+                            pageSize
+                        )
+                    )
+                };
 
             IDataReader reader = null;
 
             try
             {
-                reader = DB.ExecuteReader(
-                    sql,
-                    null,
-                    trx
-                );
+                reader =
+                    DB.ExecuteReader(
+                        sql,
+                        parameters,
+                        trx
+                    );
 
                 while (
                     reader != null &&
@@ -1534,7 +1841,7 @@ PagedRows.ResultRowNumber";
                     result.SchemaCurrencyISOCode =
                         GetString(
                             reader,
-                            "SchemaCurrencyISOCode"
+                            "SchemaCurrencyISO"
                         );
 
                     result.SchemaCurrencySymbol =
@@ -1546,7 +1853,7 @@ PagedRows.ResultRowNumber";
                     result.SchemaStdPrecision =
                         GetInt(
                             reader,
-                            "SchemaStdPrecision"
+                            "SchemaPrecision"
                         );
 
                     result.TotalRecords =
@@ -1558,7 +1865,7 @@ PagedRows.ResultRowNumber";
                     result.TotalAccountingAmount =
                         GetDecimal(
                             reader,
-                            "TotalAccountingAmount"
+                            "TotalAccountingAmt"
                         );
 
                     result.HighConfidenceCount =
@@ -1611,7 +1918,7 @@ PagedRows.ResultRowNumber";
                             PaymentDocumentNo =
                                 GetString(
                                     reader,
-                                    "PaymentDocumentNo"
+                                    "PaymentDocNo"
                                 ),
 
                             PaymentDate =
@@ -1635,19 +1942,19 @@ PagedRows.ResultRowNumber";
                             PaymentOriginalAmount =
                                 GetDecimal(
                                     reader,
-                                    "PaymentOriginalAmount"
+                                    "PaymentOriginalAmt"
                                 ),
 
                             PaymentAllocatedAmount =
                                 GetDecimal(
                                     reader,
-                                    "PaymentAllocatedAmount"
+                                    "PaymentAllocatedAmt"
                                 ),
 
                             PaymentOpenAmount =
                                 GetDecimal(
                                     reader,
-                                    "PaymentOpenAmount"
+                                    "PaymentOpenAmt"
                                 ),
 
                             PaymentMethod =
@@ -1677,7 +1984,7 @@ PagedRows.ResultRowNumber";
                             PaymentCurrencyISOCode =
                                 GetString(
                                     reader,
-                                    "PaymentCurrencyISOCode"
+                                    "PaymentCurrencyISO"
                                 ),
 
                             PaymentCurrencySymbol =
@@ -1695,7 +2002,7 @@ PagedRows.ResultRowNumber";
                             InvoiceDocumentNo =
                                 GetString(
                                     reader,
-                                    "InvoiceDocumentNo"
+                                    "InvoiceDocNo"
                                 ),
 
                             InvoiceDate =
@@ -1725,7 +2032,7 @@ PagedRows.ResultRowNumber";
                             InvoiceCurrencyISOCode =
                                 GetString(
                                     reader,
-                                    "InvoiceCurrencyISOCode"
+                                    "InvoiceCurrencyISO"
                                 ),
 
                             InvoiceCurrencySymbol =
@@ -1743,37 +2050,43 @@ PagedRows.ResultRowNumber";
                             InvoiceOriginalAmount =
                                 GetDecimal(
                                     reader,
-                                    "InvoiceOriginalAmount"
+                                    "InvoiceOriginalAmt"
                                 ),
 
                             InvoiceAllocatedAmount =
                                 GetDecimal(
                                     reader,
-                                    "InvoiceAllocatedAmount"
+                                    "InvoiceAllocatedAmt"
                                 ),
 
                             InvoiceOpenAmount =
                                 GetDecimal(
                                     reader,
-                                    "InvoiceOpenAmount"
+                                    "InvoiceOpenAmt"
                                 ),
 
                             InvoiceOpenAmountPaymentCurrency =
                                 GetDecimal(
                                     reader,
-                                    "InvoiceOpenAmountPaymentCurrency"
+                                    "InvoiceOpenPayAmt"
                                 ),
 
                             ReadyAmount =
                                 GetDecimal(
                                     reader,
-                                    "ReadyAmount"
+                                    "ReadyAmt"
                                 ),
 
                             AccountingAmount =
                                 GetDecimal(
                                     reader,
-                                    "AccountingAmount"
+                                    "AccountingAmt"
+                                ),
+
+                            Score =
+                                GetInt(
+                                    reader,
+                                    "MatchScore"
                                 ),
 
                             Confidence =
@@ -1782,14 +2095,6 @@ PagedRows.ResultRowNumber";
                                     "MatchConfidence"
                                 )
                         };
-
-                    row.Score =
-                        CalculateScore(
-                            row.PaymentOpenAmount,
-                            row.InvoiceOpenAmountPaymentCurrency,
-                            row.PaymentDate,
-                            row.DueDate
-                        );
 
                     result.Rows.Add(row);
                 }
@@ -1828,7 +2133,7 @@ PagedRows.ResultRowNumber";
             )
             {
                 result.Message =
-                    GetMessage(
+                    GetMsg(
                         ctx,
                         "FillMandatory",
                         "Mandatory values are missing"
@@ -1863,7 +2168,7 @@ PagedRows.ResultRowNumber";
                             row.PaymentId == paymentId &&
                             row.InvoiceId == invoiceId &&
                             row.InvoicePayScheduleId ==
-                                payScheduleId
+                            payScheduleId
                     );
 
                 if (matchRow == null)
@@ -1871,7 +2176,7 @@ PagedRows.ResultRowNumber";
                     trx.Rollback();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VIS_NoRecordFound",
                             "The selected match is no longer available"
@@ -1898,13 +2203,21 @@ PagedRows.ResultRowNumber";
                     payment.Get_ID() <= 0 ||
                     invoice.Get_ID() <= 0 ||
                     payment.IsReceipt() ||
-                    invoice.IsSOTrx()
+                    invoice.IsSOTrx() ||
+                    !(
+                        payment.GetDocStatus() == "CO" ||
+                        payment.GetDocStatus() == "CL"
+                    ) ||
+                    !(
+                        invoice.GetDocStatus() == "CO" ||
+                        invoice.GetDocStatus() == "CL"
+                    )
                 )
                 {
                     trx.Rollback();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VIS_NoRecordFound",
                             "AP payment or purchase invoice was not found"
@@ -1921,24 +2234,10 @@ PagedRows.ResultRowNumber";
                     trx.Rollback();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VAS_072_DifferentBusinessPartner",
                             "Payment and invoice belong to different vendors"
-                        );
-
-                    return result;
-                }
-
-                if (payment.IsAllocated())
-                {
-                    trx.Rollback();
-
-                    result.Message =
-                        GetMessage(
-                            ctx,
-                            "PaymentIsAllocated",
-                            "Payment is already allocated"
                         );
 
                     return result;
@@ -1965,7 +2264,7 @@ PagedRows.ResultRowNumber";
                     trx.Rollback();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "AmountIsZero",
                             "Available amount is zero"
@@ -2013,7 +2312,7 @@ PagedRows.ResultRowNumber";
                         VLogger.RetrieveError();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VIS_AllocationHdrNotSaved",
                             "Allocation header was not saved"
@@ -2082,7 +2381,7 @@ PagedRows.ResultRowNumber";
                         VLogger.RetrieveError();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VIS_AllocLineNotCreated",
                             "Allocation line was not created"
@@ -2107,7 +2406,7 @@ PagedRows.ResultRowNumber";
                     trx.Rollback();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VAS_AllocationNotCompDueTo",
                             "Allocation could not be completed due to"
@@ -2126,7 +2425,7 @@ PagedRows.ResultRowNumber";
                         VLogger.RetrieveError();
 
                     result.Message =
-                        GetMessage(
+                        GetMsg(
                             ctx,
                             "VIS_AllocationHdrNotSaved",
                             "Completed allocation was not saved"
@@ -2141,30 +2440,30 @@ PagedRows.ResultRowNumber";
                     return result;
                 }
 
-                if (payment.TestAllocation())
+                if (
+                    payment.TestAllocation() &&
+                    !payment.Save()
+                )
                 {
-                    if (!payment.Save())
-                    {
-                        trx.Rollback();
+                    trx.Rollback();
 
-                        ValueNamePair error =
-                            VLogger.RetrieveError();
+                    ValueNamePair error =
+                        VLogger.RetrieveError();
 
-                        result.Message =
-                            GetMessage(
-                                ctx,
-                                "PaymentNotCreated",
-                                "Payment allocation status was not saved"
-                            ) +
-                            (
-                                error != null
-                                    ? " :- " +
-                                      error.GetName()
-                                    : ""
-                            );
+                    result.Message =
+                        GetMsg(
+                            ctx,
+                            "PaymentNotCreated",
+                            "Payment allocation status was not saved"
+                        ) +
+                        (
+                            error != null
+                                ? " :- " +
+                                  error.GetName()
+                                : ""
+                        );
 
-                        return result;
-                    }
+                    return result;
                 }
 
                 trx.Commit();
@@ -2175,7 +2474,7 @@ PagedRows.ResultRowNumber";
                     allocation.GetDocumentNo();
 
                 result.Message =
-                    GetMessage(
+                    GetMsg(
                         ctx,
                         "AllocationIsCreated",
                         "Allocation is created"
@@ -2185,7 +2484,7 @@ PagedRows.ResultRowNumber";
 
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (trx != null)
                 {
@@ -2193,7 +2492,11 @@ PagedRows.ResultRowNumber";
                 }
 
                 result.Message =
-                    ex.Message;
+                    GetMsg(
+                        ctx,
+                        "VAS_072_ApplyError",
+                        "Could not complete allocation"
+                    );
 
                 return result;
             }
@@ -2204,109 +2507,6 @@ PagedRows.ResultRowNumber";
                     trx.Close();
                 }
             }
-        }
-
-        private int CalculateScore(
-            decimal paymentOpenAmount,
-            decimal invoiceOpenAmount,
-            DateTime? paymentDate,
-            DateTime? dueDate)
-        {
-            decimal difference =
-                Math.Abs(
-                    paymentOpenAmount -
-                    invoiceOpenAmount
-                );
-
-            decimal comparisonAmount =
-                Math.Max(
-                    Math.Abs(
-                        paymentOpenAmount
-                    ),
-                    Math.Abs(
-                        invoiceOpenAmount
-                    )
-                );
-
-            decimal differencePercentage =
-                comparisonAmount == 0
-                    ? 100
-                    : difference *
-                      100 /
-                      comparisonAmount;
-
-            int score = 40;
-
-            if (
-                difference <=
-                AmountTolerance
-            )
-            {
-                score += 45;
-            }
-            else if (
-                differencePercentage <= 1
-            )
-            {
-                score += 38;
-            }
-            else if (
-                differencePercentage <=
-                HighPercentageThreshold
-            )
-            {
-                score += 28;
-            }
-            else if (
-                differencePercentage <= 10
-            )
-            {
-                score += 18;
-            }
-            else if (
-                differencePercentage <=
-                ReviewPercentageThreshold
-            )
-            {
-                score += 8;
-            }
-
-            if (
-                paymentDate.HasValue &&
-                dueDate.HasValue
-            )
-            {
-                double dateDifference =
-                    Math.Abs(
-                        (
-                            paymentDate.Value.Date -
-                            dueDate.Value.Date
-                        ).TotalDays
-                    );
-
-                if (dateDifference <= 7)
-                {
-                    score += 15;
-                }
-                else if (
-                    dateDifference <=
-                    DateWindowDays
-                )
-                {
-                    score += 10;
-                }
-                else if (
-                    dateDifference <= 60
-                )
-                {
-                    score += 5;
-                }
-            }
-
-            return Math.Min(
-                100,
-                score
-            );
         }
 
         private bool IsAmountMatch(
@@ -2391,7 +2591,7 @@ PagedRows.ResultRowNumber";
                 : "";
         }
 
-        private string GetMessage(
+        private string GetMsg(
             Ctx ctx,
             string key,
             string fallback)
@@ -2401,29 +2601,22 @@ PagedRows.ResultRowNumber";
                 return fallback;
             }
 
-            string message =
+            string msg =
                 Msg.GetMsg(
                     ctx,
                     key
                 );
 
             if (
-                string.IsNullOrEmpty(message) ||
-                message == key ||
-                message == "[" + key + "]"
+                string.IsNullOrEmpty(msg) ||
+                msg == key ||
+                msg == "[" + key + "]"
             )
             {
                 return fallback;
             }
 
-            return message;
-        }
-
-        private string ToSqlInt(int value)
-        {
-            return value.ToString(
-                CultureInfo.InvariantCulture
-            );
+            return msg;
         }
 
         private int GetInt(
@@ -2433,10 +2626,13 @@ PagedRows.ResultRowNumber";
             object value =
                 record[columnName];
 
-            return value == null ||
-                   value == DBNull.Value
-                ? 0
-                : Convert.ToInt32(value);
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? 0
+                    : Convert.ToInt32(
+                        value
+                    );
         }
 
         private decimal GetDecimal(
@@ -2446,10 +2642,13 @@ PagedRows.ResultRowNumber";
             object value =
                 record[columnName];
 
-            return value == null ||
-                   value == DBNull.Value
-                ? 0
-                : Convert.ToDecimal(value);
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? 0
+                    : Convert.ToDecimal(
+                        value
+                    );
         }
 
         private string GetString(
@@ -2459,10 +2658,13 @@ PagedRows.ResultRowNumber";
             object value =
                 record[columnName];
 
-            return value == null ||
-                   value == DBNull.Value
-                ? ""
-                : Convert.ToString(value);
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? ""
+                    : Convert.ToString(
+                        value
+                    );
         }
 
         private DateTime? GetNullableDateTime(
@@ -2480,7 +2682,9 @@ PagedRows.ResultRowNumber";
                 return null;
             }
 
-            return Convert.ToDateTime(value);
+            return Convert.ToDateTime(
+                value
+            );
         }
 
         private class MatchQueryResult
@@ -2779,3 +2983,4 @@ PagedRows.ResultRowNumber";
         }
     }
 }
+ 
