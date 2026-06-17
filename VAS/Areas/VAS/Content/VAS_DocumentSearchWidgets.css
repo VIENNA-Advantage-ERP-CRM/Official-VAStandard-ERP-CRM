@@ -1,0 +1,334 @@
+/* ==========================================================
+   VAS Document Search Widgets  -  vas-dssrch-* namespace
+
+   Shared styling for the four single-table search-bar widgets:
+     VAS_067 AP Invoice       (chip: invoice)
+     VAS_068 AP Payment       (chip: payment)
+     VAS_069 Cash Journal     (chip: cash)
+     VAS_070 GL Journal       (chip: gljournal)
+
+   Each is a full-width 9x1 glass search bar living inside the
+   widget cell (em-scaled to the widget root). Its results
+   dropdown is appended to <body> and positioned as a fixed
+   popover so it escapes the dashboard cell's overflow:hidden;
+   being an overlay (chrome, not widget-internal) it is sized
+   in rem per the hybrid unit rules.
+
+   Borders, radii and shadow offsets stay in px (physical edges).
+   ========================================================== */
+
+/* ---------- Search bar (inside the widget cell) ---------- */
+.vas-dssrch-root {
+    position: relative;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75em 0;
+    /* Transparent like the design's search-outer, so the dashboard gradient
+       shows through the translucent glass bar (no card/box around it). */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.vas-dssrch-bar {
+    width: 80%;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    padding: 0.7em 0.8em;
+    box-sizing: border-box;
+}
+
+.vas-dssrch-bar.vas-dssrch-bar-focus {
+    border-color: #B6DEFB;
+    box-shadow: 0 6px 18px rgba(0, 131, 218, 0.16);
+}
+
+/* Never resize/scale the bar on hover - keep it perfectly stable. */
+.vas-dssrch-root:hover,
+.vas-dssrch-bar:hover {
+    transform: none !important;
+    transition: none !important;
+    zoom: normal !important;
+}
+
+.vas-dssrch-icon {
+    width: 1.125em;
+    height: 1.125em;
+    color: #0083DA;
+    flex-shrink: 0;
+}
+
+/* Force the input to disappear into the glass bar, overriding any global
+   app input styling (border / background / inset shadow / rounded box). */
+.vas-dssrch-input,
+.vas-dssrch-input:focus,
+.vas-dssrch-input:hover,
+.vas-dssrch-input:active {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    background-image: none !important;
+    font: inherit;
+    font-size: 0.875em !important;
+    color: #102C3F;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: 1.4 !important;
+    transform: none !important;
+    transition: none !important;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.vas-dssrch-input::placeholder { color: #748494; opacity: 1; }
+
+.vas-dssrch-clear {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1em;
+    line-height: 1;
+    color: #748494;
+    padding: 0.1em 0.25em;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+    visibility: hidden;
+}
+
+.vas-dssrch-clear:hover { opacity: 1; }
+.vas-dssrch-bar.vas-dssrch-has-text .vas-dssrch-clear { visibility: visible; }
+
+.vas-dssrch-spin {
+    width: 1.05em;
+    height: 1.05em;
+    flex-shrink: 0;
+    border: 2px solid rgba(0, 131, 218, 0.18);
+    border-top-color: #0083DA;
+    border-radius: 50%;
+    animation: vas-dssrch-spin 0.7s linear infinite;
+    display: none;
+}
+
+.vas-dssrch-bar.vas-dssrch-busy .vas-dssrch-spin { display: block; }
+.vas-dssrch-bar.vas-dssrch-busy .vas-dssrch-icon { display: none; }
+
+@keyframes vas-dssrch-spin { to { transform: rotate(360deg); } }
+
+/* ---------- Results dropdown (appended to <body>) ---------- */
+.vas-dssrch-panel {
+    position: fixed;
+    z-index: 99999;
+    box-sizing: border-box;
+    max-height: 60vh;
+    overflow-y: auto;
+    /* Same glass-card surface as the search bar: 2px white border, 14px radius,
+       soft navy shadow (slightly lifted as it floats over the dashboard). */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.80));
+    backdrop-filter: blur(8px);
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(16, 47, 74, 0.12);
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.875rem;
+    color: #102C3F;
+    padding: 0.4rem;
+    display: none;
+}
+
+.vas-dssrch-panel.vas-dssrch-open { display: block; }
+
+.vas-dssrch-panel::-webkit-scrollbar { width: 6px; }
+.vas-dssrch-panel::-webkit-scrollbar-track { background: transparent; }
+.vas-dssrch-panel::-webkit-scrollbar-thumb { background: rgba(16, 47, 74, 0.18); border-radius: 999px; }
+
+.vas-dssrch-count {
+    padding: 0.35rem 0.6rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #5F7283;
+}
+
+/* ---- Infinite-scroll "load more" footer ---- */
+.vas-dssrch-more {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 0.6rem 0.35rem;
+}
+
+.vas-dssrch-more.vas-dssrch-more-active { display: flex; }
+
+.vas-dssrch-more-spin {
+    width: 1.1rem;
+    height: 1.1rem;
+    border: 2px solid rgba(0, 131, 218, 0.18);
+    border-top-color: #0083DA;
+    border-radius: 50%;
+    animation: vas-dssrch-spin 0.7s linear infinite;
+}
+
+.vas-dssrch-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.vas-dssrch-row:hover { background: rgba(0, 131, 218, 0.08); }
+.vas-dssrch-row.vas-dssrch-nozoom { cursor: default; }
+.vas-dssrch-row.vas-dssrch-nozoom:hover { background: rgba(16, 47, 74, 0.04); }
+
+.vas-dssrch-chip {
+    flex-shrink: 0;
+    min-width: 3.4rem;
+    text-align: center;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.25rem 0.4rem;
+    border-radius: 7px;
+    line-height: 1.1;
+}
+
+.vas-dssrch-chip-order     { background: rgba(0, 131, 218, 0.12);  color: #0072C6; }
+.vas-dssrch-chip-invoice   { background: rgba(0, 131, 218, 0.12);  color: #0072C6; }
+.vas-dssrch-chip-payment   { background: rgba(1, 157, 137, 0.12);  color: #019D89; }
+.vas-dssrch-chip-cash      { background: rgba(215, 139, 16, 0.14); color: #B5740C; }
+.vas-dssrch-chip-gljournal { background: rgba(123, 97, 255, 0.14); color: #6B4BE0; }
+
+.vas-dssrch-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-dssrch-docline {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.vas-dssrch-docno {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.25;
+}
+
+/* Document status pill */
+.vas-dssrch-status {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.vas-dssrch-status-ok    { background: rgba(1, 157, 137, 0.14); color: #019D89; }
+.vas-dssrch-status-info  { background: rgba(0, 131, 218, 0.14); color: #0072C6; }
+.vas-dssrch-status-warn  { background: rgba(215, 139, 16, 0.16); color: #B5740C; }
+.vas-dssrch-status-err   { background: rgba(237, 28, 36, 0.12);  color: #C0392B; }
+.vas-dssrch-status-muted { background: rgba(16, 47, 74, 0.08);  color: #5F7283; }
+
+/* Linked-invoice tag: shown only on payment/cash rows that matched via their
+   linked invoice. Distinct violet, bordered, with a document icon, on its own
+   line so "invoice-driven" hits are unmistakable vs. the document's own data. */
+.vas-dssrch-invtag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #6B4BE0;
+    background: rgba(123, 97, 255, 0.10);
+    border: 1px solid rgba(123, 97, 255, 0.30);
+    border-radius: 6px;
+    padding: 0.12rem 0.45rem;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.vas-dssrch-invtag svg {
+    width: 0.95em;
+    height: 0.95em;
+    flex-shrink: 0;
+}
+
+.vas-dssrch-title {
+    font-size: 0.76rem;
+    color: #5F7283;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-dssrch-meta {
+    flex-shrink: 0;
+    text-align: right;
+    max-width: 42%;
+}
+
+.vas-dssrch-amount {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas-dssrch-date {
+    font-size: 0.72rem;
+    color: #748494;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas-dssrch-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.1rem 0.8rem;
+    font-size: 0.82rem;
+    color: #748494;
+    text-align: center;
+}
+
+.vas-dssrch-state svg { width: 1.1rem; height: 1.1rem; flex-shrink: 0; }
+.vas-dssrch-state-error { color: #C0392B; }
+.vas-dssrch-state-error svg { color: #C0392B; }
+
+/* Responsive anchor for the in-cell bar (80% centered, like the design) */
+@media (max-width: 1366px) { .vas-dssrch-bar { width: 86%; } }
+@media (max-width: 1024px) { .vas-dssrch-bar { width: 92%; } }
+@media (max-width: 768px)  { .vas-dssrch-bar { width: 100%; } }

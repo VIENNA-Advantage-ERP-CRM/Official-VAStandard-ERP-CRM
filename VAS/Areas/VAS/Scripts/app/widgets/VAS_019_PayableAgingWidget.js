@@ -28,6 +28,13 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* ---- Message helper: returns the AD_Message text, or the inline default
+         when the system has no message for the key. ---- */
+    function msg(key, fallback) {
+        var value = VIS.Msg.getMsg(key);
+        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+    }
+
     VAS.VAS_019_PayableAgingWidget = function () {
         this.frame;
         this.windowNo;
@@ -96,17 +103,17 @@
                 +       '<circle cx="12" cy="12" r="10"/>'
                 +       '<polyline points="12 6 12 12 16 14"/>'
                 +     '</svg>'
-                +     VIS.Msg.getMsg('VAS_019_PayableAging')
+                +     msg('VAS_019_PayableAging', 'Payable Aging')
                 +   '</div>'
-                +   '<span class="vas-pawdg-chip">' + data.OverdueCount + ' ' + VIS.Msg.getMsg('VAS_019_Overdue') + '</span>'
+                +   '<span class="vas-pawdg-chip">' + data.OverdueCount + ' ' + msg('VAS_019_Overdue', 'overdue') + '</span>'
                 + '</div>'
 
                 /* ---- Aging bars ---- */
                 + '<div class="vas-pawdg-aging-bars">'
-                +   buildAgingRow('VAS_019_Aging0to30',  data.Bucket0to30,  data.Count0to30,  totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--green')
-                +   buildAgingRow('VAS_019_Aging31to60', data.Bucket31to60, data.Count31to60, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--amber')
-                +   buildAgingRow('VAS_019_Aging61to90', data.Bucket61to90, data.Count61to90, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--orange')
-                +   buildAgingRow('VAS_019_Aging90Plus', data.Bucket90Plus, data.Count90Plus, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--red')
+                +   buildAgingRow('VAS_019_Aging0to30',  '0–30d',  data.Bucket0to30,  data.Count0to30,  totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--green')
+                +   buildAgingRow('VAS_019_Aging31to60', '31–60d', data.Bucket31to60, data.Count31to60, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--amber')
+                +   buildAgingRow('VAS_019_Aging61to90', '61–90d', data.Bucket61to90, data.Count61to90, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--orange')
+                +   buildAgingRow('VAS_019_Aging90Plus', '90+d',   data.Bucket90Plus, data.Count90Plus, totalOpen, sym, data.StdPrecision, 'vas-pawdg-ag-fill--red')
                 + '</div>'
 
                 /* ---- Divider ---- */
@@ -118,7 +125,7 @@
                 +       ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
                 +     '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'
                 +   '</svg>'
-                +   VIS.Msg.getMsg('VAS_019_PaymentHealth')
+                +   msg('VAS_019_PaymentHealth', 'Payment Health')
                 + '</div>'
 
                 /* ---- Donut (Chart.js) ---- */
@@ -130,9 +137,9 @@
 
                 /* ---- Legend ---- */
                 + '<div class="vas-pawdg-legend">'
-                +   buildLegendRow('vas-pawdg-dot--ok',   VIS.Msg.getMsg('VAS_019_PaidOnTime'),   sym + formatAmount(data.PaidAmount,    data.StdPrecision) + ' · ' + paidPct    + '%', 'vas-pawdg-lv-ok')
-                +   buildLegendRow('vas-pawdg-dot--info', VIS.Msg.getMsg('VAS_019_Pending'),       sym + formatAmount(data.PendingAmount, data.StdPrecision) + ' · ' + pendingPct + '%', 'vas-pawdg-lv-info')
-                +   buildLegendRow('vas-pawdg-dot--err',  VIS.Msg.getMsg('VAS_019_OverdueLabel'),  sym + formatAmount(data.OverdueAmount, data.StdPrecision) + ' · ' + overduePct + '%', 'vas-pawdg-lv-err')
+                +   buildLegendRow('vas-pawdg-dot--ok',   msg('VAS_019_PaidOnTime', 'Paid on time'),   sym + formatAmount(data.PaidAmount,    data.StdPrecision) + ' · ' + paidPct    + '%', 'vas-pawdg-lv-ok')
+                +   buildLegendRow('vas-pawdg-dot--info', msg('VAS_019_Pending', 'Pending'),       sym + formatAmount(data.PendingAmount, data.StdPrecision) + ' · ' + pendingPct + '%', 'vas-pawdg-lv-info')
+                +   buildLegendRow('vas-pawdg-dot--err',  msg('VAS_019_OverdueLabel', 'Overdue'),  sym + formatAmount(data.OverdueAmount, data.StdPrecision) + ' · ' + overduePct + '%', 'vas-pawdg-lv-err')
                 + '</div>';
 
             $container.html(html);
@@ -178,7 +185,7 @@
                     ctx.fillText(pct + '%', cx, cy - fs * 0.6);
                     ctx.font      = fs + 'px Roboto, sans-serif';
                     ctx.fillStyle = '#748494';
-                    ctx.fillText(VIS.Msg.getMsg('VAS_019_Paid') || 'Paid', cx, cy + fs * 0.9);
+                    ctx.fillText(msg('VAS_019_Paid', 'Paid'), cx, cy + fs * 0.9);
                     ctx.restore();
                 }
             };
@@ -187,9 +194,9 @@
                 type: 'doughnut',
                 data: {
                     labels: [
-                        VIS.Msg.getMsg('VAS_019_PaidOnTime')   || 'Paid on time',
-                        VIS.Msg.getMsg('VAS_019_Pending')      || 'Pending',
-                        VIS.Msg.getMsg('VAS_019_OverdueLabel') || 'Overdue'
+                        msg('VAS_019_PaidOnTime', 'Paid on time'),
+                        msg('VAS_019_Pending', 'Pending'),
+                        msg('VAS_019_OverdueLabel', 'Overdue')
                     ],
                     datasets: [{
                         data: [data.PaidAmount, data.PendingAmount, data.OverdueAmount],
@@ -221,12 +228,12 @@
         }
 
         /* ---- Build one aging row (label | bar | amount | count) ---- */
-        function buildAgingRow(msgKey, amount, count, totalOpen, sym, stdPrecision, colorClass) {
+        function buildAgingRow(msgKey, defaultLabel, amount, count, totalOpen, sym, stdPrecision, colorClass) {
             var pct    = totalOpen > 0 ? Math.round((amount / totalOpen) * 100) : 0;
             var amtFmt = sym + formatAmount(amount, stdPrecision);
-            var cntFmt = count + ' ' + VIS.Msg.getMsg('VAS_019_InvSuffix');
+            var cntFmt = count + ' ' + msg('VAS_019_InvSuffix', 'inv.');
             return '<div class="vas-pawdg-aging-row">'
-                + '<div class="vas-pawdg-ag-lbl">' + VIS.Msg.getMsg(msgKey) + '</div>'
+                + '<div class="vas-pawdg-ag-lbl">' + msg(msgKey, defaultLabel) + '</div>'
                 + '<div class="vas-pawdg-ag-track">'
                 +   '<div class="vas-pawdg-ag-fill ' + colorClass + '" data-w="' + pct + '"></div>'
                 + '</div>'
@@ -255,19 +262,19 @@
             var opts2   = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
             var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
             if (absNumber >= 1000000000000) {
-                unit      = VIS.Msg.getMsg('VAS_019_Trillion');
+                unit      = msg('VAS_019_Trillion', 'T');
                 formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000000000) {
-                unit      = VIS.Msg.getMsg('VAS_019_Billion');
+                unit      = msg('VAS_019_Billion', 'B');
                 formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 10000000) {
-                unit      = VIS.Msg.getMsg('VAS_019_Crore');
+                unit      = msg('VAS_019_Crore', 'Cr');
                 formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 100000) {
-                unit      = VIS.Msg.getMsg('VAS_019_Lakh');
+                unit      = msg('VAS_019_Lakh', 'L');
                 formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
             } else if (absNumber >= 1000) {
-                unit      = VIS.Msg.getMsg('VAS_019_Thousand');
+                unit      = msg('VAS_019_Thousand', 'K');
                 formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
             } else {
                 formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);

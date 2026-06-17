@@ -121,3 +121,8 @@ import "../app/widgets/VAS_021_RealTimeAlertsWidget.js";
 import "../app/widgets/VAS_023_TopFiveVendorsWidget.js";
 import "../app/widgets/VAS_020_PendingInvoicesWidget.js";
 import "../app/widgets/VAS_026_VendorCreditUtilisationWidget.js";
+import "../app/widgets/VAS_067_APInvoiceSearchWidget.js";
+import "../app/widgets/VAS_068_APPaymentSearchWidget.js";
+import "../app/widgets/VAS_069_CashJournalSearchWidget.js";
+import "../app/widgets/VAS_070_GLJournalSearchWidget.js";
+import "../app/widgets/VAS_071_NewPaymentWidget.js";

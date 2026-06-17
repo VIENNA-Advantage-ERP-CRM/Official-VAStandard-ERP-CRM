@@ -12,6 +12,13 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* ---- Message helper: returns the AD_Message text, or the inline default
+         when the system has no message for the key. ---- */
+    function msg(key, fallback) {
+        var value = VIS.Msg.getMsg(key);
+        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+    }
+
     /* Per-rank avatar palette */
     var AVATAR_COLORS = [
         { bg: '#EAF8FF', text: '#0E5DA8' },
@@ -86,7 +93,7 @@
                             '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>' +
                             '<path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>' +
                         '</svg>' +
-                        t5vEsc(VIS.Msg.getMsg('VAS_023_Top5VendorsBySpend') || 'Top 5 Vendors by Spend') +
+                        t5vEsc(msg('VAS_023_Top5VendorsBySpend', 'Top 5 Vendors by Spend')) +
                     '</div>' +
                     '<span class="vas-t5vwdg-fy-chip">' + t5vEsc(fyLabel) + '</span>' +
                 '</div>' +
@@ -123,7 +130,7 @@
                         ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
                         '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>' +
                     '</svg>' +
-                    t5vEsc(VIS.Msg.getMsg('VAS_023_VendorSpendDist') || 'Vendor Spend Distribution') +
+                    t5vEsc(msg('VAS_023_VendorSpendDist', 'Vendor Spend Distribution')) +
                 '</div>' +
                 '<div class="vas-t5vwdg-chart-wrap">' +
                     '<canvas class="vas-t5vwdg-canvas" id="vas_t5vwdg_cv_' + widgetID + '"></canvas>' +
@@ -158,7 +165,7 @@
             }
 
             var centerText  = sym + t5vShort(total);
-            var totalLabel  = VIS.Msg.getMsg('VAS_023_Total') || 'Total';
+            var totalLabel  = msg('VAS_023_Total', 'Total');
             var bgColors    = DONUT_COLORS.slice(0, n);
 
             var centerPlugin = {

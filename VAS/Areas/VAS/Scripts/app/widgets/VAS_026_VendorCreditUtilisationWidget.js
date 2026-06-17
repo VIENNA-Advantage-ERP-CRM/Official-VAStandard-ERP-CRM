@@ -13,6 +13,13 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* ---- Message helper: returns the AD_Message text, or the inline default
+         when the system has no message for the key. ---- */
+    function msg(key, fallback) {
+        var value = VIS.Msg.getMsg(key);
+        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+    }
+
     VAS.VAS_026_VendorCreditUtilisationWidget = function () {
         this.frame;
         this.windowNo;
@@ -74,17 +81,17 @@
                             '<rect x="1" y="4" width="22" height="16" rx="2"/>' +
                             '<line x1="1" y1="10" x2="23" y2="10"/>' +
                         '</svg>' +
-                        vcuEsc(VIS.Msg.getMsg('VAS_026_VendorCreditUtil') || 'Vendor Credit Utilisation') +
+                        vcuEsc(msg('VAS_026_VendorCreditUtil', 'Vendor Credit Utilisation')) +
                     '</div>' +
                     (breached > 0
                         ? '<span class="vas-vcuwdg-badge">' + breached + ' ' +
-                          vcuEsc(VIS.Msg.getMsg('VAS_026_Breached') || 'breached') + '</span>'
+                          vcuEsc(msg('VAS_026_Breached', 'breached')) + '</span>'
                         : '') +
                 '</div>' +
                 '<div class="vas-vcuwdg-list">';
 
             if (vendors.length === 0) {
-                html += '<div class="vas-vcuwdg-empty">' + (VIS.Msg.getMsg('VAS_026_NoCreditVendors') || 'No vendors with a credit limit configured') + '</div>';
+                html += '<div class="vas-vcuwdg-empty">' + (msg('VAS_026_NoCreditVendors', 'No vendors with a credit limit configured')) + '</div>';
             } else {
                 for (var i = 0; i < vendors.length; i++) {
                     html += vcuBuildRow(vendors[i], sym, prec);
@@ -103,7 +110,7 @@
             var valClass   = pct >= 100 ? 'vas-vcuwdg-prog-val--breached' : 'vas-vcuwdg-prog-val--normal';
             var breachChip = v.IsBreached
                 ? '<span class="vas-vcuwdg-breach-chip">' +
-                  vcuEsc(VIS.Msg.getMsg('VAS_026_BreachedChip') || 'Breached') + '</span>'
+                  vcuEsc(msg('VAS_026_BreachedChip', 'Breached')) + '</span>'
                 : '';
             var pctStr = Math.round(pct) + '%';
             var amtStr = vcuFmt(v.CreditUsed, sym, prec) + '/' + vcuFmt(v.CreditLimit, sym, prec);

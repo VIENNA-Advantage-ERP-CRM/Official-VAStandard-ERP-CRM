@@ -12,10 +12,16 @@
  *   VAS_022_Crore              => "Cr"
  *   VAS_022_Lakh               => "L"
  *   VAS_022_Thousand           => "K"
- *   VAS_022_NoData             => "No spend data for this month"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    /* ---- Message helper: returns the AD_Message text, or the inline default
+         when the system has no message for the key. ---- */
+    function msg(key, fallback) {
+        var value = VIS.Msg.getMsg(key);
+        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+    }
 
     /* Category colour palette (12 distinct colours) */
     var CAT_COLORS = [
@@ -84,14 +90,14 @@
                 +       '<rect x="10" y="8" width="4" height="13"/>'
                 +       '<rect x="18" y="1" width="4" height="20"/>'
                 +     '</svg>'
-                +     VIS.Msg.getMsg('VAS_022_SpendByCategoryMTD')
+                +     msg('VAS_022_SpendByCategoryMTD', 'Spend by Category (MTD)')
                 +   '</div>'
                 +   '<div class="vas-sbcwdg-tabs">'
                 +     '<button class="vas-sbcwdg-tab vas-sbcwdg-tab-active" data-view="bar">'
-                +       VIS.Msg.getMsg('VAS_022_Bar')
+                +       msg('VAS_022_Bar', 'Bar')
                 +     '</button>'
                 +     '<button class="vas-sbcwdg-tab" data-view="pie">'
-                +       VIS.Msg.getMsg('VAS_022_Donut')
+                +       msg('VAS_022_Donut', 'Donut')
                 +     '</button>'
                 +   '</div>'
                 + '</div>'
@@ -116,25 +122,6 @@
             if (_currentView === 'pie') { drawDonut(data); } else { drawBar(data); }
         }
 
-        /* ---- No-data overlay helper ---- */
-        function setNoData(el, show) {
-            var wrap = el ? el.parentElement : null;
-            if (!wrap) { return; }
-            var prev = wrap.querySelector('.vas-sbcwdg-nodata');
-            if (show) {
-                el.style.display = 'none';
-                if (!prev) {
-                    var msg = document.createElement('div');
-                    msg.className   = 'vas-sbcwdg-nodata';
-                    msg.textContent = VIS.Msg.getMsg('VAS_022_NoData') || 'No spend data for this month';
-                    wrap.appendChild(msg);
-                }
-            } else {
-                el.style.display = '';
-                if (prev) { wrap.removeChild(prev); }
-            }
-        }
-
         /* ---- Chart.js Horizontal Bar ---- */
         function drawBar(data) {
             if (typeof Chart === 'undefined') { return; }
@@ -146,8 +133,7 @@
             var cats = (data && data.Categories) || [];
             var sym  = (data && data.CurSymbol)  || '';
             var n    = cats.length;
-            if (!n) { setNoData(el, true); return; }
-            setNoData(el, false);
+            if (!n) { return; }
 
             var catNames   = cats.map(function (c) { return c.Name; });
             var catAmounts = cats.map(function (c) { return c.Amount; });
@@ -216,8 +202,7 @@
             var cats = (data && data.Categories) || [];
             var sym  = (data && data.CurSymbol)  || '';
             var n    = cats.length;
-            if (!n) { setNoData(el, true); return; }
-            setNoData(el, false);
+            if (!n) { return; }
 
             var total = 0;
             for (var ti = 0; ti < n; ti++) { total += cats[ti].Amount; }
@@ -227,7 +212,7 @@
             var catAmounts = cats.map(function (c) { return c.Amount; });
             var catColors  = cats.map(function (c, i) { return CAT_COLORS[i % CAT_COLORS.length]; });
 
-            var totalLabel = VIS.Msg.getMsg('VAS_022_Total') || 'Total';
+            var totalLabel = msg('VAS_022_Total', 'Total');
             var centerText = sym + fmtShort(total, data.StdPrecision);
 
             var centerPlugin = {
@@ -314,9 +299,9 @@
             var loc   = window.navigator.language;
             var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_022_Crore'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_022_Lakh'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_022_Thousand'); }
+            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + msg('VAS_022_Crore', 'Cr'); }
+            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + msg('VAS_022_Lakh', 'L'); }
+            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + msg('VAS_022_Thousand', 'K'); }
             return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
         }
 

@@ -23,7 +23,7 @@
     justify-content: space-between;
     height: 100%;
     padding: 1.14em 1.14em 1.28em;
-    background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
     border-radius: 12px;
     box-sizing: border-box;
     position: relative;
@@ -118,6 +118,314 @@
     pointer-events: none;
 }
 
+/* ---- Full-card click overlay (opens the drill-down) ---- */
+.vas-opwdg-open {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.vas-opwdg-open:focus-visible {
+    outline: 2px solid #D78B10;
+    outline-offset: -4px;
+}
+
+.vis-editModeWidget .vas-opwdg-open {
+    pointer-events: none;
+}
+
+/* ==========================================================
+   Drill-down dialog (jQuery UI) — matches the Onfinity modal
+   ========================================================== */
+.vas-opwdg-dialog-shell {
+    background: #FFFFFF;
+    border: 1px solid #ECEFF3 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 60px rgba(10, 28, 45, 0.25) !important;
+    overflow: hidden !important;
+}
+
+.vas-opwdg-dialog-shell .ui-dialog-titlebar {
+    background: #FFFFFF !important;
+    border: 0;
+    border-bottom: 1px solid #EDF2F6;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    letter-spacing: 0;
+    padding: 18px 20px 14px;
+    position: relative;
+    overflow: visible;
+}
+
+.vas-opwdg-dialog-shell .ui-dialog-title {
+    color: #102C3F !important;
+    font-family: Roboto, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+}
+
+.vas-opwdg-dialog-shell .vas-opwdg-dialog-close {
+    -webkit-appearance: none;
+    appearance: none;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    box-shadow: none;
+    box-sizing: border-box;
+    color: #6B7280;
+    cursor: pointer;
+    display: flex;
+    height: 30px;
+    justify-content: center;
+    line-height: 0;
+    margin: 0;
+    outline: 0;
+    padding: 0;
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+}
+
+.vas-opwdg-dialog-shell .vas-opwdg-dialog-close:hover,
+.vas-opwdg-dialog-shell .vas-opwdg-dialog-close:focus-visible {
+    background: rgba(0, 0, 0, 0.07);
+    color: #111827;
+}
+
+.vas-opwdg-dialog-shell .vas-opwdg-dialog-close svg {
+    display: block;
+    fill: currentColor;
+    height: 14px;
+    pointer-events: none;
+    width: 14px;
+}
+
+.vas-opwdg-dialog-shell .ui-dialog-content {
+    padding: 18px 20px;
+}
+
+.vas-opwdg-dialog-shell .ui-dialog-buttonpane {
+    background: #FFFFFF;
+    border-top: 1px solid #EDF2F6;
+    margin: 0;
+    padding: 12px 20px;
+}
+
+.vas-opwdg-dialog-shell .ui-dialog-buttonset button {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    color: #5F7283;
+    font-family: Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+    padding: 0.45rem 0.9rem;
+}
+
+.vas-opwdg-dialog-shell .ui-dialog-buttonset button:hover,
+.vas-opwdg-dialog-shell .ui-dialog-buttonset button:focus {
+    background: rgba(255, 255, 255, 0.95);
+    color: #102C3F;
+    outline: 0;
+}
+
+.vas-opwdg-dialog {
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    min-height: 220px;
+}
+
+.vas-opwdg-drill-state {
+    align-items: center;
+    color: #748494;
+    display: flex;
+    font-size: 14px;
+    justify-content: center;
+    min-height: 180px;
+    text-align: center;
+}
+
+.vas-opwdg-drill-error {
+    color: #D14545;
+}
+
+.vas-opwdg-drill {
+    align-items: flex-start;
+    display: flex;
+    gap: 16px;
+}
+
+.vas-opwdg-drill-card {
+    background: rgba(215, 139, 16, 0.094);
+    border-radius: 10px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 14px 16px;
+}
+
+.vas-opwdg-drill-card-label {
+    color: #5F7283;
+    display: block;
+    font-size: 11px;
+    line-height: 1.25;
+    margin-bottom: 4px;
+}
+
+.vas-opwdg-drill-card-value {
+    color: #D78B10;
+    display: block;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+}
+
+.vas-opwdg-drill-card-trend {
+    display: block;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-top: 4px;
+}
+
+.vas-opwdg-drill-trend-bad {
+    color: #D78B10;
+}
+
+.vas-opwdg-drill-trend-good {
+    color: #019D89;
+}
+
+.vas-opwdg-drill-copy {
+    flex: 2 1 0;
+    min-width: 0;
+}
+
+.vas-opwdg-drill-desc {
+    color: #5F7283;
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 0 0 12px;
+}
+
+.vas-opwdg-drill-row {
+    margin-bottom: 7px;
+}
+
+.vas-opwdg-drill-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Invisible filler row — keeps the popup body a stable height on short pages. */
+.vas-opwdg-drill-row--ph {
+    visibility: hidden;
+}
+
+.vas-opwdg-drill-row-head {
+    display: flex;
+    font-size: 11px;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.vas-opwdg-drill-row-name {
+    color: #102C3F;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-opwdg-drill-row-val {
+    color: #D78B10;
+    flex-shrink: 0;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.vas-opwdg-drill-track {
+    background: rgba(0, 0, 0, 0.07);
+    border-radius: 3px;
+    height: 6px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.vas-opwdg-drill-fill {
+    background: #D78B10;
+    border-radius: 3px;
+    height: 100%;
+}
+
+/* ---- Drill-down pager (rule 18) ---- */
+.vas-opwdg-drill-pager {
+    align-items: center;
+    display: flex;
+    gap: 0.75em;
+    justify-content: space-between;
+    margin-top: 0.85em;
+}
+
+.vas-opwdg-drill-pager-info {
+    color: #5A6B78;
+    font-size: 0.85em;
+}
+
+.vas-opwdg-drill-pager-nav {
+    align-items: center;
+    display: flex;
+    gap: 0.5em;
+}
+
+.vas-opwdg-drill-pager-btn {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(16, 44, 63, 0.18);
+    border-radius: 6px;
+    color: #102C3F;
+    cursor: pointer;
+    display: flex;
+    height: 24px;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    width: 24px;
+}
+
+.vas-opwdg-drill-pager-btn:hover:not([disabled]) {
+    background: #FFFFFF;
+    border-color: rgba(16, 44, 63, 0.35);
+}
+
+.vas-opwdg-drill-pager-btn[disabled] {
+    cursor: default;
+    opacity: 0.4;
+}
+
+.vas-opwdg-drill-pager-label {
+    color: #5A6B78;
+    font-size: 0.85em;
+    min-width: 4.5em;
+    text-align: center;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 1920px) {
     .vas-opwdg-container { font-size: 14px; }
@@ -142,6 +450,19 @@
 
 @media (max-width: 680px) {
     .vas-opwdg-container { font-size: 10.5px; }
+
+    .vas-opwdg-dialog-shell .ui-dialog-content {
+        padding: 0.875rem;
+    }
+
+    .vas-opwdg-drill {
+        flex-direction: column;
+    }
+
+    .vas-opwdg-drill-card,
+    .vas-opwdg-drill-copy {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
@@ -152,6 +473,3 @@
 @media (max-width: 320px) {
     .vas-opwdg-container { font-size: 9px; }
 }
-@media (min-width: 1600px) { .vas-opwdg-container { font-size: 16px; } }
-@media (min-width: 1920px) { .vas-opwdg-container { font-size: 18px; } }
-@media (min-width: 2560px) { .vas-opwdg-container { font-size: 21px; } }

@@ -12,6 +12,13 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* ---- Message helper: returns the AD_Message text, or the inline default
+         when the system has no message for the key. ---- */
+    function msg(key, fallback) {
+        var value = VIS.Msg.getMsg(key);
+        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+    }
+
     VAS.VAS_021_RealTimeAlertsWidget = function () {
         this.frame;
         this.windowNo;
@@ -60,7 +67,7 @@
             $container.empty();
 
             var alerts = (data && data.Alerts) ? data.Alerts : [];
-            var title = VIS.Msg.getMsg('VAS_021_RealTimeAlerts') || 'Real-time Alerts';
+            var title = msg('VAS_021_RealTimeAlerts', 'Real-time Alerts');
             var badgeHtml = alerts.length > 0 ? '<span class="vas-rtawdg-badge">' + alerts.length + '</span>' : '';
 
             var html =
@@ -83,7 +90,7 @@
                         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
                             '<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
                         '</svg>' +
-                        (VIS.Msg.getMsg('VAS_021_NoAlerts') || 'No alerts - all clear') +
+                        (msg('VAS_021_NoAlerts', 'No alerts - all clear')) +
                     '</div>';
             } else {
                 for (var i = 0; i < alerts.length; i++) {
@@ -93,28 +100,6 @@
 
             html += '</div>';
             $container.html(html);
-
-            $container.find('.vas-rtawdg-dismiss').on('click', function () {
-                var $alertEl = $(this).closest('.vas-rtawdg-alert');
-                $alertEl.slideUp(180, function () {
-                    $alertEl.remove();
-                    var remaining = $container.find('.vas-rtawdg-alert').length;
-                    var $badge = $container.find('.vas-rtawdg-badge');
-                    if (remaining === 0) {
-                        $badge.remove();
-                        $container.find('.vas-rtawdg-list').html(
-                            '<div class="vas-rtawdg-empty">' +
-                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
-                                    '<path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>' +
-                                '</svg>' +
-                                (VIS.Msg.getMsg('VAS_021_NoAlerts') || 'No alerts - all clear') +
-                            '</div>'
-                        );
-                    } else {
-                        $badge.text(remaining);
-                    }
-                });
-            });
         }
 
         function rtaBuildRow(alert, idx) {
@@ -126,7 +111,6 @@
                         '<div class="vas-rtawdg-al-title">' + rtaEsc(alert.Title || '') + '</div>' +
                         '<div class="vas-rtawdg-al-sub">' + rtaEsc(alert.Subtitle || '') + '</div>' +
                     '</div>' +
-                    '<button class="vas-rtawdg-dismiss" title="' + rtaEsc(VIS.Msg.getMsg('VAS_021_Dismiss') || 'Dismiss') + '">x</button>' +
                 '</div>'
             );
         }

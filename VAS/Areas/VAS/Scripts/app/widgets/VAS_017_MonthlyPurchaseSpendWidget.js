@@ -21,6 +21,13 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* ---- Message helper: returns the AD_Message text, or the inline default
+         when the system has no message for the key. ---- */
+    function msg(key, fallback) {
+        var value = VIS.Msg.getMsg(key);
+        return value && value !== key && value !== '[' + key + ']' ? value : fallback;
+    }
+
     VAS.VAS_017_MonthlyPurchaseSpendWidget = function () {
         this.frame;
         this.windowNo;
@@ -83,25 +90,25 @@
                 +       '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>'
                 +       '<polyline points="17 6 23 6 23 12"/>'
                 +     '</svg>'
-                +     VIS.Msg.getMsg('VAS_017_MonthlyPurchaseSpend') + ' — ' + fyLbl
+                +     msg('VAS_017_MonthlyPurchaseSpend', 'Monthly Purchase Spend') + ' — ' + fyLbl
                 +   '</div>'
                 +   '<div class="vas-mpswdg-header-right">'
                 +     '<div class="vas-mpswdg-legend">'
                 +       '<span class="vas-mpswdg-legend-item">'
                 +         '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-solid"></span>'
-                +         VIS.Msg.getMsg('VAS_017_ThisYear')
+                +         msg('VAS_017_ThisYear', 'This year')
                 +       '</span>'
                 +       '<span class="vas-mpswdg-legend-item">'
                 +         '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-dashed"></span>'
-                +         VIS.Msg.getMsg('VAS_017_LastYear')
+                +         msg('VAS_017_LastYear', 'Last year')
                 +       '</span>'
                 +     '</div>'
                 +     '<div class="vas-mpswdg-tabs">'
                 +       '<button class="vas-mpswdg-tab vas-mpswdg-tab-active" data-mode="monthly">'
-                +         VIS.Msg.getMsg('VAS_017_Monthly')
+                +         msg('VAS_017_Monthly', 'Monthly')
                 +       '</button>'
                 +       '<button class="vas-mpswdg-tab" data-mode="quarterly">'
-                +         VIS.Msg.getMsg('VAS_017_Quarterly')
+                +         msg('VAS_017_Quarterly', 'Quarterly')
                 +       '</button>'
                 +     '</div>'
                 +   '</div>'
@@ -149,10 +156,10 @@
                     ly[9] + ly[10] + ly[11]
                 ];
                 xLabels = [
-                    VIS.Msg.getMsg('VAS_017_Q1'),
-                    VIS.Msg.getMsg('VAS_017_Q2'),
-                    VIS.Msg.getMsg('VAS_017_Q3'),
-                    VIS.Msg.getMsg('VAS_017_Q4')
+                    msg('VAS_017_Q1', 'Q1'),
+                    msg('VAS_017_Q2', 'Q2'),
+                    msg('VAS_017_Q3', 'Q3'),
+                    msg('VAS_017_Q4', 'Q4')
                 ];
             } else {
                 /* Indian FY: Apr(3)→Mar(2); generate locale-aware month abbreviations */
@@ -174,7 +181,7 @@
                     labels: xLabels,
                     datasets: [
                         {
-                            label: VIS.Msg.getMsg('VAS_017_ThisYear') || 'This year',
+                            label: msg('VAS_017_ThisYear', 'This year'),
                             data: d1,
                             borderColor: '#0083DA',
                             backgroundColor: 'rgba(0,131,218,0.10)',
@@ -188,7 +195,7 @@
                             borderWidth: 2
                         },
                         {
-                            label: VIS.Msg.getMsg('VAS_017_LastYear') || 'Last year',
+                            label: msg('VAS_017_LastYear', 'Last year'),
                             data: d2,
                             borderColor: 'rgba(0,131,218,0.38)',
                             backgroundColor: 'transparent',
@@ -205,15 +212,9 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     layout: { padding: { top: 4, right: 8 } },
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
                     plugins: {
                         legend: { display: false },   /* custom HTML legend in header */
                         tooltip: {
-                            mode: 'index',
-                            intersect: false,
                             callbacks: {
                                 label: function (ctx) {
                                     if (ctx.raw === null) { return null; }
@@ -253,9 +254,9 @@
             var loc   = window.navigator.language;
             var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
             var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + VIS.Msg.getMsg('VAS_017_Crore'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + VIS.Msg.getMsg('VAS_017_Lakh'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + VIS.Msg.getMsg('VAS_017_Thousand'); }
+            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + msg('VAS_017_Crore', 'Cr'); }
+            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + msg('VAS_017_Lakh', 'L'); }
+            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + msg('VAS_017_Thousand', 'K'); }
             return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
         }
 

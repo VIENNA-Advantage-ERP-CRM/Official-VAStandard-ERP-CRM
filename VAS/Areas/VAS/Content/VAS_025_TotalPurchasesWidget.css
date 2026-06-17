@@ -10,6 +10,14 @@
 .vas-tpwidg-root {
     height: 100%;
     width: 100%;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.07);
+    transition: box-shadow 0.18s ease;
+}
+
+.vas-tpwidg-root:hover {
+    box-shadow: 0 12px 28px rgba(15, 61, 97, 0.11);
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -24,70 +32,79 @@
 .vas-tpwidg-container {
     height: 100%;
     width: 100%;
-    padding: 1em;
+    padding: 1em 1em 1.125em;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     position: relative;
     overflow: hidden;
+    isolation: isolate;
     font-size: 14px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
     border-radius: 0.85em;
     box-sizing: border-box;
 }
 
+.vas-tpwidg-container > :not(.vas-tpwidg-sparkline):not(.vas-tpwidg-open) {
+    position: relative;
+    z-index: 1;
+}
+
 /* ---- Label (top) ---- */
 .vas-tpwidg-label {
-    font-size: 0.86em;
+    font-size: 0.8125em;
     font-weight: 400;
-    color: #5F7283;
+    color: #748494;
     font-family: Roboto, sans-serif;
     line-height: 1.3;
-    margin-bottom: 0.15em;
+    letter-spacing: 0;
+    margin-bottom: 0.375em;
 }
 
 /* ---- Primary KPI value ---- */
 .vas-tpwidg-value {
-    font-size: 2.2em;
+    font-size: 2.28em;
     font-weight: 700;
     color: #0B5EA8;
-    line-height: 1.1;
-    letter-spacing: -0.01em;
-    margin-bottom: 0.3em;
+    line-height: 1;
+    letter-spacing: 0;
+    margin-bottom: 0.25em;
     font-family: Roboto, sans-serif;
 }
 
 /* ---- Pills row ---- */
 .vas-tpwidg-pills-row {
     display: flex;
-    gap: 0.45em;
+    align-items: center;
+    gap: 0.5em;
     flex-wrap: wrap;
-    margin-bottom: 0.35em;
+    margin-bottom: 0.375em;
 }
 
 .vas-tpwidg-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.3em;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid #BFE4FF;
+    gap: 0.25em;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #B6D4EE;
     border-radius: 999px;
-    padding: 0.22em 0.65em;
+    padding: 0.22em 0.64em;
     font-size: 0.78em;
     font-family: Roboto, sans-serif;
+    line-height: 1.2;
     white-space: nowrap;
 }
 
 .vas-tpwidg-pill-label {
     color: #5F7283;
-    font-weight: 400;
-    font-size: 0.95em;
+    font-weight: 700;
+    font-size: 0.82em;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
+    letter-spacing: 0;
 }
 
 .vas-tpwidg-pill-value {
-    color: #102C3F;
+    color: #0B5EA8;
     font-weight: 700;
 }
 
@@ -98,8 +115,9 @@
     gap: 0.3em;
     font-size: 0.8em;
     font-family: Roboto, sans-serif;
-    font-weight: 400;
+    font-weight: 700;
     line-height: 1.2;
+    margin-top: 0.125em;
 }
 
 .vas-tpwidg-trend-icon {
@@ -119,10 +137,310 @@
 /* ---- Sparkline (bottom-right, decorative) ---- */
 .vas-tpwidg-sparkline {
     position: absolute;
-    bottom: 0.4em;
-    right: 0.5em;
-    opacity: 0.5;
+    bottom: 0;
+    right: 0;
+    width: 6.43em;
+    height: auto;
+    opacity: 0.16;
     pointer-events: none;
+    z-index: 0;
+}
+
+.vas-tpwidg-open {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.vas-tpwidg-open:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: -4px;
+}
+
+.vis-editModeWidget .vas-tpwidg-open {
+    pointer-events: none;
+}
+
+.vas-tpwidg-dialog-shell {
+    background: #FFFFFF;
+    border: 1px solid #ECEFF3 !important;
+    border-radius: 14px !important;
+    box-shadow: 0 20px 60px rgba(10, 28, 45, 0.25) !important;
+    overflow: hidden !important;
+}
+
+.vas-tpwidg-dialog-shell .ui-dialog-titlebar {
+    background: #FFFFFF !important;
+    border: 0;
+    border-bottom: 1px solid #E4EDF4;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    letter-spacing: 0;
+    padding: 18px 20px 14px;
+    position: relative;
+    overflow: visible;
+}
+
+.vas-tpwidg-dialog-shell .ui-dialog-title {
+    color: #102C3F !important;
+    font-family: Roboto, sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+}
+
+.vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close {
+    -webkit-appearance: none;
+    appearance: none;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    box-shadow: none;
+    box-sizing: border-box;
+    color: #6B7280;
+    cursor: pointer;
+    display: flex;
+    height: 30px;
+    justify-content: center;
+    line-height: 0;
+    margin: 0;
+    outline: 0;
+    padding: 0;
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+}
+
+.vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close:hover,
+.vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close:focus-visible {
+    background: rgba(0, 0, 0, 0.07);
+    color: #111827;
+}
+
+.vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close svg {
+    display: block;
+    fill: currentColor;
+    height: 14px;
+    pointer-events: none;
+    width: 14px;
+}
+
+.vas-tpwidg-dialog-shell .ui-dialog-content {
+    padding: 18px 20px;
+}
+
+.vas-tpwidg-dialog-shell .ui-dialog-buttonpane {
+    background: #FFFFFF;
+    border-top: 1px solid #E4EDF4;
+    margin: 0;
+    padding: 12px 20px;
+}
+
+.vas-tpwidg-dialog-shell .ui-dialog-buttonset button {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    color: #5F7283;
+    font-family: Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+    padding: 0.45rem 0.9rem;
+}
+
+.vas-tpwidg-dialog-shell .ui-dialog-buttonset button:hover,
+.vas-tpwidg-dialog-shell .ui-dialog-buttonset button:focus {
+    background: rgba(255, 255, 255, 0.95);
+    color: #102C3F;
+    outline: 0;
+}
+
+.vas-tpwidg-dialog {
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    min-height: 220px;
+}
+
+.vas-tpwidg-drill-state {
+    align-items: center;
+    color: #748494;
+    display: flex;
+    font-size: 14px;
+    justify-content: center;
+    min-height: 180px;
+    text-align: center;
+}
+
+.vas-tpwidg-drill-error {
+    color: #D14545;
+}
+
+.vas-tpwidg-drill {
+    align-items: flex-start;
+    display: flex;
+    gap: 16px;
+}
+
+.vas-tpwidg-drill-card {
+    background: rgba(0, 131, 218, 0.094);
+    border-radius: 10px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 14px 16px;
+}
+
+.vas-tpwidg-drill-card-label {
+    color: #5F7283;
+    display: block;
+    font-size: 11px;
+    line-height: 1.25;
+    margin-bottom: 4px;
+}
+
+.vas-tpwidg-drill-card-value {
+    color: #0083DA;
+    display: block;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 1;
+}
+
+.vas-tpwidg-drill-card-trend {
+    color: #0083DA;
+    display: block;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    line-height: 1.25;
+    margin-top: 4px;
+}
+
+.vas-tpwidg-drill-copy {
+    flex: 2 1 0;
+    min-width: 0;
+}
+
+.vas-tpwidg-drill-desc {
+    color: #5F7283;
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 0 0 12px;
+}
+
+.vas-tpwidg-drill-row {
+    margin-bottom: 7px;
+}
+
+.vas-tpwidg-drill-row:last-child {
+    margin-bottom: 0;
+}
+
+/* Invisible filler row — keeps the popup body a stable height on short pages. */
+.vas-tpwidg-drill-row--ph {
+    visibility: hidden;
+}
+
+.vas-tpwidg-drill-row-head {
+    display: flex;
+    font-size: 11px;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 3px;
+}
+
+.vas-tpwidg-drill-row-name {
+    color: #102C3F;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tpwidg-drill-row-val {
+    color: #0083DA;
+    flex-shrink: 0;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.vas-tpwidg-drill-track {
+    background: rgba(0, 0, 0, 0.07);
+    border-radius: 3px;
+    height: 6px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.vas-tpwidg-drill-fill {
+    background: #0083DA;
+    border-radius: 3px;
+    height: 100%;
+}
+
+/* ---- Drill-down pager (rule 18) ---- */
+.vas-tpwidg-drill-pager {
+    align-items: center;
+    display: flex;
+    gap: 0.75em;
+    justify-content: space-between;
+    margin-top: 0.85em;
+}
+
+.vas-tpwidg-drill-pager-info {
+    color: #5A6B78;
+    font-size: 0.85em;
+}
+
+.vas-tpwidg-drill-pager-nav {
+    align-items: center;
+    display: flex;
+    gap: 0.5em;
+}
+
+.vas-tpwidg-drill-pager-btn {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(16, 44, 63, 0.18);
+    border-radius: 6px;
+    color: #102C3F;
+    cursor: pointer;
+    display: flex;
+    height: 24px;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    width: 24px;
+}
+
+.vas-tpwidg-drill-pager-btn:hover:not([disabled]) {
+    background: #FFFFFF;
+    border-color: rgba(16, 44, 63, 0.35);
+}
+
+.vas-tpwidg-drill-pager-btn[disabled] {
+    cursor: default;
+    opacity: 0.4;
+}
+
+.vas-tpwidg-drill-pager-label {
+    color: #5A6B78;
+    font-size: 0.85em;
+    min-width: 4.5em;
+    text-align: center;
 }
 
 /* ============================================================
@@ -178,6 +496,19 @@
     .vas-tpwidg-container {
         font-size: 9px;
     }
+
+    .vas-tpwidg-dialog-shell .ui-dialog-content {
+        padding: 0.875rem;
+    }
+
+    .vas-tpwidg-drill {
+        flex-direction: column;
+    }
+
+    .vas-tpwidg-drill-card,
+    .vas-tpwidg-drill-copy {
+        width: 100%;
+    }
 }
 
 @media screen and (max-width: 480px) {
@@ -191,6 +522,3 @@
         font-size: 9px;
     }
 }
-@media (min-width: 1600px) { .vas-tpwidg-container { font-size: 16px; } }
-@media (min-width: 1920px) { .vas-tpwidg-container { font-size: 18px; } }
-@media (min-width: 2560px) { .vas-tpwidg-container { font-size: 21px; } }

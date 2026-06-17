@@ -246,6 +246,120 @@ namespace VAS.Areas.VAS.Controllers
             return result;
         }
 
+        /// <summary>
+        /// Returns invoice headers behind a clicked KPI tile. The category filters mirror
+        /// the KPI queries above, but amounts stay in the invoice transaction currency.
+        /// </summary>
+        public JsonResult GetCategoryInvoices(string category, int maxRows = 25, int offset = 0)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                CategoryInvoicesResult result = BuildCategoryInvoices(ctx, category, maxRows, offset);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        private CategoryInvoicesResult BuildCategoryInvoices(Ctx ctx, string category, int maxRows, int offset)
+        {
+            var result = new CategoryInvoicesResult
+            {
+                Items = new List<CategoryInvoiceRow>()
+            };
+
+            if (maxRows < 1) { maxRows = 1; }
+            if (maxRows > 50) { maxRows = 50; }
+            if (offset < 0) { offset = 0; }
+
+            string baseWhere;
+            string outerWhere = "";
+            string cat = (category ?? "").Trim().ToLower();
+
+            if (cat == "approval")
+            {
+                baseWhere = " AND i.DocStatus IN ('DR', 'IP', 'WC', 'NA')";
+            }
+            else if (cat == "grn")
+            {
+                baseWhere = " AND i.DocStatus IN ('CO', 'CL')";
+                outerWhere = @" AND EXISTS (SELECT 1 FROM C_InvoiceLine il
+                                  WHERE il.C_Invoice_ID = b.C_Invoice_ID
+                                    AND il.IsActive = 'Y'
+                                    AND il.M_Product_ID IS NOT NULL
+                                    AND NOT EXISTS (SELECT 1 FROM M_MatchInv mi WHERE mi.C_InvoiceLine_ID = il.C_InvoiceLine_ID AND mi.IsActive = 'Y'))";
+            }
+            else if (cat == "po")
+            {
+                baseWhere = " AND i.DocStatus IN ('CO', 'CL', 'IP') AND i.C_Order_ID IS NULL";
+            }
+            else if (cat == "ready")
+            {
+                baseWhere = " AND i.DocStatus IN ('CO', 'CL')";
+                outerWhere = @" AND EXISTS (SELECT 1 FROM C_InvoicePaySchedule ips
+                                  WHERE ips.C_Invoice_ID = b.C_Invoice_ID
+                                    AND ips.IsActive = 'Y'
+                                    AND ips.VA009_IsPaid = 'N'
+                                    AND ips.DueAmt > 0)";
+            }
+            else
+            {
+                return result;
+            }
+
+            int clientId = ctx.GetAD_Client_ID();
+            SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId) };
+
+            string baseSql = @"SELECT i.C_Invoice_ID, i.DocumentNo, i.DateInvoiced, i.DocStatus,
+                       i.GrandTotal, i.C_BPartner_ID, i.C_Currency_ID
+                  FROM C_Invoice i
+                 WHERE i.IsSOTrx = 'N'
+                   AND i.IsExpenseInvoice = 'N'
+                   AND i.IsActive = 'Y'
+                   AND i.AD_Client_ID = @ClientID" + baseWhere;
+            baseSql = MRole.GetDefault(ctx).AddAccessSQL(baseSql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            string core = @"SELECT b.C_Invoice_ID AS InvID, b.DocumentNo AS DocumentNo, b.DateInvoiced AS DocDate,
+                       bp.Name AS VendorName, b.DocStatus AS DocStatus, b.GrandTotal AS Amount,
+                       cur.ISO_Code AS CurCode, cur.CurSymbol AS CurSym
+                  FROM (" + baseSql + @") b
+                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = b.C_BPartner_ID)
+                 LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = b.C_Currency_ID)
+                 WHERE bp.IsActive = 'Y'" + outerWhere;
+
+            if (DB.IsPostgreSQL())
+            {
+                strQuery = core + " ORDER BY DocDate DESC, DocumentNo DESC, InvID DESC LIMIT " + maxRows + " OFFSET " + offset;
+            }
+            else
+            {
+                strQuery = "SELECT * FROM (SELECT t.*, ROWNUM rn FROM (" + core + " ORDER BY DocDate DESC, DocumentNo DESC, InvID DESC) t WHERE ROWNUM <= " + (offset + maxRows) + ") WHERE rn > " + offset;
+            }
+
+            DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
+            if (ds != null && ds.Tables.Count > 0)
+            {
+                foreach (DataRow row in ds.Tables[0].Rows)
+                {
+                    DateTime? docDate = Util.GetValueOfDateTime(row["DocDate"]);
+                    string curCode = Util.GetValueOfString(row["CurCode"]);
+                    string curSymbol = Util.GetValueOfString(row["CurSym"]);
+                    result.Items.Add(new CategoryInvoiceRow
+                    {
+                        DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
+                        DocDate    = docDate.HasValue ? docDate.Value.ToString("yyyy-MM-dd") : "",
+                        VendorName = Util.GetValueOfString(row["VendorName"]),
+                        DocStatus  = Util.GetValueOfString(row["DocStatus"]),
+                        Amount     = Util.GetValueOfDecimal(row["Amount"]),
+                        CurCode    = !string.IsNullOrEmpty(curCode) ? curCode : curSymbol
+                    });
+                }
+            }
+
+            return result;
+        }
+
         private static string FormatAmount(decimal amount, string sym, int precision)
         {
             if (amount >= 10000000m) { return sym + Math.Round(amount / 10000000m, 1) + "Cr"; }
@@ -276,6 +390,21 @@ namespace VAS.Areas.VAS.Controllers
             public string  DueDateStr   { get; set; }
             public decimal OpenAmt      { get; set; }
             public int     DaysUntilDue { get; set; }
+        }
+
+        public class CategoryInvoicesResult
+        {
+            public List<CategoryInvoiceRow> Items { get; set; }
+        }
+
+        public class CategoryInvoiceRow
+        {
+            public string  DocumentNo { get; set; }
+            public string  DocDate    { get; set; }
+            public string  VendorName { get; set; }
+            public string  DocStatus  { get; set; }
+            public decimal Amount     { get; set; }
+            public string  CurCode    { get; set; }
         }
     }
 }

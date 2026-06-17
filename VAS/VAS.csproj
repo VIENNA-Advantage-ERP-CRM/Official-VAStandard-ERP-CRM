@@ -270,7 +270,10 @@
     <Content Include="Areas\VAS\Content\VAS_023_TopFiveVendorsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_024_TotalOutstandingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_025_TotalPurchasesWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_026_VendorCreditUtilisationWidget.css" />    <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
+    <Content Include="Areas\VAS\Content\VAS_026_VendorCreditUtilisationWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
+    <Content Include="Areas\VAS\Content\VAS_071_NewPaymentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_HighestSellingWidget.css" />
@@ -342,7 +345,13 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_023_TopFiveVendorsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_024_TotalOutstandingWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_025_TotalPurchasesWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_026_VendorCreditUtilisationWidget.js" />    <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_026_VendorCreditUtilisationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_067_APInvoiceSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_068_APPaymentSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_069_CashJournalSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_070_GLJournalSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_071_NewPaymentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutBudget.js" />

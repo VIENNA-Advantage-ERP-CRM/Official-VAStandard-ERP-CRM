@@ -23,4 +23,5 @@
 @import "../VAS_023_TopFiveVendorsWidget.css";
 @import "../VAS_020_PendingInvoicesWidget.css";
 @import "../VAS_026_VendorCreditUtilisationWidget.css";
-
+@import "../VAS_DocumentSearchWidgets.css";
+@import "../VAS_071_NewPaymentWidget.css";
