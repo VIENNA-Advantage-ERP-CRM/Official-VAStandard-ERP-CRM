@@ -17,7 +17,7 @@
         box-sizing: border-box;
     }
 
-.vas-ptm-busy,
+.vas-ptm-ap-busy,
 .vas-ptm-state-message {
     position: absolute;
     inset: 0;
@@ -35,7 +35,7 @@
     line-height: 1.35;
 }
 
-.vas-ptm-busy.is-visible,
+.vas-ptm-ap-busy.is-visible,
 .vas-ptm-state-message.is-visible {
     display: flex;
 }

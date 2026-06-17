@@ -196,7 +196,7 @@
 
             $why.append($whyText);
 
-            $busy = $('<div class="vas-ptm-busy">').text(
+            $busy = $('<div class="vas-ptm-ap-busy">').text(
                 lbl(
                     'VAS_028_MessageLoading',
                     'Loading'
