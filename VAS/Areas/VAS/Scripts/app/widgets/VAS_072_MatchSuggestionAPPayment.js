@@ -1,38 +1,31 @@
-﻿
-/**
- * Auto Allocated AP Payment Widget
- * Purpose - Shows the percentage of automatically allocated AP payments
- *           and displays allocated and unallocated payment details.
+﻿/**
+ * AP Payment Match Suggestions Widget
+ * Purpose - Shows the best purchase-invoice match for each available
+ *           AP payment and allows individual or high-confidence allocation.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────────────
- *  #  | Current Text                                           | Message Key
- * ----+--------------------------------------------------------+----------------------------------------
- *  1  | Auto-allocated AP                                      | VAS_056_AutoAllocatedAPPayments
- *  2  | Last 30 days                                           | VAS_Last30Days
- *  3  | Payment Match to Invoice                               | VAS_056_PaymentMatchToInvoice
- *  4  | Payment allocation                                     | VAS_056_PaymentAllocation
- *  5  | Allocated vs unallocated payments in the last 30 days  | VAS_056_AllocatedVsUnallocated
- *  6  | Allocated                                              | VAS_Allocated
- *  7  | Unallocated                                            | VAS_Unallocated
- *  8  | Date                                                   | VAS_Date
- *  9  | Payment No.                                            | VAS_056_PaymentNo
- * 10  | Vendor                                                 | VAS_Vendor
- * 11  | Bank account                                           | VAS_BankAccount
- * 12  | Payment Currency                                       | VAS_PaymentCurrency
- * 13  | Amount                                                 | VAS_Amount
- * 14  | No payments in this period                             | VAS_056_NoPaymentsThisPeriod
- * 15  | payment                                                | VAS_056_Payment
- * 16  | payments                                               | VAS_056_Payments
- * 17  | Showing                                                | VAS_Showing
- * 18  | of                                                     | VAS_Of
- * 19  | Previous                                               | VAS_Previous
- * 20  | Next                                                   | VAS_Next
- * 21  | Close                                                  | VAS_Close
+ *  #  | Current Text                                      | Message Key
+ * ----+---------------------------------------------------+---------------------------------------
+ *  1  | Match Suggestions                                 | VAS_072_MatchSuggestions
+ *  2  | Vendor payments paired with their best-fit...     | VAS_072_Subtitle
+ *  3  | Apply high-confidence                             | VAS_072_ApplyHighConfidence
+ *  4  | High                                              | VAS_072_High
+ *  5  | Review                                            | VAS_072_Review
+ *  6  | Open                                              | VAS_072_Open
+ *  7  | Due                                               | VAS_072_Due
+ *  8  | Suggestions                                       | VAS_072_Suggestions
+ *  9  | Ready to allocate                                 | VAS_072_ReadyToAllocate
+ * 10  | Open allocation form                              | VAS_072_OpenAllocationForm
+ * 11  | No match suggestions found                        | VAS_072_NoData
+ * 12  | Could not load match suggestions                  | VAS_072_LoadError
+ * 13  | Could not complete allocation                     | VAS_072_ApplyError
+ * 14  | Allocation completed successfully                 | VAS_072_ApplySuccess
+ * 15  | Could not open allocation form                    | VAS_072_OpenFormError
+ * 16  | Previous                                          | VAS_Previous
+ * 17  | Next                                              | VAS_Next
+ * 18  | Of                                                | VAS_Of
  * ──────────────────────────────────────────────────────────────────────────────
  */
-
-
-
 
 ; VAS = window.VAS || {};
 
@@ -46,6 +39,10 @@
 
         var classPrefix =
             "VAS-072-MatchSuggestionAPPayment-";
+
+        var controllerUrl =
+            VIS.Application.contextUrl +
+            "VAS_072_MatchSuggestionAPPaymentWidget/";
 
         var $root = $(
             '<div class="' +
@@ -62,6 +59,7 @@
         var $pagerPrev = null;
         var $pagerNext = null;
         var $pagerText = null;
+        var $openForm = null;
 
         var pageNo = 1;
         var pageSize = 5;
@@ -69,16 +67,30 @@
         var totalRecords = 0;
         var totalReadyAmount = 0;
         var highConfidenceCount = 0;
-        var allocationWindowId = 0;
+
+        var allocationFormId = 0;
+        var serverStdPrecision = 2;
 
         var currentRows = [];
+
         var isLoading = false;
         var isDisposed = false;
 
+        var activeListRequest = null;
+        var activeActionRequest = null;
+
         function lbl(key, fallback) {
-            var text = VIS.Msg.getMsg(key);
+            var text = null;
+
+            try {
+                text = VIS.Msg.getMsg(key);
+            }
+            catch (error) {
+                text = null;
+            }
 
             return text &&
+                text !== key &&
                 text !== "[" + key + "]"
                 ? text
                 : fallback;
@@ -97,7 +109,36 @@
                 .replace(/'/g, "&#039;");
         }
 
+        function toNumber(value, fallback) {
+            var numberValue = Number(value);
+
+            return isNaN(numberValue)
+                ? Number(fallback || 0)
+                : numberValue;
+        }
+
+        function normalizePrecision(value) {
+            var precision = Number(value);
+
+            if (
+                isNaN(precision) ||
+                precision < 0 ||
+                precision > 10
+            ) {
+                return 2;
+            }
+
+            return Math.floor(precision);
+        }
+
         function parseResponse(response) {
+            if (
+                response == null ||
+                response === ""
+            ) {
+                return null;
+            }
+
             if (typeof response !== "string") {
                 return response;
             }
@@ -130,16 +171,16 @@
                 xhr &&
                 xhr.responseJSON
             ) {
-                if (xhr.responseJSON.error) {
-                    return xhr.responseJSON.error;
-                }
+                var jsonData =
+                    parseResponse(
+                        xhr.responseJSON
+                    );
 
-                if (xhr.responseJSON.errorText) {
-                    return xhr.responseJSON.errorText;
-                }
-
-                if (xhr.responseJSON.message) {
-                    return xhr.responseJSON.message;
+                if (jsonData) {
+                    return getServerMessage(
+                        jsonData,
+                        errorThrown
+                    );
                 }
             }
 
@@ -153,17 +194,10 @@
                     );
 
                 if (responseData) {
-                    if (responseData.error) {
-                        return responseData.error;
-                    }
-
-                    if (responseData.errorText) {
-                        return responseData.errorText;
-                    }
-
-                    if (responseData.message) {
-                        return responseData.message;
-                    }
+                    return getServerMessage(
+                        responseData,
+                        xhr.responseText
+                    );
                 }
 
                 return xhr.responseText;
@@ -184,22 +218,22 @@
             fallback
         ) {
             if (!data) {
-                return fallback;
+                return fallback || "";
             }
 
             if (data.error) {
-                return data.error;
+                return String(data.error);
             }
 
             if (data.errorText) {
-                return data.errorText;
+                return String(data.errorText);
             }
 
             if (data.message) {
-                return data.message;
+                return String(data.message);
             }
 
-            return fallback;
+            return fallback || "";
         }
 
         function setBusy(show) {
@@ -217,6 +251,14 @@
                     "disabled",
                     isLoading ||
                     highConfidenceCount <= 0
+                );
+            }
+
+            if ($openForm) {
+                $openForm.prop(
+                    "disabled",
+                    isLoading ||
+                    allocationFormId <= 0
                 );
             }
 
@@ -248,16 +290,15 @@
             }
         }
 
-        function getStdPrecision() {
+        function getContextPrecision() {
             var precision = 2;
 
             try {
                 if (
                     VIS.Env &&
                     VIS.Env.getCtx &&
-                    VIS.Env
-                        .getCtx()
-                        .getStdPrecision
+                    VIS.Env.getCtx() &&
+                    VIS.Env.getCtx().getStdPrecision
                 ) {
                     precision = Number(
                         VIS.Env
@@ -270,44 +311,84 @@
                 precision = 2;
             }
 
-            if (
-                isNaN(precision) ||
-                precision < 0
-            ) {
-                return 2;
-            }
-
-            return precision;
+            return normalizePrecision(
+                precision
+            );
         }
 
-        function formatAmount(value) {
-            var amount = Number(
-                value || 0
-            );
-
+        function getAmountPrecision(row) {
             if (
-                VIS.Utility &&
-                VIS.Utility.Util &&
-                VIS.Utility.Util
-                    .getValueOfDecimal
+                row &&
+                row.stdPrecision != null
             ) {
-                amount =
-                    VIS.Utility.Util
-                        .getValueOfDecimal(
-                            amount
-                        );
+                return normalizePrecision(
+                    row.stdPrecision
+                );
             }
 
-            return amount.toLocaleString(
-                window.navigator.language,
-                {
-                    minimumFractionDigits:
-                        getStdPrecision(),
+            if (serverStdPrecision != null) {
+                return normalizePrecision(
+                    serverStdPrecision
+                );
+            }
 
-                    maximumFractionDigits:
-                        getStdPrecision()
+            return getContextPrecision();
+        }
+
+        function formatAmount(
+            value,
+            precision
+        ) {
+            var amount =
+                toNumber(
+                    value,
+                    0
+                );
+
+            var decimalPrecision =
+                normalizePrecision(
+                    precision
+                );
+
+            try {
+                if (
+                    VIS.Utility &&
+                    VIS.Utility.Util &&
+                    VIS.Utility.Util
+                        .getValueOfDecimal
+                ) {
+                    amount =
+                        VIS.Utility.Util
+                            .getValueOfDecimal(
+                                amount
+                            );
                 }
-            );
+            }
+            catch (error) {
+                amount =
+                    toNumber(
+                        value,
+                        0
+                    );
+            }
+
+            try {
+                return amount.toLocaleString(
+                    window.navigator.language,
+                    {
+                        minimumFractionDigits:
+                            decimalPrecision,
+
+                        maximumFractionDigits:
+                            decimalPrecision
+                    }
+                );
+            }
+            catch (error) {
+                return amount.toFixed(
+                    decimalPrecision
+                );
+            }
         }
 
         function formatDate(value) {
@@ -315,20 +396,43 @@
                 return "";
             }
 
-            var date = new Date(value);
+            var stringValue =
+                String(value);
 
-            if (isNaN(date.getTime())) {
-                return String(value);
+            var dateOnlyMatch =
+                /^(\d{4})-(\d{2})-(\d{2})$/
+                    .exec(stringValue);
+
+            var date;
+
+            if (dateOnlyMatch) {
+                date = new Date(
+                    Number(dateOnlyMatch[1]),
+                    Number(dateOnlyMatch[2]) - 1,
+                    Number(dateOnlyMatch[3])
+                );
+            }
+            else {
+                date = new Date(value);
             }
 
-            return date.toLocaleDateString(
-                window.navigator.language,
-                {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric"
-                }
-            );
+            if (isNaN(date.getTime())) {
+                return stringValue;
+            }
+
+            try {
+                return date.toLocaleDateString(
+                    window.navigator.language,
+                    {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric"
+                    }
+                );
+            }
+            catch (error) {
+                return stringValue;
+            }
         }
 
         function buildAmountText(
@@ -341,7 +445,10 @@
                 "";
 
             var amount =
-                formatAmount(value);
+                formatAmount(
+                    value,
+                    getAmountPrecision(row)
+                );
 
             return symbol
                 ? symbol + " " + amount
@@ -349,13 +456,18 @@
         }
 
         function renderRows(rows) {
-            currentRows = rows || [];
+            currentRows =
+                Array.isArray(rows)
+                    ? rows
+                    : [];
+
+            if (!$rows) {
+                return;
+            }
 
             $rows.empty();
 
-            if (
-                currentRows.length === 0
-            ) {
+            if (currentRows.length === 0) {
                 showState(
                     lbl(
                         "VAS_072_NoData",
@@ -376,11 +488,13 @@
                 var row =
                     currentRows[i] || {};
 
-                var isHigh =
+                var confidence =
                     String(
                         row.confidence || ""
-                    ).toUpperCase() ===
-                    "HIGH";
+                    ).toUpperCase();
+
+                var isHigh =
+                    confidence === "HIGH";
 
                 var rowClass =
                     classPrefix +
@@ -421,7 +535,7 @@
                         row.paymentAmount
                     );
 
-                var openAmount =
+                var invoiceOpenAmount =
                     buildAmountText(
                         row,
                         row.invoiceOpenAmount
@@ -436,17 +550,17 @@
                     " · " +
                     lbl(
                         "VAS_072_Open",
-                        "open"
+                        "Open"
                     ) +
                     " " +
-                    openAmount;
+                    invoiceOpenAmount;
 
                 if (dueDate) {
                     metaText +=
                         " · " +
                         lbl(
                             "VAS_072_Due",
-                            "due"
+                            "Due"
                         ) +
                         " " +
                         dueDate;
@@ -482,6 +596,7 @@
                     ) +
 
                     "</span>" +
+
                     "</div>" +
 
                     '<div class="' +
@@ -520,9 +635,12 @@
                     classPrefix +
                     'meta">' +
 
-                    escapeHtml(metaText) +
+                    escapeHtml(
+                        metaText
+                    ) +
 
                     "</span>" +
+
                     "</div>" +
                     "</div>" +
 
@@ -549,6 +667,7 @@
                     "</svg>" +
 
                     "</span>" +
+
                     "</div>" +
                     "</div>"
                 );
@@ -561,7 +680,7 @@
                 $row.on(
                     "click",
                     function () {
-                        openMatchDetail(
+                        applySingleSuggestion(
                             $(this).data(
                                 "match-row"
                             )
@@ -573,13 +692,12 @@
                     "keydown",
                     function (event) {
                         if (
-                            event.key ===
-                            "Enter" ||
+                            event.key === "Enter" ||
                             event.key === " "
                         ) {
                             event.preventDefault();
 
-                            openMatchDetail(
+                            applySingleSuggestion(
                                 $(this).data(
                                     "match-row"
                                 )
@@ -593,35 +711,82 @@
         }
 
         function renderResult(data) {
+            data = data || {};
+
             var rows =
-                data &&
-                    Array.isArray(data.rows)
+                Array.isArray(data.rows)
                     ? data.rows
                     : [];
 
-            pageNo = Number(
-                data.pageNo || 1
-            );
+            pageNo =
+                Math.max(
+                    1,
+                    toNumber(
+                        data.pageNo,
+                        pageNo
+                    )
+                );
 
-            totalPages = Number(
-                data.totalPages || 0
-            );
+            totalPages =
+                Math.max(
+                    0,
+                    toNumber(
+                        data.totalPages,
+                        0
+                    )
+                );
 
-            totalRecords = Number(
-                data.totalRecords || 0
-            );
+            totalRecords =
+                Math.max(
+                    0,
+                    toNumber(
+                        data.totalRecords,
+                        0
+                    )
+                );
 
-            totalReadyAmount = Number(
-                data.totalReadyAmount || 0
-            );
+            totalReadyAmount =
+                toNumber(
+                    data.totalReadyAmount,
+                    0
+                );
 
-            highConfidenceCount = Number(
-                data.highConfidenceCount || 0
-            );
+            highConfidenceCount =
+                Math.max(
+                    0,
+                    toNumber(
+                        data.highConfidenceCount,
+                        0
+                    )
+                );
 
-            allocationWindowId = Number(
-                data.allocationWindowId || 0
-            );
+            serverStdPrecision =
+                normalizePrecision(
+                    data.stdPrecision != null
+                        ? data.stdPrecision
+                        : serverStdPrecision
+                );
+
+            allocationFormId =
+                Math.max(
+                    0,
+                    toNumber(
+                        data.allocationFormId,
+                        0
+                    )
+                );
+
+            if ($openForm) {
+                $openForm.toggle(
+                    allocationFormId > 0
+                );
+
+                $openForm.prop(
+                    "disabled",
+                    isLoading ||
+                    allocationFormId <= 0
+                );
+            }
 
             renderRows(rows);
             updateFooter(data);
@@ -641,45 +806,48 @@
                 return;
             }
 
-            var displayAmount = "";
+            data = data || {};
 
-            if (data) {
-                var symbol =
-                    data.currencySymbol ||
-                    data.currencyISOCode ||
-                    "";
+            var symbol =
+                data.currencySymbol ||
+                data.currencyISOCode ||
+                "";
 
-                displayAmount =
-                    (
-                        symbol
-                            ? symbol + " "
-                            : ""
-                    ) +
-                    formatAmount(
-                        totalReadyAmount
-                    );
-            }
+            var displayAmount =
+                (
+                    symbol
+                        ? symbol + " "
+                        : ""
+                ) +
+                formatAmount(
+                    totalReadyAmount,
+                    serverStdPrecision
+                );
 
             $footerSummary.html(
                 "<strong>" +
-                escapeHtml(totalRecords) +
+                escapeHtml(
+                    totalRecords
+                ) +
                 "</strong> " +
 
                 escapeHtml(
                     lbl(
                         "VAS_072_Suggestions",
-                        "suggestions"
+                        "Suggestions"
                     )
                 ) +
 
                 " · <strong>" +
-                escapeHtml(displayAmount) +
+                escapeHtml(
+                    displayAmount
+                ) +
                 "</strong> " +
 
                 escapeHtml(
                     lbl(
                         "VAS_072_ReadyToAllocate",
-                        "ready to allocate"
+                        "Ready to allocate"
                     )
                 )
             );
@@ -732,10 +900,10 @@
             hideState();
             setBusy(true);
 
-            $.ajax({
+            activeListRequest = $.ajax({
                 url:
-                    VIS.Application.contextUrl +
-                    "VAS_072_MatchSuggestionAPPaymentWidget/GetMatchSuggestions",
+                    controllerUrl +
+                    "GetMatchSuggestions",
 
                 type: "GET",
                 cache: false,
@@ -754,14 +922,14 @@
                         parseResponse(response);
 
                     console.log(
-                        "VAS_072 Match Suggestions response:",
+                        "VAS_072 GetMatchSuggestions response:",
                         data
                     );
 
                     if (
                         !data ||
-                        data.error ||
-                        data.success === false
+                        data.success !== true ||
+                        data.error
                     ) {
                         renderResult({});
 
@@ -775,7 +943,7 @@
                             );
 
                         console.error(
-                            "VAS_072 server error:",
+                            "VAS_072 GetMatchSuggestions error:",
                             message,
                             data
                         );
@@ -786,6 +954,19 @@
                     }
 
                     renderResult(data);
+
+                    if (
+                        data.hasData === false ||
+                        !Array.isArray(data.rows) ||
+                        data.rows.length === 0
+                    ) {
+                        showState(
+                            lbl(
+                                "VAS_072_NoData",
+                                "No match suggestions found"
+                            )
+                        );
+                    }
                 },
 
                 error: function (
@@ -793,7 +974,10 @@
                     status,
                     errorThrown
                 ) {
-                    if (isDisposed) {
+                    if (
+                        isDisposed ||
+                        status === "abort"
+                    ) {
                         return;
                     }
 
@@ -806,7 +990,7 @@
                         );
 
                     console.error(
-                        "VAS_072 AJAX error:",
+                        "VAS_072 GetMatchSuggestions AJAX error:",
                         status,
                         errorThrown,
                         xhr
@@ -818,6 +1002,8 @@
                 },
 
                 complete: function () {
+                    activeListRequest = null;
+
                     if (!isDisposed) {
                         setBusy(false);
                     }
@@ -825,42 +1011,69 @@
             });
         }
 
-        function openMatchDetail(row) {
-            if (!row) {
-                return;
-            }
-
-            applySingleSuggestion(row);
-        }
-
         function applySingleSuggestion(row) {
             if (
-                !row.paymentId ||
-                !row.invoiceId ||
-                !row.payScheduleId
+                isDisposed ||
+                isLoading ||
+                !row
             ) {
                 return;
             }
 
+            var paymentId =
+                toNumber(
+                    row.paymentId,
+                    0
+                );
+
+            var invoiceId =
+                toNumber(
+                    row.invoiceId,
+                    0
+                );
+
+            var payScheduleId =
+                toNumber(
+                    row.payScheduleId,
+                    0
+                );
+
+            if (
+                paymentId <= 0 ||
+                invoiceId <= 0 ||
+                payScheduleId <= 0
+            ) {
+                VIS.ADialog.error(
+                    lbl(
+                        "VAS_072_ApplyError",
+                        "Could not complete allocation"
+                    )
+                );
+
+                return;
+            }
+
+            var reloadAfterComplete = false;
+
             setBusy(true);
 
-            $.ajax({
+            activeActionRequest = $.ajax({
                 url:
-                    VIS.Application.contextUrl +
-                    "VAS_072_MatchSuggestionAPPaymentWidget/ApplyAllocation",
+                    controllerUrl +
+                    "ApplyAllocation",
 
                 type: "POST",
                 cache: false,
 
                 data: {
                     paymentId:
-                        row.paymentId,
+                        paymentId,
 
                     invoiceId:
-                        row.invoiceId,
+                        invoiceId,
 
                     payScheduleId:
-                        row.payScheduleId
+                        payScheduleId
                 },
 
                 success: function (response) {
@@ -878,7 +1091,7 @@
 
                     if (
                         !data ||
-                        data.success === false ||
+                        data.success !== true ||
                         data.error
                     ) {
                         var message =
@@ -891,7 +1104,7 @@
                             );
 
                         console.error(
-                            "VAS_072 allocation error:",
+                            "VAS_072 ApplyAllocation error:",
                             message,
                             data
                         );
@@ -911,7 +1124,14 @@
                         )
                     );
 
-                    loadCurrentPageAfterApply();
+                    if (
+                        pageNo > 1 &&
+                        currentRows.length <= 1
+                    ) {
+                        pageNo--;
+                    }
+
+                    reloadAfterComplete = true;
                 },
 
                 error: function (
@@ -919,7 +1139,10 @@
                     status,
                     errorThrown
                 ) {
-                    if (isDisposed) {
+                    if (
+                        isDisposed ||
+                        status === "abort"
+                    ) {
                         return;
                     }
 
@@ -944,8 +1167,16 @@
                 },
 
                 complete: function () {
-                    if (!isDisposed) {
-                        setBusy(false);
+                    activeActionRequest = null;
+
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    setBusy(false);
+
+                    if (reloadAfterComplete) {
+                        loadData();
                     }
                 }
             });
@@ -953,18 +1184,21 @@
 
         function applyHighConfidence() {
             if (
+                isDisposed ||
                 isLoading ||
                 highConfidenceCount <= 0
             ) {
                 return;
             }
 
+            var reloadAfterComplete = false;
+
             setBusy(true);
 
-            $.ajax({
+            activeActionRequest = $.ajax({
                 url:
-                    VIS.Application.contextUrl +
-                    "VAS_072_MatchSuggestionAPPaymentWidget/ApplyHighConfidence",
+                    controllerUrl +
+                    "ApplyHighConfidence",
 
                 type: "POST",
                 cache: false,
@@ -984,7 +1218,7 @@
 
                     if (
                         !data ||
-                        data.success === false ||
+                        data.success !== true ||
                         data.error
                     ) {
                         var message =
@@ -997,7 +1231,7 @@
                             );
 
                         console.error(
-                            "VAS_072 high-confidence error:",
+                            "VAS_072 ApplyHighConfidence error:",
                             message,
                             data
                         );
@@ -1018,8 +1252,7 @@
                     );
 
                     pageNo = 1;
-
-                    loadCurrentPageAfterApply();
+                    reloadAfterComplete = true;
                 },
 
                 error: function (
@@ -1027,7 +1260,10 @@
                     status,
                     errorThrown
                 ) {
-                    if (isDisposed) {
+                    if (
+                        isDisposed ||
+                        status === "abort"
+                    ) {
                         return;
                     }
 
@@ -1052,54 +1288,138 @@
                 },
 
                 complete: function () {
-                    if (!isDisposed) {
-                        setBusy(false);
+                    activeActionRequest = null;
+
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    setBusy(false);
+
+                    if (reloadAfterComplete) {
+                        loadData();
                     }
                 }
             });
         }
 
-        function loadCurrentPageAfterApply() {
-            if (
-                pageNo > 1 &&
-                currentRows.length <= 1
-            ) {
-                pageNo--;
+        function startFormSmart(formId) {
+            var numericFormId =
+                toNumber(
+                    formId,
+                    0
+                );
+
+            if (numericFormId <= 0) {
+                return false;
             }
 
-            window.setTimeout(
-                function () {
-                    loadData();
-                },
-                100
-            );
+            if (
+                VIS.viewManager &&
+                typeof VIS.viewManager.startForm ===
+                "function"
+            ) {
+                try {
+                    var viewManagerArgCount =
+                        VIS.viewManager
+                            .startForm.length || 0;
+
+                    if (viewManagerArgCount === 2) {
+                        VIS.viewManager.startForm(
+                            numericFormId,
+                            0
+                        );
+
+                        return true;
+                    }
+
+                    if (viewManagerArgCount >= 3) {
+                        VIS.viewManager.startForm(
+                            numericFormId,
+                            0,
+                            ""
+                        );
+
+                        return true;
+                    }
+
+                    VIS.viewManager.startForm(
+                        numericFormId
+                    );
+
+                    return true;
+                }
+                catch (error) {
+                    console.error(
+                        "VAS_072 viewManager.startForm error:",
+                        error
+                    );
+                }
+            }
+
+            if (
+                VIS.AEnv &&
+                typeof VIS.AEnv.startForm ===
+                "function"
+            ) {
+                try {
+                    var aEnvArgCount =
+                        VIS.AEnv
+                            .startForm.length || 0;
+
+                    if (aEnvArgCount === 2) {
+                        VIS.AEnv.startForm(
+                            numericFormId,
+                            ""
+                        );
+
+                        return true;
+                    }
+
+                    if (aEnvArgCount >= 3) {
+                        VIS.AEnv.startForm(
+                            numericFormId,
+                            0,
+                            ""
+                        );
+
+                        return true;
+                    }
+
+                    VIS.AEnv.startForm(
+                        numericFormId
+                    );
+
+                    return true;
+                }
+                catch (error) {
+                    console.error(
+                        "VAS_072 AEnv.startForm error:",
+                        error
+                    );
+                }
+            }
+
+            return false;
         }
 
         function openAllocationForm() {
             if (
-                allocationWindowId <= 0
+                isLoading ||
+                allocationFormId <= 0
             ) {
                 return;
             }
 
-            try {
-                var zoomQuery =
-                    new VIS.Query();
-
-                VIS.viewManager.startWindow(
-                    allocationWindowId,
-                    zoomQuery
-                );
-            }
-            catch (error) {
-                console.error(
-                    "VAS_072 open allocation form error:",
-                    error
+            var opened =
+                startFormSmart(
+                    allocationFormId
                 );
 
+            if (!opened) {
                 VIS.ADialog.error(
                     lbl(
-                        "VAS_072_ApplyError",
+                        "VAS_072_OpenFormError",
                         "Could not open allocation form"
                     )
                 );
@@ -1133,6 +1453,7 @@
                 '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' +
 
                 "</svg>" +
+
                 "</div>" +
 
                 '<div class="' +
@@ -1164,6 +1485,7 @@
                 ) +
 
                 "</div>" +
+
                 "</div>" +
                 "</div>" +
 
@@ -1185,6 +1507,7 @@
                 ) +
 
                 "</span>" +
+
                 "</button>" +
                 "</div>" +
 
@@ -1267,22 +1590,25 @@
                 ) +
 
                 " →</button>" +
+
                 "</div>" +
                 "</div>" +
                 "</div>"
             );
 
-            $rows = $card.find(
-                "." +
-                classPrefix +
-                "rows"
-            );
+            $rows =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "rows"
+                );
 
-            $applyHigh = $card.find(
-                "." +
-                classPrefix +
-                "apply-high"
-            );
+            $applyHigh =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "apply-high"
+                );
 
             $footerSummary =
                 $card.find(
@@ -1291,32 +1617,50 @@
                     "footer-summary"
                 );
 
-            $pagerPrev = $card.find(
-                "." +
-                classPrefix +
-                "pager-prev"
-            );
+            $pagerPrev =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "pager-prev"
+                );
 
-            $pagerNext = $card.find(
-                "." +
-                classPrefix +
-                "pager-next"
-            );
+            $pagerNext =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "pager-next"
+                );
 
-            $pagerText = $card.find(
-                "." +
-                classPrefix +
-                "pager-text"
-            );
+            $pagerText =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "pager-text"
+                );
+
+            $openForm =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "open-form"
+                );
 
             $applyHigh.on(
                 "click",
-                applyHighConfidence
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    applyHighConfidence();
+                }
             );
 
             $pagerPrev.on(
                 "click",
-                function () {
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
                     if (
                         isLoading ||
                         pageNo <= 1
@@ -1331,9 +1675,13 @@
 
             $pagerNext.on(
                 "click",
-                function () {
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
                     if (
                         isLoading ||
+                        totalPages <= 0 ||
                         pageNo >= totalPages
                     ) {
                         return;
@@ -1344,14 +1692,17 @@
                 }
             );
 
-            $card.find(
-                "." +
-                classPrefix +
-                "open-form"
-            ).on(
+            $openForm.on(
                 "click",
-                openAllocationForm
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    openAllocationForm();
+                }
             );
+
+            $openForm.hide();
 
             $root.append($card);
 
@@ -1363,6 +1714,7 @@
                 '<div class="vis-busyindicatorinnerwrap">' +
                 '<i class="vis_widgetloader"></i>' +
                 "</div>" +
+
                 "</div>"
             );
 
@@ -1378,14 +1730,41 @@
                 "</div>"
             );
 
-            $stateText = $state.find(
-                "." +
-                classPrefix +
-                "state-text"
-            );
+            $stateText =
+                $state.find(
+                    "." +
+                    classPrefix +
+                    "state-text"
+                );
 
             $root.append($busy);
             $root.append($state);
+
+            updatePager();
+
+            $applyHigh.prop(
+                "disabled",
+                true
+            );
+        }
+
+        function abortRequest(request) {
+            if (
+                request &&
+                request.readyState !== 4 &&
+                typeof request.abort ===
+                "function"
+            ) {
+                try {
+                    request.abort();
+                }
+                catch (error) {
+                    console.error(
+                        "VAS_072 request abort error:",
+                        error
+                    );
+                }
+            }
         }
 
         this.Initalize = function () {
@@ -1394,6 +1773,20 @@
         };
 
         this.refreshData = function () {
+            if (isDisposed) {
+                return;
+            }
+
+            abortRequest(
+                activeListRequest
+            );
+
+            activeListRequest = null;
+
+            if (!activeActionRequest) {
+                setBusy(false);
+            }
+
             pageNo = 1;
             loadData();
         };
@@ -1402,29 +1795,43 @@
             return $root;
         };
 
-        this.disposeComponent =
-            function () {
-                isDisposed = true;
+        this.disposeComponent = function () {
+            isDisposed = true;
 
-                if ($root) {
-                    $root
-                        .find("*")
-                        .off();
+            abortRequest(
+                activeListRequest
+            );
 
-                    $root.remove();
-                }
+            abortRequest(
+                activeActionRequest
+            );
 
-                $rows = null;
-                $busy = null;
-                $state = null;
-                $stateText = null;
-                $applyHigh = null;
-                $footerSummary = null;
-                $pagerPrev = null;
-                $pagerNext = null;
-                $pagerText = null;
-                currentRows = [];
-            };
+            activeListRequest = null;
+            activeActionRequest = null;
+
+            if ($root) {
+                $root
+                    .find("*")
+                    .off();
+
+                $root.off();
+                $root.remove();
+            }
+
+            currentRows = [];
+
+            $rows = null;
+            $busy = null;
+            $state = null;
+            $stateText = null;
+            $applyHigh = null;
+            $footerSummary = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
+            $openForm = null;
+            $root = null;
+        };
     };
 
     VAS.VAS_072_MatchSuggestionAPPaymentWidget.prototype.init =

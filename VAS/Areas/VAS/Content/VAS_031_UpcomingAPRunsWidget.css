@@ -529,6 +529,29 @@
     line-height: 1.25;
 }
 
+.vas-upcoming-ap-runs-edit-control {
+    width: 100%;
+    min-width: 0;
+    height: 2em;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #102c3f;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+    .vas-upcoming-ap-runs-edit-control:focus {
+        color: #0078e8;
+    }
+
+    .vas-upcoming-ap-runs-edit-control[readonly] {
+        color: #102c3f;
+        cursor: default;
+    }
+
 .vas-upcoming-ap-runs-pay-footer {
     flex: 0 0 auto;
     display: flex;

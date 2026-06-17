@@ -44,6 +44,9 @@
         var isDisposed = false;
         var runsData = [];
         var selectedRun = null;
+        var selectedPaymentRow = null;
+        var paymentRows = [];
+        var popupLookups = null;
         var saveInProgress = false;
         var pageNo = 1;
         var pageSize = 3;
@@ -293,9 +296,9 @@
             }
 
             selectedRun = run;
+            selectedPaymentRow = null;
+            paymentRows = [];
 
-            var vendorName = run.vendorName || lbl('VAS_031_MessageNotSpecified', 'Not Specified');
-            var documentNo = run.documentNo || '';
             var amountText = formatCurrencyAmount(
                 pickRunValue(run, 'totalAmount', 'amount'),
                 run.currencySymbol,
@@ -308,23 +311,24 @@
             }
 
             if ($payDialogSub) {
-                $payDialogSub.text(lbl('VAS_031_MessagePrefilledFromUpcoming', 'Pre-filled from upcoming') + ' · ' + vendorName);
+                $payDialogSub.text(lbl('VAS_031_MessagePrefilledFromUpcoming', 'Pre-filled from upcoming') + ' · ' + (run.paymentMethodName || ''));
             }
 
             if ($payDialogNotice) {
-                $payDialogNotice.html(
-                    escapeHtml(lbl('VAS_031_MessagePrefilledForInvoice', 'Pre-filled for invoice')) +
-                    ' <strong>' + escapeHtml(documentNo) + '</strong> — ' +
-                    escapeHtml(vendorName) + ' · ' +
-                    escapeHtml(amountText) + '. ' +
-                    escapeHtml(lbl('VAS_031_MessageReviewAndSave', 'Review and save.'))
-                );
+                $payDialogNotice.text(lbl('VAS_031_MessageLoadingDetails', 'Loading payment details'));
             }
 
-            renderPayDialogGrid(run, amountText);
-            setPayDialogBusy(false);
+            if ($payDialogGrid) {
+                $payDialogGrid.empty();
+            }
+
+            setPayDialogBusy(true);
             $payDialog.show();
             $('body').addClass('vas-upcoming-ap-runs-body-lock');
+
+            ensurePopupLookups(function () {
+                loadRunPaymentDetails(run, amountText);
+            });
         }
 
         function closePayDialog() {
@@ -341,37 +345,198 @@
             }
         }
 
-        function renderPayDialogGrid(run, amountText) {
+        function ensurePopupLookups(callback) {
+            if (popupLookups) {
+                callback();
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_033_UpcomingAPRunsWidget/GetPaymentPopupLookups',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                success: function (response) {
+                    popupLookups = normalizeResponse(response) || {};
+                    callback();
+                },
+                error: function () {
+                    popupLookups = {};
+                    callback();
+                }
+            });
+        }
+
+        function loadRunPaymentDetails(run, amountText) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_033_UpcomingAPRunsWidget/GetUpcomingAPRunDetails',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                data: {
+                    runDate: run.runDate || run.dueDate || '',
+                    paymentMethodId: run.paymentMethodId || 0
+                },
+                success: function (response) {
+                    var data = normalizeResponse(response);
+
+                    if (!data || data.error) {
+                        showPayError((data && (data.errorText || data.error)) || lbl('VAS_ErrorLoading', 'Could not load data'));
+                        return;
+                    }
+
+                    paymentRows = $.isArray(data.rows) ? data.rows : [];
+
+                    if (paymentRows.length === 0) {
+                        showPayError(lbl('VAS_031_MessageNoData', 'No Data'));
+                        return;
+                    }
+
+                    selectedPaymentRow = paymentRows[0];
+                    renderPayDialogGrid(selectedPaymentRow, amountText);
+                    updatePayNotice(selectedPaymentRow);
+                },
+                error: function () {
+                    showPayError(lbl('VAS_ErrorLoading', 'Could not load data'));
+                },
+                complete: function () {
+                    setPayDialogBusy(false);
+                }
+            });
+        }
+
+        function normalizeResponse(response) {
+            var data = response;
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e) {
+                    data = null;
+                }
+            }
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e2) {
+                    data = null;
+                }
+            }
+
+            return data;
+        }
+
+        function renderPayDialogGrid(row, amountText) {
             if (!$payDialogGrid) {
                 return;
             }
 
-            var bankText = getBankAccountDisplay(run);
-            var currencyText = (run.currencyISO || '') + (run.currencyISO && run.currencySymbol ? ' · ' : '') + (run.currencySymbol || '');
+            var bankText = getBankAccountDisplay(row);
+            var currencyText = (row.currencyISO || '') + (row.currencyISO && row.currencySymbol ? ' · ' : '') + (row.currencySymbol || '');
+            var rows = paymentRows || [];
 
             var html =
-                fieldHtml(lbl('VAS_031_MessageOrganization', 'Organization'), run.organizationName || '') +
-                fieldHtml(lbl('VAS_031_MessageBankAccount', 'Bank Account'), bankText, true) +
-                fieldHtml(lbl('VAS_031_MessageTransactionDate', 'Transaction Date'), formatShortDate(run.dueDate || run.runDate)) +
-                fieldHtml(lbl('VAS_032_MessageVendor', 'Vendor'), run.vendorName || '', true) +
-                fieldHtml(lbl('VAS_PaymentCurrency', 'Currency'), currencyText, true) +
-                fieldHtml(lbl('VAS_031_MessageCurrencyType', 'Currency Type'), lbl('VAS_031_MessageSpot', 'Spot')) +
-                fieldHtml(lbl('VAS_031_MessagePaymentAmount', 'Payment Amount'), amountText, true) +
-                fieldHtml(lbl('VIS_InvoiceNo', 'Invoice No.'), run.documentNo || '', true);
+                fieldHtml(lbl('VAS_031_MessagePayment', 'Payment'), selectHtml('paymentId', rows, row.paymentId, 'documentNo', 'paymentId'), true, true) +
+                fieldHtml(lbl('VAS_031_MessageOrganization', 'Organization'), selectHtml('adOrgId', getLookup('organizations'), row.organizationId), false, true) +
+                fieldHtml(lbl('VAS_031_MessageBankAccount', 'Bank Account'), selectHtml('bankAccountId', getLookup('bankAccounts'), row.bankAccountId, null, null, bankText), true, true) +
+                fieldHtml(lbl('VAS_031_MessageTransactionDate', 'Transaction Date'), inputHtml('transactionDate', 'date', row.transactionDate || ''), false, true) +
+                fieldHtml(lbl('VAS_032_MessageVendor', 'Vendor'), selectHtml('vendorId', getLookup('vendors'), row.vendorId, null, null, row.vendorName), true, true) +
+                fieldHtml(lbl('VAS_PaymentCurrency', 'Currency'), selectHtml('currencyId', getLookup('currencies'), row.cCurrencyId, null, null, currencyText), true, true) +
+                fieldHtml(lbl('VAS_031_MessageCurrencyType', 'Currency Type'), selectHtml('conversionTypeId', getLookup('conversionTypes'), row.conversionTypeId, null, null, row.currencyTypeName || lbl('VAS_031_MessageSpot', 'Spot')), false, true) +
+                fieldHtml(lbl('VAS_031_MessagePaymentAmount', 'Payment Amount'), inputHtml('payAmt', 'number', normalizeNumber(row.amount), '0.01'), true, true) +
+                fieldHtml(lbl('VIS_InvoiceNo', 'Invoice No.'), inputHtml('documentNo', 'text', row.documentNo || ''), true, true);
 
             $payDialogGrid.html(html);
+
+            $payDialogGrid.find('[data-pay-field="paymentId"]').on('change', function () {
+                var paymentId = Number($(this).val() || 0);
+                var nextRow = findPaymentRow(paymentId);
+
+                if (nextRow) {
+                    selectedPaymentRow = nextRow;
+                    renderPayDialogGrid(nextRow, amountText);
+                    updatePayNotice(nextRow);
+                }
+            });
         }
 
-        function fieldHtml(label, value, prefilled) {
+        function fieldHtml(label, value, prefilled, rawValue) {
             return '<div class="vas-upcoming-ap-runs-field">' +
                 '<div class="vas-upcoming-ap-runs-field-label">' +
                 escapeHtml(label) +
                 (prefilled ? '<span>' + escapeHtml(lbl('VAS_031_MessagePrefilled', 'PRE-FILLED')) + '</span>' : '') +
                 '</div>' +
-                '<div class="vas-upcoming-ap-runs-field-value" title="' + escapeHtml(value || '') + '">' +
-                escapeHtml(value || '') +
+                '<div class="vas-upcoming-ap-runs-field-value">' +
+                (rawValue ? (value || '') : escapeHtml(value || '')) +
                 '</div>' +
                 '</div>';
+        }
+
+        function getLookup(name) {
+            return popupLookups && $.isArray(popupLookups[name]) ? popupLookups[name] : [];
+        }
+
+        function selectHtml(fieldName, items, selectedValue, textProp, valueProp, fallbackText) {
+            var html = '<select class="vas-upcoming-ap-runs-edit-control" data-pay-field="' + escapeHtml(fieldName) + '">';
+            var hasSelected = false;
+
+            items = $.isArray(items) ? items : [];
+
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i] || {};
+                var value = valueProp ? item[valueProp] : (item.id != null ? item.id : item.paymentId);
+                var text = textProp ? item[textProp] : (item.name || item.documentNo || value);
+                var selected = String(value) === String(selectedValue);
+
+                if (selected) {
+                    hasSelected = true;
+                }
+
+                html += '<option value="' + escapeHtml(value) + '"' + (selected ? ' selected' : '') + '>' + escapeHtml(text || value || '') + '</option>';
+            }
+
+            if (!hasSelected && selectedValue != null && selectedValue !== '') {
+                html += '<option value="' + escapeHtml(selectedValue) + '" selected>' + escapeHtml(fallbackText || selectedValue) + '</option>';
+            }
+
+            html += '</select>';
+            return html;
+        }
+
+        function inputHtml(fieldName, type, value, step, readonly) {
+            return '<input class="vas-upcoming-ap-runs-edit-control" data-pay-field="' + escapeHtml(fieldName) + '" type="' + escapeHtml(type) + '" value="' + escapeHtml(value || '') + '"' +
+                (step ? ' step="' + escapeHtml(step) + '"' : '') +
+                (readonly ? ' readonly' : '') +
+                '>';
+        }
+
+        function findPaymentRow(paymentId) {
+            for (var i = 0; i < paymentRows.length; i++) {
+                if (Number(paymentRows[i].paymentId || 0) === Number(paymentId || 0)) {
+                    return paymentRows[i];
+                }
+            }
+
+            return null;
+        }
+
+        function updatePayNotice(row) {
+            if (!$payDialogNotice || !row) {
+                return;
+            }
+
+            var amountText = formatCurrencyAmount(row.amount, row.currencySymbol, row.currencyISO, row.stdPrecision);
+
+            $payDialogNotice.html(
+                escapeHtml(lbl('VAS_031_MessagePrefilledForInvoice', 'Pre-filled for invoice')) +
+                ' <strong>' + escapeHtml(row.documentNo || '') + '</strong> — ' +
+                escapeHtml(row.vendorName || '') + ' · ' +
+                escapeHtml(amountText) + '. ' +
+                escapeHtml(lbl('VAS_031_MessageReviewAndSave', 'Review and save.'))
+            );
         }
 
         function getBankAccountDisplay(run) {
@@ -407,7 +572,13 @@
         }
 
         function savePayDialog() {
-            if (!selectedRun || saveInProgress) {
+            if (!selectedRun || !selectedPaymentRow || saveInProgress) {
+                return;
+            }
+
+            var payload = readPayDialogPayload();
+
+            if (!payload) {
                 return;
             }
 
@@ -418,12 +589,7 @@
                 url: VIS.Application.contextUrl + 'VAS_033_UpcomingAPRunsWidget/CreateUpcomingAPPayment',
                 type: 'POST',
                 dataType: 'json',
-                data: {
-                    invoiceId: selectedRun.invoiceId || 0,
-                    invoicePayScheduleId: selectedRun.invoicePayScheduleId || 0,
-                    bankAccountId: selectedRun.bankAccountId || 0,
-                    payAmt: Number(pickRunValue(selectedRun, 'totalAmount', 'amount') || 0)
-                },
+                data: payload,
                 success: function (response) {
                     var data = response;
 
@@ -456,6 +622,31 @@
                     }
                 }
             });
+        }
+
+        function readPayDialogPayload() {
+            var $field = $payDialogGrid ? $payDialogGrid.find('[data-pay-field]') : $();
+            var payload = {};
+
+            $field.each(function () {
+                payload[$(this).attr('data-pay-field')] = $(this).val();
+            });
+
+            payload.paymentId = Number(payload.paymentId || selectedPaymentRow.paymentId || 0);
+            payload.adOrgId = Number(payload.adOrgId || selectedPaymentRow.organizationId || 0);
+            payload.bankAccountId = Number(payload.bankAccountId || selectedPaymentRow.bankAccountId || 0);
+            payload.vendorId = Number(payload.vendorId || selectedPaymentRow.vendorId || 0);
+            payload.currencyId = Number(payload.currencyId || selectedPaymentRow.cCurrencyId || 0);
+            payload.conversionTypeId = Number(payload.conversionTypeId || selectedPaymentRow.conversionTypeId || 0);
+            payload.transactionDate = payload.transactionDate || selectedPaymentRow.transactionDate || '';
+            payload.payAmt = Number(payload.payAmt || 0);
+
+            if (payload.paymentId <= 0 || payload.payAmt <= 0 || !payload.transactionDate) {
+                showPayError(lbl('VAS_031_MessageReviewRequiredFields', 'Review required fields before saving.'));
+                return null;
+            }
+
+            return payload;
         }
 
         function showPayError(message) {
@@ -644,6 +835,16 @@
             }
 
             return currencyISO ? amount + ' ' + currencyISO : amount;
+        }
+
+        function normalizeNumber(value) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                return '0';
+            }
+
+            return String(numericValue);
         }
 
         function showBusy(show) {
