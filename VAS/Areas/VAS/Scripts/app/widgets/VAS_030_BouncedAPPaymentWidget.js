@@ -1,17 +1,15 @@
 ﻿/**
- * Bounced
- * Purpose - Shows outgoing AP payments that were reversed/bounced and need re-issue.
+ * Bounced AP Payment Widget
+ * Purpose - Shows outgoing AP payments that were bounced or rejected
+ * and need re-issue.
  *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Bounced                              | VAS_030_MessageBounced
- *  2  | Need re-issue                        | VAS_030_MessageNeedReissue
- *  3  | Loading                              | VAS_030_MessageLoading
- *  4  | No Data                              | VAS_030_MessageNoData
- * ─────────────────────────────────────────────────────────────────────
+ * Labels / Message Keys
+ * 1 | Bounced             | VAS_030_MessageBounced
+ * 2 | Need re-issue       | VAS_030_MessageNeedReissue
+ * 3 | Loading             | VAS_030_MessageLoading
+ * 4 | No Data             | VAS_030_MessageNoData
+ * 5 | Bounced AP payments | VAS_030_MessageBouncedAPPayments
  */
-
 
 ; VAS = window.VAS || {};
 
@@ -22,9 +20,13 @@
         this.frame = null;
         this.windowNo = 0;
         this.AD_UserHomeWidgetID = 0;
+
         var self = this;
 
-        var $root = $('<div class="vas-bounced-ap-payment-root">');
+        var $root = $(
+            '<div class="vas-bounced-ap-payment-root">'
+        );
+
         var $card = null;
         var $value = null;
         var $description = null;
@@ -32,80 +34,171 @@
         var $footer = null;
         var $busy = null;
         var $state = null;
+
         var $dialog = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
+
         var $pagerHelper = null;
         var $pagerPrev = null;
         var $pagerNext = null;
         var $pagerText = null;
+
         var pageNo = 1;
         var pageSize = 10;
         var totalPages = 0;
         var totalRecords = 0;
+
         var rowsLoading = false;
         var isDisposed = false;
 
+        /**
+         * Returns translated message or fallback.
+         */
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
-            return text && text !== '[' + key + ']' ? text : fallback;
+
+            return text &&
+                text !== '[' + key + ']'
+                ? text
+                : fallback;
         }
 
+        /**
+         * Widget initialization.
+         */
         this.Initalize = function () {
             createWidget();
             loadData();
         };
 
+        /**
+         * Creates the main widget card.
+         */
         function createWidget() {
-            $card = $('<div class="vas-bounced-ap-payment-card">');
-            $card.attr({ role: 'button', tabindex: '0' });
+            $card = $(
+                '<div class="vas-bounced-ap-payment-card">'
+            );
 
-            var $header = $('<div class="vas-bounced-ap-payment-header">');
-            var $iconBox = $('<div class="vas-bounced-ap-payment-icon-box">');
+            $card.attr({
+                role: 'button',
+                tabindex: '0'
+            });
+
+            var $header = $(
+                '<div class="vas-bounced-ap-payment-header">'
+            );
+
+            var $iconBox = $(
+                '<div class="vas-bounced-ap-payment-icon-box">'
+            );
 
             var $icon = $(
-                '<svg class="vas-bounced-ap-payment-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">' +
-                '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>' +
+                '<svg ' +
+                'class="vas-bounced-ap-payment-icon" ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'aria-hidden="true" ' +
+                'focusable="false">' +
+                '<path d="' +
+                'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3' +
+                's-1 1-4 1-5-2-8-2-4 1-4 1z' +
+                '"></path>' +
                 '<line x1="4" y1="22" x2="4" y2="15"></line>' +
                 '</svg>'
             );
 
-            var $title = $('<div class="vas-bounced-ap-payment-title">').text(
-                lbl('VAS_030_MessageBounced', 'Bounced')
+            var $title = $(
+                '<div class="vas-bounced-ap-payment-title">'
+            ).text(
+                lbl(
+                    'VAS_030_MessageBounced',
+                    'Bounced'
+                )
             );
 
             $iconBox.append($icon);
-            $header.append($iconBox).append($title);
 
-            $body = $('<div class="vas-bounced-ap-payment-body">');
-            $value = $('<div class="vas-bounced-ap-payment-value">');
+            $header
+                .append($iconBox)
+                .append($title);
+
+            $body = $(
+                '<div class="vas-bounced-ap-payment-body">'
+            );
+
+            $value = $(
+                '<div class="vas-bounced-ap-payment-value">'
+            );
+
             $body.append($value);
 
-            $footer = $('<div class="vas-bounced-ap-payment-footer">');
+            $footer = $(
+                '<div class="vas-bounced-ap-payment-footer">'
+            );
 
-     
-            $description = $('<div class="vas-bounced-ap-payment-desc">').text(
-                lbl('VAS_030_MessageNeedReissue', 'Need re-issue')
+            $description = $(
+                '<div class="vas-bounced-ap-payment-desc">'
+            ).text(
+                lbl(
+                    'VAS_030_MessageNeedReissue',
+                    'Need re-issue'
+                )
             );
 
             $footer.append($description);
-            $busy = $('<div class="vas-bounced-ap-payment-busy">').text(lbl('VAS_030_MessageLoading', 'Loading'));
-            $state = $('<div class="vas-bounced-ap-payment-state-message">');
 
-            $card.append($header).append($body).append($footer).append($busy).append($state);
-            $root.empty().append($card);
+            $busy = $(
+                '<div class="vas-bounced-ap-payment-busy">'
+            ).text(
+                lbl(
+                    'VAS_030_MessageLoading',
+                    'Loading'
+                )
+            );
 
-            $card.on('click', openDialog);
-            $card.on('keydown', function (e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openDialog();
-                }
-            });
+            $state = $(
+                '<div class="vas-bounced-ap-payment-state-message">'
+            );
+
+            $card
+                .append($header)
+                .append($body)
+                .append($footer)
+                .append($busy)
+                .append($state);
+
+            $root
+                .empty()
+                .append($card);
+
+            $card
+                .off('click.vas030')
+                .on(
+                    'click.vas030',
+                    openDialog
+                );
+
+            $card
+                .off('keydown.vas030')
+                .on(
+                    'keydown.vas030',
+                    function (e) {
+                        if (
+                            e.key === 'Enter' ||
+                            e.key === ' '
+                        ) {
+                            openDialog(e);
+                        }
+                    }
+                );
 
             createDialog();
         }
 
+        /**
+         * Loads the widget count.
+         */
         function loadData() {
             if (isDisposed) {
                 return;
@@ -115,29 +208,78 @@
             showState(false, '');
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_030_BouncedAPPaymentWidget/GetBouncedAPPayments',
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_030_BouncedAPPaymentWidget/' +
+                    'GetBouncedAPPayments',
+
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
+
+                data: {
+                    _: new Date().getTime()
+                },
+
                 success: function (response) {
                     if (isDisposed) {
                         return;
                     }
 
-                    var data = normalizeResponse(response);
+                    var data =
+                        normalizeResponse(response);
 
-                    if (!data || data.error) {
-                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    if (!data) {
+                        showState(
+                            true,
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load data'
+                            )
+                        );
+
+                        return;
+                    }
+
+                    if (isErrorResponse(data)) {
+                        showState(
+                            true,
+                            getErrorText(data)
+                        );
+
                         return;
                     }
 
                     renderData(data);
                 },
-                error: function () {
-                    if (!isDisposed) {
-                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+
+                error: function (
+                    xhr,
+                    status,
+                    errorThrown
+                ) {
+                    if (isDisposed) {
+                        return;
                     }
+
+                    console.error(
+                        'VAS_030 GetBouncedAPPayments error:',
+                        {
+                            status: status,
+                            error: errorThrown,
+                            responseText:
+                                xhr
+                                    ? xhr.responseText
+                                    : ''
+                        }
+                    );
+
+                    showState(
+                        true,
+                        getAjaxErrorText(xhr)
+                    );
                 },
+
                 complete: function () {
                     if (!isDisposed) {
                         showBusy(false);
@@ -146,21 +288,170 @@
             });
         }
 
+        /**
+         * Handles ASP.NET response formats.
+         */
         function normalizeResponse(response) {
-            if (typeof response !== 'string') {
-                return response;
+            var data = response;
+
+            if (
+                data &&
+                typeof data === 'object' &&
+                Object.prototype.hasOwnProperty.call(
+                    data,
+                    'd'
+                )
+            ) {
+                data = data.d;
             }
 
-            try {
-                return JSON.parse(response);
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e) {
+                    console.error(
+                        'VAS_030 response parsing error:',
+                        e,
+                        data
+                    );
+
+                    return null;
+                }
             }
-            catch (e) {
-                return null;
+
+            if (
+                data &&
+                typeof data === 'object' &&
+                Object.prototype.hasOwnProperty.call(
+                    data,
+                    'd'
+                )
+            ) {
+                data = data.d;
+
+                if (typeof data === 'string') {
+                    try {
+                        data = JSON.parse(data);
+                    }
+                    catch (e2) {
+                        console.error(
+                            'VAS_030 response.d parsing error:',
+                            e2,
+                            data
+                        );
+
+                        return null;
+                    }
+                }
             }
+
+            return data;
         }
 
+        /**
+         * Returns a property supporting camelCase and PascalCase.
+         */
+        function getResponseValue(
+            data,
+            camelName,
+            pascalName,
+            fallback
+        ) {
+            if (!data) {
+                return fallback;
+            }
+
+            if (
+                typeof data[camelName] !== 'undefined' &&
+                data[camelName] !== null
+            ) {
+                return data[camelName];
+            }
+
+            if (
+                typeof data[pascalName] !== 'undefined' &&
+                data[pascalName] !== null
+            ) {
+                return data[pascalName];
+            }
+
+            return fallback;
+        }
+
+        /**
+         * Checks whether response contains an error.
+         */
+        function isErrorResponse(data) {
+            var error = getResponseValue(
+                data,
+                'error',
+                'Error',
+                false
+            );
+
+            return error === true ||
+                String(error).toLowerCase() === 'true';
+        }
+
+        /**
+         * Gets server error text.
+         */
+        function getErrorText(data) {
+            return getResponseValue(
+                data,
+                'errorText',
+                'ErrorText',
+                lbl(
+                    'VAS_ErrorLoading',
+                    'Could not load data'
+                )
+            );
+        }
+
+        /**
+         * Gets AJAX error text.
+         */
+        function getAjaxErrorText(xhr) {
+            var fallback = lbl(
+                'VAS_ErrorLoading',
+                'Could not load data'
+            );
+
+            if (!xhr) {
+                return fallback;
+            }
+
+            if (
+                xhr.responseJSON &&
+                xhr.responseJSON.errorText
+            ) {
+                return xhr.responseJSON.errorText;
+            }
+
+            if (xhr.responseText) {
+                var response =
+                    normalizeResponse(
+                        xhr.responseText
+                    );
+
+                if (response) {
+                    return getErrorText(response);
+                }
+            }
+
+            return fallback;
+        }
+
+        /**
+         * Escapes HTML values.
+         */
         function escapeHtml(value) {
-            return String(value == null ? '' : value)
+            return String(
+                value == null
+                    ? ''
+                    : value
+            )
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
@@ -168,11 +459,28 @@
                 .replace(/'/g, '&#039;');
         }
 
+        /**
+         * Renders widget count.
+         */
         function renderData(data) {
-            var count = Number(data.value);
+            var count = Number(
+                getResponseValue(
+                    data,
+                    'value',
+                    'Value',
+                    NaN
+                )
+            );
 
             if (isNaN(count)) {
-                count = Number(data.bouncedPaymentCount);
+                count = Number(
+                    getResponseValue(
+                        data,
+                        'bouncedPaymentCount',
+                        'BouncedPaymentCount',
+                        0
+                    )
+                );
             }
 
             if (isNaN(count) || count <= 0) {
@@ -181,29 +489,65 @@
             }
 
             showState(false, '');
-            $value.text(formatCount(count));
 
-            if ($description && data.description) {
-                $description.text(data.description);
+            $value.text(
+                formatCount(count)
+            );
+
+            var description =
+                getResponseValue(
+                    data,
+                    'description',
+                    'Description',
+                    ''
+                );
+
+            if (
+                $description &&
+                description
+            ) {
+                $description.text(description);
             }
         }
 
+        /**
+         * Formats widget count.
+         */
         function formatCount(value) {
-            return Number(value || 0).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            });
+            return Number(
+                value || 0
+            ).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }
+            );
         }
 
+        /**
+         * Shows or hides widget loading.
+         */
         function showBusy(show) {
             if ($busy) {
-                $busy.toggleClass('is-visible', !!show);
+                $busy.toggleClass(
+                    'is-visible',
+                    !!show
+                );
             }
         }
 
+        /**
+         * Shows widget state message.
+         */
         function showState(show, message) {
             if ($state) {
-                $state.text(message || '').toggleClass('is-visible', !!show);
+                $state
+                    .text(message || '')
+                    .toggleClass(
+                        'is-visible',
+                        !!show
+                    );
             }
 
             if ($body) {
@@ -215,98 +559,374 @@
             }
         }
 
+        /**
+         * Shows no data state.
+         */
         function setNoData() {
-            showState(true, lbl('VAS_030_MessageNoData', 'No Data'));
+            showState(
+                true,
+                lbl(
+                    'VAS_030_MessageNoData',
+                    'No Data'
+                )
+            );
         }
 
-        function openDialog() {
-            if (!$dialog) {
+        /**
+         * Opens details dialog.
+         */
+        function openDialog(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            if (
+                !$dialog ||
+                !$dialog.length ||
+                isDisposed
+            ) {
                 return;
             }
 
-            $dialog.show();
-            $('body').addClass('vas-bounced-ap-payment-body-lock');
             pageNo = 1;
+            totalPages = 0;
+            totalRecords = 0;
+            rowsLoading = false;
+
+            if ($dialogTbody) {
+                $dialogTbody.empty();
+            }
+
+            $dialog
+                .show()
+                .attr(
+                    'aria-hidden',
+                    'false'
+                );
+
+            $('body').addClass(
+                'vas-bounced-ap-payment-body-lock'
+            );
+
+            updatePager();
             loadRows();
         }
 
-        function closeDialog() {
-            if (!$dialog) {
+        /**
+         * Closes details dialog.
+         */
+        function closeDialog(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            if (
+                !$dialog ||
+                !$dialog.length
+            ) {
                 return;
             }
 
-            $dialog.hide();
-            $('body').removeClass('vas-bounced-ap-payment-body-lock');
+            $dialog
+                .hide()
+                .attr(
+                    'aria-hidden',
+                    'true'
+                );
+
+            $('body').removeClass(
+                'vas-bounced-ap-payment-body-lock'
+            );
+
             pageNo = 1;
+            totalPages = 0;
+            totalRecords = 0;
+            rowsLoading = false;
+
+            updatePager();
         }
 
+        /**
+         * Loads popup rows.
+         */
         function loadRows() {
-            if (!$dialogTbody || rowsLoading) {
+            if (
+                isDisposed ||
+                !$dialogTbody ||
+                !$dialogTbody.length ||
+                rowsLoading
+            ) {
                 return;
+            }
+
+            pageNo = Number(pageNo);
+            pageSize = Number(pageSize);
+
+            if (
+                isNaN(pageNo) ||
+                pageNo < 1
+            ) {
+                pageNo = 1;
+            }
+
+            if (
+                isNaN(pageSize) ||
+                pageSize < 1
+            ) {
+                pageSize = 10;
             }
 
             rowsLoading = true;
+
+            renderLoadingRow();
             showDialogBusy(true);
             updatePager();
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_030_BouncedAPPaymentWidget/GetBouncedAPPaymentRows',
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_030_BouncedAPPaymentWidget/' +
+                    'GetBouncedAPPaymentRows',
+
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
+
                 data: {
                     pageNo: pageNo,
-                    pageSize: pageSize
+                    pageSize: pageSize,
+                    _: new Date().getTime()
                 },
+
                 success: function (response) {
                     if (isDisposed) {
                         return;
                     }
 
-                    var data = normalizeResponse(response);
+                    var data =
+                        normalizeResponse(response);
 
-                    if (!data || data.error) {
-                        renderRows([]);
+                    console.log(
+                        'VAS_030 GetBouncedAPPaymentRows response:',
+                        data
+                    );
+
+                    if (!data) {
                         totalRecords = 0;
                         totalPages = 0;
-                        updatePager();
+
+                        renderErrorRow(
+                            'Invalid response from server'
+                        );
+
                         return;
                     }
 
-                    totalRecords = Number(data.totalRecords || 0);
-                    totalPages = Number(data.totalPages || 0);
-
-                    if (typeof data.pageNo !== 'undefined') {
-                        pageNo = Number(data.pageNo);
-                    }
-
-                    if (pageNo > totalPages && totalPages > 0) {
-                        pageNo = totalPages;
-                    }
-
-                    if (pageNo < 1) {
-                        pageNo = 1;
-                    }
-
-                    renderRows(data.rows || []);
-                    updatePager();
-                },
-                error: function () {
-                    if (!isDisposed) {
-                        renderRows([]);
+                    if (isErrorResponse(data)) {
                         totalRecords = 0;
                         totalPages = 0;
-                        updatePager();
+
+                        var serverError =
+                            getErrorText(data);
+
+                        console.error(
+                            'VAS_030 rows server error:',
+                            serverError,
+                            data
+                        );
+
+                        renderErrorRow(
+                            serverError
+                        );
+
+                        return;
                     }
+
+                    var rows =
+                        getResponseValue(
+                            data,
+                            'rows',
+                            'Rows',
+                            []
+                        );
+
+                    if (!Array.isArray(rows)) {
+                        rows = [];
+                    }
+
+                    totalRecords = Number(
+                        getResponseValue(
+                            data,
+                            'totalRecords',
+                            'TotalRecords',
+                            rows.length
+                        )
+                    );
+
+                    totalPages = Number(
+                        getResponseValue(
+                            data,
+                            'totalPages',
+                            'TotalPages',
+                            0
+                        )
+                    );
+
+                    var returnedPageNo =
+                        Number(
+                            getResponseValue(
+                                data,
+                                'pageNo',
+                                'PageNo',
+                                pageNo
+                            )
+                        );
+
+                    if (
+                        !isNaN(returnedPageNo) &&
+                        returnedPageNo > 0
+                    ) {
+                        pageNo =
+                            returnedPageNo;
+                    }
+
+                    if (
+                        isNaN(totalRecords) ||
+                        totalRecords < 0
+                    ) {
+                        totalRecords =
+                            rows.length;
+                    }
+
+                    if (
+                        isNaN(totalPages) ||
+                        totalPages < 0
+                    ) {
+                        totalPages = 0;
+                    }
+
+                    if (
+                        totalPages === 0 &&
+                        totalRecords > 0
+                    ) {
+                        totalPages =
+                            Math.ceil(
+                                totalRecords /
+                                pageSize
+                            );
+                    }
+
+                    /*
+                     * If current page exceeds last page,
+                     * automatically request the last page.
+                     */
+                    if (
+                        totalPages > 0 &&
+                        pageNo > totalPages
+                    ) {
+                        pageNo = totalPages;
+                        rowsLoading = false;
+                        loadRows();
+                        return;
+                    }
+
+                    renderRows(rows);
+                    updatePager();
                 },
+
+                error: function (
+                    xhr,
+                    status,
+                    errorThrown
+                ) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    totalRecords = 0;
+                    totalPages = 0;
+
+                    var message =
+                        getAjaxErrorText(xhr);
+
+                    console.error(
+                        'VAS_030 GetBouncedAPPaymentRows AJAX error:',
+                        {
+                            status: status,
+                            error: errorThrown,
+                            responseText:
+                                xhr
+                                    ? xhr.responseText
+                                    : ''
+                        }
+                    );
+
+                    renderErrorRow(message);
+                },
+
                 complete: function () {
                     rowsLoading = false;
+
                     showDialogBusy(false);
                     updatePager();
                 }
             });
         }
 
+        /**
+         * Renders loading row.
+         */
+        function renderLoadingRow() {
+            if (!$dialogTbody) {
+                return;
+            }
+
+            $dialogTbody.html(
+                '<tr>' +
+                '<td ' +
+                'class="vas-bounced-ap-payment-dialog-empty" ' +
+                'colspan="8">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_030_MessageLoading',
+                        'Loading'
+                    )
+                ) +
+                '</td>' +
+                '</tr>'
+            );
+        }
+
+        /**
+         * Renders error row.
+         */
+        function renderErrorRow(message) {
+            if (!$dialogTbody) {
+                return;
+            }
+
+            $dialogTbody.html(
+                '<tr>' +
+                '<td ' +
+                'class="vas-bounced-ap-payment-dialog-empty" ' +
+                'colspan="8">' +
+                escapeHtml(
+                    message ||
+                    lbl(
+                        'VAS_ErrorLoading',
+                        'Could not load data'
+                    )
+                ) +
+                '</td>' +
+                '</tr>'
+            );
+        }
+
+        /**
+         * Renders popup rows.
+         */
         function renderRows(rows) {
             if (!$dialogTbody) {
                 return;
@@ -314,48 +934,374 @@
 
             $dialogTbody.empty();
 
-            if (!rows || rows.length === 0) {
+            if (
+                !Array.isArray(rows) ||
+                rows.length === 0
+            ) {
                 $dialogTbody.html(
-                    '<tr><td class="vas-bounced-ap-payment-dialog-empty" colspan="8">' +
-                    escapeHtml(lbl('VAS_030_MessageNoData', 'No Data')) +
-                    '</td></tr>'
+                    '<tr>' +
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-dialog-empty" ' +
+                    'colspan="8">' +
+                    escapeHtml(
+                        lbl(
+                            'VAS_030_MessageNoData',
+                            'No Data'
+                        )
+                    ) +
+                    '</td>' +
+                    '</tr>'
                 );
+
                 return;
             }
 
-            for (var i = 0; i < rows.length; i++) {
-                var row = rows[i];
-                var dateText = formatDate(row.paymentDate);
-                var bankText = formatBank(row);
-                var symbol = row.currencySymbol || row.currency || '';
-                var amountText = formatAmount(row.amount);
-                var amountHtml = (symbol ? '<span class="vas-bounced-ap-payment-currency-inline">' + escapeHtml(symbol) + '</span>' : '') + escapeHtml(amountText);
+            for (
+                var i = 0;
+                i < rows.length;
+                i++
+            ) {
+                var row = rows[i] || {};
+
+                var paymentNo =
+                    getResponseValue(
+                        row,
+                        'paymentNo',
+                        'PaymentNo',
+                        ''
+                    );
+
+                if (!paymentNo) {
+                    paymentNo =
+                        getResponseValue(
+                            row,
+                            'documentNo',
+                            'DocumentNo',
+                            ''
+                        );
+                }
+
+                var paymentDate =
+                    getResponseValue(
+                        row,
+                        'paymentDate',
+                        'PaymentDate',
+                        ''
+                    );
+
+                if (!paymentDate) {
+                    paymentDate =
+                        getResponseValue(
+                            row,
+                            'date',
+                            'Date',
+                            ''
+                        );
+                }
+
+                var vendorName =
+                    getResponseValue(
+                        row,
+                        'vendorName',
+                        'VendorName',
+                        ''
+                    );
+
+                if (!vendorName) {
+                    vendorName =
+                        getResponseValue(
+                            row,
+                            'supplier',
+                            'Supplier',
+                            ''
+                        );
+                }
+
+                var bankName =
+                    getResponseValue(
+                        row,
+                        'bankName',
+                        'BankName',
+                        ''
+                    );
+
+                var accountNo =
+                    getResponseValue(
+                        row,
+                        'accountNo',
+                        'AccountNo',
+                        ''
+                    );
+
+                var currency =
+                    getResponseValue(
+                        row,
+                        'currency',
+                        'Currency',
+                        ''
+                    );
+
+                if (!currency) {
+                    currency =
+                        getResponseValue(
+                            row,
+                            'currencyISO',
+                            'CurrencyISO',
+                            ''
+                        );
+                }
+
+                if (!currency) {
+                    currency =
+                        getResponseValue(
+                            row,
+                            'paymentCurrency',
+                            'PaymentCurrency',
+                            ''
+                        );
+                }
+
+                var currencySymbol =
+                    getResponseValue(
+                        row,
+                        'currencySymbol',
+                        'CurrencySymbol',
+                        ''
+                    );
+
+                if (!currencySymbol) {
+                    currencySymbol =
+                        getResponseValue(
+                            row,
+                            'paymentCurrencySymbol',
+                            'PaymentCurrencySymbol',
+                            currency
+                        );
+                }
+
+                var amount =
+                    getResponseValue(
+                        row,
+                        'amount',
+                        'Amount',
+                        0
+                    );
+
+                var method =
+                    getResponseValue(
+                        row,
+                        'method',
+                        'Method',
+                        ''
+                    );
+
+                if (!method) {
+                    method =
+                        getResponseValue(
+                            row,
+                            'paymentMethodName',
+                            'PaymentMethodName',
+                            ''
+                        );
+                }
+
+                if (!method) {
+                    method =
+                        getResponseValue(
+                            row,
+                            'tenderTypeName',
+                            'TenderTypeName',
+                            ''
+                        );
+                }
+
+                var status =
+                    getResponseValue(
+                        row,
+                        'status',
+                        'Status',
+                        ''
+                    );
+
+                if (!status) {
+                    status =
+                        getResponseValue(
+                            row,
+                            'statusName',
+                            'StatusName',
+                            ''
+                        );
+                }
+
+                if (!status) {
+                    status =
+                        getResponseValue(
+                            row,
+                            'executionStatus',
+                            'ExecutionStatus',
+                            ''
+                        );
+                }
+
+                var precision =
+                    Number(
+                        getResponseValue(
+                            row,
+                            'stdPrecision',
+                            'StdPrecision',
+                            2
+                        )
+                    );
+
+                if (
+                    isNaN(precision) ||
+                    precision < 0
+                ) {
+                    precision = 2;
+                }
+
+                var dateText =
+                    formatDate(paymentDate);
+
+                var bankText =
+                    formatBank({
+                        bankName: bankName,
+                        accountNo: accountNo
+                    });
+
+                var amountText =
+                    formatAmountWithPrecision(
+                        amount,
+                        precision
+                    );
+
+                var amountHtml =
+                    currencySymbol
+                        ? '<span class="' +
+                        'vas-bounced-ap-payment-currency-inline">' +
+                        escapeHtml(currencySymbol) +
+                        '</span> ' +
+                        escapeHtml(amountText)
+                        : escapeHtml(amountText);
+
+                var statusHtml =
+                    status
+                        ? '<span class="' +
+                        'vas-bounced-ap-payment-status-chip">' +
+                        escapeHtml(status) +
+                        '</span>'
+                        : '';
 
                 $dialogTbody.append(
                     '<tr>' +
-                    '<td class="vas-bounced-ap-payment-td-doc" title="' + escapeHtml(row.paymentNo || '') + '">' + escapeHtml(row.paymentNo || '') + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-date" title="' + escapeHtml(dateText) + '">' + escapeHtml(dateText) + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-vendor" title="' + escapeHtml(row.vendorName || '') + '">' + escapeHtml(row.vendorName || '') + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-bank" title="' + escapeHtml(bankText) + '">' + escapeHtml(bankText) + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-currency" title="' + escapeHtml(row.currency || '') + '">' + escapeHtml(row.currency || '') + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-amount" title="' + escapeHtml((symbol ? symbol + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-method" title="' + escapeHtml(row.method || '') + '">' + escapeHtml(row.method || '') + '</td>' +
-                    '<td class="vas-bounced-ap-payment-td-status"><span class="vas-bounced-ap-payment-status-chip">' + escapeHtml(row.status || '') + '</span></td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-doc" ' +
+                    'title="' +
+                    escapeHtml(paymentNo) +
+                    '">' +
+                    escapeHtml(paymentNo) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-date" ' +
+                    'title="' +
+                    escapeHtml(dateText) +
+                    '">' +
+                    escapeHtml(dateText) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-vendor" ' +
+                    'title="' +
+                    escapeHtml(vendorName) +
+                    '">' +
+                    escapeHtml(vendorName) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-bank" ' +
+                    'title="' +
+                    escapeHtml(bankText) +
+                    '">' +
+                    escapeHtml(bankText) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-currency" ' +
+                    'title="' +
+                    escapeHtml(currency) +
+                    '">' +
+                    escapeHtml(currency) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-amount" ' +
+                    'title="' +
+                    escapeHtml(
+                        (
+                            currencySymbol
+                                ? currencySymbol + ' '
+                                : ''
+                        ) +
+                        amountText
+                    ) +
+                    '">' +
+                    amountHtml +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-method" ' +
+                    'title="' +
+                    escapeHtml(method) +
+                    '">' +
+                    escapeHtml(method) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-status">' +
+                    statusHtml +
+                    '</td>' +
+
                     '</tr>'
                 );
             }
         }
 
+        /**
+         * Updates pagination information.
+         */
         function updatePager() {
             if ($pagerHelper) {
                 if (totalRecords > 0) {
-                    var from = (pageNo - 1) * pageSize + 1;
-                    var to = Math.min((pageNo - 1) * pageSize + pageSize, totalRecords);
+                    var from =
+                        (pageNo - 1) *
+                        pageSize +
+                        1;
+
+                    var to =
+                        Math.min(
+                            (pageNo - 1) *
+                            pageSize +
+                            pageSize,
+                            totalRecords
+                        );
 
                     $pagerHelper.text(
-                        lbl('VAS_Showing', 'Showing') + ' ' +
-                        from + '-' + to + ' ' +
-                        lbl('VAS_Of', 'of') + ' ' +
+                        lbl(
+                            'VAS_Showing',
+                            'Showing'
+                        ) +
+                        ' ' +
+                        from +
+                        '-' +
+                        to +
+                        ' ' +
+                        lbl(
+                            'VAS_Of',
+                            'of'
+                        ) +
+                        ' ' +
                         totalRecords
                     );
                 }
@@ -365,151 +1311,537 @@
             }
 
             if ($pagerText) {
-                $pagerText.text(totalPages > 0 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+                $pagerText.text(
+                    totalPages > 0
+                        ? pageNo +
+                        ' ' +
+                        lbl(
+                            'VAS_Of',
+                            'of'
+                        ) +
+                        ' ' +
+                        totalPages
+                        : ''
+                );
             }
 
             if ($pagerPrev) {
-                $pagerPrev.prop('disabled', rowsLoading || pageNo <= 1);
+                $pagerPrev.prop(
+                    'disabled',
+                    rowsLoading ||
+                    pageNo <= 1
+                );
             }
 
             if ($pagerNext) {
-                $pagerNext.prop('disabled', rowsLoading || totalPages <= 1 || pageNo >= totalPages);
+                $pagerNext.prop(
+                    'disabled',
+                    rowsLoading ||
+                    totalPages <= 1 ||
+                    pageNo >= totalPages
+                );
             }
         }
 
+        /**
+         * Shows or hides dialog loading state.
+         */
         function showDialogBusy(show) {
             if ($dialogBusy) {
-                $dialogBusy.toggleClass('is-visible', !!show);
+                $dialogBusy.toggleClass(
+                    'is-visible',
+                    !!show
+                );
             }
         }
 
+        /**
+         * Creates details dialog.
+         */
         function createDialog() {
             $dialog = $(
-                '<div class="vas-bounced-ap-payment-dialog" style="display:none;" role="dialog" aria-modal="true">' +
-                '<div class="vas-bounced-ap-payment-dialog-scrim"></div>' +
-                '<div class="vas-bounced-ap-payment-dialog-card">' +
-                '<div class="vas-bounced-ap-payment-dialog-header">' +
-                '<div class="vas-bounced-ap-payment-dialog-icon">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+                '<div ' +
+                'class="vas-bounced-ap-payment-dialog" ' +
+                'style="display:none;" ' +
+                'role="dialog" ' +
+                'aria-modal="true" ' +
+                'aria-hidden="true">' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-scrim">' +
                 '</div>' +
-                '<div class="vas-bounced-ap-payment-dialog-title-group">' +
-                '<div class="vas-bounced-ap-payment-dialog-title">' + escapeHtml(lbl('VAS_030_MessageBouncedAPPayments', 'Bounced AP payments')) + '</div>' +
-                '<div class="vas-bounced-ap-payment-dialog-subtitle">' + escapeHtml(lbl('VAS_030_MessageNeedReissue', 'Need re-issue')) + '</div>' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-card">' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-header">' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-icon">' +
+
+                '<svg ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'stroke="currentColor" ' +
+                'stroke-width="1.8" ' +
+                'stroke-linecap="round" ' +
+                'stroke-linejoin="round">' +
+
+                '<circle ' +
+                'cx="12" cy="12" r="10"/>' +
+
+                '<line ' +
+                'x1="12" y1="8" ' +
+                'x2="12" y2="13"/>' +
+
+                '<line ' +
+                'x1="12" y1="16" ' +
+                'x2="12.01" y2="16"/>' +
+
+                '</svg>' +
                 '</div>' +
-                '<button type="button" class="vas-bounced-ap-payment-dialog-close" aria-label="' + escapeHtml(lbl('VAS_Close', 'Close')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-title-group">' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-title">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_030_MessageBouncedAPPayments',
+                        'Bounced AP payments'
+                    )
+                ) +
                 '</div>' +
-                '<div class="vas-bounced-ap-payment-dialog-body">' +
-                '<div class="vas-bounced-ap-payment-dialog-busy">' + escapeHtml(lbl('VAS_030_MessageLoading', 'Loading')) + '</div>' +
-                '<table class="vas-bounced-ap-payment-dialog-table">' +
-                '<thead><tr>' +
-                '<th>' + escapeHtml(lbl('VAS_030_MessagePaymentNo', 'Payment No.')) + '</th>' +
-                '<th>' + escapeHtml(lbl('VAS_Date', 'Date')) + '</th>' +
-                '<th>' + escapeHtml(lbl('VAS_Vendor', 'Vendor')) + '</th>' +
-                '<th>' + escapeHtml(lbl('VAS_BankAccount', 'Bank account')) + '</th>' +
-                '<th>' + escapeHtml(lbl('VAS_PaymentCurrency', 'Payment Currency')) + '</th>' +
-                '<th class="vas-bounced-ap-payment-th-amount">' + escapeHtml(lbl('VAS_Amount', 'Amount')) + '</th>' +
-                '<th>' + escapeHtml(lbl('VAS_Method', 'Method')) + '</th>' +
-                '<th>' + escapeHtml(lbl('VAS_Status', 'Status')) + '</th>' +
-                '</tr></thead>' +
-                '<tbody class="vas-bounced-ap-payment-dialog-tbody"></tbody>' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-subtitle">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_030_MessageNeedReissue',
+                        'Need re-issue'
+                    )
+                ) +
+                '</div>' +
+
+                '</div>' +
+
+                '<button ' +
+                'type="button" ' +
+                'class="' +
+                'vas-bounced-ap-payment-dialog-close" ' +
+                'aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Close',
+                        'Close'
+                    )
+                ) +
+                '">' +
+
+                '<svg ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'stroke="currentColor" ' +
+                'stroke-width="1.8" ' +
+                'stroke-linecap="round" ' +
+                'stroke-linejoin="round">' +
+
+                '<line ' +
+                'x1="18" y1="6" ' +
+                'x2="6" y2="18"/>' +
+
+                '<line ' +
+                'x1="6" y1="6" ' +
+                'x2="18" y2="18"/>' +
+
+                '</svg>' +
+                '</button>' +
+
+                '</div>' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-body">' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-busy">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_030_MessageLoading',
+                        'Loading'
+                    )
+                ) +
+                '</div>' +
+
+                '<table class="' +
+                'vas-bounced-ap-payment-dialog-table">' +
+
+                '<thead>' +
+                '<tr>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_030_MessagePaymentNo',
+                        'Payment No.'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Date',
+                        'Date'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Vendor',
+                        'Vendor'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_BankAccount',
+                        'Bank account'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_PaymentCurrency',
+                        'Payment Currency'
+                    )
+                ) +
+                '</th>' +
+
+                '<th class="' +
+                'vas-bounced-ap-payment-th-amount">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Amount',
+                        'Amount'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Method',
+                        'Method'
+                    )
+                ) +
+                '</th>' +
+
+                '<th>' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Status',
+                        'Status'
+                    )
+                ) +
+                '</th>' +
+
+                '</tr>' +
+                '</thead>' +
+
+                '<tbody class="' +
+                'vas-bounced-ap-payment-dialog-tbody">' +
+                '</tbody>' +
+
                 '</table>' +
                 '</div>' +
-                '<div class="vas-bounced-ap-payment-dialog-footer">' +
-                '<span class="vas-bounced-ap-payment-pager-helper"></span>' +
-                '<div class="vas-bounced-ap-payment-pager">' +
-                '<button type="button" class="vas-bounced-ap-payment-pager-btn vas-bounced-ap-payment-pager-prev" aria-label="' + escapeHtml(lbl('VAS_Previous', 'Previous')) + '">‹</button>' +
-                '<span class="vas-bounced-ap-payment-pager-text"></span>' +
-                '<button type="button" class="vas-bounced-ap-payment-pager-btn vas-bounced-ap-payment-pager-next" aria-label="' + escapeHtml(lbl('VAS_Next', 'Next')) + '">›</button>' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-dialog-footer">' +
+
+                '<span class="' +
+                'vas-bounced-ap-payment-pager-helper">' +
+                '</span>' +
+
+                '<div class="' +
+                'vas-bounced-ap-payment-pager">' +
+
+                '<button ' +
+                'type="button" ' +
+                'class="' +
+                'vas-bounced-ap-payment-pager-btn ' +
+                'vas-bounced-ap-payment-pager-prev" ' +
+                'aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Previous',
+                        'Previous'
+                    )
+                ) +
+                '">' +
+                '‹' +
+                '</button>' +
+
+                '<span class="' +
+                'vas-bounced-ap-payment-pager-text">' +
+                '</span>' +
+
+                '<button ' +
+                'type="button" ' +
+                'class="' +
+                'vas-bounced-ap-payment-pager-btn ' +
+                'vas-bounced-ap-payment-pager-next" ' +
+                'aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Next',
+                        'Next'
+                    )
+                ) +
+                '">' +
+                '›' +
+                '</button>' +
+
                 '</div>' +
                 '</div>' +
+
                 '</div>' +
                 '</div>'
             );
 
-            $dialogTbody = $dialog.find('.vas-bounced-ap-payment-dialog-tbody');
-            $dialogBusy = $dialog.find('.vas-bounced-ap-payment-dialog-busy');
-            $pagerHelper = $dialog.find('.vas-bounced-ap-payment-pager-helper');
-            $pagerPrev = $dialog.find('.vas-bounced-ap-payment-pager-prev');
-            $pagerNext = $dialog.find('.vas-bounced-ap-payment-pager-next');
-            $pagerText = $dialog.find('.vas-bounced-ap-payment-pager-text');
+            $dialogTbody =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-dialog-tbody'
+                );
 
-            $dialog.find('.vas-bounced-ap-payment-dialog-close').on('click', closeDialog);
-            $dialog.find('.vas-bounced-ap-payment-dialog-scrim').on('click', closeDialog);
+            $dialogBusy =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-dialog-busy'
+                );
 
-            $pagerPrev.on('click', function () {
-                if (rowsLoading || pageNo <= 1) {
-                    return;
-                }
+            $pagerHelper =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-pager-helper'
+                );
 
-                pageNo--;
-                loadRows();
-            });
+            $pagerPrev =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-pager-prev'
+                );
 
-            $pagerNext.on('click', function () {
-                if (rowsLoading || pageNo >= totalPages) {
-                    return;
-                }
+            $pagerNext =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-pager-next'
+                );
 
-                pageNo++;
-                loadRows();
-            });
+            $pagerText =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-pager-text'
+                );
 
-            $(document).on('keydown.vas-bounced-ap-payment-' + self.AD_UserHomeWidgetID, function (e) {
-                if (e.key === 'Escape' && $dialog.is(':visible')) {
-                    closeDialog();
-                }
-            });
+            $dialog
+                .find(
+                    '.vas-bounced-ap-payment-dialog-close'
+                )
+                .off('click.vas030')
+                .on(
+                    'click.vas030',
+                    closeDialog
+                );
+
+            $dialog
+                .find(
+                    '.vas-bounced-ap-payment-dialog-scrim'
+                )
+                .off('click.vas030')
+                .on(
+                    'click.vas030',
+                    closeDialog
+                );
+
+            $pagerPrev
+                .off('click.vas030')
+                .on(
+                    'click.vas030',
+                    function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (
+                            rowsLoading ||
+                            pageNo <= 1
+                        ) {
+                            return;
+                        }
+
+                        pageNo--;
+                        loadRows();
+                    }
+                );
+
+            $pagerNext
+                .off('click.vas030')
+                .on(
+                    'click.vas030',
+                    function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        if (
+                            rowsLoading ||
+                            totalPages <= 0 ||
+                            pageNo >= totalPages
+                        ) {
+                            return;
+                        }
+
+                        pageNo++;
+                        loadRows();
+                    }
+                );
+
+            $(document)
+                .off(
+                    'keydown.vas-bounced-ap-payment-' +
+                    self.AD_UserHomeWidgetID
+                )
+                .on(
+                    'keydown.vas-bounced-ap-payment-' +
+                    self.AD_UserHomeWidgetID,
+                    function (e) {
+                        if (
+                            e.key === 'Escape' &&
+                            $dialog &&
+                            $dialog.is(':visible')
+                        ) {
+                            closeDialog(e);
+                        }
+                    }
+                );
 
             $('body').append($dialog);
         }
 
+        /**
+         * Formats date value.
+         */
         function formatDate(value) {
             if (!value) {
                 return '';
             }
 
-            var date = new Date(value);
+            /*
+             * Controller returns yyyy-MM-dd.
+             * Parse it locally to avoid UTC timezone shifting.
+             */
+            var isoMatch =
+                /^(\d{4})-(\d{2})-(\d{2})$/
+                    .exec(String(value));
+
+            var date;
+
+            if (isoMatch) {
+                date = new Date(
+                    Number(isoMatch[1]),
+                    Number(isoMatch[2]) - 1,
+                    Number(isoMatch[3])
+                );
+            }
+            else {
+                date = new Date(value);
+            }
 
             if (isNaN(date.getTime())) {
-                return value;
+                return String(value);
             }
 
-            return date.toLocaleDateString(window.navigator.language, {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-            });
-        }
-
-        function formatAmount(value) {
-            return Number(value || 0).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getStdPrecision(),
-                maximumFractionDigits: getStdPrecision()
-            });
-        }
-
-        function getStdPrecision() {
-            var stdPrecision = 2;
-
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            return date.toLocaleDateString(
+                window.navigator.language,
+                {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
                 }
-            }
-            catch (e) {
-                stdPrecision = 2;
-            }
-
-            return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
+            );
         }
 
-        function formatBank(row) {
-            var bankName = row && row.bankName ? String(row.bankName).trim() : '';
-            var accountNo = row && row.accountNo ? String(row.accountNo).trim() : '';
-            var last4 = accountNo ? (accountNo.length > 4 ? accountNo.slice(-4) : accountNo) : '';
+        /**
+         * Formats amount using the row currency precision.
+         */
+        function formatAmountWithPrecision(
+            value,
+            precision
+        ) {
+            var amount = Number(value || 0);
+            var digits = Number(precision);
 
-            if (bankName && last4) {
-                return bankName + ' - ****' + last4;
+            if (isNaN(amount)) {
+                amount = 0;
+            }
+
+            if (
+                isNaN(digits) ||
+                digits < 0
+            ) {
+                digits = 2;
+            }
+
+            return amount.toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits:
+                        digits,
+                    maximumFractionDigits:
+                        digits
+                }
+            );
+        }
+
+        /**
+         * Formats bank name and last four account digits.
+         */
+        function formatBank(row) {
+            var bankName =
+                row &&
+                    row.bankName
+                    ? String(
+                        row.bankName
+                    ).trim()
+                    : '';
+
+            var accountNo =
+                row &&
+                    row.accountNo
+                    ? String(
+                        row.accountNo
+                    ).trim()
+                    : '';
+
+            var last4 =
+                accountNo
+                    ? (
+                        accountNo.length > 4
+                            ? accountNo.slice(-4)
+                            : accountNo
+                    )
+                    : '';
+
+            if (
+                bankName &&
+                last4
+            ) {
+                return (
+                    bankName +
+                    ' - ****' +
+                    last4
+                );
             }
 
             if (bankName) {
@@ -523,20 +1855,64 @@
             return '';
         }
 
+        /**
+         * Refreshes widget data.
+         */
         this.refreshData = function () {
+            if (isDisposed) {
+                return;
+            }
+
             loadData();
+
+            if (
+                $dialog &&
+                $dialog.is(':visible')
+            ) {
+                pageNo = 1;
+                loadRows();
+            }
         };
 
+        /**
+         * Returns root element.
+         */
         this.getRoot = function () {
             return $root;
         };
 
+        /**
+         * Disposes widget.
+         */
         this.disposeComponent = function () {
             isDisposed = true;
-            $(document).off('keydown.vas-bounced-ap-payment-' + this.AD_UserHomeWidgetID);
-            $('body').removeClass('vas-bounced-ap-payment-body-lock');
+
+            $(document).off(
+                'keydown.vas-bounced-ap-payment-' +
+                this.AD_UserHomeWidgetID
+            );
+
+            $('body').removeClass(
+                'vas-bounced-ap-payment-body-lock'
+            );
+
+            if ($card) {
+                $card.off('.vas030');
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.off('.vas030');
+            }
+
+            if ($pagerNext) {
+                $pagerNext.off('.vas030');
+            }
 
             if ($dialog) {
+                $dialog
+                    .find('*')
+                    .off('.vas030');
+
                 $dialog.remove();
             }
 
@@ -549,9 +1925,11 @@
             $footer = null;
             $busy = null;
             $state = null;
+
             $dialog = null;
             $dialogTbody = null;
             $dialogBusy = null;
+
             $pagerHelper = null;
             $pagerPrev = null;
             $pagerNext = null;
@@ -559,46 +1937,87 @@
         };
     };
 
-    VAS.VAS_030_BouncedAPPaymentWidget.prototype.init = function (windowNo, frame) {
-        this.frame = frame;
-        this.windowNo = windowNo;
+    /**
+     * Widget init.
+     */
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype.init =
+        function (windowNo, frame) {
+            this.frame = frame;
+            this.windowNo = windowNo;
 
-        if (frame && frame.widgetInfo) {
-            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
-        }
+            if (
+                frame &&
+                frame.widgetInfo
+            ) {
+                this.AD_UserHomeWidgetID =
+                    frame.widgetInfo
+                        .AD_UserHomeWidgetID;
+            }
 
-        this.Initalize();
+            this.Initalize();
 
-        if (this.frame && this.frame.getContentGrid) {
-            this.frame.getContentGrid().append(this.getRoot());
-        }
-    };
+            if (
+                this.frame &&
+                this.frame.getContentGrid
+            ) {
+                this.frame
+                    .getContentGrid()
+                    .append(
+                        this.getRoot()
+                    );
+            }
+        };
 
-    VAS.VAS_030_BouncedAPPaymentWidget.prototype.widgetSizeChange = function (height, width) {
-        var $root = this.getRoot();
+    /**
+     * Handles widget size changes.
+     */
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype
+        .widgetSizeChange =
+        function (height, width) {
+            var $root =
+                this.getRoot();
 
-        if (!$root) {
-            return;
-        }
+            if (!$root) {
+                return;
+            }
 
-        $root.toggleClass(
-            'vas-bounced-ap-payment-compact',
-            (width && width < 240) || (height && height < 160)
-        );
-    };
+            $root.toggleClass(
+                'vas-bounced-ap-payment-compact',
+                (
+                    width &&
+                    width < 240
+                ) ||
+                (
+                    height &&
+                    height < 160
+                )
+            );
+        };
 
-    VAS.VAS_030_BouncedAPPaymentWidget.prototype.refreshWidget = function () {
-        this.refreshData();
-    };
+    /**
+     * Refreshes widget.
+     */
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype
+        .refreshWidget =
+        function () {
+            this.refreshData();
+        };
 
-    VAS.VAS_030_BouncedAPPaymentWidget.prototype.dispose = function () {
-        this.disposeComponent();
+    /**
+     * Disposes widget.
+     */
+    VAS.VAS_030_BouncedAPPaymentWidget.prototype.dispose =
+        function () {
+            this.disposeComponent();
 
-        if (this.frame && this.frame.dispose) {
-            this.frame.dispose();
-        }
+            if (
+                this.frame &&
+                this.frame.dispose
+            ) {
+                this.frame.dispose();
+            }
 
-        this.frame = null;
-    };
+            this.frame = null;
+        };
 
 })(VAS, jQuery);

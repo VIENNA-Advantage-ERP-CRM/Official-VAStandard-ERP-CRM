@@ -117,8 +117,12 @@ namespace VAS.Controllers
                     " + filteredPaymentCte + @"
                     SELECT p.C_Payment_ID,
                     p.DateAcct AS PaymentDate,
+                    p.DocumentNo AS DocumentNo,
                     bp.Name AS VendorName,
                     pm.VA009_Name AS PaymentMethodName,
+                    ba.Name AS BankAccountName,
+                    ba.AccountNo AS BankAccountNo,
+                    bnk.Name AS BankName,
                     COALESCE(MAX(inv.DocumentNo), MAX(ord.DocumentNo), p.DocumentNo) AS ReferenceNo,
                     CASE WHEN MAX(inv.DocumentNo) IS NOT NULL OR MAX(ord.DocumentNo) IS NOT NULL THEN 'Y' ELSE 'N' END AS HasBusinessRef,
                     p.DocStatus,
@@ -140,6 +144,8 @@ namespace VAS.Controllers
                     INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=p.AD_Client_ID)
                     LEFT OUTER JOIN C_BPartner bp ON (p.C_BPartner_ID=bp.C_BPartner_ID)
                     LEFT OUTER JOIN VA009_PaymentMethod pm ON (p.VA009_PaymentMethod_ID=pm.VA009_PaymentMethod_ID)
+                    LEFT OUTER JOIN C_BankAccount ba ON (p.C_BankAccount_ID=ba.C_BankAccount_ID)
+                    LEFT OUTER JOIN C_Bank bnk ON (ba.C_Bank_ID=bnk.C_Bank_ID)
                     LEFT OUTER JOIN C_AllocationLine al ON (p.C_Payment_ID=al.C_Payment_ID)
                     LEFT OUTER JOIN C_Invoice inv ON (al.C_Invoice_ID=inv.C_Invoice_ID)
                     LEFT OUTER JOIN C_Order ord ON (inv.C_Order_ID=ord.C_Order_ID)
@@ -157,6 +163,9 @@ namespace VAS.Controllers
                     p.DateAcct,
                     bp.Name,
                     pm.VA009_Name,
+                    ba.Name,
+                    ba.AccountNo,
+                    bnk.Name,
                     p.DocumentNo,
                     p.DocStatus,
                     p.IsReconciled,
@@ -204,8 +213,13 @@ namespace VAS.Controllers
             {
                 paymentId = Util.GetValueOfInt(dr["C_Payment_ID"]),
                 paymentDate = FormatDate(Util.GetValueOfDateTime(dr["PaymentDate"])),
+                documentNo = Util.GetValueOfString(dr["DocumentNo"]),
+                value = Util.GetValueOfString(dr["DocumentNo"]),
                 vendorName = Util.GetValueOfString(dr["VendorName"]),
                 paymentMethodName = GetPaymentMethodName(ctx, Util.GetValueOfString(dr["PaymentMethodName"])),
+                bankAccountName = Util.GetValueOfString(dr["BankAccountName"]),
+                bankAccountNo = Util.GetValueOfString(dr["BankAccountNo"]),
+                bankName = Util.GetValueOfString(dr["BankName"]),
                 referenceNo = referenceNo,
                 docStatus = Util.GetValueOfString(dr["DocStatus"]),
                 statusType = statusType,

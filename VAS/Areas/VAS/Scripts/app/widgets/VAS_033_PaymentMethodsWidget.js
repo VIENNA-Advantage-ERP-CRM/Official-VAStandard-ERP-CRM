@@ -27,9 +27,17 @@
         var $card;
         var $body;
         var $foot;
+        var $pager;
+        var $pagerPrev;
+        var $pagerNext;
+        var $pagerText;
         var $busy;
         var $state;
         var isDisposed = false;
+        var methodsData = [];
+        var pageNo = 1;
+        var pageSize = 4;
+        var totalPages = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -54,6 +62,13 @@
             );
             var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_033_MessagePaymentMethods', 'Payment methods'));
 
+            $pager = $('<div class="vas-payment-methods-pager">');
+            $pagerPrev = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">‹</button>');
+            $pagerText = $('<span class="vas-payment-methods-page-text">');
+            $pagerNext = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">›</button>');
+
+            $pager.append($pagerPrev).append($pagerText).append($pagerNext);
+
             $iconBox.append($icon);
             $head.append($iconBox).append($title);
 
@@ -63,12 +78,30 @@
           
             var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'Upi is cheapest - shift small payments where possible'));
 
-            $foot.append($whyText);
+            $foot.append($whyText).append($pager);
             $busy = $('<div class="vas-payment-methods-busy">').text(lbl('VAS_033_MessageLoading', 'Loading'));
             $state = $('<div class="vas-payment-methods-state-message">');
 
             $card.append($head).append($body).append($foot).append($busy).append($state);
             $root.empty().append($card);
+
+            $pagerPrev.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                renderPage();
+            });
+
+            $pagerNext.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                renderPage();
+            });
         }
 
         function loadData() {
@@ -122,30 +155,84 @@
         }
 
         function renderData(data) {
-            var methods = $.isArray(data.methods)
+            methodsData = $.isArray(data.methods)
                 ? $.grep(data.methods, function (method) {
                     return method != null;
                 })
                 : [];
 
-            if (methods.length === 0) {
+            if (methodsData.length === 0) {
                 setNoData();
                 return;
+            }
+
+            pageNo = 1;
+            totalPages = Math.ceil(methodsData.length / pageSize);
+            renderPage();
+        }
+
+        function renderPage() {
+            if (!methodsData || methodsData.length === 0) {
+                setNoData();
+                return;
+            }
+
+            totalPages = Math.max(1, Math.ceil(methodsData.length / pageSize));
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
             }
 
             showState(false, '');
             $body.empty();
             $foot.show();
 
-            for (var i = 0; i < methods.length; i++) {
-                $body.append(createMethodRow(methods[i]));
+            var startIndex = (pageNo - 1) * pageSize;
+            var pageItems = methodsData.slice(startIndex, startIndex + pageSize);
+
+            for (var i = 0; i < pageItems.length; i++) {
+                $body.append(createMethodRow(pageItems[i]));
             }
+
+            updatePager();
         }
 
+        function updatePager() {
+            if (!$pager) {
+                return;
+            }
+
+            if ($pagerText) {
+                if (totalPages > 1) {
+                    $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
+                }
+                else {
+                    $pagerText.text('');
+                }
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($pagerNext) {
+                $pagerNext.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
+            }
+        }
 
         function createMethodRow(method) {
             var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
             var percentage = Number(method.percentage || 0);
+            var amountText = formatCurrencyAmount(
+                method.paymentAmount,
+                method.currencySymbol || method.symbol,
+                method.currencyISO,
+                method.stdPrecision
+            );
 
             if (isNaN(percentage)) {
                 percentage = 0;
@@ -159,22 +246,27 @@
             var $top = $('<div class="vas-payment-methods-row-top">');
             var $name = $('<span class="vas-payment-methods-name">').text(methodName);
             var $metrics = $('<span class="vas-payment-methods-metrics">');
-            var $percent = $('<span class="vas-payment-methods-percent">').text(formatPercentage(percentage));
-            var $amount = $('<span class="vas-payment-methods-amount">').text(formatCurrencyAmount(
-                method.paymentAmount,
-                method.currencySymbol || method.symbol,
-                method.currencyISO,
-                method.stdPrecision
-            ));
-            var $track = $('<div class="vas-payment-methods-track">');
+            var percentText = formatPercentage(percentage);
+            var $percent = $('<span class="vas-payment-methods-percent">').text(percentText);
+            var $amount = $('<span class="vas-payment-methods-amount">').text(amountText);
+            var tooltipText = methodName + ' | ' + percentText + ' | ' + amountText;
+            var $track = $('<div class="vas-payment-methods-track">').attr({
+                role: 'progressbar',
+                tabindex: '0',
+                'aria-label': tooltipText,
+                'aria-valuemin': 0,
+                'aria-valuemax': 100,
+                'aria-valuenow': percentage
+            });
             var $fill = $('<div class="vas-payment-methods-fill">').addClass(getMethodClass(methodName));
+            var $tooltip = $('<div class="vas-payment-methods-tooltip">').text(tooltipText);
 
             $fill.css('width', percentage + '%');
 
             $metrics.append($percent).append($amount);
             $top.append($name).append($metrics);
             $track.append($fill);
-            $row.append($top).append($track);
+            $row.append($top).append($track).append($tooltip);
 
             return $row;
         }
@@ -271,6 +363,10 @@
             if ($body) {
                 $body.toggle(!show);
             }
+
+            if ($pager) {
+                $pager.toggle(!show);
+            }
         }
 
         function setNoData() {
@@ -291,8 +387,13 @@
             $card = null;
             $body = null;
             $foot = null;
+            $pager = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
             $busy = null;
             $state = null;
+            methodsData = [];
         };
     };
 

@@ -1,6 +1,7 @@
 ﻿/**
  * Recent payments
- * Purpose - Shows the latest outgoing AP payments with vendor, payment method, invoice/order reference, status, and amount.
+ * Purpose - Shows the latest outgoing AP payments with vendor, document number, payment method,
+ *           bank account, status, and amount. Clicking a row opens a payment detail popup.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *   Current Text                         | Message Key
@@ -8,10 +9,11 @@
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
  *  2  | Date                                 | VAS_032_MessageDate
  *  3  | Vendor                               | VAS_032_MessageVendor
- *  4  | Method                               | VAS_032_MessageMethod
- *  5  | Ref                                  | VAS_032_MessageRef
- *  6  | Status                               | VAS_032_MessageStatus
- *  7  | Amount                               | VAS_032_MessageAmount
+ *  4  | Value (Document Number)              | VAS_032_MessageValueDocumentNumber
+ *  5  | Method                               | VAS_032_MessageMethod
+ *  6  | Bank Account Name                    | VAS_032_MessageBankAccountName
+ *  7  | Status                               | VAS_032_MessageStatus
+ *  8  | Amount                               | VAS_032_MessageAmount
  *  8  | Loading                              | VAS_032_MessageLoading
  *  9  | No Data                              | VAS_032_MessageNoData
  * ─────────────────────────────────────────────────────────────────────
@@ -39,6 +41,10 @@
         var $pagerText;
         var $busy;
         var $state;
+        var $dialog;
+        var $dialogTitle;
+        var $dialogSub;
+        var $dialogGrid;
 
         var isDisposed = false;
         var paymentsData = [];
@@ -49,6 +55,15 @@
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
             return text && text !== '[' + key + ']' ? text : fallback;
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         this.Initalize = function () {
@@ -89,6 +104,7 @@
 
             $card.append($head).append($tableWrap).append($busy).append($state);
             $root.empty().append($card);
+            createDialog();
 
             $pagerPrev.on('click', function () {
                 if (pageNo <= 1) {
@@ -210,9 +226,10 @@
 
             $headerRow
                 .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Date')))
+                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Value')))
                 .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
                 .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
-                .append($('<th class="vas-recent-ap-payments-ref">').text(lbl('VAS_032_MessageRef', 'Ref')))
+                .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name')))
                 .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_032_MessageStatus', 'Status')))
                 .append($('<th class="vas-recent-ap-payments-amount">').text(lbl('VAS_032_MessageAmount', 'Amount')));
 
@@ -253,27 +270,46 @@
         }
 
         function createPaymentRow(payment) {
-            var $row = $('<tr>');
+            var $row = $('<tr class="vas-recent-ap-payments-row" tabindex="0">');
 
-            var statusClass = getStatusClass(payment.statusType);
             var statusText = payment.statusName || getStatusText(payment.statusType);
+            var statusClass = getStatusClass(payment.statusType, statusText);
+            var documentNo = getDocumentNo(payment);
+            var bankAccountText = getBankAccountText(payment);
+            var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
+            var paymentMethodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
+            var amountText = formatCurrencyAmount(
+                payment.amount,
+                payment.currencySymbol,
+                payment.currencyISO,
+                payment.stdPrecision
+            );
 
             $row
                 .append($('<td class="vas-recent-ap-payments-date">')
                     .append($('<span class="vas-recent-ap-payments-cell-text">')
+                        .attr('title', formatDate(payment.paymentDate))
                         .text(formatDate(payment.paymentDate))))
+
+                .append($('<td class="vas-recent-ap-payments-value">')
+                    .append($('<span class="vas-recent-ap-payments-cell-text">')
+                        .attr('title', documentNo)
+                        .text(documentNo)))
 
                 .append($('<td class="vas-recent-ap-payments-vendor">')
                     .append($('<span class="vas-recent-ap-payments-cell-text">')
-                        .text(payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
+                        .attr('title', vendorName)
+                        .text(vendorName)))
 
                 .append($('<td class="vas-recent-ap-payments-method-col">')
                     .append($('<span class="vas-recent-ap-payments-method">')
-                        .text(payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified'))))
+                        .attr('title', paymentMethodName)
+                        .text(paymentMethodName)))
 
-                .append($('<td class="vas-recent-ap-payments-ref">')
+                .append($('<td class="vas-recent-ap-payments-bank-account">')
                     .append($('<span class="vas-recent-ap-payments-cell-text">')
-                        .text(payment.referenceNo || '')))
+                        .attr('title', bankAccountText)
+                        .text(bankAccountText)))
 
                 .append($('<td class="vas-recent-ap-payments-status-col">')
                     .append($('<span class="vas-recent-ap-payments-status">')
@@ -282,26 +318,231 @@
 
                 .append($('<td class="vas-recent-ap-payments-amount">')
                     .append($('<span class="vas-recent-ap-payments-cell-text">')
-                        .text(formatCurrencyAmount(
-                            payment.amount,
-                            payment.currencySymbol,
-                            payment.currencyISO,
-                            payment.stdPrecision
-                        ))));
+                        .attr('title', amountText)
+                        .text(amountText)));
+
+            $row.on('click', function () {
+                openDialog(payment);
+            });
+
+            $row.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openDialog(payment);
+                }
+            });
 
             return $row;
         }
 
-        function getStatusClass(statusType) {
-            if (statusType === 'bounced') {
+        function getDocumentNo(payment) {
+            return payment.value || payment.documentNo || payment.referenceNo || '';
+        }
+
+        function last4(accountNo) {
+            if (!accountNo) {
+                return '';
+            }
+
+            var text = String(accountNo).trim();
+            return text.length > 4 ? text.slice(-4) : text;
+        }
+
+        function getBankAccountText(payment) {
+            var accountName = String(payment.bankAccountName || '').trim();
+            var bankName = String(payment.bankName || '').trim();
+            var accountTail = last4(payment.bankAccountNo);
+
+            if (accountName) {
+                return accountName;
+            }
+
+            if (bankName) {
+                return bankName;
+            }
+
+            return accountTail ? '****' + accountTail : '';
+        }
+
+        function fieldHtml(label, valueHtml, extraClass, title) {
+            var cls = 'vas-recent-ap-payments-dialog-field' + (extraClass ? ' ' + extraClass : '');
+            var titleAttr = title ? ' title="' + escapeHtml(title) + '"' : '';
+
+            return '<div class="' + cls + '">' +
+                '<div class="vas-recent-ap-payments-dialog-label">' + escapeHtml(label) + '</div>' +
+                '<div class="vas-recent-ap-payments-dialog-value"' + titleAttr + '>' + valueHtml + '</div>' +
+                '</div>';
+        }
+
+        function openDialog(payment) {
+            if (!$dialog || !payment) {
+                return;
+            }
+
+            var documentNo = getDocumentNo(payment);
+            var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
+            var methodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
+            var bankAccountText = getBankAccountText(payment);
+            var statusText = payment.statusName || getStatusText(payment.statusType);
+            var statusClass = getStatusClass(payment.statusType, statusText);
+            var currencyText = payment.currencyISO || payment.currencySymbol || '';
+            var amountText = formatCurrencyAmount(
+                payment.amount,
+                payment.currencySymbol,
+                payment.currencyISO,
+                payment.stdPrecision
+            );
+
+            if ($dialogTitle) {
+                $dialogTitle.text(lbl('VAS_032_MessagePayment', 'Payment') + (documentNo ? ' ' + documentNo : ''));
+            }
+
+            if ($dialogSub) {
+                $dialogSub.text(vendorName);
+            }
+
+            var gridHtml =
+                fieldHtml(lbl('VAS_032_MessagePaymentDate', 'Payment date'), escapeHtml(formatDate(payment.paymentDate))) +
+                fieldHtml(lbl('VAS_032_MessageValueDocumentNumber', 'Value (Document Number)'), '<span class="vas-recent-ap-payments-dialog-mono">' + escapeHtml(documentNo) + '</span>', null, documentNo) +
+                fieldHtml(lbl('VAS_032_MessageVendor', 'Vendor'), '<strong>' + escapeHtml(vendorName) + '</strong>', null, vendorName) +
+                fieldHtml(lbl('VAS_032_MessagePaymentMethod', 'Payment method'), escapeHtml(methodName), null, methodName) +
+                fieldHtml(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name'), escapeHtml(bankAccountText), null, bankAccountText) +
+                fieldHtml(lbl('VAS_032_MessageStatus', 'Status'), '<span class="vas-recent-ap-payments-status ' + statusClass + '">' + escapeHtml(statusText) + '</span>') +
+                fieldHtml(lbl('VAS_032_MessageAmount', 'Amount'), '<span class="vas-recent-ap-payments-dialog-amount">' + escapeHtml(amountText) + '</span>', 'vas-recent-ap-payments-dialog-amount-field', amountText);
+
+            if (currencyText) {
+                gridHtml += fieldHtml(lbl('VAS_032_MessageCurrency', 'Currency'), escapeHtml(currencyText));
+            }
+
+            if ($dialogGrid) {
+                $dialogGrid.html(gridHtml);
+            }
+
+            $dialog.show();
+            $('body').addClass('vas-recent-ap-payments-body-lock');
+        }
+
+        function closeDialog() {
+            if (!$dialog) {
+                return;
+            }
+
+            $dialog.hide();
+            $('body').removeClass('vas-recent-ap-payments-body-lock');
+
+            if ($dialogGrid) {
+                $dialogGrid.empty();
+            }
+        }
+
+        function createDialog() {
+            if ($dialog) {
+                return;
+            }
+
+            $dialog = $(
+                '<div class="vas-recent-ap-payments-dialog" style="display:none;" role="dialog" aria-modal="true">' +
+                '<div class="vas-recent-ap-payments-dialog-scrim"></div>' +
+                '<div class="vas-recent-ap-payments-dialog-card">' +
+                '<div class="vas-recent-ap-payments-dialog-header">' +
+                '<div class="vas-recent-ap-payments-dialog-htext">' +
+                '<span class="vas-recent-ap-payments-dialog-hicon">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                '<line x1="22" y1="2" x2="11" y2="13"></line>' +
+                '<polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>' +
+                '</svg>' +
+                '</span>' +
+                '<div class="vas-recent-ap-payments-dialog-title-group">' +
+                '<div class="vas-recent-ap-payments-dialog-title">' + escapeHtml(lbl('VAS_032_MessagePayment', 'Payment')) + '</div>' +
+                '<div class="vas-recent-ap-payments-dialog-sub"></div>' +
+                '</div>' +
+                '</div>' +
+                '<button type="button" class="vas-recent-ap-payments-dialog-close" aria-label="' + escapeHtml(lbl('VAS_Close', 'Close')) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+                '</button>' +
+                '</div>' +
+                '<div class="vas-recent-ap-payments-dialog-body">' +
+                '<div class="vas-recent-ap-payments-dialog-section-label">' + escapeHtml(lbl('VAS_032_MessagePaymentSummary', 'Payment summary')) + '</div>' +
+                '<div class="vas-recent-ap-payments-dialog-grid"></div>' +
+                '</div>' +
+                '</div>' +
+                '</div>'
+            );
+
+            $dialogTitle = $dialog.find('.vas-recent-ap-payments-dialog-title');
+            $dialogSub = $dialog.find('.vas-recent-ap-payments-dialog-sub');
+            $dialogGrid = $dialog.find('.vas-recent-ap-payments-dialog-grid');
+
+            $dialog.find('.vas-recent-ap-payments-dialog-close').on('click', function (e) {
+                e.stopPropagation();
+                closeDialog();
+            });
+
+            $dialog.find('.vas-recent-ap-payments-dialog-scrim').on('click', function () {
+                closeDialog();
+            });
+
+            $(document).on('keydown.vas-recent-ap-payments', function (e) {
+                if (e.key === 'Escape' && $dialog && $dialog.is(':visible')) {
+                    closeDialog();
+                }
+            });
+
+            $('body').append($dialog);
+        }
+
+        function getStatusClass(statusType, statusText) {
+            var rawStatus = ((statusType || '') + ' ' + (statusText || '')).toLowerCase();
+
+            if (rawStatus.indexOf('bounce') >= 0 ||
+                rawStatus.indexOf('fail') >= 0 ||
+                rawStatus.indexOf('reject') >= 0 ||
+                rawStatus.indexOf('cancel') >= 0 ||
+                rawStatus.indexOf('void') >= 0 ||
+                rawStatus.indexOf('error') >= 0 ||
+                rawStatus.indexOf('declin') >= 0 ||
+                rawStatus.indexOf('return') >= 0) {
                 return 'vas-recent-ap-payments-status-bounced';
             }
 
-            if (statusType === 'intransit') {
+            if (rawStatus.indexOf('pending') >= 0 ||
+                rawStatus.indexOf('wait') >= 0 ||
+                rawStatus.indexOf('queue') >= 0 ||
+                rawStatus.indexOf('submitted') >= 0 ||
+                rawStatus.indexOf('draft') >= 0 ||
+                rawStatus.indexOf('not approved') >= 0) {
+                return 'vas-recent-ap-payments-status-pending';
+            }
+
+            if (rawStatus.indexOf('transit') >= 0 ||
+                rawStatus.indexOf('process') >= 0 ||
+                rawStatus.indexOf('running') >= 0 ||
+                rawStatus.indexOf('progress') >= 0) {
                 return 'vas-recent-ap-payments-status-intransit';
             }
 
-            return 'vas-recent-ap-payments-status-cleared';
+            if (rawStatus.indexOf('review') >= 0 ||
+                rawStatus.indexOf('check') >= 0 ||
+                rawStatus.indexOf('verify') >= 0) {
+                return 'vas-recent-ap-payments-status-review';
+            }
+
+            if (rawStatus.indexOf('partial') >= 0) {
+                return 'vas-recent-ap-payments-status-partial';
+            }
+
+            if (rawStatus.indexOf('clear') >= 0 ||
+                rawStatus.indexOf('reconcile') >= 0 ||
+                rawStatus.indexOf('allocat') >= 0 ||
+                rawStatus.indexOf('complete') >= 0 ||
+                rawStatus.indexOf('paid') >= 0 ||
+                rawStatus.indexOf('success') >= 0 ||
+                rawStatus.indexOf('approve') >= 0 ||
+                rawStatus.indexOf('release') >= 0) {
+                return 'vas-recent-ap-payments-status-cleared';
+            }
+
+            return 'vas-recent-ap-payments-status-neutral';
         }
 
         function getStatusText(statusType) {
@@ -400,6 +641,13 @@
         this.disposeComponent = function () {
             isDisposed = true;
             $root.remove();
+            closeDialog();
+            $(document).off('keydown.vas-recent-ap-payments');
+
+            if ($dialog) {
+                $dialog.remove();
+            }
+
             $card = null;
             $banner = null;
             $bannerTitle = null;
@@ -411,6 +659,10 @@
             $pagerText = null;
             $busy = null;
             $state = null;
+            $dialog = null;
+            $dialogTitle = null;
+            $dialogSub = null;
+            $dialogGrid = null;
         };
     };
 

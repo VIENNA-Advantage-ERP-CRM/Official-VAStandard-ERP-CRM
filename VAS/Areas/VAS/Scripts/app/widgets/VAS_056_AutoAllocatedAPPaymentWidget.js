@@ -361,7 +361,7 @@
                 '<div class="vas-aa-dialog-scrim"></div>' +
                 '<div class="vas-aa-dialog-card">' +
                 '<div class="vas-aa-dialog-header">' +
-                '<div class="vas-aa-dialog-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>' +
+                '<div class="vas-aa-dialog-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>' +
                 '<div class="vas-aa-dialog-title-group">' +
                 '<div class="vas-aa-dialog-title">' + escapeHtml(lbl("VAS_056_PaymentAllocation", "Payment allocation")) + '</div>' +
                 '<div class="vas-aa-dialog-subtitle">' + escapeHtml(lbl("VAS_056_AllocatedVsUnallocated", "Allocated vs unallocated payments in the last 30 days")) + '</div>' +
@@ -435,7 +435,7 @@
                 '<div class="vas-aa-card vas-aap-card" role="button" tabindex="0">' +
                 '<div class="vas-aa-head">' +
                 '<div class="vas-aa-head-left">' +
-                '<div class="vas-aa-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>' +
+                '<div class="vas-aa-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>' +
                 '<span class="vas-aa-label">' + escapeHtml(lbl("VAS_056_AutoAllocatedAPPayments", "Auto-allocated AP")) + '</span>' +
                 '</div>' +
                 '<button type="button" class="vas-aa-view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg><span>' + escapeHtml(lbl("VAS_View", "View")) + '</span></button>' +

@@ -240,7 +240,6 @@
 .vas-upcoming-ap-runs-amount {
     flex: 0 1 auto;
     min-width: 0;
-    max-width: 42%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -250,6 +249,46 @@
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
+}
+
+.vas-upcoming-ap-runs-actions {
+    flex: 0 0 auto;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625em;
+    max-width: 52%;
+}
+
+.vas-upcoming-ap-runs-pay-btn {
+    flex: 0 0 auto;
+    height: 2em;
+    min-width: 4.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25em;
+    padding: 0 0.75em;
+    border: 0.0625em solid #bfe4ff;
+    border-radius: 999em;
+    background: rgba(255, 255, 255, 0.78);
+    color: #0078e8;
+    font-family: inherit;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+    .vas-upcoming-ap-runs-pay-btn:hover {
+        background: #eaf8ff;
+        border-color: #9ed1ff;
+    }
+
+.vas-upcoming-ap-runs-pay-arrow {
+    font-size: 1.25em;
+    line-height: 1;
 }
 
 .vas-upcoming-ap-runs-state {
@@ -286,6 +325,257 @@
     .vas-upcoming-ap-runs-busy.is-visible,
     .vas-upcoming-ap-runs-state-message.is-visible {
         display: flex;
+    }
+
+.vas-upcoming-ap-runs-body-lock {
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-pay-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+}
+
+    .vas-upcoming-ap-runs-pay-dialog,
+    .vas-upcoming-ap-runs-pay-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-upcoming-ap-runs-pay-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-upcoming-ap-runs-pay-card {
+    position: relative;
+    width: min(90em, 100%);
+    height: min(46em, 100%);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border-radius: 1em;
+    background: #ffffff;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    color: #102c3f;
+}
+
+.vas-upcoming-ap-runs-pay-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1.25em 2em;
+    border-bottom: 0.0625em solid #edf2f6;
+}
+
+.vas-upcoming-ap-runs-pay-icon {
+    flex: 0 0 auto;
+    width: 2.75em;
+    height: 2.75em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0.0625em solid #bfe4ff;
+    border-radius: 0.625em;
+    background: #eef8ff;
+    color: #0083da;
+}
+
+    .vas-upcoming-ap-runs-pay-icon svg {
+        width: 1.25em;
+        height: 1.25em;
+        stroke: currentColor;
+    }
+
+.vas-upcoming-ap-runs-pay-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-upcoming-ap-runs-pay-title {
+    color: #141414;
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.vas-upcoming-ap-runs-pay-sub {
+    margin-top: 0.25em;
+    color: #717182;
+    font-size: 1em;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-upcoming-ap-runs-pay-close {
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #141414;
+    font-size: 1.75em;
+    line-height: 1;
+    cursor: pointer;
+}
+
+    .vas-upcoming-ap-runs-pay-close:hover {
+        background: #f3f7fb;
+    }
+
+.vas-upcoming-ap-runs-pay-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.25em 2em 2em;
+}
+
+.vas-upcoming-ap-runs-pay-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.68);
+    color: #60748a;
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+    .vas-upcoming-ap-runs-pay-busy.is-visible {
+        display: flex;
+    }
+
+.vas-upcoming-ap-runs-pay-notice {
+    margin-bottom: 1.25em;
+    padding: 1em 1.25em;
+    border: 0.0625em solid #bfe4ff;
+    border-radius: 0.75em;
+    background: #eaf4fe;
+    color: #102c3f;
+    font-size: 1em;
+    line-height: 1.35;
+}
+
+    .vas-upcoming-ap-runs-pay-notice strong {
+        font-weight: 800;
+    }
+
+    .vas-upcoming-ap-runs-pay-notice.vas-upcoming-ap-runs-pay-error {
+        border-color: #f4b6b6;
+        background: #ffe1e1;
+        color: #a33f3f;
+    }
+
+.vas-upcoming-ap-runs-pay-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.75em 2.5em;
+}
+
+.vas-upcoming-ap-runs-field {
+    min-width: 0;
+    border-bottom: 0.0625em solid #d7dce2;
+    padding-bottom: 0.875em;
+}
+
+.vas-upcoming-ap-runs-field-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    color: #708399;
+    font-size: 1em;
+    line-height: 1.2;
+}
+
+    .vas-upcoming-ap-runs-field-label span {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25em 0.625em;
+        border-radius: 0.375em;
+        background: #c7efd9;
+        color: #087349;
+        font-size: 0.8125em;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+    }
+
+.vas-upcoming-ap-runs-field-value {
+    min-width: 0;
+    margin-top: 1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #102c3f;
+    font-size: 1.125em;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.vas-upcoming-ap-runs-pay-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 1.25em 2em;
+    border-top: 0.0625em solid #edf2f6;
+    background: #ffffff;
+    color: #708399;
+    font-size: 1em;
+}
+
+.vas-upcoming-ap-runs-pay-footer-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75em;
+    flex: 0 0 auto;
+}
+
+.vas-upcoming-ap-runs-pay-cancel,
+.vas-upcoming-ap-runs-pay-save {
+    min-width: 7em;
+    height: 3em;
+    padding: 0 1.5em;
+    border-radius: 999em;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.vas-upcoming-ap-runs-pay-cancel {
+    border: 0.0625em solid #bfe4ff;
+    background: #ffffff;
+    color: #0078e8;
+}
+
+.vas-upcoming-ap-runs-pay-save {
+    border: 0.0625em solid #247ff5;
+    background: #247ff5;
+    color: #ffffff;
+}
+
+    .vas-upcoming-ap-runs-pay-save:disabled {
+        opacity: 0.62;
+        cursor: default;
     }
 
 .vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-card {
@@ -347,7 +637,17 @@
     }
 
     .vas-upcoming-ap-runs-amount {
-        max-width: 40%;
+        max-width: 100%;
+    }
+
+    .vas-upcoming-ap-runs-actions {
+        max-width: 48%;
+        gap: 0.4375em;
+    }
+
+    .vas-upcoming-ap-runs-pay-btn {
+        min-width: 3.75em;
+        padding: 0 0.5em;
     }
 }
 
@@ -395,7 +695,18 @@
     }
 
     .vas-upcoming-ap-runs-amount {
-        max-width: 38%;
+        max-width: 100%;
+    }
+
+    .vas-upcoming-ap-runs-pay-btn {
+        height: 1.75em;
+        min-width: 3.375em;
+        font-size: 0.625em;
+    }
+
+    .vas-upcoming-ap-runs-actions {
+        max-width: 48%;
+        gap: 0.3125em;
     }
 
     .vas-upcoming-ap-runs-page-text {
@@ -410,5 +721,44 @@
 
     .vas-upcoming-ap-runs-pager {
         gap: 0.375em;
+    }
+}
+
+@media (max-width: 48em) {
+    .vas-upcoming-ap-runs-pay-dialog {
+        padding: 0;
+    }
+
+    .vas-upcoming-ap-runs-pay-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-upcoming-ap-runs-pay-header,
+    .vas-upcoming-ap-runs-pay-body,
+    .vas-upcoming-ap-runs-pay-footer {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+}
+
+@media (max-width: 36em) {
+    .vas-upcoming-ap-runs-pay-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25em;
+    }
+
+    .vas-upcoming-ap-runs-pay-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .vas-upcoming-ap-runs-pay-footer-actions {
+        justify-content: flex-end;
+    }
+
+    .vas-upcoming-ap-runs-pay-title {
+        font-size: 1.25em;
     }
 }

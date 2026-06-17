@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -129,6 +130,129 @@ namespace VAS.Controllers
                     currencySymbol = currencySymbol,
                     symbol = currencySymbol,
                     precision = precision,
+                    dateFrom = dateFrom,
+                    dateTo = dateTo
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    error = true,
+                    errorText = ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetScheduledAPPaymentRows(int pageNo = 1, int pageSize = 10)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new
+                {
+                    error = true,
+                    errorText = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (ctx == null)
+            {
+                return Json(new
+                {
+                    error = true,
+                    errorText = "Session Expired"
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            if (pageNo <= 0)
+            {
+                pageNo = 1;
+            }
+
+            if (pageSize <= 0)
+            {
+                pageSize = 10;
+            }
+
+            IDataReader dr = null;
+
+            try
+            {
+                SqlQueryData queryData = BuildScheduledAPPaymentRowsSql(ctx, pageNo, pageSize);
+                dr = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
+
+                List<object> rows = new List<object>();
+                int totalRecords = 0;
+                int vendorCount = 0;
+                int paymentMethodCount = 0;
+                string dateFrom = string.Empty;
+                string dateTo = string.Empty;
+
+                while (dr != null && dr.Read())
+                {
+                    totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
+                    vendorCount = Util.GetValueOfInt(dr["VendorCount"]);
+                    paymentMethodCount = Util.GetValueOfInt(dr["PaymentMethodCount"]);
+
+                    if (string.IsNullOrEmpty(dateFrom) && dr["DateFrom"] != DBNull.Value)
+                    {
+                        dateFrom = FormatDate(Util.GetValueOfDateTime(dr["DateFrom"]));
+                    }
+
+                    if (string.IsNullOrEmpty(dateTo) && dr["DateTo"] != DBNull.Value)
+                    {
+                        dateTo = FormatDate(Util.GetValueOfDateTime(dr["DateTo"]));
+                    }
+
+                    DateTime? invoiceDate = Util.GetValueOfDateTime(dr["InvoiceDate"]);
+                    DateTime? dueDate = Util.GetValueOfDateTime(dr["DueDate"]);
+                    string paymentMethodName = Util.GetValueOfString(dr["PaymentMethodName"]);
+
+                    if (string.IsNullOrEmpty(paymentMethodName))
+                    {
+                        paymentMethodName = GetMsg(ctx, "VAS_029_MessageNotSpecified", "Not Specified");
+                    }
+
+                    rows.Add(new
+                    {
+                        invoiceId = Util.GetValueOfInt(dr["C_Invoice_ID"]),
+                        documentNo = Util.GetValueOfString(dr["DocumentNo"]),
+                        invoiceDate = invoiceDate.HasValue
+                            ? invoiceDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                            : string.Empty,
+                        dueDate = dueDate.HasValue
+                            ? dueDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                            : string.Empty,
+                        vendor = Util.GetValueOfString(dr["VendorName"]),
+                        invoiceCurrency = Util.GetValueOfString(dr["InvoiceCurrency"]),
+                        invoiceCurrencySymbol = Util.GetValueOfString(dr["InvoiceCurrencySymbol"]),
+                        amount = Util.GetValueOfDecimal(dr["DueAmount"]),
+                        precision = Util.GetValueOfInt(dr["StdPrecision"]),
+                        paymentMethodName = paymentMethodName
+                    });
+                }
+
+                return Json(new
+                {
+                    rows = rows,
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+                    totalRecords = totalRecords,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize)),
+                    vendorCount = vendorCount,
+                    paymentMethodCount = paymentMethodCount,
                     dateFrom = dateFrom,
                     dateTo = dateTo
                 }, JsonRequestBehavior.AllowGet);
@@ -346,7 +470,371 @@ ORDER BY ScheduledAmount DESC";
                 Parameters = parameters
             };
         }
+        private SqlQueryData BuildScheduledAPPaymentRowsSql(
+    Ctx ctx,
+    int pageNo,
+    int pageSize
+)
+        {
+            bool hasPaymentMethod =
+                HasInvoicePaymentMethodColumn();
 
+            bool hasPaymentMethodVA009Name =
+                hasPaymentMethod &&
+                HasPaymentMethodVA009NameColumn();
+
+            bool hasPaymentMethodName =
+                hasPaymentMethod &&
+                HasPaymentMethodNameColumn();
+
+            bool hasPaymentMethodValue =
+                hasPaymentMethod &&
+                HasPaymentMethodValueColumn();
+
+            string paymentMethodDisplayColumn =
+                string.Empty;
+
+            string paymentMethodDisplayCondition =
+                string.Empty;
+
+            if (hasPaymentMethodVA009Name)
+            {
+                paymentMethodDisplayColumn =
+                    GetTextSql(
+                        "PaymentMethod.VA009_Name"
+                    );
+
+                paymentMethodDisplayCondition =
+                    "PaymentMethod.VA009_Name IS NOT NULL";
+            }
+            else if (hasPaymentMethodName)
+            {
+                paymentMethodDisplayColumn =
+                    GetTextSql(
+                        "PaymentMethod.Name"
+                    );
+
+                paymentMethodDisplayCondition =
+                    "PaymentMethod.Name IS NOT NULL";
+            }
+            else if (hasPaymentMethodValue)
+            {
+                paymentMethodDisplayColumn =
+                    GetTextSql(
+                        "PaymentMethod.Value"
+                    );
+
+                paymentMethodDisplayCondition =
+                    "PaymentMethod.Value IS NOT NULL";
+            }
+
+            string invoicePaymentRuleSql =
+                GetTextSql(
+                    "Invoice.PaymentRule"
+                );
+
+            string emptyTextSql =
+                GetEmptyTextSql();
+
+            string paymentMethodIdSelect =
+                hasPaymentMethod
+                    ? "COALESCE(Invoice.VA009_PaymentMethod_ID, 0)"
+                    : "0";
+
+            string paymentMethodNameSelect;
+
+            if (
+                hasPaymentMethod &&
+                !string.IsNullOrEmpty(
+                    paymentMethodDisplayColumn
+                )
+            )
+            {
+                paymentMethodNameSelect = @"
+CASE
+WHEN " + paymentMethodDisplayCondition + @"
+THEN " + paymentMethodDisplayColumn + @"
+WHEN Invoice.PaymentRule IS NOT NULL
+THEN " + invoicePaymentRuleSql + @"
+ELSE " + emptyTextSql + @"
+END";
+            }
+            else
+            {
+                paymentMethodNameSelect = @"
+CASE
+WHEN Invoice.PaymentRule IS NOT NULL
+THEN " + invoicePaymentRuleSql + @"
+ELSE " + emptyTextSql + @"
+END";
+            }
+
+            string paymentMethodJoin =
+                hasPaymentMethod &&
+                !string.IsNullOrEmpty(
+                    paymentMethodDisplayColumn
+                )
+                    ? @"
+LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
+(
+Invoice.VA009_PaymentMethod_ID =
+PaymentMethod.VA009_PaymentMethod_ID
+)"
+                    : string.Empty;
+
+            /*
+             * Parameter خاص بجدول WeekRange.
+             * الاسم مختلف حتى لا يحدث ORA-01008 في Oracle.
+             */
+            string weekRangeSql = @"
+WeekRange AS
+(
+SELECT
+" + GetWeekStartSql() + @" AS DateFrom,
+" + GetWeekEndExclusiveSql() + @" AS DateToExclusive,
+" + GetWeekEndDisplaySql() + @" AS DateTo
+FROM AD_ClientInfo ClientInfo
+WHERE ClientInfo.IsActive = 'Y'
+AND ClientInfo.AD_Client_ID =
+@RowsWeekClientID
+)";
+
+            /*
+             * نفس شروط Invoice الموجودة في كويري الكارد.
+             */
+            string invoiceAccessSql = @"
+SELECT
+Invoice.C_Invoice_ID,
+Invoice.AD_Client_ID,
+Invoice.AD_Org_ID,
+Invoice.C_BPartner_ID,
+Invoice.C_Currency_ID,
+Invoice.DateAcct,
+Invoice.DateInvoiced,
+Invoice.DocumentNo,
+Invoice.C_ConversionType_ID,
+Invoice.IsReturnTrx,
+Invoice.PaymentRule"
+                + (
+                    hasPaymentMethod
+                        ? @",
+Invoice.VA009_PaymentMethod_ID"
+                        : string.Empty
+                ) + @"
+FROM C_Invoice Invoice
+WHERE Invoice.IsActive = 'Y'
+AND Invoice.AD_Client_ID =
+@RowsInvoiceClientID
+AND Invoice.IsSOTrx = 'N'
+AND Invoice.DocStatus IN ('CO', 'CL')";
+
+            invoiceAccessSql =
+                MRole.GetDefault(ctx).AddAccessSQL(
+                    invoiceAccessSql,
+                    "Invoice",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
+
+            string invoiceFilteredSql = @"
+InvoiceFiltered AS
+(
+" + invoiceAccessSql + @"
+)";
+
+            /*
+             * C_InvoicePaySchedule يبقى INNER JOIN لأنه الجدول الأساسي
+             * الذي يحدد السجلات المجدولة.
+             *
+             * BPartner وCurrency وPaymentMethod تكون LEFT OUTER JOIN
+             * حتى فقدان البيانات المرتبطة لا يحذف السجل.
+             */
+            string scheduledRowsDataSql = @"
+ScheduledRowsData AS
+(
+SELECT
+Invoice.C_Invoice_ID,
+" + GetTextSql(
+                "Invoice.DocumentNo"
+            ) + @" AS DocumentNo,
+
+Invoice.DateInvoiced AS InvoiceDate,
+InvoicePaySchedule.DueDate,
+
+" + GetTextSql(
+                "BPartner.Name"
+            ) + @" AS VendorName,
+
+" + GetTextSql(
+                "Currency.ISO_Code"
+            ) + @" AS InvoiceCurrency,
+
+CASE
+WHEN Currency.CurSymbol IS NOT NULL
+THEN " + GetTextSql(
+                "Currency.CurSymbol"
+            ) + @"
+ELSE " + GetTextSql(
+                "Currency.ISO_Code"
+            ) + @"
+END AS InvoiceCurrencySymbol,
+
+COALESCE(
+Currency.StdPrecision,
+2
+) AS StdPrecision,
+
+" + paymentMethodIdSelect + @" AS PaymentMethod_ID,
+
+" + paymentMethodNameSelect + @" AS PaymentMethodName,
+
+CASE
+WHEN COALESCE(
+Invoice.IsReturnTrx,
+'N'
+) = 'Y'
+THEN -COALESCE(
+InvoicePaySchedule.DueAmt,
+0
+)
+ELSE COALESCE(
+InvoicePaySchedule.DueAmt,
+0
+)
+END AS DueAmount,
+
+WeekRange.DateFrom,
+WeekRange.DateTo
+
+FROM InvoiceFiltered Invoice
+
+INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
+(
+Invoice.C_Invoice_ID =
+InvoicePaySchedule.C_Invoice_ID
+)
+
+INNER JOIN WeekRange WeekRange ON
+(
+InvoicePaySchedule.DueDate >=
+WeekRange.DateFrom
+AND InvoicePaySchedule.DueDate <
+WeekRange.DateToExclusive
+)
+
+LEFT OUTER JOIN C_BPartner BPartner ON
+(
+Invoice.C_BPartner_ID =
+BPartner.C_BPartner_ID
+)
+
+LEFT OUTER JOIN C_Currency Currency ON
+(
+Invoice.C_Currency_ID =
+Currency.C_Currency_ID
+)
+" + paymentMethodJoin + @"
+
+WHERE InvoicePaySchedule.IsActive = 'Y'
+AND COALESCE(
+InvoicePaySchedule.VA009_IsPaid,
+'N'
+) <> 'Y'
+AND COALESCE(
+InvoicePaySchedule.DueAmt,
+0
+) > 0
+)";
+
+            string rowsWithCountSql = @"
+RowsWithCount AS
+(
+SELECT
+ScheduledRowsData.*,
+COUNT(1) OVER () AS TotalRecords,
+COUNT(
+DISTINCT ScheduledRowsData.C_BPartner_ID
+) OVER () AS VendorCount,
+COUNT(
+DISTINCT ScheduledRowsData.PaymentMethod_ID
+) OVER () AS PaymentMethodCount
+FROM
+(
+SELECT
+ScheduledRowsData.*,
+Invoice.C_BPartner_ID
+FROM ScheduledRowsData ScheduledRowsData
+LEFT OUTER JOIN C_Invoice Invoice ON
+(
+ScheduledRowsData.C_Invoice_ID =
+Invoice.C_Invoice_ID
+)
+) ScheduledRowsData
+)";
+
+            int offset =
+                (pageNo - 1) * pageSize;
+
+            string sql = @"
+WITH
+" + weekRangeSql + @",
+" + invoiceFilteredSql + @",
+" + scheduledRowsDataSql + @",
+" + rowsWithCountSql + @"
+
+SELECT
+RowsWithCount.C_Invoice_ID,
+RowsWithCount.DocumentNo,
+RowsWithCount.InvoiceDate,
+RowsWithCount.DueDate,
+RowsWithCount.VendorName,
+RowsWithCount.InvoiceCurrency,
+RowsWithCount.InvoiceCurrencySymbol,
+RowsWithCount.StdPrecision,
+RowsWithCount.PaymentMethodName,
+RowsWithCount.DueAmount,
+RowsWithCount.DateFrom,
+RowsWithCount.DateTo,
+RowsWithCount.TotalRecords,
+RowsWithCount.VendorCount,
+RowsWithCount.PaymentMethodCount
+FROM RowsWithCount RowsWithCount
+ORDER BY
+RowsWithCount.DueDate ASC,
+RowsWithCount.DocumentNo ASC
+OFFSET @RowsOffset ROWS
+FETCH NEXT @RowsPageSize ROWS ONLY";
+
+            SqlParameter[] parameters =
+            {
+        new SqlParameter(
+            "@RowsWeekClientID",
+            ctx.GetAD_Client_ID()
+        ),
+
+        new SqlParameter(
+            "@RowsInvoiceClientID",
+            ctx.GetAD_Client_ID()
+        ),
+
+        new SqlParameter(
+            "@RowsOffset",
+            offset
+        ),
+
+        new SqlParameter(
+            "@RowsPageSize",
+            pageSize
+        )
+    };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
+        }
+       
         private string GetWeekStartSql()
         {
             if (DB.IsOracle())

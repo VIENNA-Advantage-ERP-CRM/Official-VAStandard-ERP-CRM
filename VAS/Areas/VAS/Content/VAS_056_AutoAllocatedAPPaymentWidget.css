@@ -1,0 +1,816 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Auto Allocated Widget — KPI/Summary glass card + drill-down dialog.
+ * Design source: design.md (Onfinity) + dashboard-widgets.md (tint-success KPI).
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` resolves to the widget's base font-size (16px on the card, 16px on the
+ * dialog). Container queries scale the card on small dashboard cells; media
+ * queries scale the dialog on small viewports.
+ * Namespaced vas-aa-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-aa-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    font-family: Roboto, sans-serif;
+}
+
+    .vas-aa-root,
+    .vas-aa-root * {
+        box-sizing: border-box;
+    }
+
+.vas-aa-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── KPI card (glass widget, tint-success) ────────────────────────── */
+
+.vas-aa-card {
+    font-size: 1em;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    background: linear-gradient(135deg, rgba(206, 238, 212, 0.78), rgba(255, 255, 255, 0.62));
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 1em 1em 1.125em;
+    overflow: hidden;
+    cursor: pointer;
+    transition: box-shadow 180ms ease;
+}
+
+    .vas-aa-card:hover {
+        box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
+    }
+
+    .vas-aa-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+.vas-aa-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-aa-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-aa-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0B6B45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-aa-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-aa-label {
+    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
+       Per project request the weight is Bold (700) instead of the spec's
+       Medium (500). */
+    font-size: 1.125em;
+    color: #141414;
+    font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-aa-view {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0.3125em 0.625em;
+    border-radius: 999em;
+    color: #0083DA;
+    font-size: 0.75em;
+    font-weight: 500;
+    font-family: inherit;
+    flex-shrink: 0;
+}
+
+    .vas-aa-view svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-aa-view:hover {
+        background: rgba(0, 131, 218, 0.08);
+        color: #0069AE;
+    }
+
+/* Big percentage — success green to match the tint. */
+.vas-aa-metric {
+    font-size: 2.5em;                 /* 40px design.md KPI value */
+    font-weight: 700;
+    color: #0B6B45;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Plain "Receipt Match to Invoice" detail line (no pill chrome). */
+.vas-aa-detail-text {
+    display: block;
+    align-self: flex-start;
+    max-width: 100%;
+    font-size: 0.75em;
+    color: #5F7283;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Responsive (widget cell) ─────────────────────────────────────── */
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-aa-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-aa-card { font-size: 0.6875em; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Drill-down modal dialog. Attached to <body>; uses fixed positioning.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-aa-body-lock {
+    overflow: hidden;
+}
+
+.vas-aa-dialog {
+    font-family: Roboto, sans-serif;
+    font-size: 1em;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-aa-dialog,
+    .vas-aa-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-aa-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-aa-dialog-card {
+    position: relative;
+    width: min(64em, 100%);           /* ~1024px on wide screens */
+    /* Fixed dialog height sized so 10 page rows + tabs + header + footer all
+       fit inside without forcing the body to show a scrollbar. The body still
+       has `overflow: auto` as a safety net but should rarely engage at the
+       default pageSize of 10. */
+    height: min(40em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header */
+.vas-aa-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.vas-aa-dialog-icon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    border-radius: 0.5em;
+    background: #E5F5EA;
+    border: 0.0625em solid #B6E1C2;
+    color: #0B6B45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-aa-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-aa-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-aa-dialog-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-aa-dialog-subtitle {
+    margin-top: 0.125em;
+    font-size: 0.8125em;
+    color: #748494;
+    line-height: 1.3;
+}
+
+.vas-aa-dialog-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    color: #5F7283;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-aa-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-aa-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+/* ── Tab bar: Allocated / Unallocated with count chips ───────────── */
+.vas-aa-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+    background: #FFFFFF;
+}
+
+.vas-aa-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0.875em 0.625em;
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #748494;
+}
+
+    .vas-aa-tab:hover { color: #102C3F; }
+
+    .vas-aa-tab.vas-aa-tab-active {
+        color: #102C3F;
+        font-weight: 700;
+    }
+
+        /* Active-tab underline rides on a pseudo-element so the row above
+           keeps its own divider line. */
+        .vas-aa-tab.vas-aa-tab-active::after {
+            content: "";
+            position: absolute;
+            left: 0.625em;
+            right: 0.625em;
+            bottom: -0.0625em;
+            height: 0.125em;
+            background: #102C3F;
+            border-radius: 0.125em;
+        }
+
+.vas-aa-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75em;
+    height: 1.5em;
+    padding: 0 0.5em;
+    border-radius: 999em;
+    background: #F3F7FB;
+    color: #5F7283;
+    font-size: 0.75em;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-aa-tab-active .vas-aa-tab-count {
+    background: #DFF1FF;
+    color: #0083DA;
+}
+
+/* Body / table */
+.vas-aa-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+.vas-aa-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.vas-aa-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+}
+
+    .vas-aa-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        background: #FFFFFF;
+        font-size: 0.8125em;
+        font-weight: 400;
+        color: #748494;
+        text-align: left;
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-aa-dialog-table thead th.vas-aa-th-amount {
+            text-align: right;
+        }
+
+        .vas-aa-dialog-table thead th.vas-aa-th-currency {
+            text-align: center;
+        }
+
+    .vas-aa-dialog-table tbody td {
+        /* Tight row padding so 10 rows + thead fit inside the fixed body
+           height without forcing a scrollbar. */
+        padding: 0.6875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.875em;
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vas-aa-dialog-table tbody tr:hover td {
+        background: #F8FBFE;
+    }
+
+/* Per-column widths — Currency before Amount (per spec). Customer flexes.
+   Order: Date | Receipt No | Customer | Bank account | Currency | Amount.
+   The Matched column was dropped — the active tab indicates the state. */
+.vas-aa-th-date,        .vas-aa-td-date        { width: 7.5em; }
+.vas-aa-th-doc,         .vas-aa-td-doc         { width: 8em; }
+.vas-aa-th-customer,    .vas-aa-td-customer    { width: 14em; }
+.vas-aa-th-bank,        .vas-aa-td-bank        { width: 13em; }
+.vas-aa-th-currency,    .vas-aa-td-currency    { width: 5.5em; text-align: center; }
+.vas-aa-th-amount,      .vas-aa-td-amount      { width: 10em; }
+
+.vas-aa-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-aa-td-date {
+    color: #748494;
+}
+
+.vas-aa-td-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    color: #5F7283;
+    font-size: 0.8125em;
+}
+
+.vas-aa-td-customer {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-aa-td-bank {
+    color: #5F7283;
+}
+
+.vas-aa-td-currency {
+    text-align: center;
+    color: #5F7283;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.vas-aa-td-amount {
+    text-align: right;
+    font-weight: 700;
+    color: #0B6B45;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* Inline currency symbol used inside the amount cell. */
+.vas-aa-cur-inline {
+    margin-inline-end: 0.2em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+/* Empty / loading states */
+.vas-aa-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+    background: #FFFFFF;
+}
+
+/* Footer: helper text (left) · compact pager (right). */
+.vas-aa-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-aa-pager-helper {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-aa-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-aa-pager-btn {
+    width: 2em;
+    height: 2em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-aa-pager-btn svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .vas-aa-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-aa-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-aa-pager-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+
+@media (max-width: 48em) {            /* ~768px tablet */
+    .vas-aa-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-aa-th-date,        .vas-aa-td-date        { width: 6.5em; }
+    .vas-aa-th-doc,         .vas-aa-td-doc         { width: 7em; }
+    .vas-aa-th-customer,    .vas-aa-td-customer    { width: 11em; }
+    .vas-aa-th-bank,        .vas-aa-td-bank        { width: 10em; }
+    .vas-aa-th-currency,    .vas-aa-td-currency    { width: 4.5em; }
+    .vas-aa-th-amount,      .vas-aa-td-amount      { width: 9em; }
+}
+
+@media (max-width: 36em) {            /* ~576px phone */
+    .vas-aa-dialog {
+        padding: 0;
+    }
+
+    .vas-aa-dialog-table thead th,
+    .vas-aa-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    .vas-aa-td-doc {
+        font-size: 0.75em;
+    }
+
+    /* On the narrowest screens drop the Bank Account column to keep the
+       primary (Date / Receipt / Customer / Currency / Amount / Matched)
+       visible without horizontal scrolling. */
+    .vas-aa-th-bank,
+    .vas-aa-td-bank {
+        display: none;
+    }
+
+    .vas-aa-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .vas-aa-pager-helper {
+        flex: 1 1 100%;
+        order: 2;
+    }
+
+    .vas-aa-pager { order: 1; }
+}
+
+/* AP variant follows the Scheduled AP Payment widget visual treatment. */
+.vas-aap-root {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.vas-aap-root .vas-aa-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    gap: 0.375em;
+    padding: 0.875em;
+    border: 2px solid #ffffff;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102c3f;
+}
+
+.vas-aap-root .vas-aa-card:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+}
+
+.vas-aap-root .vas-aa-card:focus-visible {
+    outline: 2px solid #0083da;
+    outline-offset: 2px;
+}
+
+.vas-aap-root .vas-aa-head {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    justify-content: flex-start;
+    gap: 0.625em;
+    overflow: hidden;
+}
+
+.vas-aap-root .vas-aa-head-left {
+    gap: 0.625em;
+    overflow: hidden;
+}
+
+.vas-aap-root .vas-aa-icon {
+    flex: 0 0 auto;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
+    background: rgba(255, 255, 255, 0.90);
+    color: #d78b10;
+}
+
+.vas-aap-root .vas-aa-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke-width: 0.1125em;
+}
+
+.vas-aap-root .vas-aa-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.875em;
+    font-weight: 400;
+    line-height: 1.2;
+    color: #102c3f;
+}
+
+.vas-aap-root .vas-aa-view {
+    display: none;
+}
+
+.vas-aap-root .vas-aa-metric {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 1.375em;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+    color: #9a6500;
+}
+
+.vas-aap-root .vas-aa-detail-text {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #5f7283;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    line-clamp: 1;
+    white-space: normal;
+}
+
+.vas-aap-root .vas-aa-busy {
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.vas-aap-dialog .vas-aa-dialog-card {
+    width: min(74em, 100%);
+    height: min(38em, 100%);
+}
+
+.vas-aap-dialog .vas-aa-dialog-header {
+    padding: 1em 1.25em;
+}
+
+.vas-aap-dialog .vas-aa-dialog-icon {
+    border-color: #f4d89b;
+    background: #fff4dd;
+    color: #d78b10;
+}
+
+.vas-aap-dialog .vas-aa-tabs {
+    padding: 0 1.125em;
+    border-bottom: 0.0625em solid #edf2f6;
+    background: #fbfdff;
+}
+
+.vas-aap-dialog .vas-aa-tab.vas-aa-tab-active {
+    color: #9a6500;
+}
+
+.vas-aap-dialog .vas-aa-tab.vas-aa-tab-active::after {
+    background: #d78b10;
+}
+
+.vas-aap-dialog .vas-aa-tab-active .vas-aa-tab-count {
+    background: #fff4dd;
+    color: #9a6500;
+}
+
+.vas-aap-dialog .vas-aa-dialog-table thead th {
+    font-weight: 700;
+}
+
+.vas-aap-dialog .vas-aa-td-amount {
+    color: #102c3f;
+}
+
+@container (max-width: 18.75em) {
+    .vas-aap-root .vas-aa-card {
+        padding: 0.75em;
+        gap: 0.375em;
+    }
+
+    .vas-aap-root .vas-aa-label {
+        font-size: 0.8125em;
+    }
+
+    .vas-aap-root .vas-aa-metric {
+        font-size: 1.375em;
+    }
+}
+
+@container (max-width: 13.75em) {
+    .vas-aap-root .vas-aa-card {
+        padding: 0.625em;
+        gap: 0.3125em;
+    }
+
+    .vas-aap-root .vas-aa-icon {
+        width: 1.625em;
+        height: 1.625em;
+        min-width: 1.625em;
+    }
+
+    .vas-aap-root .vas-aa-icon svg {
+        width: 0.8125em;
+        height: 0.8125em;
+    }
+
+    .vas-aap-root .vas-aa-label {
+        font-size: 0.75em;
+    }
+
+    .vas-aap-root .vas-aa-detail-text {
+        font-size: 0.625em;
+    }
+}
