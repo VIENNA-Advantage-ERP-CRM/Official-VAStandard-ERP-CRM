@@ -17,7 +17,7 @@
 
 /* Busy/loading overlay over the card while data is fetched (initial load + refresh);
    the inner spinner uses the core busy-indicator classes. */
-.vas-ptm-root:not(.vas-ptm-ap-root) .vas-ptm-busy {
+.vas-ptm-busy {
     position: absolute;
     inset: 0;
     display: flex;
