@@ -87,7 +87,7 @@
             );
 
             var $title = $('<div class="vas-scheduled-ap-payment-title">').text(
-                lbl('VAS_029_MessageScheduled', 'Scheduled')
+                lbl('VAS_029_MessageScheduled', 'Due This Week')
             );
 
             $iconBox.append($icon);

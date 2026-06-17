@@ -353,7 +353,7 @@
             ).text(
                 lbl(
                     'VAS_027_messageCleared',
-                    'Cleared'
+                    'Unreconciled'
                 )
             );
 
