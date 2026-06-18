@@ -13,6 +13,7 @@
 
 .vas-reconciliation-status-busy {
     align-items: center;
+    background: rgba(255, 255, 255, 0.55);
     border-radius: 14px;
     color: #5f7283;
     display: none;

@@ -489,6 +489,10 @@
     line-height: 1.35;
 }
 
+.VAS-072-MatchSuggestionAPPayment-busy {
+    background: rgba(255, 255, 255, 0.55);
+}
+
     .VAS-072-MatchSuggestionAPPayment-busy.is-visible,
     .VAS-072-MatchSuggestionAPPayment-state.is-visible {
         display: flex;

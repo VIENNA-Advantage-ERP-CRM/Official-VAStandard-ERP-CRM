@@ -12,6 +12,10 @@
     overflow: hidden;
 }
 
+.vas-scheduled-ap-payment-busy {
+    background: rgba(255, 255, 255, 0.55);
+}
+
     .vas-scheduled-ap-payment-root,
     .vas-scheduled-ap-payment-root * {
         box-sizing: border-box;

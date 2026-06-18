@@ -1,8 +1,7 @@
-﻿
-
-/**
+﻿/**
  * Upcoming runs
- * Purpose - Displays upcoming AP payment runs due within the next 7 days, grouped by payment method and due date.
+ * Purpose - Displays upcoming AP payment runs due within the next 7 days,
+ * grouped by payment method and due date.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
@@ -62,6 +61,8 @@
 ; (function (VAS, $) {
 
     VAS.VAS_031_UpcomingAPRunsWidget = function () {
+
+        var $self = this;
 
         this.frame;
         this.windowNo;
@@ -124,10 +125,18 @@
             $card = $('<div class="vas-upcoming-ap-runs-card">');
 
             var $head = $('<div class="vas-upcoming-ap-runs-head">');
-            var $headLeft = $('<div class="vas-upcoming-ap-runs-head-left">');
-            var $titleRow = $('<div class="vas-upcoming-ap-runs-title-row">');
 
-            var $iconBox = $('<span class="vas-upcoming-ap-runs-icon-box">');
+            var $headLeft = $(
+                '<div class="vas-upcoming-ap-runs-head-left">'
+            );
+
+            var $titleRow = $(
+                '<div class="vas-upcoming-ap-runs-title-row">'
+            );
+
+            var $iconBox = $(
+                '<span class="vas-upcoming-ap-runs-icon-box">'
+            );
 
             var $icon = $(
                 '<svg class="vas-upcoming-ap-runs-icon" ' +
@@ -162,13 +171,20 @@
                 )
             );
 
-            $pager = $('<div class="vas-upcoming-ap-runs-pager">');
+            $pager = $(
+                '<div class="vas-upcoming-ap-runs-pager">'
+            );
 
             $pagerPrev = $(
                 '<button type="button" ' +
                 'class="vas-upcoming-ap-runs-page-btn" ' +
                 'aria-label="' +
-                escapeHtml(lbl('VAS_Previous', 'Previous')) +
+                escapeHtml(
+                    lbl(
+                        'VAS_Previous',
+                        'Previous'
+                    )
+                ) +
                 '">‹</button>'
             );
 
@@ -180,7 +196,12 @@
                 '<button type="button" ' +
                 'class="vas-upcoming-ap-runs-page-btn" ' +
                 'aria-label="' +
-                escapeHtml(lbl('VAS_Next', 'Next')) +
+                escapeHtml(
+                    lbl(
+                        'VAS_Next',
+                        'Next'
+                    )
+                ) +
                 '">›</button>'
             );
 
@@ -199,12 +220,15 @@
                 .append($titleRow)
                 .append($sub);
 
-            $head
-                .append($headLeft);
+            $head.append($headLeft);
 
-            $body = $('<div class="vas-upcoming-ap-runs-body">');
+            $body = $(
+                '<div class="vas-upcoming-ap-runs-body">'
+            );
 
-            var $foot = $('<div class="vas-upcoming-ap-runs-footer">');
+            var $foot = $(
+                '<div class="vas-upcoming-ap-runs-footer">'
+            );
 
             $busy = $(
                 '<div class="vas-upcoming-ap-runs-busy">' +
@@ -241,7 +265,10 @@
             });
 
             $pagerNext.on('click', function () {
-                if (totalPages <= 1 || pageNo >= totalPages) {
+                if (
+                    totalPages <= 1 ||
+                    pageNo >= totalPages
+                ) {
                     return;
                 }
 
@@ -274,10 +301,20 @@
 
                     var data = normalizeResponse(response);
 
-                    if (!data || data.error) {
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
                         showState(
                             true,
-                            (data && (data.errorText || data.error)) ||
+                            (
+                                data &&
+                                (
+                                    data.errorText ||
+                                    data.error
+                                )
+                            ) ||
                             lbl(
                                 'VAS_ErrorLoading',
                                 'Could not load data'
@@ -317,27 +354,30 @@
 
         function renderData(data) {
             runsData = $.isArray(data.runs)
-                ? $.grep(data.runs, function (run) {
-                    var amount = Number(
-                        pickRunValue(
-                            run,
-                            'totalAmount',
-                            'amount'
-                        ) || 0
-                    );
-
-                    var paymentCount = Number(
-                        run.paymentCount || 0
-                    );
-
-                    return (
-                        !isNaN(amount) &&
-                        amount > 0
-                    ) || (
-                            !isNaN(paymentCount) &&
-                            paymentCount > 0
+                ? $.grep(
+                    data.runs,
+                    function (run) {
+                        var amount = Number(
+                            pickRunValue(
+                                run,
+                                'totalAmount',
+                                'amount'
+                            ) || 0
                         );
-                })
+
+                        var paymentCount = Number(
+                            run.paymentCount || 0
+                        );
+
+                        return (
+                            !isNaN(amount) &&
+                            amount > 0
+                        ) || (
+                                !isNaN(paymentCount) &&
+                                paymentCount > 0
+                            );
+                    }
+                )
                 : [];
 
             if (runsData.length === 0) {
@@ -346,6 +386,7 @@
             }
 
             pageNo = 1;
+
             totalPages = Math.ceil(
                 runsData.length / pageSize
             );
@@ -354,14 +395,19 @@
         }
 
         function renderPage() {
-            if (!runsData || runsData.length === 0) {
+            if (
+                !runsData ||
+                runsData.length === 0
+            ) {
                 setNoData();
                 return;
             }
 
             totalPages = Math.max(
                 1,
-                Math.ceil(runsData.length / pageSize)
+                Math.ceil(
+                    runsData.length / pageSize
+                )
             );
 
             if (pageNo < 1) {
@@ -373,18 +419,26 @@
             }
 
             showState(false, '');
+
             $body.empty();
 
-            var startIndex = (pageNo - 1) * pageSize;
+            var startIndex =
+                (pageNo - 1) * pageSize;
 
             var pageItems = runsData.slice(
                 startIndex,
                 startIndex + pageSize
             );
 
-            for (var i = 0; i < pageItems.length; i++) {
+            for (
+                var i = 0;
+                i < pageItems.length;
+                i++
+            ) {
                 $body.append(
-                    createRunRow(pageItems[i])
+                    createRunRow(
+                        pageItems[i]
+                    )
                 );
             }
 
@@ -401,7 +455,10 @@
                     $pagerText.text(
                         pageNo +
                         ' ' +
-                        lbl('VAS_Of', 'of') +
+                        lbl(
+                            'VAS_Of',
+                            'of'
+                        ) +
                         ' ' +
                         totalPages
                     );
@@ -414,7 +471,8 @@
             if ($pagerPrev) {
                 $pagerPrev.prop(
                     'disabled',
-                    pageNo <= 1 || totalPages <= 1
+                    pageNo <= 1 ||
+                    totalPages <= 1
                 );
             }
 
@@ -468,12 +526,16 @@
             );
 
             var metaParts = [];
-            var barClass = getPaymentMethodClass(
-                paymentMethodName
-            );
+
+            var barClass =
+                getPaymentMethodClass(
+                    paymentMethodName
+                );
 
             if (dueDateText) {
-                metaParts.push(dueDateText);
+                metaParts.push(
+                    dueDateText
+                );
             }
 
             metaParts.push(
@@ -481,7 +543,9 @@
                     window.navigator.language
                 ) +
                 ' ' +
-                getPaymentLabel(paymentCount)
+                getPaymentLabel(
+                    paymentCount
+                )
             );
 
             var $row = $(
@@ -502,7 +566,9 @@
 
             var $meta = $(
                 '<div class="vas-upcoming-ap-runs-meta">'
-            ).text(metaParts.join(' · '));
+            ).text(
+                metaParts.join(' · ')
+            );
 
             var $amount = $(
                 '<span class="vas-upcoming-ap-runs-amount">'
@@ -548,18 +614,24 @@
                 .append($info)
                 .append($actions);
 
-            $payBtn.on('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
+            $payBtn.on(
+                'click',
+                function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
 
-                openPayDialog(run);
-            });
+                    openPayDialog(run);
+                }
+            );
 
             return $row;
         }
 
         function openPayDialog(run) {
-            if (!$payDialog || !run) {
+            if (
+                !$payDialog ||
+                !run
+            ) {
                 return;
             }
 
@@ -583,7 +655,10 @@
                         'Pre-filled from upcoming'
                     ) +
                     ' · ' +
-                    (run.paymentMethodName || '')
+                    (
+                        run.paymentMethodName ||
+                        ''
+                    )
                 );
             }
 
@@ -604,7 +679,10 @@
                 $payDialogGrid.empty();
             }
 
-            setPayDialogBusy(true, false);
+            setPayDialogBusy(
+                true,
+                false
+            );
 
             $payDialog.show();
 
@@ -612,13 +690,20 @@
                 'vas-upcoming-ap-runs-body-lock'
             );
 
-            ensurePopupLookups(function () {
-                loadRunPaymentDetails(run);
-            });
+            ensurePopupLookups(
+                function () {
+                    loadRunPaymentDetails(
+                        run
+                    );
+                }
+            );
         }
 
         function closePayDialog() {
-            if (!$payDialog || saveInProgress) {
+            if (
+                !$payDialog ||
+                saveInProgress
+            ) {
                 return;
             }
 
@@ -661,16 +746,26 @@
                 cache: false,
 
                 success: function (response) {
-                    var data = normalizeResponse(response);
+                    var data =
+                        normalizeResponse(
+                            response
+                        );
 
-                    if (!data || data.error) {
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
                         popupLookups = {};
 
                         showPayError(
-                            (data && (
-                                data.errorText ||
-                                data.error
-                            )) ||
+                            (
+                                data &&
+                                (
+                                    data.errorText ||
+                                    data.error
+                                )
+                            ) ||
                             lbl(
                                 'VAS_ErrorLoading',
                                 'Could not load lookup data'
@@ -682,6 +777,7 @@
                     }
 
                     popupLookups = data;
+
                     callback();
                 },
 
@@ -720,18 +816,29 @@
                         '',
 
                     paymentMethodId:
-                        run.paymentMethodId || 0
+                        run.paymentMethodId ||
+                        0
                 },
 
                 success: function (response) {
-                    var data = normalizeResponse(response);
+                    var data =
+                        normalizeResponse(
+                            response
+                        );
 
-                    if (!data || data.error) {
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
                         showPayError(
-                            (data && (
-                                data.errorText ||
-                                data.error
-                            )) ||
+                            (
+                                data &&
+                                (
+                                    data.errorText ||
+                                    data.error
+                                )
+                            ) ||
                             lbl(
                                 'VAS_ErrorLoading',
                                 'Could not load data'
@@ -741,11 +848,14 @@
                         return;
                     }
 
-                    paymentRows = $.isArray(data.rows)
-                        ? data.rows
-                        : [];
+                    paymentRows =
+                        $.isArray(data.rows)
+                            ? data.rows
+                            : [];
 
-                    if (paymentRows.length === 0) {
+                    if (
+                        paymentRows.length === 0
+                    ) {
                         showPayError(
                             lbl(
                                 'VAS_031_MessageNoData',
@@ -756,7 +866,8 @@
                         return;
                     }
 
-                    selectedPaymentRow = paymentRows[0];
+                    selectedPaymentRow =
+                        paymentRows[0];
 
                     renderPayDialogGrid(
                         selectedPaymentRow
@@ -780,7 +891,10 @@
                 },
 
                 complete: function () {
-                    setPayDialogBusy(false, false);
+                    setPayDialogBusy(
+                        false,
+                        false
+                    );
                 }
             });
         }
@@ -788,15 +902,21 @@
         function normalizeResponse(response) {
             var data = response;
 
-            for (var i = 0; i < 2; i++) {
-                if (typeof data !== 'string') {
+            for (
+                var i = 0;
+                i < 2;
+                i++
+            ) {
+                if (
+                    typeof data !== 'string'
+                ) {
                     break;
                 }
 
                 try {
                     data = JSON.parse(data);
                 }
-                catch (e) {
+                catch (error) {
                     data = null;
                     break;
                 }
@@ -805,14 +925,18 @@
             return data;
         }
 
-        function getAjaxErrorMessage(xhr, fallback) {
+        function getAjaxErrorMessage(
+            xhr,
+            fallback
+        ) {
             if (!xhr) {
                 return fallback;
             }
 
-            var response = normalizeResponse(
-                xhr.responseText
-            );
+            var response =
+                normalizeResponse(
+                    xhr.responseText
+                );
 
             if (response) {
                 return (
@@ -827,11 +951,17 @@
         }
 
         function renderPayDialogGrid(row) {
-            if (!$payDialogGrid || !row) {
+            if (
+                !$payDialogGrid ||
+                !row
+            ) {
                 return;
             }
 
-            var bankText = getBankAccountDisplay(row);
+            var bankText =
+                getBankAccountDisplay(
+                    row
+                );
 
             var currencyText =
                 (row.currencyISO || '') +
@@ -843,99 +973,138 @@
                 ) +
                 (row.currencySymbol || '');
 
-            var documentTypes = getLookupAny([
-                'documentTypes',
-                'docTypes'
-            ]);
+            var documentTypes =
+                getLookupAny([
+                    'documentTypes',
+                    'docTypes'
+                ]);
 
-            var tenderTypes = getLookupAny([
-                'tenderTypes',
-                'paymentMethods'
-            ]);
+            var tenderTypes =
+                getLookupAny([
+                    'tenderTypes',
+                    'paymentMethods'
+                ]);
 
-            var selectedDocTypeId = firstValue(
-                row.docTypeId,
-                row.cDocTypeId,
-                selectedRun && selectedRun.docTypeId,
-                getFirstLookupValue(documentTypes)
-            );
+            var selectedDocTypeId =
+                firstPositiveValue(
+                    row.docTypeId,
+                    row.cDocTypeId,
 
-            var selectedTenderType = firstValue(
-                row.tenderType,
-                row.paymentMethodValue,
-                selectedRun && selectedRun.tenderType,
-                selectedRun &&
-                selectedRun.paymentMethodValue,
-                getFirstLookupValue(tenderTypes)
-            );
+                    selectedRun &&
+                    selectedRun.docTypeId,
 
-            var selectedOrganizationId = firstValue(
-                row.organizationId,
-                row.adOrgId,
-                selectedRun &&
-                selectedRun.organizationId,
-                selectedRun &&
-                selectedRun.adOrgId
-            );
+                    selectedRun &&
+                    selectedRun.cDocTypeId,
 
-            var selectedBankAccountId = firstValue(
-                row.bankAccountId,
-                selectedRun &&
-                selectedRun.bankAccountId
-            );
+                    getFirstPositiveLookupValue(
+                        documentTypes
+                    )
+                );
 
-            var selectedVendorId = firstValue(
-                row.vendorId,
-                row.cBPartnerId,
-                selectedRun &&
-                selectedRun.vendorId
-            );
-
-            var selectedCurrencyId = firstValue(
-                row.cCurrencyId,
-                row.currencyId,
-                selectedRun &&
-                selectedRun.cCurrencyId,
-                selectedRun &&
-                selectedRun.currencyId
-            );
-
-            var selectedConversionTypeId = firstValue(
-                row.conversionTypeId,
-                row.cConversionTypeId,
-                selectedRun &&
-                selectedRun.conversionTypeId
-            );
-
-            var transactionDate = formatDateForInput(
+            var selectedTenderType =
                 firstValue(
-                    row.transactionDate,
-                    row.dateTrx,
-                    selectedRun &&
-                    selectedRun.transactionDate,
-                    selectedRun &&
-                    selectedRun.runDate,
-                    selectedRun &&
-                    selectedRun.dueDate
-                )
-            );
+                    row.tenderType,
+                    row.paymentMethodValue,
 
-            var paymentAmount = firstValue(
-                row.amount,
-                row.payAmt,
-                selectedRun &&
-                selectedRun.amount,
-                selectedRun &&
-                selectedRun.totalAmount,
-                0
-            );
+                    selectedRun &&
+                    selectedRun.tenderType,
 
-            var paymentDocumentNo = firstValue(
-                row.paymentDocumentNo,
-                row.newPaymentDocumentNo,
-                row.documentNo,
-                ''
-            );
+                    selectedRun &&
+                    selectedRun.paymentMethodValue,
+
+                    getFirstLookupValue(
+                        tenderTypes
+                    )
+                );
+
+            var selectedOrganizationId =
+                firstPositiveValue(
+                    row.organizationId,
+                    row.adOrgId,
+
+                    selectedRun &&
+                    selectedRun.organizationId,
+
+                    selectedRun &&
+                    selectedRun.adOrgId
+                );
+
+            var selectedBankAccountId =
+                firstPositiveValue(
+                    row.bankAccountId,
+
+                    selectedRun &&
+                    selectedRun.bankAccountId
+                );
+
+            var selectedVendorId =
+                firstPositiveValue(
+                    row.vendorId,
+                    row.cBPartnerId,
+
+                    selectedRun &&
+                    selectedRun.vendorId
+                );
+
+            var selectedCurrencyId =
+                firstPositiveValue(
+                    row.cCurrencyId,
+                    row.currencyId,
+
+                    selectedRun &&
+                    selectedRun.cCurrencyId,
+
+                    selectedRun &&
+                    selectedRun.currencyId
+                );
+
+            var selectedConversionTypeId =
+                firstPositiveValue(
+                    row.conversionTypeId,
+                    row.cConversionTypeId,
+
+                    selectedRun &&
+                    selectedRun.conversionTypeId
+                );
+
+            var transactionDate =
+                formatDateForInput(
+                    firstValue(
+                        row.transactionDate,
+                        row.dateTrx,
+
+                        selectedRun &&
+                        selectedRun.transactionDate,
+
+                        selectedRun &&
+                        selectedRun.runDate,
+
+                        selectedRun &&
+                        selectedRun.dueDate
+                    )
+                );
+
+            var paymentAmount =
+                firstValue(
+                    row.amount,
+                    row.payAmt,
+
+                    selectedRun &&
+                    selectedRun.amount,
+
+                    selectedRun &&
+                    selectedRun.totalAmount,
+
+                    0
+                );
+
+            var paymentDocumentNo =
+                firstValue(
+                    row.paymentDocumentNo,
+                    row.newPaymentDocumentNo,
+                    row.documentNo,
+                    ''
+                );
 
             var html =
                 fieldHtml(
@@ -943,14 +1112,19 @@
                         'VAS_031_MessageOrganization',
                         'Organization'
                     ),
+
                     selectHtml(
                         'adOrgId',
-                        getLookup('organizations'),
+                        getLookup(
+                            'organizations'
+                        ),
                         selectedOrganizationId,
                         null,
                         null,
-                        row.organizationName || ''
+                        row.organizationName ||
+                        ''
                     ),
+
                     false,
                     true
                 ) +
@@ -960,14 +1134,18 @@
                         'VAS_031_MessageBankAccount',
                         'Bank Account'
                     ),
+
                     selectHtml(
                         'bankAccountId',
-                        getLookup('bankAccounts'),
+                        getLookup(
+                            'bankAccounts'
+                        ),
                         selectedBankAccountId,
                         null,
                         null,
                         bankText
                     ),
+
                     true,
                     true
                 ) +
@@ -977,11 +1155,13 @@
                         'VAS_031_MessageTransactionDate',
                         'Transaction Date'
                     ),
+
                     inputHtml(
                         'transactionDate',
                         'date',
                         transactionDate
                     ),
+
                     false,
                     true
                 ) +
@@ -991,14 +1171,19 @@
                         'VAS_032_MessageVendor',
                         'Vendor'
                     ),
+
                     selectHtml(
                         'vendorId',
-                        getLookup('vendors'),
+                        getLookup(
+                            'vendors'
+                        ),
                         selectedVendorId,
                         null,
                         null,
-                        row.vendorName || ''
+                        row.vendorName ||
+                        ''
                     ),
+
                     true,
                     true
                 ) +
@@ -1008,14 +1193,18 @@
                         'VAS_PaymentCurrency',
                         'Currency'
                     ),
+
                     selectHtml(
                         'currencyId',
-                        getLookup('currencies'),
+                        getLookup(
+                            'currencies'
+                        ),
                         selectedCurrencyId,
                         null,
                         null,
                         currencyText
                     ),
+
                     true,
                     true
                 ) +
@@ -1025,18 +1214,23 @@
                         'VAS_031_MessageCurrencyType',
                         'Currency Type'
                     ),
+
                     selectHtml(
                         'conversionTypeId',
-                        getLookup('conversionTypes'),
+                        getLookup(
+                            'conversionTypes'
+                        ),
                         selectedConversionTypeId,
                         null,
                         null,
+
                         row.currencyTypeName ||
                         lbl(
                             'VAS_031_MessageSpot',
                             'Spot'
                         )
                     ),
+
                     false,
                     true
                 ) +
@@ -1046,14 +1240,17 @@
                         'VAS_031_MessageDocumentType',
                         'Document Type'
                     ),
+
                     selectHtml(
                         'docTypeId',
                         documentTypes,
                         selectedDocTypeId,
                         null,
                         null,
-                        row.docTypeName || ''
+                        row.docTypeName ||
+                        ''
                     ),
+
                     false,
                     true
                 ) +
@@ -1063,12 +1260,14 @@
                         'VAS_031_MessageTenderType',
                         'Tender Type'
                     ),
+
                     selectHtml(
                         'tenderType',
                         tenderTypes,
                         selectedTenderType,
                         null,
                         null,
+
                         row.tenderTypeName ||
                         row.paymentMethodName ||
                         (
@@ -1077,6 +1276,7 @@
                         ) ||
                         ''
                     ),
+
                     false,
                     true
                 ) +
@@ -1086,14 +1286,18 @@
                         'VAS_031_MessagePaymentAmount',
                         'Payment Amount'
                     ),
+
                     inputHtml(
                         'payAmt',
                         'number',
+
                         normalizeNumber(
                             paymentAmount
                         ),
+
                         '0.01'
                     ),
+
                     true,
                     true
                 ) +
@@ -1103,11 +1307,13 @@
                         'VAS_031_MessageDocumentNo',
                         'Document No.'
                     ),
+
                     inputHtml(
                         'documentNo',
                         'text',
                         paymentDocumentNo
                     ),
+
                     false,
                     true
                 );
@@ -1123,10 +1329,15 @@
         ) {
             return (
                 '<div class="vas-upcoming-ap-runs-field' +
-                (prefilled ? ' is-prefilled' : '') +
+                (
+                    prefilled
+                        ? ' is-prefilled'
+                        : ''
+                ) +
                 '">' +
 
                 '<div class="vas-upcoming-ap-runs-field-label">' +
+
                 escapeHtml(label) +
 
                 (
@@ -1145,11 +1356,15 @@
                 '</div>' +
 
                 '<div class="vas-upcoming-ap-runs-field-value">' +
+
                 (
                     rawValue
                         ? value || ''
-                        : escapeHtml(value || '')
+                        : escapeHtml(
+                            value || ''
+                        )
                 ) +
+
                 '</div>' +
 
                 '</div>'
@@ -1159,7 +1374,9 @@
         function getLookup(name) {
             return (
                 popupLookups &&
-                $.isArray(popupLookups[name])
+                $.isArray(
+                    popupLookups[name]
+                )
             )
                 ? popupLookups[name]
                 : [];
@@ -1170,8 +1387,15 @@
                 ? names
                 : [];
 
-            for (var i = 0; i < names.length; i++) {
-                var items = getLookup(names[i]);
+            for (
+                var i = 0;
+                i < names.length;
+                i++
+            ) {
+                var items =
+                    getLookup(
+                        names[i]
+                    );
 
                 if (items.length > 0) {
                     return items;
@@ -1187,12 +1411,44 @@
                 i < arguments.length;
                 i++
             ) {
-                var value = arguments[i];
+                var value =
+                    arguments[i];
 
                 if (
                     value !== undefined &&
                     value !== null &&
                     String(value).trim() !== ''
+                ) {
+                    return value;
+                }
+            }
+
+            return '';
+        }
+
+        function firstPositiveValue() {
+            for (
+                var i = 0;
+                i < arguments.length;
+                i++
+            ) {
+                var value =
+                    arguments[i];
+
+                if (
+                    value === undefined ||
+                    value === null ||
+                    String(value).trim() === ''
+                ) {
+                    continue;
+                }
+
+                var numericValue =
+                    Number(value);
+
+                if (
+                    !isNaN(numericValue) &&
+                    numericValue > 0
                 ) {
                     return value;
                 }
@@ -1209,7 +1465,8 @@
 
             if (
                 valueProp &&
-                item[valueProp] !== undefined
+                item[valueProp] !== undefined &&
+                item[valueProp] !== null
             ) {
                 return item[valueProp];
             }
@@ -1254,7 +1511,8 @@
 
             if (
                 textProp &&
-                item[textProp] !== undefined
+                item[textProp] !== undefined &&
+                item[textProp] !== null
             ) {
                 return item[textProp];
             }
@@ -1275,13 +1533,57 @@
                 ? items
                 : [];
 
-            if (items.length === 0) {
-                return '';
+            for (
+                var i = 0;
+                i < items.length;
+                i++
+            ) {
+                var value =
+                    getLookupItemValue(
+                        items[i]
+                    );
+
+                if (
+                    value !== undefined &&
+                    value !== null &&
+                    String(value).trim() !== ''
+                ) {
+                    return value;
+                }
             }
 
-            return getLookupItemValue(
-                items[0]
-            );
+            return '';
+        }
+
+        function getFirstPositiveLookupValue(
+            items
+        ) {
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            for (
+                var i = 0;
+                i < items.length;
+                i++
+            ) {
+                var value =
+                    getLookupItemValue(
+                        items[i]
+                    );
+
+                var numericValue =
+                    Number(value);
+
+                if (
+                    !isNaN(numericValue) &&
+                    numericValue > 0
+                ) {
+                    return value;
+                }
+            }
+
+            return '';
         }
 
         function selectHtml(
@@ -1292,6 +1594,20 @@
             valueProp,
             fallbackText
         ) {
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            if (
+                selectedValue !== undefined &&
+                selectedValue !== null &&
+                String(
+                    selectedValue
+                ).trim() === '0'
+            ) {
+                selectedValue = '';
+            }
+
             var html =
                 '<select ' +
                 'class="vas-upcoming-ap-runs-edit-control" ' +
@@ -1301,39 +1617,44 @@
 
             var hasSelected = false;
 
-            items = $.isArray(items)
-                ? items
-                : [];
+            html +=
+                '<option value="">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Select',
+                        'Select'
+                    )
+                ) +
+                '</option>';
 
-            if (
-                selectedValue === undefined ||
-                selectedValue === null ||
-                String(selectedValue).trim() === ''
+            for (
+                var i = 0;
+                i < items.length;
+                i++
             ) {
-                html +=
-                    '<option value="">' +
-                    escapeHtml(
-                        lbl(
-                            'VAS_Select',
-                            'Select'
-                        )
-                    ) +
-                    '</option>';
-            }
+                var item =
+                    items[i] || {};
 
-            for (var i = 0; i < items.length; i++) {
-                var item = items[i] || {};
+                var value =
+                    getLookupItemValue(
+                        item,
+                        valueProp
+                    );
 
-                var value = getLookupItemValue(
-                    item,
-                    valueProp
-                );
+                var text =
+                    getLookupItemText(
+                        item,
+                        textProp,
+                        value
+                    );
 
-                var text = getLookupItemText(
-                    item,
-                    textProp,
-                    value
-                );
+                if (
+                    value === undefined ||
+                    value === null ||
+                    String(value).trim() === ''
+                ) {
+                    continue;
+                }
 
                 var selected =
                     String(value) ===
@@ -1353,9 +1674,13 @@
                             : ''
                     ) +
                     '>' +
+
                     escapeHtml(
-                        text || value || ''
+                        text ||
+                        value ||
+                        ''
                     ) +
+
                     '</option>';
             }
 
@@ -1363,16 +1688,25 @@
                 !hasSelected &&
                 selectedValue !== undefined &&
                 selectedValue !== null &&
-                String(selectedValue).trim() !== ''
+                String(
+                    selectedValue
+                ).trim() !== '' &&
+                String(
+                    selectedValue
+                ).trim() !== '0'
             ) {
                 html +=
                     '<option value="' +
-                    escapeHtml(selectedValue) +
+                    escapeHtml(
+                        selectedValue
+                    ) +
                     '" selected>' +
+
                     escapeHtml(
                         fallbackText ||
                         selectedValue
                     ) +
+
                     '</option>';
             }
 
@@ -1399,7 +1733,9 @@
                 '" ' +
                 'value="' +
                 escapeHtml(
-                    value == null ? '' : value
+                    value == null
+                        ? ''
+                        : value
                 ) +
                 '"' +
 
@@ -1422,48 +1758,61 @@
         }
 
         function updatePayNotice(row) {
-            if (!$payDialogNotice || !row) {
+            if (
+                !$payDialogNotice ||
+                !row
+            ) {
                 return;
             }
 
-            var amountText = formatCurrencyAmount(
+            var amountText =
+                formatCurrencyAmount(
+                    firstValue(
+                        row.amount,
+                        row.payAmt,
+
+                        selectedRun &&
+                        selectedRun.totalAmount,
+
+                        0
+                    ),
+
+                    row.currencySymbol ||
+                    (
+                        selectedRun &&
+                        selectedRun.currencySymbol
+                    ),
+
+                    row.currencyISO ||
+                    (
+                        selectedRun &&
+                        selectedRun.currencyISO
+                    ),
+
+                    row.stdPrecision ||
+                    (
+                        selectedRun &&
+                        selectedRun.stdPrecision
+                    )
+                );
+
+            var sourceDocumentNo =
                 firstValue(
-                    row.amount,
-                    row.payAmt,
-                    selectedRun &&
-                    selectedRun.totalAmount,
-                    0
-                ),
-                row.currencySymbol ||
-                (
-                    selectedRun &&
-                    selectedRun.currencySymbol
-                ),
-                row.currencyISO ||
-                (
-                    selectedRun &&
-                    selectedRun.currencyISO
-                ),
-                row.stdPrecision ||
-                (
-                    selectedRun &&
-                    selectedRun.stdPrecision
-                )
-            );
+                    row.documentNo,
+                    row.invoiceDocumentNo,
+                    row.invoiceNo,
+                    ''
+                );
 
-            var sourceDocumentNo = firstValue(
-                row.documentNo,
-                row.invoiceDocumentNo,
-                row.invoiceNo,
-                ''
-            );
+            var vendorName =
+                firstValue(
+                    row.vendorName,
 
-            var vendorName = firstValue(
-                row.vendorName,
-                selectedRun &&
-                selectedRun.vendorName,
-                ''
-            );
+                    selectedRun &&
+                    selectedRun.vendorName,
+
+                    ''
+                );
 
             $payDialogNotice
                 .removeClass(
@@ -1497,7 +1846,9 @@
                     ) +
 
                     ' · ' +
-                    escapeHtml(amountText) +
+                    escapeHtml(
+                        amountText
+                    ) +
                     '. ' +
 
                     escapeHtml(
@@ -1539,7 +1890,10 @@
                 );
             }
 
-            if (bankName && tail) {
+            if (
+                bankName &&
+                tail
+            ) {
                 return (
                     bankName +
                     ' · ****' +
@@ -1547,7 +1901,10 @@
                 );
             }
 
-            if (accountName && tail) {
+            if (
+                accountName &&
+                tail
+            ) {
                 return (
                     accountName +
                     ' · ****' +
@@ -1575,14 +1932,19 @@
                 return;
             }
 
-            var payload = readPayDialogPayload();
+            var payload =
+                readPayDialogPayload();
 
             if (!payload) {
                 return;
             }
 
             saveInProgress = true;
-            setPayDialogBusy(true, true);
+
+            setPayDialogBusy(
+                true,
+                true
+            );
 
             $.ajax({
                 url:
@@ -1594,7 +1956,10 @@
                 data: payload,
 
                 success: function (response) {
-                    var data = normalizeResponse(response);
+                    var data =
+                        normalizeResponse(
+                            response
+                        );
 
                     if (
                         !data ||
@@ -1611,8 +1976,8 @@
                                 )
                             ) ||
                             lbl(
-                                'VAS_ErrorLoading',
-                                'Could not save data'
+                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'Could not save AP payment'
                             )
                         );
 
@@ -1620,7 +1985,11 @@
                     }
 
                     saveInProgress = false;
-                    setPayDialogBusy(false, true);
+
+                    setPayDialogBusy(
+                        false,
+                        true
+                    );
 
                     closePayDialog();
                     loadData();
@@ -1631,8 +2000,8 @@
                         getAjaxErrorMessage(
                             xhr,
                             lbl(
-                                'VAS_ErrorLoading',
-                                'Could not save data'
+                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'Could not save AP payment'
                             )
                         )
                     );
@@ -1641,6 +2010,7 @@
                 complete: function () {
                     if (saveInProgress) {
                         saveInProgress = false;
+
                         setPayDialogBusy(
                             false,
                             true
@@ -1651,92 +2021,120 @@
         }
 
         function readPayDialogPayload() {
-            var $fields = $payDialogGrid
-                ? $payDialogGrid.find(
-                    '[data-pay-field]'
-                )
-                : $();
+            var $fields =
+                $payDialogGrid
+                    ? $payDialogGrid.find(
+                        '[data-pay-field]'
+                    )
+                    : $();
 
             var payload = {};
 
             $fields.each(function () {
-                var fieldName = $(this).attr(
-                    'data-pay-field'
-                );
+                var fieldName =
+                    $(this).attr(
+                        'data-pay-field'
+                    );
 
-                payload[fieldName] = $(this).val();
+                payload[fieldName] =
+                    $(this).val();
             });
 
-            /*
-             * paymentId is intentionally not sent.
-             * The controller creates a new MPayment using ID = 0.
-             */
-
             payload.adOrgId = Number(
-                firstValue(
+                firstPositiveValue(
                     payload.adOrgId,
+
                     selectedPaymentRow.organizationId,
                     selectedPaymentRow.adOrgId,
+
                     selectedRun &&
                     selectedRun.organizationId,
+
                     selectedRun &&
                     selectedRun.adOrgId,
+
                     0
                 )
             );
 
             payload.bankAccountId = Number(
-                firstValue(
+                firstPositiveValue(
                     payload.bankAccountId,
+
                     selectedPaymentRow.bankAccountId,
+
                     selectedRun &&
                     selectedRun.bankAccountId,
+
                     0
                 )
             );
 
             payload.vendorId = Number(
-                firstValue(
+                firstPositiveValue(
                     payload.vendorId,
+
                     selectedPaymentRow.vendorId,
                     selectedPaymentRow.cBPartnerId,
+
                     selectedRun &&
                     selectedRun.vendorId,
+
                     0
                 )
             );
 
             payload.currencyId = Number(
-                firstValue(
+                firstPositiveValue(
                     payload.currencyId,
+
                     selectedPaymentRow.cCurrencyId,
                     selectedPaymentRow.currencyId,
+
                     selectedRun &&
                     selectedRun.cCurrencyId,
+
                     selectedRun &&
                     selectedRun.currencyId,
+
                     0
                 )
             );
 
             payload.conversionTypeId = Number(
-                firstValue(
+                firstPositiveValue(
                     payload.conversionTypeId,
+
                     selectedPaymentRow.conversionTypeId,
                     selectedPaymentRow.cConversionTypeId,
+
                     selectedRun &&
                     selectedRun.conversionTypeId,
+
                     0
                 )
             );
 
             payload.docTypeId = Number(
-                firstValue(
+                firstPositiveValue(
                     payload.docTypeId,
+
                     selectedPaymentRow.docTypeId,
                     selectedPaymentRow.cDocTypeId,
+
                     selectedRun &&
                     selectedRun.docTypeId,
+
+                    selectedRun &&
+                    selectedRun.cDocTypeId,
+
+                    getFirstPositiveLookupValue(
+                        getLookupAny([
+                            'documentTypes',
+                            'docTypes'
+                        ])
+                    ),
+
                     0
                 )
             );
@@ -1744,30 +2142,40 @@
             payload.tenderType = String(
                 firstValue(
                     payload.tenderType,
+
                     selectedPaymentRow.tenderType,
                     selectedPaymentRow.paymentMethodValue,
+
                     selectedRun &&
                     selectedRun.tenderType,
+
                     selectedRun &&
                     selectedRun.paymentMethodValue,
+
                     ''
                 )
             ).trim();
 
-            payload.transactionDate = formatDateForInput(
-                firstValue(
-                    payload.transactionDate,
-                    selectedPaymentRow.transactionDate,
-                    selectedPaymentRow.dateTrx,
-                    selectedRun &&
-                    selectedRun.transactionDate,
-                    selectedRun &&
-                    selectedRun.runDate,
-                    selectedRun &&
-                    selectedRun.dueDate,
-                    ''
-                )
-            );
+            payload.transactionDate =
+                formatDateForInput(
+                    firstValue(
+                        payload.transactionDate,
+
+                        selectedPaymentRow.transactionDate,
+                        selectedPaymentRow.dateTrx,
+
+                        selectedRun &&
+                        selectedRun.transactionDate,
+
+                        selectedRun &&
+                        selectedRun.runDate,
+
+                        selectedRun &&
+                        selectedRun.dueDate,
+
+                        ''
+                    )
+                );
 
             payload.documentNo = String(
                 payload.documentNo || ''
@@ -1776,12 +2184,16 @@
             payload.payAmt = Number(
                 firstValue(
                     payload.payAmt,
+
                     selectedPaymentRow.amount,
                     selectedPaymentRow.payAmt,
+
                     selectedRun &&
                     selectedRun.totalAmount,
+
                     selectedRun &&
                     selectedRun.amount,
+
                     0
                 )
             );
@@ -1797,7 +2209,9 @@
                 return null;
             }
 
-            if (payload.bankAccountId <= 0) {
+            if (
+                payload.bankAccountId <= 0
+            ) {
                 showPayError(
                     lbl(
                         'VAS_031_MessageBankAccountRequired',
@@ -1830,7 +2244,9 @@
                 return null;
             }
 
-            if (payload.conversionTypeId <= 0) {
+            if (
+                payload.conversionTypeId <= 0
+            ) {
                 showPayError(
                     lbl(
                         'VAS_031_MessageConversionTypeRequired',
@@ -1874,7 +2290,10 @@
                 return null;
             }
 
-            if (payload.payAmt <= 0) {
+            if (
+                isNaN(payload.payAmt) ||
+                payload.payAmt <= 0
+            ) {
                 showPayError(
                     lbl(
                         'VAS_031_MessagePaymentAmountRequired',
@@ -1911,14 +2330,14 @@
             isSaving
         ) {
             var busy = !!show;
-            var saving = !!isSaving && busy;
+            var saving =
+                !!isSaving && busy;
 
             if ($payDialogBusy) {
-                $payDialogBusy
-                    .toggleClass(
-                        'is-visible',
-                        busy
-                    );
+                $payDialogBusy.toggleClass(
+                    'is-visible',
+                    busy
+                );
             }
 
             if ($payDialogSave) {
@@ -1965,7 +2384,6 @@
             $payDialog = $(
                 '<div ' +
                 'class="vas-upcoming-ap-runs-pay-dialog" ' +
-                'style="display:none;" ' +
                 'role="dialog" ' +
                 'aria-modal="true">' +
 
@@ -2130,50 +2548,65 @@
                 '</div>'
             );
 
-            $payDialogTitle = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-title'
-            );
+            $payDialog.hide();
 
-            $payDialogSub = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-sub'
-            );
+            $payDialogTitle =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-title'
+                );
 
-            $payDialogNotice = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-notice'
-            );
+            $payDialogSub =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-sub'
+                );
 
-            $payDialogGrid = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-grid'
-            );
+            $payDialogNotice =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-notice'
+                );
 
-            $payDialogSave = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-save'
-            );
+            $payDialogGrid =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-grid'
+                );
 
-            $payDialogSaveLabel = $payDialog.find(
-                '.vas-upcoming-ap-runs-save-label'
-            );
+            $payDialogSave =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-save'
+                );
 
-            $payDialogBusy = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-busy'
-            );
+            $payDialogSaveLabel =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-save-label'
+                );
+
+            $payDialogBusy =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-busy'
+                );
 
             $payDialog
                 .find(
                     '.vas-upcoming-ap-runs-pay-close, ' +
                     '.vas-upcoming-ap-runs-pay-cancel'
                 )
-                .on('click', function () {
-                    closePayDialog();
-                });
+                .on(
+                    'click',
+                    function () {
+                        closePayDialog();
+                    }
+                );
 
             $payDialog
                 .find(
                     '.vas-upcoming-ap-runs-pay-scrim'
                 )
-                .on('click', function () {
-                    closePayDialog();
-                });
+                .on(
+                    'click',
+                    function () {
+                        closePayDialog();
+                    }
+                );
 
             $payDialogSave.on(
                 'click',
@@ -2183,10 +2616,12 @@
             );
 
             $(document).on(
-                'keydown.vas-upcoming-ap-runs-pay',
-                function (e) {
+                'keydown.vas-upcoming-ap-runs-pay-' +
+                $self.AD_UserHomeWidgetID,
+
+                function (event) {
                     if (
-                        e.key === 'Escape' &&
+                        event.key === 'Escape' &&
                         $payDialog &&
                         $payDialog.is(':visible')
                     ) {
@@ -2195,7 +2630,9 @@
                 }
             );
 
-            $('body').append($payDialog);
+            $('body').append(
+                $payDialog
+            );
         }
 
         function pickRunValue(
@@ -2245,7 +2682,9 @@
             return paymentMethodName;
         }
 
-        function getPaymentLabel(paymentCount) {
+        function getPaymentLabel(
+            paymentCount
+        ) {
             return paymentCount === 1
                 ? lbl(
                     'VAS_031_MessagePayment',
@@ -2264,27 +2703,43 @@
                 paymentMethodName || ''
             ).toLowerCase();
 
-            if (method.indexOf('rtgs') >= 0) {
+            if (
+                method.indexOf(
+                    'rtgs'
+                ) >= 0
+            ) {
                 return (
                     'vas-upcoming-ap-runs-bar-rtgs'
                 );
             }
 
-            if (method.indexOf('upi') >= 0) {
+            if (
+                method.indexOf(
+                    'upi'
+                ) >= 0
+            ) {
                 return (
                     'vas-upcoming-ap-runs-bar-upi'
                 );
             }
 
-            if (method.indexOf('card') >= 0) {
+            if (
+                method.indexOf(
+                    'card'
+                ) >= 0
+            ) {
                 return (
                     'vas-upcoming-ap-runs-bar-card'
                 );
             }
 
             if (
-                method.indexOf('cheque') >= 0 ||
-                method.indexOf('check') >= 0
+                method.indexOf(
+                    'cheque'
+                ) >= 0 ||
+                method.indexOf(
+                    'check'
+                ) >= 0
             ) {
                 return (
                     'vas-upcoming-ap-runs-bar-cheque'
@@ -2301,7 +2756,10 @@
                 return '';
             }
 
-            var date = parseDateValue(value);
+            var date =
+                parseDateValue(
+                    value
+                );
 
             if (!date) {
                 return value;
@@ -2324,26 +2782,38 @@
 
             if (
                 typeof value === 'string' &&
-                /^\d{4}-\d{2}-\d{2}$/.test(value)
+                /^\d{4}-\d{2}-\d{2}$/.test(
+                    value
+                )
             ) {
                 return value;
             }
 
-            var date = parseDateValue(value);
+            var date =
+                parseDateValue(
+                    value
+                );
 
             if (!date) {
                 return '';
             }
 
-            var year = date.getFullYear();
+            var year =
+                date.getFullYear();
 
             var month = String(
                 date.getMonth() + 1
-            ).padStart(2, '0');
+            ).padStart(
+                2,
+                '0'
+            );
 
             var day = String(
                 date.getDate()
-            ).padStart(2, '0');
+            ).padStart(
+                2,
+                '0'
+            );
 
             return (
                 year +
@@ -2361,7 +2831,9 @@
 
             if (
                 typeof value === 'string' &&
-                value.indexOf('/Date(') === 0
+                value.indexOf(
+                    '/Date('
+                ) === 0
             ) {
                 var timestamp = Number(
                     value.replace(
@@ -2371,30 +2843,45 @@
                 );
 
                 if (!isNaN(timestamp)) {
-                    return new Date(timestamp);
+                    return new Date(
+                        timestamp
+                    );
                 }
             }
 
             if (
                 typeof value === 'string' &&
-                /^\d{4}-\d{2}-\d{2}$/.test(value)
+                /^\d{4}-\d{2}-\d{2}$/.test(
+                    value
+                )
             ) {
-                var parts = value.split('-');
+                var parts =
+                    value.split('-');
 
-                var localDate = new Date(
-                    Number(parts[0]),
-                    Number(parts[1]) - 1,
-                    Number(parts[2])
-                );
+                var localDate =
+                    new Date(
+                        Number(parts[0]),
+                        Number(parts[1]) - 1,
+                        Number(parts[2])
+                    );
 
-                if (!isNaN(localDate.getTime())) {
+                if (
+                    !isNaN(
+                        localDate.getTime()
+                    )
+                ) {
                     return localDate;
                 }
             }
 
-            var date = new Date(value);
+            var date =
+                new Date(value);
 
-            if (isNaN(date.getTime())) {
+            if (
+                isNaN(
+                    date.getTime()
+                )
+            ) {
                 return null;
             }
 
@@ -2407,21 +2894,33 @@
             currencyISO,
             stdPrecision
         ) {
-            var numericValue = Number(value || 0);
-            var precision = Number(stdPrecision);
+            var numericValue =
+                Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var precision =
+                Number(stdPrecision);
 
             if (
                 isNaN(precision) &&
                 VIS &&
                 VIS.Env &&
                 VIS.Env.getCtx &&
-                VIS.Env.getCtx().getStdPrecision
+                VIS.Env.getCtx()
             ) {
-                precision = Number(
-                    VIS.Env
-                        .getCtx()
-                        .getStdPrecision()
-                );
+                var context =
+                    VIS.Env.getCtx();
+
+                if (
+                    context.getStdPrecision
+                ) {
+                    precision = Number(
+                        context.getStdPrecision()
+                    );
+                }
             }
 
             if (
@@ -2431,37 +2930,29 @@
                 precision = 2;
             }
 
-            var amount =
-                numericValue.toLocaleString(
-                    window.navigator.language,
-                    {
-                        minimumFractionDigits:
-                            precision,
+            return numericValue.toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits:
+                        precision,
 
-                        maximumFractionDigits:
-                            precision
-                    }
-                );
-
-            if (currencySymbol) {
-                return currencySymbol + amount;
-            }
-
-            return currencyISO
-                ? amount + ' ' + currencyISO
-                : amount;
+                    maximumFractionDigits:
+                        precision
+                }
+            );
         }
 
         function normalizeNumber(value) {
-            var numericValue = Number(
-                value || 0
-            );
+            var numericValue =
+                Number(value || 0);
 
             if (isNaN(numericValue)) {
                 return '0';
             }
 
-            return String(numericValue);
+            return String(
+                numericValue
+            );
         }
 
         function showBusy(show) {
@@ -2479,7 +2970,9 @@
         ) {
             if ($state) {
                 $state
-                    .text(message || '')
+                    .text(
+                        message || ''
+                    )
                     .toggleClass(
                         'is-visible',
                         !!show
@@ -2487,13 +2980,19 @@
             }
 
             if ($body) {
-                $body.toggle(!show);
+                $body.toggle(
+                    !show
+                );
             }
         }
 
         function setNoData() {
             totalPages = 0;
             pageNo = 1;
+
+            if ($body) {
+                $body.empty();
+            }
 
             updatePager();
 
@@ -2507,6 +3006,12 @@
         }
 
         this.refreshWidget = function () {
+            if (isDisposed) {
+                return;
+            }
+
+            popupLookups = null;
+
             loadData();
         };
 
@@ -2518,16 +3023,37 @@
             isDisposed = true;
 
             $(document).off(
-                'keydown.vas-upcoming-ap-runs-pay'
+                'keydown.vas-upcoming-ap-runs-pay-' +
+                $self.AD_UserHomeWidgetID
             );
 
             $('body').removeClass(
                 'vas-upcoming-ap-runs-body-lock'
             );
 
+            if ($pagerPrev) {
+                $pagerPrev.off();
+            }
+
+            if ($pagerNext) {
+                $pagerNext.off();
+            }
+
+            if ($payDialogSave) {
+                $payDialogSave.off();
+            }
+
             if ($payDialog) {
+                $payDialog
+                    .find('*')
+                    .off();
+
                 $payDialog.remove();
             }
+
+            $root
+                .find('*')
+                .off();
 
             $root.remove();
 
@@ -2551,6 +3077,7 @@
 
             selectedRun = null;
             selectedPaymentRow = null;
+
             paymentRows = [];
             popupLookups = null;
             runsData = [];
@@ -2558,11 +3085,15 @@
     };
 
     VAS.VAS_031_UpcomingAPRunsWidget.prototype.init =
-        function (windowNo, frame) {
+        function (
+            windowNo,
+            frame
+        ) {
             this.frame = frame;
 
             this.AD_UserHomeWidgetID =
-                frame.widgetInfo.AD_UserHomeWidgetID;
+                frame.widgetInfo
+                    .AD_UserHomeWidgetID;
 
             this.windowNo = windowNo;
 
@@ -2576,7 +3107,10 @@
         };
 
     VAS.VAS_031_UpcomingAPRunsWidget.prototype.widgetSizeChange =
-        function (height, width) {
+        function (
+            height,
+            width
+        ) {
         };
 
     VAS.VAS_031_UpcomingAPRunsWidget.prototype.dispose =

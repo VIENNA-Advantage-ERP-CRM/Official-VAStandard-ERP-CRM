@@ -40,7 +40,7 @@
         var isDisposed = false;
         var methodsData = [];
         var pageNo = 1;
-        var pageSize = 4;
+        var pageSize = 3;
         var totalPages = 0;
 
         function lbl(key, fallback) {

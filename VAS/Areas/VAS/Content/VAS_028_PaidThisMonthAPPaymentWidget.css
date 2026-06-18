@@ -47,6 +47,10 @@
     display: flex;
 }
 
+.vas-ptm-ap-busy {
+    background: rgba(255, 255, 255, 0.55);
+}
+
     .vas-ptm-root.vas-ptm-ap-root,
     .vas-ptm-root.vas-ptm-ap-root * {
         box-sizing: border-box;

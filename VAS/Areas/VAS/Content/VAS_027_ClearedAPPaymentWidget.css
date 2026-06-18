@@ -47,6 +47,10 @@
     display: flex;
 }
 
+.vas-finance-kpi-busy {
+    background: rgba(255, 255, 255, 0.55);
+}
+
     .vas-finance-kpi-root,
     .vas-finance-kpi-root * {
         box-sizing: border-box;
