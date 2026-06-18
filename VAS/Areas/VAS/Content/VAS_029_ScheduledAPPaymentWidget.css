@@ -364,6 +364,15 @@
     font-weight: 700;
 }
 
+.vas-scheduled-ap-payment-dialog-busy {
+    display: flex;
+    visibility: hidden;
+}
+
+.vas-scheduled-ap-payment-dialog-busy.is-visible {
+    visibility: visible;
+}
+
 .vas-scheduled-ap-payment-dialog,
 .vas-scheduled-ap-payment-dialog * {
     font-weight: 700;

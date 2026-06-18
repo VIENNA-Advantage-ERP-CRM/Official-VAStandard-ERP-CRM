@@ -162,12 +162,12 @@ namespace VAS.Controllers
 
             if (pageSize <= 0)
             {
-                pageSize = 10;
+                pageSize = 8;
             }
 
             if (pageSize > 20)
             {
-                pageSize = 20;
+                pageSize = 8;
             }
 
             string paymentAccessSql =

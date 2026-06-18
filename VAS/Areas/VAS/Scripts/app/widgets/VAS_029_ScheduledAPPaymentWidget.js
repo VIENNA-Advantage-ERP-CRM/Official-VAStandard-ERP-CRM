@@ -682,6 +682,7 @@
                 return;
             }
 
+            $dialogBusy.toggleClass('is-visible', !!show);
             $dialogBusy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
