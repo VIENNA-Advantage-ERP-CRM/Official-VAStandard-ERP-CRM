@@ -10,6 +10,10 @@
  *  3  | Loading                              | VAS_033_MessageLoading
  *  4  | No Data                              | VAS_033_MessageNoData
  *  5  | Not Specified                        | VAS_033_MessageNotSpecified
+ *  6  | Previous                             | VAS_Previous
+ *  7  | Next                                 | VAS_Next
+ *  8  | Could not load data                  | VAS_ErrorLoading
+ *  9  | Of                                   | VAS_Of
  * ─────────────────────────────────────────────────────────────────────
  */
 

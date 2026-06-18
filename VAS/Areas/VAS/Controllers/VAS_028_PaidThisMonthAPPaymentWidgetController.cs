@@ -208,9 +208,9 @@ namespace VAS.Controllers
                 pageSize = 10;
             }
 
-            if (pageSize > 100)
+            if (pageSize > 50)
             {
-                pageSize = 100;
+                pageSize = 50;
             }
 
             IDataReader dr = null;
@@ -1023,15 +1023,20 @@ AND ColumnData.ColumnName =
 
         private JsonResult GetSessionExpiredResult()
         {
+            Ctx ctx = Env.GetCtx();
+            string sessionExpired =
+                GetMsg(
+                    ctx,
+                    "SessionExpired",
+                    "Session Expired"
+                );
+
             return Json(
                 new
                 {
                     error = true,
 
-                    errorText = Msg.GetMsg(
-                        Env.GetCtx(),
-                        "SessionExpired"
-                    ) ?? "Session Expired"
+                    errorText = sessionExpired
                 },
                 JsonRequestBehavior.AllowGet
             );

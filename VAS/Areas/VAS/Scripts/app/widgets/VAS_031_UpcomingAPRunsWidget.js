@@ -13,6 +13,47 @@
  *  4  | payments                             | VAS_031_MessagePayments
  *  5  | Loading                              | VAS_031_MessageLoading
  *  6  | No Data                              | VAS_031_MessageNoData
+ *  7  | Previous                             | VAS_Previous
+ *  8  | Next                                 | VAS_Next
+ *  9  | Could not load data                  | VAS_ErrorLoading
+ * 10  | Of                                   | VAS_Of
+ * 11  | Not Specified                        | VAS_031_MessageNotSpecified
+ * 12  | Pay                                  | VAS_031_MessagePay
+ * 13  | Create Payment                       | VAS_031_MessageCreatePayment
+ * 14  | Pre-filled from upcoming             | VAS_031_MessagePrefilledFromUpcoming
+ * 15  | Loading payment details              | VAS_031_MessageLoadingDetails
+ * 16  | Organization                         | VAS_031_MessageOrganization
+ * 17  | Bank Account                         | VAS_031_MessageBankAccount
+ * 18  | Transaction Date                     | VAS_031_MessageTransactionDate
+ * 19  | Vendor                               | VAS_032_MessageVendor
+ * 20  | Currency                             | VAS_PaymentCurrency
+ * 21  | Currency Type                        | VAS_031_MessageCurrencyType
+ * 22  | Spot                                 | VAS_031_MessageSpot
+ * 23  | Document Type                        | VAS_031_MessageDocumentType
+ * 24  | Tender Type                          | VAS_031_MessageTenderType
+ * 25  | Payment Amount                       | VAS_031_MessagePaymentAmount
+ * 26  | Document No.                         | VAS_031_MessageDocumentNo
+ * 27  | PRE-FILLED                           | VAS_031_MessagePrefilled
+ * 28  | Select                               | VAS_Select
+ * 29  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
+ * 30  | Review and save.                     | VAS_031_MessageReviewAndSave
+ * 31  | Organization is required.            | VAS_031_MessageOrganizationRequired
+ * 32  | Bank account is required.            | VAS_031_MessageBankAccountRequired
+ * 33  | Vendor is required.                  | VAS_031_MessageVendorRequired
+ * 34  | Currency is required.                | VAS_031_MessageCurrencyRequired
+ * 35  | Currency type is required.           | VAS_031_MessageConversionTypeRequired
+ * 36  | Document type is required.           | VAS_031_MessageDocumentTypeRequired
+ * 37  | Tender type is required.             | VAS_031_MessageTenderTypeRequired
+ * 38  | Transaction date is required.        | VAS_031_MessageTransactionDateRequired
+ * 39  | Payment amount must be greater...    | VAS_031_MessagePaymentAmountRequired
+ * 40  | Saving                               | VAS_031_MessageSaving
+ * 41  | Save payment                         | VAS_031_MessageSavePayment
+ * 42  | Close                                | VAS_Close
+ * 43  | Generated from Upcoming · 7 days     | VAS_031_MessageGeneratedFromUpcoming
+ * 44  | Cancel                               | VAS_Cancel
+ * 45  | Transaction date must be in...       | VAS_031_MessageTransactionDateInvalid
+ * 46  | Could not save AP payment            | VAS_031_MessageCouldNotSaveAPPayment
+ * 47  | Upcoming AP payment created...       | VAS_031_MessagePaymentCreatedSuccessfully
  * ─────────────────────────────────────────────────────────────────────
  */
 

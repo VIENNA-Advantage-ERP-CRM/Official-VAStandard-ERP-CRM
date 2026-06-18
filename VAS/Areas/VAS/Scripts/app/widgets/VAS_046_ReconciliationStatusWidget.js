@@ -13,6 +13,7 @@
  *  6  | Review unmatched                     | VAS_046_ReviewUnmatched
  *  7  | Loading                              | VAS_046_Loading
  *  8  | No Data                              | VAS_046_NoData
+ *  9  | Could not load data                  | VAS_ErrorLoading
  * ─────────────────────────────────────────────────────────────────────
  */
 

@@ -1161,7 +1161,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Session Expired"
+                        error = GetMsg(Env.GetCtx(), "SessionExpired", "Session Expired")
                     }
                 );
             }
@@ -1172,7 +1172,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Organization is required"
+                        error = GetMsg(ctx, "VAS_031_MessageOrganizationRequired", "Organization is required.")
                     }
                 );
             }
@@ -1183,7 +1183,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Bank account is required"
+                        error = GetMsg(ctx, "VAS_031_MessageBankAccountRequired", "Bank account is required.")
                     }
                 );
             }
@@ -1194,7 +1194,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Vendor is required"
+                        error = GetMsg(ctx, "VAS_031_MessageVendorRequired", "Vendor is required.")
                     }
                 );
             }
@@ -1205,7 +1205,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Currency is required"
+                        error = GetMsg(ctx, "VAS_031_MessageCurrencyRequired", "Currency is required.")
                     }
                 );
             }
@@ -1216,7 +1216,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Conversion type is required"
+                        error = GetMsg(ctx, "VAS_031_MessageConversionTypeRequired", "Currency type is required.")
                     }
                 );
             }
@@ -1227,7 +1227,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Document type is required"
+                        error = GetMsg(ctx, "VAS_031_MessageDocumentTypeRequired", "Document type is required.")
                     }
                 );
             }
@@ -1242,7 +1242,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Tender type is required"
+                        error = GetMsg(ctx, "VAS_031_MessageTenderTypeRequired", "Tender type is required.")
                     }
                 );
             }
@@ -1253,7 +1253,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Payment amount must be greater than zero"
+                        error = GetMsg(ctx, "VAS_031_MessagePaymentAmountRequired", "Payment amount must be greater than zero.")
                     }
                 );
             }
@@ -1271,7 +1271,7 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Transaction date must be in yyyy-MM-dd format"
+                        error = GetMsg(ctx, "VAS_031_MessageTransactionDateInvalid", "Transaction date must be in yyyy-MM-dd format.")
                     }
                 );
             }
@@ -1502,7 +1502,7 @@ ORDER BY
                 if (!payment.Save())
                 {
                     string modelError =
-                        "Could not save AP payment";
+                        GetMsg(ctx, "VAS_031_MessageCouldNotSaveAPPayment", "Could not save AP payment");
 
                     try
                     {
@@ -1528,7 +1528,7 @@ ORDER BY
                     catch
                     {
                         modelError =
-                            "Could not save AP payment";
+                            GetMsg(ctx, "VAS_031_MessageCouldNotSaveAPPayment", "Could not save AP payment");
                     }
 
                     throw new Exception(
@@ -1553,7 +1553,7 @@ ORDER BY
                             payment.GetDocStatus(),
 
                         message =
-                            "Upcoming AP payment created successfully"
+                            GetMsg(ctx, "VAS_031_MessagePaymentCreatedSuccessfully", "Upcoming AP payment created successfully")
                     }
                 );
             }
@@ -2139,7 +2139,7 @@ AND ColumnData.ColumnName =
                 new
                 {
                     error = true,
-                    errorText = "Session Expired"
+                    errorText = GetMsg(Env.GetCtx(), "SessionExpired", "Session Expired")
                 },
                 JsonRequestBehavior.AllowGet
             );

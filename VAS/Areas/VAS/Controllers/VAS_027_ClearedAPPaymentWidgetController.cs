@@ -162,12 +162,12 @@ namespace VAS.Controllers
 
             if (pageSize <= 0)
             {
-                pageSize = 25;
+                pageSize = 10;
             }
 
-            if (pageSize > 100)
+            if (pageSize > 20)
             {
-                pageSize = 100;
+                pageSize = 20;
             }
 
             string paymentAccessSql =
@@ -985,11 +985,19 @@ PaymentAccess.VA009_PaymentMethod_ID
 
         private JsonResult GetSessionExpiredResult()
         {
+            Ctx ctx = Env.GetCtx();
+            string sessionExpired =
+                GetMsg(
+                    ctx,
+                    "SessionExpired",
+                    "Session Expired"
+                );
+
             return Json(
                 new
                 {
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    error = sessionExpired,
+                    errorText = sessionExpired
                 },
                 JsonRequestBehavior.AllowGet
             );

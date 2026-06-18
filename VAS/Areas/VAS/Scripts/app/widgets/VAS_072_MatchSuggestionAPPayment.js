@@ -24,6 +24,44 @@
  * 16  | Previous                                          | VAS_Previous
  * 17  | Next                                              | VAS_Next
  * 18  | Of                                                | VAS_Of
+ * 19  | Match review                                      | VAS_072_MatchReview
+ * 20  | Could not load match details                       | VAS_072_LoadDetailError
+ * 21  | Strong match                                      | VAS_072_HighConfidenceMatch
+ * 22  | Needs review                                      | VAS_072_NeedsReview
+ * 23  | payment and invoice line up                       | VAS_072_PaymentAndInvoiceLineUp
+ * 24  | Vendor, amount and timing all agree.              | VAS_072_MatchSignalsAgree
+ * 25  | Confidence                                        | VAS_072_Confidence
+ * 26  | Vendor payment                                    | VAS_072_VendorPayment
+ * 27  | Payment date                                      | VAS_PaymentDate
+ * 28  | Vendor                                            | VAS_Vendor
+ * 29  | Payment method                                    | VAS_035_PaymentMethod
+ * 30  | Reference                                         | VAS_035_Reference
+ * 31  | Bank account                                      | VAS_011_BankAccount
+ * 32  | Currency                                          | VAS_PaymentCurrency
+ * 33  | Amount paid                                       | VAS_072_AmountPaid
+ * 34  | Suggested invoice                                 | VAS_035_SuggestedInvoice
+ * 35  | Invoice date                                      | VAS_035_InvoiceDate
+ * 36  | Payment terms                                     | VAS_035_PaymentTerms
+ * 37  | Due date                                          | VAS_035_DueDate
+ * 38  | Grand total                                       | VAS_035_GrandTotal
+ * 39  | Open amount                                       | VAS_035_OpenAmount
+ * 40  | balance — fully settles the invoice               | VAS_035_FullySettles
+ * 41  | still open after apply                            | VAS_035_StillOpen
+ * 42  | Why this match                                    | VAS_035_WhyThisMatch
+ * 43  | Vendor matches                                    | VAS_072_VendorMatches
+ * 44  | Payment and invoice belong to the same vendor     | VAS_072_VendorMatchesDetail
+ * 45  | Amount matches                                    | VAS_035_AmountMatches
+ * 46  | Amount differs                                    | VAS_035_AmountDiffers
+ * 47  | vs                                                | VAS_035_Vs
+ * 48  | Reference cited                                   | VAS_035_ReferenceCited
+ * 49  | No reference cited                                | VAS_035_NoReferenceCited
+ * 50  | Within due window                                 | VAS_035_WithinDueWindow
+ * 51  | Outside due window                                | VAS_035_OutsideDueWindow
+ * 52  | Apply as part-payment                             | VAS_035_ApplyPartPayment
+ * 53  | Apply allocation                                  | VAS_035_ApplyAllocation
+ * 54  | Close                                             | VAS_Close
+ * 55  | High-confidence — safe to apply                   | VAS_072_HighConfidenceSafe
+ * 56  | Skip                                              | VAS_035_Skip
  * ──────────────────────────────────────────────────────────────────────────────
  */
 

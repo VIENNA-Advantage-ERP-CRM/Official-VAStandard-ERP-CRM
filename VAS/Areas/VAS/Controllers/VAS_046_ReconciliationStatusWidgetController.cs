@@ -18,10 +18,13 @@ namespace VAS.Controllers
         {
             if (Session["ctx"] == null)
             {
+                Ctx fallbackCtx = Env.GetCtx();
+                string sessionExpired = GetMsg(fallbackCtx, "SessionExpired", "Session Expired");
+
                 return Json(new
                 {
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    error = sessionExpired,
+                    errorText = sessionExpired
                 }, JsonRequestBehavior.AllowGet);
             }
 
@@ -29,10 +32,12 @@ namespace VAS.Controllers
 
             if (ctx == null)
             {
+                string sessionExpired = GetMsg(Env.GetCtx(), "SessionExpired", "Session Expired");
+
                 return Json(new
                 {
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    error = sessionExpired,
+                    errorText = sessionExpired
                 }, JsonRequestBehavior.AllowGet);
             }
 

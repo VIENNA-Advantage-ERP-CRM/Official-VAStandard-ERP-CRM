@@ -1,6 +1,30 @@
 /**
  * Auto Allocated AP Payment Widget
- * Widget: VAS_056_AutoAllocatedAPPayment
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────────────
+ *  #  | Current Text                                      | Message Key
+ * ----+---------------------------------------------------+------------------------------
+ *  1  | No payments in this period                        | VAS_056_NoPaymentsThisPeriod
+ *  2  | payment                                           | VAS_056_Payment
+ *  3  | payments                                          | VAS_056_Payments
+ *  4  | Showing                                           | VAS_Showing
+ *  5  | of                                                | VAS_Of
+ *  6  | Payment allocation                                | VAS_056_PaymentAllocation
+ *  7  | Allocated vs unallocated payments in the last...   | VAS_056_AllocatedVsUnallocated
+ *  8  | Close                                             | VAS_Close
+ *  9  | Allocated                                         | VAS_Allocated
+ * 10  | Unallocated                                       | VAS_Unallocated
+ * 11  | Date                                              | VAS_Date
+ * 12  | Payment No.                                       | VAS_056_PaymentNo
+ * 13  | Vendor                                            | VAS_Vendor
+ * 14  | Bank account                                      | VAS_BankAccount
+ * 15  | Payment Currency                                  | VAS_PaymentCurrency
+ * 16  | Amount                                            | VAS_Amount
+ * 17  | Previous                                          | VAS_Previous
+ * 18  | Next                                              | VAS_Next
+ * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
+ * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
+ * ──────────────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};

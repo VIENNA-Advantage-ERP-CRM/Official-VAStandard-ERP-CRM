@@ -25,6 +25,7 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
     padding: 0.875em;
     gap: 0.5em;
     border-radius: 14px;
@@ -33,6 +34,17 @@
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+}
+
+.vas-recent-ap-payments-card:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+}
+
+.vas-recent-ap-payments-card:focus-visible {
+    outline: 2px solid #0083da;
+    outline-offset: 2px;
 }
 
 .vas-recent-ap-payments-head {

@@ -5,11 +5,30 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Scheduled                            | VAS_029_MessageScheduled
+ *  1  | Due This Week                        | VAS_029_MessageScheduled
  *  2  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
  *  3  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
  *  4  | Loading                              | VAS_029_MessageLoading
  *  5  | No Data                              | VAS_029_MessageNoData
+ *  6  | Could not load data                  | VAS_ErrorLoading
+ *  7  | Not Specified                        | VAS_029_MessageNotSpecified
+ *  8  | invoices                             | VAS_029_MessageInvoices
+ *  9  | Showing                              | VIS_Showing
+ * 10  | Of                                   | VIS_Of
+ * 11  | Close                                | VIS_Close
+ * 12  | Total due                            | VAS_029_MessageTotalDue
+ * 13  | Vendors                              | VAS_029_MessageVendors
+ * 14  | Payment methods                      | VAS_029_MessagePaymentMethods
+ * 15  | Invoice No.                          | VIS_InvoiceNo
+ * 16  | Invoice date                         | VIS_InvoiceDate
+ * 17  | Vendor                               | VAS_032_MessageVendor
+ * 18  | Due date                             | VIS_DueDate
+ * 19  | Currency                             | VAS_PaymentCurrency
+ * 20  | Amount                               | VAS_032_MessageAmount
+ * 21  | Method                               | VAS_032_MessageMethod
+ * 22  | Previous                             | VIS_Previous
+ * 23  | Next                                 | VIS_Next
+ * 24  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
  * ─────────────────────────────────────────────────────────────────────
  */
 

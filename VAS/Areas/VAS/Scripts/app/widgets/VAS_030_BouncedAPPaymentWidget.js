@@ -3,12 +3,29 @@
  * Purpose - Shows outgoing AP payments that were bounced or rejected
  * and need re-issue.
  *
- * Labels / Message Keys
- * 1 | Bounced             | VAS_030_MessageBounced
- * 2 | Need re-issue       | VAS_030_MessageNeedReissue
- * 3 | Loading             | VAS_030_MessageLoading
- * 4 | No Data             | VAS_030_MessageNoData
- * 5 | Bounced AP payments | VAS_030_MessageBouncedAPPayments
+ * ── Labels / Message Keys ─────────────────────────────────────────────────────
+ *  #  | Current Text                                      | Message Key
+ * ----+---------------------------------------------------+------------------------------
+ *  1  | Bounced                                           | VAS_030_MessageBounced
+ *  2  | Need re-issue                                     | VAS_030_MessageNeedReissue
+ *  3  | Loading                                           | VAS_030_MessageLoading
+ *  4  | No Data                                           | VAS_030_MessageNoData
+ *  5  | Bounced AP payments                               | VAS_030_MessageBouncedAPPayments
+ *  6  | Could not load data                               | VAS_ErrorLoading
+ *  7  | Showing                                           | VAS_Showing
+ *  8  | of                                                | VAS_Of
+ *  9  | Close                                             | VAS_Close
+ * 10  | Payment No.                                       | VAS_030_MessagePaymentNo
+ * 11  | Date                                              | VAS_Date
+ * 12  | Vendor                                            | VAS_Vendor
+ * 13  | Bank account                                      | VAS_BankAccount
+ * 14  | Payment Currency                                  | VAS_PaymentCurrency
+ * 15  | Amount                                            | VAS_Amount
+ * 16  | Method                                            | VAS_Method
+ * 17  | Status                                            | VAS_Status
+ * 18  | Previous                                          | VAS_Previous
+ * 19  | Next                                              | VAS_Next
+ * ──────────────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};

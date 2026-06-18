@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -28,57 +28,96 @@ namespace VAS.Controllers
         {
             string periodFilter = PeriodFilterMonth;
 
-            if (Session["ctx"] == null)
-            {
-                return Json(new
-                {
-                    error = "Session Expired",
-                    errorText = "Session Expired"
-                }, JsonRequestBehavior.AllowGet);
-            }
-
-            Ctx ctx = Session["ctx"] as Ctx;
+            Ctx ctx = GetContext();
 
             if (ctx == null)
             {
-                return Json(new
-                {
-                    error = "Session Expired",
-                    errorText = "Session Expired"
-                }, JsonRequestBehavior.AllowGet);
+                return GetSessionExpiredResult();
             }
 
             IDataReader dr = null;
+            string sql = string.Empty;
 
             try
             {
-                if (string.IsNullOrEmpty(periodFilter))
+                if (string.IsNullOrWhiteSpace(periodFilter))
                 {
                     periodFilter = PeriodFilterMonth;
                 }
 
-                periodFilter = periodFilter.ToUpper();
+                periodFilter = periodFilter.ToUpperInvariant();
 
-                bool isYTD = periodFilter == PeriodFilterYTD;
+                bool isYTD =
+                    periodFilter == PeriodFilterYTD;
 
-                SqlQueryData queryData = BuildPaymentMethodsSql(ctx, isYTD);
+                sql = BuildPaymentMethodsSql(
+                    ctx,
+                    isYTD
+                );
 
-                dr = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
+                dr = DB.ExecuteReader(
+                    sql,
+                    null,
+                    null
+                );
 
-                List<PaymentMethodSummary> rows = new List<PaymentMethodSummary>();
+                List<PaymentMethodSummary> rows =
+                    new List<PaymentMethodSummary>();
+
                 decimal totalAmount = 0;
+
                 int cCurrencyId = 0;
                 int stdPrecision = 2;
+
                 string currencyISO = string.Empty;
                 string currencySymbol = string.Empty;
 
                 while (dr != null && dr.Read())
                 {
-                    decimal paymentAmount = Util.GetValueOfDecimal(dr["PaymentAmount"]);
-                    int rowCurrencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
-                    int rowPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
-                    string rowCurrencyISO = Util.GetValueOfString(dr["CurrencyISO"]);
-                    string rowCurrencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]);
+                    int rowPrecision =
+                        NormalizePrecision(
+                            GetInt(
+                                dr,
+                                "StdPrecision",
+                                2
+                            )
+                        );
+
+                    decimal paymentAmount =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "PaymentAmount",
+                                0
+                            ),
+                            rowPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
+
+                    int rowCurrencyId =
+                        GetInt(
+                            dr,
+                            "C_Currency_ID"
+                        );
+
+                    string rowCurrencyISO =
+                        GetString(
+                            dr,
+                            "CurrencyISO",
+                            string.Empty
+                        );
+
+                    string rowCurrencySymbol =
+                        GetString(
+                            dr,
+                            "CurrencySymbol",
+                            string.Empty
+                        );
+
+                    if (string.IsNullOrWhiteSpace(rowCurrencySymbol))
+                    {
+                        rowCurrencySymbol = rowCurrencyISO;
+                    }
 
                     if (cCurrencyId == 0)
                     {
@@ -88,188 +127,343 @@ namespace VAS.Controllers
                         currencySymbol = rowCurrencySymbol;
                     }
 
-                    rows.Add(new PaymentMethodSummary
-                    {
-                        PaymentMethodName = Util.GetValueOfString(dr["PaymentMethodName"]),
-                        PaymentCount = Util.GetValueOfInt(dr["PaymentCount"]),
-                        PaymentAmount = paymentAmount,
-                        CCurrencyId = rowCurrencyId,
-                        StdPrecision = rowPrecision,
-                        CurrencyISO = rowCurrencyISO,
-                        CurrencySymbol = rowCurrencySymbol
-                    });
+                    string paymentMethodName =
+                        FirstNotEmpty(
+                            GetString(
+                                dr,
+                                "PaymentMethodName",
+                                string.Empty
+                            ),
+
+                            GetString(
+                                dr,
+                                "PaymentRule",
+                                string.Empty
+                            )
+                        );
+
+                    rows.Add(
+                        new PaymentMethodSummary
+                        {
+                            PaymentMethodName =
+                                paymentMethodName,
+
+                            PaymentCount =
+                                GetInt(
+                                    dr,
+                                    "PaymentCount"
+                                ),
+
+                            PaymentAmount =
+                                paymentAmount,
+
+                            CCurrencyId =
+                                rowCurrencyId,
+
+                            StdPrecision =
+                                rowPrecision,
+
+                            CurrencyISO =
+                                rowCurrencyISO,
+
+                            CurrencySymbol =
+                                rowCurrencySymbol
+                        }
+                    );
 
                     totalAmount += paymentAmount;
                 }
 
-                List<object> methods = new List<object>();
+                CloseReader(dr);
+                dr = null;
+
+                List<object> methods =
+                    new List<object>();
 
                 foreach (PaymentMethodSummary row in rows)
                 {
-                    string paymentMethodName = row.PaymentMethodName;
+                    string paymentMethodName =
+                        row.PaymentMethodName;
 
-                    if (string.IsNullOrEmpty(paymentMethodName))
+                    if (string.IsNullOrWhiteSpace(paymentMethodName))
                     {
-                        paymentMethodName = GetMsg(ctx, "VAS_033_MessageNotSpecified", "Not Specified");
+                        paymentMethodName = GetMsg(
+                            ctx,
+                            "VAS_033_MessageNotSpecified",
+                            "Not Specified"
+                        );
                     }
 
                     decimal percentage = 0;
 
                     if (totalAmount > 0)
                     {
-                        percentage = decimal.Round((row.PaymentAmount * 100M) / totalAmount, 2);
+                        percentage = decimal.Round(
+                            row.PaymentAmount * 100M /
+                            totalAmount,
+                            2,
+                            MidpointRounding.AwayFromZero
+                        );
                     }
 
-                    methods.Add(new
-                    {
-                        paymentMethodName = paymentMethodName,
-                        paymentCount = row.PaymentCount,
-                        paymentAmount = row.PaymentAmount,
-                        cCurrencyId = row.CCurrencyId,
-                        stdPrecision = row.StdPrecision,
-                        currencyISO = row.CurrencyISO,
-                        currencySymbol = row.CurrencySymbol,
-                        symbol = row.CurrencySymbol,
-                        percentage = percentage
-                    });
+                    methods.Add(
+                        new
+                        {
+                            paymentMethodName =
+                                paymentMethodName,
+
+                            paymentCount =
+                                row.PaymentCount,
+
+                            paymentAmount =
+                                row.PaymentAmount,
+
+                            cCurrencyId =
+                                row.CCurrencyId,
+
+                            stdPrecision =
+                                row.StdPrecision,
+
+                            currencyISO =
+                                row.CurrencyISO,
+
+                            currencySymbol =
+                                row.CurrencySymbol,
+
+                            symbol =
+                                row.CurrencySymbol,
+
+                            percentage =
+                                percentage
+                        }
+                    );
                 }
 
-                DateRangeResult dateRange = GetPeriodDateRange(ctx, isYTD);
+                DateRangeResult dateRange =
+                    GetPeriodDateRange(
+                        ctx,
+                        isYTD
+                    );
 
-                return Json(new
-                {
-                    title = GetMsg(ctx, "VAS_033_MessagePaymentMethods", "Payment methods"),
-                    description = GetMsg(ctx, "VAS_033_MessagePaymentMethodWhy", "Upi is cheapest - shift small payments where possible"),
-                    totalAmount = totalAmount,
-                    cCurrencyId = cCurrencyId,
-                    stdPrecision = stdPrecision,
-                    currencyISO = currencyISO,
-                    currencySymbol = currencySymbol,
-                    symbol = currencySymbol,
-                    dateFrom = dateRange != null && dateRange.DateFrom.HasValue ? FormatDate(dateRange.DateFrom.Value) : "",
-                    dateTo = dateRange != null && dateRange.DateTo.HasValue ? FormatDate(dateRange.DateTo.Value) : "",
-                    periodFilter = isYTD ? PeriodFilterYTD : PeriodFilterMonth,
-                    methods = methods
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        title = GetMsg(
+                            ctx,
+                            "VAS_033_MessagePaymentMethods",
+                            "Payment methods"
+                        ),
+
+                        description = GetMsg(
+                            ctx,
+                            "VAS_033_MessagePaymentMethodWhy",
+                            "Upi is cheapest - shift small payments where possible"
+                        ),
+
+                        totalAmount =
+                            Math.Round(
+                                totalAmount,
+                                NormalizePrecision(stdPrecision),
+                                MidpointRounding.AwayFromZero
+                            ),
+
+                        cCurrencyId = cCurrencyId,
+                        stdPrecision = stdPrecision,
+                        currencyISO = currencyISO,
+                        currencySymbol = currencySymbol,
+                        symbol = currencySymbol,
+
+                        dateFrom =
+                            dateRange != null &&
+                            dateRange.DateFrom.HasValue
+                                ? FormatDate(
+                                    dateRange.DateFrom.Value
+                                )
+                                : string.Empty,
+
+                        dateTo =
+                            dateRange != null &&
+                            dateRange.DateTo.HasValue
+                                ? FormatDate(
+                                    dateRange.DateTo.Value
+                                )
+                                : string.Empty,
+
+                        periodFilter =
+                            isYTD
+                                ? PeriodFilterYTD
+                                : PeriodFilterMonth,
+
+                        methods = methods
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    error = ex.Message
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        error = ex.Message,
+                        errorText = ex.Message,
+                        sql = sql
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             finally
             {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
+                CloseReader(dr);
             }
         }
-        private SqlQueryData BuildPaymentMethodsSql(Ctx ctx, bool isYTD)
+
+        private string BuildPaymentMethodsSql(
+            Ctx ctx,
+            bool isYTD
+        )
         {
-            bool hasPaymentMethod = HasPaymentMethodColumn();
-            bool hasPaymentMethodName = hasPaymentMethod && HasPaymentMethodNameColumn();
-            bool hasPaymentMethodValue = hasPaymentMethod && HasPaymentMethodValueColumn();
-            bool hasPaymentRule = HasPaymentRuleColumn();
+            bool hasPaymentMethod =
+                HasPaymentMethodColumn();
 
-            string paymentMethodNameSelect = GetEmptyTextSql();
-            string paymentMethodListSql = string.Empty;
-            string paymentJoinCondition = string.Empty;
+            bool hasPaymentRule =
+                HasPaymentRuleColumn();
 
-            if (hasPaymentMethod)
-            {
-                //if (hasPaymentMethodName)
-                //{
-                //    paymentMethodNameSelect = GetTextSql("PaymentMethod.Name");
-                //}
-                //else if (hasPaymentMethodValue)
-                //{
-                //    paymentMethodNameSelect = GetTextSql("PaymentMethod.Value");
-                //}
-                //else
-                //{
-                //    paymentMethodNameSelect = GetTextSql("PaymentMethod.VA009_PaymentMethod_ID");
-                //}
+            string clientIdSql =
+                ctx.GetAD_Client_ID().ToString(
+                    CultureInfo.InvariantCulture
+                );
 
-                paymentMethodListSql = @"
-PaymentMethodList AS
+            string paymentMethodNameColumn =
+                hasPaymentMethod
+                    ? GetPaymentMethodNameColumn(
+                        "PaymentMethod"
+                    )
+                    : string.Empty;
+
+            bool usePaymentMethodTable =
+                hasPaymentMethod &&
+                !string.IsNullOrWhiteSpace(
+                    paymentMethodNameColumn
+                );
+
+            string paymentMethodIdSelect =
+                hasPaymentMethod
+                    ? "COALESCE(Payment.VA009_PaymentMethod_ID, 0)"
+                    : "0";
+
+            string paymentMethodNameSelect =
+                usePaymentMethodTable
+                    ? paymentMethodNameColumn
+                    : "NULL";
+
+            string paymentRuleSelect =
+                hasPaymentRule
+                    ? "Payment.PaymentRule"
+                    : "NULL";
+
+            string paymentMethodColumnInAccess =
+                hasPaymentMethod
+                    ? @",
+    Payment.VA009_PaymentMethod_ID"
+                    : string.Empty;
+
+            string paymentRuleColumnInAccess =
+                hasPaymentRule
+                    ? @",
+    Payment.PaymentRule"
+                    : string.Empty;
+
+            string paymentMethodJoin =
+                usePaymentMethodTable
+                    ? @"
+LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 (
-SELECT
-PaymentMethod.VA009_PaymentMethod_ID,
-PaymentMethod.VA009_Name AS PaymentMethodName
-FROM VA009_PaymentMethod PaymentMethod
-WHERE PaymentMethod.IsActive = 'Y'
-AND PaymentMethod.AD_Client_ID IN (0, @AD_Client_ID)
-)";
+    PaymentMethod.VA009_PaymentMethod_ID =
+    Payment.VA009_PaymentMethod_ID
+)"
+                    : string.Empty;
 
-                paymentJoinCondition = "Payment.VA009_PaymentMethod_ID = PaymentMethodList.VA009_PaymentMethod_ID";
-            }
-            else if (hasPaymentRule)
-            {
-                paymentMethodListSql = @"
-PaymentMethodList AS
-(
-SELECT DISTINCT
-Payment.PaymentRule AS PaymentRule,
-" + GetTextSql("Payment.PaymentRule") + @" AS PaymentMethodName
-FROM C_Payment Payment
-WHERE Payment.IsActive = 'Y'
-AND Payment.PaymentRule IS NOT NULL
-)";
+            string paymentMethodGroupBy =
+                usePaymentMethodTable
+                    ? @",
+    " + paymentMethodNameColumn
+                    : string.Empty;
 
-                paymentJoinCondition = "Payment.PaymentRule = PaymentMethodList.PaymentRule";
-            }
-            else
-            {
-                paymentMethodListSql = @"
-PaymentMethodList AS
-(
-SELECT
-CAST(NULL AS CHAR(1)) AS PaymentMethodName
-FROM AD_ClientInfo ClientInfo
-WHERE ClientInfo.AD_Client_ID = @AD_Client_ID
-)";
-
-                paymentJoinCondition = "1 = 1";
-            }
+            string paymentRuleGroupBy =
+                hasPaymentRule
+                    ? @",
+    Payment.PaymentRule"
+                    : string.Empty;
 
             string schemaCurrencySql = @"
 SchemaCurrency AS
 (
-SELECT
-ClientInfo.AD_Client_ID,
-AcctSchema.C_Currency_ID AS C_Currency_ID,
-Currency.StdPrecision,
-" + GetTextSql("Currency.ISO_Code") + @" AS ISO_Code,
-CASE
-    WHEN Currency.CurSymbol IS NOT NULL THEN " + GetTextSql("Currency.CurSymbol") + @"
-    ELSE " + GetTextSql("Currency.ISO_Code") + @"
-END AS Cur_Symbol
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
-INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
-WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+    SELECT
+        ClientInfo.AD_Client_ID,
+
+        AcctSchema.C_Currency_ID,
+
+        Currency.StdPrecision,
+
+        Currency.ISO_Code,
+
+        Currency.CurSymbol
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_AcctSchema AcctSchema ON
+    (
+        AcctSchema.C_AcctSchema_ID =
+        ClientInfo.C_AcctSchema1_ID
+    )
+
+    INNER JOIN C_Currency Currency ON
+    (
+        Currency.C_Currency_ID =
+        AcctSchema.C_Currency_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+        " + clientIdSql + @"
 )";
 
             string currentPeriodSql = @"
 CurrentPeriod AS
 (
-SELECT
-Period.C_Period_ID,
-Period.C_Year_ID,
-Period.StartDate,
-Period.EndDate
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
-INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
-WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
-AND " + GetCurrentTimestampSql() + @" >= CAST(Period.StartDate AS TIMESTAMP)
-AND " + GetCurrentTimestampSql() + @" < " + GetDateToExclusiveSql("Period.EndDate") + @"
+    SELECT
+        Period.C_Period_ID,
+        Period.C_Year_ID,
+        Period.StartDate,
+        Period.EndDate
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+        " + clientIdSql + @"
+
+    AND " + GetCurrentDateSql() + @" >=
+        Period.StartDate
+
+    AND " + GetCurrentDateSql() + @" <
+        " + GetDateToExclusiveSql(
+            "Period.EndDate"
+        ) + @"
 )";
 
             string periodRangeSql;
@@ -279,13 +473,32 @@ AND " + GetCurrentTimestampSql() + @" < " + GetDateToExclusiveSql("Period.EndDat
                 periodRangeSql = @"
 PeriodRange AS
 (
-SELECT
-MIN(Period.StartDate) AS StartDate,
-MAX(CurrentPeriod.EndDate) AS EndDate,
-MAX(" + GetDateToExclusiveSql("CurrentPeriod.EndDate") + @") AS EndDateExclusive
-FROM CurrentPeriod CurrentPeriod
-INNER JOIN C_Period Period ON (Period.C_Year_ID = CurrentPeriod.C_Year_ID)
-WHERE Period.StartDate <= CurrentPeriod.EndDate
+    SELECT
+        MIN(
+            Period.StartDate
+        ) AS StartDate,
+
+        MAX(
+            CurrentPeriod.EndDate
+        ) AS EndDate,
+
+        MAX
+        (
+            " + GetDateToExclusiveSql(
+                "CurrentPeriod.EndDate"
+            ) + @"
+        ) AS EndDateExclusive
+
+    FROM CurrentPeriod CurrentPeriod
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        CurrentPeriod.C_Year_ID
+    )
+
+    WHERE Period.StartDate <=
+        CurrentPeriod.EndDate
 )";
             }
             else
@@ -293,140 +506,251 @@ WHERE Period.StartDate <= CurrentPeriod.EndDate
                 periodRangeSql = @"
 PeriodRange AS
 (
-SELECT
-CurrentPeriod.StartDate AS StartDate,
-CurrentPeriod.EndDate AS EndDate,
-" + GetDateToExclusiveSql("CurrentPeriod.EndDate") + @" AS EndDateExclusive
-FROM CurrentPeriod CurrentPeriod
+    SELECT
+        CurrentPeriod.StartDate AS StartDate,
+
+        CurrentPeriod.EndDate AS EndDate,
+
+        " + GetDateToExclusiveSql(
+            "CurrentPeriod.EndDate"
+        ) + @" AS EndDateExclusive
+
+    FROM CurrentPeriod CurrentPeriod
 )";
             }
 
             string paymentAccessSql = @"
 SELECT
-Payment.C_Payment_ID,
-Payment.AD_Client_ID,
-Payment.AD_Org_ID,
-Payment.C_Currency_ID,
-Payment.C_ConversionType_ID,
-Payment.DateAcct,
-Payment.PayAmt"
-        + (hasPaymentRule ? @",
-Payment.PaymentRule" : string.Empty)
-        + (hasPaymentMethod ? @",
-Payment.VA009_PaymentMethod_ID" : string.Empty) + @"
+    Payment.C_Payment_ID,
+
+    Payment.AD_Client_ID,
+
+    Payment.AD_Org_ID,
+
+    Payment.C_Currency_ID,
+
+    Payment.C_ConversionType_ID,
+
+    Payment.DateAcct,
+
+    Payment.PayAmt" +
+                paymentRuleColumnInAccess +
+                paymentMethodColumnInAccess + @"
+
 FROM C_Payment Payment
+
 WHERE Payment.IsActive = 'Y'
+
 AND Payment.IsReceipt = 'N'
-AND Payment.DocStatus IN ('CO', 'CL')";
 
-            paymentAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                paymentAccessSql,
-                "Payment",
-                MRole.SQL_FULLYQUALIFIED,
-                MRole.SQL_RO
-            );
+AND Payment.AD_Client_ID =
+    " + clientIdSql + @"
 
-            string paymentFilteredSql = @"
-PaymentFiltered AS
+AND Payment.DocStatus IN
 (
-" + paymentAccessSql + @"
+    'CO',
+    'CL'
 )";
+
+            paymentAccessSql =
+                MRole.GetDefault(ctx).AddAccessSQL(
+                    paymentAccessSql,
+                    "Payment",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
             string paymentDataSql = @"
 PaymentData AS
 (
-SELECT
-PaymentMethodList.PaymentMethodName AS PaymentMethodName,
+    SELECT
+        " + paymentMethodIdSelect + @"
+            AS PaymentMethod_ID,
 
-COUNT(Payment.C_Payment_ID) AS PaymentCount,
+        " + paymentMethodNameSelect + @"
+            AS PaymentMethodName,
 
-ROUND(
-COALESCE(
-SUM(
-CASE
-    WHEN Payment.C_Payment_ID IS NULL THEN 0
-    WHEN Payment.C_Currency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(Payment.PayAmt, 0)
-    ELSE CurrencyConvert(
-        COALESCE(Payment.PayAmt, 0),
-        Payment.C_Currency_ID,
-        SchemaCurrency.C_Currency_ID,
-        Payment.DateAcct,
-        Payment.C_ConversionType_ID,
-        Payment.AD_Client_ID,
-        Payment.AD_Org_ID
+        " + paymentRuleSelect + @"
+            AS PaymentRule,
+
+        COUNT(
+            Payment.C_Payment_ID
+        ) AS PaymentCount,
+
+        ROUND
+        (
+            CAST
+            (
+                COALESCE
+                (
+                    SUM
+                    (
+                        CASE
+                            WHEN Payment.C_Currency_ID =
+                                 SchemaCurrency.C_Currency_ID
+
+                            THEN COALESCE(
+                                Payment.PayAmt,
+                                0
+                            )
+
+                            ELSE CurrencyConvert
+                            (
+                                COALESCE(
+                                    Payment.PayAmt,
+                                    0
+                                ),
+                                Payment.C_Currency_ID,
+                                SchemaCurrency.C_Currency_ID,
+                                Payment.DateAcct,
+                                Payment.C_ConversionType_ID,
+                                Payment.AD_Client_ID,
+                                Payment.AD_Org_ID
+                            )
+                        END
+                    ),
+                    0
+                ) AS NUMERIC
+            ),
+
+            CAST
+            (
+                COALESCE
+                (
+                    MAX(
+                        SchemaCurrency.StdPrecision
+                    ),
+                    2
+                ) AS INTEGER
+            )
+        ) AS PaymentAmount,
+
+        MAX(
+            SchemaCurrency.C_Currency_ID
+        ) AS C_Currency_ID,
+
+        MAX(
+            SchemaCurrency.StdPrecision
+        ) AS StdPrecision,
+
+        MAX(
+            SchemaCurrency.ISO_Code
+        ) AS CurrencyISO,
+
+        MAX(
+            SchemaCurrency.CurSymbol
+        ) AS CurrencySymbol
+
+    FROM PaymentFiltered Payment
+
+    INNER JOIN SchemaCurrency SchemaCurrency ON
+    (
+        SchemaCurrency.AD_Client_ID =
+        Payment.AD_Client_ID
     )
-END
-),
-0
-),
-MAX(SchemaCurrency.StdPrecision)
-) AS PaymentAmount,
 
-MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
-MAX(SchemaCurrency.StdPrecision) AS StdPrecision,
-MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
-MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
+    INNER JOIN PeriodRange PeriodRange ON
+    (
+        Payment.DateAcct >=
+            PeriodRange.StartDate
 
-FROM PaymentMethodList PaymentMethodList
-INNER JOIN SchemaCurrency SchemaCurrency ON (1 = 1)
-INNER JOIN PeriodRange PeriodRange ON (1 = 1)
+        AND Payment.DateAcct <
+            PeriodRange.EndDateExclusive
+    )
 
-LEFT OUTER JOIN PaymentFiltered Payment ON (
-    " + paymentJoinCondition + @"
-    AND Payment.DateAcct >= PeriodRange.StartDate
-    AND Payment.DateAcct < PeriodRange.EndDateExclusive
-)
+    " + paymentMethodJoin + @"
 
-GROUP BY
-PaymentMethodList.PaymentMethodName
+    GROUP BY
+        " + paymentMethodIdSelect +
+                paymentMethodGroupBy +
+                paymentRuleGroupBy + @"
 )";
 
             string sql = @"
-WITH " + schemaCurrencySql + @",
+WITH
+" + schemaCurrencySql + @",
+
 " + currentPeriodSql + @",
+
 " + periodRangeSql + @",
-" + paymentMethodListSql + @",
-" + paymentFilteredSql + @",
+
+PaymentFiltered AS
+(
+" + paymentAccessSql + @"
+),
+
 " + paymentDataSql + @"
+
 SELECT
-PaymentData.PaymentMethodName,
-PaymentData.PaymentCount,
-PaymentData.PaymentAmount,
-PaymentData.C_Currency_ID,
-PaymentData.StdPrecision,
-PaymentData.CurrencyISO,
-PaymentData.CurrencySymbol
+    PaymentData.PaymentMethodName,
+
+    PaymentData.PaymentRule,
+
+    PaymentData.PaymentCount,
+
+    PaymentData.PaymentAmount,
+
+    PaymentData.C_Currency_ID,
+
+    PaymentData.StdPrecision,
+
+    PaymentData.CurrencyISO,
+
+    PaymentData.CurrencySymbol
+
 FROM PaymentData PaymentData
-ORDER BY PaymentData.PaymentAmount DESC, PaymentData.PaymentMethodName ASC";
 
-            SqlParameter[] parameters = new SqlParameter[]
-            {
-        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
-            };
+ORDER BY
+    PaymentData.PaymentAmount DESC,
+    PaymentData.PaymentMethodName ASC";
 
-            return new SqlQueryData
-            {
-                Sql = sql,
-                Parameters = parameters
-            };
+            return sql;
         }
-   
-        private DateRangeResult GetPeriodDateRange(Ctx ctx, bool isYTD)
+
+        private DateRangeResult GetPeriodDateRange(
+            Ctx ctx,
+            bool isYTD
+        )
         {
+            string clientIdSql =
+                ctx.GetAD_Client_ID().ToString(
+                    CultureInfo.InvariantCulture
+                );
+
             string currentPeriodSql = @"
 CurrentPeriod AS
 (
-SELECT
-Period.C_Year_ID,
-Period.StartDate,
-Period.EndDate
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
-INNER JOIN C_Period Period ON (Period.C_Year_ID = YearData.C_Year_ID)
-WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
-AND " + GetCurrentTimestampSql() + @" >= CAST(Period.StartDate AS TIMESTAMP)
-AND " + GetCurrentTimestampSql() + @" < " + GetDateToExclusiveSql("Period.EndDate") + @"
+    SELECT
+        Period.C_Year_ID,
+        Period.StartDate,
+        Period.EndDate
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+        " + clientIdSql + @"
+
+    AND " + GetCurrentDateSql() + @" >=
+        Period.StartDate
+
+    AND " + GetCurrentDateSql() + @" <
+        " + GetDateToExclusiveSql(
+            "Period.EndDate"
+        ) + @"
 )";
 
             string sql;
@@ -434,51 +758,76 @@ AND " + GetCurrentTimestampSql() + @" < " + GetDateToExclusiveSql("Period.EndDat
             if (isYTD)
             {
                 sql = @"
-WITH " + currentPeriodSql + @"
+WITH
+" + currentPeriodSql + @"
+
 SELECT
-MIN(Period.StartDate) AS DateFrom,
-MAX(CurrentPeriod.EndDate) AS DateTo
+    MIN(
+        Period.StartDate
+    ) AS DateFrom,
+
+    MAX(
+        CurrentPeriod.EndDate
+    ) AS DateTo
+
 FROM CurrentPeriod CurrentPeriod
-INNER JOIN C_Period Period ON (Period.C_Year_ID = CurrentPeriod.C_Year_ID)
-WHERE Period.StartDate <= CurrentPeriod.EndDate";
+
+INNER JOIN C_Period Period ON
+(
+    Period.C_Year_ID =
+    CurrentPeriod.C_Year_ID
+)
+
+WHERE Period.StartDate <=
+    CurrentPeriod.EndDate";
             }
             else
             {
                 sql = @"
-WITH " + currentPeriodSql + @"
+WITH
+" + currentPeriodSql + @"
+
 SELECT
-CurrentPeriod.StartDate AS DateFrom,
-CurrentPeriod.EndDate AS DateTo
+    CurrentPeriod.StartDate AS DateFrom,
+
+    CurrentPeriod.EndDate AS DateTo
+
 FROM CurrentPeriod CurrentPeriod";
             }
-
-            SqlParameter[] parameters = new SqlParameter[]
-            {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
-            };
 
             IDataReader dr = null;
 
             try
             {
-                dr = DB.ExecuteReader(sql, parameters, null);
+                dr = DB.ExecuteReader(
+                    sql,
+                    null,
+                    null
+                );
 
                 if (dr != null && dr.Read())
                 {
                     return new DateRangeResult
                     {
-                        DateFrom = dr["DateFrom"] != DBNull.Value ? Util.GetValueOfDateTime(dr["DateFrom"]) : null,
-                        DateTo = dr["DateTo"] != DBNull.Value ? Util.GetValueOfDateTime(dr["DateTo"]) : null
+                        DateFrom =
+                            dr["DateFrom"] != DBNull.Value
+                                ? Util.GetValueOfDateTime(
+                                    dr["DateFrom"]
+                                )
+                                : null,
+
+                        DateTo =
+                            dr["DateTo"] != DBNull.Value
+                                ? Util.GetValueOfDateTime(
+                                    dr["DateTo"]
+                                )
+                                : null
                     };
                 }
             }
             finally
             {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
+                CloseReader(dr);
             }
 
             return new DateRangeResult
@@ -488,113 +837,330 @@ FROM CurrentPeriod CurrentPeriod";
             };
         }
 
-        private string GetCurrentTimestampSql()
+        private string GetCurrentDateSql()
         {
-            return "CAST(CURRENT_TIMESTAMP AS TIMESTAMP)";
+            if (DB.IsOracle())
+            {
+                return "TRUNC(CURRENT_DATE)";
+            }
+
+            return "CURRENT_DATE";
         }
 
-        private string GetDateToExclusiveSql(string columnName)
+        private string GetDateToExclusiveSql(
+            string columnName
+        )
         {
-            return "CAST(" + columnName + " AS TIMESTAMP) + INTERVAL '1' DAY";
+            if (DB.IsOracle())
+            {
+                return "TRUNC("
+                    + columnName
+                    + ") + 1";
+            }
+
+            return "CAST("
+                + columnName
+                + " AS DATE) + 1";
         }
 
-        private string GetTextSql(string columnName)
+        private string GetPaymentMethodNameColumn(
+            string tableAlias
+        )
         {
-            return "TRIM(CAST(" + columnName + " AS CHAR(255)))";
-        }
+            if (
+                HasColumn(
+                    "VA009_PaymentMethod",
+                    "VA009_Name"
+                )
+            )
+            {
+                return tableAlias +
+                    ".VA009_Name";
+            }
 
-        private string GetEmptyTextSql()
-        {
-            return "CAST(NULL AS CHAR(1))";
+            if (
+                HasColumn(
+                    "VA009_PaymentMethod",
+                    "Name"
+                )
+            )
+            {
+                return tableAlias +
+                    ".Name";
+            }
+
+            if (
+                HasColumn(
+                    "VA009_PaymentMethod",
+                    "Value"
+                )
+            )
+            {
+                return tableAlias +
+                    ".Value";
+            }
+
+            return string.Empty;
         }
 
         private bool HasPaymentMethodColumn()
         {
-            string sql = @"
-SELECT
-COUNT(1)
-FROM AD_Table TableData
-INNER JOIN AD_Column ColumnData ON (TableData.AD_Table_ID = ColumnData.AD_Table_ID)
-WHERE TableData.TableName = 'C_Payment'
-AND ColumnData.ColumnName = 'VA009_PaymentMethod_ID'";
-
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+            return HasColumn(
+                "C_Payment",
+                "VA009_PaymentMethod_ID"
+            );
         }
 
         private bool HasPaymentRuleColumn()
         {
-            string sql = @"
-SELECT
-COUNT(1)
-FROM AD_Table TableData
-INNER JOIN AD_Column ColumnData ON (TableData.AD_Table_ID = ColumnData.AD_Table_ID)
-WHERE TableData.TableName = 'C_Payment'
-AND ColumnData.ColumnName = 'PaymentRule'";
-
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+            return HasColumn(
+                "C_Payment",
+                "PaymentRule"
+            );
         }
 
-        private bool HasPaymentMethodNameColumn()
+        private bool HasColumn(
+            string tableName,
+            string columnName
+        )
         {
             string sql = @"
 SELECT
-COUNT(1)
+    COUNT(1)
+
 FROM AD_Table TableData
-INNER JOIN AD_Column ColumnData ON (TableData.AD_Table_ID = ColumnData.AD_Table_ID)
-WHERE TableData.TableName = 'VA009_PaymentMethod'
-AND ColumnData.ColumnName = 'Name'";
 
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+INNER JOIN AD_Column ColumnData ON
+(
+    ColumnData.AD_Table_ID =
+    TableData.AD_Table_ID
+)
+
+WHERE TableData.TableName =
+    " + ToSqlString(tableName) + @"
+
+AND ColumnData.ColumnName =
+    " + ToSqlString(columnName);
+
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(sql)
+            ) > 0;
         }
 
-        private bool HasPaymentMethodValueColumn()
+        private string ToSqlString(
+            string value
+        )
         {
-            string sql = @"
-SELECT
-COUNT(1)
-FROM AD_Table TableData
-INNER JOIN AD_Column ColumnData ON (TableData.AD_Table_ID = ColumnData.AD_Table_ID)
-WHERE TableData.TableName = 'VA009_PaymentMethod'
-AND ColumnData.ColumnName = 'Value'";
-
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+            return "'"
+                + (value ?? string.Empty)
+                    .Replace("'", "''")
+                + "'";
         }
 
-        private string FormatDate(DateTime date)
+        private Ctx GetContext()
         {
-            return date.ToString("yyyy-MM-dd");
+            if (Session["ctx"] == null)
+            {
+                return null;
+            }
+
+            return Session["ctx"] as Ctx;
         }
 
-        private string GetMsg(Ctx ctx, string key, string fallback)
+        private JsonResult GetSessionExpiredResult()
         {
-            string msg = Msg.GetMsg(ctx, key);
+            Ctx ctx = Env.GetCtx();
+            string sessionExpired = GetMsg(ctx, "SessionExpired", "Session Expired");
 
-            return !string.IsNullOrEmpty(msg) && msg != "[" + key + "]"
-                ? msg
-                : fallback;
+            return Json(
+                new
+                {
+                    error = sessionExpired,
+                    errorText = sessionExpired
+                },
+                JsonRequestBehavior.AllowGet
+            );
+        }
+
+        private string FirstNotEmpty(
+            params string[] values
+        )
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(values[i]))
+                {
+                    return values[i];
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private int NormalizePrecision(
+            int precision
+        )
+        {
+            if (
+                precision < 0 ||
+                precision > 28
+            )
+            {
+                return 2;
+            }
+
+            return precision;
+        }
+
+        private int GetInt(
+            IDataReader reader,
+            string columnName,
+            int fallback = 0
+        )
+        {
+            object value = reader[columnName];
+
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? fallback
+                    : Util.GetValueOfInt(value);
+        }
+
+        private decimal GetDecimal(
+            IDataReader reader,
+            string columnName,
+            decimal fallback
+        )
+        {
+            object value = reader[columnName];
+
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? fallback
+                    : Util.GetValueOfDecimal(value);
+        }
+
+        private string GetString(
+            IDataReader reader,
+            string columnName,
+            string fallback
+        )
+        {
+            object value = reader[columnName];
+
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? fallback
+                    : Util.GetValueOfString(value);
+        }
+
+        private void CloseReader(
+            IDataReader reader
+        )
+        {
+            if (reader == null)
+            {
+                return;
+            }
+
+            reader.Close();
+            reader.Dispose();
+        }
+
+        private string FormatDate(
+            DateTime date
+        )
+        {
+            return date.ToString(
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture
+            );
+        }
+
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback
+        )
+        {
+            string msg = Msg.GetMsg(
+                ctx,
+                key
+            );
+
+            return
+                !string.IsNullOrWhiteSpace(msg) &&
+                msg != "[" + key + "]"
+                    ? msg
+                    : fallback;
         }
 
         private class PaymentMethodSummary
         {
-            public string PaymentMethodName { get; set; }
-            public int PaymentCount { get; set; }
-            public decimal PaymentAmount { get; set; }
-            public int CCurrencyId { get; set; }
-            public int StdPrecision { get; set; }
-            public string CurrencyISO { get; set; }
-            public string CurrencySymbol { get; set; }
+            public string PaymentMethodName
+            {
+                get;
+                set;
+            }
+
+            public int PaymentCount
+            {
+                get;
+                set;
+            }
+
+            public decimal PaymentAmount
+            {
+                get;
+                set;
+            }
+
+            public int CCurrencyId
+            {
+                get;
+                set;
+            }
+
+            public int StdPrecision
+            {
+                get;
+                set;
+            }
+
+            public string CurrencyISO
+            {
+                get;
+                set;
+            }
+
+            public string CurrencySymbol
+            {
+                get;
+                set;
+            }
         }
 
         private class DateRangeResult
         {
-            public DateTime? DateFrom { get; set; }
-            public DateTime? DateTo { get; set; }
-        }
+            public DateTime? DateFrom
+            {
+                get;
+                set;
+            }
 
-        private class SqlQueryData
-        {
-            public string Sql { get; set; }
-            public SqlParameter[] Parameters { get; set; }
+            public DateTime? DateTo
+            {
+                get;
+                set;
+            }
         }
     }
 }

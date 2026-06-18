@@ -27,7 +27,7 @@
     justify-content: space-between;
     overflow: hidden;
     padding: 0.875em;
-    gap: 0.375em;
+    gap: 0.5em;
     border: 2px solid #ffffff;
     border-radius: 14px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
@@ -67,7 +67,7 @@
     border: 1px solid #E4EDF4;
     border-radius: 0.375em;
     background: rgba(255, 255, 255, 0.90);
-    color: #d78b10;
+    color: #0083da;
 }
 
 .vas-scheduled-ap-payment-icon {
@@ -116,7 +116,7 @@
     line-height: 1.1;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
-    color: #9a6500;
+    color: #106ab0;
 }
 
 .vas-scheduled-ap-payment-footer {
@@ -141,8 +141,8 @@
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
     border: 1px solid rgba(0, 131, 218, 0.15);
-    border-radius: 62.4375em;
-    background: rgba(255, 255, 255, 0.85);
+    border-radius: 999em;
+    background: #dff1ff;
     color: #0083da;
     font-size: 0.6875em;
     font-weight: 700;
@@ -159,9 +159,9 @@
     line-height: 1.3;
     color: #5f7283;
     display: -webkit-box;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
-    line-clamp: 1;
+    line-clamp: 2;
 }
 
 .vas-scheduled-ap-payment-body.vas-scheduled-ap-payment-state .vas-scheduled-ap-payment-value {
@@ -276,7 +276,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2em;
+    padding: 1.25em;
     font-family: Roboto, Arial, sans-serif;
     font-size: 1em;
 }
@@ -305,42 +305,44 @@
 .vas-scheduled-ap-payment-dialog-busy {
     align-items: center;
     background: rgba(255, 255, 255, 0.62);
-    display: flex;
+    display: none;
     inset: 0;
     justify-content: center;
     position: absolute;
     z-index: 5;
 }
 
+.vas-scheduled-ap-payment-dialog-busy.is-visible {
+    display: flex;
+}
+
 .vas-scheduled-ap-payment-dialog-scrim {
     position: absolute;
     inset: 0;
-    background: rgba(0, 38, 64, 0.34);
-    backdrop-filter: blur(0.1875em);
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
 }
 
 .vas-scheduled-ap-payment-dialog-card {
     position: relative;
-    width: 100%;
-    max-width: 56em;
-    max-height: 86vh;
+    width: min(90em, 100%);
+    height: min(46em, 100%);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 0.0625em solid #e4edf4;
     border-radius: 1em;
     background: #ffffff;
-    box-shadow: 0 1.875em 5em rgba(15, 61, 97, 0.28);
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    color: #102c3f;
 }
 
 .vas-scheduled-ap-payment-dialog-header {
     flex: 0 0 auto;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1em;
-    padding: 1.125em 1.375em;
-    border-bottom: 0.0625em solid #e4edf4;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1.25em 2em;
+    border-bottom: 1px solid #edf2f6;
 }
 
 .vas-scheduled-ap-payment-dialog-icon {
@@ -351,15 +353,15 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 0.0625em solid #bfe4ff;
-    border-radius: 0.5625em;
-    background: linear-gradient(180deg, #ffffff, #eaf4fe);
+    border: 1px solid #bfe4ff;
+    border-radius: 0.5em;
+    background: #eef8ff;
     color: #0083da;
 }
 
 .vas-scheduled-ap-payment-dialog-icon svg {
-    width: 1.15em;
-    height: 1.15em;
+    width: 1.125em;
+    height: 1.125em;
     stroke: currentColor;
     stroke-linecap: round;
     stroke-linejoin: round;
@@ -374,24 +376,24 @@
 }
 
 .vas-scheduled-ap-payment-dialog-title {
-    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #141414;
+    color: #102c3f;
     font-size: 1.125em;
-    font-weight: 500;
-    line-height: 1.15;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 .vas-scheduled-ap-payment-dialog-subtitle {
     min-width: 0;
-    margin-top: 0.125em;
+    margin-top: 0.25em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #717182;
-    font-size: 0.75em;
+    color: #667386;
+    font-size: 0.8125em;
+    line-height: 1.3;
 }
 
 .vas-scheduled-ap-payment-dialog-close {
@@ -405,33 +407,32 @@
     border: 0;
     border-radius: 0.5em;
     background: transparent;
-    color: #141414;
+    color: #1f2933;
     cursor: pointer;
 }
 
 .vas-scheduled-ap-payment-dialog-close svg {
-    width: 1.25em;
-    height: 1.25em;
+    width: 1.125em;
+    height: 1.125em;
     stroke: currentColor;
 }
 
 .vas-scheduled-ap-payment-dialog-close:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: #f3f7fb;
 }
 
 .vas-scheduled-ap-payment-dialog-summary {
     flex: 0 0 auto;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 1.75em;
-    padding: 0.5em 1.375em 1.25em;
-    background: #ffffff;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25em;
+    padding: 1.25em 2em;
+    border-bottom: 1px solid #edf2f6;
+    background: #fbfdff;
 }
 
 .vas-scheduled-ap-payment-dialog-summary div {
     min-width: 0;
-    padding: 0.6875em 0 0.5625em;
-    border-bottom: 0.0625em solid #edf2f6;
 }
 
 .vas-scheduled-ap-payment-dialog-summary span,
@@ -444,19 +445,18 @@
 }
 
 .vas-scheduled-ap-payment-dialog-summary span {
-    color: #141414;
+    color: #748494;
     font-size: 0.75em;
-    font-weight: 400;
-    line-height: 1.3;
-    opacity: 0.55;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 .vas-scheduled-ap-payment-dialog-summary strong {
-    margin-top: 0.4375em;
-    color: #141414;
-    font-size: 0.9375em;
-    font-weight: 500;
-    line-height: 1.3;
+    margin-top: 0.5em;
+    color: #102c3f;
+    font-size: 1.25em;
+    font-weight: 800;
+    line-height: 1.15;
     font-variant-numeric: tabular-nums;
 }
 
@@ -469,7 +469,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 0 1.375em 1.25em;
+    padding: 0 1.5em;
     position: relative;
 }
 
@@ -477,15 +477,19 @@
     position: absolute;
     inset: 0;
     z-index: 5;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.62);
 }
 
+.vas-scheduled-ap-payment-dialog-busy.is-visible {
+    display: flex;
+}
+
 .vas-scheduled-ap-payment-dialog-table {
     width: 100%;
-    min-width: 48em;
+    min-width: 72em;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -494,15 +498,13 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 0.625em 0.5em;
-    border-bottom: 0.0625em solid #edf2f6;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(0.375em);
+    padding: 1em 0.75em;
+    border-bottom: 1px solid #edf2f6;
+    background: #ffffff;
     color: #748494;
-    font-size: 0.6875em;
-    font-weight: 500;
+    font-size: 0.75em;
+    font-weight: 700;
     line-height: 1.2;
-    letter-spacing: 0.0625em;
     text-align: left;
     white-space: nowrap;
     overflow: hidden;
@@ -510,11 +512,11 @@
 }
 
 .vas-scheduled-ap-payment-dialog-table tbody td {
-    padding: 0.625em 0.5em;
-    border-bottom: 0.0625em solid #edf2f6;
+    padding: 0.875em 0.75em;
+    border-bottom: 1px solid #edf2f6;
     color: #102c3f;
-    font-size: 0.75em;
-    line-height: 1.25;
+    font-size: 0.875em;
+    line-height: 1.2;
     vertical-align: middle;
     white-space: nowrap;
     overflow: hidden;
@@ -522,27 +524,27 @@
 }
 
 .vas-scheduled-ap-payment-dialog-table tbody tr:hover td {
-    background: rgba(31, 131, 255, 0.04);
+    background: #f8fbfe;
 }
 
 .vas-scheduled-ap-payment-th-doc,
 .vas-scheduled-ap-payment-td-doc {
-    width: 9em;
+    width: 10em;
 }
 
 .vas-scheduled-ap-payment-th-invdate,
 .vas-scheduled-ap-payment-td-invdate {
-    width: 8em;
+    width: 9em;
 }
 
 .vas-scheduled-ap-payment-th-vendor,
 .vas-scheduled-ap-payment-td-vendor {
-    width: 13em;
+    width: 14em;
 }
 
 .vas-scheduled-ap-payment-th-duedate,
 .vas-scheduled-ap-payment-td-duedate {
-    width: 8em;
+    width: 9em;
 }
 
 .vas-scheduled-ap-payment-th-currency,
@@ -553,13 +555,13 @@
 
 .vas-scheduled-ap-payment-th-amount,
 .vas-scheduled-ap-payment-td-amount {
-    width: 10em;
+    width: 9em;
     text-align: right !important;
 }
 
 .vas-scheduled-ap-payment-th-method,
 .vas-scheduled-ap-payment-td-method {
-    width: 10em;
+    width: 8em;
 }
 
 .vas-scheduled-ap-payment-truncate {
@@ -572,7 +574,7 @@
 
 .vas-scheduled-ap-payment-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 400;
+    font-weight: 700;
 }
 
 .vas-scheduled-ap-payment-td-invdate,
@@ -587,7 +589,7 @@
 }
 
 .vas-scheduled-ap-payment-td-amount {
-    font-weight: 700;
+    font-weight: 800;
     font-variant-numeric: tabular-nums;
     overflow: visible !important;
     text-overflow: clip !important;
@@ -611,9 +613,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 1em;
-    padding: 0.875em 1.375em;
-    border-top: 0.0625em solid #e4edf4;
-    background: #ffffff;
+    padding: 0.875em 2em;
+    border-top: 1px solid #edf2f6;
+    background: #fbfdff;
 }
 
 .vas-scheduled-ap-payment-pager-helper {
@@ -630,7 +632,7 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.75em;
 }
 
 .vas-scheduled-ap-payment-pager-btn {
@@ -640,9 +642,9 @@
     align-items: center;
     justify-content: center;
     padding: 0;
-    border: 0.0625em solid #e4edf4;
+    border: 1px solid #cfe9ff;
     border-radius: 0.5em;
-    background: #fbfdff;
+    background: rgba(255, 255, 255, 0.86);
     color: #0083da;
     cursor: pointer;
 }
@@ -655,20 +657,21 @@
 
 .vas-scheduled-ap-payment-pager-btn:hover:not(:disabled) {
     background: #eaf8ff;
-    border-color: #bfe4ff;
+    border-color: #9ed1ff;
 }
 
 .vas-scheduled-ap-payment-pager-btn:disabled {
     color: #b8c6d2;
+    background: rgba(255, 255, 255, 0.64);
     cursor: default;
 }
 
 .vas-scheduled-ap-payment-pager-text {
-    min-width: 3em;
+    min-width: 4.25em;
     text-align: center;
     white-space: nowrap;
-    font-size: 0.875em;
-    font-weight: 500;
+    font-size: 1em;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
 }
@@ -680,10 +683,23 @@
 
     .vas-scheduled-ap-payment-dialog-card {
         width: 100%;
-        max-width: none;
         height: 100%;
-        max-height: 100%;
         border-radius: 0;
+    }
+
+    .vas-scheduled-ap-payment-dialog-header,
+    .vas-scheduled-ap-payment-dialog-summary,
+    .vas-scheduled-ap-payment-dialog-footer {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+
+    .vas-scheduled-ap-payment-dialog-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vas-scheduled-ap-payment-dialog-body {
+        padding: 0 0.75em;
     }
 
     .vas-scheduled-ap-payment-th-doc,
@@ -698,21 +714,6 @@
 }
 
 @media (max-width: 36em) {
-    .vas-scheduled-ap-payment-dialog-header {
-        padding: 1em;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary,
-    .vas-scheduled-ap-payment-dialog-body {
-        padding-left: 1em;
-        padding-right: 1em;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary {
-        grid-template-columns: 1fr;
-        gap: 0;
-    }
-
     .vas-scheduled-ap-payment-dialog-table thead th,
     .vas-scheduled-ap-payment-dialog-table tbody td {
         padding: 0.625em 0.5em;
@@ -762,9 +763,13 @@
 .vas-scheduled-ap-payment-dialog-busy {
     align-items: center;
     background: rgba(255, 255, 255, 0.62);
-    display: flex;
+    display: none;
     inset: 0;
     justify-content: center;
     position: absolute;
     z-index: 5;
+}
+
+.vas-scheduled-ap-payment-dialog-busy.is-visible {
+    display: flex;
 }

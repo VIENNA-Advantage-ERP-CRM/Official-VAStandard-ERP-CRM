@@ -4,7 +4,7 @@
  *           bank account, status, and amount. Clicking a row opens a payment detail popup.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
- *   Current Text                         | Message Key
+ *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
  *  2  | Date                                 | VAS_032_MessageDate
@@ -14,8 +14,22 @@
  *  6  | Bank Account Name                    | VAS_032_MessageBankAccountName
  *  7  | Status                               | VAS_032_MessageStatus
  *  8  | Amount                               | VAS_032_MessageAmount
- *  8  | Loading                              | VAS_032_MessageLoading
- *  9  | No Data                              | VAS_032_MessageNoData
+ *  9  | Loading                              | VAS_032_MessageLoading
+ * 10  | No Data                              | VAS_032_MessageNoData
+ * 11  | Previous                             | VAS_Previous
+ * 12  | Next                                 | VAS_Next
+ * 13  | Could not load data                  | VAS_ErrorLoading
+ * 14  | Of                                   | VAS_Of
+ * 15  | Not Specified                        | VAS_032_MessageNotSpecified
+ * 16  | Payment                              | VAS_032_MessagePayment
+ * 17  | Payment date                         | VAS_032_MessagePaymentDate
+ * 18  | Payment method                       | VAS_032_MessagePaymentMethod
+ * 19  | Currency                             | VAS_032_MessageCurrency
+ * 20  | Close                                | VAS_Close
+ * 21  | Payment summary                      | VAS_032_MessagePaymentSummary
+ * 22  | Bounced                              | VAS_032_MessageBounced
+ * 23  | In transit                           | VAS_032_MessageInTransit
+ * 24  | Cleared                              | VAS_032_MessageCleared
  * ─────────────────────────────────────────────────────────────────────
  */
 

@@ -1330,11 +1330,19 @@ AND ColumnData.ColumnName = " +
 
         private JsonResult GetSessionExpiredResult()
         {
+            Ctx ctx = Env.GetCtx();
+            string sessionExpired =
+                GetMsg(
+                    ctx,
+                    "SessionExpired",
+                    "Session Expired"
+                );
+
             return Json(
                 new
                 {
                     error = true,
-                    errorText = "Session Expired"
+                    errorText = sessionExpired
                 },
                 JsonRequestBehavior.AllowGet
             );

@@ -1,5 +1,27 @@
 ﻿; VAS = window.VAS || {};
 
+/**
+ * Cleared AP Payment Widget
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────────────
+ *  #  | Current Text                                      | Message Key
+ * ----+---------------------------------------------------+------------------------------
+ *  1  | Unreconciled                                      | VAS_027_messageCleared
+ *  2  | Of last month                                     | VAS_027_messageAPPaymentClearedWhy
+ *  3  | No Data                                           | VAS_027_messageNoData
+ *  4  | payments                                          | VAS_027_messagePayments
+ *  5  | awaiting bank match                               | VAS_027_messageAwaitingBankMatch
+ *  6  | days                                              | VAS_027_messageDays
+ *  7  | No unreconciled payments                          | VAS_027_messageNoUnreconciledPayments
+ *  8  | Showing                                           | VAS_Showing
+ *  9  | of                                                | VAS_Of
+ * 10  | Unreconciled payments                             | VAS_027_messageUnreconciledPayments
+ * 11  | Auto-match process is not configured              | VAS_027_messageAutoMatchProcessNotConfigured
+ * 12  | Payment reconciliation window is not configured    | VAS_027_messageReconciliationWindowNotConfigured
+ * 13  | Could not open action                             | VAS_ErrorLoading
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
+
 ; (function (VAS, $) {
     "use strict";
 
@@ -44,7 +66,7 @@
         var rowsLoading = false;
 
         var pageNo = 1;
-        var pageSize = 25;
+        var pageSize = 10;
         var totalPages = 0;
         var totalRecords = 0;
 
