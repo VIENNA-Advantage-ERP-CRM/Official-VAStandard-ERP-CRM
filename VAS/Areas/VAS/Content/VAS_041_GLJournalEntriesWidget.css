@@ -1141,3 +1141,50 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 .VAS-glje-zoom {
     color: #748494;
 }
+
+/* Shared GL Journal widget busy overlay */
+.VAS-glju-root,
+.VAS-gljtd-root,
+.VAS-gljtc-root,
+.VAS-gljp-root,
+.VAS-gljnd-root,
+.VAS-glje-root,
+.VAS-gljv-root,
+.VAS-gljtm-root,
+.VAS-gljr-root,
+.VAS-gljpq-root {
+    position: relative;
+}
+
+.VAS-glju-root > .vis-busyindicatorouterwrap,
+.VAS-gljtd-root > .vis-busyindicatorouterwrap,
+.VAS-gljtc-root > .vis-busyindicatorouterwrap,
+.VAS-gljp-root > .vis-busyindicatorouterwrap,
+.VAS-gljnd-root > .vis-busyindicatorouterwrap,
+.VAS-glje-root > .vis-busyindicatorouterwrap,
+.VAS-gljv-root > .vis-busyindicatorouterwrap,
+.VAS-gljtm-root > .vis-busyindicatorouterwrap,
+.VAS-gljr-root > .vis-busyindicatorouterwrap,
+.VAS-gljpq-root > .vis-busyindicatorouterwrap {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.62);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+.VAS-glju-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljtd-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljtc-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljp-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljnd-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-glje-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljv-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljtm-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljr-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap,
+.VAS-gljpq-root > .vis-busyindicatorouterwrap .vis-busyindicatorinnerwrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
