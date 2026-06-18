@@ -542,7 +542,10 @@ ORDER BY
                             "DocumentNo"
                         ),
 
-                        paymentDocumentNo = string.Empty,
+                        paymentDocumentNo = GetString(
+                            reader,
+                            "DocumentNo"
+                        ),
 
                         organizationId = GetInt(
                             reader,

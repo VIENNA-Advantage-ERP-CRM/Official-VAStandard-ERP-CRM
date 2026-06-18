@@ -704,6 +704,9 @@ input.vas-upcoming-ap-runs-edit-control[type="number"]::-webkit-outer-spin-butto
     font-size: 0.875em;
     font-weight: 700;
     cursor: pointer;
+    background: #1f83ff;
+    border: 0;
+    color: #fff;
 }
 
 .vas-upcoming-ap-runs-pay-cancel {

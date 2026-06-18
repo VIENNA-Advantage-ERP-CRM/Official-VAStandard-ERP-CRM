@@ -933,6 +933,7 @@
             var paymentDocumentNo = firstValue(
                 row.paymentDocumentNo,
                 row.newPaymentDocumentNo,
+                row.documentNo,
                 ''
             );
 
