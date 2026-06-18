@@ -25,176 +25,922 @@ namespace VAS.Controllers
     /// </summary>
     public class VAS_045_GLJournalPendingWidgetController : Controller
     {
+
+        private const string DocStatusReferenceName = "_Document Status";
+
+        ///// <summary>
+        ///// Returns pending GL journals (DocStatus IN DR, IP, AP, NA) ordered oldest-first,
+        ///// capped at 15 display rows. TotalCount reflects all pending records.
+        ///// </summary>
+        //public JsonResult GetPendingQueue()
+        //{
+        //    if (Session["ctx"] == null) { return Json("", JsonRequestBehavior.AllowGet); }
+        //    Ctx ctx = Session["ctx"] as Ctx;
+
+        //    // ── Step 1: Resolve primary accounting schema ─────────────────────
+        //    int acctSchemaId = 0;
+        //    string curSymbol = "";
+        //    string isoCode = "";
+        //    int stdPrecision = 2;
+
+        //    string schemaSql = "SELECT C_AcctSchema.C_AcctSchema_ID,"
+        //                     + " C_Currency.CurSymbol, C_Currency.ISO_Code, C_Currency.StdPrecision"
+        //                     + " FROM C_AcctSchema"
+        //                     + " INNER JOIN C_Currency ON (C_AcctSchema.C_Currency_ID=C_Currency.C_Currency_ID)"
+        //                     + " WHERE C_AcctSchema.IsActive='Y'"
+        //                     + " AND C_AcctSchema.AD_Client_ID=@ClientID";
+
+        //    SqlParameter[] schemaParams = { new SqlParameter("@ClientID", ctx.GetAD_Client_ID()) };
+        //    DataSet schemaDs = CoreLibrary.DataBase.DB.ExecuteDataset(schemaSql, schemaParams, null);
+        //    if (schemaDs != null && schemaDs.Tables[0].Rows.Count > 0)
+        //    {
+        //        acctSchemaId = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["C_AcctSchema_ID"]);
+        //        curSymbol = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["CurSymbol"]);
+        //        isoCode = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["ISO_Code"]);
+        //        stdPrecision = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["StdPrecision"]);
+        //    }
+
+        //    // ── Step 3: Count all pending journals for header badge ───────────
+        //    // Uses same WHERE conditions + MRole so the count respects row-level security.
+        //    string countBase = "SELECT COUNT(1) FROM GL_Journal"
+        //                     + " WHERE GL_Journal.DocStatus IN ('DR','IP','AP','NA')"
+        //                     + " AND GL_Journal.IsActive='Y'"
+        //                     + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";
+
+        //    countBase = MRole.GetDefault(ctx).AddAccessSQL(
+        //        countBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+        //    SqlParameter[] countParams = { new SqlParameter("@AcctSchemaID", acctSchemaId) };
+        //    int totalCount = 0;
+        //    DataSet countDs = CoreLibrary.DataBase.DB.ExecuteDataset(countBase, countParams, null);
+        //    if (countDs != null && countDs.Tables[0].Rows.Count > 0)
+        //    {
+        //        totalCount = Util.GetValueOfInt(countDs.Tables[0].Rows[0][0]);
+        //    }
+
+        //    // ── Step 4: Query pending journals — no GROUP BY needed ───────────
+        //    // Correlated subquery fetches TotalDebit per journal without GROUP BY,
+        //    // allowing MRole to be applied cleanly before ORDER BY.
+        //    // FETCH FIRST 25 ROWS ONLY caps at the database level — works on Oracle 12c+ and PostgreSQL 8.4+.
+        //    string sqlBase = "SELECT GL_Journal.GL_Journal_ID,"
+        //                   + " GL_Journal.DocumentNo,"
+        //                   + " GL_Journal.Description,"
+        //                   + " GL_Journal.DocStatus,"
+        //                   + " AD_Ref_List.Name AS DocStatusName,"
+        //                   + " GL_Journal.Created,"
+        //                   + " (SELECT COALESCE(SUM(jl.AmtAcctDr),0) FROM GL_JournalLine jl"
+        //                   + " WHERE jl.GL_Journal_ID=GL_Journal.GL_Journal_ID AND jl.IsActive='Y') AS TotalDebit,"
+        //                   + " AD_User.Name AS UserName"
+        //                   + " FROM GL_Journal"
+        //                   + " INNER JOIN AD_User ON (GL_Journal.CreatedBy=AD_User.AD_User_ID)"
+        //                   + " LEFT OUTER JOIN AD_Ref_List ON (AD_Ref_List.AD_Reference_ID=131"
+        //                   + " AND AD_Ref_List.Value=GL_Journal.DocStatus"
+        //                   + " AND AD_Ref_List.IsActive='Y')"
+        //                   + " WHERE GL_Journal.DocStatus IN ('DR','IP','AP','NA')"
+        //                   + " AND GL_Journal.IsActive='Y'"
+        //                   + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";
+
+        //    // Apply MRole before ORDER BY
+        //    sqlBase = MRole.GetDefault(ctx).AddAccessSQL(
+        //        sqlBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+        //    string sql = sqlBase + " ORDER BY GL_Journal.Created ASC FETCH FIRST 25 ROWS ONLY";
+
+        //    SqlParameter[] mainParams = { new SqlParameter("@AcctSchemaID", acctSchemaId) };
+        //    DataSet ds = CoreLibrary.DataBase.DB.ExecuteDataset(sql, mainParams, null);
+
+        //    // ── Step 5: Build result — SQL already capped at 25 rows ─────────
+        //    var queue = new List<object>();
+        //    DateTime now = DateTime.Now;
+
+        //    if (ds != null && ds.Tables[0].Rows.Count > 0)
+        //    {
+        //        for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+        //        {
+        //            DataRow row = ds.Tables[0].Rows[i];
+
+        //            int journalId = Util.GetValueOfInt(row["GL_Journal_ID"]);
+        //            string docNo = Util.GetValueOfString(row["DocumentNo"]);
+        //            string description = Util.GetValueOfString(row["Description"]);
+        //            string docStatus = Util.GetValueOfString(row["DocStatus"]);
+        //            string statusName = Util.GetValueOfString(row["DocStatusName"]);
+        //            string userName = Util.GetValueOfString(row["UserName"]);
+        //            decimal totalDebit = Decimal.Round(
+        //                Util.GetValueOfDecimal(row["TotalDebit"]), stdPrecision, MidpointRounding.AwayFromZero);
+
+        //            // Age — calculated from Created timestamp
+        //            DateTime created = row["Created"] != DBNull.Value
+        //                ? Convert.ToDateTime(row["Created"])
+        //                : now;
+        //            double totalHours = (now - created).TotalHours;
+
+        //            string ageStr;
+        //            if (totalHours < 1)
+        //                ageStr = "< 1h";
+        //            else if (totalHours < 24)
+        //                ageStr = ((int)totalHours) + "h";
+        //            else if (totalHours < 48)
+        //                ageStr = "1d";
+        //            else
+        //                ageStr = ((int)(totalHours / 24)) + "d";
+
+        //            // Urgency marker
+        //            string markerType;
+        //            if (totalHours >= 48)
+        //                markerType = "danger";
+        //            else if (totalHours >= 24)
+        //                markerType = "warn";
+        //            else
+        //                markerType = "info";
+
+        //            // Action label based on DocStatus
+        //            string actionLabel;
+        //            switch (docStatus)
+        //            {
+        //                case "IP":
+        //                    actionLabel = "Approval";
+        //                    break;
+        //                case "AP":
+        //                    actionLabel = "Post";
+        //                    break;
+        //                case "NA":
+        //                    actionLabel = "Resubmit";
+        //                    break;
+        //                default:
+        //                    actionLabel = "Draft";
+        //                    break;
+        //            }
+
+        //            queue.Add(new
+        //            {
+        //                GL_Journal_ID = journalId,
+        //                DocumentNo = docNo,
+        //                Description = description,
+        //                DocStatus = docStatus,
+        //                StatusName = statusName,
+        //                ActionLabel = actionLabel,
+        //                MarkerType = markerType,
+        //                AgeStr = ageStr,
+        //                IsOverdue = totalHours >= 48,
+        //                TotalDebit = totalDebit,
+        //                UserName = userName
+        //            });
+        //        }
+        //    }
+
+        //    return Json(JsonConvert.SerializeObject(new
+        //    {
+        //        Queue = queue,
+        //        TotalCount = totalCount,
+        //        CurSymbol = curSymbol,
+        //        ISOCode = isoCode,
+        //        StdPrecision = stdPrecision
+        //    }), JsonRequestBehavior.AllowGet);
+        //}
+
+
         /// <summary>
-        /// Returns pending GL journals (DocStatus IN DR, IP, AP, NA) ordered oldest-first,
-        /// capped at 15 display rows. TotalCount reflects all pending records.
+        /// Returns pending GL journals with translated document status.
+        /// Status is returned as Value and Name.
         /// </summary>
         public JsonResult GetPendingQueue()
         {
-            if (Session["ctx"] == null) { return Json("", JsonRequestBehavior.AllowGet); }
-            Ctx ctx = Session["ctx"] as Ctx;
-
-            // ── Step 1: Resolve primary accounting schema ─────────────────────
-            int acctSchemaId = 0;
-            string curSymbol = "";
-            string isoCode = "";
-            int stdPrecision = 2;
-
-            string schemaSql = "SELECT C_AcctSchema.C_AcctSchema_ID,"
-                             + " C_Currency.CurSymbol, C_Currency.ISO_Code, C_Currency.StdPrecision"
-                             + " FROM C_AcctSchema"
-                             + " INNER JOIN C_Currency ON (C_AcctSchema.C_Currency_ID=C_Currency.C_Currency_ID)"
-                             + " WHERE C_AcctSchema.IsActive='Y'"
-                             + " AND C_AcctSchema.AD_Client_ID=@ClientID";
-
-            SqlParameter[] schemaParams = { new SqlParameter("@ClientID", ctx.GetAD_Client_ID()) };
-            DataSet schemaDs = CoreLibrary.DataBase.DB.ExecuteDataset(schemaSql, schemaParams, null);
-            if (schemaDs != null && schemaDs.Tables[0].Rows.Count > 0)
+            if (Session["ctx"] == null)
             {
-                acctSchemaId = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["C_AcctSchema_ID"]);
-                curSymbol = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["CurSymbol"]);
-                isoCode = Util.GetValueOfString(schemaDs.Tables[0].Rows[0]["ISO_Code"]);
-                stdPrecision = Util.GetValueOfInt(schemaDs.Tables[0].Rows[0]["StdPrecision"]);
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            success = false,
+                            error = "Session Expired",
+                            errorText = "Session Expired",
+                            Queue = new List<object>(),
+                            TotalCount = 0
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
             }
 
-            // ── Step 3: Count all pending journals for header badge ───────────
-            // Uses same WHERE conditions + MRole so the count respects row-level security.
-            string countBase = "SELECT COUNT(1) FROM GL_Journal"
-                             + " WHERE GL_Journal.DocStatus IN ('DR','IP','AP','NA')"
-                             + " AND GL_Journal.IsActive='Y'"
-                             + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";
+            Ctx ctx =
+                Session["ctx"] as Ctx;
 
-            countBase = MRole.GetDefault(ctx).AddAccessSQL(
-                countBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            SqlParameter[] countParams = { new SqlParameter("@AcctSchemaID", acctSchemaId) };
-            int totalCount = 0;
-            DataSet countDs = CoreLibrary.DataBase.DB.ExecuteDataset(countBase, countParams, null);
-            if (countDs != null && countDs.Tables[0].Rows.Count > 0)
+            if (ctx == null)
             {
-                totalCount = Util.GetValueOfInt(countDs.Tables[0].Rows[0][0]);
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            success = false,
+                            error = "Session Expired",
+                            errorText = "Session Expired",
+                            Queue = new List<object>(),
+                            TotalCount = 0
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
             }
 
-            // ── Step 4: Query pending journals — no GROUP BY needed ───────────
-            // Correlated subquery fetches TotalDebit per journal without GROUP BY,
-            // allowing MRole to be applied cleanly before ORDER BY.
-            // FETCH FIRST 25 ROWS ONLY caps at the database level — works on Oracle 12c+ and PostgreSQL 8.4+.
-            string sqlBase = "SELECT GL_Journal.GL_Journal_ID,"
-                           + " GL_Journal.DocumentNo,"
-                           + " GL_Journal.Description,"
-                           + " GL_Journal.DocStatus,"
-                           + " AD_Ref_List.Name AS DocStatusName,"
-                           + " GL_Journal.Created,"
-                           + " (SELECT COALESCE(SUM(jl.AmtAcctDr),0) FROM GL_JournalLine jl"
-                           + " WHERE jl.GL_Journal_ID=GL_Journal.GL_Journal_ID AND jl.IsActive='Y') AS TotalDebit,"
-                           + " AD_User.Name AS UserName"
-                           + " FROM GL_Journal"
-                           + " INNER JOIN AD_User ON (GL_Journal.CreatedBy=AD_User.AD_User_ID)"
-                           + " LEFT OUTER JOIN AD_Ref_List ON (AD_Ref_List.AD_Reference_ID=131"
-                           + " AND AD_Ref_List.Value=GL_Journal.DocStatus"
-                           + " AND AD_Ref_List.IsActive='Y')"
-                           + " WHERE GL_Journal.DocStatus IN ('DR','IP','AP','NA')"
-                           + " AND GL_Journal.IsActive='Y'"
-                           + " AND GL_Journal.C_AcctSchema_ID=@AcctSchemaID";
+            IDataReader reader =
+                null;
 
-            // Apply MRole before ORDER BY
-            sqlBase = MRole.GetDefault(ctx).AddAccessSQL(
-                sqlBase, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            string sql = sqlBase + " ORDER BY GL_Journal.Created ASC FETCH FIRST 25 ROWS ONLY";
-
-            SqlParameter[] mainParams = { new SqlParameter("@AcctSchemaID", acctSchemaId) };
-            DataSet ds = CoreLibrary.DataBase.DB.ExecuteDataset(sql, mainParams, null);
-
-            // ── Step 5: Build result — SQL already capped at 25 rows ─────────
-            var queue = new List<object>();
-            DateTime now = DateTime.Now;
-
-            if (ds != null && ds.Tables[0].Rows.Count > 0)
+            try
             {
-                for (int i = 0; i < ds.Tables[0].Rows.Count; i++)
+                string language =
+                    ctx.GetAD_Language();
+
+                if (
+                    string.IsNullOrWhiteSpace(
+                        language
+                    )
+                )
                 {
-                    DataRow row = ds.Tables[0].Rows[i];
+                    language =
+                        "en_US";
+                }
 
-                    int journalId = Util.GetValueOfInt(row["GL_Journal_ID"]);
-                    string docNo = Util.GetValueOfString(row["DocumentNo"]);
-                    string description = Util.GetValueOfString(row["Description"]);
-                    string docStatus = Util.GetValueOfString(row["DocStatus"]);
-                    string statusName = Util.GetValueOfString(row["DocStatusName"]);
-                    string userName = Util.GetValueOfString(row["UserName"]);
-                    decimal totalDebit = Decimal.Round(
-                        Util.GetValueOfDecimal(row["TotalDebit"]), stdPrecision, MidpointRounding.AwayFromZero);
+                /*
+                 * Prevent Oracle ORA-12704.
+                 *
+                 * Oracle:
+                 * VARCHAR2(4000)
+                 *
+                 * PostgreSQL:
+                 * VARCHAR(4000)
+                 */
+                string textCastType =
+                    CoreLibrary.DataBase.DB.IsOracle()
+                        ? "VARCHAR2(4000)"
+                        : "VARCHAR(4000)";
 
-                    // Age — calculated from Created timestamp
-                    DateTime created = row["Created"] != DBNull.Value
-                        ? Convert.ToDateTime(row["Created"])
-                        : now;
-                    double totalHours = (now - created).TotalHours;
+                /*
+                 * Apply MRole only to the physical GL_Journal query.
+                 * Do not apply MRole to the final WITH query.
+                 */
+                string protectedJournalSql = @"
+SELECT
+    GL_Journal.GL_Journal_ID,
+    GL_Journal.AD_Client_ID,
+    GL_Journal.AD_Org_ID,
+    GL_Journal.C_AcctSchema_ID,
+    GL_Journal.DocumentNo,
+    GL_Journal.Description,
+    GL_Journal.DocStatus,
+    GL_Journal.Posted,
+    GL_Journal.Processed,
+    GL_Journal.Created,
+    GL_Journal.CreatedBy
+FROM GL_Journal GL_Journal
+WHERE GL_Journal.IsActive = 'Y'
+AND GL_Journal.AD_Client_ID =
+@PendingClientID
+AND GL_Journal.DocStatus IN
+(
+    'DR',
+    'IP',
+    'AP',
+    'NA'
+)";
 
-                    string ageStr;
+                protectedJournalSql =
+                    MRole.GetDefault(ctx)
+                        .AddAccessSQL(
+                            protectedJournalSql,
+                            "GL_Journal",
+                            MRole.SQL_FULLYQUALIFIED,
+                            MRole.SQL_RO
+                        );
+
+                /*
+                 * One query provides:
+                 *
+                 * 1. Primary accounting schema and currency.
+                 * 2. Protected GL journal records.
+                 * 3. Journal debit totals.
+                 * 4. Translated DocStatus reference.
+                 * 5. Total pending count.
+                 * 6. First 25 pending rows.
+                 */
+                string sql = @"
+WITH SchemaCurrency AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        AcctSchema.C_AcctSchema_ID,
+        Currency.CurSymbol,
+        Currency.ISO_Code,
+        Currency.StdPrecision
+    FROM AD_ClientInfo ClientInfo
+    INNER JOIN C_AcctSchema AcctSchema ON
+    (
+        ClientInfo.C_AcctSchema1_ID =
+        AcctSchema.C_AcctSchema_ID
+    )
+    INNER JOIN C_Currency Currency ON
+    (
+        AcctSchema.C_Currency_ID =
+        Currency.C_Currency_ID
+    )
+    WHERE ClientInfo.IsActive = 'Y'
+    AND AcctSchema.IsActive = 'Y'
+    AND Currency.IsActive = 'Y'
+    AND ClientInfo.AD_Client_ID =
+    @SchemaClientID
+),
+ProtectedJournal AS
+(
+" + protectedJournalSql + @"
+),
+JournalLineTotals AS
+(
+    SELECT
+        GL_JournalLine.GL_Journal_ID,
+
+        COALESCE(
+            SUM(
+                COALESCE(
+                    GL_JournalLine.AmtAcctDr,
+                    0
+                )
+            ),
+            0
+        ) AS TotalDebit
+
+    FROM GL_JournalLine GL_JournalLine
+
+    WHERE GL_JournalLine.IsActive = 'Y'
+
+    GROUP BY
+        GL_JournalLine.GL_Journal_ID
+),
+DocumentStatusReference AS
+(
+    SELECT DISTINCT
+        CAST(
+            RefList.Value AS " + textCastType + @"
+        ) AS StatusValue,
+
+        CAST(
+            RefList.Name AS " + textCastType + @"
+        ) AS StatusBaseName,
+
+        CAST(
+            RefListTrl.Name AS " + textCastType + @"
+        ) AS StatusTranslatedName
+
+    FROM AD_Reference ReferenceInfo
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        RefList.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefList.AD_Ref_List_ID =
+        RefListTrl.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        @StatusLanguage
+    )
+
+    WHERE ReferenceInfo.IsActive = 'Y'
+    AND RefList.IsActive = 'Y'
+
+    AND ReferenceInfo.Name =
+    @StatusReferenceName
+),
+PendingRows AS
+(
+    SELECT
+        ProtectedJournal.GL_Journal_ID,
+        ProtectedJournal.DocumentNo,
+        ProtectedJournal.Description,
+        ProtectedJournal.DocStatus,
+        ProtectedJournal.Posted,
+        ProtectedJournal.Processed,
+        ProtectedJournal.Created,
+
+        StatusReference.StatusBaseName,
+        StatusReference.StatusTranslatedName,
+
+        CreatedUser.Name AS UserName,
+
+        COALESCE(
+            JournalLineTotals.TotalDebit,
+            0
+        ) AS TotalDebit,
+
+        SchemaCurrency.CurSymbol,
+        SchemaCurrency.ISO_Code,
+        SchemaCurrency.StdPrecision,
+
+        COUNT(1) OVER
+        (
+        ) AS TotalCount,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                ProtectedJournal.Created ASC,
+                ProtectedJournal.GL_Journal_ID ASC
+        ) AS RowNumber
+
+    FROM ProtectedJournal ProtectedJournal
+
+    INNER JOIN SchemaCurrency SchemaCurrency ON
+    (
+        SchemaCurrency.AD_Client_ID =
+        ProtectedJournal.AD_Client_ID
+
+        AND SchemaCurrency.C_AcctSchema_ID =
+        ProtectedJournal.C_AcctSchema_ID
+    )
+
+    LEFT OUTER JOIN JournalLineTotals JournalLineTotals ON
+    (
+        ProtectedJournal.GL_Journal_ID =
+        JournalLineTotals.GL_Journal_ID
+    )
+
+    LEFT OUTER JOIN AD_User CreatedUser ON
+    (
+        ProtectedJournal.CreatedBy =
+        CreatedUser.AD_User_ID
+
+        AND CreatedUser.IsActive = 'Y'
+    )
+
+    LEFT OUTER JOIN DocumentStatusReference StatusReference ON
+    (
+        CAST(
+            ProtectedJournal.DocStatus AS " + textCastType + @"
+        ) =
+        StatusReference.StatusValue
+    )
+)
+SELECT
+    PendingRows.GL_Journal_ID,
+    PendingRows.DocumentNo,
+    PendingRows.Description,
+    PendingRows.DocStatus,
+    PendingRows.Posted,
+    PendingRows.Processed,
+    PendingRows.Created,
+    PendingRows.StatusBaseName,
+    PendingRows.StatusTranslatedName,
+    PendingRows.UserName,
+    PendingRows.TotalDebit,
+    PendingRows.CurSymbol,
+    PendingRows.ISO_Code,
+    PendingRows.StdPrecision,
+    PendingRows.TotalCount,
+    PendingRows.RowNumber
+
+FROM PendingRows PendingRows
+
+WHERE PendingRows.RowNumber <= 25
+
+ORDER BY
+    PendingRows.RowNumber";
+
+                /*
+                 * Placeholder order:
+                 *
+                 * 1. @SchemaClientID
+                 * 2. @PendingClientID
+                 * 3. @StatusLanguage
+                 * 4. @StatusReferenceName
+                 *
+                 * Every bind variable appears exactly once.
+                 */
+                SqlParameter[] parameters =
+                {
+            new SqlParameter(
+                "@SchemaClientID",
+                ctx.GetAD_Client_ID()
+            ),
+
+            new SqlParameter(
+                "@PendingClientID",
+                ctx.GetAD_Client_ID()
+            ),
+
+            new SqlParameter(
+                "@StatusLanguage",
+                language
+            ),
+
+            new SqlParameter(
+                "@StatusReferenceName",
+                DocStatusReferenceName
+            )
+        };
+
+                reader =
+                    CoreLibrary.DataBase.DB.ExecuteReader(
+                        sql,
+                        parameters,
+                        null
+                    );
+
+                List<object> queue =
+                    new List<object>();
+
+                int totalCount =
+                    0;
+
+                string curSymbol =
+                    string.Empty;
+
+                string isoCode =
+                    string.Empty;
+
+                int stdPrecision =
+                    2;
+
+                DateTime now =
+                    DateTime.Now;
+
+                while (reader.Read())
+                {
+                    int journalId =
+                        Util.GetValueOfInt(
+                            reader["GL_Journal_ID"]
+                        );
+
+                    string documentNo =
+                        Util.GetValueOfString(
+                            reader["DocumentNo"]
+                        );
+
+                    string description =
+                        Util.GetValueOfString(
+                            reader["Description"]
+                        );
+
+                    /*
+                     * Original stored reference value.
+                     * Example:
+                     *
+                     * DR
+                     * IP
+                     * AP
+                     * NA
+                     */
+                    string statusValue =
+                        Util.GetValueOfString(
+                            reader["DocStatus"]
+                        );
+
+                    /*
+                     * Translation fallback order:
+                     *
+                     * 1. AD_Ref_List_Trl.Name
+                     * 2. AD_Ref_List.Name
+                     * 3. Original DocStatus value
+                     */
+                    string translatedStatusName =
+                        Util.GetValueOfString(
+                            reader[
+                                "StatusTranslatedName"
+                            ]
+                        );
+
+                    string baseStatusName =
+                        Util.GetValueOfString(
+                            reader[
+                                "StatusBaseName"
+                            ]
+                        );
+
+                    string statusName;
+
+                    if (
+                        !string.IsNullOrWhiteSpace(
+                            translatedStatusName
+                        )
+                    )
+                    {
+                        statusName =
+                            translatedStatusName;
+                    }
+                    else if (
+                        !string.IsNullOrWhiteSpace(
+                            baseStatusName
+                        )
+                    )
+                    {
+                        statusName =
+                            baseStatusName;
+                    }
+                    else
+                    {
+                        statusName =
+                            statusValue;
+                    }
+
+                    string userName =
+                        Util.GetValueOfString(
+                            reader["UserName"]
+                        );
+
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            userName
+                        )
+                    )
+                    {
+                        userName =
+                            "-";
+                    }
+
+                    stdPrecision =
+                        (
+                            Util.GetValueOfInt(
+                                reader["StdPrecision"]
+                            )
+                        );
+
+                    decimal totalDebit =
+                        Decimal.Round(
+                            Util.GetValueOfDecimal(
+                                reader["TotalDebit"]
+                            ),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
+
+                    totalCount =
+                        Util.GetValueOfInt(
+                            reader["TotalCount"]
+                        );
+
+                    curSymbol =
+                        Util.GetValueOfString(
+                            reader["CurSymbol"]
+                        );
+
+                    isoCode =
+                        Util.GetValueOfString(
+                            reader["ISO_Code"]
+                        );
+
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            curSymbol
+                        )
+                    )
+                    {
+                        curSymbol =
+                            isoCode;
+                    }
+
+                    DateTime created =
+                        reader["Created"] != DBNull.Value
+                            ? Convert.ToDateTime(
+                                reader["Created"]
+                            )
+                            : now;
+
+                    double totalHours =
+                        (now - created).TotalHours;
+
+                    if (totalHours < 0)
+                    {
+                        totalHours =
+                            0;
+                    }
+
+                    string ageText;
+
                     if (totalHours < 1)
-                        ageStr = "< 1h";
+                    {
+                        ageText =
+                            "< 1h";
+                    }
                     else if (totalHours < 24)
-                        ageStr = ((int)totalHours) + "h";
+                    {
+                        ageText =
+                            ((int)totalHours) +
+                            "h";
+                    }
                     else if (totalHours < 48)
-                        ageStr = "1d";
+                    {
+                        ageText =
+                            "1d";
+                    }
                     else
-                        ageStr = ((int)(totalHours / 24)) + "d";
+                    {
+                        ageText =
+                            (
+                                (int)(
+                                    totalHours / 24
+                                )
+                            ) +
+                            "d";
+                    }
 
-                    // Urgency marker
                     string markerType;
-                    if (totalHours >= 48)
-                        markerType = "danger";
-                    else if (totalHours >= 24)
-                        markerType = "warn";
-                    else
-                        markerType = "info";
 
-                    // Action label based on DocStatus
+                    if (totalHours >= 48)
+                    {
+                        markerType =
+                            "danger";
+                    }
+                    else if (totalHours >= 24)
+                    {
+                        markerType =
+                            "warn";
+                    }
+                    else
+                    {
+                        markerType =
+                            "info";
+                    }
+
                     string actionLabel;
-                    switch (docStatus)
+
+                    switch (
+                        statusValue.ToUpperInvariant()
+                    )
                     {
                         case "IP":
-                            actionLabel = "Approval";
+                            actionLabel =
+                                GetMsg(
+                                    ctx,
+                                    "VAS_045_Approval",
+                                    "Approval"
+                                );
                             break;
+
                         case "AP":
-                            actionLabel = "Post";
+                            actionLabel =
+                                GetMsg(
+                                    ctx,
+                                    "VAS_045_Post",
+                                    "Post"
+                                );
                             break;
+
                         case "NA":
-                            actionLabel = "Resubmit";
+                            actionLabel =
+                                GetMsg(
+                                    ctx,
+                                    "VAS_045_Resubmit",
+                                    "Resubmit"
+                                );
                             break;
+
                         default:
-                            actionLabel = "Draft";
+                            actionLabel =
+                                GetMsg(
+                                    ctx,
+                                    "VAS_045_Draft",
+                                    "Draft"
+                                );
                             break;
                     }
 
-                    queue.Add(new
-                    {
-                        GL_Journal_ID = journalId,
-                        DocumentNo = docNo,
-                        Description = description,
-                        DocStatus = docStatus,
-                        StatusName = statusName,
-                        ActionLabel = actionLabel,
-                        MarkerType = markerType,
-                        AgeStr = ageStr,
-                        IsOverdue = totalHours >= 48,
-                        TotalDebit = totalDebit,
-                        UserName = userName
-                    });
+                    queue.Add(
+                        new
+                        {
+                            GL_Journal_ID =
+                                journalId,
+
+                            DocumentNo =
+                                documentNo,
+
+                            Description =
+                                description,
+
+                            /*
+                             * Existing field retained for compatibility.
+                             */
+                            DocStatus =
+                                statusValue,
+
+                            /*
+                             * Separate value and name fields.
+                             */
+                            StatusValue =
+                                statusValue,
+
+                            StatusName =
+                                statusName,
+
+                            /*
+                             * Requested reference object.
+                             */
+                            Status = new
+                            {
+                                Value =
+                                    statusValue,
+
+                                Name =
+                                    statusName
+                            },
+
+                            Posted =
+                                Util.GetValueOfString(
+                                    reader["Posted"]
+                                ),
+
+                            Processed =
+                                Util.GetValueOfString(
+                                    reader["Processed"]
+                                ),
+
+                            ActionLabel =
+                                actionLabel,
+
+                            MarkerType =
+                                markerType,
+
+                            AgeStr =
+                                ageText,
+
+                            IsOverdue =
+                                totalHours >= 48,
+
+                            TotalDebit =
+                                totalDebit,
+
+                            UserName =
+                                userName
+                        }
+                    );
+                }
+
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            success = true,
+                            error = string.Empty,
+
+                            Queue =
+                                queue,
+
+                            TotalCount =
+                                totalCount,
+
+                            CurSymbol =
+                                curSymbol,
+
+                            ISOCode =
+                                isoCode,
+
+                            StdPrecision =
+                                stdPrecision
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+            catch (Exception)
+            {
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_045_LoadPendingQueueFailed",
+                        "Error loading pending journal queue."
+                    );
+
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            success = false,
+
+                            error =
+                                errorMessage,
+
+                            errorText =
+                                errorMessage,
+
+                            Queue =
+                                new List<object>(),
+
+                            TotalCount =
+                                0
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+            finally
+            {
+                if (reader != null)
+                {
+                    reader.Close();
+                    reader.Dispose();
+                    reader = null;
                 }
             }
-
-            return Json(JsonConvert.SerializeObject(new
-            {
-                Queue = queue,
-                TotalCount = totalCount,
-                CurSymbol = curSymbol,
-                ISOCode = isoCode,
-                StdPrecision = stdPrecision
-            }), JsonRequestBehavior.AllowGet);
         }
-
 
         /// <summary>
         /// Prepares and approves the selected GL Journal.
@@ -906,6 +1652,7 @@ namespace VAS.Controllers
 
             return false;
         }
+
 
         private string GetPostingErrorMessage(
             Ctx ctx,
