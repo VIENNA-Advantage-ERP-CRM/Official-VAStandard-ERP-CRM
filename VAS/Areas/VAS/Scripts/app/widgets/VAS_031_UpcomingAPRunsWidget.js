@@ -451,7 +451,7 @@
         }
 
         function fieldHtml(label, value, prefilled, rawValue) {
-            return '<div class="vas-upcoming-ap-runs-field">' +
+            return '<div class="vas-upcoming-ap-runs-field' + (prefilled ? ' is-prefilled' : '') + '">' +
                 '<div class="vas-upcoming-ap-runs-field-label">' +
                 escapeHtml(label) +
                 (prefilled ? '<span>' + escapeHtml(lbl('VAS_031_MessagePrefilled', 'PRE-FILLED')) + '</span>' : '') +
@@ -680,7 +680,12 @@
                 '<div class="vas-upcoming-ap-runs-pay-title"></div>' +
                 '<div class="vas-upcoming-ap-runs-pay-sub"></div>' +
                 '</div>' +
-                '<button type="button" class="vas-upcoming-ap-runs-pay-close" aria-label="' + escapeHtml(lbl('VAS_Close', 'Close')) + '">×</button>' +
+                '<button type="button" class="vas-upcoming-ap-runs-pay-close" aria-label="' + escapeHtml(lbl('VAS_Close', 'Close')) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+                '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+                '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+                '</svg>' +
+                '</button>' +
                 '</div>' +
                 '<div class="vas-upcoming-ap-runs-pay-body">' +
                 '<div class="vas-upcoming-ap-runs-pay-busy">' + escapeHtml(lbl('VAS_031_MessageSaving', 'Saving')) + '</div>' +

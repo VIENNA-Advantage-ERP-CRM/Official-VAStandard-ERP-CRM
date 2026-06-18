@@ -682,7 +682,7 @@
 .vas-recent-ap-payments-dialog-amount {
     display: inline-block;
     color: #102c3f;
-    font-size: 1.25em;
+    font-size: 0.9375em;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
