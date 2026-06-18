@@ -1,4 +1,3 @@
-
 using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
@@ -17,140 +16,22 @@ namespace VAS.Controllers
 {
     public class VAS_041_GLJournalEntriesWidgetController : Controller
     {
-        /// <summary>
-        /// Returns the number of Actual GL Journals
-        /// created within the current accounting month.
-        /// </summary>
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
-        public JsonResult GetMonthlyEntryCount()
-        {
-            Ctx ctx = GetContext();
-
-            if (ctx == null)
-            {
-                return GetSessionExpiredResult();
-            }
-
-            string sql = @"
-WITH SchemaCurrency AS
-(
-" + BuildSchemaCurrencySql() + @"
-),
-PeriodRange AS
-(
-" + BuildPeriodRangeSql() + @"
-),
-ProtectedJournal AS
-(
-" + BuildProtectedJournalSql(
-                    ctx,
-                    "GL_Journal.PostingType = 'A'"
-                ) + @"
-)
-SELECT
-    COUNT(
-        ProtectedJournal.GL_Journal_ID
-    ) AS EntryCount,
-    MAX(
-        PeriodRange.MonthDateFrom
-    ) AS MonthDateFrom
-FROM PeriodRange PeriodRange
-INNER JOIN SchemaCurrency SchemaCurrency ON
-(
-    SchemaCurrency.AD_Client_ID =
-    PeriodRange.AD_Client_ID
-)
-LEFT OUTER JOIN ProtectedJournal ProtectedJournal ON
-(
-    ProtectedJournal.AD_Client_ID =
-    SchemaCurrency.AD_Client_ID
-    AND ProtectedJournal.C_AcctSchema_ID =
-    SchemaCurrency.C_AcctSchema_ID
-    AND ProtectedJournal.DateAcct >=
-    PeriodRange.MonthDateFrom
-    AND ProtectedJournal.DateAcct <
-" + GetDateToExclusiveExpression(
-                    "PeriodRange.MonthDateTo"
-                ) + @"
-)";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                )
-            };
-
-            int entryCount = 0;
-            DateTime? monthDateFrom = null;
-
-            DataSet dataSet =
-                DB.ExecuteDataset(
-                    sql,
-                    parameters,
-                    null
-                );
-
-            if (
-                dataSet != null &&
-                dataSet.Tables.Count > 0 &&
-                dataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                DataRow row =
-                    dataSet.Tables[0].Rows[0];
-
-                entryCount =
-                    Util.GetValueOfInt(
-                        row["EntryCount"]
-                    );
-
-                monthDateFrom =
-                    Util.GetValueOfDateTime(
-                        row["MonthDateFrom"]
-                    );
-            }
-
-            DateTime displayDate =
-                monthDateFrom.HasValue
-                    ? monthDateFrom.Value
-                    : DateTime.Now;
-
-            return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        EntryCount =
-                            entryCount,
-
-                        MonthName =
-                            displayDate.ToString(
-                                "MMMM"
-                            ),
-
-                        MonthAbbr =
-                            displayDate.ToString(
-                                "MMM"
-                            ),
-
-                        Year =
-                            displayDate.Year
-                    }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
-        }
-
-        /// <summary>
-        /// Returns all Actual GL Journals created
-        /// in the current accounting month.
-        /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetMonthlyEntries()
         {
+            return GetJournalEntries(false);
+        }
+
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetUnpostedEntries()
+        {
+            return GetJournalEntries(true);
+        }
+
+        private JsonResult GetJournalEntries(bool onlyUnposted)
+        {
             Ctx ctx = GetContext();
 
             if (ctx == null)
@@ -158,30 +39,87 @@ LEFT OUTER JOIN ProtectedJournal ProtectedJournal ON
                 return GetSessionExpiredResult();
             }
 
-            string language =
-                GetLanguage(ctx);
+            try
+            {
+                string language = GetLanguage(ctx);
 
-            string sql = @"
-WITH SchemaCurrency AS
-(
-" + BuildSchemaCurrencySql() + @"
-),
+                string schemaParameter =
+                    onlyUnposted
+                        ? "@UnpostedSchemaClientID"
+                        : "@MonthlySchemaClientID";
+
+                string periodParameter =
+                    "@MonthlyPeriodClientID";
+
+                string journalClientParameter =
+                    onlyUnposted
+                        ? "@UnpostedJournalClientID"
+                        : "@MonthlyJournalClientID";
+
+                string languageParameter =
+                    onlyUnposted
+                        ? "@UnpostedLanguage"
+                        : "@MonthlyLanguage";
+
+                string journalCondition =
+                    onlyUnposted
+                        ? @"
+COALESCE(
+    GL_Journal.Posted,
+    'N'
+) <> 'Y'
+AND GL_Journal.DocStatus <> 'VO'"
+                        : @"
+GL_Journal.PostingType = 'A'";
+
+                string periodCte = string.Empty;
+                string periodJoin = string.Empty;
+
+                if (!onlyUnposted)
+                {
+                    periodCte = @",
 PeriodRange AS
 (
-" + BuildPeriodRangeSql() + @"
-),
+" + BuildCurrentPeriodSql(periodParameter) + @"
+)";
+
+                    periodJoin = @"
+INNER JOIN PeriodRange PeriodRange ON
+(
+    PeriodRange.AD_Client_ID =
+    ProtectedJournal.AD_Client_ID
+    AND ProtectedJournal.DateAcct >=
+    PeriodRange.MonthDateFrom
+    AND ProtectedJournal.DateAcct <
+" + GetDateToExclusiveExpression(
+                        "PeriodRange.MonthDateTo"
+                    ) + @"
+)";
+                }
+
+                string sql = @"
+WITH SchemaCurrency AS
+(
+" + BuildSchemaCurrencySql(
+                    schemaParameter
+                ) + @"
+)" +
+periodCte + @",
 ProtectedJournal AS
 (
 " + BuildProtectedJournalSql(
                     ctx,
-                    "GL_Journal.PostingType = 'A'"
+                    journalClientParameter,
+                    journalCondition
                 ) + @"
 ),
 DocumentStatusReference AS
 (
-" + BuildDocumentStatusReferenceSql() + @"
+" + BuildDocumentStatusReferenceSql(
+                    languageParameter
+                ) + @"
 ),
-JournalData AS
+JournalTotals AS
 (
     SELECT
         ProtectedJournal.GL_Journal_ID,
@@ -191,313 +129,349 @@ JournalData AS
         ProtectedJournal.DocStatus,
         ProtectedJournal.Posted,
         ProtectedJournal.Processed,
-        ProtectedJournal.AD_Client_ID,
-        ProtectedJournal.C_AcctSchema_ID
-    FROM PeriodRange PeriodRange
-    INNER JOIN SchemaCurrency SchemaCurrency ON
-    (
-        SchemaCurrency.AD_Client_ID =
-        PeriodRange.AD_Client_ID
-    )
-    INNER JOIN ProtectedJournal ProtectedJournal ON
-    (
-        ProtectedJournal.AD_Client_ID =
-        SchemaCurrency.AD_Client_ID
-        AND ProtectedJournal.C_AcctSchema_ID =
-        SchemaCurrency.C_AcctSchema_ID
-        AND ProtectedJournal.DateAcct >=
-        PeriodRange.MonthDateFrom
-        AND ProtectedJournal.DateAcct <
-" + GetDateToExclusiveExpression(
-                    "PeriodRange.MonthDateTo"
-                ) + @"
-    )
-),
-JournalTotals AS
-(
-    SELECT
-        JournalData.GL_Journal_ID,
-        JournalData.DocumentNo,
-        JournalData.DateAcct,
-        JournalData.Description,
-        JournalData.DocStatus,
-        JournalData.Posted,
-        JournalData.Processed,
-        DocumentStatusReference.BaseName AS DocStatusBaseName,
-        DocumentStatusReference.TranslatedName AS DocStatusTranslatedName,
-        ROUND(
-            COALESCE(
-                SUM(
-                    COALESCE(
-                        GL_JournalLine.AmtAcctDr,
-                        0
-                    )
-                ),
-                0
+
+        DocumentStatusReference.BaseName
+            AS DocStatusBaseName,
+
+        DocumentStatusReference.TranslatedName
+            AS DocStatusTranslatedName,
+
+        COALESCE(
+            SUM(
+                COALESCE(
+                    GL_JournalLine.AmtAcctDr,
+                    0
+                )
             ),
-            COALESCE(
-                MAX(
-                    SchemaCurrency.StdPrecision
-                ),
-                2
-            )
+            0
         ) AS TotalDebit,
-        ROUND(
-            COALESCE(
-                SUM(
-                    COALESCE(
-                        GL_JournalLine.AmtAcctCr,
-                        0
-                    )
-                ),
-                0
+
+        COALESCE(
+            SUM(
+                COALESCE(
+                    GL_JournalLine.AmtAcctCr,
+                    0
+                )
             ),
-            COALESCE(
-                MAX(
-                    SchemaCurrency.StdPrecision
-                ),
-                2
-            )
+            0
         ) AS TotalCredit,
+
         MAX(
-            SchemaCurrency.Cur_Symbol
+            SchemaCurrency.CurSymbol
         ) AS CurSymbol,
+
         MAX(
-            SchemaCurrency.ISO_Code
+            SchemaCurrency.ISOCode
         ) AS ISOCode,
+
         COALESCE(
             MAX(
                 SchemaCurrency.StdPrecision
             ),
             2
         ) AS StdPrecision
-    FROM JournalData JournalData
+
+    FROM ProtectedJournal ProtectedJournal
+
+" + periodJoin + @"
+
     INNER JOIN SchemaCurrency SchemaCurrency ON
     (
         SchemaCurrency.AD_Client_ID =
-        JournalData.AD_Client_ID
+        ProtectedJournal.AD_Client_ID
+
         AND SchemaCurrency.C_AcctSchema_ID =
-        JournalData.C_AcctSchema_ID
+        ProtectedJournal.C_AcctSchema_ID
     )
+
     LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
     (
-        JournalData.GL_Journal_ID =
+        ProtectedJournal.GL_Journal_ID =
         GL_JournalLine.GL_Journal_ID
+
         AND GL_JournalLine.IsActive = 'Y'
     )
-    LEFT OUTER JOIN DocumentStatusReference DocumentStatusReference ON
+
+    LEFT OUTER JOIN DocumentStatusReference
+        DocumentStatusReference ON
     (
         DocumentStatusReference.Value =
-        JournalData.DocStatus
+        ProtectedJournal.DocStatus
     )
+
     GROUP BY
-        JournalData.GL_Journal_ID,
-        JournalData.DocumentNo,
-        JournalData.DateAcct,
-        JournalData.Description,
-        JournalData.DocStatus,
-        JournalData.Posted,
-        JournalData.Processed,
+        ProtectedJournal.GL_Journal_ID,
+        ProtectedJournal.DocumentNo,
+        ProtectedJournal.DateAcct,
+        ProtectedJournal.Description,
+        ProtectedJournal.DocStatus,
+        ProtectedJournal.Posted,
+        ProtectedJournal.Processed,
         DocumentStatusReference.BaseName,
         DocumentStatusReference.TranslatedName
+),
+OrderedJournals AS
+(
+    SELECT
+        JournalTotals.GL_Journal_ID,
+        JournalTotals.DocumentNo,
+        JournalTotals.DateAcct,
+        JournalTotals.Description,
+        JournalTotals.DocStatus,
+        JournalTotals.Posted,
+        JournalTotals.Processed,
+        JournalTotals.DocStatusBaseName,
+        JournalTotals.DocStatusTranslatedName,
+        JournalTotals.TotalDebit,
+        JournalTotals.TotalCredit,
+        JournalTotals.CurSymbol,
+        JournalTotals.ISOCode,
+        JournalTotals.StdPrecision,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                JournalTotals.DateAcct DESC,
+                JournalTotals.GL_Journal_ID DESC
+        ) AS RowNumber
+
+    FROM JournalTotals JournalTotals
 )
 SELECT
-    JournalTotals.GL_Journal_ID,
-    JournalTotals.DocumentNo,
-    JournalTotals.DateAcct,
-    JournalTotals.Description,
-    JournalTotals.DocStatus,
-    JournalTotals.Posted,
-    JournalTotals.Processed,
-    JournalTotals.DocStatusBaseName,
-    JournalTotals.DocStatusTranslatedName,
-    JournalTotals.TotalDebit,
-    JournalTotals.TotalCredit,
-    JournalTotals.CurSymbol,
-    JournalTotals.ISOCode,
-    JournalTotals.StdPrecision
-FROM JournalTotals JournalTotals
+    OrderedJournals.GL_Journal_ID,
+    OrderedJournals.DocumentNo,
+    OrderedJournals.DateAcct,
+    OrderedJournals.Description,
+    OrderedJournals.DocStatus,
+    OrderedJournals.Posted,
+    OrderedJournals.Processed,
+    OrderedJournals.DocStatusBaseName,
+    OrderedJournals.DocStatusTranslatedName,
+    OrderedJournals.TotalDebit,
+    OrderedJournals.TotalCredit,
+    OrderedJournals.CurSymbol,
+    OrderedJournals.ISOCode,
+    OrderedJournals.StdPrecision
+
+FROM OrderedJournals OrderedJournals
+
+WHERE OrderedJournals.RowNumber <= 100
+
 ORDER BY
-    JournalTotals.DateAcct DESC,
-    JournalTotals.GL_Journal_ID DESC
-FETCH FIRST 100 ROWS ONLY";
+    OrderedJournals.RowNumber";
 
-            SqlParameter[] parameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                ),
+                List<SqlParameter> parameterList =
+                    new List<SqlParameter>();
 
-                new SqlParameter(
-                    "@AD_Language",
-                    language
-                )
-            };
-
-            DataSet dataSet =
-                DB.ExecuteDataset(
-                    sql,
-                    parameters,
-                    null
+                parameterList.Add(
+                    new SqlParameter(
+                        schemaParameter,
+                        ctx.GetAD_Client_ID()
+                    )
                 );
 
-            List<object> entries =
-                new List<object>();
-
-            decimal totalDebit = 0m;
-            decimal totalCredit = 0m;
-
-            string curSymbol =
-                string.Empty;
-
-            string isoCode =
-                string.Empty;
-
-            int stdPrecision = 2;
-
-            DateTime? monthDate = null;
-
-            if (
-                dataSet != null &&
-                dataSet.Tables.Count > 0 &&
-                dataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                foreach (
-                    DataRow row in
-                    dataSet.Tables[0].Rows
-                )
+                if (!onlyUnposted)
                 {
-                    stdPrecision =
-                        NormalizePrecision(
-                            Util.GetValueOfInt(
-                                row["StdPrecision"]
-                            )
-                        );
-
-                    decimal debit =
-                        Util.GetValueOfDecimal(
-                            row["TotalDebit"]
-                        );
-
-                    decimal credit =
-                        Util.GetValueOfDecimal(
-                            row["TotalCredit"]
-                        );
-
-                    totalDebit += debit;
-                    totalCredit += credit;
-
-                    string docStatus =
-                        Util.GetValueOfString(
-                            row["DocStatus"]
-                        );
-
-                    string statusName =
-                        GetReferenceName(
-                            row,
-                            "DocStatusTranslatedName",
-                            "DocStatusBaseName",
-                            docStatus
-                        );
-
-                    string dateAcctText =
-                        string.Empty;
-
-                    DateTime? dateAcct =
-                        Util.GetValueOfDateTime(
-                            row["DateAcct"]
-                        );
-
-                    if (dateAcct.HasValue)
-                    {
-                        dateAcctText =
-                            dateAcct.Value.ToString(
-                                "dd MMM yyyy"
-                            );
-
-                        if (!monthDate.HasValue)
-                        {
-                            monthDate =
-                                dateAcct.Value;
-                        }
-                    }
-
-                    curSymbol =
-                        Util.GetValueOfString(
-                            row["CurSymbol"]
-                        );
-
-                    isoCode =
-                        Util.GetValueOfString(
-                            row["ISOCode"]
-                        );
-
-                    entries.Add(
-                        new
-                        {
-                            GL_Journal_ID =
-                                Util.GetValueOfInt(
-                                    row["GL_Journal_ID"]
-                                ),
-
-                            DocumentNo =
-                                Util.GetValueOfString(
-                                    row["DocumentNo"]
-                                ),
-
-                            DateAcct =
-                                dateAcctText,
-
-                            Description =
-                                Util.GetValueOfString(
-                                    row["Description"]
-                                ),
-
-                            DocStatus =
-                                docStatus,
-
-                            StatusName =
-                                statusName,
-
-                            Posted =
-                                Util.GetValueOfString(
-                                    row["Posted"]
-                                ),
-
-                            Processed =
-                                Util.GetValueOfString(
-                                    row["Processed"]
-                                ),
-
-                            TotalDebit =
-                                Decimal.Round(
-                                    debit,
-                                    stdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
-                                ),
-
-                            TotalCredit =
-                                Decimal.Round(
-                                    credit,
-                                    stdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
-                                )
-                        }
+                    parameterList.Add(
+                        new SqlParameter(
+                            periodParameter,
+                            ctx.GetAD_Client_ID()
+                        )
                     );
                 }
-            }
 
-            DateTime displayDate =
-                monthDate.HasValue
-                    ? monthDate.Value
-                    : DateTime.Now;
+                parameterList.Add(
+                    new SqlParameter(
+                        journalClientParameter,
+                        ctx.GetAD_Client_ID()
+                    )
+                );
 
-            return Json(
-                JsonConvert.SerializeObject(
+                parameterList.Add(
+                    new SqlParameter(
+                        languageParameter,
+                        language
+                    )
+                );
+
+                DataSet dataSet =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameterList.ToArray(),
+                        null
+                    );
+
+                List<object> entries =
+                    new List<object>();
+
+                decimal totalDebit = 0m;
+                decimal totalCredit = 0m;
+
+                string curSymbol = string.Empty;
+                string isoCode = string.Empty;
+
+                int stdPrecision = 2;
+
+                DateTime? displayPeriodDate =
+                    null;
+
+                if (
+                    dataSet != null &&
+                    dataSet.Tables.Count > 0
+                )
+                {
+                    foreach (
+                        DataRow row in
+                        dataSet.Tables[0].Rows
+                    )
+                    {
+                        stdPrecision =
+                            NormalizePrecision(
+                                Util.GetValueOfInt(
+                                    row["StdPrecision"]
+                                )
+                            );
+
+                        decimal debit =
+                            Decimal.Round(
+                                Util.GetValueOfDecimal(
+                                    row["TotalDebit"]
+                                ),
+                                stdPrecision,
+                                MidpointRounding.AwayFromZero
+                            );
+
+                        decimal credit =
+                            Decimal.Round(
+                                Util.GetValueOfDecimal(
+                                    row["TotalCredit"]
+                                ),
+                                stdPrecision,
+                                MidpointRounding.AwayFromZero
+                            );
+
+                        totalDebit += debit;
+                        totalCredit += credit;
+
+                        string docStatus =
+                            Util.GetValueOfString(
+                                row["DocStatus"]
+                            );
+
+                        string statusName =
+                            Util.GetValueOfString(
+                                row[
+                                    "DocStatusTranslatedName"
+                                ]
+                            );
+
+                        if (
+                            string.IsNullOrWhiteSpace(
+                                statusName
+                            )
+                        )
+                        {
+                            statusName =
+                                Util.GetValueOfString(
+                                    row[
+                                        "DocStatusBaseName"
+                                    ]
+                                );
+                        }
+
+                        if (
+                            string.IsNullOrWhiteSpace(
+                                statusName
+                            )
+                        )
+                        {
+                            statusName =
+                                docStatus;
+                        }
+
+                        DateTime? dateAcct =
+                            Util.GetValueOfDateTime(
+                                row["DateAcct"]
+                            );
+
+                        if (
+                            dateAcct.HasValue &&
+                            !displayPeriodDate.HasValue
+                        )
+                        {
+                            displayPeriodDate =
+                                dateAcct.Value;
+                        }
+
+                        curSymbol =
+                            Util.GetValueOfString(
+                                row["CurSymbol"]
+                            );
+
+                        isoCode =
+                            Util.GetValueOfString(
+                                row["ISOCode"]
+                            );
+
+                        entries.Add(
+                            new
+                            {
+                                GL_Journal_ID =
+                                    Util.GetValueOfInt(
+                                        row[
+                                            "GL_Journal_ID"
+                                        ]
+                                    ),
+
+                                DocumentNo =
+                                    Util.GetValueOfString(
+                                        row["DocumentNo"]
+                                    ),
+
+                                DateAcct =
+                                    dateAcct.HasValue
+                                        ? dateAcct.Value.ToString(
+                                            "dd MMM yyyy"
+                                        )
+                                        : string.Empty,
+
+                                Description =
+                                    Util.GetValueOfString(
+                                        row["Description"]
+                                    ),
+
+                                DocStatus =
+                                    docStatus,
+
+                                StatusName =
+                                    statusName,
+
+                                Posted =
+                                    Util.GetValueOfString(
+                                        row["Posted"]
+                                    ),
+
+                                Processed =
+                                    Util.GetValueOfString(
+                                        row["Processed"]
+                                    ),
+
+                                TotalDebit =
+                                    debit,
+
+                                TotalCredit =
+                                    credit
+                            }
+                        );
+                    }
+                }
+
+                DateTime displayDate =
+                    displayPeriodDate.HasValue
+                        ? displayPeriodDate.Value
+                        : DateTime.Now;
+
+                return JsonString(
                     new
                     {
                         success = true,
@@ -512,16 +486,14 @@ FETCH FIRST 100 ROWS ONLY";
                             Decimal.Round(
                                 totalDebit,
                                 stdPrecision,
-                                MidpointRounding
-                                    .AwayFromZero
+                                MidpointRounding.AwayFromZero
                             ),
 
                         TotalCredit =
                             Decimal.Round(
                                 totalCredit,
                                 stdPrecision,
-                                MidpointRounding
-                                    .AwayFromZero
+                                MidpointRounding.AwayFromZero
                             ),
 
                         MonthName =
@@ -546,14 +518,363 @@ FETCH FIRST 100 ROWS ONLY";
                         StdPrecision =
                             stdPrecision
                     }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
+                );
+            }
+            catch (Exception exception)
+            {
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+                        errorText =
+                            exception.Message
+                    }
+                );
+            }
         }
 
-        /// <summary>
-        /// Returns the selected Journal header and lines.
-        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetMonthlyEntryCount()
+        {
+            Ctx ctx = GetContext();
+
+            if (ctx == null)
+            {
+                return GetSessionExpiredResult();
+            }
+
+            try
+            {
+                string sql = @"
+WITH PeriodRange AS
+(
+" + BuildCurrentPeriodSql(
+                    "@CountPeriodClientID"
+                ) + @"
+),
+ProtectedJournal AS
+(
+" + BuildProtectedJournalSql(
+                    ctx,
+                    "@CountJournalClientID",
+                    "GL_Journal.PostingType = 'A'"
+                ) + @"
+)
+SELECT
+    COUNT(
+        ProtectedJournal.GL_Journal_ID
+    ) AS EntryCount,
+
+    MAX(
+        PeriodRange.MonthDateFrom
+    ) AS MonthDateFrom
+
+FROM PeriodRange PeriodRange
+
+LEFT OUTER JOIN ProtectedJournal ProtectedJournal ON
+(
+    ProtectedJournal.AD_Client_ID =
+    PeriodRange.AD_Client_ID
+
+    AND ProtectedJournal.DateAcct >=
+    PeriodRange.MonthDateFrom
+
+    AND ProtectedJournal.DateAcct <
+" + GetDateToExclusiveExpression(
+                    "PeriodRange.MonthDateTo"
+                ) + @"
+)";
+
+                SqlParameter[] parameters =
+                {
+                    new SqlParameter(
+                        "@CountPeriodClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@CountJournalClientID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
+
+                DataSet dataSet =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameters,
+                        null
+                    );
+
+                int entryCount = 0;
+
+                DateTime? monthDateFrom =
+                    null;
+
+                if (
+                    dataSet != null &&
+                    dataSet.Tables.Count > 0 &&
+                    dataSet.Tables[0].Rows.Count > 0
+                )
+                {
+                    DataRow row =
+                        dataSet.Tables[0].Rows[0];
+
+                    entryCount =
+                        Util.GetValueOfInt(
+                            row["EntryCount"]
+                        );
+
+                    monthDateFrom =
+                        Util.GetValueOfDateTime(
+                            row["MonthDateFrom"]
+                        );
+                }
+
+                DateTime displayDate =
+                    monthDateFrom.HasValue
+                        ? monthDateFrom.Value
+                        : DateTime.Now;
+
+                return JsonString(
+                    new
+                    {
+                        success = true,
+
+                        EntryCount =
+                            entryCount,
+
+                        MonthName =
+                            displayDate.ToString(
+                                "MMMM"
+                            ),
+
+                        MonthAbbr =
+                            displayDate.ToString(
+                                "MMM"
+                            ),
+
+                        Year =
+                            displayDate.Year
+                    }
+                );
+            }
+            catch (Exception exception)
+            {
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+                        errorText =
+                            exception.Message
+                    }
+                );
+            }
+        }
+
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetUnpostedCount()
+        {
+            Ctx ctx = GetContext();
+
+            if (ctx == null)
+            {
+                return GetSessionExpiredResult();
+            }
+
+            try
+            {
+                string sql = @"
+WITH ProtectedJournal AS
+(
+" + BuildProtectedJournalSql(
+                    ctx,
+                    "@UnpostedCountClientID",
+                    @"
+COALESCE(
+    GL_Journal.Posted,
+    'N'
+) <> 'Y'
+AND GL_Journal.DocStatus <> 'VO'"
+                ) + @"
+)
+SELECT
+    COUNT(1) AS UnpostedCount
+
+FROM ProtectedJournal ProtectedJournal";
+
+                SqlParameter[] parameters =
+                {
+                    new SqlParameter(
+                        "@UnpostedCountClientID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
+
+                DataSet dataSet =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameters,
+                        null
+                    );
+
+                int unpostedCount = 0;
+
+                if (
+                    dataSet != null &&
+                    dataSet.Tables.Count > 0 &&
+                    dataSet.Tables[0].Rows.Count > 0
+                )
+                {
+                    unpostedCount =
+                        Util.GetValueOfInt(
+                            dataSet.Tables[0]
+                                .Rows[0]["UnpostedCount"]
+                        );
+                }
+
+                return JsonString(
+                    new
+                    {
+                        success = true,
+
+                        UnpostedCount =
+                            unpostedCount
+                    }
+                );
+            }
+            catch (Exception exception)
+            {
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+                        errorText =
+                            exception.Message
+                    }
+                );
+            }
+        }
+
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetPostedPercentage()
+        {
+            Ctx ctx = GetContext();
+
+            if (ctx == null)
+            {
+                return GetSessionExpiredResult();
+            }
+
+            try
+            {
+                string sql = @"
+WITH ProtectedJournal AS
+(
+" + BuildProtectedJournalSql(
+                    ctx,
+                    "@PercentageClientID",
+                    "1 = 1"
+                ) + @"
+)
+SELECT
+    COALESCE(
+        SUM(
+            CASE
+                WHEN ProtectedJournal.Posted = 'Y'
+                THEN 1
+                ELSE 0
+            END
+        ),
+        0
+    ) AS PostedCount,
+
+    COUNT(1) AS TotalCount
+
+FROM ProtectedJournal ProtectedJournal";
+
+                SqlParameter[] parameters =
+                {
+                    new SqlParameter(
+                        "@PercentageClientID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
+
+                DataSet dataSet =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameters,
+                        null
+                    );
+
+                int postedCount = 0;
+                int totalCount = 0;
+
+                if (
+                    dataSet != null &&
+                    dataSet.Tables.Count > 0 &&
+                    dataSet.Tables[0].Rows.Count > 0
+                )
+                {
+                    postedCount =
+                        Util.GetValueOfInt(
+                            dataSet.Tables[0]
+                                .Rows[0]["PostedCount"]
+                        );
+
+                    totalCount =
+                        Util.GetValueOfInt(
+                            dataSet.Tables[0]
+                                .Rows[0]["TotalCount"]
+                        );
+                }
+
+                int percentage =
+                    totalCount > 0
+                        ? (int)Math.Round(
+                            (
+                                (double)postedCount /
+                                totalCount
+                            ) * 100
+                        )
+                        : 0;
+
+                return JsonString(
+                    new
+                    {
+                        success = true,
+
+                        PostedCount =
+                            postedCount,
+
+                        TotalCount =
+                            totalCount,
+
+                        Percentage =
+                            percentage
+                    }
+                );
+            }
+            catch (Exception exception)
+            {
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+                        errorText =
+                            exception.Message
+                    }
+                );
+            }
+        }
+
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetJournalEntryDetail(
@@ -568,56 +889,44 @@ FETCH FIRST 100 ROWS ONLY";
 
             if (journalId <= 0)
             {
-                return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            error = true,
-                            errorText =
-                                "Invalid journal ID."
-                        }
-                    ),
-                    JsonRequestBehavior.AllowGet
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+                        errorText =
+                            "Invalid journal ID."
+                    }
                 );
             }
 
-            string language =
-                GetLanguage(ctx);
+            try
+            {
+                string language =
+                    GetLanguage(ctx);
 
-            string headerSql = @"
+                string headerSql = @"
 WITH ProtectedJournal AS
 (
 " + BuildProtectedJournalSql(
                     ctx,
-                    "GL_Journal.GL_Journal_ID = @JournalID"
+                    "@DetailHeaderClientID",
+                    @"
+GL_Journal.GL_Journal_ID =
+@DetailHeaderJournalID"
                 ) + @"
 ),
 SchemaCurrency AS
 (
-    SELECT
-        AcctSchema.AD_Client_ID,
-        AcctSchema.C_AcctSchema_ID,
-        AcctSchema.Name AS AcctSchemaName,
-        Currency.StdPrecision,
-        Currency.ISO_Code AS ISO_Code,
-        CASE
-            WHEN Currency.CurSymbol IS NOT NULL
-            THEN Currency.CurSymbol
-            ELSE Currency.ISO_Code
-        END AS Cur_Symbol
-    FROM C_AcctSchema AcctSchema
-    INNER JOIN C_Currency Currency ON
-    (
-        AcctSchema.C_Currency_ID =
-        Currency.C_Currency_ID
-    )
-    WHERE AcctSchema.IsActive = 'Y'
-    AND AcctSchema.AD_Client_ID =
-    @AD_Client_ID
+" + BuildSchemaCurrencySql(
+                    "@DetailSchemaClientID"
+                ) + @"
 ),
 DocumentStatusReference AS
 (
-" + BuildDocumentStatusReferenceSql() + @"
+" + BuildDocumentStatusReferenceSql(
+                    "@DetailLanguage"
+                ) + @"
 )
 SELECT
     ProtectedJournal.GL_Journal_ID,
@@ -628,82 +937,86 @@ SELECT
     ProtectedJournal.Posted,
     ProtectedJournal.Processed,
     ProtectedJournal.Created,
-    DocumentStatusReference.BaseName AS DocStatusBaseName,
-    DocumentStatusReference.TranslatedName AS DocStatusTranslatedName,
+
+    DocumentStatusReference.BaseName
+        AS DocStatusBaseName,
+
+    DocumentStatusReference.TranslatedName
+        AS DocStatusTranslatedName,
+
     AD_User.Name AS CreatedByName,
-    ROUND(
-        COALESCE(
-            SUM(
-                COALESCE(
-                    GL_JournalLine.AmtAcctDr,
-                    0
-                )
-            ),
-            0
+
+    COALESCE(
+        SUM(
+            COALESCE(
+                GL_JournalLine.AmtAcctDr,
+                0
+            )
         ),
-        COALESCE(
-            MAX(
-                SchemaCurrency.StdPrecision
-            ),
-            2
-        )
+        0
     ) AS TotalDebit,
-    ROUND(
-        COALESCE(
-            SUM(
-                COALESCE(
-                    GL_JournalLine.AmtAcctCr,
-                    0
-                )
-            ),
-            0
+
+    COALESCE(
+        SUM(
+            COALESCE(
+                GL_JournalLine.AmtAcctCr,
+                0
+            )
         ),
-        COALESCE(
-            MAX(
-                SchemaCurrency.StdPrecision
-            ),
-            2
-        )
+        0
     ) AS TotalCredit,
+
     MAX(
-        SchemaCurrency.Cur_Symbol
+        SchemaCurrency.CurSymbol
     ) AS CurSymbol,
+
     MAX(
-        SchemaCurrency.ISO_Code
+        SchemaCurrency.ISOCode
     ) AS ISOCode,
+
     COALESCE(
         MAX(
             SchemaCurrency.StdPrecision
         ),
         2
     ) AS StdPrecision,
+
     MAX(
         SchemaCurrency.AcctSchemaName
     ) AS AccountingBook
+
 FROM ProtectedJournal ProtectedJournal
+
 INNER JOIN SchemaCurrency SchemaCurrency ON
 (
     SchemaCurrency.AD_Client_ID =
     ProtectedJournal.AD_Client_ID
+
     AND SchemaCurrency.C_AcctSchema_ID =
     ProtectedJournal.C_AcctSchema_ID
 )
+
 LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
 (
     ProtectedJournal.GL_Journal_ID =
     GL_JournalLine.GL_Journal_ID
+
     AND GL_JournalLine.IsActive = 'Y'
 )
-LEFT OUTER JOIN DocumentStatusReference DocumentStatusReference ON
+
+LEFT OUTER JOIN DocumentStatusReference
+    DocumentStatusReference ON
 (
     DocumentStatusReference.Value =
     ProtectedJournal.DocStatus
 )
+
 LEFT OUTER JOIN AD_User AD_User ON
 (
     ProtectedJournal.CreatedBy =
     AD_User.AD_User_ID
 )
+
 GROUP BY
     ProtectedJournal.GL_Journal_ID,
     ProtectedJournal.DocumentNo,
@@ -717,309 +1030,326 @@ GROUP BY
     DocumentStatusReference.TranslatedName,
     AD_User.Name";
 
-            SqlParameter[] headerParameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                ),
+                SqlParameter[] headerParameters =
+                {
+                    new SqlParameter(
+                        "@DetailHeaderClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
 
-                new SqlParameter(
-                    "@JournalID",
-                    journalId
-                ),
+                    new SqlParameter(
+                        "@DetailHeaderJournalID",
+                        journalId
+                    ),
 
-                new SqlParameter(
-                    "@AD_Language",
-                    language
+                    new SqlParameter(
+                        "@DetailSchemaClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@DetailLanguage",
+                        language
+                    )
+                };
+
+                DataSet headerDataSet =
+                    DB.ExecuteDataset(
+                        headerSql,
+                        headerParameters,
+                        null
+                    );
+
+                if (
+                    headerDataSet == null ||
+                    headerDataSet.Tables.Count == 0 ||
+                    headerDataSet.Tables[0].Rows.Count == 0
                 )
-            };
-
-            DataSet headerDataSet =
-                DB.ExecuteDataset(
-                    headerSql,
-                    headerParameters,
-                    null
-                );
-
-            if (
-                headerDataSet == null ||
-                headerDataSet.Tables.Count == 0 ||
-                headerDataSet.Tables[0]
-                    .Rows.Count == 0
-            )
-            {
-                return Json(
-                    JsonConvert.SerializeObject(
+                {
+                    return JsonString(
                         new
                         {
+                            success = false,
                             error = true,
                             errorText =
                                 "Journal details not found."
                         }
-                    ),
-                    JsonRequestBehavior.AllowGet
-                );
-            }
+                    );
+                }
 
-            DataRow headerRow =
-                headerDataSet.Tables[0].Rows[0];
+                DataRow headerRow =
+                    headerDataSet.Tables[0].Rows[0];
 
-            int stdPrecision =
-                NormalizePrecision(
-                    Util.GetValueOfInt(
-                        headerRow["StdPrecision"]
-                    )
-                );
+                int stdPrecision =
+                    NormalizePrecision(
+                        Util.GetValueOfInt(
+                            headerRow["StdPrecision"]
+                        )
+                    );
 
-            string linesSql = @"
+                string linesSql = @"
 WITH ProtectedJournal AS
 (
 " + BuildProtectedJournalSql(
                     ctx,
-                    "GL_Journal.GL_Journal_ID = @JournalID"
+                    "@DetailLineClientID",
+                    @"
+GL_Journal.GL_Journal_ID =
+@DetailLineJournalID"
                 ) + @"
 )
 SELECT
     GL_JournalLine.GL_JournalLine_ID,
     GL_JournalLine.Line,
     GL_JournalLine.C_ValidCombination_ID,
+
     ValidCombination.Account_ID,
+
     AccountValue.Value AS AccountCode,
     AccountValue.Name AS AccountName,
+
     GL_JournalLine.AmtAcctDr,
     GL_JournalLine.AmtAcctCr,
+
     CostCenterValue.Value AS CostCenterCode,
     CostCenterValue.Name AS CostCenterName,
+
     BPartner.Name AS BPartnerName,
     Product.Name AS ProductName,
     Project.Name AS ProjectName
+
 FROM ProtectedJournal ProtectedJournal
+
 INNER JOIN GL_JournalLine GL_JournalLine ON
 (
     ProtectedJournal.GL_Journal_ID =
     GL_JournalLine.GL_Journal_ID
 )
-LEFT OUTER JOIN C_ValidCombination ValidCombination ON
+
+LEFT OUTER JOIN C_ValidCombination
+    ValidCombination ON
 (
     GL_JournalLine.C_ValidCombination_ID =
     ValidCombination.C_ValidCombination_ID
 )
-LEFT OUTER JOIN C_ElementValue AccountValue ON
+
+LEFT OUTER JOIN C_ElementValue
+    AccountValue ON
 (
     ValidCombination.Account_ID =
     AccountValue.C_ElementValue_ID
 )
-LEFT OUTER JOIN C_ElementValue CostCenterValue ON
+
+LEFT OUTER JOIN C_ElementValue
+    CostCenterValue ON
 (
     ValidCombination.User1_ID =
     CostCenterValue.C_ElementValue_ID
 )
+
 LEFT OUTER JOIN C_BPartner BPartner ON
 (
     ValidCombination.C_BPartner_ID =
     BPartner.C_BPartner_ID
 )
+
 LEFT OUTER JOIN M_Product Product ON
 (
     ValidCombination.M_Product_ID =
     Product.M_Product_ID
 )
+
 LEFT OUTER JOIN C_Project Project ON
 (
     ValidCombination.C_Project_ID =
     Project.C_Project_ID
 )
+
 WHERE GL_JournalLine.IsActive = 'Y'
+
 ORDER BY
     GL_JournalLine.Line,
     GL_JournalLine.GL_JournalLine_ID";
 
-            SqlParameter[] lineParameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                ),
+                SqlParameter[] lineParameters =
+                {
+                    new SqlParameter(
+                        "@DetailLineClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
 
-                new SqlParameter(
-                    "@JournalID",
-                    journalId
-                )
-            };
+                    new SqlParameter(
+                        "@DetailLineJournalID",
+                        journalId
+                    )
+                };
 
-            DataSet lineDataSet =
-                DB.ExecuteDataset(
-                    linesSql,
-                    lineParameters,
-                    null
-                );
+                DataSet lineDataSet =
+                    DB.ExecuteDataset(
+                        linesSql,
+                        lineParameters,
+                        null
+                    );
 
-            List<object> lines =
-                new List<object>();
+                List<object> lines =
+                    new List<object>();
 
-            if (
-                lineDataSet != null &&
-                lineDataSet.Tables.Count > 0 &&
-                lineDataSet.Tables[0]
-                    .Rows.Count > 0
-            )
-            {
-                foreach (
-                    DataRow row in
-                    lineDataSet.Tables[0].Rows
+                if (
+                    lineDataSet != null &&
+                    lineDataSet.Tables.Count > 0
                 )
                 {
-                    string accountCode =
-                        Util.GetValueOfString(
-                            row["AccountCode"]
-                        );
-
-                    string accountName =
-                        Util.GetValueOfString(
-                            row["AccountName"]
-                        );
-
-                    if (string.IsNullOrWhiteSpace(
-                        accountCode
-                    ))
+                    foreach (
+                        DataRow row in
+                        lineDataSet.Tables[0].Rows
+                    )
                     {
-                        accountCode =
+                        string accountCode =
                             Util.GetValueOfString(
-                                row["Account_ID"]
+                                row["AccountCode"]
                             );
-                    }
 
-                    if (string.IsNullOrWhiteSpace(
-                        accountCode
-                    ))
-                    {
-                        accountCode =
+                        string accountName =
                             Util.GetValueOfString(
-                                row[
-                                    "C_ValidCombination_ID"
-                                ]
+                                row["AccountName"]
                             );
-                    }
 
-                    if (string.IsNullOrWhiteSpace(
-                        accountName
-                    ))
-                    {
-                        accountName = "-";
-                    }
-
-                    string costCenter =
-                        BuildCodeName(
-                            Util.GetValueOfString(
-                                row["CostCenterCode"]
-                            ),
-                            Util.GetValueOfString(
-                                row["CostCenterName"]
+                        if (
+                            string.IsNullOrWhiteSpace(
+                                accountCode
                             )
-                        );
-
-                    string bPartner =
-                        Util.GetValueOfString(
-                            row["BPartnerName"]
-                        );
-
-                    string product =
-                        Util.GetValueOfString(
-                            row["ProductName"]
-                        );
-
-                    string project =
-                        Util.GetValueOfString(
-                            row["ProjectName"]
-                        );
-
-                    lines.Add(
-                        new
+                        )
                         {
-                            AccountCode =
-                                accountCode,
-
-                            AccountName =
-                                accountName,
-
-                            Debit =
-                                Decimal.Round(
-                                    Util.GetValueOfDecimal(
-                                        row["AmtAcctDr"]
-                                    ),
-                                    stdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
-                                ),
-
-                            Credit =
-                                Decimal.Round(
-                                    Util.GetValueOfDecimal(
-                                        row["AmtAcctCr"]
-                                    ),
-                                    stdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
-                                ),
-
-                            CostCenter =
-                                string.IsNullOrWhiteSpace(
-                                    costCenter
-                                )
-                                    ? "-"
-                                    : costCenter,
-
-                            BPartner =
-                                string.IsNullOrWhiteSpace(
-                                    bPartner
-                                )
-                                    ? "-"
-                                    : bPartner,
-
-                            Product =
-                                string.IsNullOrWhiteSpace(
-                                    product
-                                )
-                                    ? "-"
-                                    : product,
-
-                            Project =
-                                string.IsNullOrWhiteSpace(
-                                    project
-                                )
-                                    ? "-"
-                                    : project
+                            accountCode =
+                                Util.GetValueOfString(
+                                    row["Account_ID"]
+                                );
                         }
-                    );
+
+                        if (
+                            string.IsNullOrWhiteSpace(
+                                accountCode
+                            )
+                        )
+                        {
+                            accountCode =
+                                Util.GetValueOfString(
+                                    row[
+                                        "C_ValidCombination_ID"
+                                    ]
+                                );
+                        }
+
+                        if (
+                            string.IsNullOrWhiteSpace(
+                                accountName
+                            )
+                        )
+                        {
+                            accountName = "-";
+                        }
+
+                        string costCenter =
+                            BuildCodeName(
+                                Util.GetValueOfString(
+                                    row["CostCenterCode"]
+                                ),
+                                Util.GetValueOfString(
+                                    row["CostCenterName"]
+                                )
+                            );
+
+                        lines.Add(
+                            new
+                            {
+                                GL_JournalLine_ID =
+                                    Util.GetValueOfInt(
+                                        row[
+                                            "GL_JournalLine_ID"
+                                        ]
+                                    ),
+
+                                Line =
+                                    Util.GetValueOfInt(
+                                        row["Line"]
+                                    ),
+
+                                AccountCode =
+                                    accountCode,
+
+                                AccountName =
+                                    accountName,
+
+                                Debit =
+                                    Decimal.Round(
+                                        Util.GetValueOfDecimal(
+                                            row["AmtAcctDr"]
+                                        ),
+                                        stdPrecision,
+                                        MidpointRounding
+                                            .AwayFromZero
+                                    ),
+
+                                Credit =
+                                    Decimal.Round(
+                                        Util.GetValueOfDecimal(
+                                            row["AmtAcctCr"]
+                                        ),
+                                        stdPrecision,
+                                        MidpointRounding
+                                            .AwayFromZero
+                                    ),
+
+                                CostCenter =
+                                    string.IsNullOrWhiteSpace(
+                                        costCenter
+                                    )
+                                        ? "-"
+                                        : costCenter,
+
+                                BPartner =
+                                    GetDisplayValue(
+                                        row["BPartnerName"]
+                                    ),
+
+                                Product =
+                                    GetDisplayValue(
+                                        row["ProductName"]
+                                    ),
+
+                                Project =
+                                    GetDisplayValue(
+                                        row["ProjectName"]
+                                    )
+                            }
+                        );
+                    }
                 }
-            }
 
-            string docStatus =
-                Util.GetValueOfString(
-                    headerRow["DocStatus"]
-                );
+                string docStatus =
+                    Util.GetValueOfString(
+                        headerRow["DocStatus"]
+                    );
 
-            string statusName =
-                GetReferenceName(
-                    headerRow,
-                    "DocStatusTranslatedName",
-                    "DocStatusBaseName",
-                    docStatus
-                );
+                string statusName =
+                    GetReferenceName(
+                        headerRow,
+                        "DocStatusTranslatedName",
+                        "DocStatusBaseName",
+                        docStatus
+                    );
 
-            DateTime? dateAcct =
-                Util.GetValueOfDateTime(
-                    headerRow["DateAcct"]
-                );
+                DateTime? dateAcct =
+                    Util.GetValueOfDateTime(
+                        headerRow["DateAcct"]
+                    );
 
-            DateTime? created =
-                Util.GetValueOfDateTime(
-                    headerRow["Created"]
-                );
+                DateTime? created =
+                    Util.GetValueOfDateTime(
+                        headerRow["Created"]
+                    );
 
-            return Json(
-                JsonConvert.SerializeObject(
+                return JsonString(
                     new
                     {
                         success = true,
@@ -1042,10 +1372,9 @@ ORDER BY
 
                             DateAcct =
                                 dateAcct.HasValue
-                                    ? dateAcct.Value
-                                        .ToString(
-                                            "dd MMM yyyy"
-                                        )
+                                    ? dateAcct.Value.ToString(
+                                        "dd MMM yyyy"
+                                    )
                                     : string.Empty,
 
                             Description =
@@ -1096,22 +1425,15 @@ ORDER BY
                                 ),
 
                             AccountingBook =
-                                string.IsNullOrWhiteSpace(
-                                    Util.GetValueOfString(
-                                        headerRow[
-                                            "AccountingBook"
-                                        ]
-                                    )
-                                )
-                                    ? "Primary"
-                                    : Util.GetValueOfString(
-                                        headerRow[
-                                            "AccountingBook"
-                                        ]
-                                    ),
+                                GetDefaultValue(
+                                    headerRow[
+                                        "AccountingBook"
+                                    ],
+                                    "Primary"
+                                ),
 
                             CreatedByName =
-                                Util.GetValueOfString(
+                                GetDisplayValue(
                                     headerRow[
                                         "CreatedByName"
                                     ]
@@ -1144,9 +1466,20 @@ ORDER BY
                         StdPrecision =
                             stdPrecision
                     }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
+                );
+            }
+            catch (Exception exception)
+            {
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+                        errorText =
+                            exception.Message
+                    }
+                );
+            }
         }
 
         [HttpPost]
@@ -1163,7 +1496,8 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Session Expired",
+                        error =
+                            "Session Expired",
                         errorText =
                             "Session Expired"
                     }
@@ -1217,10 +1551,13 @@ ORDER BY
                 string docStatus =
                     journal.GetDocStatus();
 
-                if (string.Equals(
-                    docStatus,
-                    "AP",
-                    StringComparison.OrdinalIgnoreCase))
+                if (
+                    string.Equals(
+                        docStatus,
+                        "AP",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     transaction.Commit();
 
@@ -1228,16 +1565,21 @@ ORDER BY
                         new
                         {
                             success = true,
+
                             journalId =
                                 journal.Get_ID(),
+
                             documentNo =
                                 journal.GetDocumentNo(),
+
                             docStatus =
                                 journal.GetDocStatus(),
+
                             posted =
                                 IsJournalPosted(
                                     journal
                                 ),
+
                             message =
                                 "The journal is already approved."
                         }
@@ -1262,9 +1604,12 @@ ORDER BY
                             .ACTION_PREPARE
                     );
 
-                    if (!journal.ProcessIt(
-                        DocActionVariables
-                            .ACTION_PREPARE))
+                    if (
+                        !journal.ProcessIt(
+                            DocActionVariables
+                                .ACTION_PREPARE
+                        )
+                    )
                     {
                         throw new InvalidOperationException(
                             GetJournalProcessError(
@@ -1280,10 +1625,13 @@ ORDER BY
                         journal.GetDocStatus();
                 }
 
-                if (!string.Equals(
-                    docStatus,
-                    "IP",
-                    StringComparison.OrdinalIgnoreCase))
+                if (
+                    !string.Equals(
+                        docStatus,
+                        "IP",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     throw new InvalidOperationException(
                         "Only Draft, In Progress or Not Approved journals can be approved."
@@ -1295,9 +1643,12 @@ ORDER BY
                         .ACTION_APPROVE
                 );
 
-                if (!journal.ProcessIt(
-                    DocActionVariables
-                        .ACTION_APPROVE))
+                if (
+                    !journal.ProcessIt(
+                        DocActionVariables
+                            .ACTION_APPROVE
+                    )
+                )
                 {
                     throw new InvalidOperationException(
                         GetJournalProcessError(
@@ -1315,16 +1666,21 @@ ORDER BY
                     new
                     {
                         success = true,
+
                         journalId =
                             journal.Get_ID(),
+
                         documentNo =
                             journal.GetDocumentNo(),
+
                         docStatus =
                             journal.GetDocStatus(),
+
                         posted =
                             IsJournalPosted(
                                 journal
                             ),
+
                         message =
                             "Journal approved successfully."
                     }
@@ -1371,7 +1727,8 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Session Expired",
+                        error =
+                            "Session Expired",
                         errorText =
                             "Session Expired"
                     }
@@ -1389,7 +1746,7 @@ ORDER BY
                 return validationResult;
             }
 
-            VAdvantage.DataBase.Trx completeTransaction =
+            VAdvantage.DataBase.Trx transaction =
                 null;
 
             try
@@ -1397,10 +1754,10 @@ ORDER BY
                 string transactionName =
                     VAdvantage.DataBase.Trx
                         .CreateTrxName(
-                            "VAS041CompleteJournal"
+                            "VAS041PostJournal"
                         );
 
-                completeTransaction =
+                transaction =
                     VAdvantage.DataBase.Trx.GetTrx(
                         transactionName
                     );
@@ -1409,7 +1766,7 @@ ORDER BY
                     new MJournal(
                         ctx,
                         journalId,
-                        completeTransaction
+                        transaction
                     );
 
                 ValidateJournal(
@@ -1420,7 +1777,7 @@ ORDER BY
 
                 if (IsJournalPosted(journal))
                 {
-                    completeTransaction.Commit();
+                    transaction.Commit();
 
                     return Json(
                         new
@@ -1442,19 +1799,25 @@ ORDER BY
                 string docStatus =
                     journal.GetDocStatus();
 
-                if (string.Equals(
-                    docStatus,
-                    "AP",
-                    StringComparison.OrdinalIgnoreCase))
+                if (
+                    string.Equals(
+                        docStatus,
+                        "AP",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     journal.SetDocAction(
                         DocActionVariables
                             .ACTION_COMPLETE
                     );
 
-                    if (!journal.ProcessIt(
-                        DocActionVariables
-                            .ACTION_COMPLETE))
+                    if (
+                        !journal.ProcessIt(
+                            DocActionVariables
+                                .ACTION_COMPLETE
+                        )
+                    )
                     {
                         throw new InvalidOperationException(
                             GetJournalProcessError(
@@ -1465,36 +1828,32 @@ ORDER BY
                     }
 
                     SaveJournal(journal);
-
-                    completeTransaction.Commit();
                 }
                 else if (
-                    string.Equals(
+                    !string.Equals(
                         docStatus,
                         "CO",
                         StringComparison.OrdinalIgnoreCase
-                    ) ||
-                    string.Equals(
+                    ) &&
+                    !string.Equals(
                         docStatus,
                         "CL",
                         StringComparison.OrdinalIgnoreCase
                     )
                 )
                 {
-                    completeTransaction.Commit();
-                }
-                else
-                {
                     throw new InvalidOperationException(
                         "The journal must be approved before it can be posted."
                     );
                 }
+
+                transaction.Commit();
             }
             catch (Exception exception)
             {
-                if (completeTransaction != null)
+                if (transaction != null)
                 {
-                    completeTransaction.Rollback();
+                    transaction.Rollback();
                 }
 
                 return Json(
@@ -1510,15 +1869,16 @@ ORDER BY
             }
             finally
             {
-                if (completeTransaction != null)
+                if (transaction != null)
                 {
-                    completeTransaction.Close();
-                    completeTransaction = null;
+                    transaction.Close();
+                    transaction = null;
                 }
             }
 
             JournalPostingState journalState =
                 GetJournalPostingState(
+                    ctx,
                     journalId
                 );
 
@@ -1536,10 +1896,13 @@ ORDER BY
                 );
             }
 
-            if (string.Equals(
-                journalState.Posted,
-                "Y",
-                StringComparison.OrdinalIgnoreCase))
+            if (
+                string.Equals(
+                    journalState.Posted,
+                    "Y",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
                 return Json(
                     new
@@ -1588,10 +1951,13 @@ ORDER BY
                 );
             }
 
-            if (!string.Equals(
-                journalState.Processed,
-                "Y",
-                StringComparison.OrdinalIgnoreCase))
+            if (
+                !string.Equals(
+                    journalState.Processed,
+                    "Y",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
                 return Json(
                     new
@@ -1607,21 +1973,20 @@ ORDER BY
 
             try
             {
-                int journalTableId =
+                int tableId =
                     MTable.Get_Table_ID(
                         "GL_Journal"
                     );
 
-                MAcctSchema[] accountingSchemas =
-                    MAcctSchema
-                        .GetClientAcctSchema(
-                            ctx,
-                            ctx.GetAD_Client_ID()
-                        );
+                MAcctSchema[] schemas =
+                    MAcctSchema.GetClientAcctSchema(
+                        ctx,
+                        ctx.GetAD_Client_ID()
+                    );
 
                 if (
-                    accountingSchemas == null ||
-                    accountingSchemas.Length == 0
+                    schemas == null ||
+                    schemas.Length == 0
                 )
                 {
                     return Json(
@@ -1638,16 +2003,14 @@ ORDER BY
 
                 string postingResult =
                     Doc.PostImmediate(
-                        accountingSchemas,
-                        journalTableId,
+                        schemas,
+                        tableId,
                         journalId,
                         false,
                         null
                     );
 
-                if (!IsPostingSuccess(
-                    postingResult
-                ))
+                if (!IsPostingSuccess(postingResult))
                 {
                     string errorMessage =
                         GetPostingErrorMessage(
@@ -1668,6 +2031,7 @@ ORDER BY
 
                 journalState =
                     GetJournalPostingState(
+                        ctx,
                         journalId
                     );
 
@@ -1680,32 +2044,14 @@ ORDER BY
                     )
                 )
                 {
-                    string postedStatus =
-                        journalState == null
-                            ? string.Empty
-                            : journalState.Posted;
-
-                    string errorMessage =
-                        "The accounting engine finished, " +
-                        "but the journal was not posted.";
-
-                    if (!string.IsNullOrWhiteSpace(
-                        postedStatus
-                    ))
-                    {
-                        errorMessage +=
-                            " Posted status: " +
-                            postedStatus;
-                    }
-
                     return Json(
                         new
                         {
                             success = false,
                             error =
-                                errorMessage,
+                                "The accounting engine finished, but the journal was not posted.",
                             errorText =
-                                errorMessage
+                                "The accounting engine finished, but the journal was not posted."
                         }
                     );
                 }
@@ -1741,578 +2087,102 @@ ORDER BY
             }
         }
 
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
-        public JsonResult GetUnpostedCount()
-        {
-            Ctx ctx = GetContext();
-
-            if (ctx == null)
-            {
-                return GetSessionExpiredResult();
-            }
-
-            string sql = @"
-WITH ProtectedJournal AS
-(
-" + BuildProtectedJournalSql(
-                    ctx,
-                    "GL_Journal.Posted = 'N' AND GL_Journal.DocStatus NOT IN ('VO')"
-                ) + @"
-)
-SELECT
-    COUNT(
-        ProtectedJournal.GL_Journal_ID
-    ) AS UnpostedCount
-FROM ProtectedJournal ProtectedJournal";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                )
-            };
-
-            DataSet dataSet =
-                DB.ExecuteDataset(
-                    sql,
-                    parameters,
-                    null
-                );
-
-            int unpostedCount = 0;
-
-            if (
-                dataSet != null &&
-                dataSet.Tables.Count > 0 &&
-                dataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                unpostedCount =
-                    Util.GetValueOfInt(
-                        dataSet.Tables[0]
-                            .Rows[0]["UnpostedCount"]
-                    );
-            }
-
-            return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        UnpostedCount =
-                            unpostedCount
-                    }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
-        }
-
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
-        public JsonResult GetUnpostedEntries()
-        {
-            Ctx ctx = GetContext();
-
-            if (ctx == null)
-            {
-                return GetSessionExpiredResult();
-            }
-
-            string language =
-                GetLanguage(ctx);
-
-            string sql = @"
-WITH SchemaCurrency AS
-(
-" + BuildSchemaCurrencySql() + @"
-),
-ProtectedJournal AS
-(
-" + BuildProtectedJournalSql(
-                    ctx,
-                    "GL_Journal.Posted = 'N' AND GL_Journal.DocStatus NOT IN ('VO')"
-                ) + @"
-),
-DocumentStatusReference AS
-(
-" + BuildDocumentStatusReferenceSql() + @"
-),
-JournalTotals AS
-(
-    SELECT
-        ProtectedJournal.GL_Journal_ID,
-        ProtectedJournal.DocumentNo,
-        ProtectedJournal.DateAcct,
-        ProtectedJournal.Description,
-        ProtectedJournal.DocStatus,
-        ProtectedJournal.Posted,
-        ProtectedJournal.Processed,
-        DocumentStatusReference.BaseName AS DocStatusBaseName,
-        DocumentStatusReference.TranslatedName AS DocStatusTranslatedName,
-        ROUND(
-            COALESCE(
-                SUM(
-                    COALESCE(
-                        GL_JournalLine.AmtAcctDr,
-                        0
-                    )
-                ),
-                0
-            ),
-            COALESCE(
-                MAX(
-                    SchemaCurrency.StdPrecision
-                ),
-                2
-            )
-        ) AS TotalDebit,
-        ROUND(
-            COALESCE(
-                SUM(
-                    COALESCE(
-                        GL_JournalLine.AmtAcctCr,
-                        0
-                    )
-                ),
-                0
-            ),
-            COALESCE(
-                MAX(
-                    SchemaCurrency.StdPrecision
-                ),
-                2
-            )
-        ) AS TotalCredit,
-        MAX(
-            SchemaCurrency.Cur_Symbol
-        ) AS CurSymbol,
-        MAX(
-            SchemaCurrency.ISO_Code
-        ) AS ISOCode,
-        COALESCE(
-            MAX(
-                SchemaCurrency.StdPrecision
-            ),
-            2
-        ) AS StdPrecision
-    FROM ProtectedJournal ProtectedJournal
-    INNER JOIN SchemaCurrency SchemaCurrency ON
-    (
-        SchemaCurrency.AD_Client_ID =
-        ProtectedJournal.AD_Client_ID
-        AND SchemaCurrency.C_AcctSchema_ID =
-        ProtectedJournal.C_AcctSchema_ID
-    )
-    LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
-    (
-        ProtectedJournal.GL_Journal_ID =
-        GL_JournalLine.GL_Journal_ID
-        AND GL_JournalLine.IsActive = 'Y'
-    )
-    LEFT OUTER JOIN DocumentStatusReference DocumentStatusReference ON
-    (
-        DocumentStatusReference.Value =
-        ProtectedJournal.DocStatus
-    )
-    GROUP BY
-        ProtectedJournal.GL_Journal_ID,
-        ProtectedJournal.DocumentNo,
-        ProtectedJournal.DateAcct,
-        ProtectedJournal.Description,
-        ProtectedJournal.DocStatus,
-        ProtectedJournal.Posted,
-        ProtectedJournal.Processed,
-        DocumentStatusReference.BaseName,
-        DocumentStatusReference.TranslatedName
-)
-SELECT
-    JournalTotals.GL_Journal_ID,
-    JournalTotals.DocumentNo,
-    JournalTotals.DateAcct,
-    JournalTotals.Description,
-    JournalTotals.DocStatus,
-    JournalTotals.Posted,
-    JournalTotals.Processed,
-    JournalTotals.DocStatusBaseName,
-    JournalTotals.DocStatusTranslatedName,
-    JournalTotals.TotalDebit,
-    JournalTotals.TotalCredit,
-    JournalTotals.CurSymbol,
-    JournalTotals.ISOCode,
-    JournalTotals.StdPrecision
-FROM JournalTotals JournalTotals
-ORDER BY
-    JournalTotals.DateAcct DESC,
-    JournalTotals.GL_Journal_ID DESC
-FETCH FIRST 100 ROWS ONLY";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                ),
-
-                new SqlParameter(
-                    "@AD_Language",
-                    language
-                )
-            };
-
-            DataSet dataSet =
-                DB.ExecuteDataset(
-                    sql,
-                    parameters,
-                    null
-                );
-
-            List<object> entries =
-                new List<object>();
-
-            decimal totalDebit = 0m;
-            decimal totalCredit = 0m;
-
-            string curSymbol =
-                string.Empty;
-
-            string isoCode =
-                string.Empty;
-
-            int stdPrecision = 2;
-
-            if (
-                dataSet != null &&
-                dataSet.Tables.Count > 0 &&
-                dataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                foreach (
-                    DataRow row in
-                    dataSet.Tables[0].Rows
-                )
-                {
-                    stdPrecision =
-                        NormalizePrecision(
-                            Util.GetValueOfInt(
-                                row["StdPrecision"]
-                            )
-                        );
-
-                    decimal debit =
-                        Util.GetValueOfDecimal(
-                            row["TotalDebit"]
-                        );
-
-                    decimal credit =
-                        Util.GetValueOfDecimal(
-                            row["TotalCredit"]
-                        );
-
-                    totalDebit += debit;
-                    totalCredit += credit;
-
-                    string docStatus =
-                        Util.GetValueOfString(
-                            row["DocStatus"]
-                        );
-
-                    string statusName =
-                        GetReferenceName(
-                            row,
-                            "DocStatusTranslatedName",
-                            "DocStatusBaseName",
-                            docStatus
-                        );
-
-                    DateTime? dateAcct =
-                        Util.GetValueOfDateTime(
-                            row["DateAcct"]
-                        );
-
-                    curSymbol =
-                        Util.GetValueOfString(
-                            row["CurSymbol"]
-                        );
-
-                    isoCode =
-                        Util.GetValueOfString(
-                            row["ISOCode"]
-                        );
-
-                    entries.Add(
-                        new
-                        {
-                            GL_Journal_ID =
-                                Util.GetValueOfInt(
-                                    row["GL_Journal_ID"]
-                                ),
-
-                            DocumentNo =
-                                Util.GetValueOfString(
-                                    row["DocumentNo"]
-                                ),
-
-                            DateAcct =
-                                dateAcct.HasValue
-                                    ? dateAcct.Value.ToString(
-                                        "dd MMM yyyy"
-                                    )
-                                    : string.Empty,
-
-                            Description =
-                                Util.GetValueOfString(
-                                    row["Description"]
-                                ),
-
-                            DocStatus =
-                                docStatus,
-
-                            StatusName =
-                                statusName,
-
-                            Posted =
-                                Util.GetValueOfString(
-                                    row["Posted"]
-                                ),
-
-                            Processed =
-                                Util.GetValueOfString(
-                                    row["Processed"]
-                                ),
-
-                            TotalDebit =
-                                Decimal.Round(
-                                    debit,
-                                    stdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
-                                ),
-
-                            TotalCredit =
-                                Decimal.Round(
-                                    credit,
-                                    stdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
-                                )
-                        }
-                    );
-                }
-            }
-
-            return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        success = true,
-
-                        Entries =
-                            entries,
-
-                        TotalCount =
-                            entries.Count,
-
-                        TotalDebit =
-                            Decimal.Round(
-                                totalDebit,
-                                stdPrecision,
-                                MidpointRounding
-                                    .AwayFromZero
-                            ),
-
-                        TotalCredit =
-                            Decimal.Round(
-                                totalCredit,
-                                stdPrecision,
-                                MidpointRounding
-                                    .AwayFromZero
-                            ),
-
-                        CurSymbol =
-                            curSymbol,
-
-                        ISOCode =
-                            isoCode,
-
-                        StdPrecision =
-                            stdPrecision
-                    }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
-        }
-
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
-        public JsonResult GetPostedPercentage()
-        {
-            Ctx ctx = GetContext();
-
-            if (ctx == null)
-            {
-                return GetSessionExpiredResult();
-            }
-
-            string sql = @"
-WITH ProtectedJournal AS
-(
-" + BuildProtectedJournalSql(
-                    ctx,
-                    "1 = 1"
-                ) + @"
-)
-SELECT
-    SUM(
-        CASE
-            WHEN ProtectedJournal.Posted = 'Y'
-            THEN 1
-            ELSE 0
-        END
-    ) AS PostedCount,
-    COUNT(1) AS TotalCount
-FROM ProtectedJournal ProtectedJournal";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter(
-                    "@AD_Client_ID",
-                    ctx.GetAD_Client_ID()
-                )
-            };
-
-            DataSet dataSet =
-                DB.ExecuteDataset(
-                    sql,
-                    parameters,
-                    null
-                );
-
-            int postedCount = 0;
-            int totalCount = 0;
-
-            if (
-                dataSet != null &&
-                dataSet.Tables.Count > 0 &&
-                dataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                postedCount =
-                    Util.GetValueOfInt(
-                        dataSet.Tables[0]
-                            .Rows[0]["PostedCount"]
-                    );
-
-                totalCount =
-                    Util.GetValueOfInt(
-                        dataSet.Tables[0]
-                            .Rows[0]["TotalCount"]
-                    );
-            }
-
-            int percentage =
-                totalCount > 0
-                    ? (int)Math.Round(
-                        (double)postedCount /
-                        totalCount *
-                        100
-                    )
-                    : 0;
-
-            return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        PostedCount =
-                            postedCount,
-
-                        TotalCount =
-                            totalCount,
-
-                        Percentage =
-                            percentage
-                    }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
-        }
-
-        private string BuildSchemaCurrencySql()
+        private string BuildSchemaCurrencySql(
+            string clientParameter)
         {
             return @"
 SELECT
-    ClientInfo.AD_Client_ID,
+    AcctSchema.AD_Client_ID,
     AcctSchema.C_AcctSchema_ID,
     AcctSchema.Name AS AcctSchemaName,
-    AcctSchema.C_Currency_ID,
     Currency.StdPrecision,
-    Currency.ISO_Code,
+    Currency.ISO_Code AS ISOCode,
+
     CASE
         WHEN Currency.CurSymbol IS NOT NULL
         THEN Currency.CurSymbol
         ELSE Currency.ISO_Code
-    END AS Cur_Symbol
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_AcctSchema AcctSchema ON
-(
-    ClientInfo.C_AcctSchema1_ID =
-    AcctSchema.C_AcctSchema_ID
-)
+    END AS CurSymbol
+
+FROM C_AcctSchema AcctSchema
+
 INNER JOIN C_Currency Currency ON
 (
     AcctSchema.C_Currency_ID =
     Currency.C_Currency_ID
 )
-WHERE ClientInfo.IsActive = 'Y'
-AND AcctSchema.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID =
-@AD_Client_ID";
+
+WHERE AcctSchema.IsActive = 'Y'
+AND Currency.IsActive = 'Y'
+AND AcctSchema.AD_Client_ID =
+" + clientParameter;
         }
 
-        private string BuildPeriodRangeSql()
+        private string BuildCurrentPeriodSql(
+            string clientParameter)
         {
             return @"
 SELECT
-    ClientInfo.AD_Client_ID,
-    CurrentPeriod.StartDate AS MonthDateFrom,
-    CurrentPeriod.EndDate AS MonthDateTo,
-    (
-        SELECT
-            MIN(
-                PeriodYTD.StartDate
-            )
-        FROM C_Period PeriodYTD
-        WHERE PeriodYTD.C_Year_ID =
-        CurrentPeriod.C_Year_ID
-        AND PeriodYTD.IsActive = 'Y'
-    ) AS YTDDateFrom,
-    CurrentPeriod.EndDate AS YTDDateTo
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_Year YearData ON
-(
-    YearData.C_Calendar_ID =
-    ClientInfo.C_Calendar_ID
-)
-INNER JOIN C_Period CurrentPeriod ON
-(
-    CurrentPeriod.C_Year_ID =
-    YearData.C_Year_ID
-)
-WHERE ClientInfo.IsActive = 'Y'
-AND CurrentPeriod.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID =
-@AD_Client_ID
-AND CURRENT_DATE >=
-CurrentPeriod.StartDate
-AND CURRENT_DATE <
-" + GetDateToExclusiveExpression(
-                "CurrentPeriod.EndDate"
-            );
-        }
+    PeriodCandidates.AD_Client_ID,
+    PeriodCandidates.MonthDateFrom,
+    PeriodCandidates.MonthDateTo
 
+FROM
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+
+        CurrentPeriod.StartDate
+            AS MonthDateFrom,
+
+        CurrentPeriod.EndDate
+            AS MonthDateTo,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                CurrentPeriod.StartDate DESC,
+                CurrentPeriod.C_Period_ID DESC
+        ) AS PeriodRowNumber
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+
+        AND YearData.IsActive = 'Y'
+    )
+
+    INNER JOIN C_Period CurrentPeriod ON
+    (
+        CurrentPeriod.C_Year_ID =
+        YearData.C_Year_ID
+
+        AND CurrentPeriod.IsActive = 'Y'
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+    " + clientParameter + @"
+
+    AND CURRENT_DATE >=
+    CurrentPeriod.StartDate
+
+    AND CURRENT_DATE <
+    " + GetDateToExclusiveExpression(
+                "CurrentPeriod.EndDate"
+            ) + @"
+) PeriodCandidates
+
+WHERE PeriodCandidates.PeriodRowNumber = 1";
+        }
 
         private string BuildProtectedJournalSql(
             Ctx ctx,
+            string clientParameter,
             string extraWhere)
         {
             string sql = @"
@@ -2330,11 +2200,18 @@ SELECT
     GL_Journal.PostingType,
     GL_Journal.Created,
     GL_Journal.CreatedBy
+
 FROM GL_Journal GL_Journal
+
 WHERE GL_Journal.IsActive = 'Y'
+
 AND GL_Journal.AD_Client_ID =
-@AD_Client_ID
-AND " + extraWhere;
+" + clientParameter + @"
+
+AND
+(
+" + extraWhere + @"
+)";
 
             return MRole.GetDefault(ctx)
                 .AddAccessSQL(
@@ -2343,6 +2220,40 @@ AND " + extraWhere;
                     MRole.SQL_FULLYQUALIFIED,
                     MRole.SQL_RO
                 );
+        }
+
+        private string BuildDocumentStatusReferenceSql(
+            string languageParameter)
+        {
+            return @"
+SELECT
+    AD_Ref_List.Value,
+    AD_Ref_List.Name AS BaseName,
+
+    AD_Ref_List_Trl.Name
+        AS TranslatedName
+
+FROM AD_Reference AD_Reference
+
+INNER JOIN AD_Ref_List AD_Ref_List ON
+(
+    AD_Reference.AD_Reference_ID =
+    AD_Ref_List.AD_Reference_ID
+)
+
+LEFT OUTER JOIN AD_Ref_List_Trl
+    AD_Ref_List_Trl ON
+(
+    AD_Ref_List.AD_Ref_List_ID =
+    AD_Ref_List_Trl.AD_Ref_List_ID
+
+    AND AD_Ref_List_Trl.AD_Language =
+    " + languageParameter + @"
+)
+
+WHERE AD_Reference.Name = '_Document Status'
+AND AD_Reference.IsActive = 'Y'
+AND AD_Ref_List.IsActive = 'Y'";
         }
 
         private JsonResult ValidateActionRequest(
@@ -2363,7 +2274,7 @@ AND " + extraWhere;
                 );
             }
 
-            int journalTableId =
+            int tableId =
                 MTable.Get_Table_ID(
                     "GL_Journal"
                 );
@@ -2371,10 +2282,13 @@ AND " + extraWhere;
             MRole role =
                 MRole.GetDefault(ctx);
 
-            if (!role.IsRecordAccess(
-                journalTableId,
-                journalId,
-                false))
+            if (
+                !role.IsRecordAccess(
+                    tableId,
+                    journalId,
+                    false
+                )
+            )
             {
                 return Json(
                     new
@@ -2425,221 +2339,10 @@ AND " + extraWhere;
             }
         }
 
-        private bool IsJournalPosted(
-            MJournal journal)
-        {
-            if (journal == null)
-            {
-                return false;
-            }
-
-            object postedValue =
-                journal.Get_Value(
-                    "Posted"
-                );
-
-            if (
-                postedValue == null ||
-                postedValue == DBNull.Value
-            )
-            {
-                return false;
-            }
-
-            if (postedValue is bool)
-            {
-                return (bool)postedValue;
-            }
-
-            string postedText =
-                Util.GetValueOfString(
-                    postedValue
-                );
-
-            return
-                string.Equals(
-                    postedText,
-                    "Y",
-                    StringComparison.OrdinalIgnoreCase
-                ) ||
-                string.Equals(
-                    postedText,
-                    "TRUE",
-                    StringComparison.OrdinalIgnoreCase
-                ) ||
-                string.Equals(
-                    postedText,
-                    "1",
-                    StringComparison.OrdinalIgnoreCase
-                );
-        }
-
-        private void SaveJournal(
-            MJournal journal)
-        {
-            if (journal.Save())
-            {
-                return;
-            }
-
-            string errorMessage =
-                "Could not save the journal.";
-
-            try
-            {
-                ValueNamePair modelError =
-                    VLogger.RetrieveError();
-
-                if (
-                    modelError != null &&
-                    !string.IsNullOrWhiteSpace(
-                        modelError.GetName()
-                    )
-                )
-                {
-                    errorMessage =
-                        modelError.GetName();
-                }
-            }
-            catch
-            {
-                errorMessage =
-                    "Could not save the journal.";
-            }
-
-            throw new InvalidOperationException(
-                errorMessage
-            );
-        }
-
-        private string GetJournalProcessError(
-            MJournal journal,
-            string fallback)
-        {
-            string processMessage =
-                journal == null
-                    ? string.Empty
-                    : journal.GetProcessMsg();
-
-            if (!string.IsNullOrWhiteSpace(
-                processMessage
-            ))
-            {
-                return processMessage;
-            }
-
-            try
-            {
-                ValueNamePair modelError =
-                    VLogger.RetrieveError();
-
-                if (
-                    modelError != null &&
-                    !string.IsNullOrWhiteSpace(
-                        modelError.GetName()
-                    )
-                )
-                {
-                    return modelError.GetName();
-                }
-            }
-            catch
-            {
-                /*
-                 * Keep the fallback message.
-                 */
-            }
-
-            return fallback;
-        }
-
-        private bool IsPostingSuccess(
-            string postingResult)
-        {
-            if (string.IsNullOrWhiteSpace(
-                postingResult
-            ))
-            {
-                return true;
-            }
-
-            return
-                string.Equals(
-                    postingResult,
-                    Doc.STATUS_Posted,
-                    StringComparison.OrdinalIgnoreCase
-                ) ||
-                string.Equals(
-                    postingResult,
-                    "AlreadyPosted",
-                    StringComparison.OrdinalIgnoreCase
-                ) ||
-                string.Equals(
-                    postingResult,
-                    "OK",
-                    StringComparison.OrdinalIgnoreCase
-                );
-        }
-
-        private string GetPostingErrorMessage(
-            string postingResult)
-        {
-            string result =
-                postingResult == null
-                    ? string.Empty
-                    : postingResult.Trim();
-
-            if (string.Equals(
-                result,
-                Doc.STATUS_NotBalanced,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return
-                    "The journal could not be posted because it is not balanced.";
-            }
-
-            if (string.Equals(
-                result,
-                Doc.STATUS_NotConvertible,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return
-                    "The journal could not be posted because currency conversion is missing.";
-            }
-
-            if (string.Equals(
-                result,
-                Doc.STATUS_PeriodClosed,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return
-                    "The journal could not be posted because the accounting period is closed.";
-            }
-
-            if (string.Equals(
-                result,
-                Doc.STATUS_InvalidAccount,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return
-                    "The journal could not be posted because one or more accounts are invalid.";
-            }
-
-            if (string.IsNullOrWhiteSpace(
-                result
-            ))
-            {
-                return
-                    "The journal could not be posted.";
-            }
-
-            return
-                "Accounting posting failed: " +
-                result;
-        }
-
-        private JournalPostingState GetJournalPostingState(
-            int journalId)
+        private JournalPostingState
+            GetJournalPostingState(
+                Ctx ctx,
+                int journalId)
         {
             string sql = @"
 SELECT
@@ -2647,15 +2350,25 @@ SELECT
     GL_Journal.DocStatus,
     GL_Journal.Processed,
     GL_Journal.Posted
-FROM GL_Journal
+
+FROM GL_Journal GL_Journal
+
 WHERE GL_Journal.GL_Journal_ID =
-@JournalID";
+@StateJournalID
+
+AND GL_Journal.AD_Client_ID =
+@StateClientID";
 
             SqlParameter[] parameters =
             {
                 new SqlParameter(
-                    "@JournalID",
+                    "@StateJournalID",
                     journalId
+                ),
+
+                new SqlParameter(
+                    "@StateClientID",
+                    ctx.GetAD_Client_ID()
                 )
             };
 
@@ -2702,6 +2415,228 @@ WHERE GL_Journal.GL_Journal_ID =
             };
         }
 
+        private bool IsJournalPosted(
+            MJournal journal)
+        {
+            if (journal == null)
+            {
+                return false;
+            }
+
+            object postedValue =
+                journal.Get_Value(
+                    "Posted"
+                );
+
+            if (
+                postedValue == null ||
+                postedValue == DBNull.Value
+            )
+            {
+                return false;
+            }
+
+            if (postedValue is bool)
+            {
+                return (bool)postedValue;
+            }
+
+            string value =
+                Util.GetValueOfString(
+                    postedValue
+                );
+
+            return
+                string.Equals(
+                    value,
+                    "Y",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    value,
+                    "TRUE",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    value,
+                    "1",
+                    StringComparison.OrdinalIgnoreCase
+                );
+        }
+
+        private void SaveJournal(
+            MJournal journal)
+        {
+            if (journal.Save())
+            {
+                return;
+            }
+
+            string errorMessage =
+                "Could not save the journal.";
+
+            try
+            {
+                ValueNamePair modelError =
+                    VLogger.RetrieveError();
+
+                if (
+                    modelError != null &&
+                    !string.IsNullOrWhiteSpace(
+                        modelError.GetName()
+                    )
+                )
+                {
+                    errorMessage =
+                        modelError.GetName();
+                }
+            }
+            catch
+            {
+            }
+
+            throw new InvalidOperationException(
+                errorMessage
+            );
+        }
+
+        private string GetJournalProcessError(
+            MJournal journal,
+            string fallback)
+        {
+            string processMessage =
+                journal == null
+                    ? string.Empty
+                    : journal.GetProcessMsg();
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    processMessage
+                )
+            )
+            {
+                return processMessage;
+            }
+
+            try
+            {
+                ValueNamePair modelError =
+                    VLogger.RetrieveError();
+
+                if (
+                    modelError != null &&
+                    !string.IsNullOrWhiteSpace(
+                        modelError.GetName()
+                    )
+                )
+                {
+                    return modelError.GetName();
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
+        }
+
+        private bool IsPostingSuccess(
+            string postingResult)
+        {
+            if (
+                string.IsNullOrWhiteSpace(
+                    postingResult
+                )
+            )
+            {
+                return true;
+            }
+
+            return
+                string.Equals(
+                    postingResult,
+                    Doc.STATUS_Posted,
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    postingResult,
+                    "AlreadyPosted",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    postingResult,
+                    "OK",
+                    StringComparison.OrdinalIgnoreCase
+                );
+        }
+
+        private string GetPostingErrorMessage(
+            string postingResult)
+        {
+            string result =
+                postingResult == null
+                    ? string.Empty
+                    : postingResult.Trim();
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_NotBalanced,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return
+                    "The journal could not be posted because it is not balanced.";
+            }
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_NotConvertible,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return
+                    "The journal could not be posted because currency conversion is missing.";
+            }
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_PeriodClosed,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return
+                    "The journal could not be posted because the accounting period is closed.";
+            }
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_InvalidAccount,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return
+                    "The journal could not be posted because one or more accounts are invalid.";
+            }
+
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                return
+                    "The journal could not be posted.";
+            }
+
+            return
+                "Accounting posting failed: " +
+                result;
+        }
+
         private string GetReferenceName(
             DataRow row,
             string translatedColumn,
@@ -2713,9 +2648,11 @@ WHERE GL_Journal.GL_Journal_ID =
                     row[translatedColumn]
                 );
 
-            if (!string.IsNullOrWhiteSpace(
-                translatedName
-            ))
+            if (
+                !string.IsNullOrWhiteSpace(
+                    translatedName
+                )
+            )
             {
                 return translatedName;
             }
@@ -2725,9 +2662,11 @@ WHERE GL_Journal.GL_Journal_ID =
                     row[baseColumn]
                 );
 
-            if (!string.IsNullOrWhiteSpace(
-                baseName
-            ))
+            if (
+                !string.IsNullOrWhiteSpace(
+                    baseName
+                )
+            )
             {
                 return baseName;
             }
@@ -2760,6 +2699,29 @@ WHERE GL_Journal.GL_Journal_ID =
             return string.Empty;
         }
 
+        private string GetDisplayValue(
+            object value)
+        {
+            string text =
+                Util.GetValueOfString(value);
+
+            return string.IsNullOrWhiteSpace(text)
+                ? "-"
+                : text;
+        }
+
+        private string GetDefaultValue(
+            object value,
+            string defaultValue)
+        {
+            string text =
+                Util.GetValueOfString(value);
+
+            return string.IsNullOrWhiteSpace(text)
+                ? defaultValue
+                : text;
+        }
+
         private string GetLanguage(
             Ctx ctx)
         {
@@ -2768,14 +2730,9 @@ WHERE GL_Journal.GL_Journal_ID =
                     ? string.Empty
                     : ctx.GetAD_Language();
 
-            if (string.IsNullOrWhiteSpace(
-                language
-            ))
-            {
-                language = "en_US";
-            }
-
-            return language;
+            return string.IsNullOrWhiteSpace(language)
+                ? "en_US"
+                : language;
         }
 
         private Ctx GetContext()
@@ -2788,19 +2745,27 @@ WHERE GL_Journal.GL_Journal_ID =
             return Session["ctx"] as Ctx;
         }
 
-        private JsonResult GetSessionExpiredResult()
+        private JsonResult JsonString(
+            object value)
         {
             return Json(
                 JsonConvert.SerializeObject(
-                    new
-                    {
-                        success = false,
-                        error = "Session Expired",
-                        errorText =
-                            "Session Expired"
-                    }
+                    value
                 ),
                 JsonRequestBehavior.AllowGet
+            );
+        }
+
+        private JsonResult GetSessionExpiredResult()
+        {
+            return JsonString(
+                new
+                {
+                    success = false,
+                    error = true,
+                    errorText =
+                        "Session Expired"
+                }
             );
         }
 
@@ -2818,38 +2783,14 @@ WHERE GL_Journal.GL_Journal_ID =
             return precision;
         }
 
-        private string BuildDocumentStatusReferenceSql()
-        {
-            return @"
-        SELECT
-            AD_Ref_List.Value,
-            AD_Ref_List.Name AS BaseName,
-            AD_Ref_List_Trl.Name AS TranslatedName
-        FROM AD_Reference
-        INNER JOIN AD_Ref_List ON
-        (
-            AD_Reference.AD_Reference_ID =
-            AD_Ref_List.AD_Reference_ID
-        )
-        INNER JOIN AD_Ref_List_Trl ON
-        (
-            AD_Ref_List.AD_Ref_List_ID =
-            AD_Ref_List_Trl.AD_Ref_List_ID
-            AND AD_Ref_List_Trl.AD_Language =
-            @AD_Language
-        )
-        WHERE AD_Reference.Name = 'DocStatus'
-        AND AD_Reference.IsActive = 'Y'
-        AND AD_Ref_List.IsActive = 'Y'";
-        }
-
-
         private string GetDateToExclusiveExpression(
             string dateColumn)
         {
             if (DB.IsOracle())
             {
-                return dateColumn + " + 1";
+                return
+                    dateColumn +
+                    " + 1";
             }
 
             return
@@ -2859,13 +2800,29 @@ WHERE GL_Journal.GL_Journal_ID =
 
         private class JournalPostingState
         {
-            public string DocumentNo { get; set; }
+            public string DocumentNo
+            {
+                get;
+                set;
+            }
 
-            public string DocStatus { get; set; }
+            public string DocStatus
+            {
+                get;
+                set;
+            }
 
-            public string Processed { get; set; }
+            public string Processed
+            {
+                get;
+                set;
+            }
 
-            public string Posted { get; set; }
+            public string Posted
+            {
+                get;
+                set;
+            }
         }
     }
 }

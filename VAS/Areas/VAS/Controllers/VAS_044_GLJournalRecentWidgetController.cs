@@ -1,10 +1,10 @@
-
 using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Web.Mvc;
 using VAdvantage.Acct;
 using VAdvantage.Logging;
@@ -16,113 +16,25 @@ using VIS.Filters;
 namespace VAS.Controllers
 {
     /// <summary>
-    /// Controller for GL Journal Recent Entries widget.
-    /// Displays recent GL journals and supports approval and posting.
+    /// Controller for the GL Journal Recent Entries widget.
+    /// Returns recent journals, journal details, and journal actions.
     /// </summary>
     public class VAS_044_GLJournalRecentWidgetController : Controller
     {
-        private class SchemaInfo
-        {
-            public int AcctSchemaId { get; set; }
-
-            public string AcctSchemaName { get; set; }
-
-            public string CurSymbol { get; set; }
-
-            public string ISOCode { get; set; }
-
-            public int StdPrecision { get; set; }
-        }
-
-        private SchemaInfo GetPrimarySchema(Ctx ctx)
-        {
-            SchemaInfo info = new SchemaInfo
-            {
-                AcctSchemaId = 0,
-                AcctSchemaName = string.Empty,
-                CurSymbol = string.Empty,
-                ISOCode = string.Empty,
-                StdPrecision = 2
-            };
-
-            string schemaSql = @"
-SELECT
-    C_AcctSchema.C_AcctSchema_ID,
-    C_AcctSchema.Name,
-    C_Currency.CurSymbol,
-    C_Currency.ISO_Code,
-    C_Currency.StdPrecision
-FROM C_AcctSchema
-INNER JOIN C_Currency ON
-(
-    C_AcctSchema.C_Currency_ID =
-    C_Currency.C_Currency_ID
-)
-WHERE C_AcctSchema.IsActive = 'Y'
-AND C_AcctSchema.AD_Client_ID = @ClientID
-ORDER BY C_AcctSchema.C_AcctSchema_ID";
-
-            SqlParameter[] schemaParameters =
-            {
-                new SqlParameter(
-                    "@ClientID",
-                    ctx.GetAD_Client_ID()
-                )
-            };
-
-            DataSet schemaDataSet = DB.ExecuteDataset(
-                schemaSql,
-                schemaParameters,
-                null
-            );
-
-            if (
-                schemaDataSet != null &&
-                schemaDataSet.Tables.Count > 0 &&
-                schemaDataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                DataRow row =
-                    schemaDataSet.Tables[0].Rows[0];
-
-                info.AcctSchemaId =
-                    Util.GetValueOfInt(
-                        row["C_AcctSchema_ID"]
-                    );
-
-                info.AcctSchemaName =
-                    Util.GetValueOfString(
-                        row["Name"]
-                    );
-
-                info.CurSymbol =
-                    Util.GetValueOfString(
-                        row["CurSymbol"]
-                    );
-
-                info.ISOCode =
-                    Util.GetValueOfString(
-                        row["ISO_Code"]
-                    );
-
-                info.StdPrecision =
-                    NormalizePrecision(
-                        Util.GetValueOfInt(
-                            row["StdPrecision"]
-                        )
-                    );
-            }
-
-            return info;
-        }
+        /*
+         * Keep the reference name in one place.
+         * Change this value only if the DocStatus reference
+         * has another Name in AD_Reference.
+         */
+        private const string DocumentStatusReferenceName =
+            "_Document Status";
 
         /// <summary>
-        /// Returns journal header and journal lines.
+        /// Returns the six most recent GL journals.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetJournalEntryDetail(
-            int journalId)
+        public JsonResult GetRecentEntries()
         {
             Ctx ctx = GetContext();
 
@@ -131,52 +43,24 @@ ORDER BY C_AcctSchema.C_AcctSchema_ID";
                 return GetSessionExpiredResult();
             }
 
-            if (journalId <= 0)
+            try
             {
-                return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            error = true,
-                            errorText =
-                                "Invalid journal ID."
-                        }
-                    ),
-                    JsonRequestBehavior.AllowGet
-                );
-            }
+                string language =
+                    GetLanguage(ctx);
 
-            SchemaInfo schema =
-                GetPrimarySchema(ctx);
+                string castType =
+                    GetTextCastType();
 
-            if (schema.AcctSchemaId <= 0)
-            {
-                return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            error = true,
-                            errorText =
-                                "Accounting schema was not found."
-                        }
-                    ),
-                    JsonRequestBehavior.AllowGet
-                );
-            }
-
-            string language =
-                ctx.GetAD_Language();
-
-            if (string.IsNullOrWhiteSpace(
-                language
-            ))
-            {
-                language = "ar_IQ";
-            }
-
-            string headerBase = @"
+                /*
+                 * Apply MRole only to the physical GL_Journal query.
+                 * Do not apply MRole to the final WITH query.
+                 */
+                string protectedJournalSql = @"
 SELECT
     GL_Journal.GL_Journal_ID,
+    GL_Journal.AD_Client_ID,
+    GL_Journal.AD_Org_ID,
+    GL_Journal.C_AcctSchema_ID,
     GL_Journal.DocumentNo,
     GL_Journal.DateAcct,
     GL_Journal.Description,
@@ -184,299 +68,940 @@ SELECT
     GL_Journal.Posted,
     GL_Journal.Processed,
     GL_Journal.Created,
-    DocStatusReference.Name AS DocStatusName,
-    AD_User.Name AS CreatedByName,
+    GL_Journal.CreatedBy
+FROM GL_Journal GL_Journal
+WHERE GL_Journal.IsActive = 'Y'
+AND GL_Journal.AD_Client_ID =
+@RecentClientID";
+
+                protectedJournalSql =
+                    MRole.GetDefault(ctx)
+                        .AddAccessSQL(
+                            protectedJournalSql,
+                            "GL_Journal",
+                            MRole.SQL_FULLYQUALIFIED,
+                            MRole.SQL_RO
+                        );
+
+                /*
+                 * ANSI SQL query compatible with Oracle and PostgreSQL.
+                 *
+                 * ROW_NUMBER is used instead of ROWNUM or LIMIT.
+                 * COALESCE is supported by both databases.
+                 */
+                string sql = @"
+WITH ProtectedJournal AS
+(
+" + protectedJournalSql + @"
+),
+SchemaCurrency AS
+(
+    SELECT
+        AcctSchema.AD_Client_ID,
+        AcctSchema.C_AcctSchema_ID,
+        AcctSchema.Name AS AcctSchemaName,
+        Currency.StdPrecision,
+        Currency.ISO_Code AS ISOCode,
+        Currency.CurSymbol AS CurSymbol
+    FROM C_AcctSchema AcctSchema
+    INNER JOIN C_Currency Currency ON
+    (
+        AcctSchema.C_Currency_ID =
+        Currency.C_Currency_ID
+    )
+    WHERE AcctSchema.IsActive = 'Y'
+    AND Currency.IsActive = 'Y'
+    AND AcctSchema.AD_Client_ID =
+    @RecentSchemaClientID
+),
+DocumentStatusReference AS
+(
+    SELECT DISTINCT
+        CAST(
+            RefList.Value AS " + castType + @"
+        ) AS StatusValue,
+
+        CAST(
+            RefList.Name AS " + castType + @"
+        ) AS BaseName,
+
+        CAST(
+            RefListTrl.Name AS " + castType + @"
+        ) AS TranslatedName
+
+    FROM AD_Reference ReferenceInfo
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        RefList.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefList.AD_Ref_List_ID =
+        RefListTrl.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        @RecentLanguage
+    )
+
+    WHERE ReferenceInfo.Name =
+    @RecentStatusReferenceName
+
+    AND ReferenceInfo.IsActive = 'Y'
+    AND RefList.IsActive = 'Y'
+),
+JournalTotals AS
+(
+    SELECT
+        ProtectedJournal.GL_Journal_ID,
+        ProtectedJournal.DocumentNo,
+        ProtectedJournal.DateAcct,
+        ProtectedJournal.Description,
+        ProtectedJournal.DocStatus,
+        ProtectedJournal.Posted,
+        ProtectedJournal.Processed,
+
+        DocumentStatusReference.BaseName
+            AS StatusBaseName,
+
+        DocumentStatusReference.TranslatedName
+            AS StatusTranslatedName,
+
+        COALESCE(
+            SUM(
+                COALESCE(
+                    GL_JournalLine.AmtAcctDr,
+                    0
+                )
+            ),
+            0
+        ) AS TotalDebit,
+
+        COALESCE(
+            SUM(
+                COALESCE(
+                    GL_JournalLine.AmtAcctCr,
+                    0
+                )
+            ),
+            0
+        ) AS TotalCredit,
+
+        MAX(
+            SchemaCurrency.CurSymbol
+        ) AS CurSymbol,
+
+        MAX(
+            SchemaCurrency.ISOCode
+        ) AS ISOCode,
+
+        COALESCE(
+            MAX(
+                SchemaCurrency.StdPrecision
+            ),
+            2
+        ) AS StdPrecision
+
+    FROM ProtectedJournal ProtectedJournal
+
+    INNER JOIN SchemaCurrency SchemaCurrency ON
+    (
+        SchemaCurrency.AD_Client_ID =
+        ProtectedJournal.AD_Client_ID
+
+        AND SchemaCurrency.C_AcctSchema_ID =
+        ProtectedJournal.C_AcctSchema_ID
+    )
+
+    LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
+    (
+        ProtectedJournal.GL_Journal_ID =
+        GL_JournalLine.GL_Journal_ID
+
+        AND GL_JournalLine.IsActive = 'Y'
+    )
+
+    LEFT OUTER JOIN DocumentStatusReference
+        DocumentStatusReference ON
+    (
+        CAST(
+            ProtectedJournal.DocStatus AS " + castType + @"
+        ) =
+        DocumentStatusReference.StatusValue
+    )
+
+    GROUP BY
+        ProtectedJournal.GL_Journal_ID,
+        ProtectedJournal.DocumentNo,
+        ProtectedJournal.DateAcct,
+        ProtectedJournal.Description,
+        ProtectedJournal.DocStatus,
+        ProtectedJournal.Posted,
+        ProtectedJournal.Processed,
+        DocumentStatusReference.BaseName,
+        DocumentStatusReference.TranslatedName
+),
+OrderedJournals AS
+(
+    SELECT
+        JournalTotals.GL_Journal_ID,
+        JournalTotals.DocumentNo,
+        JournalTotals.DateAcct,
+        JournalTotals.Description,
+        JournalTotals.DocStatus,
+        JournalTotals.Posted,
+        JournalTotals.Processed,
+        JournalTotals.StatusBaseName,
+        JournalTotals.StatusTranslatedName,
+        JournalTotals.TotalDebit,
+        JournalTotals.TotalCredit,
+        JournalTotals.CurSymbol,
+        JournalTotals.ISOCode,
+        JournalTotals.StdPrecision,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                JournalTotals.DateAcct DESC,
+                JournalTotals.GL_Journal_ID DESC
+        ) AS RowNumber
+
+    FROM JournalTotals JournalTotals
+)
+SELECT
+    OrderedJournals.GL_Journal_ID,
+    OrderedJournals.DocumentNo,
+    OrderedJournals.DateAcct,
+    OrderedJournals.Description,
+    OrderedJournals.DocStatus,
+    OrderedJournals.Posted,
+    OrderedJournals.Processed,
+    OrderedJournals.StatusBaseName,
+    OrderedJournals.StatusTranslatedName,
+    OrderedJournals.TotalDebit,
+    OrderedJournals.TotalCredit,
+    OrderedJournals.CurSymbol,
+    OrderedJournals.ISOCode,
+    OrderedJournals.StdPrecision
+
+FROM OrderedJournals OrderedJournals
+
+WHERE OrderedJournals.RowNumber <= 6
+
+ORDER BY
+    OrderedJournals.RowNumber";
+
+                /*
+                 * Parameter order matches the placeholder order.
+                 * Unique parameter names prevent Oracle binding issues.
+                 */
+                SqlParameter[] parameters =
+                {
+                    new SqlParameter(
+                        "@RecentClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@RecentSchemaClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@RecentLanguage",
+                        language
+                    ),
+
+                    new SqlParameter(
+                        "@RecentStatusReferenceName",
+                        DocumentStatusReferenceName
+                    )
+                };
+
+                DataSet dataSet =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameters,
+                        null
+                    );
+
+                List<object> entries =
+                    new List<object>();
+
+                string curSymbol =
+                    string.Empty;
+
+                string isoCode =
+                    string.Empty;
+
+                int stdPrecision =
+                    2;
+
+                if (
+                    dataSet != null &&
+                    dataSet.Tables.Count > 0
+                )
+                {
+                    foreach (
+                        DataRow row in
+                        dataSet.Tables[0].Rows
+                    )
+                    {
+                        string statusValue =
+                            Util.GetValueOfString(
+                                row["DocStatus"]
+                            );
+
+                        string statusName =
+                            GetReferenceDisplayName(
+                                row,
+                                "StatusTranslatedName",
+                                "StatusBaseName",
+                                statusValue
+                            );
+
+                        DateTime? dateAcct =
+                            Util.GetValueOfDateTime(
+                                row["DateAcct"]
+                            );
+
+                        stdPrecision =
+                            NormalizePrecision(
+                                Util.GetValueOfInt(
+                                    row["StdPrecision"]
+                                )
+                            );
+
+                        decimal totalDebit =
+                            Decimal.Round(
+                                Util.GetValueOfDecimal(
+                                    row["TotalDebit"]
+                                ),
+                                stdPrecision,
+                                MidpointRounding.AwayFromZero
+                            );
+
+                        decimal totalCredit =
+                            Decimal.Round(
+                                Util.GetValueOfDecimal(
+                                    row["TotalCredit"]
+                                ),
+                                stdPrecision,
+                                MidpointRounding.AwayFromZero
+                            );
+
+                        curSymbol =
+                            Util.GetValueOfString(
+                                row["CurSymbol"]
+                            );
+
+                        isoCode =
+                            Util.GetValueOfString(
+                                row["ISOCode"]
+                            );
+
+                        if (
+                            string.IsNullOrWhiteSpace(
+                                curSymbol
+                            )
+                        )
+                        {
+                            curSymbol =
+                                isoCode;
+                        }
+
+                        entries.Add(
+                            new
+                            {
+                                GL_Journal_ID =
+                                    Util.GetValueOfInt(
+                                        row[
+                                            "GL_Journal_ID"
+                                        ]
+                                    ),
+
+                                DocumentNo =
+                                    Util.GetValueOfString(
+                                        row["DocumentNo"]
+                                    ),
+
+                                DateAcct =
+                                    dateAcct.HasValue
+                                        ? dateAcct.Value.ToString(
+                                            "dd MMM yyyy"
+                                        )
+                                        : string.Empty,
+
+                                Description =
+                                    Util.GetValueOfString(
+                                        row["Description"]
+                                    ),
+
+                                /*
+                                 * Existing compatibility field.
+                                 */
+                                DocStatus =
+                                    statusValue,
+
+                                /*
+                                 * Separate status fields.
+                                 */
+                                StatusValue =
+                                    statusValue,
+
+                                StatusName =
+                                    statusName,
+
+                                /*
+                                 * Requested Status Value / Name object.
+                                 */
+                                Status = new
+                                {
+                                    Value =
+                                        statusValue,
+
+                                    Name =
+                                        statusName
+                                },
+
+                                Posted =
+                                    Util.GetValueOfString(
+                                        row["Posted"]
+                                    ),
+
+                                Processed =
+                                    Util.GetValueOfString(
+                                        row["Processed"]
+                                    ),
+
+                                TotalDebit =
+                                    totalDebit,
+
+                                TotalCredit =
+                                    totalCredit,
+
+                                IsUnbalanced =
+                                    totalDebit !=
+                                    totalCredit
+                            }
+                        );
+                    }
+                }
+
+                return JsonString(
+                    new
+                    {
+                        success = true,
+                        error = string.Empty,
+
+                        Entries =
+                            entries,
+
+                        TotalCount =
+                            entries.Count,
+
+                        CurSymbol =
+                            curSymbol,
+
+                        ISOCode =
+                            isoCode,
+
+                        StdPrecision =
+                            stdPrecision
+                    }
+                );
+            }
+            catch (Exception exception)
+            {
+                LogException(
+                    "GetRecentEntries",
+                    exception
+                );
+
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_LoadFailed",
+                        "Error loading journal entries."
+                    );
+
+                return JsonString(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            errorMessage,
+
+                        errorText =
+                            errorMessage
+                    }
+                );
+            }
+        }
+
+        /// <summary>
+        /// Returns the selected journal header and lines.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetJournalEntryDetail(
+            int journalId)
+        {
+            Ctx ctx =
+                GetContext();
+
+            if (ctx == null)
+            {
+                return GetSessionExpiredResult();
+            }
+
+            if (journalId <= 0)
+            {
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+
+                        errorText =
+                            GetMsg(
+                                ctx,
+                                "VAS_044_InvalidJournalID",
+                                "Invalid journal ID."
+                            )
+                    }
+                );
+            }
+
+            try
+            {
+                string language =
+                    GetLanguage(ctx);
+
+                string castType =
+                    GetTextCastType();
+
+                /*
+                 * The old query used:
+                 *
+                 * ClientInfo.C_AcctSchema1_ID =
+                 * GL_Journal.C_AcctSchema_ID
+                 *
+                 * That condition removed journals that used another
+                 * valid accounting schema.
+                 */
+                string protectedJournalSql = @"
+SELECT
+    GL_Journal.GL_Journal_ID,
+    GL_Journal.AD_Client_ID,
+    GL_Journal.AD_Org_ID,
+    GL_Journal.C_AcctSchema_ID,
+    GL_Journal.DocumentNo,
+    GL_Journal.DateAcct,
+    GL_Journal.Description,
+    GL_Journal.DocStatus,
+    GL_Journal.Posted,
+    GL_Journal.Processed,
+    GL_Journal.Created,
+    GL_Journal.CreatedBy
+FROM GL_Journal GL_Journal
+WHERE GL_Journal.IsActive = 'Y'
+AND GL_Journal.AD_Client_ID =
+@DetailClientID
+AND GL_Journal.GL_Journal_ID =
+@DetailJournalID";
+
+                /*
+                 * Apply MRole only to GL_Journal physical table.
+                 */
+                protectedJournalSql =
+                    MRole.GetDefault(ctx)
+                        .AddAccessSQL(
+                            protectedJournalSql,
+                            "GL_Journal",
+                            MRole.SQL_FULLYQUALIFIED,
+                            MRole.SQL_RO
+                        );
+
+                string sql = @"
+WITH ProtectedJournal AS
+(
+" + protectedJournalSql + @"
+),
+DocumentStatusReference AS
+(
+    SELECT DISTINCT
+        CAST(
+            RefList.Value AS " + castType + @"
+        ) AS StatusValue,
+
+        CAST(
+            RefList.Name AS " + castType + @"
+        ) AS BaseName,
+
+        CAST(
+            RefListTrl.Name AS " + castType + @"
+        ) AS TranslatedName
+
+    FROM AD_Reference ReferenceInfo
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        RefList.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefList.AD_Ref_List_ID =
+        RefListTrl.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        @DetailLanguage
+    )
+
+    WHERE ReferenceInfo.Name =
+    @DetailStatusReferenceName
+
+    AND ReferenceInfo.IsActive = 'Y'
+    AND RefList.IsActive = 'Y'
+)
+SELECT
+    ProtectedJournal.GL_Journal_ID,
+    ProtectedJournal.DocumentNo,
+    ProtectedJournal.DateAcct,
+    ProtectedJournal.Description,
+    ProtectedJournal.DocStatus,
+    ProtectedJournal.Posted,
+    ProtectedJournal.Processed,
+    ProtectedJournal.Created,
+    ProtectedJournal.CreatedBy,
+
+    DocumentStatusReference.BaseName
+        AS StatusBaseName,
+
+    DocumentStatusReference.TranslatedName
+        AS StatusTranslatedName,
+
+    CreatedUser.Name AS CreatedByName,
+
+    AcctSchema.Name AS AccountingBook,
+    Currency.CurSymbol,
+    Currency.ISO_Code AS ISOCode,
+    Currency.StdPrecision,
+
+    GL_JournalLine.GL_JournalLine_ID,
+    GL_JournalLine.Line,
+    GL_JournalLine.C_ValidCombination_ID,
+
+    ValidCombination.Account_ID,
+
+    AccountValue.Value AS AccountCode,
+    AccountValue.Name AS AccountName,
+
+    COALESCE(
+        GL_JournalLine.AmtAcctDr,
+        0
+    ) AS AmtAcctDr,
+
+    COALESCE(
+        GL_JournalLine.AmtAcctCr,
+        0
+    ) AS AmtAcctCr,
+
+    CostCenterValue.Value AS CostCenterCode,
+    CostCenterValue.Name AS CostCenterName,
+
+    BusinessPartner.Name AS BPartnerName,
+    Product.Name AS ProductName,
+    Project.Name AS ProjectName,
+
     COALESCE(
         SUM(
             COALESCE(
                 GL_JournalLine.AmtAcctDr,
                 0
             )
+        ) OVER
+        (
+            PARTITION BY
+                ProtectedJournal.GL_Journal_ID
         ),
         0
     ) AS TotalDebit,
+
     COALESCE(
         SUM(
             COALESCE(
                 GL_JournalLine.AmtAcctCr,
                 0
             )
+        ) OVER
+        (
+            PARTITION BY
+                ProtectedJournal.GL_Journal_ID
         ),
         0
     ) AS TotalCredit
-FROM GL_Journal GL_Journal
+
+FROM ProtectedJournal ProtectedJournal
+
+INNER JOIN C_AcctSchema AcctSchema ON
+(
+    AcctSchema.C_AcctSchema_ID =
+    ProtectedJournal.C_AcctSchema_ID
+
+    AND AcctSchema.AD_Client_ID =
+    ProtectedJournal.AD_Client_ID
+
+    AND AcctSchema.IsActive = 'Y'
+)
+
+INNER JOIN C_Currency Currency ON
+(
+    Currency.C_Currency_ID =
+    AcctSchema.C_Currency_ID
+
+    AND Currency.IsActive = 'Y'
+)
+
 LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
 (
-    GL_Journal.GL_Journal_ID =
+    ProtectedJournal.GL_Journal_ID =
     GL_JournalLine.GL_Journal_ID
+
     AND GL_JournalLine.IsActive = 'Y'
 )
-LEFT OUTER JOIN
-(
-    SELECT
-        AD_Ref_List.Value,
-        AD_Ref_List_Trl.Name
-    FROM AD_Reference AD_Reference
-    INNER JOIN AD_Ref_List AD_Ref_List ON
-    (
-        AD_Reference.AD_Reference_ID =
-        AD_Ref_List.AD_Reference_ID
-    )
-    INNER JOIN AD_Ref_List_Trl AD_Ref_List_Trl ON
-    (
-        AD_Ref_List.AD_Ref_List_ID =
-        AD_Ref_List_Trl.AD_Ref_List_ID
-        AND AD_Ref_List_Trl.AD_Language =
-        @AD_Language
-    )
-    WHERE AD_Reference.Name = 'DocStatus'
-    AND AD_Reference.IsActive = 'Y'
-    AND AD_Ref_List.IsActive = 'Y'
-) DocStatusReference ON
-(
-    DocStatusReference.Value =
-    GL_Journal.DocStatus
-)
-LEFT OUTER JOIN AD_User AD_User ON
-(
-    GL_Journal.CreatedBy =
-    AD_User.AD_User_ID
-)
-WHERE GL_Journal.GL_Journal_ID =
-@JournalID
-AND GL_Journal.IsActive = 'Y'
-AND GL_Journal.C_AcctSchema_ID =
-@AcctSchemaID";
 
-            headerBase =
-                MRole.GetDefault(ctx)
-                    .AddAccessSQL(
-                        headerBase,
-                        "GL_Journal",
-                        MRole.SQL_FULLYQUALIFIED,
-                        MRole.SQL_RO
-                    );
-
-            string headerSql = headerBase + @"
-GROUP BY
-    GL_Journal.GL_Journal_ID,
-    GL_Journal.DocumentNo,
-    GL_Journal.DateAcct,
-    GL_Journal.Description,
-    GL_Journal.DocStatus,
-    GL_Journal.Posted,
-    GL_Journal.Processed,
-    GL_Journal.Created,
-    DocStatusReference.Name,
-    AD_User.Name";
-
-            SqlParameter[] headerParameters =
-            {
-        new SqlParameter(
-            "@JournalID",
-            journalId
-        ),
-
-        new SqlParameter(
-            "@AcctSchemaID",
-            schema.AcctSchemaId
-        ),
-
-        new SqlParameter(
-            "@AD_Language",
-            language
-        )
-    };
-
-            DataSet headerDataSet =
-                DB.ExecuteDataset(
-                    headerSql,
-                    headerParameters,
-                    null
-                );
-
-            if (
-                headerDataSet == null ||
-                headerDataSet.Tables.Count == 0 ||
-                headerDataSet.Tables[0]
-                    .Rows.Count == 0
-            )
-            {
-                return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            error = true,
-                            errorText =
-                                "Journal details not found."
-                        }
-                    ),
-                    JsonRequestBehavior.AllowGet
-                );
-            }
-
-            DataRow headerRow =
-                headerDataSet.Tables[0].Rows[0];
-
-            string docStatus =
-                Util.GetValueOfString(
-                    headerRow["DocStatus"]
-                );
-
-            string statusName =
-                Util.GetValueOfString(
-                    headerRow["DocStatusName"]
-                );
-
-            if (string.IsNullOrWhiteSpace(
-                statusName
-            ))
-            {
-                statusName = docStatus;
-            }
-
-            string dateAcctText =
-                string.Empty;
-
-            if (
-                headerRow["DateAcct"] !=
-                DBNull.Value
-            )
-            {
-                dateAcctText =
-                    Convert.ToDateTime(
-                        headerRow["DateAcct"]
-                    ).ToString(
-                        "dd MMM yyyy"
-                    );
-            }
-
-            string createdText =
-                string.Empty;
-
-            if (
-                headerRow["Created"] !=
-                DBNull.Value
-            )
-            {
-                createdText =
-                    Convert.ToDateTime(
-                        headerRow["Created"]
-                    ).ToString(
-                        "dd MMM yyyy"
-                    );
-            }
-
-            decimal totalDebit =
-                Decimal.Round(
-                    Util.GetValueOfDecimal(
-                        headerRow["TotalDebit"]
-                    ),
-                    schema.StdPrecision,
-                    MidpointRounding.AwayFromZero
-                );
-
-            decimal totalCredit =
-                Decimal.Round(
-                    Util.GetValueOfDecimal(
-                        headerRow["TotalCredit"]
-                    ),
-                    schema.StdPrecision,
-                    MidpointRounding.AwayFromZero
-                );
-
-            /*
-             * GL_JournalLine does not retrieve the account
-             * directly from Account_ID.
-             *
-             * The correct relation is:
-             * GL_JournalLine.C_ValidCombination_ID
-             * -> C_ValidCombination.Account_ID
-             * -> C_ElementValue.C_ElementValue_ID
-             */
-            string linesSql = @"
-SELECT
-    GL_JournalLine.GL_JournalLine_ID,
-    GL_JournalLine.Line,
-    GL_JournalLine.C_ValidCombination_ID,
-    ValidCombination.Account_ID,
-    AccountValue.Value AS AccountCode,
-    AccountValue.Name AS AccountName,
-    GL_JournalLine.AmtAcctDr,
-    GL_JournalLine.AmtAcctCr,
-    CostCenterValue.Value AS CostCenterCode,
-    CostCenterValue.Name AS CostCenterName,
-    BusinessPartner.Name AS BPartnerName,
-    Product.Name AS ProductName,
-    Project.Name AS ProjectName
-FROM GL_JournalLine GL_JournalLine
-LEFT OUTER JOIN C_ValidCombination ValidCombination ON
+LEFT OUTER JOIN C_ValidCombination
+    ValidCombination ON
 (
     GL_JournalLine.C_ValidCombination_ID =
     ValidCombination.C_ValidCombination_ID
+
+    AND ValidCombination.IsActive = 'Y'
 )
+
 LEFT OUTER JOIN C_ElementValue AccountValue ON
 (
     ValidCombination.Account_ID =
     AccountValue.C_ElementValue_ID
+
+    AND AccountValue.IsActive = 'Y'
 )
-LEFT OUTER JOIN C_ElementValue CostCenterValue ON
+
+LEFT OUTER JOIN C_ElementValue
+    CostCenterValue ON
 (
     ValidCombination.User1_ID =
     CostCenterValue.C_ElementValue_ID
+
+    AND CostCenterValue.IsActive = 'Y'
 )
-LEFT OUTER JOIN C_BPartner BusinessPartner ON
+
+LEFT OUTER JOIN C_BPartner
+    BusinessPartner ON
 (
     ValidCombination.C_BPartner_ID =
     BusinessPartner.C_BPartner_ID
+
+    AND BusinessPartner.IsActive = 'Y'
 )
+
 LEFT OUTER JOIN M_Product Product ON
 (
     ValidCombination.M_Product_ID =
     Product.M_Product_ID
+
+    AND Product.IsActive = 'Y'
 )
+
 LEFT OUTER JOIN C_Project Project ON
 (
     ValidCombination.C_Project_ID =
     Project.C_Project_ID
+
+    AND Project.IsActive = 'Y'
 )
-WHERE GL_JournalLine.GL_Journal_ID =
-@JournalID
-AND GL_JournalLine.IsActive = 'Y'
+
+LEFT OUTER JOIN AD_User CreatedUser ON
+(
+    ProtectedJournal.CreatedBy =
+    CreatedUser.AD_User_ID
+
+    AND CreatedUser.IsActive = 'Y'
+)
+
+LEFT OUTER JOIN DocumentStatusReference
+    DocumentStatusReference ON
+(
+    CAST(
+        ProtectedJournal.DocStatus AS " + castType + @"
+    ) =
+    DocumentStatusReference.StatusValue
+)
+
 ORDER BY
     GL_JournalLine.Line,
     GL_JournalLine.GL_JournalLine_ID";
 
-            SqlParameter[] lineParameters =
-            {
-        new SqlParameter(
-            "@JournalID",
-            journalId
-        )
-    };
+                /*
+                 * The parameter order follows the placeholder order.
+                 * Every placeholder has a unique name.
+                 */
+                SqlParameter[] parameters =
+                {
+                    new SqlParameter(
+                        "@DetailClientID",
+                        ctx.GetAD_Client_ID()
+                    ),
 
-            DataSet linesDataSet =
-                DB.ExecuteDataset(
-                    linesSql,
-                    lineParameters,
-                    null
-                );
+                    new SqlParameter(
+                        "@DetailJournalID",
+                        journalId
+                    ),
 
-            List<object> lines =
-                new List<object>();
+                    new SqlParameter(
+                        "@DetailLanguage",
+                        language
+                    ),
 
-            if (
-                linesDataSet != null &&
-                linesDataSet.Tables.Count > 0 &&
-                linesDataSet.Tables[0]
-                    .Rows.Count > 0
-            )
-            {
-                foreach (
-                    DataRow row in
-                    linesDataSet.Tables[0].Rows
+                    new SqlParameter(
+                        "@DetailStatusReferenceName",
+                        DocumentStatusReferenceName
+                    )
+                };
+
+                DataSet dataSet =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameters,
+                        null
+                    );
+
+                if (
+                    dataSet == null ||
+                    dataSet.Tables.Count == 0 ||
+                    dataSet.Tables[0].Rows.Count == 0
                 )
                 {
+                    return JsonString(
+                        new
+                        {
+                            success = false,
+                            error = true,
+
+                            errorText =
+                                GetMsg(
+                                    ctx,
+                                    "VAS_044_DetailsNotAvailable",
+                                    "Journal details are not available."
+                                )
+                        }
+                    );
+                }
+
+                DataTable resultTable =
+                    dataSet.Tables[0];
+
+                DataRow headerRow =
+                    resultTable.Rows[0];
+
+                int stdPrecision =
+                    NormalizePrecision(
+                        Util.GetValueOfInt(
+                            headerRow["StdPrecision"]
+                        )
+                    );
+
+                string statusValue =
+                    Util.GetValueOfString(
+                        headerRow["DocStatus"]
+                    );
+
+                string statusName =
+                    GetReferenceDisplayName(
+                        headerRow,
+                        "StatusTranslatedName",
+                        "StatusBaseName",
+                        statusValue
+                    );
+
+                DateTime? dateAcct =
+                    Util.GetValueOfDateTime(
+                        headerRow["DateAcct"]
+                    );
+
+                DateTime? created =
+                    Util.GetValueOfDateTime(
+                        headerRow["Created"]
+                    );
+
+                decimal totalDebit =
+                    Decimal.Round(
+                        Util.GetValueOfDecimal(
+                            headerRow["TotalDebit"]
+                        ),
+                        stdPrecision,
+                        MidpointRounding.AwayFromZero
+                    );
+
+                decimal totalCredit =
+                    Decimal.Round(
+                        Util.GetValueOfDecimal(
+                            headerRow["TotalCredit"]
+                        ),
+                        stdPrecision,
+                        MidpointRounding.AwayFromZero
+                    );
+
+                string curSymbol =
+                    Util.GetValueOfString(
+                        headerRow["CurSymbol"]
+                    );
+
+                string isoCode =
+                    Util.GetValueOfString(
+                        headerRow["ISOCode"]
+                    );
+
+                if (
+                    string.IsNullOrWhiteSpace(
+                        curSymbol
+                    )
+                )
+                {
+                    curSymbol =
+                        isoCode;
+                }
+
+                List<object> lines =
+                    new List<object>();
+
+                foreach (
+                    DataRow row in
+                    resultTable.Rows
+                )
+                {
+                    int journalLineId =
+                        Util.GetValueOfInt(
+                            row[
+                                "GL_JournalLine_ID"
+                            ]
+                        );
+
+                    /*
+                     * LEFT OUTER JOIN returns one header row
+                     * when no active journal lines exist.
+                     */
+                    if (journalLineId <= 0)
+                    {
+                        continue;
+                    }
+
                     string accountCode =
                         Util.GetValueOfString(
                             row["AccountCode"]
@@ -487,9 +1012,11 @@ ORDER BY
                             row["AccountName"]
                         );
 
-                    if (string.IsNullOrWhiteSpace(
-                        accountCode
-                    ))
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            accountCode
+                        )
+                    )
                     {
                         accountCode =
                             Util.GetValueOfString(
@@ -497,9 +1024,11 @@ ORDER BY
                             );
                     }
 
-                    if (string.IsNullOrWhiteSpace(
-                        accountCode
-                    ))
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            accountCode
+                        )
+                    )
                     {
                         accountCode =
                             Util.GetValueOfString(
@@ -509,77 +1038,37 @@ ORDER BY
                             );
                     }
 
-                    if (string.IsNullOrWhiteSpace(
-                        accountName
-                    ))
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            accountName
+                        )
+                    )
                     {
-                        accountName = "-";
+                        accountName =
+                            "-";
                     }
-
-                    string costCenterCode =
-                        Util.GetValueOfString(
-                            row["CostCenterCode"]
-                        );
-
-                    string costCenterName =
-                        Util.GetValueOfString(
-                            row["CostCenterName"]
-                        );
 
                     string costCenter =
-                        string.Empty;
-
-                    if (
-                        !string.IsNullOrWhiteSpace(
-                            costCenterCode
-                        ) &&
-                        !string.IsNullOrWhiteSpace(
-                            costCenterName
-                        )
-                    )
-                    {
-                        costCenter =
-                            costCenterCode +
-                            " · " +
-                            costCenterName;
-                    }
-                    else if (
-                        !string.IsNullOrWhiteSpace(
-                            costCenterCode
-                        )
-                    )
-                    {
-                        costCenter =
-                            costCenterCode;
-                    }
-                    else if (
-                        !string.IsNullOrWhiteSpace(
-                            costCenterName
-                        )
-                    )
-                    {
-                        costCenter =
-                            costCenterName;
-                    }
-
-                    string businessPartner =
-                        Util.GetValueOfString(
-                            row["BPartnerName"]
-                        );
-
-                    string product =
-                        Util.GetValueOfString(
-                            row["ProductName"]
-                        );
-
-                    string project =
-                        Util.GetValueOfString(
-                            row["ProjectName"]
+                        BuildCodeName(
+                            Util.GetValueOfString(
+                                row["CostCenterCode"]
+                            ),
+                            Util.GetValueOfString(
+                                row["CostCenterName"]
+                            )
                         );
 
                     lines.Add(
                         new
                         {
+                            GL_JournalLine_ID =
+                                journalLineId,
+
+                            Line =
+                                Util.GetValueOfInt(
+                                    row["Line"]
+                                ),
+
                             AccountCode =
                                 accountCode,
 
@@ -591,9 +1080,8 @@ ORDER BY
                                     Util.GetValueOfDecimal(
                                         row["AmtAcctDr"]
                                     ),
-                                    schema.StdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
+                                    stdPrecision,
+                                    MidpointRounding.AwayFromZero
                                 ),
 
                             Credit =
@@ -601,48 +1089,48 @@ ORDER BY
                                     Util.GetValueOfDecimal(
                                         row["AmtAcctCr"]
                                     ),
-                                    schema.StdPrecision,
-                                    MidpointRounding
-                                        .AwayFromZero
+                                    stdPrecision,
+                                    MidpointRounding.AwayFromZero
                                 ),
 
                             CostCenter =
-                                string.IsNullOrWhiteSpace(
-                                    costCenter
-                                )
-                                    ? "-"
-                                    : costCenter,
+                                GetDefaultValue(
+                                    costCenter,
+                                    "-"
+                                ),
 
                             BPartner =
-                                string.IsNullOrWhiteSpace(
-                                    businessPartner
-                                )
-                                    ? "-"
-                                    : businessPartner,
+                                GetDefaultValue(
+                                    Util.GetValueOfString(
+                                        row["BPartnerName"]
+                                    ),
+                                    "-"
+                                ),
 
                             Product =
-                                string.IsNullOrWhiteSpace(
-                                    product
-                                )
-                                    ? "-"
-                                    : product,
+                                GetDefaultValue(
+                                    Util.GetValueOfString(
+                                        row["ProductName"]
+                                    ),
+                                    "-"
+                                ),
 
                             Project =
-                                string.IsNullOrWhiteSpace(
-                                    project
+                                GetDefaultValue(
+                                    Util.GetValueOfString(
+                                        row["ProjectName"]
+                                    ),
+                                    "-"
                                 )
-                                    ? "-"
-                                    : project
                         }
                     );
                 }
-            }
 
-            return Json(
-                JsonConvert.SerializeObject(
+                return JsonString(
                     new
                     {
                         success = true,
+                        error = string.Empty,
 
                         Journal = new
                         {
@@ -661,7 +1149,11 @@ ORDER BY
                                 ),
 
                             DateAcct =
-                                dateAcctText,
+                                dateAcct.HasValue
+                                    ? dateAcct.Value.ToString(
+                                        "dd MMM yyyy"
+                                    )
+                                    : string.Empty,
 
                             Description =
                                 Util.GetValueOfString(
@@ -670,24 +1162,41 @@ ORDER BY
                                     ]
                                 ),
 
+                            /*
+                             * Existing compatibility field.
+                             */
                             DocStatus =
-                                docStatus,
+                                statusValue,
+
+                            /*
+                             * Separate fields.
+                             */
+                            StatusValue =
+                                statusValue,
 
                             StatusName =
                                 statusName,
 
+                            /*
+                             * Requested object.
+                             */
+                            Status = new
+                            {
+                                Value =
+                                    statusValue,
+
+                                Name =
+                                    statusName
+                            },
+
                             Posted =
                                 Util.GetValueOfString(
-                                    headerRow[
-                                        "Posted"
-                                    ]
+                                    headerRow["Posted"]
                                 ),
 
                             Processed =
                                 Util.GetValueOfString(
-                                    headerRow[
-                                        "Processed"
-                                    ]
+                                    headerRow["Processed"]
                                 ),
 
                             TotalDebit =
@@ -697,21 +1206,31 @@ ORDER BY
                                 totalCredit,
 
                             AccountingBook =
-                                string.IsNullOrWhiteSpace(
-                                    schema.AcctSchemaName
-                                )
-                                    ? "Primary"
-                                    : schema.AcctSchemaName,
+                                GetDefaultValue(
+                                    Util.GetValueOfString(
+                                        headerRow[
+                                            "AccountingBook"
+                                        ]
+                                    ),
+                                    "Primary"
+                                ),
 
                             CreatedByName =
-                                Util.GetValueOfString(
-                                    headerRow[
-                                        "CreatedByName"
-                                    ]
+                                GetDefaultValue(
+                                    Util.GetValueOfString(
+                                        headerRow[
+                                            "CreatedByName"
+                                        ]
+                                    ),
+                                    "-"
                                 ),
 
                             CreatedDate =
-                                createdText
+                                created.HasValue
+                                    ? created.Value.ToString(
+                                        "dd MMM yyyy"
+                                    )
+                                    : string.Empty
                         },
 
                         Lines =
@@ -721,23 +1240,42 @@ ORDER BY
                             lines.Count,
 
                         CurSymbol =
-                            string.IsNullOrWhiteSpace(
-                                schema.CurSymbol
-                            )
-                                ? schema.ISOCode
-                                : schema.CurSymbol,
+                            curSymbol,
 
                         ISOCode =
-                            schema.ISOCode,
+                            isoCode,
 
                         StdPrecision =
-                            schema.StdPrecision
+                            stdPrecision
                     }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
-        }
+                );
+            }
+            catch (Exception exception)
+            {
+                LogException(
+                    "GetJournalEntryDetail",
+                    exception
+                );
 
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_DetailsLoadFailed",
+                        "Error loading journal details."
+                    );
+
+                return JsonString(
+                    new
+                    {
+                        success = false,
+                        error = true,
+
+                        errorText =
+                            errorMessage
+                    }
+                );
+            }
+        }
 
         /// <summary>
         /// Prepares and approves a Draft, In Progress,
@@ -749,7 +1287,8 @@ ORDER BY
         public JsonResult ApproveJournal(
             int journalId)
         {
-            Ctx ctx = GetContext();
+            Ctx ctx =
+                GetContext();
 
             if (ctx == null)
             {
@@ -757,7 +1296,9 @@ ORDER BY
                     new
                     {
                         success = false,
-                        error = "Session Expired",
+                        error =
+                            "Session Expired",
+
                         errorText =
                             "Session Expired"
                     }
@@ -803,10 +1344,13 @@ ORDER BY
 
                 if (IsJournalPosted(journal))
                 {
-                    throw new
-                        InvalidOperationException(
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_044_AlreadyPosted",
                             "The journal is already posted."
-                        );
+                        )
+                    );
                 }
 
                 string docStatus =
@@ -816,8 +1360,7 @@ ORDER BY
                     string.Equals(
                         docStatus,
                         "AP",
-                        StringComparison
-                            .OrdinalIgnoreCase
+                        StringComparison.OrdinalIgnoreCase
                     )
                 )
                 {
@@ -827,20 +1370,27 @@ ORDER BY
                         new
                         {
                             success = true,
+
                             journalId =
                                 journal.Get_ID(),
+
                             documentNo =
-                                journal
-                                    .GetDocumentNo(),
+                                journal.GetDocumentNo(),
+
                             docStatus =
-                                journal
-                                    .GetDocStatus(),
+                                journal.GetDocStatus(),
+
                             posted =
                                 IsJournalPosted(
                                     journal
                                 ),
+
                             message =
-                                "The journal is already approved."
+                                GetMsg(
+                                    ctx,
+                                    "VAS_044_AlreadyApproved",
+                                    "The journal is already approved."
+                                )
                         }
                     );
                 }
@@ -849,33 +1399,35 @@ ORDER BY
                     string.Equals(
                         docStatus,
                         "DR",
-                        StringComparison
-                            .OrdinalIgnoreCase
+                        StringComparison.OrdinalIgnoreCase
                     ) ||
                     string.Equals(
                         docStatus,
                         "NA",
-                        StringComparison
-                            .OrdinalIgnoreCase
+                        StringComparison.OrdinalIgnoreCase
                     )
                 )
                 {
                     journal.SetDocAction(
-                        DocActionVariables
-                            .ACTION_PREPARE
+                        DocActionVariables.ACTION_PREPARE
                     );
 
-                    if (!journal.ProcessIt(
-                        DocActionVariables
-                            .ACTION_PREPARE))
+                    if (
+                        !journal.ProcessIt(
+                            DocActionVariables.ACTION_PREPARE
+                        )
+                    )
                     {
-                        throw new
-                            InvalidOperationException(
-                                GetJournalProcessError(
-                                    journal,
+                        throw new InvalidOperationException(
+                            GetJournalProcessError(
+                                journal,
+                                GetMsg(
+                                    ctx,
+                                    "VAS_044_PrepareFailed",
                                     "The journal could not be prepared."
                                 )
-                            );
+                            )
+                        );
                     }
 
                     SaveJournal(journal);
@@ -884,34 +1436,43 @@ ORDER BY
                         journal.GetDocStatus();
                 }
 
-                if (!string.Equals(
-                    docStatus,
-                    "IP",
-                    StringComparison
-                        .OrdinalIgnoreCase))
+                if (
+                    !string.Equals(
+                        docStatus,
+                        "IP",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
-                    throw new
-                        InvalidOperationException(
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_044_ApproveInvalidStatus",
                             "Only Draft, In Progress or Not Approved journals can be approved."
-                        );
+                        )
+                    );
                 }
 
                 journal.SetDocAction(
-                    DocActionVariables
-                        .ACTION_APPROVE
+                    DocActionVariables.ACTION_APPROVE
                 );
 
-                if (!journal.ProcessIt(
-                    DocActionVariables
-                        .ACTION_APPROVE))
+                if (
+                    !journal.ProcessIt(
+                        DocActionVariables.ACTION_APPROVE
+                    )
+                )
                 {
-                    throw new
-                        InvalidOperationException(
-                            GetJournalProcessError(
-                                journal,
+                    throw new InvalidOperationException(
+                        GetJournalProcessError(
+                            journal,
+                            GetMsg(
+                                ctx,
+                                "VAS_044_ApproveFailed",
                                 "The journal could not be approved."
                             )
-                        );
+                        )
+                    );
                 }
 
                 SaveJournal(journal);
@@ -922,18 +1483,27 @@ ORDER BY
                     new
                     {
                         success = true,
+
                         journalId =
                             journal.Get_ID(),
+
                         documentNo =
                             journal.GetDocumentNo(),
+
                         docStatus =
                             journal.GetDocStatus(),
+
                         posted =
                             IsJournalPosted(
                                 journal
                             ),
+
                         message =
-                            "Journal approved successfully."
+                            GetMsg(
+                                ctx,
+                                "VAS_044_ApprovedSuccessfully",
+                                "Journal approved successfully."
+                            )
                     }
                 );
             }
@@ -948,8 +1518,10 @@ ORDER BY
                     new
                     {
                         success = false,
+
                         error =
                             exception.Message,
+
                         errorText =
                             exception.Message
                     }
@@ -964,23 +1536,32 @@ ORDER BY
             }
         }
 
-
+        /// <summary>
+        /// Completes and posts the selected journal.
+        /// </summary>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult PostJournal(
             int journalId)
         {
-            Ctx ctx = GetContext();
+            Ctx ctx =
+                GetContext();
 
             if (ctx == null)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = "Session Expired",
-                    errorText = "Session Expired"
-                });
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            "Session Expired",
+
+                        errorText =
+                            "Session Expired"
+                    }
+                );
             }
 
             JsonResult validationResult =
@@ -994,30 +1575,27 @@ ORDER BY
                 return validationResult;
             }
 
-            VAdvantage.DataBase.Trx completeTransaction =
+            VAdvantage.DataBase.Trx transaction =
                 null;
 
             try
             {
-                /*
-                 * Step 1:
-                 * Complete the Approved journal first.
-                 */
-                string completeTransactionName =
-                    VAdvantage.DataBase.Trx.CreateTrxName(
-                        "VAS044CompleteJournal"
-                    );
+                string transactionName =
+                    VAdvantage.DataBase.Trx
+                        .CreateTrxName(
+                            "VAS044CompleteJournal"
+                        );
 
-                completeTransaction =
+                transaction =
                     VAdvantage.DataBase.Trx.GetTrx(
-                        completeTransactionName
+                        transactionName
                     );
 
                 MJournal journal =
                     new MJournal(
                         ctx,
                         journalId,
-                        completeTransaction
+                        transaction
                     );
 
                 ValidateJournal(
@@ -1028,49 +1606,70 @@ ORDER BY
 
                 if (IsJournalPosted(journal))
                 {
-                    completeTransaction.Commit();
+                    transaction.Commit();
 
-                    return Json(new
-                    {
-                        success = true,
-                        journalId = journal.Get_ID(),
-                        documentNo = journal.GetDocumentNo(),
-                        docStatus = journal.GetDocStatus(),
-                        posted = true,
-                        message = "The journal is already posted."
-                    });
+                    return Json(
+                        new
+                        {
+                            success = true,
+
+                            journalId =
+                                journal.Get_ID(),
+
+                            documentNo =
+                                journal.GetDocumentNo(),
+
+                            docStatus =
+                                journal.GetDocStatus(),
+
+                            posted = true,
+
+                            message =
+                                GetMsg(
+                                    ctx,
+                                    "VAS_044_AlreadyPosted",
+                                    "The journal is already posted."
+                                )
+                        }
+                    );
                 }
 
                 string docStatus =
                     journal.GetDocStatus();
 
-                if (string.Equals(
-                    docStatus,
-                    "AP",
-                    StringComparison.OrdinalIgnoreCase))
+                if (
+                    string.Equals(
+                        docStatus,
+                        "AP",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     journal.SetDocAction(
                         DocActionVariables.ACTION_COMPLETE
                     );
 
-                    if (!journal.ProcessIt(
-                        DocActionVariables.ACTION_COMPLETE))
+                    if (
+                        !journal.ProcessIt(
+                            DocActionVariables.ACTION_COMPLETE
+                        )
+                    )
                     {
                         throw new InvalidOperationException(
                             GetJournalProcessError(
                                 journal,
-                                "The journal could not be completed."
+                                GetMsg(
+                                    ctx,
+                                    "VAS_044_CompleteFailed",
+                                    "The journal could not be completed."
+                                )
                             )
                         );
                     }
 
                     SaveJournal(journal);
 
-                    /*
-                     * The Complete process must be committed before
-                     * the accounting posting engine reads the journal.
-                     */
-                    completeTransaction.Commit();
+                    transaction.Commit();
                 }
                 else if (
                     string.Equals(
@@ -1085,71 +1684,111 @@ ORDER BY
                     )
                 )
                 {
-                    completeTransaction.Commit();
+                    transaction.Commit();
                 }
                 else
                 {
                     throw new InvalidOperationException(
-                        "The journal must be approved before it can be posted."
+                        GetMsg(
+                            ctx,
+                            "VAS_044_MustApproveBeforePost",
+                            "The journal must be approved before it can be posted."
+                        )
                     );
                 }
             }
             catch (Exception exception)
             {
-                if (completeTransaction != null)
+                if (transaction != null)
                 {
-                    completeTransaction.Rollback();
+                    transaction.Rollback();
                 }
 
-                return Json(new
-                {
-                    success = false,
-                    error = exception.Message,
-                    errorText = exception.Message
-                });
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            exception.Message,
+
+                        errorText =
+                            exception.Message
+                    }
+                );
             }
             finally
             {
-                if (completeTransaction != null)
+                if (transaction != null)
                 {
-                    completeTransaction.Close();
-                    completeTransaction = null;
+                    transaction.Close();
+
+                    transaction =
+                        null;
                 }
             }
 
-            /*
-             * Step 2:
-             * Read the journal again after committing Complete.
-             */
             JournalPostingState journalState =
                 GetJournalPostingState(
+                    ctx,
                     journalId
                 );
 
             if (journalState == null)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = "Journal details not found.",
-                    errorText = "Journal details not found."
-                });
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_DetailsNotAvailable",
+                        "Journal details are not available."
+                    );
+
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            errorMessage,
+
+                        errorText =
+                            errorMessage
+                    }
+                );
             }
 
-            if (string.Equals(
-                journalState.Posted,
-                "Y",
-                StringComparison.OrdinalIgnoreCase))
+            if (
+                string.Equals(
+                    journalState.Posted,
+                    "Y",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
-                return Json(new
-                {
-                    success = true,
-                    journalId = journalId,
-                    documentNo = journalState.DocumentNo,
-                    docStatus = journalState.DocStatus,
-                    posted = true,
-                    message = "The journal is already posted."
-                });
+                return Json(
+                    new
+                    {
+                        success = true,
+
+                        journalId =
+                            journalId,
+
+                        documentNo =
+                            journalState.DocumentNo,
+
+                        docStatus =
+                            journalState.DocStatus,
+
+                        posted = true,
+
+                        message =
+                            GetMsg(
+                                ctx,
+                                "VAS_044_AlreadyPosted",
+                                "The journal is already posted."
+                            )
+                    }
+                );
             }
 
             if (
@@ -1165,44 +1804,60 @@ ORDER BY
                 )
             )
             {
-                return Json(new
-                {
-                    success = false,
-                    error =
-                        "The journal was not completed successfully. " +
-                        "Current status: " +
-                        journalState.DocStatus,
-                    errorText =
-                        "The journal was not completed successfully. " +
-                        "Current status: " +
-                        journalState.DocStatus
-                });
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_CompleteFailed",
+                        "The journal was not completed successfully."
+                    ) +
+                    " " +
+                    journalState.DocStatus;
+
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            errorMessage,
+
+                        errorText =
+                            errorMessage
+                    }
+                );
             }
 
-            /*
-             * Doc.PostImmediate only loads processed documents.
-             */
-            if (!string.Equals(
-                journalState.Processed,
-                "Y",
-                StringComparison.OrdinalIgnoreCase))
+            if (
+                !string.Equals(
+                    journalState.Processed,
+                    "Y",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
-                return Json(new
-                {
-                    success = false,
-                    error =
-                        "The journal is completed but Processed is not Y.",
-                    errorText =
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_NotProcessed",
                         "The journal is completed but Processed is not Y."
-                });
+                    );
+
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            errorMessage,
+
+                        errorText =
+                            errorMessage
+                    }
+                );
             }
 
             try
             {
-                /*
-                 * Step 3:
-                 * Use Vienna Advantage accounting posting engine.
-                 */
                 int journalTableId =
                     MTable.Get_Table_ID(
                         "GL_Journal"
@@ -1219,14 +1874,25 @@ ORDER BY
                     accountingSchemas.Length == 0
                 )
                 {
-                    return Json(new
-                    {
-                        success = false,
-                        error =
-                            "No accounting schema was found for the client.",
-                        errorText =
+                    string errorMessage =
+                        GetMsg(
+                            ctx,
+                            "VAS_044_NoAccountingSchema",
                             "No accounting schema was found for the client."
-                    });
+                        );
+
+                    return Json(
+                        new
+                        {
+                            success = false,
+
+                            error =
+                                errorMessage,
+
+                            errorText =
+                                errorMessage
+                        }
+                    );
                 }
 
                 string postingResult =
@@ -1238,28 +1904,35 @@ ORDER BY
                         null
                     );
 
-                /*
-                 * PostImmediate returns null or empty on success.
-                 * Otherwise it returns the actual accounting error.
-                 */
-                if (!string.IsNullOrWhiteSpace(
-                    postingResult
-                ))
+                if (
+                    !IsPostingSuccess(
+                        postingResult
+                    )
+                )
                 {
-                    return Json(new
-                    {
-                        success = false,
-                        error = postingResult,
-                        errorText = postingResult
-                    });
+                    string errorMessage =
+                        GetPostingErrorMessage(
+                            ctx,
+                            postingResult
+                        );
+
+                    return Json(
+                        new
+                        {
+                            success = false,
+
+                            error =
+                                errorMessage,
+
+                            errorText =
+                                errorMessage
+                        }
+                    );
                 }
 
-                /*
-                 * Step 4:
-                 * Verify the Posted value after posting.
-                 */
                 journalState =
                     GetJournalPostingState(
+                        ctx,
                         journalId
                     );
 
@@ -1272,101 +1945,203 @@ ORDER BY
                     )
                 )
                 {
-                    string postedStatus =
-                        journalState == null
-                            ? string.Empty
-                            : journalState.Posted;
-
                     string errorMessage =
-                        "The accounting engine finished, " +
-                        "but the journal was not posted.";
+                        GetMsg(
+                            ctx,
+                            "VAS_044_PostVerificationFailed",
+                            "The accounting engine finished, but the journal was not posted."
+                        );
 
-                    if (!string.IsNullOrWhiteSpace(
-                        postedStatus
-                    ))
-                    {
-                        errorMessage +=
-                            " Posted status: " +
-                            postedStatus;
-                    }
+                    return Json(
+                        new
+                        {
+                            success = false,
 
-                    return Json(new
-                    {
-                        success = false,
-                        error = errorMessage,
-                        errorText = errorMessage
-                    });
+                            error =
+                                errorMessage,
+
+                            errorText =
+                                errorMessage
+                        }
+                    );
                 }
 
-                return Json(new
-                {
-                    success = true,
-                    journalId = journalId,
-                    documentNo =
-                        journalState.DocumentNo,
-                    docStatus =
-                        journalState.DocStatus,
-                    posted = true,
-                    message =
-                        "Journal posted successfully."
-                });
+                return Json(
+                    new
+                    {
+                        success = true,
+
+                        journalId =
+                            journalId,
+
+                        documentNo =
+                            journalState.DocumentNo,
+
+                        docStatus =
+                            journalState.DocStatus,
+
+                        posted = true,
+
+                        message =
+                            GetMsg(
+                                ctx,
+                                "VAS_044_PostedSuccessfully",
+                                "Journal posted successfully."
+                            )
+                    }
+                );
             }
             catch (Exception exception)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = exception.Message,
-                    errorText = exception.Message
-                });
+                LogException(
+                    "PostJournal",
+                    exception
+                );
+
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_PostFailed",
+                        "Journal posting failed."
+                    );
+
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error =
+                            errorMessage,
+
+                        errorText =
+                            errorMessage
+                    }
+                );
             }
         }
 
+        private string GetTextCastType()
+        {
+            if (DB.IsOracle())
+            {
+                return "VARCHAR2(4000)";
+            }
 
+            return "VARCHAR(4000)";
+        }
 
+        private string GetLanguage(
+            Ctx ctx)
+        {
+            string language =
+                ctx == null
+                    ? string.Empty
+                    : ctx.GetAD_Language();
 
+            if (
+                string.IsNullOrWhiteSpace(
+                    language
+                )
+            )
+            {
+                return "en_US";
+            }
 
-        private string GetJournalProcessError(
-            MJournal journal,
+            return language;
+        }
+
+        private string GetReferenceDisplayName(
+            DataRow row,
+            string translatedColumn,
+            string baseColumn,
             string fallback)
         {
-            string processMessage =
-                journal == null
-                    ? string.Empty
-                    : journal.GetProcessMsg();
+            string translatedName =
+                Util.GetValueOfString(
+                    row[translatedColumn]
+                );
 
-            if (!string.IsNullOrWhiteSpace(
-                processMessage
-            ))
-            {
-                return processMessage;
-            }
-
-            try
-            {
-                ValueNamePair modelError =
-                    VLogger.RetrieveError();
-
-                if (
-                    modelError != null &&
-                    !string.IsNullOrWhiteSpace(
-                        modelError.GetName()
-                    )
+            if (
+                !string.IsNullOrWhiteSpace(
+                    translatedName
                 )
-                {
-                    return modelError.GetName();
-                }
-            }
-            catch
+            )
             {
-                /*
-                 * Keep fallback when no logger error exists.
-                 */
+                return translatedName;
+            }
+
+            string baseName =
+                Util.GetValueOfString(
+                    row[baseColumn]
+                );
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    baseName
+                )
+            )
+            {
+                return baseName;
             }
 
             return fallback;
         }
 
+        private string BuildCodeName(
+            string code,
+            string name)
+        {
+            if (
+                !string.IsNullOrWhiteSpace(
+                    code
+                ) &&
+                !string.IsNullOrWhiteSpace(
+                    name
+                )
+            )
+            {
+                return
+                    code +
+                    " · " +
+                    name;
+            }
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    code
+                )
+            )
+            {
+                return code;
+            }
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    name
+                )
+            )
+            {
+                return name;
+            }
+
+            return string.Empty;
+        }
+
+        private string GetDefaultValue(
+            string value,
+            string fallback)
+        {
+            if (
+                string.IsNullOrWhiteSpace(
+                    value
+                )
+            )
+            {
+                return fallback;
+            }
+
+            return value;
+        }
 
         private JsonResult ValidateActionRequest(
             Ctx ctx,
@@ -1374,14 +2149,23 @@ ORDER BY
         {
             if (journalId <= 0)
             {
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_DetailsNotAvailable",
+                        "Journal details are not available."
+                    );
+
                 return Json(
                     new
                     {
                         success = false,
+
                         error =
-                            "Journal details not found.",
+                            errorMessage,
+
                         errorText =
-                            "Journal details not found."
+                            errorMessage
                     }
                 );
             }
@@ -1394,19 +2178,31 @@ ORDER BY
             MRole role =
                 MRole.GetDefault(ctx);
 
-            if (!role.IsRecordAccess(
-                journalTableId,
-                journalId,
-                false))
+            if (
+                !role.IsRecordAccess(
+                    journalTableId,
+                    journalId,
+                    false
+                )
+            )
             {
+                string errorMessage =
+                    GetMsg(
+                        ctx,
+                        "VAS_044_NoPermission",
+                        "You do not have permission to update this journal."
+                    );
+
                 return Json(
                     new
                     {
                         success = false,
+
                         error =
-                            "You do not have permission to update this journal.",
+                            errorMessage,
+
                         errorText =
-                            "You do not have permission to update this journal."
+                            errorMessage
                     }
                 );
             }
@@ -1425,18 +2221,24 @@ ORDER BY
                 journal.Get_ID() != journalId
             )
             {
-                throw new
-                    InvalidOperationException(
-                        "Journal details not found."
-                    );
+                throw new InvalidOperationException(
+                    GetMsg(
+                        ctx,
+                        "VAS_044_DetailsNotAvailable",
+                        "Journal details are not available."
+                    )
+                );
             }
 
             if (!journal.IsActive())
             {
-                throw new
-                    InvalidOperationException(
+                throw new InvalidOperationException(
+                    GetMsg(
+                        ctx,
+                        "VAS_044_InactiveJournal",
                         "The journal is inactive."
-                    );
+                    )
+                );
             }
 
             if (
@@ -1444,10 +2246,13 @@ ORDER BY
                 ctx.GetAD_Client_ID()
             )
             {
-                throw new
-                    InvalidOperationException(
+                throw new InvalidOperationException(
+                    GetMsg(
+                        ctx,
+                        "VAS_044_NoPermission",
                         "You do not have permission to update this journal."
-                    );
+                    )
+                );
             }
         }
 
@@ -1460,7 +2265,9 @@ ORDER BY
             }
 
             object postedValue =
-                journal.Get_Value("Posted");
+                journal.Get_Value(
+                    "Posted"
+                );
 
             if (
                 postedValue == null ||
@@ -1484,14 +2291,17 @@ ORDER BY
                 string.Equals(
                     postedText,
                     "Y",
-                    StringComparison
-                        .OrdinalIgnoreCase
+                    StringComparison.OrdinalIgnoreCase
                 ) ||
                 string.Equals(
                     postedText,
                     "TRUE",
-                    StringComparison
-                        .OrdinalIgnoreCase
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    postedText,
+                    "1",
+                    StringComparison.OrdinalIgnoreCase
                 );
         }
 
@@ -1524,70 +2334,163 @@ ORDER BY
             }
             catch
             {
-                errorMessage =
-                    "Could not save the journal.";
             }
 
-            throw new
-                InvalidOperationException(
-                    errorMessage
-                );
-        }
-
-
-        private Ctx GetContext()
-        {
-            if (Session["ctx"] == null)
-            {
-                return null;
-            }
-
-            return Session["ctx"] as Ctx;
-        }
-
-        private JsonResult GetSessionExpiredResult()
-        {
-            return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        success = false,
-                        error = "Session Expired",
-                        errorText =
-                            "Session Expired"
-                    }
-                ),
-                JsonRequestBehavior.AllowGet
+            throw new InvalidOperationException(
+                errorMessage
             );
         }
 
-        private int NormalizePrecision(
-            int precision)
+        private string GetJournalProcessError(
+            MJournal journal,
+            string fallback)
         {
+            string processMessage =
+                journal == null
+                    ? string.Empty
+                    : journal.GetProcessMsg();
+
             if (
-                precision < 0 ||
-                precision > 28
+                !string.IsNullOrWhiteSpace(
+                    processMessage
+                )
             )
             {
-                return 2;
+                return processMessage;
             }
 
-            return precision;
+            try
+            {
+                ValueNamePair modelError =
+                    VLogger.RetrieveError();
+
+                if (
+                    modelError != null &&
+                    !string.IsNullOrWhiteSpace(
+                        modelError.GetName()
+                    )
+                )
+                {
+                    return modelError.GetName();
+                }
+            }
+            catch
+            {
+            }
+
+            return fallback;
         }
 
-        private class JournalPostingState
+        private bool IsPostingSuccess(
+            string postingResult)
         {
-            public string DocumentNo { get; set; }
+            if (
+                string.IsNullOrWhiteSpace(
+                    postingResult
+                )
+            )
+            {
+                return true;
+            }
 
-            public string DocStatus { get; set; }
-
-            public string Processed { get; set; }
-
-            public string Posted { get; set; }
+            return
+                string.Equals(
+                    postingResult,
+                    Doc.STATUS_Posted,
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    postingResult,
+                    "AlreadyPosted",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    postingResult,
+                    "OK",
+                    StringComparison.OrdinalIgnoreCase
+                );
         }
 
-        private JournalPostingState GetJournalPostingState(
-            int journalId)
+        private string GetPostingErrorMessage(
+            Ctx ctx,
+            string postingResult)
+        {
+            string result =
+                postingResult == null
+                    ? string.Empty
+                    : postingResult.Trim();
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_NotBalanced,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_044_NotBalanced",
+                    "The journal could not be posted because it is not balanced."
+                );
+            }
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_NotConvertible,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_044_NotConvertible",
+                    "The journal could not be posted because currency conversion is missing."
+                );
+            }
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_PeriodClosed,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_044_PeriodClosed",
+                    "The journal could not be posted because the accounting period is closed."
+                );
+            }
+
+            if (
+                string.Equals(
+                    result,
+                    Doc.STATUS_InvalidAccount,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_044_InvalidAccount",
+                    "The journal could not be posted because one or more accounts are invalid."
+                );
+            }
+
+            return GetMsg(
+                ctx,
+                "VAS_044_PostFailed",
+                "Journal posting failed."
+            );
+        }
+
+        private JournalPostingState
+            GetJournalPostingState(
+                Ctx ctx,
+                int journalId)
         {
             string sql = @"
 SELECT
@@ -1595,16 +2498,24 @@ SELECT
     GL_Journal.DocStatus,
     GL_Journal.Processed,
     GL_Journal.Posted
-FROM GL_Journal
-WHERE GL_Journal.GL_Journal_ID = @JournalID";
+FROM GL_Journal GL_Journal
+WHERE GL_Journal.GL_Journal_ID =
+@StateJournalID
+AND GL_Journal.AD_Client_ID =
+@StateClientID";
 
             SqlParameter[] parameters =
             {
-        new SqlParameter(
-            "@JournalID",
-            journalId
-        )
-    };
+                new SqlParameter(
+                    "@StateJournalID",
+                    journalId
+                ),
+
+                new SqlParameter(
+                    "@StateClientID",
+                    ctx.GetAD_Client_ID()
+                )
+            };
 
             DataSet dataSet =
                 DB.ExecuteDataset(
@@ -1649,8 +2560,119 @@ WHERE GL_Journal.GL_Journal_ID = @JournalID";
             };
         }
 
+        private Ctx GetContext()
+        {
+            if (Session["ctx"] == null)
+            {
+                return null;
+            }
 
+            return Session["ctx"] as Ctx;
+        }
+
+        private JsonResult GetSessionExpiredResult()
+        {
+            return JsonString(
+                new
+                {
+                    success = false,
+
+                    error =
+                        "Session Expired",
+
+                    errorText =
+                        "Session Expired"
+                }
+            );
+        }
+
+        private JsonResult JsonString(
+            object value)
+        {
+            return Json(
+                JsonConvert.SerializeObject(
+                    value
+                ),
+                JsonRequestBehavior.AllowGet
+            );
+        }
+
+        private int NormalizePrecision(
+            int precision)
+        {
+            if (
+                precision < 0 ||
+                precision > 28
+            )
+            {
+                return 2;
+            }
+
+            return precision;
+        }
+
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback)
+        {
+            string message =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
+
+            if (
+                string.IsNullOrEmpty(
+                    message
+                ) ||
+                message == key ||
+                message == "[" + key + "]"
+            )
+            {
+                return fallback;
+            }
+
+            return message;
+        }
+
+        private void LogException(
+            string actionName,
+            Exception exception)
+        {
+            Trace.TraceError(
+                "VAS_044_GLJournalRecentWidgetController." +
+                actionName +
+                ": " +
+                exception
+            );
+        }
+
+        private class JournalPostingState
+        {
+            public string DocumentNo
+            {
+                get;
+                set;
+            }
+
+            public string DocStatus
+            {
+                get;
+                set;
+            }
+
+            public string Processed
+            {
+                get;
+                set;
+            }
+
+            public string Posted
+            {
+                get;
+                set;
+            }
+        }
     }
 }
-
-

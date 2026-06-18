@@ -67,13 +67,19 @@
  */
 
 
-
 /**
  * GL Journal Recent Entries Widget
- * Displays recent GL Journals and supports:
- * 1. Approve Journal
- * 2. Post Journal
- * 3. Print / Save popup details as PDF
+ *
+ * Purpose:
+ * Displays the most recent GL journal entries and opens
+ * the selected journal details inside a popup.
+ *
+ * Status response:
+ *
+ * Status: {
+ *     Value: "DR",
+ *     Name: "Drafted"
+ * }
  */
 
 ; VAS = window.VAS || {};
@@ -82,10 +88,13 @@
     "use strict";
 
     function lbl(key, fallback) {
-        var text = VIS.Msg.getMsg(key);
+        var text =
+            VIS.Msg.getMsg(key);
 
-        return text &&
-            text.charAt(0) !== "["
+        return (
+            text &&
+            text !== "[" + key + "]"
+        )
             ? text
             : fallback;
     }
@@ -103,50 +112,96 @@
             .replace(/'/g, "&#039;");
     }
 
-    function fmtAmt(
+    function normalizeResponse(result) {
+        var data =
+            result;
+
+        if (
+            data &&
+            data.d !== undefined
+        ) {
+            data =
+                data.d;
+        }
+
+        for (
+            var index = 0;
+            index < 3;
+            index++
+        ) {
+            if (
+                typeof data !== "string"
+            ) {
+                break;
+            }
+
+            try {
+                data =
+                    JSON.parse(data);
+            }
+            catch (error) {
+                return null;
+            }
+
+            if (
+                data &&
+                data.d !== undefined
+            ) {
+                data =
+                    data.d;
+            }
+        }
+
+        return data;
+    }
+
+    function formatAmount(
         amount,
         precision
     ) {
-        var standardPrecision = 2;
+        var standardPrecision =
+            2;
 
         try {
-            if (
-                VIS &&
-                VIS.Env &&
-                VIS.Env.getCtx &&
-                VIS.Env
-                    .getCtx()
-                    .getStdPrecision
-            ) {
-                standardPrecision = Number(
+            standardPrecision =
+                Number(
                     VIS.Env
                         .getCtx()
                         .getStdPrecision()
                 );
-            }
         }
         catch (error) {
-            standardPrecision = 2;
+            standardPrecision =
+                2;
         }
 
         var resolvedPrecision =
-            typeof precision === "number" &&
-            precision >= 0
-                ? precision
-                : standardPrecision;
+            Number(precision);
 
         if (
             isNaN(resolvedPrecision) ||
             resolvedPrecision < 0
         ) {
-            resolvedPrecision = 2;
+            resolvedPrecision =
+                standardPrecision;
+        }
+
+        if (
+            isNaN(resolvedPrecision) ||
+            resolvedPrecision < 0
+        ) {
+            resolvedPrecision =
+                2;
         }
 
         var numericAmount =
-            Number(amount || 0);
+            Number(
+                amount || 0
+            );
 
         if (isNaN(numericAmount)) {
-            numericAmount = 0;
+            numericAmount =
+                0;
         }
 
         return numericAmount.toLocaleString(
@@ -161,137 +216,293 @@
         );
     }
 
-    function normalizeResponse(result) {
-        var data = result;
+    function isPosted(value) {
+        if (
+            value === true ||
+            value === 1
+        ) {
+            return true;
+        }
+
+        var text =
+            String(
+                value == null
+                    ? ""
+                    : value
+            ).toUpperCase();
+
+        return (
+            text === "Y" ||
+            text === "TRUE" ||
+            text === "1"
+        );
+    }
+
+    /*
+     * Supports the new Status object and the old fields.
+     */
+    function getStatusValue(source) {
+        source =
+            source || {};
 
         if (
-            data &&
-            data.d !== undefined
+            source.Status &&
+            source.Status.Value != null
         ) {
-            data = data.d;
+            return String(
+                source.Status.Value
+            );
         }
 
-        for (
-            var index = 0;
-            index < 2;
-            index++
-        ) {
-            if (typeof data !== "string") {
-                break;
-            }
+        return String(
+            source.StatusValue ||
+            source.DocStatus ||
+            ""
+        );
+    }
 
-            try {
-                data = JSON.parse(data);
-            }
-            catch (error) {
-                return null;
-            }
+    function getStatusName(source) {
+        source =
+            source || {};
+
+        if (
+            source.Status &&
+            source.Status.Name
+        ) {
+            return String(
+                source.Status.Name
+            );
         }
 
-        return data;
+        return String(
+            source.StatusName ||
+            getStatusValue(source) ||
+            ""
+        );
+    }
+
+    function getAjaxErrorMessage(
+        xhr,
+        fallback
+    ) {
+        var response =
+            normalizeResponse(
+                xhr &&
+                xhr.responseText
+            );
+
+        if (response) {
+            return (
+                response.errorText ||
+                response.error ||
+                response.message ||
+                fallback ||
+                lbl(
+                    "VIS_Error",
+                    "Error loading data."
+                )
+            );
+        }
+
+        if (
+            xhr &&
+            xhr.status
+        ) {
+            return (
+                fallback ||
+                lbl(
+                    "VIS_Error",
+                    "Error loading data."
+                )
+            ) +
+                " HTTP " +
+                xhr.status;
+        }
+
+        return (
+            fallback ||
+            lbl(
+                "VIS_Error",
+                "Error loading data."
+            )
+        );
     }
 
     var PILL_CLASS = {
-        "DR": "VAS-gljr-pill-draft",
-        "CO": "VAS-gljr-pill-posted",
-        "IP": "VAS-gljr-pill-submit",
-        "AP": "VAS-gljr-pill-posted",
-        "NA": "VAS-gljr-pill-pending",
-        "VO": "VAS-gljr-pill-voided",
-        "RE": "VAS-gljr-pill-reverse",
-        "CL": "VAS-gljr-pill-closed"
+        "DR":
+            "VAS-gljr-pill-draft",
+
+        "CO":
+            "VAS-gljr-pill-posted",
+
+        "IP":
+            "VAS-gljr-pill-submit",
+
+        "AP":
+            "VAS-gljr-pill-posted",
+
+        "NA":
+            "VAS-gljr-pill-pending",
+
+        "VO":
+            "VAS-gljr-pill-voided",
+
+        "RE":
+            "VAS-gljr-pill-reverse",
+
+        "CL":
+            "VAS-gljr-pill-closed"
     };
 
     VAS.VAS_044_GLJournalRecentWidget =
         function () {
-            this.frame = null;
-            this.windowNo = 0;
-            this.AD_UserHomeWidgetID = 0;
+            this.frame =
+                null;
 
-            var $self = this;
+            this.windowNo =
+                0;
 
-            var $root = $(
-                '<div class="VAS-gljr-root">'
-            );
+            this.AD_UserHomeWidgetID =
+                0;
 
-            var $detailDialog = null;
-            var $detailBody = null;
-            var $detailBusy = null;
+            var $self =
+                this;
 
-            var $approveButton = null;
-            var $postButton = null;
-            var $downloadButton = null;
+            var $root =
+                $(
+                    '<div class="VAS-gljr-root">'
+                );
 
-            var currentData = null;
+            var $detailDialog =
+                null;
 
-            var pageNo = 1;
-            var pageSize = 3;
-            var totalPages = 0;
+            var $detailBody =
+                null;
 
-            var selectedJournalId = 0;
-            var selectedJournalStatus = "";
-            var selectedJournalPosted = false;
+            var $detailBusy =
+                null;
 
-            var detailLoaded = false;
+            var $approveButton =
+                null;
+
+            var $postButton =
+                null;
+
+            var $downloadButton =
+                null;
+
+            var currentData =
+                null;
+
+            var pageNo =
+                1;
+
+            var pageSize =
+                3;
+
+            var totalPages =
+                0;
+
+            var selectedJournalId =
+                0;
+
+            var selectedJournalStatus =
+                "";
+
+            var selectedJournalPosted =
+                false;
+
+            var detailLoaded =
+                false;
 
             var journalActionInProgress =
                 false;
 
-            var refreshTimer = null;
-            var loadRequest = null;
-            var detailRequest = null;
-            var actionRequest = null;
+            var refreshTimer =
+                null;
 
-            var isDisposed = false;
+            var loadRequest =
+                null;
+
+            var detailRequest =
+                null;
+
+            var actionRequest =
+                null;
+
+            var isDisposed =
+                false;
 
             var baseUrl =
                 VIS.Application.contextUrl;
 
-            this.Initalize = function () {
-                createWidget();
-                createBusyIndicator();
-                showBusy(true);
-                loadData();
+            this.Initalize =
+                function () {
+                    createWidget();
+                    createBusyIndicator();
 
-                refreshTimer =
-                    window.setInterval(
-                        function () {
-                            if (
-                                !isDisposed &&
-                                !journalActionInProgress
-                            ) {
-                                loadData();
-                            }
-                        },
-                        1000 * 60 * 5
-                    );
-            };
+                    showBusy(true);
+
+                    loadData();
+
+                    refreshTimer =
+                        window.setInterval(
+                            function () {
+                                if (
+                                    !isDisposed &&
+                                    !journalActionInProgress
+                                ) {
+                                    loadData();
+                                }
+                            },
+                            1000 * 60 * 5
+                        );
+                };
+
+            function documentIconSvg() {
+                return (
+                    '<svg viewBox="0 0 24 24" ' +
+                    'fill="none" ' +
+                    'stroke="currentColor" ' +
+                    'stroke-width="2" ' +
+                    'stroke-linecap="round" ' +
+                    'stroke-linejoin="round">' +
+
+                    '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>' +
+
+                    '<polyline points="14 2 14 8 20 8"></polyline>' +
+
+                    "</svg>"
+                );
+            }
 
             function createBusyIndicator() {
-                var $busy = $(
-                    '<div id="VAS-gljr-busy-' +
-                    $self.AD_UserHomeWidgetID +
-                    '" class="vis-busyindicatorouterwrap">' +
+                var $busy =
+                    $(
+                        '<div id="VAS-gljr-busy-' +
+                        $self.AD_UserHomeWidgetID +
+                        '" class="vis-busyindicatorouterwrap">' +
 
-                    '<div class="vis-busyindicatorinnerwrap">' +
-                    '<i class="vis_widgetloader"></i>' +
-                    "</div>" +
+                        '<div class="vis-busyindicatorinnerwrap">' +
 
-                    "</div>"
+                        '<i class="vis_widgetloader"></i>' +
+
+                        "</div>" +
+
+                        "</div>"
+                    );
+
+                $root.append(
+                    $busy
                 );
-
-                $root.append($busy);
             }
 
             function showBusy(show) {
-                if (!$root) {
-                    return;
-                }
-
-                var $busy = $root.find(
-                    "#VAS-gljr-busy-" +
-                    $self.AD_UserHomeWidgetID
-                );
+                var $busy =
+                    $root.find(
+                        "#VAS-gljr-busy-" +
+                        $self.AD_UserHomeWidgetID
+                    );
 
                 if (show) {
                     $busy.show();
@@ -301,22 +512,27 @@
                 }
             }
 
+            function showDetailBusy(show) {
+                if (
+                    !$detailBusy ||
+                    !$detailBusy[0]
+                ) {
+                    return;
+                }
+
+                $detailBusy[0]
+                    .style.visibility =
+                    show
+                        ? "visible"
+                        : "hidden";
+            }
+
             function createWidget() {
-                var documentIcon =
-                    '<svg viewBox="0 0 24 24" ' +
-                    'fill="none" ' +
-                    'stroke="currentColor" ' +
-                    'stroke-width="2" ' +
-                    'stroke-linecap="round" ' +
-                    'stroke-linejoin="round">' +
-
-                    '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>' +
-                    '<polyline points="14 2 14 8 20 8"></polyline>' +
-
-                    "</svg>";
-
                 var id =
                     $self.AD_UserHomeWidgetID;
+
+                var documentIcon =
+                    documentIconSvg();
 
                 var html =
                     '<div class="VAS-gljr-card">' +
@@ -328,12 +544,14 @@
                     "</div>" +
 
                     '<div class="w-title">' +
+
                     esc(
                         lbl(
                             "VAS_044_RecentJournalEntries",
                             "Recent Journal Entries"
                         )
                     ) +
+
                     "</div>" +
 
                     "</div>" +
@@ -343,6 +561,7 @@
                     '<table class="VAS-gljr-table">' +
 
                     "<thead>" +
+
                     "<tr>" +
 
                     "<th>" +
@@ -400,13 +619,22 @@
                     "</th>" +
 
                     "</tr>" +
+
                     "</thead>" +
 
                     '<tbody id="VAS-gljr-tbody-' +
                     id +
                     '">' +
 
-                    '<tr><td colspan="6" class="VAS-gljr-empty">—</td></tr>' +
+                    '<tr>' +
+
+                    '<td colspan="6" class="VAS-gljr-empty">' +
+
+                    "&mdash;" +
+
+                    "</td>" +
+
+                    "</tr>" +
 
                     "</tbody>" +
 
@@ -417,47 +645,122 @@
                     '<div class="VAS-gljr-pager">' +
 
                     '<button type="button" ' +
+
                     'class="VAS-gljr-page-btn VAS-gljr-prev" ' +
+
                     'aria-label="' +
+
                     esc(
                         lbl(
                             "VIS_Previous",
                             "Previous"
                         )
                     ) +
-                    '">&#8249;</button>' +
+
+                    '">' +
+
+                    "&#8249;" +
+
+                    "</button>" +
 
                     '<span class="VAS-gljr-page-text"></span>' +
 
                     '<button type="button" ' +
+
                     'class="VAS-gljr-page-btn VAS-gljr-next" ' +
+
                     'aria-label="' +
+
                     esc(
                         lbl(
                             "VIS_Next",
                             "Next"
                         )
                     ) +
-                    '">&#8250;</button>' +
+
+                    '">' +
+
+                    "&#8250;" +
+
+                    "</button>" +
 
                     "</div>" +
 
                     "</div>";
 
-                $root.append(html);
+                $root.append(
+                    html
+                );
 
+                /*
+                 * Delegated event.
+                 * It remains active after tbody HTML is rebuilt.
+                 */
                 $root.on(
-                    "click",
+                    "click.VAS044Row",
                     ".VAS-gljr-row",
-                    function () {
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        var journalId =
+                            parseInt(
+                                $(this).attr(
+                                    "data-id"
+                                ),
+                                10
+                            );
+
+                        if (
+                            isNaN(journalId) ||
+                            journalId <= 0
+                        ) {
+                            return;
+                        }
+
                         openDetailDialog(
-                            $(this).data("id")
+                            journalId
                         );
                     }
                 );
 
                 $root.on(
-                    "click",
+                    "keydown.VAS044Row",
+                    ".VAS-gljr-row",
+                    function (event) {
+                        if (
+                            event.key !== "Enter" &&
+                            event.key !== " "
+                        ) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        var journalId =
+                            parseInt(
+                                $(this).attr(
+                                    "data-id"
+                                ),
+                                10
+                            );
+
+                        if (
+                            isNaN(journalId) ||
+                            journalId <= 0
+                        ) {
+                            return;
+                        }
+
+                        openDetailDialog(
+                            journalId
+                        );
+                    }
+                );
+
+                $root.on(
+                    "click.VAS044Pager",
                     ".VAS-gljr-prev",
                     function () {
                         if (pageNo <= 1) {
@@ -474,7 +777,7 @@
                 );
 
                 $root.on(
-                    "click",
+                    "click.VAS044Pager",
                     ".VAS-gljr-next",
                     function () {
                         if (
@@ -512,76 +815,100 @@
 
                 showBusy(true);
 
-                loadRequest = $.ajax({
-                    url:
-                        baseUrl +
-                        "VAS/VAS_044_GLJournalRecentWidget/GetRecentEntries",
+                loadRequest =
+                    $.ajax({
+                        url:
+                            baseUrl +
+                            "VAS/VAS_044_GLJournalRecentWidget/GetRecentEntries",
 
-                    type: "GET",
-                    dataType: "json",
-                    cache: false,
+                        type:
+                            "GET",
 
-                    success: function (result) {
-                        if (isDisposed) {
-                            return;
-                        }
+                        dataType:
+                            "json",
 
-                        var data =
-                            normalizeResponse(
-                                result
-                            );
+                        cache:
+                            false,
 
-                        if (
-                            !data ||
-                            data.success === false ||
-                            data.error
-                        ) {
-                            showEmpty(
-                                data &&
-                                (
-                                    data.errorText ||
+                        success:
+                            function (result) {
+                                if (isDisposed) {
+                                    return;
+                                }
+
+                                var data =
+                                    normalizeResponse(
+                                        result
+                                    );
+
+                                if (
+                                    !data ||
+                                    data.success === false ||
                                     data.error
-                                )
-                            );
+                                ) {
+                                    showEmpty(
+                                        data &&
+                                        (
+                                            data.errorText ||
+                                            data.error
+                                        )
+                                    );
 
-                            return;
-                        }
+                                    return;
+                                }
 
-                        currentData = data;
-                        pageNo = 1;
+                                currentData =
+                                    data;
 
-                        renderRows(
-                            data,
-                            $self
-                                .AD_UserHomeWidgetID
-                        );
-                    },
+                                pageNo =
+                                    1;
 
-                    error: function (
-                        xhr,
-                        textStatus
-                    ) {
-                        if (
-                            isDisposed ||
-                            textStatus === "abort"
-                        ) {
-                            return;
-                        }
+                                renderRows(
+                                    data,
+                                    $self
+                                        .AD_UserHomeWidgetID
+                                );
+                            },
 
-                        showEmpty();
-                    },
+                        error:
+                            function (
+                                xhr,
+                                textStatus
+                            ) {
+                                if (
+                                    isDisposed ||
+                                    textStatus === "abort"
+                                ) {
+                                    return;
+                                }
 
-                    complete: function () {
-                        loadRequest = null;
+                                showEmpty(
+                                    getAjaxErrorMessage(
+                                        xhr,
+                                        lbl(
+                                            "VAS_044_LoadFailed",
+                                            "Error loading journal entries."
+                                        )
+                                    )
+                                );
+                            },
 
-                        if (!isDisposed) {
-                            showBusy(false);
-                        }
-                    }
-                });
+                        complete:
+                            function () {
+                                loadRequest =
+                                    null;
+
+                                if (!isDisposed) {
+                                    showBusy(false);
+                                }
+                            }
+                    });
             }
 
-            function renderRows(data, id) {
+            function renderRows(
+                data,
+                id
+            ) {
                 var entries =
                     Array.isArray(
                         data.Entries
@@ -605,7 +932,7 @@
                         id
                     );
 
-                if (entries.length === 0) {
+                if (!entries.length) {
                     $root.find(
                         ".VAS-gljr-table-wrap"
                     ).addClass(
@@ -614,19 +941,26 @@
 
                     $tableBody.html(
                         '<tr class="VAS-gljr-empty-row">' +
+
                         '<td colspan="6" class="VAS-gljr-empty">' +
+
                         esc(
                             lbl(
                                 "VIS_NoData",
                                 "No data available."
                             )
                         ) +
+
                         "</td>" +
+
                         "</tr>"
                     );
 
-                    totalPages = 0;
+                    totalPages =
+                        0;
+
                     updatePager();
+
                     return;
                 }
 
@@ -636,18 +970,20 @@
                     "is-empty"
                 );
 
-                totalPages = Math.ceil(
-                    entries.length /
-                    pageSize
-                );
+                totalPages =
+                    Math.ceil(
+                        entries.length /
+                        pageSize
+                    );
 
-                pageNo = Math.max(
-                    1,
-                    Math.min(
-                        pageNo,
-                        totalPages
-                    )
-                );
+                pageNo =
+                    Math.max(
+                        1,
+                        Math.min(
+                            pageNo,
+                            totalPages
+                        )
+                    );
 
                 var start =
                     (pageNo - 1) *
@@ -659,7 +995,8 @@
                         start + pageSize
                     );
 
-                var html = "";
+                var html =
+                    "";
 
                 for (
                     var index = 0;
@@ -667,16 +1004,38 @@
                     index++
                 ) {
                     var entry =
-                        pageEntries[index];
+                        pageEntries[index] || {};
 
-                    var statusText =
-                        entry.DocStatus ||
-                        entry.StatusName ||
-                        "";
+                    var journalId =
+                        parseInt(
+                            entry.GL_Journal_ID,
+                            10
+                        );
+
+                    if (
+                        isNaN(journalId) ||
+                        journalId <= 0
+                    ) {
+                        continue;
+                    }
+
+                    /*
+                     * Value controls the CSS.
+                     * Name is displayed to the user.
+                     */
+                    var statusValue =
+                        getStatusValue(
+                            entry
+                        ).toUpperCase();
+
+                    var statusName =
+                        getStatusName(
+                            entry
+                        );
 
                     var pillClass =
                         PILL_CLASS[
-                            entry.DocStatus
+                        statusValue
                         ] ||
                         "VAS-gljr-pill-draft";
 
@@ -686,7 +1045,7 @@
                         ) > 0
                             ? (
                                 symbol +
-                                fmtAmt(
+                                formatAmount(
                                     entry.TotalDebit,
                                     precision
                                 )
@@ -699,7 +1058,7 @@
                         ) > 0
                             ? (
                                 symbol +
-                                fmtAmt(
+                                formatAmount(
                                     entry.TotalCredit,
                                     precision
                                 )
@@ -714,32 +1073,54 @@
                                 : ""
                         );
 
-                    var rowInformation = esc(
-                        entry.DocumentNo +
-                        " - " +
-                        statusText +
-                        ", " +
-                        lbl(
-                            "VAS_044_Debit",
-                            "Debit"
-                        ) +
-                        ": " +
-                        debitText +
-                        ", " +
-                        lbl(
-                            "VAS_044_Credit",
-                            "Credit"
-                        ) +
-                        ": " +
-                        creditText
-                    );
+                    var rowInformation =
+                        esc(
+                            (
+                                entry.DocumentNo ||
+                                ""
+                            ) +
+
+                            " - " +
+
+                            statusName +
+
+                            ", " +
+
+                            lbl(
+                                "VAS_044_Debit",
+                                "Debit"
+                            ) +
+
+                            ": " +
+
+                            debitText +
+
+                            ", " +
+
+                            lbl(
+                                "VAS_044_Credit",
+                                "Credit"
+                            ) +
+
+                            ": " +
+
+                            creditText
+                        );
 
                     html +=
                         '<tr class="' +
                         rowClass +
-                        '" data-id="' +
-                        entry.GL_Journal_ID +
-                        '" title="' +
+                        '" ' +
+
+                        'data-id="' +
+                        journalId +
+                        '" ' +
+
+                        'role="button" ' +
+
+                        'tabindex="0" ' +
+
+                        'title="' +
                         rowInformation +
                         '">' +
 
@@ -765,10 +1146,16 @@
 
                         '<span class="VAS-gljr-pill ' +
                         pillClass +
+                        '" ' +
+
+                        'data-status-value="' +
+                        esc(
+                            statusValue
+                        ) +
                         '">' +
 
                         esc(
-                            statusText
+                            statusName
                         ) +
 
                         "</span>" +
@@ -776,17 +1163,24 @@
                         "</td>" +
 
                         '<td class="VAS-gljr-col-num">' +
-                        esc(debitText) +
+                        esc(
+                            debitText
+                        ) +
                         "</td>" +
 
                         '<td class="VAS-gljr-col-num">' +
-                        esc(creditText) +
+                        esc(
+                            creditText
+                        ) +
                         "</td>" +
 
                         "</tr>";
                 }
 
-                $tableBody.html(html);
+                $tableBody.html(
+                    html
+                );
+
                 updatePager();
             }
 
@@ -809,17 +1203,23 @@
                 if (totalPages > 1) {
                     $pageText.text(
                         pageNo +
+
                         " " +
+
                         lbl(
                             "VIS_Of",
                             "of"
                         ) +
+
                         " " +
+
                         totalPages
                     );
                 }
                 else {
-                    $pageText.text("");
+                    $pageText.text(
+                        ""
+                    );
                 }
 
                 $previousButton.prop(
@@ -841,130 +1241,160 @@
                 var id =
                     $self.AD_UserHomeWidgetID;
 
-                $detailDialog = $(
-                    '<div class="VAS-gljr-detail-dialog" ' +
-                    'id="VAS-gljr-detail-dialog-' +
-                    id +
-                    '" style="display:none" ' +
-                    'role="dialog" ' +
-                    'aria-modal="true">' +
+                $detailDialog =
+                    $(
+                        '<div class="VAS-gljr-detail-dialog" ' +
 
-                    '<div class="VAS-gljr-detail-scrim"></div>' +
+                        'id="VAS-gljr-detail-dialog-' +
+                        id +
+                        '" ' +
 
-                    '<div class="VAS-gljr-detail-card">' +
+                        'role="dialog" ' +
 
-                    '<div class="VAS-gljr-detail-head">' +
+                        'aria-modal="true">' +
 
-                    '<div class="VAS-gljr-detail-icon">' +
-                    svgIcon +
-                    "</div>" +
+                        '<div class="VAS-gljr-detail-scrim"></div>' +
 
-                    '<div class="VAS-gljr-detail-title-wrap">' +
+                        '<div class="VAS-gljr-detail-card">' +
 
-                    '<div class="VAS-gljr-detail-title" ' +
-                    'id="VAS-gljr-detail-title-' +
-                    id +
-                    '">&mdash;</div>' +
+                        '<div class="VAS-gljr-detail-head">' +
 
-                    '<div class="VAS-gljr-detail-sub" ' +
-                    'id="VAS-gljr-detail-sub-' +
-                    id +
-                    '">&mdash;</div>' +
+                        '<div class="VAS-gljr-detail-icon">' +
+                        svgIcon +
+                        "</div>" +
 
-                    "</div>" +
+                        '<div class="VAS-gljr-detail-title-wrap">' +
 
-                    '<button type="button" ' +
-                    'class="VAS-gljr-detail-close-x" ' +
-                    'aria-label="' +
-                    esc(
-                        lbl(
-                            "VAS_Close",
-                            "Close"
-                        )
-                    ) +
-                    '">' +
+                        '<div class="VAS-gljr-detail-title" ' +
 
-                    '<svg viewBox="0 0 24 24" ' +
-                    'fill="none" ' +
-                    'stroke="currentColor" ' +
-                    'stroke-width="2" ' +
-                    'stroke-linecap="round" ' +
-                    'stroke-linejoin="round">' +
+                        'id="VAS-gljr-detail-title-' +
+                        id +
+                        '">' +
 
-                    '<line x1="18" y1="6" x2="6" y2="18"></line>' +
-                    '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+                        "&mdash;" +
 
-                    "</svg>" +
+                        "</div>" +
 
-                    "</button>" +
+                        '<div class="VAS-gljr-detail-sub" ' +
 
-                    "</div>" +
+                        'id="VAS-gljr-detail-sub-' +
+                        id +
+                        '">' +
 
-                    '<div class="VAS-gljr-detail-body">' +
+                        "&mdash;" +
 
-                    '<div class="VAS-gljr-detail-busy">' +
+                        "</div>" +
 
-                    '<div class="vis-busyindicatorinnerwrap">' +
-                    '<i class="vis_widgetloader"></i>' +
-                    "</div>" +
+                        "</div>" +
 
-                    "</div>" +
+                        '<button type="button" ' +
 
-                    '<div class="VAS-gljr-detail-content" ' +
-                    'id="VAS-gljr-detail-body-' +
-                    id +
-                    '"></div>' +
+                        'class="VAS-gljr-detail-close-x" ' +
 
-                    "</div>" +
+                        'aria-label="' +
 
-                    '<div class="VAS-gljr-detail-footer">' +
+                        esc(
+                            lbl(
+                                "VAS_Close",
+                                "Close"
+                            )
+                        ) +
 
-                    '<button type="button" ' +
-                    'class="VAS-gljr-detail-secondary VAS-gljr-download">' +
+                        '">' +
 
-                    esc(
-                        lbl(
-                            "VAS_DownloadPDF",
-                            "Download PDF"
-                        )
-                    ) +
+                        '<svg viewBox="0 0 24 24" ' +
 
-                    "</button>" +
+                        'fill="none" ' +
 
-                    '<div class="VAS-gljr-detail-actions">' +
+                        'stroke="currentColor" ' +
 
-                    '<button type="button" ' +
-                    'class="VAS-gljr-detail-secondary VAS-gljr-action-approve">' +
+                        'stroke-width="2" ' +
 
-                    esc(
-                        lbl(
-                            "VAS_041_Approve",
-                            "Approve"
-                        )
-                    ) +
+                        'stroke-linecap="round" ' +
 
-                    "</button>" +
+                        'stroke-linejoin="round">' +
 
-                    '<button type="button" ' +
-                    'class="VAS-gljr-detail-primary VAS-gljr-action-post">' +
+                        '<line x1="18" y1="6" x2="6" y2="18"></line>' +
 
-                    esc(
-                        lbl(
-                            "VAS_041_PostJournal",
-                            "Post journal"
-                        )
-                    ) +
+                        '<line x1="6" y1="6" x2="18" y2="18"></line>' +
 
-                    "</button>" +
+                        "</svg>" +
 
-                    "</div>" +
+                        "</button>" +
 
-                    "</div>" +
+                        "</div>" +
 
-                    "</div>" +
+                        '<div class="VAS-gljr-detail-body">' +
 
-                    "</div>"
-                );
+                        '<div class="VAS-gljr-detail-busy">' +
+
+                        '<div class="vis-busyindicatorinnerwrap">' +
+
+                        '<i class="vis_widgetloader"></i>' +
+
+                        "</div>" +
+
+                        "</div>" +
+
+                        '<div class="VAS-gljr-detail-content" ' +
+
+                        'id="VAS-gljr-detail-body-' +
+                        id +
+                        '"></div>' +
+
+                        "</div>" +
+
+                        '<div class="VAS-gljr-detail-footer">' +
+
+                        '<button type="button" ' +
+
+                        'class="VAS-gljr-detail-secondary VAS-gljr-download">' +
+
+                        esc(
+                            lbl(
+                                "VAS_DownloadPDF",
+                                "Download PDF"
+                            )
+                        ) +
+
+                        "</button>" +
+
+                        '<div class="VAS-gljr-detail-actions">' +
+
+                        '<button type="button" ' +
+
+                        'class="VAS-gljr-detail-secondary VAS-gljr-action-approve">' +
+
+                        esc(
+                            lbl(
+                                "VAS_041_Approve",
+                                "Approve"
+                            )
+                        ) +
+
+                        "</button>" +
+
+                        '<button type="button" ' +
+
+                        'class="VAS-gljr-detail-primary VAS-gljr-action-post">' +
+
+                        esc(
+                            lbl(
+                                "VAS_041_PostJournal",
+                                "Post Journal"
+                            )
+                        ) +
+
+                        "</button>" +
+
+                        "</div>" +
+
+                        "</div>" +
+
+                        "</div>" +
+
+                        "</div>"
+                    );
 
                 $detailBody =
                     $detailDialog.find(
@@ -992,11 +1422,14 @@
                         ".VAS-gljr-download"
                     );
 
-                showDetailBusy(false);
+                showDetailBusy(
+                    false
+                );
+
                 updateActionButtons();
 
                 $approveButton.on(
-                    "click",
+                    "click.VAS044Approve",
                     function () {
                         executeJournalAction(
                             "ApproveJournal",
@@ -1006,7 +1439,7 @@
                 );
 
                 $postButton.on(
-                    "click",
+                    "click.VAS044Post",
                     function () {
                         executeJournalAction(
                             "PostJournal",
@@ -1016,24 +1449,21 @@
                 );
 
                 $downloadButton.on(
-                    "click",
-                    function () {
-                        printCurrentPopup();
-                    }
+                    "click.VAS044Print",
+                    printCurrentPopup
                 );
 
                 $detailDialog.find(
                     ".VAS-gljr-detail-close-x, " +
                     ".VAS-gljr-detail-scrim"
                 ).on(
-                    "click",
+                    "click.VAS044Close",
                     closeDetailDialog
                 );
 
                 $(document).on(
                     "keydown.VAS-gljr-" +
                     id,
-
                     function (event) {
                         if (
                             event.key === "Escape" &&
@@ -1051,18 +1481,22 @@
                 $("body").append(
                     $detailDialog
                 );
+
+                $detailDialog.hide();
             }
 
             function openDetailDialog(
                 journalId
             ) {
-                journalId = parseInt(
-                    journalId,
-                    10
-                );
+                journalId =
+                    parseInt(
+                        journalId,
+                        10
+                    );
 
                 if (
                     !$detailDialog ||
+                    !$detailDialog.length ||
                     isNaN(journalId) ||
                     journalId <= 0
                 ) {
@@ -1072,11 +1506,30 @@
                 selectedJournalId =
                     journalId;
 
-                selectedJournalStatus = "";
+                selectedJournalStatus =
+                    "";
+
                 selectedJournalPosted =
                     false;
 
-                detailLoaded = false;
+                detailLoaded =
+                    false;
+
+                $detailDialog.find(
+                    "#VAS-gljr-detail-title-" +
+                    $self.AD_UserHomeWidgetID
+                ).html(
+                    "&mdash;"
+                );
+
+                $detailDialog.find(
+                    "#VAS-gljr-detail-sub-" +
+                    $self.AD_UserHomeWidgetID
+                ).html(
+                    "&mdash;"
+                );
+
+                $detailBody.empty();
 
                 updateActionButtons();
 
@@ -1106,12 +1559,17 @@
                     detailRequest.abort();
                 }
 
-                selectedJournalId = 0;
-                selectedJournalStatus = "";
+                selectedJournalId =
+                    0;
+
+                selectedJournalStatus =
+                    "";
+
                 selectedJournalPosted =
                     false;
 
-                detailLoaded = false;
+                detailLoaded =
+                    false;
 
                 updateActionButtons();
 
@@ -1122,24 +1580,29 @@
                 );
             }
 
-            function showDetailBusy(show) {
-                if (
-                    !$detailBusy ||
-                    !$detailBusy[0]
-                ) {
-                    return;
-                }
-
-                $detailBusy[0]
-                    .style.visibility =
-                    show
-                        ? "visible"
-                        : "hidden";
-            }
-
             function loadJournalDetail(
                 journalId
             ) {
+                journalId =
+                    parseInt(
+                        journalId,
+                        10
+                    );
+
+                if (
+                    isNaN(journalId) ||
+                    journalId <= 0
+                ) {
+                    renderDetailError(
+                        lbl(
+                            "VAS_044_InvalidJournalID",
+                            "Invalid journal ID."
+                        )
+                    );
+
+                    return;
+                }
+
                 if (
                     detailRequest &&
                     detailRequest.readyState !== 4
@@ -1147,98 +1610,145 @@
                     detailRequest.abort();
                 }
 
-                detailLoaded = false;
+                detailLoaded =
+                    false;
 
                 updateActionButtons();
-                showDetailBusy(true);
+
+                showDetailBusy(
+                    true
+                );
+
                 $detailBody.empty();
 
-                detailRequest = $.ajax({
-                    url:
-                        baseUrl +
-                        "VAS/VAS_044_GLJournalRecentWidget/GetJournalEntryDetail",
+                detailRequest =
+                    $.ajax({
+                        url:
+                            baseUrl +
+                            "VAS/VAS_044_GLJournalRecentWidget/GetJournalEntryDetail",
 
-                    type: "GET",
-                    dataType: "json",
-                    cache: false,
+                        type:
+                            "GET",
 
-                    data: {
-                        journalId:
-                            journalId
-                    },
+                        dataType:
+                            "json",
 
-                    success: function (result) {
-                        if (isDisposed) {
-                            return;
-                        }
+                        cache:
+                            false,
 
-                        var data =
-                            normalizeResponse(
-                                result
-                            );
+                        data: {
+                            journalId:
+                                journalId
+                        },
 
-                        if (
-                            data &&
-                            !data.error
-                        ) {
-                            renderJournalDetail(
-                                data
-                            );
-                        }
-                        else {
-                            renderDetailError(
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
-                                )
-                            );
-                        }
-                    },
+                        success:
+                            function (result) {
+                                if (isDisposed) {
+                                    return;
+                                }
 
-                    error: function (
-                        xhr,
-                        textStatus
-                    ) {
-                        if (
-                            isDisposed ||
-                            textStatus === "abort"
-                        ) {
-                            return;
-                        }
+                                var data =
+                                    normalizeResponse(
+                                        result
+                                    );
 
-                        renderDetailError();
-                    },
+                                if (
+                                    data &&
+                                    data.success !== false &&
+                                    !data.error &&
+                                    data.Journal
+                                ) {
+                                    renderJournalDetail(
+                                        data
+                                    );
+                                }
+                                else {
+                                    renderDetailError(
+                                        data &&
+                                            (
+                                                data.errorText ||
+                                                data.error ||
+                                                data.message
+                                            )
+                                            ? (
+                                                data.errorText ||
+                                                data.error ||
+                                                data.message
+                                            )
+                                            : lbl(
+                                                "VAS_044_DetailsNotAvailable",
+                                                "Journal details are not available."
+                                            )
+                                    );
+                                }
+                            },
 
-                    complete: function () {
-                        detailRequest = null;
+                        error:
+                            function (
+                                xhr,
+                                textStatus,
+                                errorThrown
+                            ) {
+                                if (
+                                    isDisposed ||
+                                    textStatus === "abort"
+                                ) {
+                                    return;
+                                }
 
-                        if (!isDisposed) {
-                            showDetailBusy(false);
-                        }
-                    }
-                });
-            }
+                                var message =
+                                    getAjaxErrorMessage(
+                                        xhr,
+                                        errorThrown ||
+                                        lbl(
+                                            "VAS_044_DetailsLoadFailed",
+                                            "Error loading journal details."
+                                        )
+                                    );
 
-            function isPosted(value) {
-                if (
-                    value === true ||
-                    value === 1
-                ) {
-                    return true;
-                }
+                                if (
+                                    window.console &&
+                                    console.error
+                                ) {
+                                    console.error(
+                                        "GetJournalEntryDetail failed",
+                                        {
+                                            journalId:
+                                                journalId,
 
-                var text = String(
-                    value == null
-                        ? ""
-                        : value
-                ).toUpperCase();
+                                            status:
+                                                xhr
+                                                    ? xhr.status
+                                                    : 0,
 
-                return (
-                    text === "Y" ||
-                    text === "TRUE" ||
-                    text === "1"
-                );
+                                            responseText:
+                                                xhr
+                                                    ? xhr.responseText
+                                                    : "",
+
+                                            error:
+                                                errorThrown
+                                        }
+                                    );
+                                }
+
+                                renderDetailError(
+                                    message
+                                );
+                            },
+
+                        complete:
+                            function () {
+                                detailRequest =
+                                    null;
+
+                                if (!isDisposed) {
+                                    showDetailBusy(
+                                        false
+                                    );
+                                }
+                            }
+                    });
             }
 
             function renderJournalDetail(
@@ -1248,7 +1758,11 @@
                     data.Journal || {};
 
                 var lines =
-                    data.Lines || [];
+                    Array.isArray(
+                        data.Lines
+                    )
+                        ? data.Lines
+                        : [];
 
                 var symbol =
                     data.CurSymbol ||
@@ -1260,17 +1774,27 @@
                         data.StdPrecision
                     );
 
-                selectedJournalId =
+                var returnedJournalId =
                     parseInt(
-                        journal.GL_Journal_ID ||
-                        selectedJournalId,
+                        journal.GL_Journal_ID,
                         10
                     );
 
+                if (
+                    !isNaN(returnedJournalId) &&
+                    returnedJournalId > 0
+                ) {
+                    selectedJournalId =
+                        returnedJournalId;
+                }
+
+                /*
+                 * Value is used for actions and CSS.
+                 * Name is displayed in the popup.
+                 */
                 selectedJournalStatus =
-                    String(
-                        journal.DocStatus ||
-                        ""
+                    getStatusValue(
+                        journal
                     ).toUpperCase();
 
                 selectedJournalPosted =
@@ -1278,17 +1802,16 @@
                         journal.Posted
                     );
 
+                var statusName =
+                    getStatusName(
+                        journal
+                    );
+
                 var pillClass =
                     PILL_CLASS[
-                        selectedJournalStatus
+                    selectedJournalStatus
                     ] ||
                     "VAS-gljr-pill-draft";
-
-                var statusText =
-                    journal.DocStatus ||
-                    journal.StatusName ||
-                    selectedJournalStatus ||
-                    "";
 
                 var id =
                     $self.AD_UserHomeWidgetID;
@@ -1297,30 +1820,43 @@
                     "#VAS-gljr-detail-title-" +
                     id
                 ).text(
-                    (journal.DocumentNo || "") +
+                    (
+                        journal.DocumentNo ||
+                        ""
+                    ) +
+
                     " · " +
-                    (journal.Description || "")
+
+                    (
+                        journal.Description ||
+                        ""
+                    )
                 );
 
                 $detailDialog.find(
                     "#VAS-gljr-detail-sub-" +
                     id
                 ).text(
-                    statusText +
+                    statusName +
+
                     " · " +
-                    (journal.DateAcct || "")
+
+                    (
+                        journal.DateAcct ||
+                        ""
+                    )
                 );
 
                 var totalDebit =
                     symbol +
-                    fmtAmt(
+                    formatAmount(
                         journal.TotalDebit,
                         precision
                     );
 
                 var totalCredit =
                     symbol +
-                    fmtAmt(
+                    formatAmount(
                         journal.TotalCredit,
                         precision
                     );
@@ -1330,6 +1866,7 @@
                         journal.AccountingBook ||
                         "Primary"
                     ) +
+
                     (
                         data.ISOCode
                             ? (
@@ -1343,76 +1880,191 @@
                     '<div class="VAS-gljr-detail-summary">' +
 
                     "<div>" +
-                    "<span>Journal No.</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_JournalNo",
+                            "Journal No."
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
+
                     esc(
                         journal.DocumentNo
                     ) +
+
                     "</strong>" +
+
                     "</div>" +
 
                     "<div>" +
-                    "<span>Date</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_Date",
+                            "Date"
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
+
                     esc(
                         journal.DateAcct
                     ) +
+
                     "</strong>" +
+
                     "</div>" +
 
                     "<div>" +
-                    "<span>Status</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_Status",
+                            "Status"
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
 
                     '<span class="VAS-gljr-pill ' +
                     pillClass +
-                    '">' +
+                    '" ' +
 
-                    "<span></span>" +
+                    'data-status-value="' +
 
                     esc(
-                        statusText
+                        selectedJournalStatus
+                    ) +
+
+                    '">' +
+
+                    esc(
+                        statusName
                     ) +
 
                     "</span>" +
 
                     "</strong>" +
+
                     "</div>" +
 
                     "<div>" +
-                    "<span>Accounting Book</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_AccountingBook",
+                            "Accounting Book"
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
-                    esc(accountingBook) +
+
+                    esc(
+                        accountingBook
+                    ) +
+
                     "</strong>" +
+
                     "</div>" +
 
                     "<div>" +
-                    "<span>Total Debit</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_TotalDebit",
+                            "Total Debit"
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
-                    esc(totalDebit) +
+
+                    esc(
+                        totalDebit
+                    ) +
+
                     "</strong>" +
+
                     "</div>" +
 
                     "<div>" +
-                    "<span>Total Credit</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_TotalCredit",
+                            "Total Credit"
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
-                    esc(totalCredit) +
+
+                    esc(
+                        totalCredit
+                    ) +
+
                     "</strong>" +
+
                     "</div>" +
 
                     '<div class="VAS-gljr-detail-description">' +
-                    "<span>Description</span>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_Description",
+                            "Description"
+                        )
+                    ) +
+
+                    "</span>" +
+
                     "<strong>" +
+
                     esc(
                         journal.Description
                     ) +
+
                     "</strong>" +
+
                     "</div>" +
 
                     "</div>" +
 
                     '<div class="VAS-gljr-detail-section-title">' +
-                    "Journal Lines" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_JournalLines",
+                            "Journal Lines"
+                        )
+                    ) +
+
                     "</div>" +
 
                     '<div class="VAS-gljr-detail-lines-wrap">' +
@@ -1420,95 +2072,161 @@
                     '<table class="VAS-gljr-detail-lines">' +
 
                     "<thead>" +
+
                     "<tr>" +
 
-                    "<th>Account</th>" +
-                    "<th>Debit</th>" +
-                    "<th>Credit</th>" +
-                    "<th>Cost Center</th>" +
-                    "<th>Business Partner</th>" +
-                    "<th>Product</th>" +
-                    "<th>Project</th>" +
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_Account",
+                            "Account"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_Debit",
+                            "Debit"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_Credit",
+                            "Credit"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_CostCenter",
+                            "Cost Center"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_BusinessPartner",
+                            "Business Partner"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_Product",
+                            "Product"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_044_Project",
+                            "Project"
+                        )
+                    ) +
+                    "</th>" +
 
                     "</tr>" +
+
                     "</thead>" +
 
                     "<tbody>";
 
-                if (
-                    !Array.isArray(lines) ||
-                    lines.length === 0
-                ) {
+                if (!lines.length) {
                     html +=
                         "<tr>" +
-                        '<td colspan="7">No journal lines.</td>' +
+
+                        '<td colspan="7">' +
+
+                        esc(
+                            lbl(
+                                "VAS_044_NoJournalLines",
+                                "No journal lines."
+                            )
+                        ) +
+
+                        "</td>" +
+
                         "</tr>";
                 }
                 else {
                     for (
-                        var index = 0;
-                        index < lines.length;
-                        index++
+                        var lineIndex = 0;
+                        lineIndex < lines.length;
+                        lineIndex++
                     ) {
                         var line =
-                            lines[index];
+                            lines[lineIndex] || {};
 
                         var accountText =
-                            "";
-
-                        if (
                             line.AccountCode &&
-                            line.AccountName
-                        ) {
-                            accountText =
-                                line.AccountCode +
-                                " · " +
-                                line.AccountName;
-                        }
-                        else {
-                            accountText =
-                                line.AccountCode ||
-                                line.AccountName ||
-                                "-";
-                        }
+                                line.AccountName
+                                ? (
+                                    line.AccountCode +
+                                    " · " +
+                                    line.AccountName
+                                )
+                                : (
+                                    line.AccountCode ||
+                                    line.AccountName ||
+                                    "-"
+                                );
 
                         html +=
                             "<tr>" +
 
                             "<td>" +
-                            esc(accountText) +
+                            esc(
+                                accountText
+                            ) +
                             "</td>" +
 
-                            '<td class="VAS-gljr-detail-amt">' +
+                            '<td class="VAS-gljr-num">' +
+
                             esc(
                                 Number(
                                     line.Debit || 0
                                 ) > 0
                                     ? (
                                         symbol +
-                                        fmtAmt(
+                                        formatAmount(
                                             line.Debit,
                                             precision
                                         )
                                     )
                                     : "-"
                             ) +
+
                             "</td>" +
 
-                            '<td class="VAS-gljr-detail-amt">' +
+                            '<td class="VAS-gljr-num">' +
+
                             esc(
                                 Number(
                                     line.Credit || 0
                                 ) > 0
                                     ? (
                                         symbol +
-                                        fmtAmt(
+                                        formatAmount(
                                             line.Credit,
                                             precision
                                         )
                                     )
                                     : "-"
                             ) +
+
                             "</td>" +
 
                             "<td>" +
@@ -1547,78 +2265,124 @@
                     "</tbody>" +
 
                     "<tfoot>" +
+
                     "<tr>" +
 
-                    "<td>Total</td>" +
+                    "<td>" +
 
-                    '<td class="VAS-gljr-detail-amt">' +
-                    esc(totalDebit) +
+                    esc(
+                        lbl(
+                            "VAS_044_Total",
+                            "Total"
+                        )
+                    ) +
+
                     "</td>" +
 
-                    '<td class="VAS-gljr-detail-amt">' +
-                    esc(totalCredit) +
+                    '<td class="VAS-gljr-num">' +
+
+                    esc(
+                        totalDebit
+                    ) +
+
+                    "</td>" +
+
+                    '<td class="VAS-gljr-num">' +
+
+                    esc(
+                        totalCredit
+                    ) +
+
                     "</td>" +
 
                     '<td colspan="4"></td>' +
 
                     "</tr>" +
+
                     "</tfoot>" +
 
                     "</table>" +
+
                     "</div>" +
 
                     '<div class="VAS-gljr-created-strip">' +
 
                     '<span class="VAS-gljr-avatar">' +
+
                     esc(
                         initials(
-                            journal
-                                .CreatedByName
+                            journal.CreatedByName
                         )
                     ) +
+
                     "</span>" +
 
                     "<div>" +
 
-                    "<span>Created By</span>" +
+                    "<span>" +
+
+                    esc(
+                        lbl(
+                            "VAS_044_CreatedBy",
+                            "Created By"
+                        )
+                    ) +
+
+                    "</span>" +
 
                     "<strong>" +
+
                     esc(
-                        journal
-                            .CreatedByName ||
+                        journal.CreatedByName ||
                         "-"
                     ) +
+
                     "</strong>" +
 
                     (
                         journal.CreatedDate
                             ? (
-                                " · drafted " +
+                                " · " +
+
                                 esc(
-                                    journal
-                                        .CreatedDate
+                                    lbl(
+                                        "VAS_044_Drafted",
+                                        "Drafted"
+                                    )
+                                ) +
+
+                                " " +
+
+                                esc(
+                                    journal.CreatedDate
                                 )
                             )
                             : ""
                     ) +
 
                     "</div>" +
+
                     "</div>";
 
-                $detailBody.html(html);
+                $detailBody.html(
+                    html
+                );
 
-                detailLoaded = true;
+                detailLoaded =
+                    true;
 
                 updateActionButtons();
             }
 
             function updateActionButtons() {
-                var status = String(
-                    selectedJournalStatus ||
-                    ""
-                ).toUpperCase();
+                var status =
+                    String(
+                        selectedJournalStatus ||
+                        ""
+                    ).toUpperCase();
 
                 var canApprove =
+                    detailLoaded &&
                     !selectedJournalPosted &&
                     (
                         status === "DR" ||
@@ -1627,6 +2391,7 @@
                     );
 
                 var canPost =
+                    detailLoaded &&
                     !selectedJournalPosted &&
                     (
                         status === "AP" ||
@@ -1636,7 +2401,9 @@
 
                 if ($approveButton) {
                     $approveButton
-                        .toggle(canApprove)
+                        .toggle(
+                            canApprove
+                        )
                         .prop(
                             "disabled",
                             journalActionInProgress ||
@@ -1647,7 +2414,9 @@
 
                 if ($postButton) {
                     $postButton
-                        .toggle(canPost)
+                        .toggle(
+                            canPost
+                        )
                         .prop(
                             "disabled",
                             journalActionInProgress ||
@@ -1666,6 +2435,175 @@
                 }
             }
 
+            function executeJournalAction(
+                actionName,
+                actionType
+            ) {
+                if (
+                    journalActionInProgress ||
+                    selectedJournalId <= 0 ||
+                    !detailLoaded
+                ) {
+                    return;
+                }
+
+                journalActionInProgress =
+                    true;
+
+                setActionBusy(
+                    true,
+                    actionType
+                );
+
+                actionRequest =
+                    $.ajax({
+                        url:
+                            baseUrl +
+                            "VAS/VAS_044_GLJournalRecentWidget/" +
+                            actionName,
+
+                        type:
+                            "POST",
+
+                        dataType:
+                            "json",
+
+                        cache:
+                            false,
+
+                        data: {
+                            journalId:
+                                selectedJournalId
+                        },
+
+                        success:
+                            function (result) {
+                                var data =
+                                    normalizeResponse(
+                                        result
+                                    );
+
+                                if (
+                                    !data ||
+                                    data.success === false ||
+                                    data.error
+                                ) {
+                                    showProcessError(
+                                        (
+                                            data &&
+                                            (
+                                                data.errorText ||
+                                                data.error ||
+                                                data.message
+                                            )
+                                        ) ||
+
+                                        lbl(
+                                            "VAS_044_JournalProcessFailed",
+                                            "Journal process failed."
+                                        )
+                                    );
+
+                                    return;
+                                }
+
+                                selectedJournalStatus =
+                                    String(
+                                        data.docStatus ||
+                                        selectedJournalStatus
+                                    ).toUpperCase();
+
+                                selectedJournalPosted =
+                                    isPosted(
+                                        data.posted
+                                    );
+
+                                loadData();
+
+                                loadJournalDetail(
+                                    selectedJournalId
+                                );
+                            },
+
+                        error:
+                            function (
+                                xhr,
+                                textStatus
+                            ) {
+                                if (
+                                    textStatus === "abort"
+                                ) {
+                                    return;
+                                }
+
+                                showProcessError(
+                                    getAjaxErrorMessage(
+                                        xhr,
+                                        lbl(
+                                            "VAS_044_JournalProcessFailed",
+                                            "Journal process failed."
+                                        )
+                                    )
+                                );
+                            },
+
+                        complete:
+                            function () {
+                                actionRequest =
+                                    null;
+
+                                journalActionInProgress =
+                                    false;
+
+                                setActionBusy(
+                                    false,
+                                    actionType
+                                );
+                            }
+                    });
+            }
+
+            function setActionBusy(
+                busy,
+                actionType
+            ) {
+                showDetailBusy(
+                    busy
+                );
+
+                if ($approveButton) {
+                    $approveButton.text(
+                        busy &&
+                            actionType === "approve"
+                            ? lbl(
+                                "VAS_044_Approving",
+                                "Approving..."
+                            )
+                            : lbl(
+                                "VAS_041_Approve",
+                                "Approve"
+                            )
+                    );
+                }
+
+                if ($postButton) {
+                    $postButton.text(
+                        busy &&
+                            actionType === "post"
+                            ? lbl(
+                                "VAS_044_Posting",
+                                "Posting..."
+                            )
+                            : lbl(
+                                "VAS_041_PostJournal",
+                                "Post Journal"
+                            )
+                    );
+                }
+
+                updateActionButtons();
+            }
+
             function printCurrentPopup() {
                 if (
                     !$detailDialog ||
@@ -1676,16 +2614,15 @@
                     !detailLoaded
                 ) {
                     showProcessError(
-                        "Journal details are not loaded."
+                        lbl(
+                            "VAS_044_DetailsNotLoaded",
+                            "Journal details are not loaded."
+                        )
                     );
 
                     return;
                 }
 
-                /*
-                 * Clone the currently displayed popup.
-                 * No journal content is rebuilt.
-                 */
                 var $popupCopy =
                     $detailDialog
                         .find(
@@ -1699,70 +2636,21 @@
                     !$popupCopy.length
                 ) {
                     showProcessError(
-                        "Journal details are not available."
+                        lbl(
+                            "VAS_044_DetailsNotAvailable",
+                            "Journal details are not available."
+                        )
                     );
 
                     return;
                 }
 
-                /*
-                 * Remove controls from the printed copy only.
-                 */
                 $popupCopy.find(
-                    ".VAS-gljr-detail-footer"
-                ).remove();
-
-                $popupCopy.find(
-                    ".VAS-gljr-detail-close-x"
-                ).remove();
-
-                $popupCopy.find(
+                    ".VAS-gljr-detail-footer, " +
+                    ".VAS-gljr-detail-close-x, " +
                     ".VAS-gljr-detail-busy"
                 ).remove();
 
-                /*
-                 * Remove scrolling restrictions from the copied popup
-                 * so all journal lines appear in print.
-                 */
-                $popupCopy.css({
-                    "position": "static",
-                    "display": "block",
-                    "transform": "none",
-                    "width": "100%",
-                    "max-width": "none",
-                    "height": "auto",
-                    "max-height": "none",
-                    "margin": "0",
-                    "overflow": "visible"
-                });
-
-                $popupCopy.find(
-                    ".VAS-gljr-detail-body"
-                ).css({
-                    "height": "auto",
-                    "max-height": "none",
-                    "overflow": "visible"
-                });
-
-                $popupCopy.find(
-                    ".VAS-gljr-detail-content"
-                ).css({
-                    "height": "auto",
-                    "max-height": "none",
-                    "overflow": "visible"
-                });
-
-                $popupCopy.find(
-                    ".VAS-gljr-detail-lines-wrap"
-                ).css({
-                    "height": "auto",
-                    "max-height": "none",
-                    "overflow": "visible"
-                });
-
-                /*
-                 * Hidden iframe keeps the current screen and popup open.
-                 */
                 var printFrame =
                     document.createElement(
                         "iframe"
@@ -1791,12 +2679,6 @@
                 printFrame.style.border =
                     "0";
 
-                printFrame.style.opacity =
-                    "0";
-
-                printFrame.style.pointerEvents =
-                    "none";
-
                 document.body.appendChild(
                     printFrame
                 );
@@ -1807,11 +2689,9 @@
                 var printDocument =
                     printWindow.document;
 
-                var stylesHtml = "";
+                var stylesHtml =
+                    "";
 
-                /*
-                 * Copy all currently loaded stylesheets and style blocks.
-                 */
                 $(
                     "link[rel='stylesheet'], style"
                 ).each(
@@ -1821,33 +2701,16 @@
                     }
                 );
 
-                var baseHref =
-                    document.baseURI ||
-                    window.location.href;
-
-                var printTitle =
-                    $detailDialog.find(
-                        ".VAS-gljr-detail-title"
-                    ).text() ||
-                    "GL Journal";
-
                 printDocument.open();
 
                 printDocument.write(
                     "<!DOCTYPE html>" +
+
                     "<html>" +
 
                     "<head>" +
 
                     "<meta charset='utf-8'>" +
-
-                    "<base href='" +
-                    esc(baseHref) +
-                    "'>" +
-
-                    "<title>" +
-                    esc(printTitle) +
-                    "</title>" +
 
                     stylesHtml +
 
@@ -1858,101 +2721,41 @@
                     "margin: 10mm;" +
                     "}" +
 
-                    "html," +
-                    "body {" +
-                    "width: 100% !important;" +
-                    "height: auto !important;" +
+                    "html, body {" +
                     "margin: 0 !important;" +
                     "padding: 0 !important;" +
+                    "background: #fff !important;" +
                     "overflow: visible !important;" +
-                    "background: #ffffff !important;" +
                     "}" +
 
-                    ".VAS-gljr-print-dialog {" +
-                    "position: static !important;" +
-                    "display: block !important;" +
-                    "width: 100% !important;" +
-                    "height: auto !important;" +
-                    "min-height: 0 !important;" +
-                    "padding: 0 !important;" +
-                    "margin: 0 !important;" +
-                    "overflow: visible !important;" +
-                    "background: #ffffff !important;" +
-                    "}" +
-
-                    ".VAS-gljr-print-dialog " +
                     ".VAS-gljr-detail-card {" +
                     "position: static !important;" +
-                    "display: block !important;" +
-                    "transform: none !important;" +
-                    "inset: auto !important;" +
                     "width: 100% !important;" +
                     "max-width: none !important;" +
                     "height: auto !important;" +
                     "max-height: none !important;" +
-                    "margin: 0 !important;" +
                     "overflow: visible !important;" +
                     "box-shadow: none !important;" +
-                    "border-radius: 0 !important;" +
                     "}" +
 
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-body," +
-
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-content," +
-
-                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-body, " +
+                    ".VAS-gljr-detail-content, " +
                     ".VAS-gljr-detail-lines-wrap {" +
-                    "display: block !important;" +
                     "height: auto !important;" +
                     "max-height: none !important;" +
                     "overflow: visible !important;" +
                     "}" +
 
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-lines {" +
-                    "width: 100% !important;" +
-                    "table-layout: auto !important;" +
-                    "}" +
-
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-scrim," +
-
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-footer," +
-
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-close-x," +
-
-                    ".VAS-gljr-print-dialog " +
-                    ".VAS-gljr-detail-busy {" +
-                    "display: none !important;" +
-                    "}" +
-
                     "thead {" +
-                    "display: table-header-group !important;" +
+                    "display: table-header-group;" +
                     "}" +
 
                     "tfoot {" +
-                    "display: table-footer-group !important;" +
+                    "display: table-footer-group;" +
                     "}" +
 
-                    "tr," +
-                    ".VAS-gljr-detail-summary > div," +
-                    ".VAS-gljr-created-strip {" +
-                    "break-inside: avoid !important;" +
-                    "page-break-inside: avoid !important;" +
-                    "}" +
-
-                    "@media print {" +
-
-                    "html," +
-                    "body {" +
-                    "-webkit-print-color-adjust: exact !important;" +
-                    "print-color-adjust: exact !important;" +
-                    "}" +
-
+                    "tr {" +
+                    "page-break-inside: avoid;" +
                     "}" +
 
                     "</style>" +
@@ -1961,287 +2764,58 @@
 
                     "<body>" +
 
-                    "<div class='VAS-gljr-detail-dialog " +
-                    "VAS-gljr-print-dialog'>" +
-
                     $popupCopy[0].outerHTML +
 
-                    "</div>" +
-
                     "</body>" +
+
                     "</html>"
                 );
 
                 printDocument.close();
 
-                var cleaned = false;
-
-                function cleanupPrintFrame() {
-                    if (cleaned) {
-                        return;
-                    }
-
-                    cleaned = true;
-
-                    window.setTimeout(
-                        function () {
-                            if (
-                                printFrame &&
-                                printFrame.parentNode
-                            ) {
-                                printFrame
-                                    .parentNode
-                                    .removeChild(
-                                        printFrame
-                                    );
-                            }
-                        },
-                        700
-                    );
-                }
-
-                printWindow.onafterprint =
-                    cleanupPrintFrame;
-
-                /*
-                 * Give external CSS files enough time to load.
-                 */
                 window.setTimeout(
                     function () {
                         try {
                             printWindow.focus();
+
                             printWindow.print();
                         }
                         catch (error) {
-                            cleanupPrintFrame();
-
                             showProcessError(
-                                "Could not open the print window."
-                            );
-                        }
-
-                        /*
-                         * Fallback for browsers that do not fire afterprint.
-                         */
-                        window.setTimeout(
-                            cleanupPrintFrame,
-                            5000
-                        );
-                    },
-                    900
-                );
-            }
-
-            function executeJournalAction(
-                actionName,
-                actionType
-            ) {
-                if (
-                    journalActionInProgress ||
-                    selectedJournalId <= 0
-                ) {
-                    return;
-                }
-
-                var status = String(
-                    selectedJournalStatus ||
-                    ""
-                ).toUpperCase();
-
-                if (
-                    actionType === "approve" &&
-                    status !== "DR" &&
-                    status !== "IP" &&
-                    status !== "NA"
-                ) {
-                    return;
-                }
-
-                if (
-                    actionType === "post" &&
-                    status !== "AP" &&
-                    status !== "CO" &&
-                    status !== "CL"
-                ) {
-                    return;
-                }
-
-                journalActionInProgress =
-                    true;
-
-                setActionBusy(
-                    true,
-                    actionType
-                );
-
-                actionRequest = $.ajax({
-                    url:
-                        baseUrl +
-                        "VAS/VAS_044_GLJournalRecentWidget/" +
-                        actionName,
-
-                    type: "POST",
-                    dataType: "json",
-                    cache: false,
-
-                    data: {
-                        journalId:
-                            selectedJournalId
-                    },
-
-                    success: function (
-                        result
-                    ) {
-                        var data =
-                            normalizeResponse(
-                                result
-                            );
-
-                        if (
-                            !data ||
-                            data.success === false ||
-                            data.error
-                        ) {
-                            showProcessError(
-                                (
-                                    data &&
-                                    (
-                                        data.errorText ||
-                                        data.error ||
-                                        data.message
-                                    )
-                                ) ||
-                                "Journal process failed."
-                            );
-
-                            return;
-                        }
-
-                        selectedJournalStatus =
-                            String(
-                                data.docStatus ||
-                                selectedJournalStatus
-                            ).toUpperCase();
-
-                        selectedJournalPosted =
-                            isPosted(
-                                data.posted
-                            );
-
-                        journalActionInProgress =
-                            false;
-
-                        setActionBusy(
-                            false,
-                            actionType
-                        );
-
-                        loadData();
-
-                        /*
-                         * Recent widget keeps the record visible.
-                         * Reload details and update action buttons.
-                         */
-                        loadJournalDetail(
-                            selectedJournalId
-                        );
-                    },
-
-                    error: function (
-                        xhr,
-                        textStatus
-                    ) {
-                        if (
-                            textStatus === "abort"
-                        ) {
-                            return;
-                        }
-
-                        var response =
-                            normalizeResponse(
-                                xhr &&
-                                xhr.responseText
-                            );
-
-                        showProcessError(
-                            (
-                                response &&
-                                (
-                                    response.errorText ||
-                                    response.error ||
-                                    response.message
+                                lbl(
+                                    "VAS_044_PrintWindowFailed",
+                                    "Could not open the print window."
                                 )
-                            ) ||
-                            "Journal process failed."
-                        );
-                    },
-
-                    complete: function () {
-                        actionRequest = null;
-
-                        if (
-                            journalActionInProgress
-                        ) {
-                            journalActionInProgress =
-                                false;
-
-                            setActionBusy(
-                                false,
-                                actionType
                             );
                         }
-                    }
-                });
-            }
 
-            function setActionBusy(
-                busy,
-                actionType
-            ) {
-                showDetailBusy(busy);
-
-                if ($approveButton) {
-                    $approveButton.text(
-                        busy &&
-                        actionType === "approve"
-                            ? "Approving..."
-                            : lbl(
-                                "VAS_041_Approve",
-                                "Approve"
-                            )
-                    );
-                }
-
-                if ($postButton) {
-                    $postButton.text(
-                        busy &&
-                        actionType === "post"
-                            ? "Posting..."
-                            : lbl(
-                                "VAS_041_PostJournal",
-                                "Post journal"
-                            )
-                    );
-                }
-
-                updateActionButtons();
-            }
-
-            function showProcessError(
-                message
-            ) {
-                window.alert(
-                    message ||
-                    "Journal process failed."
+                        window.setTimeout(
+                            function () {
+                                if (
+                                    printFrame &&
+                                    printFrame.parentNode
+                                ) {
+                                    printFrame
+                                        .parentNode
+                                        .removeChild(
+                                            printFrame
+                                        );
+                                }
+                            },
+                            1000
+                        );
+                    },
+                    500
                 );
             }
 
             function initials(name) {
-                var parts = String(
-                    name || ""
-                )
-                    .trim()
-                    .split(/\s+/);
+                var parts =
+                    String(
+                        name || ""
+                    )
+                        .trim()
+                        .split(/\s+/);
 
                 if (
                     !parts.length ||
@@ -2262,33 +2836,34 @@
                 ).toUpperCase();
             }
 
-            function renderDetailError(
+            function showProcessError(
                 message
             ) {
-                detailLoaded = false;
+                window.alert(
+                    message ||
 
-                $detailBody.html(
-                    '<div class="VAS-gljr-detail-empty">' +
-                    esc(
-                        message ||
-                        lbl(
-                            "VIS_Error",
-                            "Error loading data."
-                        )
-                    ) +
-                    "</div>"
+                    lbl(
+                        "VAS_044_JournalProcessFailed",
+                        "Journal process failed."
+                    )
                 );
-
-                selectedJournalStatus = "";
-                selectedJournalPosted =
-                    false;
-
-                updateActionButtons();
             }
 
             function showEmpty(message) {
-                var id =
-                    $self.AD_UserHomeWidgetID;
+                var $tableBody =
+                    $root.find(
+                        "#VAS-gljr-tbody-" +
+                        $self.AD_UserHomeWidgetID
+                    );
+
+                currentData =
+                    null;
+
+                pageNo =
+                    1;
+
+                totalPages =
+                    0;
 
                 $root.find(
                     ".VAS-gljr-table-wrap"
@@ -2296,46 +2871,100 @@
                     "is-empty"
                 );
 
-                $root.find(
-                    "#VAS-gljr-tbody-" +
-                    id
-                ).html(
+                $tableBody.html(
                     '<tr class="VAS-gljr-empty-row">' +
+
                     '<td colspan="6" class="VAS-gljr-empty">' +
+
                     esc(
                         message ||
+
                         lbl(
                             "VIS_Error",
                             "Error loading data."
                         )
                     ) +
+
                     "</td>" +
+
                     "</tr>"
                 );
 
-                totalPages = 0;
                 updatePager();
             }
 
-            this.refreshData = function () {
-                showBusy(true);
-                loadData();
-            };
+            function renderDetailError(
+                message
+            ) {
+                detailLoaded =
+                    false;
 
-            this.getRoot = function () {
-                return $root;
-            };
+                selectedJournalStatus =
+                    "";
+
+                selectedJournalPosted =
+                    false;
+
+                $detailBody.html(
+                    '<div class="VAS-gljr-empty">' +
+
+                    esc(
+                        message ||
+
+                        lbl(
+                            "VAS_044_DetailsLoadFailed",
+                            "Error loading journal details."
+                        )
+                    ) +
+
+                    "</div>"
+                );
+
+                updateActionButtons();
+            }
+
+            function refreshData() {
+                pageNo =
+                    1;
+
+                currentData =
+                    null;
+
+                loadData();
+
+                if (
+                    $detailDialog &&
+                    $detailDialog.is(
+                        ":visible"
+                    ) &&
+                    selectedJournalId > 0
+                ) {
+                    loadJournalDetail(
+                        selectedJournalId
+                    );
+                }
+            }
+
+            this.refreshData =
+                refreshData;
+
+            this.getRoot =
+                function () {
+                    return $root;
+                };
 
             this.disposeComponent =
                 function () {
-                    isDisposed = true;
+                    isDisposed =
+                        true;
 
                     if (refreshTimer) {
                         window.clearInterval(
                             refreshTimer
                         );
 
-                        refreshTimer = null;
+                        refreshTimer =
+                            null;
                     }
 
                     if (
@@ -2369,28 +2998,47 @@
                     );
 
                     if ($detailDialog) {
+                        $detailDialog.off();
+
                         $detailDialog.remove();
-                        $detailDialog = null;
+
+                        $detailDialog =
+                            null;
                     }
 
                     $root.off();
+
                     $root.remove();
 
-                    $detailBody = null;
-                    $detailBusy = null;
+                    $detailBody =
+                        null;
 
-                    $approveButton = null;
-                    $postButton = null;
-                    $downloadButton = null;
+                    $detailBusy =
+                        null;
 
-                    currentData = null;
+                    $approveButton =
+                        null;
 
-                    selectedJournalId = 0;
-                    selectedJournalStatus = "";
+                    $postButton =
+                        null;
+
+                    $downloadButton =
+                        null;
+
+                    currentData =
+                        null;
+
+                    selectedJournalId =
+                        0;
+
+                    selectedJournalStatus =
+                        "";
+
                     selectedJournalPosted =
                         false;
 
-                    detailLoaded = false;
+                    detailLoaded =
+                        false;
                 };
         };
 
@@ -2411,7 +3059,8 @@
             windowNo,
             frame
         ) {
-            this.frame = frame;
+            this.frame =
+                frame;
 
             this.AD_UserHomeWidgetID =
                 frame
@@ -2447,9 +3096,8 @@
                 this.frame.dispose();
             }
 
-            this.frame = null;
+            this.frame =
+                null;
         };
 
 })(VAS, jQuery);
-
-
