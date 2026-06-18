@@ -322,7 +322,7 @@
 .vas-scheduled-ap-payment-dialog-card {
     position: relative;
     width: 100%;
-    max-width: 45em;
+    max-width: 56em;
     max-height: 86vh;
     display: flex;
     flex-direction: column;
