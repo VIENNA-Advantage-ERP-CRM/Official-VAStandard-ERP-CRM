@@ -11,6 +11,27 @@
     overflow: hidden;
 }
 
+.vas-reconciliation-status-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-reconciliation-status-busy.is-visible {
+    display: flex;
+}
+
     .vas-reconciliation-status-root,
     .vas-reconciliation-status-root * {
         box-sizing: border-box;
@@ -468,4 +489,25 @@
     .vas-reconciliation-status-card {
         font-size: 0.6875em;
     }
+}
+
+.vas-reconciliation-status-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-reconciliation-status-busy.is-visible {
+    display: flex;
 }

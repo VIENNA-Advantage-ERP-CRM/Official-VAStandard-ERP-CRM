@@ -103,7 +103,7 @@
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
 
             $footer.append($description);
-            $busy = $('<div class="vas-scheduled-ap-payment-busy">').text(lbl('VAS_029_MessageLoading', 'Loading'));
+            $busy = $('<div class="vas-scheduled-ap-payment-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-scheduled-ap-payment-state-message">');
 
             $card.append($header).append($body).append($footer).append($busy).append($state);

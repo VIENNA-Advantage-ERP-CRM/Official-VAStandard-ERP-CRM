@@ -196,11 +196,12 @@
 
             $why.append($whyText);
 
-            $busy = $('<div class="vas-ptm-ap-busy">').text(
-                lbl(
-                    'VAS_028_MessageLoading',
-                    'Loading'
-                )
+            $busy = $(
+                '<div class="vas-ptm-ap-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
             );
 
             $state = $('<div class="vas-ptm-state-message">');
@@ -1251,12 +1252,9 @@
                 '<div class="vas-ptm-dialog-body">' +
 
                 '<div class="vas-ptm-dialog-busy">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_028_MessageLoading',
-                        'Loading'
-                    )
-                ) +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
                 '</div>' +
 
                 '<table class="vas-ptm-dialog-table">' +

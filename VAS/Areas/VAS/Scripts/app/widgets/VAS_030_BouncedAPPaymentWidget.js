@@ -149,12 +149,11 @@
             $footer.append($description);
 
             $busy = $(
-                '<div class="vas-bounced-ap-payment-busy">'
-            ).text(
-                lbl(
-                    'VAS_030_MessageLoading',
-                    'Loading'
-                )
+                '<div class="vas-bounced-ap-payment-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
             );
 
             $state = $(
@@ -1466,12 +1465,9 @@
 
                 '<div class="' +
                 'vas-bounced-ap-payment-dialog-busy">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_030_MessageLoading',
-                        'Loading'
-                    )
-                ) +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
                 '</div>' +
 
                 '<table class="' +

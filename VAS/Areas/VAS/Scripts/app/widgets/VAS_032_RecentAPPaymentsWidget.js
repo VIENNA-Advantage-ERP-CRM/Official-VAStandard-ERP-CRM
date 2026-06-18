@@ -96,13 +96,15 @@
             $iconBox.append($icon);
             $titleWrap.append($iconBox).append($title);
 
-            $head.append($titleWrap).append($pager);
+            $head.append($titleWrap);
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
-            $busy = $('<div class="vas-recent-ap-payments-busy">').text(lbl('VAS_032_MessageLoading', 'Loading'));
+            var $foot = $('<div class="vas-recent-ap-payments-footer">');
+            $busy = $('<div class="vas-recent-ap-payments-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-recent-ap-payments-state-message">');
 
-            $card.append($head).append($tableWrap).append($busy).append($state);
+            $foot.append($pager);
+            $card.append($head).append($tableWrap).append($foot).append($busy).append($state);
             $root.empty().append($card);
             createDialog();
 

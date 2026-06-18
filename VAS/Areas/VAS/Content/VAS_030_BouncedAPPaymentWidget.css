@@ -46,6 +46,41 @@
     transition: box-shadow 0.18s ease;
 }
 
+.vas-bounced-ap-payment-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-bounced-ap-payment-busy.is-visible {
+    display: flex;
+}
+
+.vas-bounced-ap-payment-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-bounced-ap-payment-dialog-busy.is-visible {
+    display: flex;
+}
+
 .vas-bounced-ap-payment-card:hover {
     box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
 }
@@ -605,4 +640,39 @@
     .vas-bounced-ap-payment-dialog-body {
         padding: 0 0.75em;
     }
+}
+
+.vas-bounced-ap-payment-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-bounced-ap-payment-busy.is-visible {
+    display: flex;
+}
+
+.vas-bounced-ap-payment-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-bounced-ap-payment-dialog-busy.is-visible {
+    display: flex;
 }

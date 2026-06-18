@@ -106,7 +106,7 @@
 
             $body.append($donut).append($meta);
             $state = $('<div class="vas-reconciliation-status-state">');
-            $busy = $('<div class="vas-reconciliation-status-busy">').text(lbl('VAS_046_Loading', 'Loading'));
+            $busy = $('<div class="vas-reconciliation-status-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
 
             $card.append($head).append($body).append($busy).append($state);
             $root.empty().append($card);

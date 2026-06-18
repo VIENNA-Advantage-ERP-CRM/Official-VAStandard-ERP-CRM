@@ -12,6 +12,41 @@
     overflow: hidden;
 }
 
+.vas-ptm-ap-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-ptm-ap-busy.is-visible {
+    display: flex;
+}
+
+.vas-ptm-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-ptm-dialog-busy.is-visible {
+    display: flex;
+}
+
     .vas-ptm-root.vas-ptm-ap-root,
     .vas-ptm-root.vas-ptm-ap-root * {
         box-sizing: border-box;
@@ -686,4 +721,39 @@
     .vas-ptm-dialog-body {
         padding: 0 0.75em;
     }
+}
+
+.vas-ptm-ap-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-ptm-ap-busy.is-visible {
+    display: flex;
+}
+
+.vas-ptm-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-ptm-dialog-busy.is-visible {
+    display: flex;
 }

@@ -79,7 +79,7 @@
             var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'Upi is cheapest - shift small payments where possible'));
 
             $foot.append($whyText).append($pager);
-            $busy = $('<div class="vas-payment-methods-busy">').text(lbl('VAS_033_MessageLoading', 'Loading'));
+            $busy = $('<div class="vas-payment-methods-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-payment-methods-state-message">');
 
             $card.append($head).append($body).append($foot).append($busy).append($state);

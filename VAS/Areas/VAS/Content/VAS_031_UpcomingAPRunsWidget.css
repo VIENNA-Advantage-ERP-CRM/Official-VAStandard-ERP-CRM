@@ -12,6 +12,41 @@
     overflow: hidden;
 }
 
+.vas-upcoming-ap-runs-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-upcoming-ap-runs-busy.is-visible {
+    display: flex;
+}
+
+.vas-upcoming-ap-runs-pay-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-upcoming-ap-runs-pay-busy.is-visible {
+    display: flex;
+}
+
     .vas-upcoming-ap-runs-root,
     .vas-upcoming-ap-runs-root * {
         box-sizing: border-box;
@@ -162,6 +197,19 @@
     display: flex;
     flex-direction: column;
     justify-content: start;
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-footer {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5em;
+    padding-top: 0.625em;
+    border-top: 1px solid #edf2f6;
     overflow: hidden;
 }
 
@@ -497,8 +545,9 @@
 
 .vas-upcoming-ap-runs-pay-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.25em;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 2em;
+    row-gap: 0.875em;
     align-items: start;
     padding: 1.25em 2em;
 }
@@ -547,14 +596,15 @@
 .vas-upcoming-ap-runs-field-value {
     position: relative;
     min-width: 0;
-    margin-top: 0.5em;
+    margin-top: 0.4375em;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #102c3f;
-    font-size: 1.25em;
-    font-weight: 800;
-    line-height: 1.15;
+    color: #141414;
+    font-size: 0.9375em;
+    font-weight: 500;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .vas-upcoming-ap-runs-edit-control {
@@ -568,12 +618,14 @@
     outline: 0;
     background-color: transparent !important;
     box-shadow: none !important;
-    color: #102c3f;
+    color: #141414;
     font-family: inherit;
     font-size: 1em;
-    font-weight: 800;
-    line-height: 1.15;
+    font-weight: 500;
+    line-height: 1.3;
     letter-spacing: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .vas-upcoming-ap-runs-field input.vas-upcoming-ap-runs-edit-control,
@@ -892,4 +944,39 @@ input.vas-upcoming-ap-runs-edit-control[type="number"]::-webkit-outer-spin-butto
     .vas-upcoming-ap-runs-pay-title {
         font-size: 1.125em;
     }
+}
+
+.vas-upcoming-ap-runs-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-upcoming-ap-runs-busy.is-visible {
+    display: flex;
+}
+
+.vas-upcoming-ap-runs-pay-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-upcoming-ap-runs-pay-busy.is-visible {
+    display: flex;
 }

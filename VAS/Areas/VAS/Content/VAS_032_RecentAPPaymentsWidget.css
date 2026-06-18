@@ -231,6 +231,40 @@
     padding: 0 0.25em;
 }
 
+.vas-recent-ap-payments-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-recent-ap-payments-busy.is-visible {
+    display: flex;
+}
+
+.vas-recent-ap-payments-footer {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5em;
+    padding-top: 0.625em;
+    border-top: 1px solid #edf2f6;
+    overflow: hidden;
+}
+
     .vas-recent-ap-payments-table-wrap::-webkit-scrollbar {
         width: 0.5em;
         height: 0.5em;
@@ -821,4 +855,25 @@
         grid-template-columns: 1fr;
         gap: 0;
     }
+}
+
+.vas-recent-ap-payments-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-recent-ap-payments-busy.is-visible {
+    display: flex;
 }

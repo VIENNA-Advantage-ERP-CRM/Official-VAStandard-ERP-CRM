@@ -281,6 +281,37 @@
     font-size: 1em;
 }
 
+.vas-scheduled-ap-payment-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-scheduled-ap-payment-busy.is-visible {
+    display: flex;
+}
+
+.vas-scheduled-ap-payment-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
 .vas-scheduled-ap-payment-dialog-scrim {
     position: absolute;
     inset: 0;
@@ -705,4 +736,35 @@
     .vas-scheduled-ap-payment-pager {
         order: 1;
     }
+}
+
+.vas-scheduled-ap-payment-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-scheduled-ap-payment-busy.is-visible {
+    display: flex;
+}
+
+.vas-scheduled-ap-payment-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
 }

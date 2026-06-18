@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
+using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
@@ -391,16 +392,24 @@ ORDER BY Name", ctx)
             }
         }
 
+
+
+
+        /// <summary>
+        /// Creates a new upcoming AP payment as Draft.
+        /// IsReceipt = false means AP Payment.
+        /// </summary>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult CreateUpcomingAPPayment(
-            int paymentId,
             int adOrgId,
             int bankAccountId,
             int vendorId,
             int currencyId,
             int conversionTypeId,
+            int docTypeId,
+            string tenderType,
             string transactionDate,
             string documentNo,
             decimal payAmt)
@@ -414,63 +423,301 @@ ORDER BY Name", ctx)
                 });
             }
 
-            Ctx ctx = Session["ctx"] as Ctx;
-            DateTime dateTrx;
+             Ctx ctx = Session["ctx"] as Ctx;
 
-            if (paymentId <= 0)
+            if (ctx == null)
             {
-                return Json(new { success = false, error = "Payment is required" });
+                return Json(new
+                {
+                    success = false,
+                    error = "Session Expired"
+                });
             }
 
-            if (!DateTime.TryParse(transactionDate, CultureInfo.InvariantCulture, DateTimeStyles.None, out dateTrx))
+            if (adOrgId <= 0)
             {
-                return Json(new { success = false, error = "Transaction date is required" });
+                return Json(new
+                {
+                    success = false,
+                    error = "Organization is required"
+                });
+            }
+
+            if (bankAccountId <= 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Bank account is required"
+                });
+            }
+
+            if (vendorId <= 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Vendor is required"
+                });
+            }
+
+            if (currencyId <= 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Currency is required"
+                });
+            }
+
+            if (conversionTypeId <= 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Conversion type is required"
+                });
+            }
+
+            if (docTypeId <= 0)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Document type is required"
+                });
+            }
+
+            if (string.IsNullOrWhiteSpace(tenderType))
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Tender type is required"
+                });
             }
 
             if (payAmt <= 0)
             {
-                return Json(new { success = false, error = "Payment amount must be greater than zero" });
+                return Json(new
+                {
+                    success = false,
+                    error = "Payment amount must be greater than zero"
+                });
             }
+
+            DateTime dateTrx;
+
+            if (!DateTime.TryParseExact(
+                transactionDate,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out dateTrx))
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Transaction date must be in yyyy-MM-dd format"
+                });
+            }
+            Trx trxName = Trx.GetTrx("CreateUpcomingAPPayment_" + DateTime.Now.Ticks);
+
+            string trxN =
+                "CreateUpcomingAPPayment_" +
+                ctx.GetAD_User_ID() +
+                "_" +
+                DateTime.Now.Ticks;
+
+            Trx trx = Trx.GetTrx(trxN);
 
             try
             {
-                MPayment payment = new MPayment(ctx, paymentId, null);
+                MOrg organization = new MOrg(
+                    ctx,
+                    adOrgId,
+                    trxName);
 
-                if (payment.GetC_Payment_ID() <= 0)
+                if (organization.GetAD_Org_ID() <= 0)
                 {
-                    return Json(new { success = false, error = "Payment not found" });
+                    throw new Exception("Organization not found");
                 }
 
+                if (!organization.IsActive())
+                {
+                    throw new Exception("Organization is inactive");
+                }
+
+                MBankAccount bankAccount = new MBankAccount(
+                    ctx,
+                    bankAccountId,
+                    trxName);
+
+                if (bankAccount.GetC_BankAccount_ID() <= 0)
+                {
+                    throw new Exception("Bank account not found");
+                }
+
+                if (!bankAccount.IsActive())
+                {
+                    throw new Exception("Bank account is inactive");
+                }
+
+                MBPartner vendor = new MBPartner(
+                    ctx,
+                    vendorId,
+                    trxName);
+
+                if (vendor.GetC_BPartner_ID() <= 0)
+                {
+                    throw new Exception("Vendor not found");
+                }
+
+                if (!vendor.IsActive())
+                {
+                    throw new Exception("Vendor is inactive");
+                }
+
+                if (!vendor.IsVendor())
+                {
+                    throw new Exception(
+                        "Selected business partner is not configured as a vendor");
+                }
+
+                MCurrency currency = new MCurrency(
+                    ctx,
+                    currencyId,
+                    trxName);
+
+                if (currency.GetC_Currency_ID() <= 0)
+                {
+                    throw new Exception("Currency not found");
+                }
+
+                if (!currency.IsActive())
+                {
+                    throw new Exception("Currency is inactive");
+                }
+
+                MConversionType conversionType =
+                    new MConversionType(
+                        ctx,
+                        conversionTypeId,
+                        trxName);
+
+                if (conversionType.GetC_ConversionType_ID() <= 0)
+                {
+                    throw new Exception("Conversion type not found");
+                }
+
+                if (!conversionType.IsActive())
+                {
+                    throw new Exception("Conversion type is inactive");
+                }
+
+                MDocType docType = new MDocType(
+                    ctx,
+                    docTypeId,
+                    trxName);
+
+                if (docType.GetC_DocType_ID() <= 0)
+                {
+                    throw new Exception("Document type not found");
+                }
+
+                if (!docType.IsActive())
+                {
+                    throw new Exception("Document type is inactive");
+                }
+
+                /*
+                 * Create a new C_Payment record.
+                 * ID = 0 means create a new record.
+                 */
+                MPayment payment = new MPayment(
+                    ctx,
+                    0,
+                    trxName);
+
                 payment.SetAD_Org_ID(adOrgId);
+
+                /*
+                 * false = AP Payment
+                 * true  = AR Receipt
+                 */
+                payment.SetIsReceipt(false);
+
+                payment.SetC_DocType_ID(docTypeId);
                 payment.SetC_BankAccount_ID(bankAccountId);
                 payment.SetC_BPartner_ID(vendorId);
                 payment.SetC_Currency_ID(currencyId);
                 payment.SetC_ConversionType_ID(conversionTypeId);
+
                 payment.SetDateTrx(dateTrx);
                 payment.SetDateAcct(dateTrx);
-                payment.SetDocumentNo(documentNo);
+
+                payment.SetTenderType(tenderType.Trim());
                 payment.SetPayAmt(payAmt);
+
+                /*
+                 * Keep upcoming payment as Draft.
+                 * It will not create accounting facts until completed.
+                 */
+                payment.SetDocStatus("DR");
+                payment.SetDocAction("CO");
+                payment.SetProcessed(false);
+
+                if (!string.IsNullOrWhiteSpace(documentNo))
+                {
+                    payment.SetDocumentNo(documentNo.Trim());
+                }
 
                 if (!payment.Save())
                 {
-                    return Json(new { success = false, error = "Could not save payment" });
+                    string modelError = (
+                        VLogger.RetrieveError()).GetName();
+
+                    if (string.IsNullOrWhiteSpace(modelError))
+                    {
+                        modelError = "Could not save AP payment";
+                    }
+
+                    throw new Exception(modelError);
                 }
+
+                trx.Commit();
 
                 return Json(new
                 {
                     success = true,
-                    paymentId = payment.GetC_Payment_ID()
+                    paymentId = payment.GetC_Payment_ID(),
+                    documentNo = payment.GetDocumentNo(),
+                    docStatus = payment.GetDocStatus(),
+                    message = "Upcoming AP payment created successfully"
                 });
             }
             catch (Exception ex)
             {
+                if (trx != null)
+                {
+                    trx.Rollback();
+                }
+
                 return Json(new
                 {
                     success = false,
                     error = ex.Message
                 });
             }
+            finally
+            {
+                if (trx != null)
+                {
+                    trx.Close();
+                }
+            }
         }
+
 
         private List<object> ReadLookupRows(string sql, Ctx ctx)
         {

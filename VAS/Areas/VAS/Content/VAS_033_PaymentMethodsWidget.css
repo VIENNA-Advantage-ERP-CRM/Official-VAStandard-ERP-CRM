@@ -12,6 +12,27 @@
     overflow: hidden;
 }
 
+.vas-payment-methods-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-payment-methods-busy.is-visible {
+    display: flex;
+}
+
     .vas-payment-methods-root,
     .vas-payment-methods-root * {
         box-sizing: border-box;
@@ -513,4 +534,25 @@
     .vas-payment-methods-foot-text {
         font-size: 0.5625em;
     }
+}
+
+.vas-payment-methods-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-payment-methods-busy.is-visible {
+    display: flex;
 }

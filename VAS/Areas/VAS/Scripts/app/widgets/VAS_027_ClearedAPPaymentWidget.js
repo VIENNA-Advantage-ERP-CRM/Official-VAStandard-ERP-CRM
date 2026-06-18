@@ -389,12 +389,11 @@
             $footer.append($description);
 
             $busy = $(
-                '<div class="vas-finance-kpi-busy">'
-            ).text(
-                lbl(
-                    'VAS_027_messageLoading',
-                    'Loading'
-                )
+                '<div class="vas-finance-kpi-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
             );
 
             $state = $(
