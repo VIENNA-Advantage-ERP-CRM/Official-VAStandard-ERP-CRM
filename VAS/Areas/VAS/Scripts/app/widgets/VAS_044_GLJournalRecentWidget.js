@@ -236,7 +236,7 @@
             var $nextBtn = $root.find('.VAS-gljr-next');
 
             if (totalPages > 1) {
-                $pageText.text(pageNo + ' / ' + totalPages);
+                $pageText.text(pageNo + ' ' + lbl('VIS_Of', 'of') + ' ' + totalPages);
             } else {
                 $pageText.text('');
             }

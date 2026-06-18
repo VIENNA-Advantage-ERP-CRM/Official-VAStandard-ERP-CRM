@@ -332,7 +332,7 @@ html[dir="rtl"] .VAS-gljtm-row-head {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.35em;
+    gap: 0.625em;
     flex-shrink: 0;
     margin-top: 0.75em;
     padding-top: 0.625em;
@@ -340,12 +340,12 @@ html[dir="rtl"] .VAS-gljtm-row-head {
 }
 
 .VAS-gljtm-page-btn {
-    width: 1.75em;
-    height: 1.75em;
+    width: 2.25em;
+    height: 2.25em;
     padding: 0;
-    border: 0;
-    border-radius: 999px;
-    background: rgba(0, 131, 218, 0.08);
+    border: 1px solid #CFE9FF;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
     color: #0083DA;
     font-size: 1em;
     font-weight: 700;
@@ -356,18 +356,23 @@ html[dir="rtl"] .VAS-gljtm-row-head {
 }
 
 .VAS-gljtm-page-btn:hover:not(:disabled) {
-    background: rgba(0, 131, 218, 0.14);
+    background: #EAF8FF;
+    border-color: #9ED1FF;
 }
 
 .VAS-gljtm-page-btn:disabled {
-    opacity: 0.35;
+    background: rgba(255, 255, 255, 0.64);
+    color: #C7D3DF;
     cursor: default;
 }
 
 .VAS-gljtm-page-text {
-    min-width: 2.5em;
+    display: inline-block;
+    min-width: 4.25em;
     text-align: center;
-    font-size: 0.72em;
-    color: #748494;
+    font-size: 1em;
+    font-weight: 700;
+    color: #141414;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
