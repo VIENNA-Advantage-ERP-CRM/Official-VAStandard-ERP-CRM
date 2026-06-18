@@ -626,14 +626,13 @@
 }
 
 .vas-recent-ap-payments-dialog-title {
-    min-width: 0;
+    color: #102c3f;
+    font-size: 1.125em;
+    font-weight: 700;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #141414;
-    font-size: 1.125em;
-    font-weight: 500;
-    line-height: 1.15;
 }
 
 .vas-recent-ap-payments-dialog-sub {
