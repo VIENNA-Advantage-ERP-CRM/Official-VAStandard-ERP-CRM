@@ -714,14 +714,18 @@ input.vas-upcoming-ap-runs-edit-control[type="number"]::-webkit-outer-spin-butto
 }
 
 .vas-upcoming-ap-runs-pay-save {
-    min-width: 9.5em;
-    display: inline-flex;
     align-items: center;
+    border-radius: 999em;
+    cursor: pointer;
+    display: inline-flex;
+    font-size: .875em;
+    font-weight: 700;
+    gap: .4375em;
     justify-content: center;
-    gap: 0.5em;
-    border: 1px solid #247ff5;
-    background: #247ff5;
-    color: #ffffff;
+    line-height: 1.2;
+    min-height: 2.5em;
+    padding: .625em 1.125em;
+
 }
 
     .vas-upcoming-ap-runs-pay-save:disabled {
