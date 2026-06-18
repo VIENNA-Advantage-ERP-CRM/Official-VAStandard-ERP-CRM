@@ -216,13 +216,13 @@
                 '<div class="VAS-gljpq-icon">' + clockIcon + '</div>' +
                 '<div class="w-title">' + lbl('VAS_045_PendingActionQueue', 'Pending Action Queue') + '</div>' +
                 '<span class="VAS-gljpq-count" id="VAS-gljpq-count-' + id + '"></span>' +
+                '</div>' +
+                '<div class="VAS-gljpq-body" id="VAS-gljpq-body-' + id + '"></div>' +
                 '<div class="VAS-gljpq-pager">' +
                 '<button type="button" class="VAS-gljpq-page-btn VAS-gljpq-prev" aria-label="' + esc(lbl('VIS_Previous', 'Previous')) + '">&#8249;</button>' +
                 '<span class="VAS-gljpq-page-text"></span>' +
                 '<button type="button" class="VAS-gljpq-page-btn VAS-gljpq-next" aria-label="' + esc(lbl('VIS_Next', 'Next')) + '">&#8250;</button>' +
                 '</div>' +
-                '</div>' +
-                '<div class="VAS-gljpq-body" id="VAS-gljpq-body-' + id + '"></div>' +
                 '</div>';
 
             $root.append(html);
