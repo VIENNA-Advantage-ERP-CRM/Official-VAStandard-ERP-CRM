@@ -48,6 +48,61 @@
     display: flex;
 }
 
+.vas-upcoming-ap-runs-pay-dialog,
+.vas-upcoming-ap-runs-pay-dialog * {
+    font-weight: 700;
+}
+
+.vas-upcoming-ap-runs-pay-dialog,
+.vas-upcoming-ap-runs-pay-dialog * {
+    font-weight: 700;
+}
+
+.vas-upcoming-ap-runs-pay-footer-actions {
+    gap: 0.625em;
+}
+
+.vas-upcoming-ap-runs-pay-cancel,
+.vas-upcoming-ap-runs-pay-save {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0.875rem;
+    font-weight: 700;
+    gap: 0.4375em;
+    justify-content: center;
+    line-height: 1.2;
+    min-height: 2.5em;
+    min-width: 5.125em;
+    padding: 0.625em 1.125em;
+}
+
+.vas-upcoming-ap-runs-pay-cancel {
+    background: #e5f3fb;
+    border: 1px solid #bfe4ff;
+    color: #0083da;
+}
+
+.vas-upcoming-ap-runs-pay-cancel:hover:not(:disabled),
+.vas-upcoming-ap-runs-pay-cancel:focus-visible:not(:disabled) {
+    background: #cce6f8;
+    border-color: #bfe4ff;
+    outline: none;
+}
+
+.vas-upcoming-ap-runs-pay-save {
+    background: #1f83ff;
+    border: 1px solid #1f83ff;
+    color: #ffffff;
+}
+
+.vas-upcoming-ap-runs-pay-save:hover:not(:disabled),
+.vas-upcoming-ap-runs-pay-save:focus-visible:not(:disabled) {
+    background: #0069ae;
+    border-color: #0069ae;
+    outline: none;
+}
+
     .vas-upcoming-ap-runs-root,
     .vas-upcoming-ap-runs-root * {
         box-sizing: border-box;
@@ -986,4 +1041,9 @@ input.vas-upcoming-ap-runs-edit-control[type="number"]::-webkit-outer-spin-butto
 
 .vas-upcoming-ap-runs-pay-busy.is-visible {
     display: flex;
+}
+
+.vas-upcoming-ap-runs-pay-dialog,
+.vas-upcoming-ap-runs-pay-dialog * {
+    font-weight: 700;
 }

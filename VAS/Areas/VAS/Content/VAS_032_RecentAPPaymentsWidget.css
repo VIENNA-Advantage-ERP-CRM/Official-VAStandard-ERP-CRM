@@ -265,6 +265,16 @@
     display: flex;
 }
 
+.vas-recent-ap-payments-dialog,
+.vas-recent-ap-payments-dialog * {
+    font-weight: 700;
+}
+
+.vas-recent-ap-payments-dialog,
+.vas-recent-ap-payments-dialog * {
+    font-weight: 700;
+}
+
 .vas-recent-ap-payments-footer {
     flex: 0 0 auto;
     min-width: 0;
@@ -888,4 +898,9 @@
 
 .vas-recent-ap-payments-busy.is-visible {
     display: flex;
+}
+
+.vas-recent-ap-payments-dialog,
+.vas-recent-ap-payments-dialog * {
+    font-weight: 700;
 }

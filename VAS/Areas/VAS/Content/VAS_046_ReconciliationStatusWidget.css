@@ -512,3 +512,40 @@
 .vas-reconciliation-status-busy.is-visible {
     display: flex;
 }
+
+.vas-reconciliation-status-body {
+    gap: 1em;
+}
+
+.vas-reconciliation-status-donut {
+    width: clamp(7em, 34%, 9.25em);
+    height: clamp(7em, 34%, 9.25em);
+}
+
+.vas-reconciliation-status-center {
+    padding: 1.25em;
+}
+
+.vas-reconciliation-status-percent {
+    font-size: 1.125em;
+    line-height: 1;
+    max-width: 100%;
+}
+
+.vas-reconciliation-status-cap {
+    font-size: 0.68em;
+    letter-spacing: 0;
+    margin-top: 0.25em;
+    max-width: 100%;
+}
+
+@container (max-width: 18.75em) {
+    .vas-reconciliation-status-donut {
+        width: 6.5em;
+        height: 6.5em;
+    }
+
+    .vas-reconciliation-status-percent {
+        font-size: 1em;
+    }
+}

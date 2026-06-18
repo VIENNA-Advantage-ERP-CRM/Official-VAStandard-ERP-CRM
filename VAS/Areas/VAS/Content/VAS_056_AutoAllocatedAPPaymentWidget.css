@@ -44,6 +44,55 @@
     z-index: 5;
 }
 
+.VAS-056-AutoAllocatedAPPayment-dialog,
+.VAS-056-AutoAllocatedAPPayment-dialog * {
+    font-weight: 700;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog,
+.VAS-056-AutoAllocatedAPPayment-dialog * {
+    font-weight: 700;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager {
+    gap: 0.5em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn {
+    background: #fbfdff;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+    color: #0083da;
+    height: 1.5em;
+    width: 1.5em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn svg {
+    height: 0.875em;
+    width: 0.875em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn:hover:not(:disabled),
+.VAS-056-AutoAllocatedAPPayment-pager-btn:focus-visible:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #b8c6d2;
+    cursor: default;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    min-width: 3.75em;
+}
+
     .VAS-056-AutoAllocatedAPPayment-root,
     .VAS-056-AutoAllocatedAPPayment-root * {
         box-sizing: border-box;
@@ -866,4 +915,9 @@
     justify-content: center;
     position: absolute;
     z-index: 5;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog,
+.VAS-056-AutoAllocatedAPPayment-dialog * {
+    font-weight: 700;
 }

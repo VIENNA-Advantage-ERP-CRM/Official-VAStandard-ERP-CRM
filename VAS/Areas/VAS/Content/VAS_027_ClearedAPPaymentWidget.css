@@ -47,6 +47,119 @@
     display: flex;
 }
 
+.vas-cpa-dialog,
+.vas-cpa-dialog * {
+    font-weight: 700;
+}
+
+.vas-cpa-dialog,
+.vas-cpa-dialog * {
+    font-weight: 700;
+}
+
+.vas-cpa-dialog,
+.vas-cpa-dialog * {
+    font-weight: 700;
+}
+
+.vas-cpa-dialog-actions {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.625em;
+}
+
+.vas-cpa-action {
+    align-items: center;
+    background: #e5f3fb;
+    border: 1px solid #bfe4ff;
+    border-radius: 999px;
+    color: #0083da;
+    cursor: pointer;
+    display: inline-flex;
+    font-family: inherit;
+    font-size: 0.875rem;
+    font-weight: 700;
+    gap: 0.4375em;
+    justify-content: center;
+    line-height: 1.2;
+    min-height: 2.5em;
+    min-width: 5.125em;
+    padding: 0.625em 1.125em;
+}
+
+.vas-cpa-action:hover:not(:disabled),
+.vas-cpa-action:focus-visible:not(:disabled) {
+    background: #cce6f8;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.vas-cpa-action-primary {
+    background: #1f83ff;
+    border-color: #1f83ff;
+    color: #ffffff;
+}
+
+.vas-cpa-action-primary:hover:not(:disabled),
+.vas-cpa-action-primary:focus-visible:not(:disabled) {
+    background: #0069ae;
+    border-color: #0069ae;
+}
+
+.vas-cpa-action:disabled {
+    cursor: default;
+    opacity: 0.62;
+}
+
+.vas-cpa-pager {
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-cpa-pager-btn {
+    align-items: center;
+    background: #fbfdff;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+    color: #0083da;
+    cursor: pointer;
+    display: inline-flex;
+    height: 1.5em;
+    justify-content: center;
+    padding: 0;
+    width: 1.5em;
+}
+
+.vas-cpa-pager-btn:hover:not(:disabled),
+.vas-cpa-pager-btn:focus-visible:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.vas-cpa-pager-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #b8c6d2;
+    cursor: default;
+}
+
+.vas-cpa-pager-btn svg {
+    height: 0.875em;
+    width: 0.875em;
+}
+
+.vas-cpa-pager-text {
+    color: #102c3f;
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.2;
+    min-width: 3.75em;
+    text-align: center;
+}
+
 .vas-finance-kpi-busy {
     background: rgba(255, 255, 255, 0.55);
 }
@@ -1030,4 +1143,9 @@
 
 .vas-cpa-dialog-busy.is-visible {
     display: flex;
+}
+
+.vas-cpa-dialog,
+.vas-cpa-dialog * {
+    font-weight: 700;
 }

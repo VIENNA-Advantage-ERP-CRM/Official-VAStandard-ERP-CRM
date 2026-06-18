@@ -493,6 +493,83 @@
     background: rgba(255, 255, 255, 0.55);
 }
 
+.VAS-072-MatchSuggestionAPPayment-pager {
+    gap: 0.5em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-btn {
+    background: #fbfdff;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+    color: #0083da;
+    height: 1.5em;
+    width: 1.5em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-btn svg {
+    height: 0.875em;
+    width: 0.875em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-btn:hover:not(:disabled),
+.VAS-072-MatchSuggestionAPPayment-pager-btn:focus-visible:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #b8c6d2;
+    cursor: default;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    min-width: 3.75em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-actions {
+    gap: 0.625em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-skip,
+.VAS-072-MatchSuggestionAPPayment-review-apply {
+    border-radius: 999px;
+    font-size: 0.875rem;
+    min-height: 2.5em;
+    min-width: 5.125em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-skip {
+    background: #e5f3fb;
+    border: 1px solid #bfe4ff;
+    color: #0083da;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-skip:hover:not(:disabled),
+.VAS-072-MatchSuggestionAPPayment-review-skip:focus-visible:not(:disabled) {
+    background: #cce6f8;
+    border-color: #bfe4ff;
+    outline: none;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-apply {
+    background: #1f83ff;
+    border: 1px solid #1f83ff;
+    color: #ffffff;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-apply:hover:not(:disabled),
+.VAS-072-MatchSuggestionAPPayment-review-apply:focus-visible:not(:disabled) {
+    background: #0069ae;
+    border-color: #0069ae;
+    outline: none;
+}
+
     .VAS-072-MatchSuggestionAPPayment-busy.is-visible,
     .VAS-072-MatchSuggestionAPPayment-state.is-visible {
         display: flex;
@@ -1258,4 +1335,21 @@
         width: 100%;
         justify-content: flex-end;
     }
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-dialog,
+.VAS-072-MatchSuggestionAPPayment-review-dialog * {
+    font-weight: 700;
+}
+
+.VAS-072-MatchSuggestionAPPayment-apply-high {
+    gap: 0.4375em;
+    max-width: 14em;
+    min-height: 2em;
+    padding: 0.3125em 0.625em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-apply-high svg {
+    flex: 0 0 auto;
+    margin-left: 0.0625em;
 }

@@ -47,6 +47,55 @@
     display: flex;
 }
 
+.vas-ptm-dialog,
+.vas-ptm-dialog * {
+    font-weight: 700;
+}
+
+.vas-ptm-dialog,
+.vas-ptm-dialog * {
+    font-weight: 700;
+}
+
+.vas-ptm-dialog,
+.vas-ptm-dialog * {
+    font-weight: 700;
+}
+
+.vas-ptm-pager {
+    gap: 0.5em;
+}
+
+.vas-ptm-pager-btn {
+    background: #fbfdff;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+    color: #0083da;
+    height: 1.5em;
+    width: 1.5em;
+}
+
+.vas-ptm-pager-btn:hover:not(:disabled),
+.vas-ptm-pager-btn:focus-visible:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.vas-ptm-pager-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #b8c6d2;
+    cursor: default;
+}
+
+.vas-ptm-pager-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    min-width: 3.75em;
+}
+
 .vas-ptm-ap-busy {
     background: rgba(255, 255, 255, 0.55);
 }
@@ -760,4 +809,9 @@
 
 .vas-ptm-dialog-busy.is-visible {
     display: flex;
+}
+
+.vas-ptm-dialog,
+.vas-ptm-dialog * {
+    font-weight: 700;
 }
