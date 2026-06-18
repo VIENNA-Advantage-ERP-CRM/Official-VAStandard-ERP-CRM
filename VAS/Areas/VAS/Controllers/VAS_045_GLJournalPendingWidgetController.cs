@@ -1,4 +1,3 @@
-using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -431,12 +430,9 @@ namespace VAS.Controllers
             }
         }
 
-        /// <summary>
-        /// Completes and posts the selected approved GL Journal.
-        /// If immediate accounting is enabled, completion may post it automatically.
-        /// </summary>
         [HttpPost]
-        public JsonResult PostJournal(int journalId)
+        public JsonResult PostJournal(
+            int journalId)
         {
             Ctx ctx = Session["ctx"] as Ctx;
 
@@ -458,15 +454,23 @@ namespace VAS.Controllers
                     error = GetMsg(
                         ctx,
                         "VAS_045_JournalDetailsNotFound",
-                        "Journal details not found"
+                        "Journal details not found."
+                    ),
+                    errorText = GetMsg(
+                        ctx,
+                        "VAS_045_JournalDetailsNotFound",
+                        "Journal details not found."
                     )
                 });
             }
 
             int journalTableId =
-                MTable.Get_Table_ID("GL_Journal");
+                MTable.Get_Table_ID(
+                    "GL_Journal"
+                );
 
-            MRole role = MRole.GetDefault(ctx);
+            MRole role =
+                MRole.GetDefault(ctx);
 
             if (!role.IsRecordAccess(
                 journalTableId,
@@ -480,24 +484,39 @@ namespace VAS.Controllers
                         ctx,
                         "AccessTableNoUpdate",
                         "You do not have permission to update this journal."
+                    ),
+                    errorText = GetMsg(
+                        ctx,
+                        "AccessTableNoUpdate",
+                        "You do not have permission to update this journal."
                     )
                 });
             }
 
-            string trxName =
-                Trx.CreateTrxName(
-                    "VAS045PostJournal"
-                );
-
-            Trx trx = Trx.GetTrx(trxName);
+            Trx completeTransaction = null;
 
             try
             {
-                MJournal journal = new MJournal(
-                    ctx,
-                    journalId,
-                    trx
-                );
+                /*
+                 * Step 1:
+                 * Complete the approved journal.
+                 */
+                string transactionName =
+                    Trx.CreateTrxName(
+                        "VAS045CompleteJournal"
+                    );
+
+                completeTransaction =
+                    Trx.GetTrx(
+                        transactionName
+                    );
+
+                MJournal journal =
+                    new MJournal(
+                        ctx,
+                        journalId,
+                        completeTransaction
+                    );
 
                 ValidateJournal(
                     ctx,
@@ -507,15 +526,22 @@ namespace VAS.Controllers
 
                 if (IsJournalPosted(journal))
                 {
-                    trx.Commit();
+                    completeTransaction.Commit();
 
                     return Json(new
                     {
                         success = true,
-                        journalId = journal.Get_ID(),
-                        documentNo = journal.GetDocumentNo(),
-                        docStatus = journal.GetDocStatus(),
+                        journalId =
+                            journal.Get_ID(),
+
+                        documentNo =
+                            journal.GetDocumentNo(),
+
+                        docStatus =
+                            journal.GetDocStatus(),
+
                         posted = true,
+
                         message = GetMsg(
                             ctx,
                             "VAS_045_JournalAlreadyPosted",
@@ -527,10 +553,6 @@ namespace VAS.Controllers
                 string docStatus =
                     journal.GetDocStatus();
 
-                /*
-                 * Posting directly from Approved is not a valid document action.
-                 * Complete the journal first, then post it.
-                 */
                 if (string.Equals(
                     docStatus,
                     "AP",
@@ -556,22 +578,8 @@ namespace VAS.Controllers
                         ctx,
                         journal
                     );
-
-                    /*
-                     * Reload the journal because immediate accounting may
-                     * have posted it during completion.
-                     */
-                    journal = new MJournal(
-                        ctx,
-                        journalId,
-                        trx
-                    );
-
-                    docStatus =
-                        journal.GetDocStatus();
                 }
-
-                if (
+                else if (
                     !string.Equals(
                         docStatus,
                         "CO",
@@ -594,55 +602,202 @@ namespace VAS.Controllers
                 }
 
                 /*
-                 * The Complete action may already post the journal when
-                 * immediate accounting is enabled.
+                 * Complete must be committed before accounting posting.
                  */
-                if (!IsJournalPosted(journal))
+                completeTransaction.Commit();
+            }
+            catch (Exception exception)
+            {
+                if (completeTransaction != null)
                 {
-                    string postingError =
-                        PostJournalAccounting(
-                            ctx,
-                            journalId,
-                            journalTableId,
-                            trx
-                        );
+                    completeTransaction.Rollback();
+                }
 
-                    if (!string.IsNullOrWhiteSpace(
-                        postingError
-                    ))
-                    {
-                        throw new InvalidOperationException(
-                            postingError
-                        );
-                    }
+                return Json(new
+                {
+                    success = false,
+                    error = exception.Message,
+                    errorText = exception.Message
+                });
+            }
+            finally
+            {
+                if (completeTransaction != null)
+                {
+                    completeTransaction.Close();
+                    completeTransaction = null;
+                }
+            }
 
-                    journal = new MJournal(
+            try
+            {
+                /*
+                 * Step 2:
+                 * Reload after committing Complete.
+                 */
+                MJournal completedJournal =
+                    new MJournal(
                         ctx,
                         journalId,
-                        trx
+                        null
+                    );
+
+                ValidateJournal(
+                    ctx,
+                    completedJournal,
+                    journalId
+                );
+
+                if (IsJournalPosted(
+                    completedJournal))
+                {
+                    return Json(new
+                    {
+                        success = true,
+
+                        journalId =
+                            completedJournal.Get_ID(),
+
+                        documentNo =
+                            completedJournal.GetDocumentNo(),
+
+                        docStatus =
+                            completedJournal.GetDocStatus(),
+
+                        posted = true,
+
+                        message = GetMsg(
+                            ctx,
+                            "VAS_045_JournalPostedSuccessfully",
+                            "Journal posted successfully."
+                        )
+                    });
+                }
+
+                string completedStatus =
+                    completedJournal.GetDocStatus();
+
+                if (
+                    !string.Equals(
+                        completedStatus,
+                        "CO",
+                        StringComparison.OrdinalIgnoreCase
+                    ) &&
+                    !string.Equals(
+                        completedStatus,
+                        "CL",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    throw new InvalidOperationException(
+                        "The journal was not completed successfully. " +
+                        "Current status: " +
+                        completedStatus
                     );
                 }
 
-                if (!IsJournalPosted(journal))
+                if (!IsJournalProcessed(
+                    completedJournal))
+                {
+                    throw new InvalidOperationException(
+                        "The journal was completed, but Processed is not Y."
+                    );
+                }
+
+                /*
+                 * Step 3:
+                 * Run the actual Vienna Advantage accounting engine.
+                 */
+                MAcctSchema[] accountingSchemas =
+                    MAcctSchema.GetClientAcctSchema(
+                        ctx,
+                        ctx.GetAD_Client_ID()
+                    );
+
+                if (
+                    accountingSchemas == null ||
+                    accountingSchemas.Length == 0
+                )
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_045_NoAccountingSchema",
+                            "No accounting schema was found for this client."
+                        )
+                    );
+                }
+
+                /*
+                 * Important:
+                 * Do not pass the Complete transaction.
+                 * Completion has already been committed.
+                 */
+                string postingResult =
+                    Doc.PostImmediate(
+                        accountingSchemas,
+                        journalTableId,
+                        journalId,
+                        false,
+                        null
+                    );
+
+                if (!IsPostingSuccess(
+                    postingResult))
+                {
+                    throw new InvalidOperationException(
+                        GetPostingErrorMessage(
+                            ctx,
+                            postingResult
+                        )
+                    );
+                }
+
+                /*
+                 * Step 4:
+                 * Reload from database and verify Posted.
+                 */
+                MJournal postedJournal =
+                    new MJournal(
+                        ctx,
+                        journalId,
+                        null
+                    );
+
+                ValidateJournal(
+                    ctx,
+                    postedJournal,
+                    journalId
+                );
+
+                if (!IsJournalPosted(
+                    postedJournal))
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
                             "VAS_045_JournalPostingNotCompleted",
-                            "The journal process finished, but the journal was not posted."
+                            "The accounting engine finished, but the journal was not posted."
                         )
                     );
                 }
 
-                trx.Commit();
-
                 return Json(new
                 {
                     success = true,
-                    journalId = journal.Get_ID(),
-                    documentNo = journal.GetDocumentNo(),
-                    docStatus = journal.GetDocStatus(),
+
+                    journalId =
+                        postedJournal.Get_ID(),
+
+                    documentNo =
+                        postedJournal.GetDocumentNo(),
+
+                    docStatus =
+                        postedJournal.GetDocStatus(),
+
                     posted = true,
+
                     message = GetMsg(
                         ctx,
                         "VAS_045_JournalPostedSuccessfully",
@@ -650,28 +805,231 @@ namespace VAS.Controllers
                     )
                 });
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                if (trx != null)
-                {
-                    trx.Rollback();
-                }
-
                 return Json(new
                 {
                     success = false,
-                    error = ex.Message,
-                    errorText = ex.Message
+                    error = exception.Message,
+                    errorText = exception.Message
                 });
             }
-            finally
+        }
+
+
+        private bool IsJournalProcessed(
+            MJournal journal)
+        {
+            if (journal == null)
             {
-                if (trx != null)
+                return false;
+            }
+
+            object processedValue =
+                journal.Get_Value(
+                    "Processed"
+                );
+
+            if (
+                processedValue == null ||
+                processedValue == DBNull.Value
+            )
+            {
+                return false;
+            }
+
+            if (processedValue is bool)
+            {
+                return (bool)processedValue;
+            }
+
+            string processedText =
+                Util.GetValueOfString(
+                    processedValue
+                );
+
+            return
+                string.Equals(
+                    processedText,
+                    "Y",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    processedText,
+                    "TRUE",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    processedText,
+                    "1",
+                    StringComparison.OrdinalIgnoreCase
+                );
+        }
+
+        private bool IsPostingSuccess(
+            string postingResult)
+        {
+            /*
+             * Doc.PostImmediate normally returns null or empty
+             * when posting succeeds.
+             */
+            if (string.IsNullOrWhiteSpace(
+                postingResult
+            ))
+            {
+                return true;
+            }
+
+            if (string.Equals(
+                postingResult,
+                Doc.STATUS_Posted,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(
+                postingResult,
+                "AlreadyPosted",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(
+                postingResult,
+                "OK",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private string GetPostingErrorMessage(
+            Ctx ctx,
+            string postingResult)
+        {
+            string result =
+                postingResult == null
+                    ? string.Empty
+                    : postingResult.Trim();
+
+            /*
+             * Try to retrieve the detailed model error first.
+             */
+            try
+            {
+                ValueNamePair loggerError =
+                    VLogger.RetrieveError();
+
+                if (
+                    loggerError != null &&
+                    !string.IsNullOrWhiteSpace(
+                        loggerError.GetName()
+                    )
+                )
                 {
-                    trx.Close();
+                    if (string.IsNullOrWhiteSpace(
+                        result
+                    ))
+                    {
+                        return loggerError.GetName();
+                    }
+
+                    return
+                        result +
+                        " - " +
+                        loggerError.GetName();
                 }
             }
+            catch
+            {
+                /*
+                 * Continue with the posting status.
+                 */
+            }
+
+            if (string.Equals(
+                result,
+                Doc.STATUS_NotBalanced,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_045_JournalNotBalanced",
+                    "The journal could not be posted because it is not balanced."
+                );
+            }
+
+            if (string.Equals(
+                result,
+                Doc.STATUS_NotConvertible,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_045_JournalNotConvertible",
+                    "The journal could not be posted because currency conversion is missing."
+                );
+            }
+
+            if (string.Equals(
+                result,
+                Doc.STATUS_PeriodClosed,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_045_JournalPeriodClosed",
+                    "The journal could not be posted because the accounting period is closed."
+                );
+            }
+
+            if (string.Equals(
+                result,
+                Doc.STATUS_InvalidAccount,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_045_JournalInvalidAccount",
+                    "The journal could not be posted because one or more accounts are invalid."
+                );
+            }
+
+            if (string.Equals(
+                result,
+                "NoDoc",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return
+                    "The accounting document was not found. " +
+                    "Verify that the journal is Completed, Processed = Y, " +
+                    "and GL Journal is configured as an accounting document.";
+            }
+
+            if (string.IsNullOrWhiteSpace(
+                result
+            ))
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_045_JournalProcessFailed",
+                    "The journal could not be posted."
+                );
+            }
+
+            /*
+             * Return the real result instead of replacing it
+             * with a generic error.
+             */
+            return
+                "Accounting posting failed: " +
+                result;
         }
+
 
         private void ValidateJournal(
             Ctx ctx,
@@ -828,67 +1186,7 @@ namespace VAS.Controllers
             );
         }
 
-        private string PostJournalAccounting(
-            Ctx ctx,
-            int journalId,
-            int journalTableId,
-            Trx trx)
-        {
-            MAcctSchema[] acctSchemas =
-                MAcctSchema.GetClientAcctSchema(
-                    ctx,
-                    ctx.GetAD_Client_ID()
-                );
 
-            if (
-                acctSchemas == null ||
-                acctSchemas.Length == 0
-            )
-            {
-                return GetMsg(
-                    ctx,
-                    "VAS_045_NoAccountingSchema",
-                    "No accounting schema was found for this client."
-                );
-            }
-
-            string postingResult =
-                Doc.PostImmediate(
-                    acctSchemas,
-                    journalTableId,
-                    journalId,
-                    false,
-                    trx
-                );
-
-            if (string.IsNullOrWhiteSpace(
-                postingResult
-            ))
-            {
-                return string.Empty;
-            }
-
-            if (string.Equals(
-                postingResult,
-                Doc.STATUS_Posted,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
-
-            if (string.Equals(
-                postingResult,
-                "AlreadyPosted",
-                StringComparison.OrdinalIgnoreCase))
-            {
-                return string.Empty;
-            }
-
-            return GetPostingResultMessage(
-                ctx,
-                postingResult
-            );
-        }
 
         private string GetPostingResultMessage(
             Ctx ctx,

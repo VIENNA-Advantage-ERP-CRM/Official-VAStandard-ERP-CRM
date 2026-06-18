@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Web.Mvc;
+using VAdvantage.Acct;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Process;
@@ -1018,10 +1019,7 @@ ORDER BY
             }
         }
 
-        /// <summary>
-        /// Completes and posts an Approved journal.
-        /// Completed or Closed unposted journals can also be posted.
-        /// </summary>
+
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -1032,15 +1030,12 @@ ORDER BY
 
             if (ctx == null)
             {
-                return Json(
-                    new
-                    {
-                        success = false,
-                        error = "Session Expired",
-                        errorText =
-                            "Session Expired"
-                    }
-                );
+                return Json(new
+                {
+                    success = false,
+                    error = "Session Expired",
+                    errorText = "Session Expired"
+                });
             }
 
             JsonResult validationResult =
@@ -1054,24 +1049,30 @@ ORDER BY
                 return validationResult;
             }
 
-            string transactionName =
-                VAdvantage.DataBase.Trx
-                    .CreateTrxName(
-                        "VAS044PostJournal"
-                    );
-
-            VAdvantage.DataBase.Trx transaction =
-                VAdvantage.DataBase.Trx.GetTrx(
-                    transactionName
-                );
+            VAdvantage.DataBase.Trx completeTransaction =
+                null;
 
             try
             {
+                /*
+                 * Step 1:
+                 * Complete the Approved journal first.
+                 */
+                string completeTransactionName =
+                    VAdvantage.DataBase.Trx.CreateTrxName(
+                        "VAS044CompleteJournal"
+                    );
+
+                completeTransaction =
+                    VAdvantage.DataBase.Trx.GetTrx(
+                        completeTransactionName
+                    );
+
                 MJournal journal =
                     new MJournal(
                         ctx,
                         journalId,
-                        transaction
+                        completeTransaction
                     );
 
                 ValidateJournal(
@@ -1082,23 +1083,17 @@ ORDER BY
 
                 if (IsJournalPosted(journal))
                 {
-                    transaction.Commit();
+                    completeTransaction.Commit();
 
-                    return Json(
-                        new
-                        {
-                            success = true,
-                            journalId =
-                                journal.Get_ID(),
-                            documentNo =
-                                journal.GetDocumentNo(),
-                            docStatus =
-                                journal.GetDocStatus(),
-                            posted = true,
-                            message =
-                                "The journal is already posted."
-                        }
-                    );
+                    return Json(new
+                    {
+                        success = true,
+                        journalId = journal.Get_ID(),
+                        documentNo = journal.GetDocumentNo(),
+                        docStatus = journal.GetDocStatus(),
+                        posted = true,
+                        message = "The journal is already posted."
+                    });
                 }
 
                 string docStatus =
@@ -1107,141 +1102,326 @@ ORDER BY
                 if (string.Equals(
                     docStatus,
                     "AP",
-                    StringComparison
-                        .OrdinalIgnoreCase))
+                    StringComparison.OrdinalIgnoreCase))
                 {
                     journal.SetDocAction(
-                        DocActionVariables
-                            .ACTION_COMPLETE
+                        DocActionVariables.ACTION_COMPLETE
                     );
 
                     if (!journal.ProcessIt(
-                        DocActionVariables
-                            .ACTION_COMPLETE))
+                        DocActionVariables.ACTION_COMPLETE))
                     {
-                        throw new
-                            InvalidOperationException(
-                                GetJournalProcessError(
-                                    journal,
-                                    "The journal could not be completed."
-                                )
-                            );
+                        throw new InvalidOperationException(
+                            GetJournalProcessError(
+                                journal,
+                                "The journal could not be completed."
+                            )
+                        );
                     }
 
                     SaveJournal(journal);
 
-                    journal =
-                        new MJournal(
-                            ctx,
-                            journalId,
-                            transaction
-                        );
-
-                    docStatus =
-                        journal.GetDocStatus();
+                    /*
+                     * The Complete process must be committed before
+                     * the accounting posting engine reads the journal.
+                     */
+                    completeTransaction.Commit();
                 }
-
-                if (
-                    !string.Equals(
+                else if (
+                    string.Equals(
                         docStatus,
                         "CO",
-                        StringComparison
-                            .OrdinalIgnoreCase
-                    ) &&
-                    !string.Equals(
+                        StringComparison.OrdinalIgnoreCase
+                    ) ||
+                    string.Equals(
                         docStatus,
                         "CL",
-                        StringComparison
-                            .OrdinalIgnoreCase
+                        StringComparison.OrdinalIgnoreCase
                     )
                 )
                 {
-                    throw new
-                        InvalidOperationException(
-                            "The journal must be approved before it can be posted."
-                        );
+                    completeTransaction.Commit();
                 }
-
-                if (!IsJournalPosted(journal))
+                else
                 {
-                    journal.SetDocAction(
-                        DocActionVariables
-                            .ACTION_POST
+                    throw new InvalidOperationException(
+                        "The journal must be approved before it can be posted."
                     );
-
-                    if (!journal.ProcessIt(
-                        DocActionVariables
-                            .ACTION_POST))
-                    {
-                        throw new
-                            InvalidOperationException(
-                                GetJournalProcessError(
-                                    journal,
-                                    "The journal could not be posted."
-                                )
-                            );
-                    }
-
-                    journal =
-                        new MJournal(
-                            ctx,
-                            journalId,
-                            transaction
-                        );
                 }
-
-                if (!IsJournalPosted(journal))
-                {
-                    throw new
-                        InvalidOperationException(
-                            "The journal process finished, but the accounting posting was not completed."
-                        );
-                }
-
-                transaction.Commit();
-
-                return Json(
-                    new
-                    {
-                        success = true,
-                        journalId =
-                            journal.Get_ID(),
-                        documentNo =
-                            journal.GetDocumentNo(),
-                        docStatus =
-                            journal.GetDocStatus(),
-                        posted = true,
-                        message =
-                            "Journal posted successfully."
-                    }
-                );
             }
             catch (Exception exception)
             {
-                if (transaction != null)
+                if (completeTransaction != null)
                 {
-                    transaction.Rollback();
+                    completeTransaction.Rollback();
                 }
 
-                return Json(
-                    new
-                    {
-                        success = false,
-                        error =
-                            exception.Message,
-                        errorText =
-                            exception.Message
-                    }
-                );
+                return Json(new
+                {
+                    success = false,
+                    error = exception.Message,
+                    errorText = exception.Message
+                });
             }
             finally
             {
-                if (transaction != null)
+                if (completeTransaction != null)
                 {
-                    transaction.Close();
+                    completeTransaction.Close();
+                    completeTransaction = null;
                 }
             }
+
+            /*
+             * Step 2:
+             * Read the journal again after committing Complete.
+             */
+            JournalPostingState journalState =
+                GetJournalPostingState(
+                    journalId
+                );
+
+            if (journalState == null)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = "Journal details not found.",
+                    errorText = "Journal details not found."
+                });
+            }
+
+            if (string.Equals(
+                journalState.Posted,
+                "Y",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return Json(new
+                {
+                    success = true,
+                    journalId = journalId,
+                    documentNo = journalState.DocumentNo,
+                    docStatus = journalState.DocStatus,
+                    posted = true,
+                    message = "The journal is already posted."
+                });
+            }
+
+            if (
+                !string.Equals(
+                    journalState.DocStatus,
+                    "CO",
+                    StringComparison.OrdinalIgnoreCase
+                ) &&
+                !string.Equals(
+                    journalState.DocStatus,
+                    "CL",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return Json(new
+                {
+                    success = false,
+                    error =
+                        "The journal was not completed successfully. " +
+                        "Current status: " +
+                        journalState.DocStatus,
+                    errorText =
+                        "The journal was not completed successfully. " +
+                        "Current status: " +
+                        journalState.DocStatus
+                });
+            }
+
+            /*
+             * Doc.PostImmediate only loads processed documents.
+             */
+            if (!string.Equals(
+                journalState.Processed,
+                "Y",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                return Json(new
+                {
+                    success = false,
+                    error =
+                        "The journal is completed but Processed is not Y.",
+                    errorText =
+                        "The journal is completed but Processed is not Y."
+                });
+            }
+
+            try
+            {
+                /*
+                 * Step 3:
+                 * Use Vienna Advantage accounting posting engine.
+                 */
+                int journalTableId =
+                    MTable.Get_Table_ID(
+                        "GL_Journal"
+                    );
+
+                MAcctSchema[] accountingSchemas =
+                    MAcctSchema.GetClientAcctSchema(
+                        ctx,
+                        ctx.GetAD_Client_ID()
+                    );
+
+                if (
+                    accountingSchemas == null ||
+                    accountingSchemas.Length == 0
+                )
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        error =
+                            "No accounting schema was found for the client.",
+                        errorText =
+                            "No accounting schema was found for the client."
+                    });
+                }
+
+                string postingResult =
+                    Doc.PostImmediate(
+                        accountingSchemas,
+                        journalTableId,
+                        journalId,
+                        false,
+                        null
+                    );
+
+                /*
+                 * PostImmediate returns null or empty on success.
+                 * Otherwise it returns the actual accounting error.
+                 */
+                if (!string.IsNullOrWhiteSpace(
+                    postingResult
+                ))
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        error = postingResult,
+                        errorText = postingResult
+                    });
+                }
+
+                /*
+                 * Step 4:
+                 * Verify the Posted value after posting.
+                 */
+                journalState =
+                    GetJournalPostingState(
+                        journalId
+                    );
+
+                if (
+                    journalState == null ||
+                    !string.Equals(
+                        journalState.Posted,
+                        "Y",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    string postedStatus =
+                        journalState == null
+                            ? string.Empty
+                            : journalState.Posted;
+
+                    string errorMessage =
+                        "The accounting engine finished, " +
+                        "but the journal was not posted.";
+
+                    if (!string.IsNullOrWhiteSpace(
+                        postedStatus
+                    ))
+                    {
+                        errorMessage +=
+                            " Posted status: " +
+                            postedStatus;
+                    }
+
+                    return Json(new
+                    {
+                        success = false,
+                        error = errorMessage,
+                        errorText = errorMessage
+                    });
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    journalId = journalId,
+                    documentNo =
+                        journalState.DocumentNo,
+                    docStatus =
+                        journalState.DocStatus,
+                    posted = true,
+                    message =
+                        "Journal posted successfully."
+                });
+            }
+            catch (Exception exception)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = exception.Message,
+                    errorText = exception.Message
+                });
+            }
         }
+
+
+
+
+
+        private string GetJournalProcessError(
+            MJournal journal,
+            string fallback)
+        {
+            string processMessage =
+                journal == null
+                    ? string.Empty
+                    : journal.GetProcessMsg();
+
+            if (!string.IsNullOrWhiteSpace(
+                processMessage
+            ))
+            {
+                return processMessage;
+            }
+
+            try
+            {
+                ValueNamePair modelError =
+                    VLogger.RetrieveError();
+
+                if (
+                    modelError != null &&
+                    !string.IsNullOrWhiteSpace(
+                        modelError.GetName()
+                    )
+                )
+                {
+                    return modelError.GetName();
+                }
+            }
+            catch
+            {
+                /*
+                 * Keep fallback when no logger error exists.
+                 */
+            }
+
+            return fallback;
+        }
+
 
         private JsonResult ValidateActionRequest(
             Ctx ctx,
@@ -1409,21 +1589,6 @@ ORDER BY
                 );
         }
 
-        private string GetJournalProcessError(
-            MJournal journal,
-            string fallback)
-        {
-            string processMessage =
-                journal == null
-                    ? string.Empty
-                    : journal.GetProcessMsg();
-
-            return string.IsNullOrWhiteSpace(
-                processMessage
-            )
-                ? fallback
-                : processMessage;
-        }
 
         private Ctx GetContext()
         {
@@ -1464,5 +1629,83 @@ ORDER BY
 
             return precision;
         }
+
+        private class JournalPostingState
+        {
+            public string DocumentNo { get; set; }
+
+            public string DocStatus { get; set; }
+
+            public string Processed { get; set; }
+
+            public string Posted { get; set; }
+        }
+
+        private JournalPostingState GetJournalPostingState(
+            int journalId)
+        {
+            string sql = @"
+SELECT
+    GL_Journal.DocumentNo,
+    GL_Journal.DocStatus,
+    GL_Journal.Processed,
+    GL_Journal.Posted
+FROM GL_Journal
+WHERE GL_Journal.GL_Journal_ID = @JournalID";
+
+            SqlParameter[] parameters =
+            {
+        new SqlParameter(
+            "@JournalID",
+            journalId
+        )
+    };
+
+            DataSet dataSet =
+                DB.ExecuteDataset(
+                    sql,
+                    parameters,
+                    null
+                );
+
+            if (
+                dataSet == null ||
+                dataSet.Tables.Count == 0 ||
+                dataSet.Tables[0].Rows.Count == 0
+            )
+            {
+                return null;
+            }
+
+            DataRow row =
+                dataSet.Tables[0].Rows[0];
+
+            return new JournalPostingState
+            {
+                DocumentNo =
+                    Util.GetValueOfString(
+                        row["DocumentNo"]
+                    ),
+
+                DocStatus =
+                    Util.GetValueOfString(
+                        row["DocStatus"]
+                    ),
+
+                Processed =
+                    Util.GetValueOfString(
+                        row["Processed"]
+                    ),
+
+                Posted =
+                    Util.GetValueOfString(
+                        row["Posted"]
+                    )
+            };
+        }
+
+
     }
 }
+
+

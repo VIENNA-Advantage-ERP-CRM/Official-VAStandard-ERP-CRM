@@ -1,9 +1,79 @@
+/**
+ * GL Journal Recent Entries Widget
+ * Purpose  : Display the 6 most recent GL_Journal documents with document
+ *            number, account date, description, status and total debit / credit.
+ *            Clicking a row zooms to that document in the GL Journal window.
+ * Tables   : GL_Journal, GL_JournalLine, AD_Ref_List, C_AcctSchema, C_Currency
+ */
+
+
+/*
+ * ============================================================
+ * VAS_044_GLJournalRecentWidget Messages
+ * ============================================================
+ *
+ * Custom Messages:
+ *
+ * Value                                English Text                          Arabic Text
+ * ---------------------------------------------------------------------------------------------------------
+ * VAS_044_RecentJournalEntries         Recent Journal Entries               قيود اليومية الحديثة
+ * VAS_044_Hash                         #                                    #
+ * VAS_044_Date                         Date                                 التاريخ
+ * VAS_044_Description                  Description                          الوصف
+ * VAS_044_Status                       Status                               الحالة
+ * VAS_044_Debit                        Debit                                مدين
+ * VAS_044_Credit                       Credit                               دائن
+ * VAS_044_JournalNo                    Journal No.                          رقم القيد
+ * VAS_044_AccountingBook               Accounting Book                      الدفتر المحاسبي
+ * VAS_044_TotalDebit                   Total Debit                          إجمالي المدين
+ * VAS_044_TotalCredit                  Total Credit                         إجمالي الدائن
+ * VAS_044_JournalLines                 Journal Lines                        سطور القيد
+ * VAS_044_Account                      Account                              الحساب
+ * VAS_044_CostCenter                   Cost Center                          مركز التكلفة
+ * VAS_044_BusinessPartner              Business Partner                     شريك العمل
+ * VAS_044_Product                      Product                              المنتج
+ * VAS_044_Project                      Project                              المشروع
+ * VAS_044_Total                        Total                                الإجمالي
+ * VAS_044_CreatedBy                    Created By                           تم الإنشاء بواسطة
+ * VAS_044_Drafted                      Drafted                              تم إنشاء المسودة
+ * VAS_044_NoJournalLines               No journal lines.                    لا توجد سطور للقيد
+ * VAS_044_Approving                    Approving...                         جارٍ تنفيذ الموافقة...
+ * VAS_044_Posting                      Posting...                           جارٍ ترحيل القيد...
+ * VAS_044_JournalProcessFailed         Journal process failed.              فشلت معالجة القيد
+ * VAS_044_DetailsNotLoaded             Journal details are not loaded.      لم يتم تحميل تفاصيل القيد
+ * VAS_044_DetailsNotAvailable          Journal details are not available.   تفاصيل القيد غير متوفرة
+ * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة الطباعة
+ *
+ * Shared Messages:
+ *
+ * Value                                English Text                          Arabic Text
+ * ---------------------------------------------------------------------------------------------------------
+ * VAS_DownloadPDF                      Download PDF                         تنزيل PDF
+ * VAS_041_Approve                      Approve                              موافقة
+ * VAS_041_PostJournal                  Post journal                         ترحيل القيد
+ * VAS_Close                            Close                                إغلاق
+ *
+ * Existing VIS Messages:
+ *
+ * Value                                English Text
+ * ---------------------------------------------------------------------------------------------------------
+ * VIS_Previous                         Previous
+ * VIS_Next                             Next
+ * VIS_Of                               of
+ * VIS_NoData                           No data available.
+ * VIS_Error                            Error loading data.
+ *
+ * ============================================================
+ */
+
+
 
 /**
  * GL Journal Recent Entries Widget
  * Displays recent GL Journals and supports:
  * 1. Approve Journal
  * 2. Post Journal
+ * 3. Print / Save popup details as PDF
  */
 
 ; VAS = window.VAS || {};
@@ -150,6 +220,7 @@
 
             var $approveButton = null;
             var $postButton = null;
+            var $downloadButton = null;
 
             var currentData = null;
 
@@ -160,6 +231,8 @@
             var selectedJournalId = 0;
             var selectedJournalStatus = "";
             var selectedJournalPosted = false;
+
+            var detailLoaded = false;
 
             var journalActionInProgress =
                 false;
@@ -914,6 +987,11 @@
                         ".VAS-gljr-action-post"
                     );
 
+                $downloadButton =
+                    $detailDialog.find(
+                        ".VAS-gljr-download"
+                    );
+
                 showDetailBusy(false);
                 updateActionButtons();
 
@@ -934,6 +1012,13 @@
                             "PostJournal",
                             "post"
                         );
+                    }
+                );
+
+                $downloadButton.on(
+                    "click",
+                    function () {
+                        printCurrentPopup();
                     }
                 );
 
@@ -991,6 +1076,8 @@
                 selectedJournalPosted =
                     false;
 
+                detailLoaded = false;
+
                 updateActionButtons();
 
                 $detailDialog.show();
@@ -1023,6 +1110,8 @@
                 selectedJournalStatus = "";
                 selectedJournalPosted =
                     false;
+
+                detailLoaded = false;
 
                 updateActionButtons();
 
@@ -1058,6 +1147,9 @@
                     detailRequest.abort();
                 }
 
+                detailLoaded = false;
+
+                updateActionButtons();
                 showDetailBusy(true);
                 $detailBody.empty();
 
@@ -1185,8 +1277,6 @@
                     isPosted(
                         journal.Posted
                     );
-
-                updateActionButtons();
 
                 var pillClass =
                     PILL_CLASS[
@@ -1516,6 +1606,10 @@
                     "</div>";
 
                 $detailBody.html(html);
+
+                detailLoaded = true;
+
+                updateActionButtons();
             }
 
             function updateActionButtons() {
@@ -1561,6 +1655,381 @@
                             selectedJournalId <= 0
                         );
                 }
+
+                if ($downloadButton) {
+                    $downloadButton.prop(
+                        "disabled",
+                        journalActionInProgress ||
+                        selectedJournalId <= 0 ||
+                        !detailLoaded
+                    );
+                }
+            }
+
+            function printCurrentPopup() {
+                if (
+                    !$detailDialog ||
+                    !$detailDialog.is(
+                        ":visible"
+                    ) ||
+                    selectedJournalId <= 0 ||
+                    !detailLoaded
+                ) {
+                    showProcessError(
+                        "Journal details are not loaded."
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Clone the currently displayed popup.
+                 * No journal content is rebuilt.
+                 */
+                var $popupCopy =
+                    $detailDialog
+                        .find(
+                            ".VAS-gljr-detail-card"
+                        )
+                        .first()
+                        .clone();
+
+                if (
+                    !$popupCopy ||
+                    !$popupCopy.length
+                ) {
+                    showProcessError(
+                        "Journal details are not available."
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Remove controls from the printed copy only.
+                 */
+                $popupCopy.find(
+                    ".VAS-gljr-detail-footer"
+                ).remove();
+
+                $popupCopy.find(
+                    ".VAS-gljr-detail-close-x"
+                ).remove();
+
+                $popupCopy.find(
+                    ".VAS-gljr-detail-busy"
+                ).remove();
+
+                /*
+                 * Remove scrolling restrictions from the copied popup
+                 * so all journal lines appear in print.
+                 */
+                $popupCopy.css({
+                    "position": "static",
+                    "display": "block",
+                    "transform": "none",
+                    "width": "100%",
+                    "max-width": "none",
+                    "height": "auto",
+                    "max-height": "none",
+                    "margin": "0",
+                    "overflow": "visible"
+                });
+
+                $popupCopy.find(
+                    ".VAS-gljr-detail-body"
+                ).css({
+                    "height": "auto",
+                    "max-height": "none",
+                    "overflow": "visible"
+                });
+
+                $popupCopy.find(
+                    ".VAS-gljr-detail-content"
+                ).css({
+                    "height": "auto",
+                    "max-height": "none",
+                    "overflow": "visible"
+                });
+
+                $popupCopy.find(
+                    ".VAS-gljr-detail-lines-wrap"
+                ).css({
+                    "height": "auto",
+                    "max-height": "none",
+                    "overflow": "visible"
+                });
+
+                /*
+                 * Hidden iframe keeps the current screen and popup open.
+                 */
+                var printFrame =
+                    document.createElement(
+                        "iframe"
+                    );
+
+                printFrame.setAttribute(
+                    "title",
+                    "GL Journal Print"
+                );
+
+                printFrame.style.position =
+                    "fixed";
+
+                printFrame.style.left =
+                    "-10000px";
+
+                printFrame.style.top =
+                    "0";
+
+                printFrame.style.width =
+                    "1px";
+
+                printFrame.style.height =
+                    "1px";
+
+                printFrame.style.border =
+                    "0";
+
+                printFrame.style.opacity =
+                    "0";
+
+                printFrame.style.pointerEvents =
+                    "none";
+
+                document.body.appendChild(
+                    printFrame
+                );
+
+                var printWindow =
+                    printFrame.contentWindow;
+
+                var printDocument =
+                    printWindow.document;
+
+                var stylesHtml = "";
+
+                /*
+                 * Copy all currently loaded stylesheets and style blocks.
+                 */
+                $(
+                    "link[rel='stylesheet'], style"
+                ).each(
+                    function () {
+                        stylesHtml +=
+                            this.outerHTML;
+                    }
+                );
+
+                var baseHref =
+                    document.baseURI ||
+                    window.location.href;
+
+                var printTitle =
+                    $detailDialog.find(
+                        ".VAS-gljr-detail-title"
+                    ).text() ||
+                    "GL Journal";
+
+                printDocument.open();
+
+                printDocument.write(
+                    "<!DOCTYPE html>" +
+                    "<html>" +
+
+                    "<head>" +
+
+                    "<meta charset='utf-8'>" +
+
+                    "<base href='" +
+                    esc(baseHref) +
+                    "'>" +
+
+                    "<title>" +
+                    esc(printTitle) +
+                    "</title>" +
+
+                    stylesHtml +
+
+                    "<style>" +
+
+                    "@page {" +
+                    "size: A4 landscape;" +
+                    "margin: 10mm;" +
+                    "}" +
+
+                    "html," +
+                    "body {" +
+                    "width: 100% !important;" +
+                    "height: auto !important;" +
+                    "margin: 0 !important;" +
+                    "padding: 0 !important;" +
+                    "overflow: visible !important;" +
+                    "background: #ffffff !important;" +
+                    "}" +
+
+                    ".VAS-gljr-print-dialog {" +
+                    "position: static !important;" +
+                    "display: block !important;" +
+                    "width: 100% !important;" +
+                    "height: auto !important;" +
+                    "min-height: 0 !important;" +
+                    "padding: 0 !important;" +
+                    "margin: 0 !important;" +
+                    "overflow: visible !important;" +
+                    "background: #ffffff !important;" +
+                    "}" +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-card {" +
+                    "position: static !important;" +
+                    "display: block !important;" +
+                    "transform: none !important;" +
+                    "inset: auto !important;" +
+                    "width: 100% !important;" +
+                    "max-width: none !important;" +
+                    "height: auto !important;" +
+                    "max-height: none !important;" +
+                    "margin: 0 !important;" +
+                    "overflow: visible !important;" +
+                    "box-shadow: none !important;" +
+                    "border-radius: 0 !important;" +
+                    "}" +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-body," +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-content," +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-lines-wrap {" +
+                    "display: block !important;" +
+                    "height: auto !important;" +
+                    "max-height: none !important;" +
+                    "overflow: visible !important;" +
+                    "}" +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-lines {" +
+                    "width: 100% !important;" +
+                    "table-layout: auto !important;" +
+                    "}" +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-scrim," +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-footer," +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-close-x," +
+
+                    ".VAS-gljr-print-dialog " +
+                    ".VAS-gljr-detail-busy {" +
+                    "display: none !important;" +
+                    "}" +
+
+                    "thead {" +
+                    "display: table-header-group !important;" +
+                    "}" +
+
+                    "tfoot {" +
+                    "display: table-footer-group !important;" +
+                    "}" +
+
+                    "tr," +
+                    ".VAS-gljr-detail-summary > div," +
+                    ".VAS-gljr-created-strip {" +
+                    "break-inside: avoid !important;" +
+                    "page-break-inside: avoid !important;" +
+                    "}" +
+
+                    "@media print {" +
+
+                    "html," +
+                    "body {" +
+                    "-webkit-print-color-adjust: exact !important;" +
+                    "print-color-adjust: exact !important;" +
+                    "}" +
+
+                    "}" +
+
+                    "</style>" +
+
+                    "</head>" +
+
+                    "<body>" +
+
+                    "<div class='VAS-gljr-detail-dialog " +
+                    "VAS-gljr-print-dialog'>" +
+
+                    $popupCopy[0].outerHTML +
+
+                    "</div>" +
+
+                    "</body>" +
+                    "</html>"
+                );
+
+                printDocument.close();
+
+                var cleaned = false;
+
+                function cleanupPrintFrame() {
+                    if (cleaned) {
+                        return;
+                    }
+
+                    cleaned = true;
+
+                    window.setTimeout(
+                        function () {
+                            if (
+                                printFrame &&
+                                printFrame.parentNode
+                            ) {
+                                printFrame
+                                    .parentNode
+                                    .removeChild(
+                                        printFrame
+                                    );
+                            }
+                        },
+                        500
+                    );
+                }
+
+                printWindow.onafterprint =
+                    cleanupPrintFrame;
+
+                /*
+                 * Give external CSS files enough time to load.
+                 */
+                window.setTimeout(
+                    function () {
+                        try {
+                            printWindow.focus();
+                            printWindow.print();
+                        }
+                        catch (error) {
+                            cleanupPrintFrame();
+
+                            showProcessError(
+                                "Could not open the print window."
+                            );
+                        }
+
+                        /*
+                         * Fallback for browsers that do not fire afterprint.
+                         */
+                        window.setTimeout(
+                            cleanupPrintFrame,
+                            5000
+                        );
+                    },
+                    700
+                );
             }
 
             function executeJournalAction(
@@ -1671,8 +2140,7 @@
 
                         /*
                          * Recent widget keeps the record visible.
-                         * Reload its details and hide/show buttons
-                         * according to the new status.
+                         * Reload details and update action buttons.
                          */
                         loadJournalDetail(
                             selectedJournalId
@@ -1797,6 +2265,8 @@
             function renderDetailError(
                 message
             ) {
+                detailLoaded = false;
+
                 $detailBody.html(
                     '<div class="VAS-gljr-detail-empty">' +
                     esc(
@@ -1908,9 +2378,19 @@
 
                     $detailBody = null;
                     $detailBusy = null;
+
                     $approveButton = null;
                     $postButton = null;
+                    $downloadButton = null;
+
                     currentData = null;
+
+                    selectedJournalId = 0;
+                    selectedJournalStatus = "";
+                    selectedJournalPosted =
+                        false;
+
+                    detailLoaded = false;
                 };
         };
 
@@ -1971,3 +2451,5 @@
         };
 
 })(VAS, jQuery);
+
+
