@@ -437,10 +437,7 @@
 
             var bankText = getBankAccountDisplay(row);
             var currencyText = (row.currencyISO || '') + (row.currencyISO && row.currencySymbol ? ' · ' : '') + (row.currencySymbol || '');
-            var rows = paymentRows || [];
-
             var html =
-                fieldHtml(lbl('VAS_031_MessagePayment', 'Payment'), selectHtml('paymentId', rows, row.paymentId, 'documentNo', 'paymentId'), true, true) +
                 fieldHtml(lbl('VAS_031_MessageOrganization', 'Organization'), selectHtml('adOrgId', getLookup('organizations'), row.organizationId), false, true) +
                 fieldHtml(lbl('VAS_031_MessageBankAccount', 'Bank Account'), selectHtml('bankAccountId', getLookup('bankAccounts'), row.bankAccountId, null, null, bankText), true, true) +
                 fieldHtml(lbl('VAS_031_MessageTransactionDate', 'Transaction Date'), inputHtml('transactionDate', 'date', row.transactionDate || ''), false, true) +
@@ -451,17 +448,6 @@
                 fieldHtml(lbl('VIS_InvoiceNo', 'Invoice No.'), inputHtml('documentNo', 'text', row.documentNo || ''), true, true);
 
             $payDialogGrid.html(html);
-
-            $payDialogGrid.find('[data-pay-field="paymentId"]').on('change', function () {
-                var paymentId = Number($(this).val() || 0);
-                var nextRow = findPaymentRow(paymentId);
-
-                if (nextRow) {
-                    selectedPaymentRow = nextRow;
-                    renderPayDialogGrid(nextRow, amountText);
-                    updatePayNotice(nextRow);
-                }
-            });
         }
 
         function fieldHtml(label, value, prefilled, rawValue) {
@@ -512,16 +498,6 @@
                 (step ? ' step="' + escapeHtml(step) + '"' : '') +
                 (readonly ? ' readonly' : '') +
                 '>';
-        }
-
-        function findPaymentRow(paymentId) {
-            for (var i = 0; i < paymentRows.length; i++) {
-                if (Number(paymentRows[i].paymentId || 0) === Number(paymentId || 0)) {
-                    return paymentRows[i];
-                }
-            }
-
-            return null;
         }
 
         function updatePayNotice(row) {
