@@ -95,6 +95,7 @@
                 + '</div>'
 
                 + '<div class="VAS-gljtm-body" id="VAS-gljtm-body-' + id + '"></div>'
+                + renderPager()
 
                 + '</div>';
 
@@ -202,11 +203,14 @@
             }
 
             if (accounts.length === 0) {
+                $body.addClass('is-empty');
                 $body.html('<div class="VAS-gljtm-empty">' + lbl('VIS_NoData', 'No data available.') + '</div>');
                 totalPages = 0;
                 updatePager();
                 return;
             }
+
+            $body.removeClass('is-empty');
 
             totalPages = Math.ceil(accounts.length / pageSize);
 
@@ -244,7 +248,6 @@
                     +   '</div>';
             }
             html += '</div>';
-            html += renderPager();
             $body.html(html);
             updatePager();
         }
@@ -274,7 +277,7 @@
 
         function showError() {
             var id = $self.AD_UserHomeWidgetID;
-            $root.find('#VAS-gljtm-body-' + id).html(
+            $root.find('#VAS-gljtm-body-' + id).addClass('is-empty').html(
                 '<div class="VAS-gljtm-empty">' + lbl('VIS_Error', 'Error loading data.') + '</div>'
             );
             totalPages = 0;

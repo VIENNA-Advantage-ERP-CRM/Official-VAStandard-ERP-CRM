@@ -376,3 +376,33 @@ html[dir="rtl"] .VAS-gljtm-row-head {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
+
+/* Compact bottom pager and centered empty state */
+.VAS-gljtm-body.is-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.VAS-gljtm-body.is-empty .VAS-gljtm-empty,
+.VAS-gljtm-loading {
+    min-height: 100%;
+    width: 100%;
+}
+
+.VAS-gljtm-pager {
+    gap: 0.45em;
+    margin-top: auto;
+    padding-top: 0.45em;
+}
+
+.VAS-gljtm-page-btn {
+    width: 1.75em;
+    height: 1.75em;
+    font-size: 0.875em;
+}
+
+.VAS-gljtm-page-text {
+    min-width: 3.5em;
+    font-size: 0.8125em;
+}

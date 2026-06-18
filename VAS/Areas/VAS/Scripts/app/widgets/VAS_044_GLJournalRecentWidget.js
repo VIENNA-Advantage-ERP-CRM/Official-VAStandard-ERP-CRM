@@ -105,11 +105,6 @@
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljr-icon">' + docIcon + '</div>'
                 +   '<div class="w-title">' + lbl('VAS_044_RecentJournalEntries', 'Recent Journal Entries') + '</div>'
-                +   '<div class="VAS-gljr-pager">'
-                +     '<button type="button" class="VAS-gljr-page-btn VAS-gljr-prev" aria-label="' + lbl('VIS_Previous', 'Previous') + '">&#8249;</button>'
-                +     '<span class="VAS-gljr-page-text"></span>'
-                +     '<button type="button" class="VAS-gljr-page-btn VAS-gljr-next" aria-label="' + lbl('VIS_Next', 'Next') + '">&#8250;</button>'
-                +   '</div>'
                 + '</div>'
 
                 // ── Alert strip (hidden until an unbalanced entry is found) ──
@@ -130,6 +125,12 @@
                 +       '<tr><td colspan="6" class="VAS-gljr-empty">—</td></tr>'
                 +     '</tbody>'
                 +   '</table>'
+                + '</div>'
+
+                + '<div class="VAS-gljr-pager">'
+                +   '<button type="button" class="VAS-gljr-page-btn VAS-gljr-prev" aria-label="' + lbl('VIS_Previous', 'Previous') + '">&#8249;</button>'
+                +   '<span class="VAS-gljr-page-text"></span>'
+                +   '<button type="button" class="VAS-gljr-page-btn VAS-gljr-next" aria-label="' + lbl('VIS_Next', 'Next') + '">&#8250;</button>'
                 + '</div>'
 
                 + '</div>'; // .VAS-gljr-card
@@ -192,12 +193,15 @@
             var $tbody  = $root.find('#VAS-gljr-tbody-' + id);
 
             if (!entries.length) {
-                $tbody.html('<tr><td colspan="6" class="VAS-gljr-empty">'
+                $root.find('.VAS-gljr-table-wrap').addClass('is-empty');
+                $tbody.html('<tr class="VAS-gljr-empty-row"><td colspan="6" class="VAS-gljr-empty">'
                     + lbl('VIS_NoData', 'No data available.') + '</td></tr>');
                 totalPages = 0;
                 updatePager();
                 return;
             }
+
+            $root.find('.VAS-gljr-table-wrap').removeClass('is-empty');
 
             totalPages = Math.ceil(entries.length / pageSize);
             if (pageNo > totalPages) { pageNo = totalPages; }
@@ -423,8 +427,9 @@
 
         function showEmpty() {
             var id = $self.AD_UserHomeWidgetID;
+            $root.find('.VAS-gljr-table-wrap').addClass('is-empty');
             $root.find('#VAS-gljr-tbody-' + id).html(
-                '<tr><td colspan="6" class="VAS-gljr-empty">'
+                '<tr class="VAS-gljr-empty-row"><td colspan="6" class="VAS-gljr-empty">'
                 + lbl('VIS_Error', 'Error loading data.') + '</td></tr>'
             );
             totalPages = 0;

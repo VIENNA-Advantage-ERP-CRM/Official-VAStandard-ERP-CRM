@@ -300,11 +300,14 @@
             );
 
             if (queue.length === 0) {
+                $body.addClass('is-empty');
                 $body.html('<div class="VAS-gljpq-empty">' + esc(lbl('VIS_NoData', 'No pending journals.')) + '</div>');
                 totalPages = 0;
                 updatePager();
                 return;
             }
+
+            $body.removeClass('is-empty');
 
             totalPages = Math.ceil(queue.length / pageSize);
 
@@ -425,8 +428,8 @@
                 '<div class="VAS-gljpq-dialog-footer">' +
                 '<button type="button" class="VAS-gljpq-dialog-secondary VAS-gljpq-detail-close">' + esc(lbl('VAS_Close', 'Close')) + '</button>' +
                 '<div class="VAS-gljpq-dialog-actions">' +
-                '<button type="button" class="VAS-gljpq-dialog-secondary VAS-gljpq-action-approve">' + esc(lbl('VAS_041_Approve', 'Approve')) + '</button>' +
-                '<button type="button" class="VAS-gljpq-dialog-primary VAS-gljpq-action-post">' + esc(lbl('VAS_041_PostJournal', 'Post journal')) + '</button>' +
+
+                
                 '</div>' +
                 '</div>' +
 
@@ -777,7 +780,7 @@
                 text = message;
             }
 
-            $root.find('#VAS-gljpq-body-' + id).html(
+            $root.find('#VAS-gljpq-body-' + id).addClass('is-empty').html(
                 '<div class="VAS-gljpq-empty">' +
                 esc(text) +
                 '</div>'

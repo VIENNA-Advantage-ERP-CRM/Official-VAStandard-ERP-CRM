@@ -819,3 +819,35 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
         flex: 1;
     }
 }
+
+/* Compact bottom pager and centered empty state */
+.VAS-gljr-pager {
+    justify-content: center;
+    gap: 0.45em;
+    margin-top: auto;
+    margin-left: 0;
+    padding-top: 0.45em;
+    border-top: 1px solid #EDF2F6;
+}
+
+.VAS-gljr-page-btn {
+    width: 1.75em;
+    height: 1.75em;
+    font-size: 0.875em;
+}
+
+.VAS-gljr-page-text {
+    min-width: 3.5em;
+    font-size: 0.8125em;
+}
+
+.VAS-gljr-table-wrap.is-empty .VAS-gljr-table,
+.VAS-gljr-table-wrap.is-empty .VAS-gljr-table tbody,
+.VAS-gljr-table-wrap.is-empty .VAS-gljr-empty-row {
+    height: 100%;
+}
+
+.VAS-gljr-table-wrap.is-empty .VAS-gljr-empty {
+    padding: 0;
+    vertical-align: middle;
+}
