@@ -406,7 +406,6 @@
 .vas-upcoming-ap-runs-pay-card {
     position: relative;
     width: min(90em, 100%);
-    height: min(46em, 100%);
     max-width: none;
     max-height: none;
     overflow: hidden;

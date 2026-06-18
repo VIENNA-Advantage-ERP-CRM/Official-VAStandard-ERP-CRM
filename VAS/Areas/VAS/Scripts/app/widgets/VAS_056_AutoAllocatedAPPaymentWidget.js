@@ -1,3 +1,4 @@
+
 /**
  * Auto Allocated AP Payment Widget
  *
@@ -10,7 +11,7 @@
  *  4  | Showing                                           | VAS_Showing
  *  5  | of                                                | VAS_Of
  *  6  | Payment allocation                                | VAS_056_PaymentAllocation
- *  7  | Allocated vs unallocated payments in the last...   | VAS_056_AllocatedVsUnallocated
+ *  7  | Allocated vs unallocated payments in the last...  | VAS_056_AllocatedVsUnallocated
  *  8  | Close                                             | VAS_Close
  *  9  | Allocated                                         | VAS_Allocated
  * 10  | Unallocated                                       | VAS_Unallocated
@@ -39,9 +40,15 @@
 
         var self = this;
 
-        var classPrefix = "VAS-056-AutoAllocatedAPPayment-";
+        var classPrefix =
+            "VAS-056-AutoAllocatedAPPayment-";
 
-        var $root = $('<div class="' + classPrefix + 'root"></div>');
+        var $root = $(
+            '<div class="' +
+            classPrefix +
+            'root"></div>'
+        );
+
         var $metricEl = null;
         var $busy = null;
 
@@ -59,6 +66,9 @@
         var $tabAllocatedCount = null;
         var $tabUnallocatedCount = null;
 
+        var kpiRequest = null;
+        var rowsRequest = null;
+
         var rowsLoading = false;
         var pageSize = 10;
         var activeFilter = "allocated";
@@ -71,6 +81,7 @@
                 totalRecords: 0,
                 loaded: false
             },
+
             unallocated: {
                 pageNo: 1,
                 totalPages: 0,
@@ -82,13 +93,18 @@
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
 
-            return text && text !== "[" + key + "]"
+            return text &&
+                text !== "[" + key + "]"
                 ? text
                 : fallback;
         }
 
         function escapeHtml(value) {
-            return String(value == null ? "" : value)
+            return String(
+                value == null
+                    ? ""
+                    : value
+            )
                 .replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
                 .replace(/>/g, "&gt;")
@@ -97,22 +113,30 @@
         }
 
         function parseResponse(response) {
-            if (typeof response !== "string") {
-                return response;
-            }
+            var data = response;
 
-            try {
-                var data = JSON.parse(response);
-
-                if (typeof data === "string") {
-                    return JSON.parse(data);
+            for (var index = 0; index < 2; index++) {
+                if (typeof data !== "string") {
+                    break;
                 }
 
-                return data;
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e) {
+                    return null;
+                }
             }
-            catch (e) {
-                return null;
-            }
+
+            return data;
+        }
+
+        function isDialogVisible() {
+            return Boolean(
+                $dialog &&
+                $dialog.length &&
+                $dialog.is(":visible")
+            );
         }
 
         function showBusy(show) {
@@ -120,17 +144,24 @@
                 return;
             }
 
-            $busy.toggleClass("is-visible", Boolean(show));
+            $busy.toggleClass(
+                "is-visible",
+                Boolean(show)
+            );
         }
 
         function showDialogBusy(show) {
-            if (!$dialogBusy || !$dialogBusy[0]) {
+            if (
+                !$dialogBusy ||
+                !$dialogBusy.length
+            ) {
                 return;
             }
 
-            $dialogBusy[0].style.visibility = show
-                ? "visible"
-                : "hidden";
+            $dialogBusy.toggleClass(
+                "is-visible",
+                Boolean(show)
+            );
         }
 
         this.Initalize = function () {
@@ -139,14 +170,26 @@
         };
 
         function loadKpi() {
+            if (isDisposed) {
+                return;
+            }
+
+            if (
+                kpiRequest &&
+                kpiRequest.readyState !== 4
+            ) {
+                kpiRequest.abort();
+            }
+
             showBusy(true);
 
-            $.ajax({
+            kpiRequest = $.ajax({
                 url:
                     VIS.Application.contextUrl +
                     "VAS_056_AutoAllocatedAPPaymentWidget/GetAutoAllocatedAPPayments",
 
                 type: "GET",
+                dataType: "json",
                 cache: false,
 
                 success: function (response) {
@@ -154,9 +197,14 @@
                         return;
                     }
 
-                    var data = parseResponse(response);
+                    var data =
+                        parseResponse(response);
 
-                    if (!data || data.error) {
+                    if (
+                        !data ||
+                        data.error ||
+                        data.errorText
+                    ) {
                         setNoData();
                         return;
                     }
@@ -164,8 +212,14 @@
                     renderMetric(data);
                 },
 
-                error: function () {
-                    if (isDisposed) {
+                error: function (
+                    xhr,
+                    textStatus
+                ) {
+                    if (
+                        isDisposed ||
+                        textStatus === "abort"
+                    ) {
                         return;
                     }
 
@@ -173,6 +227,8 @@
                 },
 
                 complete: function () {
+                    kpiRequest = null;
+
                     if (!isDisposed) {
                         showBusy(false);
                     }
@@ -181,79 +237,199 @@
         }
 
         function loadRows() {
-            if (!$dialogTbody || rowsLoading) {
+            if (
+                isDisposed ||
+                !$dialogTbody ||
+                !$dialogTbody.length ||
+                rowsLoading
+            ) {
                 return;
             }
 
-            var filterAtRequest = activeFilter;
-            var state = tabState[filterAtRequest];
+            var filterAtRequest =
+                activeFilter;
+
+            var state =
+                tabState[filterAtRequest];
+
+            if (!state) {
+                return;
+            }
 
             rowsLoading = true;
             showDialogBusy(true);
 
             if ($pagerPrev) {
-                $pagerPrev.prop("disabled", true);
+                $pagerPrev.prop(
+                    "disabled",
+                    true
+                );
             }
 
             if ($pagerNext) {
-                $pagerNext.prop("disabled", true);
+                $pagerNext.prop(
+                    "disabled",
+                    true
+                );
             }
 
-            $.ajax({
+            rowsRequest = $.ajax({
                 url:
                     VIS.Application.contextUrl +
                     "VAS_056_AutoAllocatedAPPaymentWidget/GetAutoAllocatedAPPaymentRows",
 
                 type: "GET",
+                dataType: "json",
                 cache: false,
 
                 data: {
-                    pageNo: state.pageNo,
-                    pageSize: pageSize,
-                    filter: filterAtRequest
+                    pageNo:
+                        state.pageNo,
+
+                    pageSize:
+                        pageSize,
+
+                    filter:
+                        filterAtRequest
                 },
 
                 success: function (response) {
-                    if (
-                        isDisposed ||
-                        filterAtRequest !== activeFilter
-                    ) {
+                    if (isDisposed) {
                         return;
                     }
 
-                    var data = parseResponse(response);
+                    var data =
+                        parseResponse(response);
 
-                    renderPageResult(
-                        filterAtRequest,
-                        data && !data.error
-                            ? data
-                            : {}
-                    );
+                    if (
+                        !data ||
+                        data.error ||
+                        data.errorText
+                    ) {
+                        tabState[
+                            filterAtRequest
+                        ].loaded = false;
 
-                    tabState[filterAtRequest].loaded = true;
+                        if (
+                            filterAtRequest ===
+                            activeFilter
+                        ) {
+                            renderPageResult(
+                                filterAtRequest,
+                                {
+                                    rows: [],
+                                    pageNo:
+                                        state.pageNo,
+
+                                    pageSize:
+                                        pageSize,
+
+                                    totalRecords:
+                                        0,
+
+                                    totalPages:
+                                        0
+                                }
+                            );
+                        }
+
+                        return;
+                    }
+
+                    tabState[
+                        filterAtRequest
+                    ].loaded = true;
+
+                    /*
+                     * Only render this response when it
+                     * belongs to the currently active tab.
+                     */
+                    if (
+                        filterAtRequest ===
+                        activeFilter
+                    ) {
+                        renderPageResult(
+                            filterAtRequest,
+                            data
+                        );
+                    }
                 },
 
-                error: function () {
+                error: function (
+                    xhr,
+                    textStatus
+                ) {
                     if (
                         isDisposed ||
-                        filterAtRequest !== activeFilter
+                        textStatus === "abort"
                     ) {
                         return;
                     }
 
-                    renderPageResult(filterAtRequest, {});
+                    tabState[
+                        filterAtRequest
+                    ].loaded = false;
+
+                    if (
+                        filterAtRequest ===
+                        activeFilter
+                    ) {
+                        renderPageResult(
+                            filterAtRequest,
+                            {
+                                rows: [],
+                                pageNo:
+                                    state.pageNo,
+
+                                pageSize:
+                                    pageSize,
+
+                                totalRecords:
+                                    0,
+
+                                totalPages:
+                                    0
+                            }
+                        );
+                    }
                 },
 
                 complete: function () {
-                    if (
-                        isDisposed ||
-                        filterAtRequest !== activeFilter
-                    ) {
+                    rowsRequest = null;
+
+                    if (isDisposed) {
                         return;
                     }
 
+                    /*
+                     * Always release the loading flag.
+                     * Do not return before this block.
+                     */
                     rowsLoading = false;
                     showDialogBusy(false);
+
+                    /*
+                     * The user may switch tabs while the
+                     * previous request is still running.
+                     */
+                    if (
+                        filterAtRequest !==
+                        activeFilter
+                    ) {
+                        if (
+                            isDialogVisible() &&
+                            !tabState[
+                                activeFilter
+                            ].loaded
+                        ) {
+                            loadRows();
+                        }
+                        else {
+                            updatePagerControlsForCurrentState();
+                        }
+
+                        return;
+                    }
 
                     updatePagerControlsForCurrentState();
                 }
@@ -265,8 +441,14 @@
                 data.autoAllocatedPercent || 0
             );
 
+            if (isNaN(percent)) {
+                percent = 0;
+            }
+
             if ($metricEl) {
-                $metricEl.text(formatPercent(percent));
+                $metricEl.text(
+                    formatPercent(percent)
+                );
             }
 
             var matched = Number(
@@ -277,58 +459,121 @@
                 data.unmatchedPayments || 0
             );
 
-            tabState.allocated.totalRecords = matched;
-            tabState.unallocated.totalRecords = unmatched;
+            if (isNaN(matched) || matched < 0) {
+                matched = 0;
+            }
+
+            if (
+                isNaN(unmatched) ||
+                unmatched < 0
+            ) {
+                unmatched = 0;
+            }
+
+            tabState.allocated.totalRecords =
+                matched;
+
+            tabState.unallocated.totalRecords =
+                unmatched;
 
             tabState.allocated.totalPages =
                 pageSize > 0
-                    ? Math.ceil(matched / pageSize)
+                    ? Math.ceil(
+                        matched / pageSize
+                    )
                     : 0;
 
             tabState.unallocated.totalPages =
                 pageSize > 0
-                    ? Math.ceil(unmatched / pageSize)
+                    ? Math.ceil(
+                        unmatched / pageSize
+                    )
                     : 0;
 
             updateTabCounts();
 
-            if (
-                $dialog &&
-                $dialog.is(":visible")
-            ) {
-                tabState[activeFilter].loaded = false;
-                loadRows();
+            if (isDialogVisible()) {
+                tabState[
+                    activeFilter
+                ].loaded = false;
+
+                if (!rowsLoading) {
+                    loadRows();
+                }
             }
         }
 
-        function renderPageResult(filter, data) {
-            var state = tabState[filter];
+        function renderPageResult(
+            filter,
+            data
+        ) {
+            var state =
+                tabState[filter];
+
+            if (!state) {
+                return;
+            }
 
             var rows =
-                data && Array.isArray(data.rows)
+                data &&
+                Array.isArray(data.rows)
                     ? data.rows
                     : [];
 
-            state.totalRecords = Number(
-                data && data.totalRecords || 0
+            var totalRecords = Number(
+                data &&
+                data.totalRecords || 0
             );
 
-            state.totalPages = Number(
-                data && data.totalPages || 0
+            var totalPages = Number(
+                data &&
+                data.totalPages || 0
             );
 
             if (
-                data &&
-                typeof data.pageNo !== "undefined"
+                isNaN(totalRecords) ||
+                totalRecords < 0
             ) {
-                state.pageNo = Number(data.pageNo);
+                totalRecords = 0;
+            }
+
+            if (
+                isNaN(totalPages) ||
+                totalPages < 0
+            ) {
+                totalPages = 0;
+            }
+
+            state.totalRecords =
+                totalRecords;
+
+            state.totalPages =
+                totalPages;
+
+            if (
+                data &&
+                typeof data.pageNo !==
+                "undefined"
+            ) {
+                var responsePageNo =
+                    Number(data.pageNo);
+
+                if (
+                    !isNaN(responsePageNo) &&
+                    responsePageNo > 0
+                ) {
+                    state.pageNo =
+                        responsePageNo;
+                }
             }
 
             if (
                 state.totalPages > 0 &&
-                state.pageNo > state.totalPages
+                state.pageNo >
+                state.totalPages
             ) {
-                state.pageNo = state.totalPages;
+                state.pageNo =
+                    state.totalPages;
             }
 
             if (
@@ -343,14 +588,20 @@
             var from =
                 state.totalRecords === 0
                     ? 0
-                    : (state.pageNo - 1) * pageSize;
+                    : (
+                        state.pageNo - 1
+                    ) * pageSize;
 
             var to = Math.min(
                 from + rows.length,
                 state.totalRecords
             );
 
-            updatePagerControls(from, to);
+            updatePagerControls(
+                from,
+                to
+            );
+
             updateTabCounts();
         }
 
@@ -361,53 +612,71 @@
 
             $dialogTbody.empty();
 
-            if (!rows || rows.length === 0) {
+            if (
+                !rows ||
+                rows.length === 0
+            ) {
                 $dialogTbody.html(
                     "<tr>" +
+
                     '<td class="' +
                     classPrefix +
                     'dialog-empty" colspan="6">' +
+
                     escapeHtml(
                         lbl(
                             "VAS_056_NoPaymentsThisPeriod",
                             "No payments in this period"
                         )
                     ) +
+
                     "</td>" +
+
                     "</tr>"
                 );
 
                 return;
             }
 
-            for (var i = 0; i < rows.length; i++) {
-                var row = rows[i] || {};
+            for (
+                var index = 0;
+                index < rows.length;
+                index++
+            ) {
+                var row =
+                    rows[index] || {};
 
-                var dateText = formatDate(row.date);
-                var documentNo = row.documentNo || "";
-                var vendor = row.vendor || "";
-                var bankText = formatBankAccount(row);
-                var currencyCode = row.paymentCurrency || "";
+                var dateText =
+                    formatDate(row.date);
 
-                var currencySymbol =
-                    row.paymentCurrencySymbol ||
-                    currencyCode ||
+                var documentNo =
+                    row.documentNo || "";
+
+                var vendor =
+                    row.vendor ||
+                    row.vendorName ||
                     "";
 
-                var amountText = formatAmount(row.amount);
+                var bankText =
+                    formatBankAccount(row);
 
-                var amountHtml = "";
+                var currencyCode =
+                    row.paymentCurrency ||
+                    row.currencyISO ||
+                    "";
 
-                if (currencySymbol) {
-                    amountHtml +=
-                        '<span class="' +
-                        classPrefix +
-                        'cur-inline">' +
-                        escapeHtml(currencySymbol) +
-                        "</span>";
-                }
+                var amountText =
+                    formatAmount(
+                        row.amount
+                    );
 
-                amountHtml += escapeHtml(amountText);
+                /*
+                 * Amount is numeric only.
+                 * Currency is already displayed in
+                 * a separate table column.
+                 */
+                var amountHtml =
+                    escapeHtml(amountText);
 
                 var rowHtml =
                     "<tr>" +
@@ -425,11 +694,13 @@
                     'td-doc" title="' +
                     escapeHtml(documentNo) +
                     '">' +
+
                     '<span class="' +
                     classPrefix +
                     'truncate">' +
                     escapeHtml(documentNo) +
                     "</span>" +
+
                     "</td>" +
 
                     '<td class="' +
@@ -437,11 +708,13 @@
                     'td-customer" title="' +
                     escapeHtml(vendor) +
                     '">' +
+
                     '<span class="' +
                     classPrefix +
                     'truncate">' +
                     escapeHtml(vendor) +
                     "</span>" +
+
                     "</td>" +
 
                     '<td class="' +
@@ -449,11 +722,13 @@
                     'td-bank" title="' +
                     escapeHtml(bankText) +
                     '">' +
+
                     '<span class="' +
                     classPrefix +
                     'truncate">' +
                     escapeHtml(bankText) +
                     "</span>" +
+
                     "</td>" +
 
                     '<td class="' +
@@ -467,46 +742,62 @@
                     '<td class="' +
                     classPrefix +
                     'td-amount" title="' +
-                    escapeHtml(
-                        (
-                            currencySymbol
-                                ? currencySymbol + " "
-                                : ""
-                        ) + amountText
-                    ) +
+                    escapeHtml(amountText) +
                     '">' +
                     amountHtml +
                     "</td>" +
 
                     "</tr>";
 
-                $dialogTbody.append(rowHtml);
+                $dialogTbody.append(
+                    rowHtml
+                );
             }
         }
 
         function updatePagerControlsForCurrentState() {
-            var state = tabState[activeFilter];
+            var state =
+                tabState[activeFilter];
+
+            if (!state) {
+                return;
+            }
 
             var from =
                 state.totalRecords === 0
                     ? 0
-                    : (state.pageNo - 1) * pageSize;
+                    : (
+                        state.pageNo - 1
+                    ) * pageSize;
 
             var to = Math.min(
                 from + pageSize,
                 state.totalRecords
             );
 
-            updatePagerControls(from, to);
+            updatePagerControls(
+                from,
+                to
+            );
         }
 
-        function updatePagerControls(from, to) {
-            var state = tabState[activeFilter];
+        function updatePagerControls(
+            from,
+            to
+        ) {
+            var state =
+                tabState[activeFilter];
+
+            if (!state) {
+                return;
+            }
 
             updateTabCounts();
 
             if ($pagerHelper) {
-                if (state.totalRecords > 0) {
+                if (
+                    state.totalRecords > 0
+                ) {
                     var paymentLabel =
                         state.totalRecords === 1
                             ? lbl(
@@ -518,13 +809,19 @@
                                 "payments"
                             );
 
+                    var firstDisplayed =
+                        Math.min(
+                            from + 1,
+                            state.totalRecords
+                        );
+
                     $pagerHelper.text(
                         lbl(
                             "VAS_Showing",
                             "Showing"
                         ) +
                         " " +
-                        (from + 1) +
+                        firstDisplayed +
                         "-" +
                         to +
                         " " +
@@ -573,7 +870,8 @@
                     "disabled",
                     rowsLoading ||
                     state.totalPages <= 1 ||
-                    state.pageNo >= state.totalPages
+                    state.pageNo >=
+                    state.totalPages
                 );
             }
         }
@@ -581,13 +879,17 @@
         function updateTabCounts() {
             if ($tabAllocatedCount) {
                 $tabAllocatedCount.text(
-                    tabState.allocated.totalRecords
+                    tabState
+                        .allocated
+                        .totalRecords
                 );
             }
 
             if ($tabUnallocatedCount) {
                 $tabUnallocatedCount.text(
-                    tabState.unallocated.totalRecords
+                    tabState
+                        .unallocated
+                        .totalRecords
                 );
             }
         }
@@ -604,18 +906,20 @@
                 filter === activeFilter &&
                 tabState[filter].loaded
             ) {
+                updatePagerControlsForCurrentState();
                 return;
             }
 
             activeFilter = filter;
 
             updateActiveTabStyles();
+            updatePagerControlsForCurrentState();
 
-            if (!tabState[filter].loaded) {
+            if (
+                !tabState[filter].loaded &&
+                !rowsLoading
+            ) {
                 loadRows();
-            }
-            else {
-                updatePagerControlsForCurrentState();
             }
         }
 
@@ -654,38 +958,81 @@
 
         function setNoData() {
             if ($metricEl) {
-                $metricEl.text("0%");
+                $metricEl.text(
+                    formatPercent(0)
+                );
             }
 
-            tabState.allocated.totalRecords = 0;
-            tabState.allocated.totalPages = 0;
+            tabState.allocated.totalRecords =
+                0;
 
-            tabState.unallocated.totalRecords = 0;
-            tabState.unallocated.totalPages = 0;
+            tabState.allocated.totalPages =
+                0;
+
+            tabState.allocated.loaded =
+                false;
+
+            tabState.unallocated.totalRecords =
+                0;
+
+            tabState.unallocated.totalPages =
+                0;
+
+            tabState.unallocated.loaded =
+                false;
 
             updateTabCounts();
+
+            if (isDialogVisible()) {
+                renderRows([]);
+                updatePagerControlsForCurrentState();
+            }
         }
 
         function formatPercent(value) {
-            return Number(
+            var numericValue = Number(
                 value || 0
-            ).toLocaleString(
+            );
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var precision =
+                getStdPrecision();
+
+            return numericValue.toLocaleString(
                 window.navigator.language,
                 {
-                    minimumFractionDigits: getStdPrecision(),
-                    maximumFractionDigits: getStdPrecision()
+                    minimumFractionDigits:
+                        precision,
+
+                    maximumFractionDigits:
+                        precision
                 }
             ) + "%";
         }
 
         function formatAmount(value) {
-            return Number(
+            var numericValue = Number(
                 value || 0
-            ).toLocaleString(
+            );
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var precision =
+                getStdPrecision();
+
+            return numericValue.toLocaleString(
                 window.navigator.language,
                 {
-                    minimumFractionDigits: getStdPrecision(),
-                    maximumFractionDigits: getStdPrecision()
+                    minimumFractionDigits:
+                        precision,
+
+                    maximumFractionDigits:
+                        precision
                 }
             );
         }
@@ -697,7 +1044,9 @@
                 if (
                     VIS.Env &&
                     VIS.Env.getCtx &&
-                    VIS.Env.getCtx().getStdPrecision
+                    VIS.Env
+                        .getCtx()
+                        .getStdPrecision
                 ) {
                     stdPrecision = Number(
                         VIS.Env
@@ -725,10 +1074,42 @@
                 return "";
             }
 
+            if (
+                typeof value === "string" &&
+                /^\d{4}-\d{2}-\d{2}$/
+                    .test(value)
+            ) {
+                var parts =
+                    value.split("-");
+
+                var localDate =
+                    new Date(
+                        Number(parts[0]),
+                        Number(parts[1]) - 1,
+                        Number(parts[2])
+                    );
+
+                if (
+                    !isNaN(
+                        localDate.getTime()
+                    )
+                ) {
+                    return localDate
+                        .toLocaleDateString(
+                            window.navigator.language,
+                            {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric"
+                            }
+                        );
+                }
+            }
+
             var date = new Date(value);
 
             if (isNaN(date.getTime())) {
-                return value;
+                return String(value);
             }
 
             return date.toLocaleDateString(
@@ -742,15 +1123,32 @@
         }
 
         function formatBankAccount(row) {
+            row = row || {};
+
             var bankName =
-                row && row.bankName
-                    ? String(row.bankName).trim()
+                row.bankName
+                    ? String(
+                        row.bankName
+                    ).trim()
+                    : "";
+
+            var bankAccountName =
+                row.bankAccountName
+                    ? String(
+                        row.bankAccountName
+                    ).trim()
                     : "";
 
             var accountNo =
-                row && row.accountNo
-                    ? String(row.accountNo).trim()
+                row.accountNo
+                    ? String(
+                        row.accountNo
+                    ).trim()
                     : "";
+
+            var displayName =
+                bankName ||
+                bankAccountName;
 
             var last4 = "";
 
@@ -761,12 +1159,19 @@
                         : accountNo;
             }
 
-            if (bankName && last4) {
-                return bankName + " - ****" + last4;
+            if (
+                displayName &&
+                last4
+            ) {
+                return (
+                    displayName +
+                    " - ****" +
+                    last4
+                );
             }
 
-            if (bankName) {
-                return bankName;
+            if (displayName) {
+                return displayName;
             }
 
             if (last4) {
@@ -777,21 +1182,31 @@
         }
 
         function openDialog() {
-            if (!$dialog) {
+            if (
+                !$dialog ||
+                isDisposed
+            ) {
                 return;
             }
 
             $dialog.show();
 
             $("body").addClass(
-                classPrefix + "body-lock"
+                classPrefix +
+                "body-lock"
             );
 
             updateActiveTabStyles();
             updateTabCounts();
 
-            if (!tabState[activeFilter].loaded) {
-                loadRows();
+            if (
+                !tabState[
+                    activeFilter
+                ].loaded
+            ) {
+                if (!rowsLoading) {
+                    loadRows();
+                }
             }
             else {
                 updatePagerControlsForCurrentState();
@@ -806,16 +1221,24 @@
             $dialog.hide();
 
             $("body").removeClass(
-                classPrefix + "body-lock"
+                classPrefix +
+                "body-lock"
             );
 
-            activeFilter = "allocated";
+            activeFilter =
+                "allocated";
 
-            tabState.allocated.pageNo = 1;
-            tabState.allocated.loaded = false;
+            tabState.allocated.pageNo =
+                1;
 
-            tabState.unallocated.pageNo = 1;
-            tabState.unallocated.loaded = false;
+            tabState.allocated.loaded =
+                false;
+
+            tabState.unallocated.pageNo =
+                1;
+
+            tabState.unallocated.loaded =
+                false;
 
             updateActiveTabStyles();
         }
@@ -824,7 +1247,7 @@
             $dialog = $(
                 '<div class="' +
                 classPrefix +
-                'dialog" style="display:none;" role="dialog" aria-modal="true">' +
+                'dialog" role="dialog" aria-modal="true">' +
 
                 '<div class="' +
                 classPrefix +
@@ -856,23 +1279,27 @@
                 '<div class="' +
                 classPrefix +
                 'dialog-title">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_056_PaymentAllocation",
                         "Payment allocation"
                     )
                 ) +
+
                 "</div>" +
 
                 '<div class="' +
                 classPrefix +
                 'dialog-subtitle">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_056_AllocatedVsUnallocated",
                         "Allocated vs unallocated payments in the last 30 days"
                     )
                 ) +
+
                 "</div>" +
 
                 "</div>" +
@@ -880,12 +1307,14 @@
                 '<button type="button" class="' +
                 classPrefix +
                 'dialog-close" aria-label="' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Close",
                         "Close"
                     )
                 ) +
+
                 '">' +
 
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
@@ -912,12 +1341,14 @@
                 '<span class="' +
                 classPrefix +
                 'tab-label">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Allocated",
                         "Allocated"
                     )
                 ) +
+
                 "</span>" +
 
                 '<span class="' +
@@ -937,12 +1368,14 @@
                 '<span class="' +
                 classPrefix +
                 'tab-label">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Unallocated",
                         "Unallocated"
                     )
                 ) +
+
                 "</span>" +
 
                 '<span class="' +
@@ -979,67 +1412,79 @@
                 '<th class="' +
                 classPrefix +
                 'th-date">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Date",
                         "Date"
                     )
                 ) +
+
                 "</th>" +
 
                 '<th class="' +
                 classPrefix +
                 'th-doc">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_056_PaymentNo",
                         "Payment No."
                     )
                 ) +
+
                 "</th>" +
 
                 '<th class="' +
                 classPrefix +
                 'th-customer">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Vendor",
                         "Vendor"
                     )
                 ) +
+
                 "</th>" +
 
                 '<th class="' +
                 classPrefix +
                 'th-bank">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_BankAccount",
                         "Bank account"
                     )
                 ) +
+
                 "</th>" +
 
                 '<th class="' +
                 classPrefix +
                 'th-currency">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_PaymentCurrency",
                         "Payment Currency"
                     )
                 ) +
+
                 "</th>" +
 
                 '<th class="' +
                 classPrefix +
                 'th-amount">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Amount",
                         "Amount"
                     )
                 ) +
+
                 "</th>" +
 
                 "</tr>" +
@@ -1070,12 +1515,14 @@
                 "pager-btn " +
                 classPrefix +
                 'pager-prev" aria-label="' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Previous",
                         "Previous"
                     )
                 ) +
+
                 '">' +
 
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -1093,12 +1540,14 @@
                 "pager-btn " +
                 classPrefix +
                 'pager-next" aria-label="' +
+
                 escapeHtml(
                     lbl(
                         "VAS_Next",
                         "Next"
                     )
                 ) +
+
                 '">' +
 
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
@@ -1115,47 +1564,71 @@
                 "</div>"
             );
 
+            $dialog.hide();
+
             $dialogTbody = $dialog.find(
-                "." + classPrefix + "dialog-tbody"
+                "." +
+                classPrefix +
+                "dialog-tbody"
             );
 
             $dialogBusy = $dialog.find(
-                "." + classPrefix + "dialog-busy"
+                "." +
+                classPrefix +
+                "dialog-busy"
             );
 
             showDialogBusy(false);
 
             $pagerHelper = $dialog.find(
-                "." + classPrefix + "pager-helper"
+                "." +
+                classPrefix +
+                "pager-helper"
             );
 
             $pagerPrev = $dialog.find(
-                "." + classPrefix + "pager-prev"
+                "." +
+                classPrefix +
+                "pager-prev"
             );
 
             $pagerNext = $dialog.find(
-                "." + classPrefix + "pager-next"
+                "." +
+                classPrefix +
+                "pager-next"
             );
 
             $pagerText = $dialog.find(
-                "." + classPrefix + "pager-text"
+                "." +
+                classPrefix +
+                "pager-text"
             );
 
             $tabAllocated = $dialog.find(
-                "." + classPrefix + "tab-allocated"
+                "." +
+                classPrefix +
+                "tab-allocated"
             );
 
             $tabUnallocated = $dialog.find(
-                "." + classPrefix + "tab-unallocated"
+                "." +
+                classPrefix +
+                "tab-unallocated"
             );
 
-            $tabAllocatedCount = $dialog.find(
-                "." + classPrefix + "tab-count-allocated"
-            );
+            $tabAllocatedCount =
+                $dialog.find(
+                    "." +
+                    classPrefix +
+                    "tab-count-allocated"
+                );
 
-            $tabUnallocatedCount = $dialog.find(
-                "." + classPrefix + "tab-count-unallocated"
-            );
+            $tabUnallocatedCount =
+                $dialog.find(
+                    "." +
+                    classPrefix +
+                    "tab-count-unallocated"
+                );
 
             $dialog.find(
                 "." +
@@ -1171,21 +1644,28 @@
             $tabAllocated.on(
                 "click",
                 function () {
-                    switchTab("allocated");
+                    switchTab(
+                        "allocated"
+                    );
                 }
             );
 
             $tabUnallocated.on(
                 "click",
                 function () {
-                    switchTab("unallocated");
+                    switchTab(
+                        "unallocated"
+                    );
                 }
             );
 
             $pagerPrev.on(
                 "click",
                 function () {
-                    var state = tabState[activeFilter];
+                    var state =
+                        tabState[
+                            activeFilter
+                        ];
 
                     if (
                         rowsLoading ||
@@ -1204,11 +1684,16 @@
             $pagerNext.on(
                 "click",
                 function () {
-                    var state = tabState[activeFilter];
+                    var state =
+                        tabState[
+                            activeFilter
+                        ];
 
                     if (
                         rowsLoading ||
-                        state.pageNo >= state.totalPages
+                        state.totalPages <= 0 ||
+                        state.pageNo >=
+                        state.totalPages
                     ) {
                         return;
                     }
@@ -1221,20 +1706,24 @@
             );
 
             $(document).on(
-                "keydown.VAS-056-AutoAllocatedAPPayment-" +
+                "keydown." +
+                classPrefix +
                 self.AD_UserHomeWidgetID,
 
                 function (event) {
                     if (
-                        event.key === "Escape" &&
-                        $dialog.is(":visible")
+                        event.key ===
+                        "Escape" &&
+                        isDialogVisible()
                     ) {
                         closeDialog();
                     }
                 }
             );
 
-            $("body").append($dialog);
+            $("body").append(
+                $dialog
+            );
         }
 
         function createWidget() {
@@ -1263,12 +1752,14 @@
                 '<span class="' +
                 classPrefix +
                 'title">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_056_AutoAllocatedAPPayments",
                         "Auto-allocated AP"
                     )
                 ) +
+
                 "</span>" +
 
                 "</div>" +
@@ -1287,17 +1778,17 @@
                 classPrefix +
                 'footer">' +
 
-               
-
                 '<span class="' +
                 classPrefix +
                 'desc">' +
+
                 escapeHtml(
                     lbl(
                         "VAS_056_PaymentMatchToInvoice",
                         "Payment Match to Invoice"
                     )
                 ) +
+
                 "</span>" +
 
                 "</div>" +
@@ -1306,7 +1797,9 @@
             );
 
             $metricEl = $card.find(
-                "." + classPrefix + "value"
+                "." +
+                classPrefix +
+                "value"
             );
 
             $card.on(
@@ -1318,7 +1811,8 @@
                 "keydown",
                 function (event) {
                     if (
-                        event.key === "Enter" ||
+                        event.key ===
+                        "Enter" ||
                         event.key === " "
                     ) {
                         event.preventDefault();
@@ -1347,11 +1841,17 @@
         }
 
         this.refreshData = function () {
-            tabState.allocated.loaded = false;
-            tabState.allocated.pageNo = 1;
+            tabState.allocated.loaded =
+                false;
 
-            tabState.unallocated.loaded = false;
-            tabState.unallocated.pageNo = 1;
+            tabState.allocated.pageNo =
+                1;
+
+            tabState.unallocated.loaded =
+                false;
+
+            tabState.unallocated.pageNo =
+                1;
 
             loadKpi();
         };
@@ -1363,13 +1863,33 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
+            if (
+                kpiRequest &&
+                kpiRequest.readyState !== 4
+            ) {
+                kpiRequest.abort();
+            }
+
+            if (
+                rowsRequest &&
+                rowsRequest.readyState !== 4
+            ) {
+                rowsRequest.abort();
+            }
+
+            kpiRequest = null;
+            rowsRequest = null;
+            rowsLoading = false;
+
             $(document).off(
-                "keydown.VAS-056-AutoAllocatedAPPayment-" +
+                "keydown." +
+                classPrefix +
                 this.AD_UserHomeWidgetID
             );
 
             $("body").removeClass(
-                classPrefix + "body-lock"
+                classPrefix +
+                "body-lock"
             );
 
             if ($dialog) {
@@ -1406,7 +1926,9 @@
                 frame.widgetInfo
             ) {
                 this.AD_UserHomeWidgetID =
-                    frame.widgetInfo.AD_UserHomeWidgetID;
+                    frame
+                        .widgetInfo
+                        .AD_UserHomeWidgetID;
             }
 
             this.Initalize();
@@ -1417,7 +1939,9 @@
             ) {
                 this.frame
                     .getContentGrid()
-                    .append(this.getRoot());
+                    .append(
+                        this.getRoot()
+                    );
             }
         };
 
@@ -1445,3 +1969,4 @@
         };
 
 })(VAS, jQuery);
+
