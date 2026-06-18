@@ -1188,3 +1188,64 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     left: 50%;
     transform: translate(-50%, -50%);
 }
+
+/* Dialog buttons: design-system primary / secondary pills */
+.VAS-glje-dialog-actions {
+    gap: 0.5rem;
+}
+
+.VAS-glje-export,
+.VAS-glje-close-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 6rem;
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    border-width: 1px;
+    border-style: solid;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.VAS-glje-export {
+    background: #E5F3FB;
+    border-color: #BFE4FF;
+    color: #0083DA;
+}
+
+.VAS-glje-export:hover {
+    background: #CCE6F8;
+    border-color: #9ED1FF;
+    color: #0069AE;
+}
+
+.VAS-glje-close-primary {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+    box-shadow: none;
+}
+
+.VAS-glje-close-primary:hover {
+    background: #0069AE;
+    border-color: #0069AE;
+}
+
+.VAS-glje-export:focus-visible,
+.VAS-glje-close-primary:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.VAS-glje-export:disabled,
+.VAS-glje-close-primary:disabled {
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
+}

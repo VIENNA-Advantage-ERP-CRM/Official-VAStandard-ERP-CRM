@@ -188,6 +188,11 @@
     letter-spacing: 0.02em;
 }
 
+.VAS-gljpq-meta-approved {
+    color: #0069AE;
+    font-weight: 700;
+}
+
 /* ── Amount ──────────────────────────────────────────────────────────────── */
 .VAS-gljpq-amt {
     font-size: 0.8em;
@@ -629,6 +634,11 @@ html[dir="rtl"] .VAS-gljpq-item {
     color: #0B6B45;
 }
 
+.VAS-gljpq-pill-approved {
+    background: rgba(0, 131, 218, 0.12);
+    color: #0069AE;
+}
+
 .VAS-gljpq-pill-submit {
     background: #EAF8FF;
     color: #0083DA;
@@ -791,4 +801,64 @@ html[dir="rtl"] .VAS-gljpq-item {
 .VAS-gljpq-body.is-empty .VAS-gljpq-empty {
     min-height: 100%;
     width: 100%;
+}
+
+/* Dialog buttons: design-system primary / secondary pills */
+.VAS-gljpq-dialog-actions {
+    gap: 0.5rem;
+}
+
+.VAS-gljpq-dialog-secondary,
+.VAS-gljpq-dialog-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 6rem;
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    border-width: 1px;
+    border-style: solid;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.VAS-gljpq-dialog-secondary {
+    background: #E5F3FB;
+    border-color: #BFE4FF;
+    color: #0083DA;
+}
+
+.VAS-gljpq-dialog-secondary:hover {
+    background: #CCE6F8;
+    border-color: #9ED1FF;
+    color: #0069AE;
+}
+
+.VAS-gljpq-dialog-primary {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-gljpq-dialog-primary:hover {
+    background: #0069AE;
+    border-color: #0069AE;
+}
+
+.VAS-gljpq-dialog-secondary:focus-visible,
+.VAS-gljpq-dialog-primary:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.VAS-gljpq-dialog-secondary:disabled,
+.VAS-gljpq-dialog-primary:disabled {
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
 }
