@@ -117,290 +117,7 @@ ORDER BY C_AcctSchema.C_AcctSchema_ID";
         }
 
         /// <summary>
-        /// Returns recent GL journals.
-        /// </summary>
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
-        public JsonResult GetRecentEntries()
-        {
-            Ctx ctx = GetContext();
-
-            if (ctx == null)
-            {
-                return GetSessionExpiredResult();
-            }
-
-            SchemaInfo schema =
-                GetPrimarySchema(ctx);
-
-            if (schema.AcctSchemaId <= 0)
-            {
-                return Json(
-                    JsonConvert.SerializeObject(
-                        new
-                        {
-                            success = false,
-                            error = "Accounting schema was not found.",
-                            Entries = new List<object>()
-                        }
-                    ),
-                    JsonRequestBehavior.AllowGet
-                );
-            }
-
-            string sqlBase = @"
-SELECT
-    GL_Journal.GL_Journal_ID,
-    GL_Journal.DocumentNo,
-    GL_Journal.DateAcct,
-    GL_Journal.Description,
-    GL_Journal.DocStatus,
-    GL_Journal.Posted,
-    AD_Ref_List.Name AS DocStatusName,
-    COALESCE(
-        SUM(GL_JournalLine.AmtAcctDr),
-        0
-    ) AS TotalDebit,
-    COALESCE(
-        SUM(GL_JournalLine.AmtAcctCr),
-        0
-    ) AS TotalCredit
-FROM GL_Journal
-INNER JOIN GL_JournalLine ON
-(
-    GL_Journal.GL_Journal_ID =
-    GL_JournalLine.GL_Journal_ID
-    AND GL_JournalLine.IsActive = 'Y'
-)
-LEFT OUTER JOIN AD_Ref_List ON
-(
-    AD_Ref_List.AD_Reference_ID = 131
-    AND AD_Ref_List.Value =
-    GL_Journal.DocStatus
-    AND AD_Ref_List.IsActive = 'Y'
-)
-WHERE GL_Journal.IsActive = 'Y'
-AND GL_Journal.C_AcctSchema_ID =
-@AcctSchemaID";
-
-            sqlBase =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    sqlBase,
-                    "GL_Journal",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
-
-            string sql = sqlBase + @"
-GROUP BY
-    GL_Journal.GL_Journal_ID,
-    GL_Journal.DocumentNo,
-    GL_Journal.DateAcct,
-    GL_Journal.Description,
-    GL_Journal.DocStatus,
-    GL_Journal.Posted,
-    AD_Ref_List.Name
-ORDER BY
-    GL_Journal.DateAcct DESC,
-    GL_Journal.GL_Journal_ID DESC
-FETCH FIRST 25 ROWS ONLY";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter(
-                    "@AcctSchemaID",
-                    schema.AcctSchemaId
-                )
-            };
-
-            DataSet dataSet = DB.ExecuteDataset(
-                sql,
-                parameters,
-                null
-            );
-
-            List<object> entries =
-                new List<object>();
-
-            object unbalancedEntry = null;
-
-            if (
-                dataSet != null &&
-                dataSet.Tables.Count > 0 &&
-                dataSet.Tables[0].Rows.Count > 0
-            )
-            {
-                foreach (
-                    DataRow row in
-                    dataSet.Tables[0].Rows
-                )
-                {
-                    int journalId =
-                        Util.GetValueOfInt(
-                            row["GL_Journal_ID"]
-                        );
-
-                    string documentNo =
-                        Util.GetValueOfString(
-                            row["DocumentNo"]
-                        );
-
-                    string description =
-                        Util.GetValueOfString(
-                            row["Description"]
-                        );
-
-                    string docStatus =
-                        Util.GetValueOfString(
-                            row["DocStatus"]
-                        );
-
-                    string statusName =
-                        Util.GetValueOfString(
-                            row["DocStatusName"]
-                        );
-
-                    string posted =
-                        Util.GetValueOfString(
-                            row["Posted"]
-                        );
-
-                    if (string.IsNullOrEmpty(
-                        statusName
-                    ))
-                    {
-                        statusName = docStatus;
-                    }
-
-                    string dateAcctText =
-                        string.Empty;
-
-                    if (
-                        row["DateAcct"] !=
-                        DBNull.Value
-                    )
-                    {
-                        dateAcctText =
-                            Convert.ToDateTime(
-                                row["DateAcct"]
-                            ).ToString("MMM dd");
-                    }
-
-                    decimal totalDebit =
-                        Decimal.Round(
-                            Util.GetValueOfDecimal(
-                                row["TotalDebit"]
-                            ),
-                            schema.StdPrecision,
-                            MidpointRounding
-                                .AwayFromZero
-                        );
-
-                    decimal totalCredit =
-                        Decimal.Round(
-                            Util.GetValueOfDecimal(
-                                row["TotalCredit"]
-                            ),
-                            schema.StdPrecision,
-                            MidpointRounding
-                                .AwayFromZero
-                        );
-
-                    bool isUnbalanced =
-                        Math.Abs(
-                            totalDebit -
-                            totalCredit
-                        ) > 0m;
-
-                    entries.Add(
-                        new
-                        {
-                            GL_Journal_ID =
-                                journalId,
-
-                            DocumentNo =
-                                documentNo,
-
-                            DateAcct =
-                                dateAcctText,
-
-                            Description =
-                                description,
-
-                            DocStatus =
-                                docStatus,
-
-                            Posted =
-                                posted,
-
-                            StatusName =
-                                statusName,
-
-                            TotalDebit =
-                                totalDebit,
-
-                            TotalCredit =
-                                totalCredit,
-
-                            IsUnbalanced =
-                                isUnbalanced
-                        }
-                    );
-
-                    if (
-                        isUnbalanced &&
-                        unbalancedEntry == null
-                    )
-                    {
-                        decimal difference =
-                            Decimal.Round(
-                                Math.Abs(
-                                    totalDebit -
-                                    totalCredit
-                                ),
-                                schema.StdPrecision,
-                                MidpointRounding
-                                    .AwayFromZero
-                            );
-
-                        unbalancedEntry =
-                            new
-                            {
-                                GL_Journal_ID =
-                                    journalId,
-
-                                DocumentNo =
-                                    documentNo,
-
-                                Difference =
-                                    difference
-                            };
-                    }
-                }
-            }
-
-            return Json(
-                JsonConvert.SerializeObject(
-                    new
-                    {
-                        success = true,
-                        Entries = entries,
-                        UnbalancedEntry =
-                            unbalancedEntry,
-                        CurSymbol =
-                            schema.CurSymbol,
-                        ISOCode =
-                            schema.ISOCode,
-                        StdPrecision =
-                            schema.StdPrecision
-                    }
-                ),
-                JsonRequestBehavior.AllowGet
-            );
-        }
-
-        /// <summary>
-        /// Returns journal header and lines.
+        /// Returns journal header and journal lines.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -432,6 +149,31 @@ FETCH FIRST 25 ROWS ONLY";
             SchemaInfo schema =
                 GetPrimarySchema(ctx);
 
+            if (schema.AcctSchemaId <= 0)
+            {
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            error = true,
+                            errorText =
+                                "Accounting schema was not found."
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+
+            string language =
+                ctx.GetAD_Language();
+
+            if (string.IsNullOrWhiteSpace(
+                language
+            ))
+            {
+                language = "ar_IQ";
+            }
+
             string headerBase = @"
 SELECT
     GL_Journal.GL_Journal_ID,
@@ -442,31 +184,60 @@ SELECT
     GL_Journal.Posted,
     GL_Journal.Processed,
     GL_Journal.Created,
-    AD_Ref_List.Name AS DocStatusName,
+    DocStatusReference.Name AS DocStatusName,
     AD_User.Name AS CreatedByName,
     COALESCE(
-        SUM(GL_JournalLine.AmtAcctDr),
+        SUM(
+            COALESCE(
+                GL_JournalLine.AmtAcctDr,
+                0
+            )
+        ),
         0
     ) AS TotalDebit,
     COALESCE(
-        SUM(GL_JournalLine.AmtAcctCr),
+        SUM(
+            COALESCE(
+                GL_JournalLine.AmtAcctCr,
+                0
+            )
+        ),
         0
     ) AS TotalCredit
-FROM GL_Journal
-LEFT OUTER JOIN GL_JournalLine ON
+FROM GL_Journal GL_Journal
+LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
 (
     GL_Journal.GL_Journal_ID =
     GL_JournalLine.GL_Journal_ID
     AND GL_JournalLine.IsActive = 'Y'
 )
-LEFT OUTER JOIN AD_Ref_List ON
+LEFT OUTER JOIN
 (
-    AD_Ref_List.AD_Reference_ID = 131
-    AND AD_Ref_List.Value =
-    GL_Journal.DocStatus
+    SELECT
+        AD_Ref_List.Value,
+        AD_Ref_List_Trl.Name
+    FROM AD_Reference AD_Reference
+    INNER JOIN AD_Ref_List AD_Ref_List ON
+    (
+        AD_Reference.AD_Reference_ID =
+        AD_Ref_List.AD_Reference_ID
+    )
+    INNER JOIN AD_Ref_List_Trl AD_Ref_List_Trl ON
+    (
+        AD_Ref_List.AD_Ref_List_ID =
+        AD_Ref_List_Trl.AD_Ref_List_ID
+        AND AD_Ref_List_Trl.AD_Language =
+        @AD_Language
+    )
+    WHERE AD_Reference.Name = 'DocStatus'
+    AND AD_Reference.IsActive = 'Y'
     AND AD_Ref_List.IsActive = 'Y'
+) DocStatusReference ON
+(
+    DocStatusReference.Value =
+    GL_Journal.DocStatus
 )
-LEFT OUTER JOIN AD_User ON
+LEFT OUTER JOIN AD_User AD_User ON
 (
     GL_Journal.CreatedBy =
     AD_User.AD_User_ID
@@ -478,12 +249,13 @@ AND GL_Journal.C_AcctSchema_ID =
 @AcctSchemaID";
 
             headerBase =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    headerBase,
-                    "GL_Journal",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        headerBase,
+                        "GL_Journal",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
             string headerSql = headerBase + @"
 GROUP BY
@@ -495,21 +267,26 @@ GROUP BY
     GL_Journal.Posted,
     GL_Journal.Processed,
     GL_Journal.Created,
-    AD_Ref_List.Name,
+    DocStatusReference.Name,
     AD_User.Name";
 
             SqlParameter[] headerParameters =
             {
-                new SqlParameter(
-                    "@JournalID",
-                    journalId
-                ),
+        new SqlParameter(
+            "@JournalID",
+            journalId
+        ),
 
-                new SqlParameter(
-                    "@AcctSchemaID",
-                    schema.AcctSchemaId
-                )
-            };
+        new SqlParameter(
+            "@AcctSchemaID",
+            schema.AcctSchemaId
+        ),
+
+        new SqlParameter(
+            "@AD_Language",
+            language
+        )
+    };
 
             DataSet headerDataSet =
                 DB.ExecuteDataset(
@@ -551,7 +328,7 @@ GROUP BY
                     headerRow["DocStatusName"]
                 );
 
-            if (string.IsNullOrEmpty(
+            if (string.IsNullOrWhiteSpace(
                 statusName
             ))
             {
@@ -596,8 +373,7 @@ GROUP BY
                         headerRow["TotalDebit"]
                     ),
                     schema.StdPrecision,
-                    MidpointRounding
-                        .AwayFromZero
+                    MidpointRounding.AwayFromZero
                 );
 
             decimal totalCredit =
@@ -606,22 +382,63 @@ GROUP BY
                         headerRow["TotalCredit"]
                     ),
                     schema.StdPrecision,
-                    MidpointRounding
-                        .AwayFromZero
+                    MidpointRounding.AwayFromZero
                 );
 
+            /*
+             * GL_JournalLine does not retrieve the account
+             * directly from Account_ID.
+             *
+             * The correct relation is:
+             * GL_JournalLine.C_ValidCombination_ID
+             * -> C_ValidCombination.Account_ID
+             * -> C_ElementValue.C_ElementValue_ID
+             */
             string linesSql = @"
 SELECT
     GL_JournalLine.GL_JournalLine_ID,
-    C_ElementValue.Value AS AccountCode,
-    C_ElementValue.Name AS AccountName,
+    GL_JournalLine.Line,
+    GL_JournalLine.C_ValidCombination_ID,
+    ValidCombination.Account_ID,
+    AccountValue.Value AS AccountCode,
+    AccountValue.Name AS AccountName,
     GL_JournalLine.AmtAcctDr,
-    GL_JournalLine.AmtAcctCr
-FROM GL_JournalLine
-INNER JOIN C_ElementValue ON
+    GL_JournalLine.AmtAcctCr,
+    CostCenterValue.Value AS CostCenterCode,
+    CostCenterValue.Name AS CostCenterName,
+    BusinessPartner.Name AS BPartnerName,
+    Product.Name AS ProductName,
+    Project.Name AS ProjectName
+FROM GL_JournalLine GL_JournalLine
+LEFT OUTER JOIN C_ValidCombination ValidCombination ON
 (
-    GL_JournalLine.Account_ID =
-    C_ElementValue.C_ElementValue_ID
+    GL_JournalLine.C_ValidCombination_ID =
+    ValidCombination.C_ValidCombination_ID
+)
+LEFT OUTER JOIN C_ElementValue AccountValue ON
+(
+    ValidCombination.Account_ID =
+    AccountValue.C_ElementValue_ID
+)
+LEFT OUTER JOIN C_ElementValue CostCenterValue ON
+(
+    ValidCombination.User1_ID =
+    CostCenterValue.C_ElementValue_ID
+)
+LEFT OUTER JOIN C_BPartner BusinessPartner ON
+(
+    ValidCombination.C_BPartner_ID =
+    BusinessPartner.C_BPartner_ID
+)
+LEFT OUTER JOIN M_Product Product ON
+(
+    ValidCombination.M_Product_ID =
+    Product.M_Product_ID
+)
+LEFT OUTER JOIN C_Project Project ON
+(
+    ValidCombination.C_Project_ID =
+    Project.C_Project_ID
 )
 WHERE GL_JournalLine.GL_Journal_ID =
 @JournalID
@@ -632,11 +449,11 @@ ORDER BY
 
             SqlParameter[] lineParameters =
             {
-                new SqlParameter(
-                    "@JournalID",
-                    journalId
-                )
-            };
+        new SqlParameter(
+            "@JournalID",
+            journalId
+        )
+    };
 
             DataSet linesDataSet =
                 DB.ExecuteDataset(
@@ -660,18 +477,114 @@ ORDER BY
                     linesDataSet.Tables[0].Rows
                 )
                 {
+                    string accountCode =
+                        Util.GetValueOfString(
+                            row["AccountCode"]
+                        );
+
+                    string accountName =
+                        Util.GetValueOfString(
+                            row["AccountName"]
+                        );
+
+                    if (string.IsNullOrWhiteSpace(
+                        accountCode
+                    ))
+                    {
+                        accountCode =
+                            Util.GetValueOfString(
+                                row["Account_ID"]
+                            );
+                    }
+
+                    if (string.IsNullOrWhiteSpace(
+                        accountCode
+                    ))
+                    {
+                        accountCode =
+                            Util.GetValueOfString(
+                                row[
+                                    "C_ValidCombination_ID"
+                                ]
+                            );
+                    }
+
+                    if (string.IsNullOrWhiteSpace(
+                        accountName
+                    ))
+                    {
+                        accountName = "-";
+                    }
+
+                    string costCenterCode =
+                        Util.GetValueOfString(
+                            row["CostCenterCode"]
+                        );
+
+                    string costCenterName =
+                        Util.GetValueOfString(
+                            row["CostCenterName"]
+                        );
+
+                    string costCenter =
+                        string.Empty;
+
+                    if (
+                        !string.IsNullOrWhiteSpace(
+                            costCenterCode
+                        ) &&
+                        !string.IsNullOrWhiteSpace(
+                            costCenterName
+                        )
+                    )
+                    {
+                        costCenter =
+                            costCenterCode +
+                            " · " +
+                            costCenterName;
+                    }
+                    else if (
+                        !string.IsNullOrWhiteSpace(
+                            costCenterCode
+                        )
+                    )
+                    {
+                        costCenter =
+                            costCenterCode;
+                    }
+                    else if (
+                        !string.IsNullOrWhiteSpace(
+                            costCenterName
+                        )
+                    )
+                    {
+                        costCenter =
+                            costCenterName;
+                    }
+
+                    string businessPartner =
+                        Util.GetValueOfString(
+                            row["BPartnerName"]
+                        );
+
+                    string product =
+                        Util.GetValueOfString(
+                            row["ProductName"]
+                        );
+
+                    string project =
+                        Util.GetValueOfString(
+                            row["ProjectName"]
+                        );
+
                     lines.Add(
                         new
                         {
                             AccountCode =
-                                Util.GetValueOfString(
-                                    row["AccountCode"]
-                                ),
+                                accountCode,
 
                             AccountName =
-                                Util.GetValueOfString(
-                                    row["AccountName"]
-                                ),
+                                accountName,
 
                             Debit =
                                 Decimal.Round(
@@ -693,10 +606,33 @@ ORDER BY
                                         .AwayFromZero
                                 ),
 
-                            CostCenter = "-",
-                            BPartner = "-",
-                            Product = "-",
-                            Project = "-"
+                            CostCenter =
+                                string.IsNullOrWhiteSpace(
+                                    costCenter
+                                )
+                                    ? "-"
+                                    : costCenter,
+
+                            BPartner =
+                                string.IsNullOrWhiteSpace(
+                                    businessPartner
+                                )
+                                    ? "-"
+                                    : businessPartner,
+
+                            Product =
+                                string.IsNullOrWhiteSpace(
+                                    product
+                                )
+                                    ? "-"
+                                    : product,
+
+                            Project =
+                                string.IsNullOrWhiteSpace(
+                                    project
+                                )
+                                    ? "-"
+                                    : project
                         }
                     );
                 }
@@ -706,6 +642,8 @@ ORDER BY
                 JsonConvert.SerializeObject(
                     new
                     {
+                        success = true,
+
                         Journal = new
                         {
                             GL_Journal_ID =
@@ -735,6 +673,9 @@ ORDER BY
                             DocStatus =
                                 docStatus,
 
+                            StatusName =
+                                statusName,
+
                             Posted =
                                 Util.GetValueOfString(
                                     headerRow[
@@ -749,9 +690,6 @@ ORDER BY
                                     ]
                                 ),
 
-                            StatusName =
-                                statusName,
-
                             TotalDebit =
                                 totalDebit,
 
@@ -759,13 +697,11 @@ ORDER BY
                                 totalCredit,
 
                             AccountingBook =
-                                string.IsNullOrEmpty(
-                                    schema
-                                        .AcctSchemaName
+                                string.IsNullOrWhiteSpace(
+                                    schema.AcctSchemaName
                                 )
                                     ? "Primary"
-                                    : schema
-                                        .AcctSchemaName,
+                                    : schema.AcctSchemaName,
 
                             CreatedByName =
                                 Util.GetValueOfString(
@@ -778,10 +714,18 @@ ORDER BY
                                 createdText
                         },
 
-                        Lines = lines,
+                        Lines =
+                            lines,
+
+                        LineCount =
+                            lines.Count,
 
                         CurSymbol =
-                            schema.CurSymbol,
+                            string.IsNullOrWhiteSpace(
+                                schema.CurSymbol
+                            )
+                                ? schema.ISOCode
+                                : schema.CurSymbol,
 
                         ISOCode =
                             schema.ISOCode,
@@ -793,6 +737,7 @@ ORDER BY
                 JsonRequestBehavior.AllowGet
             );
         }
+
 
         /// <summary>
         /// Prepares and approves a Draft, In Progress,
