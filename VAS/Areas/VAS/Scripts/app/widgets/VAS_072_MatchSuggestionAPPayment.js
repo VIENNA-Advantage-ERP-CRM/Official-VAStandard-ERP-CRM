@@ -60,6 +60,13 @@
         var $pagerNext = null;
         var $pagerText = null;
         var $openForm = null;
+        var $reviewDialog = null;
+        var $reviewBody = null;
+        var $reviewBanner = null;
+        var $reviewBusy = null;
+        var $reviewTitle = null;
+        var $reviewSub = null;
+        var $reviewApply = null;
 
         var pageNo = 1;
         var pageSize = 5;
@@ -72,12 +79,14 @@
         var serverStdPrecision = 2;
 
         var currentRows = [];
+        var currentReviewRow = null;
 
         var isLoading = false;
         var isDisposed = false;
 
         var activeListRequest = null;
         var activeActionRequest = null;
+        var activeDetailRequest = null;
 
         function lbl(key, fallback) {
             var text = null;
@@ -680,7 +689,7 @@
                 $row.on(
                     "click",
                     function () {
-                        applySingleSuggestion(
+                        openReviewDialog(
                             $(this).data(
                                 "match-row"
                             )
@@ -697,7 +706,7 @@
                         ) {
                             event.preventDefault();
 
-                            applySingleSuggestion(
+                            openReviewDialog(
                                 $(this).data(
                                     "match-row"
                                 )
@@ -1011,6 +1020,799 @@
             });
         }
 
+        function showReviewBusy(show) {
+            if (
+                $reviewBusy &&
+                $reviewBusy[0]
+            ) {
+                $reviewBusy[0].style.visibility =
+                    show
+                        ? "visible"
+                        : "hidden";
+            }
+
+            if ($reviewApply) {
+                $reviewApply.prop(
+                    "disabled",
+                    Boolean(show) ||
+                    !currentReviewRow
+                );
+            }
+        }
+
+        function openReviewDialog(row) {
+            if (
+                isDisposed ||
+                isLoading ||
+                !row ||
+                !$reviewDialog
+            ) {
+                return;
+            }
+
+            currentReviewRow = row;
+
+            if ($reviewTitle) {
+                $reviewTitle.text(
+                    lbl(
+                        "VAS_072_MatchReview",
+                        "Match review"
+                    ) +
+                    (
+                        row.vendorName
+                            ? " · " + row.vendorName
+                            : ""
+                    )
+                );
+            }
+
+            if ($reviewSub) {
+                $reviewSub.text(
+                    (
+                        row.paymentDocumentNo || ""
+                    ) +
+                    (
+                        row.invoiceDocumentNo
+                            ? " → " +
+                              row.invoiceDocumentNo
+                            : ""
+                    )
+                );
+            }
+
+            $reviewDialog.show();
+            $("body").addClass(
+                classPrefix +
+                "body-lock"
+            );
+
+            if ($reviewBody) {
+                $reviewBody.empty();
+            }
+
+            if ($reviewBanner) {
+                $reviewBanner
+                    .attr(
+                        "class",
+                        classPrefix +
+                        "review-banner"
+                    )
+                    .empty();
+            }
+
+            showReviewBusy(true);
+
+            abortRequest(activeDetailRequest);
+
+            activeDetailRequest = $.ajax({
+                url:
+                    controllerUrl +
+                    "GetMatchDetail",
+
+                type: "GET",
+                cache: false,
+
+                data: {
+                    paymentId:
+                        toNumber(
+                            row.paymentId,
+                            0
+                        ),
+
+                    invoiceId:
+                        toNumber(
+                            row.invoiceId,
+                            0
+                        ),
+
+                    payScheduleId:
+                        toNumber(
+                            row.payScheduleId,
+                            0
+                        )
+                },
+
+                success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
+                    var data =
+                        parseResponse(response);
+
+                    if (
+                        !data ||
+                        data.success !== true ||
+                        data.error ||
+                        !data.detail
+                    ) {
+                        renderReviewEmpty(
+                            getServerMessage(
+                                data,
+                                lbl(
+                                    "VAS_072_LoadDetailError",
+                                    "Could not load match details"
+                                )
+                            )
+                        );
+
+                        return;
+                    }
+
+                    renderReviewDetail(data.detail);
+                },
+
+                error: function (
+                    xhr,
+                    status,
+                    errorThrown
+                ) {
+                    if (
+                        isDisposed ||
+                        status === "abort"
+                    ) {
+                        return;
+                    }
+
+                    renderReviewEmpty(
+                        extractAjaxError(
+                            xhr,
+                            errorThrown
+                        )
+                    );
+                },
+
+                complete: function () {
+                    activeDetailRequest = null;
+
+                    if (!isDisposed) {
+                        showReviewBusy(false);
+                    }
+                }
+            });
+        }
+
+        function closeReviewDialog() {
+            if (!$reviewDialog) {
+                return;
+            }
+
+            abortRequest(activeDetailRequest);
+            activeDetailRequest = null;
+
+            $reviewDialog.hide();
+            $("body").removeClass(
+                classPrefix +
+                "body-lock"
+            );
+
+            currentReviewRow = null;
+
+            if ($reviewBody) {
+                $reviewBody.empty();
+            }
+        }
+
+        function renderReviewEmpty(message) {
+            if (!$reviewBody) {
+                return;
+            }
+
+            $reviewBody.html(
+                '<div class="' +
+                classPrefix +
+                'review-empty">' +
+                escapeHtml(
+                    message ||
+                    lbl(
+                        "VAS_072_NoData",
+                        "No match suggestions found"
+                    )
+                ) +
+                "</div>"
+            );
+        }
+
+        function formatDetailAmount(
+            detail,
+            value,
+            side
+        ) {
+            var symbol =
+                side === "invoice"
+                    ? (
+                        detail.invoiceCurrencySymbol ||
+                        detail.invoiceCurrencyISOCode ||
+                        ""
+                    )
+                    : (
+                        detail.paymentCurrencySymbol ||
+                        detail.paymentCurrencyISOCode ||
+                        ""
+                    );
+
+            var precision =
+                side === "invoice"
+                    ? detail.invoicePrecision
+                    : detail.paymentPrecision;
+
+            var amount =
+                formatAmount(
+                    value,
+                    normalizePrecision(precision)
+                );
+
+            return symbol
+                ? symbol + " " + amount
+                : amount;
+        }
+
+        function formatBankAccount(detail) {
+            var bankName =
+                detail && detail.bankName
+                    ? String(detail.bankName).trim()
+                    : "";
+
+            var accountNo =
+                detail && detail.accountNo
+                    ? String(detail.accountNo).trim()
+                    : "";
+
+            var last4 =
+                accountNo
+                    ? (
+                        accountNo.length > 4
+                            ? accountNo.slice(-4)
+                            : accountNo
+                    )
+                    : "";
+
+            if (
+                bankName &&
+                last4
+            ) {
+                return bankName + " · ****" + last4;
+            }
+
+            if (bankName) {
+                return bankName;
+            }
+
+            return last4
+                ? "****" + last4
+                : "";
+        }
+
+        function reviewPaneRow(
+            label,
+            value,
+            valueClass
+        ) {
+            return (
+                '<div class="' +
+                classPrefix +
+                'review-pane-row">' +
+                '<span class="' +
+                classPrefix +
+                'review-pane-label">' +
+                escapeHtml(label) +
+                "</span>" +
+                '<span class="' +
+                classPrefix +
+                "review-pane-value" +
+                (
+                    valueClass
+                        ? " " + valueClass
+                        : ""
+                ) +
+                '">' +
+                escapeHtml(value || "-") +
+                "</span>" +
+                "</div>"
+            );
+        }
+
+        function reviewCheckRow(
+            ok,
+            title,
+            detail
+        ) {
+            return (
+                '<div class="' +
+                classPrefix +
+                "review-check " +
+                (
+                    ok
+                        ? classPrefix +
+                          "review-check-ok"
+                        : classPrefix +
+                          "review-check-warn"
+                ) +
+                '">' +
+                '<span class="' +
+                classPrefix +
+                'review-check-icon">' +
+                '<svg viewBox="0 0 24 24">' +
+                (
+                    ok
+                        ? '<polyline points="20 6 9 17 4 12"></polyline>'
+                        : '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>'
+                ) +
+                "</svg>" +
+                "</span>" +
+                '<span class="' +
+                classPrefix +
+                'review-check-text">' +
+                '<strong>' +
+                escapeHtml(title) +
+                "</strong>" +
+                '<span>' +
+                escapeHtml(detail || "") +
+                "</span>" +
+                "</span>" +
+                "</div>"
+            );
+        }
+
+        function renderReviewDetail(detail) {
+            detail = detail || {};
+
+            if (
+                !$reviewBody ||
+                !$reviewBanner
+            ) {
+                return;
+            }
+
+            var confidence =
+                String(
+                    detail.confidence || ""
+                ).toUpperCase();
+
+            var bannerClass =
+                confidence === "HIGH"
+                    ? classPrefix +
+                      "review-banner-high"
+                    : classPrefix +
+                      "review-banner-review";
+
+            var verdict =
+                confidence === "HIGH"
+                    ? lbl(
+                        "VAS_072_HighConfidenceMatch",
+                        "Strong match"
+                    )
+                    : lbl(
+                        "VAS_072_NeedsReview",
+                        "Needs review"
+                    );
+
+            var score =
+                Math.max(
+                    0,
+                    toNumber(
+                        detail.score,
+                        0
+                    )
+                );
+
+            $reviewBanner
+                .attr(
+                    "class",
+                    classPrefix +
+                    "review-banner " +
+                    bannerClass
+                )
+                .html(
+                    '<span class="' +
+                    classPrefix +
+                    'review-banner-icon">' +
+                    '<svg viewBox="0 0 24 24">' +
+                    '<polyline points="20 6 9 17 4 12"></polyline>' +
+                    "</svg>" +
+                    "</span>" +
+                    '<span class="' +
+                    classPrefix +
+                    'review-banner-copy">' +
+                    '<strong>' +
+                    escapeHtml(
+                        verdict +
+                        " — " +
+                        lbl(
+                            "VAS_072_PaymentAndInvoiceLineUp",
+                            "payment and invoice line up"
+                        )
+                    ) +
+                    "</strong>" +
+                    '<span>' +
+                    escapeHtml(
+                        lbl(
+                            "VAS_072_MatchSignalsAgree",
+                            "Vendor, amount and timing all agree."
+                        )
+                    ) +
+                    "</span>" +
+                    "</span>" +
+                    '<span class="' +
+                    classPrefix +
+                    'review-score">' +
+                    '<strong>' +
+                    escapeHtml(score + "%") +
+                    "</strong>" +
+                    '<span>' +
+                    escapeHtml(
+                        lbl(
+                            "VAS_072_Confidence",
+                            "Confidence"
+                        )
+                    ) +
+                    "</span>" +
+                    "</span>"
+                );
+
+            var paymentAmount =
+                formatDetailAmount(
+                    detail,
+                    detail.paymentOpenAmount,
+                    "payment"
+                );
+
+            var invoiceGrand =
+                formatDetailAmount(
+                    detail,
+                    detail.invoiceOriginalAmount,
+                    "invoice"
+                );
+
+            var invoiceOpen =
+                formatDetailAmount(
+                    detail,
+                    detail.invoiceOpenAmount,
+                    "invoice"
+                );
+
+            var invoiceOpenPay =
+                formatDetailAmount(
+                    detail,
+                    detail.invoiceOpenAmountPaymentCurrency,
+                    "payment"
+                );
+
+            var balance =
+                toNumber(
+                    detail.balanceAfterApply,
+                    0
+                );
+
+            var balanceText =
+                formatDetailAmount(
+                    detail,
+                    Math.abs(balance),
+                    "payment"
+                );
+
+            var paymentPane =
+                '<div class="' +
+                classPrefix +
+                'review-pane">' +
+                '<div class="' +
+                classPrefix +
+                'review-pane-head">' +
+                '<span>' +
+                escapeHtml(
+                    lbl(
+                        "VAS_072_VendorPayment",
+                        "Vendor payment"
+                    )
+                ) +
+                "</span>" +
+                '<strong>' +
+                escapeHtml(
+                    detail.paymentDocumentNo || ""
+                ) +
+                "</strong>" +
+                "</div>" +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_PaymentDate",
+                        "Payment date"
+                    ),
+                    formatDate(detail.paymentDate)
+                ) +
+                reviewPaneRow(
+                    lbl("VAS_Vendor", "Vendor"),
+                    detail.vendorName
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_PaymentMethod",
+                        "Payment method"
+                    ),
+                    detail.paymentMethod
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_Reference",
+                        "Reference"
+                    ),
+                    detail.reference
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_011_BankAccount",
+                        "Bank account"
+                    ),
+                    formatBankAccount(detail)
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_PaymentCurrency",
+                        "Currency"
+                    ),
+                    detail.paymentCurrencyISOCode
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_072_AmountPaid",
+                        "Amount paid"
+                    ),
+                    paymentAmount,
+                    classPrefix +
+                    "review-paid"
+                ) +
+                "</div>";
+
+            var invoicePane =
+                '<div class="' +
+                classPrefix +
+                'review-pane">' +
+                '<div class="' +
+                classPrefix +
+                'review-pane-head">' +
+                '<span>' +
+                escapeHtml(
+                    lbl(
+                        "VAS_035_SuggestedInvoice",
+                        "Suggested invoice"
+                    )
+                ) +
+                "</span>" +
+                '<strong>' +
+                escapeHtml(
+                    detail.invoiceDocumentNo || ""
+                ) +
+                "</strong>" +
+                "</div>" +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_InvoiceDate",
+                        "Invoice date"
+                    ),
+                    formatDate(detail.invoiceDate)
+                ) +
+                reviewPaneRow(
+                    lbl("VAS_Vendor", "Vendor"),
+                    detail.vendorName
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_PaymentTerms",
+                        "Payment terms"
+                    ),
+                    detail.paymentTerms
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_DueDate",
+                        "Due date"
+                    ),
+                    formatDate(detail.dueDate)
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_GrandTotal",
+                        "Grand total"
+                    ),
+                    invoiceGrand
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_PaymentCurrency",
+                        "Currency"
+                    ),
+                    detail.invoiceCurrencyISOCode
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_035_OpenAmount",
+                        "Open amount"
+                    ),
+                    invoiceOpen,
+                    classPrefix +
+                    "review-open"
+                ) +
+                "</div>";
+
+            var balanceClass =
+                balance === 0
+                    ? classPrefix +
+                      "review-balance-exact"
+                    : classPrefix +
+                      "review-balance-open";
+
+            var balanceLabel =
+                balance === 0
+                    ? lbl(
+                        "VAS_035_FullySettles",
+                        "balance — fully settles the invoice"
+                    )
+                    : lbl(
+                        "VAS_035_StillOpen",
+                        "still open after apply"
+                    );
+
+            var compare =
+                '<div class="' +
+                classPrefix +
+                'review-compare">' +
+                paymentPane +
+                '<span class="' +
+                classPrefix +
+                'review-arrow">' +
+                '<svg viewBox="0 0 24 24">' +
+                '<line x1="5" y1="12" x2="19" y2="12"></line>' +
+                '<polyline points="12 5 19 12 12 19"></polyline>' +
+                "</svg>" +
+                "</span>" +
+                invoicePane +
+                "</div>";
+
+            var why =
+                '<div class="' +
+                classPrefix +
+                'review-why">' +
+                '<div class="' +
+                classPrefix +
+                'review-why-title">' +
+                escapeHtml(
+                    lbl(
+                        "VAS_035_WhyThisMatch",
+                        "Why this match"
+                    )
+                ) +
+                "</div>" +
+                reviewCheckRow(
+                    !!detail.partnerOk,
+                    lbl(
+                        "VAS_072_VendorMatches",
+                        "Vendor matches"
+                    ),
+                    lbl(
+                        "VAS_072_VendorMatchesDetail",
+                        "Payment and invoice belong to the same vendor"
+                    )
+                ) +
+                reviewCheckRow(
+                    !!detail.amountOk,
+                    detail.amountOk
+                        ? lbl(
+                            "VAS_035_AmountMatches",
+                            "Amount matches"
+                        )
+                        : lbl(
+                            "VAS_035_AmountDiffers",
+                            "Amount differs"
+                        ),
+                    paymentAmount +
+                    " " +
+                    lbl("VAS_035_Vs", "vs") +
+                    " " +
+                    invoiceOpenPay
+                ) +
+                reviewCheckRow(
+                    !!detail.referenceOk,
+                    detail.referenceOk
+                        ? lbl(
+                            "VAS_035_ReferenceCited",
+                            "Reference cited"
+                        )
+                        : lbl(
+                            "VAS_035_NoReferenceCited",
+                            "No reference cited"
+                        ),
+                    detail.reference || ""
+                ) +
+                reviewCheckRow(
+                    !!detail.dateOk,
+                    detail.dateOk
+                        ? lbl(
+                            "VAS_035_WithinDueWindow",
+                            "Within due window"
+                        )
+                        : lbl(
+                            "VAS_035_OutsideDueWindow",
+                            "Outside due window"
+                        ),
+                    (
+                        formatDate(detail.paymentDate) ||
+                        ""
+                    ) +
+                    (
+                        detail.dueDate
+                            ? " → " +
+                              formatDate(detail.dueDate)
+                            : ""
+                    )
+                ) +
+                "</div>";
+
+            $reviewBody.html(
+                compare +
+                '<div class="' +
+                classPrefix +
+                "review-balance " +
+                balanceClass +
+                '">' +
+                '<span>' +
+                escapeHtml(balanceLabel) +
+                "</span>" +
+                '<strong>' +
+                escapeHtml(balanceText) +
+                "</strong>" +
+                "</div>" +
+                why
+            );
+
+            if ($reviewApply) {
+                $reviewApply
+                    .text(
+                        balance > 0
+                            ? lbl(
+                                "VAS_035_ApplyPartPayment",
+                                "Apply as part-payment"
+                            )
+                            : lbl(
+                                "VAS_035_ApplyAllocation",
+                                "Apply allocation"
+                            )
+                    )
+                    .prop("disabled", false);
+            }
+        }
+
+        function applyCurrentReview() {
+            if (
+                !currentReviewRow ||
+                isLoading
+            ) {
+                return;
+            }
+
+            applySingleSuggestion(
+                currentReviewRow
+            );
+        }
+
         function applySingleSuggestion(row) {
             if (
                 isDisposed ||
@@ -1123,6 +1925,8 @@
                             "Allocation completed successfully"
                         )
                     );
+
+                    closeReviewDialog();
 
                     if (
                         pageNo > 1 &&
@@ -1424,6 +2228,242 @@
                     )
                 );
             }
+        }
+
+        function createReviewDialog() {
+            $reviewDialog = $(
+                '<div class="' +
+                classPrefix +
+                'review-dialog" style="display:none;" role="dialog" aria-modal="true">' +
+                '<div class="' +
+                classPrefix +
+                'review-scrim"></div>' +
+                '<div class="' +
+                classPrefix +
+                'review-card">' +
+                '<div class="' +
+                classPrefix +
+                'review-header">' +
+                '<div class="' +
+                classPrefix +
+                'review-htext">' +
+                '<span class="' +
+                classPrefix +
+                'review-hicon">' +
+                '<svg viewBox="0 0 24 24">' +
+                '<path d="M9 11l3 3L22 4"></path>' +
+                '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>' +
+                "</svg>" +
+                "</span>" +
+                '<span class="' +
+                classPrefix +
+                'review-title-group">' +
+                '<span class="' +
+                classPrefix +
+                'review-title">' +
+                escapeHtml(
+                    lbl(
+                        "VAS_072_MatchReview",
+                        "Match review"
+                    )
+                ) +
+                "</span>" +
+                '<span class="' +
+                classPrefix +
+                'review-sub"></span>' +
+                "</span>" +
+                "</div>" +
+                '<button type="button" class="' +
+                classPrefix +
+                'review-close" aria-label="' +
+                escapeHtml(
+                    lbl("VAS_Close", "Close")
+                ) +
+                '">' +
+                '<svg viewBox="0 0 24 24">' +
+                '<line x1="18" y1="6" x2="6" y2="18"></line>' +
+                '<line x1="6" y1="6" x2="18" y2="18"></line>' +
+                "</svg>" +
+                "</button>" +
+                "</div>" +
+                '<div class="' +
+                classPrefix +
+                'review-dialog-body">' +
+                '<div class="' +
+                classPrefix +
+                'review-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                "</div>" +
+                "</div>" +
+                '<div class="' +
+                classPrefix +
+                'review-banner"></div>' +
+                '<div class="' +
+                classPrefix +
+                'review-content"></div>' +
+                "</div>" +
+                '<div class="' +
+                classPrefix +
+                'review-footer">' +
+                '<span class="' +
+                classPrefix +
+                'review-footnote">' +
+                escapeHtml(
+                    lbl(
+                        "VAS_072_HighConfidenceSafe",
+                        "High-confidence — safe to apply"
+                    )
+                ) +
+                "</span>" +
+                '<div class="' +
+                classPrefix +
+                'review-actions">' +
+                '<button type="button" class="' +
+                classPrefix +
+                'review-skip">' +
+                escapeHtml(
+                    lbl("VAS_035_Skip", "Skip")
+                ) +
+                "</button>" +
+                '<button type="button" class="' +
+                classPrefix +
+                'review-apply">' +
+                '<svg viewBox="0 0 24 24">' +
+                '<polyline points="20 6 9 17 4 12"></polyline>' +
+                "</svg>" +
+                '<span>' +
+                escapeHtml(
+                    lbl(
+                        "VAS_035_ApplyAllocation",
+                        "Apply allocation"
+                    )
+                ) +
+                "</span>" +
+                "</button>" +
+                "</div>" +
+                "</div>" +
+                "</div>" +
+                "</div>"
+            );
+
+            $reviewBody =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-content"
+                );
+
+            $reviewBanner =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-banner"
+                );
+
+            $reviewBusy =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-busy"
+                );
+
+            $reviewTitle =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-title"
+                );
+
+            $reviewSub =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-sub"
+                );
+
+            $reviewApply =
+                $reviewDialog.find(
+                    "." +
+                    classPrefix +
+                    "review-apply"
+                );
+
+            if (
+                $reviewBusy &&
+                $reviewBusy[0]
+            ) {
+                $reviewBusy[0].style.visibility =
+                    "hidden";
+            }
+
+            $reviewDialog
+                .find(
+                    "." +
+                    classPrefix +
+                    "review-close"
+                )
+                .on(
+                    "click",
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        closeReviewDialog();
+                    }
+                );
+
+            $reviewDialog
+                .find(
+                    "." +
+                    classPrefix +
+                    "review-scrim"
+                )
+                .on(
+                    "click",
+                    function () {
+                        closeReviewDialog();
+                    }
+                );
+
+            $reviewDialog
+                .find(
+                    "." +
+                    classPrefix +
+                    "review-skip"
+                )
+                .on(
+                    "click",
+                    function (event) {
+                        event.preventDefault();
+                        closeReviewDialog();
+                    }
+                );
+
+            $reviewApply.on(
+                "click",
+                function (event) {
+                    event.preventDefault();
+                    applyCurrentReview();
+                }
+            );
+
+            $(document).on(
+                "keydown." +
+                classPrefix +
+                "review",
+                function (event) {
+                    if (
+                        event.key === "Escape" &&
+                        $reviewDialog &&
+                        $reviewDialog.is(":visible")
+                    ) {
+                        closeReviewDialog();
+                    }
+                }
+            );
+
+            $("body").append($reviewDialog);
         }
 
         function createWidget() {
@@ -1769,6 +2809,7 @@
 
         this.Initalize = function () {
             createWidget();
+            createReviewDialog();
             loadData();
         };
 
@@ -1806,8 +2847,26 @@
                 activeActionRequest
             );
 
+            abortRequest(
+                activeDetailRequest
+            );
+
             activeListRequest = null;
             activeActionRequest = null;
+            activeDetailRequest = null;
+
+            $(document).off(
+                "keydown." +
+                classPrefix +
+                "review"
+            );
+
+            closeReviewDialog();
+
+            if ($reviewDialog) {
+                $reviewDialog.remove();
+                $reviewDialog = null;
+            }
 
             if ($root) {
                 $root
@@ -1830,6 +2889,12 @@
             $pagerNext = null;
             $pagerText = null;
             $openForm = null;
+            $reviewBody = null;
+            $reviewBanner = null;
+            $reviewBusy = null;
+            $reviewTitle = null;
+            $reviewSub = null;
+            $reviewApply = null;
             $root = null;
         };
     };

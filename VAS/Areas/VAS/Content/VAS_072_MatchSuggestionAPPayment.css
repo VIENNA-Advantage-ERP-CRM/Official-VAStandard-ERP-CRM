@@ -173,13 +173,12 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.5em;
     overflow: hidden;
 }
 
 .VAS-072-MatchSuggestionAPPayment-row {
-    flex: 1 1 0;
     min-width: 0;
     min-height: 0;
     position: relative;
@@ -528,6 +527,555 @@
     gap: 0.375em;
 }
 
+.VAS-072-MatchSuggestionAPPayment-body-lock {
+    overflow: hidden;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-dialog,
+    .VAS-072-MatchSuggestionAPPayment-review-dialog * {
+        box-sizing: border-box;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 38, 64, 0.34);
+    backdrop-filter: blur(0.1875em);
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-card {
+    position: relative;
+    width: 100%;
+    max-width: 67.5em;
+    max-height: 86vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 0.0625em solid #e4edf4;
+    border-radius: 1em;
+    background: #ffffff;
+    box-shadow: 0 1.875em 5em rgba(15, 61, 97, 0.28);
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 1.125em 1.375em;
+    border-bottom: 0.0625em solid #e4edf4;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-htext {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-hicon {
+    flex: 0 0 auto;
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0.0625em solid #bfe4ff;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #ffffff, #eaf4fe);
+    color: #0083da;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-hicon svg {
+        width: 1.15em;
+        height: 1.15em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-title-group {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #141414;
+    font-size: 1.125em;
+    font-weight: 500;
+    line-height: 1.15;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-sub {
+    min-width: 0;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #717182;
+    font-size: 0.75em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-close {
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #141414;
+    cursor: pointer;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-close:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-close svg {
+        width: 1.25em;
+        height: 1.25em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.375em;
+    position: relative;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-banner {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    margin-bottom: 1.375em;
+    padding: 1.125em 1.25em;
+    border-radius: 0.75em;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner:empty {
+        display: none;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-banner-high {
+    border: 0.0625em solid rgba(1, 157, 137, 0.28);
+    background: linear-gradient(135deg, rgba(1, 157, 137, 0.12), rgba(1, 157, 137, 0.03));
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-banner-review {
+    border: 0.0625em solid rgba(215, 139, 16, 0.28);
+    background: linear-gradient(135deg, rgba(215, 139, 16, 0.12), rgba(215, 139, 16, 0.03));
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-banner-icon {
+    flex: 0 0 auto;
+    width: 2.25em;
+    height: 2.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5625em;
+    background: #019d89;
+    color: #ffffff;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner-review .VAS-072-MatchSuggestionAPPayment-review-banner-icon {
+        background: #d78b10;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-banner-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner-copy strong {
+        min-width: 0;
+        color: #102c3f;
+        font-size: 0.9375em;
+        font-weight: 700;
+        line-height: 1.25;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner-copy span {
+        color: #5f7283;
+        font-size: 0.8125em;
+        line-height: 1.3;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-score {
+    flex: 0 0 auto;
+    min-width: 4.5em;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    color: #0b6b45;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner-review .VAS-072-MatchSuggestionAPPayment-review-score {
+        color: #9a6500;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-score strong {
+        font-size: 1.75em;
+        font-weight: 800;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-score span {
+        margin-top: 0.25em;
+        color: #5f7283;
+        font-size: 0.625em;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-compare {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 0.75em;
+    align-items: center;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-pane {
+    min-width: 0;
+    overflow: hidden;
+    border: 0.0625em solid #e4edf4;
+    border-radius: 0.75em;
+    background: #fbfdff;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-pane-head {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 1em;
+    border-bottom: 0.0625em solid #edf2f6;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-pane-head span {
+        color: #748494;
+        font-size: 0.6875em;
+        font-weight: 700;
+        letter-spacing: 0.075em;
+        text-transform: uppercase;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-pane-head strong {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #102c3f;
+        font-size: 0.875em;
+        font-weight: 700;
+        font-family: "Roboto Mono", "Roboto", monospace;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-pane-row {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.875em;
+    margin: 0 1em;
+    padding: 0.6875em 0;
+    border-bottom: 0.0625em solid #edf2f6;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-pane-row:last-child {
+        border-bottom: 0;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-pane-label {
+    flex: 0 0 auto;
+    color: #5f7283;
+    font-size: 0.8125em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-pane-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #102c3f;
+    font-size: 0.875em;
+    font-weight: 700;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-paid {
+    color: #a33f3f;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-open {
+    color: #9a6500;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-arrow {
+    width: 2.5em;
+    height: 2.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0.0625em solid #bfe4ff;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #0083da;
+    box-shadow: 0 0.25em 0.75em rgba(0, 131, 218, 0.12);
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-arrow svg {
+        width: 1.25em;
+        height: 1.25em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-balance {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    margin-top: 1em;
+    padding: 0.875em 1.125em;
+    border-radius: 0.625em;
+    font-size: 0.875em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-balance-exact {
+    border: 0.0625em solid rgba(1, 157, 137, 0.22);
+    background: rgba(1, 157, 137, 0.10);
+    color: #0b6b45;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-balance-open {
+    border: 0.0625em solid rgba(215, 139, 16, 0.22);
+    background: rgba(215, 139, 16, 0.12);
+    color: #9a6500;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-balance strong {
+        flex: 0 0 auto;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-why {
+    margin-top: 1.125em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-why-title {
+    margin-bottom: 0.625em;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-check {
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    padding: 0.375em 0;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-check-icon {
+    flex: 0 0 auto;
+    width: 1.25em;
+    height: 1.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-check-icon svg {
+        width: 0.75em;
+        height: 0.75em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-check-ok
+.VAS-072-MatchSuggestionAPPayment-review-check-icon {
+    background: rgba(1, 157, 137, 0.14);
+    color: #019d89;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-check-warn
+.VAS-072-MatchSuggestionAPPayment-review-check-icon {
+    background: rgba(215, 139, 16, 0.14);
+    color: #d78b10;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-check-text {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.375em;
+    color: #5f7283;
+    font-size: 0.8125em;
+    line-height: 1.35;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-check-text strong {
+        color: #102c3f;
+        font-weight: 700;
+    }
+
+.VAS-072-MatchSuggestionAPPayment-review-empty {
+    padding: 2.5em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.875em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.875em 1.375em;
+    border-top: 0.0625em solid #e4edf4;
+    background: #ffffff;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-footnote {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #5f7283;
+    font-size: 0.8125em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-skip,
+.VAS-072-MatchSuggestionAPPayment-review-apply {
+    min-height: 2.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4375em;
+    padding: 0.625em 1.125em;
+    border-radius: 999em;
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-skip {
+    border: 0.0625em solid #bfe4ff;
+    background: #ffffff;
+    color: #0083da;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-apply {
+    border: 0;
+    background: #1f83ff;
+    color: #ffffff;
+}
+
+    .VAS-072-MatchSuggestionAPPayment-review-apply svg {
+        width: 1em;
+        height: 1em;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-apply:hover:not(:disabled) {
+        background: #0069ae;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-apply:disabled {
+        background: rgba(31, 131, 255, 0.4);
+        cursor: default;
+    }
+
 @container (max-width: 300px) {
     .VAS-072-MatchSuggestionAPPayment-card {
         padding: 0.75em;
@@ -655,5 +1203,54 @@
 
     .VAS-072-MatchSuggestionAPPayment-open-form {
         display: none;
+    }
+}
+
+@media (max-width: 48em) {
+    .VAS-072-MatchSuggestionAPPayment-review-dialog {
+        padding: 0;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-card {
+        width: 100%;
+        max-width: none;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+}
+
+@media (max-width: 40em) {
+    .VAS-072-MatchSuggestionAPPayment-review-header,
+    .VAS-072-MatchSuggestionAPPayment-review-dialog-body,
+    .VAS-072-MatchSuggestionAPPayment-review-footer {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-banner {
+        align-items: flex-start;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-score {
+        min-width: 3.5em;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-compare {
+        grid-template-columns: 1fr;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-arrow {
+        justify-self: center;
+        transform: rotate(90deg);
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-footer {
+        flex-wrap: wrap;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 }
