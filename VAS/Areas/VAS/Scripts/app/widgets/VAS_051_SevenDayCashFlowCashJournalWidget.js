@@ -90,9 +90,9 @@
             });
 
             var $busy = $('<div>', {
-                'class': 'VAS_051_cash-flow-busy',
+                'class': 'VAS_051_cash-flow-busy vis-busyindicatorouterwrap',
                 'id': 'VAS_051_cash-flow-busy-' + widgetId,
-                'text': lbl('VAS_051_Loading', 'Loading')
+                'html': '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
             });
 
             var $header = $('<div>', {

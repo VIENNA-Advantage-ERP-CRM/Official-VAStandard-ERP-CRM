@@ -180,9 +180,9 @@
             });
 
             var $busy = $('<div>', {
-                'class': 'VAS_052_cashbook-busy',
+                'class': 'VAS_052_cashbook-busy vis-busyindicatorouterwrap',
                 'id': 'VAS_052_cashbook-busy-' + widgetId,
-                'text': lbl('VAS_052_Loading', 'Loading')
+                'html': '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
             });
 
             var $header = $('<div>', {

@@ -59,7 +59,7 @@
 
         function showBusy(show) {
             var $b = $root.find('#VAS-gljtm-busy-' + $self.AD_UserHomeWidgetID);
-            if (show) { $b.show(); } else { $b.hide(); }
+            if (show) { $b.addClass('is-visible'); } else { $b.removeClass('is-visible'); }
         }
 
         function safeNumber(value) {
@@ -128,10 +128,10 @@
             });
 
             var $busy = $('<div>', {
-                'class': 'VAS_net-cash-cash-journal-busy',
+                'class': 'VAS_net-cash-cash-journal-busy vis-busyindicatorouterwrap',
                 'id': 'VAS-gljtm-busy-' + widgetId,
-                'text': lbl('VAS_049_Loading', 'Loading')
-            }).hide();
+                'html': '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
+            });
 
             var $header = $('<div>', {
                 'class': 'VAS_net-cash-cash-journal-row'

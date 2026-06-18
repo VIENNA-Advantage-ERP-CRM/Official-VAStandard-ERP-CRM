@@ -155,9 +155,9 @@
                 + '          id="VAS-047-cj-desc-' + uid + '"></span>'
                 + '  </div>'
 
-                + '  <div class="VAS-047-today-cash-in-cash-journal-busy"'
+                + '  <div class="VAS-047-today-cash-in-cash-journal-busy vis-busyindicatorouterwrap"'
                 + '       id="VAS-047-cj-busy-' + uid + '">'
-                + '    <span id="VAS-047-cj-loading-text-' + uid + '"></span>'
+                + '    <div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
                 + '  </div>'
 
                 + '  <div class="VAS-047-today-cash-in-cash-journal-state"'
@@ -173,8 +173,6 @@
             $root.find('#VAS-047-cj-period-' + uid)
                 .text(lbl('VAS_047_PeriodToday', 'Today'));
 
-            $root.find('#VAS-047-cj-loading-text-' + uid)
-                .text(lbl('VAS_Loading', 'Loading\u2026'));
         }
 
         /* ── Render data into DOM ───────────────────────────────────── */

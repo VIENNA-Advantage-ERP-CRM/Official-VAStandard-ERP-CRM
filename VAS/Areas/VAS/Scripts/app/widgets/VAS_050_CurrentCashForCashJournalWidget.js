@@ -174,9 +174,9 @@
             });
 
             var $busy = $('<div>', {
-                'class': 'VAS_current-cash-cash-journal-busy',
+                'class': 'VAS_current-cash-cash-journal-busy vis-busyindicatorouterwrap',
                 'id': 'VAS-gljtm-busy-' + widgetId,
-                'text': lbl('VAS_050_Loading', 'Loading')
+                'html': '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
             });
 
             var $header = $('<div>', {

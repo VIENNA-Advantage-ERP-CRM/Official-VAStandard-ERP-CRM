@@ -98,9 +98,9 @@
             });
 
             var $busy = $('<div>', {
-                'class': 'VAS_today-cash-out-cash-journal-busy',
+                'class': 'VAS_today-cash-out-cash-journal-busy vis-busyindicatorouterwrap',
                 'id': 'VAS-gljtm-busy-' + widgetId,
-                'text': lbl('VAS_048_Loading', 'Loading')
+                'html': '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
             });
 
             var $header = $('<div>', {

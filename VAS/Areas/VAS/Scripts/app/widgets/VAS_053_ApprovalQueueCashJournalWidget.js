@@ -185,9 +185,9 @@
             });
 
             var $busy = $('<div>', {
-                'class': 'VAS_053_approval-busy',
+                'class': 'VAS_053_approval-busy vis-busyindicatorouterwrap',
                 'id': 'VAS_053_approval-busy-' + widgetId,
-                'text': lbl('VAS_053_Loading', 'Loading')
+                'html': '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
             });
 
             var $header = $('<div>', {
@@ -228,9 +228,9 @@
 
             var $pager = $(
                 '<div class="VAS_053_approval-pager">' +
-                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-prev-' + widgetId + '" aria-label="Previous">&lsaquo;</button>' +
+                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-prev-' + widgetId + '" aria-label="' + lbl('VAS_Previous', 'Previous') + '">&lsaquo;</button>' +
                 '<span class="VAS_053_approval-page-text" id="VAS_053_approval-page-text-' + widgetId + '"></span>' +
-                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-next-' + widgetId + '" aria-label="Next">&rsaquo;</button>' +
+                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-next-' + widgetId + '" aria-label="' + lbl('VAS_Next', 'Next') + '">&rsaquo;</button>' +
                 '</div>'
             );
 
@@ -293,7 +293,7 @@
             var $pageText = $root.find('#VAS_053_approval-page-text-' + widgetId);
 
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? pageNo + ' / ' + totalPages : '');
+                $pageText.text(totalPages > 1 ? pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages : '');
             }
 
             if ($prev) {

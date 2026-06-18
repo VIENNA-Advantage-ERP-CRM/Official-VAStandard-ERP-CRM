@@ -365,20 +365,20 @@
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
-    gap: 0.35em;
+    gap: 0.625em;
 }
 
 .VAS_054_counterparties-page-btn {
-    width: 1.75em;
-    height: 1.75em;
+    width: 2.25em;
+    height: 2.25em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
-    border: 0;
-    border-radius: 999px;
-    background: rgba(0, 131, 218, 0.08);
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
     color: #0083DA;
     font: inherit;
     font-size: 0.875em;
@@ -395,21 +395,23 @@
     }
 
     .VAS_054_counterparties-page-btn:hover:not(:disabled) {
-        background: rgba(0, 131, 218, 0.14);
+        background: #eaf8ff;
+        border-color: #9ed1ff;
     }
 
     .VAS_054_counterparties-page-btn:disabled {
-        opacity: 0.35;
+        color: #c7d3df;
+        background: rgba(255, 255, 255, 0.64);
         cursor: default;
     }
 
 .VAS_054_counterparties-page-text {
-    min-width: 2.5em;
+    min-width: 4.25em;
     text-align: center;
-    font-size: 0.72em;
+    font-size: 1em;
     line-height: 1.2;
     font-weight: 700;
-    color: #748494;
+    color: #141414;
     font-variant-numeric: tabular-nums;
 }
 
@@ -462,4 +464,35 @@
         min-width: 2.25em;
         font-size: 0.7em;
     }
+}
+
+.VAS_054_counterparties-pager {
+    gap: 0.625em;
+}
+
+.VAS_054_counterparties-page-btn {
+    width: 2.25em;
+    height: 2.25em;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+}
+
+.VAS_054_counterparties-page-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.VAS_054_counterparties-page-btn:disabled {
+    color: #c7d3df;
+    background: rgba(255, 255, 255, 0.64);
+}
+
+.VAS_054_counterparties-page-text {
+    display: inline-block;
+    min-width: 4.25em;
+    font-size: 1em;
+    font-weight: 700;
+    color: #141414;
 }
