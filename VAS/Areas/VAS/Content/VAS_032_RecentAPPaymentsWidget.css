@@ -637,7 +637,7 @@
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: 0.05em;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .vas-recent-ap-payments-dialog-grid {
