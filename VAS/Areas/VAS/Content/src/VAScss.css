@@ -13,6 +13,19 @@
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
 
+@import "../VAS_025_TotalPurchasesWidget.css";
+@import "../VAS_024_TotalOutstandingWidget.css";
+@import "../VAS_018_OverduePayablesWidget.css";
+@import "../VAS_016_AvgPaymentPeriodWidget.css";
+@import "../VAS_019_PayableAgingWidget.css";
+@import "../VAS_017_MonthlyPurchaseSpendWidget.css";
+@import "../VAS_022_SpendByCategoryWidget.css";
+@import "../VAS_021_RealTimeAlertsWidget.css";
+@import "../VAS_023_TopFiveVendorsWidget.css";
+@import "../VAS_020_PendingInvoicesWidget.css";
+@import "../VAS_026_VendorCreditUtilisationWidget.css";
+@import "../VAS_071_NewPaymentWidget.css";
+
 
 @import "../VAS_027_ClearedAPPaymentWidget.css";
 @import "../VAS_028_PaidThisMonthAPPaymentWidget.css";
@@ -66,4 +79,3 @@
 @import "../VAS_045_GLJournalPendingWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
-
