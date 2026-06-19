@@ -1,0 +1,271 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Customer Paid Method Widget — grid-data glass card.
+ * Design source: design.md / dashboard-widgets.md (Onfinity Dashboard
+ * Design System). Conforms to:
+ *   §Glass Widget             — translucent white gradient, 2px white
+ *                               border, 12-14px radius.
+ *   §Widget Root Anchor       — em-based internal sizing against
+ *                               clamp(16px, 5.6cqi, 32px) on the card.
+ *   §Widget Header            — 2em glass icon well + title + subtitle.
+ *                               Title: 0.97em #102C3F (Bold per project
+ *                               rule). Subtitle: Roboto Regular 0.75em
+ *                               #717182.
+ *   §Widget Edge Spacing      — 0.875em on all sides.
+ *   §List Widget              — label/value rows on the sm token (0.75em).
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `1em` resolves to the widget's base font-size (16px on the card).
+ * Container queries scale the card on narrow dashboard cells.
+ * Namespaced vas-cpm-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-cpm-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    /*font-family: Roboto, sans-serif;*/
+    container-type: inline-size;
+}
+
+    .vas-cpm-root,
+    .vas-cpm-root * {
+        box-sizing: border-box;
+    }
+
+.vas-cpm-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── Glass card shell (design.md §Glass Widget) ──────────────────── */
+
+.vas-cpm-card {
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. cqi resolves
+       against .vas-cpm-root (container-type: inline-size), so the spec's 1.4cqi is
+       retuned for the 2-col cell width (≈5.6cqi) and the ceiling raised to 32px so
+       content keeps pace with the grid on 2560-wide dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Header: icon well + title + subtitle ────────────────────────── */
+
+.vas-cpm-header {
+    display: flex;
+    align-items: center;            /* spec: icon and title align middle */
+    gap: 0.625em;
+    margin-bottom: 0.875em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-cpm-icon-wrap {
+    /* Family glass icon well (dashboard-widgets.md §"Widget Header": 2em well, ~1em glyph). */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-cpm-icon-wrap svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-cpm-title-group {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-cpm-title {
+    /* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
+       Medium (500) per project request. Shared dashboard-width-anchored title
+       clamp so every widget's title resolves to the same px at any dashboard
+       width. Bounds = 0.97 × the 16–32px root range. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-cpm-subtitle {
+    /* Spec: Roboto Regular, muted #717182, tight gap to title (≈2px),
+       no caps/letter-spacing. Same shared viewport-anchored sm clamp as
+       the data text (0.75 × the 16–32px root range) so the subtitle
+       renders the same px as sibling widgets' data at every screen size. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+    color: #717182;
+    margin-top: 0.125em;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Body: repeated method rows with progress bars ───────────────── */
+
+.vas-cpm-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    gap: 0.875em;
+    overflow: hidden;
+}
+
+.vas-cpm-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375em;
+    min-width: 0;
+}
+
+.vas-cpm-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+/* dashboard-widgets.md §"List Widget": item label and value share the sm token,
+   one step below the title; weight differentiates value from label. Shared
+   viewport-anchored data clamp (0.75 × the 16–32px root range) so rows render
+   the same px as sibling widgets' data at every screen size. */
+.vas-cpm-method {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+    color: #102C3F;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-cpm-percent {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 700;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.vas-cpm-track {
+    width: 100%;
+    height: 0.375em;
+    background: #EDF2F6;
+    border-radius: 999em;
+    overflow: hidden;
+}
+
+.vas-cpm-fill {
+    height: 100%;
+    border-radius: 999em;
+    transition: width 600ms ease;
+}
+
+.vas-cpm-row:nth-child(1) .vas-cpm-fill {
+    background: linear-gradient(90deg, #1F83FF, #0083DA);
+}
+
+.vas-cpm-row:nth-child(2) .vas-cpm-fill {
+    background: linear-gradient(90deg, #5DCAA5, #019D89);
+}
+
+.vas-cpm-row:nth-child(3) .vas-cpm-fill {
+    background: linear-gradient(90deg, #F0B055, #D78B10);
+}
+
+.vas-cpm-row:nth-child(4) .vas-cpm-fill {
+    background: linear-gradient(90deg, #B7A8FF, #5F4AA6);
+}
+
+/* ── Footer: WHY pill + explanatory copy ─────────────────────────── */
+
+.vas-cpm-divider {
+    height: 0.0625em;
+    background: #EDF2F6;
+    margin: 0.75em 0;
+    flex-shrink: 0;
+}
+
+.vas-cpm-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+    flex-shrink: 0;
+    /* No font-size on the footer — children set their own size from the
+       card root (1em). Previously this was 0.75em and .vas-cpm-desc was
+       also 0.75em, which compounded to ~9px and made the footer text
+       look much smaller than the body. */
+    color: #748494;
+}
+
+.vas-cpm-desc {
+    /* Footer copy on the shared xs token (0.6875em), dashboard-width-anchored
+       so it matches the family's detail-text across widgets. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    color: #748494;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.45;
+}
+
+/* ── No data ────────────────────────────────────────────────────── */
+
+.vas-cpm-nodata {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #748494;
+    font-size: 0.8125em;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* ── Responsive (dashboard cell) ─────────────────────────────────── */
+
+@container (max-width: 22.5em) {       /* ~360px */
+    .vas-cpm-card { font-size: 0.875em; }
+    .vas-cpm-list { gap: 0.625em; }
+    .vas-cpm-track { height: 0.3125em; }
+}

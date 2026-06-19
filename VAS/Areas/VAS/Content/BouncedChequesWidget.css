@@ -1,0 +1,137 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Bounced Cheques Widget — KPI/Summary glass card (design.md dashboard widgets).
+ * Glass surface, danger-tinted icon well, large bold danger-red count, ACTION pill.
+ * Em-based inner sizing; container queries scale the card on narrow cells.
+ * Namespaced vas-bc-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-bc-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    /*font-family: Roboto, sans-serif;*/
+    position: relative;
+}
+
+.vas-bc-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+.vas-bc-card {
+    /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
+       large dashboards instead of staying 16px. cqi resolves against .vas-bc-root
+       (container-type: inline-size). Only grows past 16px on wide cells. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #fff;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    /*padding: 1em 1em 1.125em;*/
+    padding: 0.875em;
+    overflow: hidden;
+}
+
+    .vas-bc-card * {
+        box-sizing: border-box;
+    }
+
+/* Header anatomy mirrors the Total Amount card (.vas-tarm-head): single-line
+   icon-well + title. No View link (no bounced-cheques drill-down). */
+.vas-bc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-bc-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-bc-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #FBE3E4);   /* white → pale danger */
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #ED1C24;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-bc-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-bc-title {
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size.
+       Weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-bc-metric {
+    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-weight: 700;
+    color: #ED1C24;                   /* danger */
+    line-height: 1;
+    letter-spacing: -0.025em;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Footer detail line mirrors .vas-tarm-detail-text. */
+.vas-bc-detail-text {
+    display: block;
+    align-self: flex-start;
+    max-width: 100%;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    color: #5F7283;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-bc-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-bc-card { font-size: 0.6875em; }
+}

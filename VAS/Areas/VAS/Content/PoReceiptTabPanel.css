@@ -471,6 +471,15 @@ html[dir="rtl"] .vas-psdwidg-salesYear {
     gap: 0.5em;
 }
 
+/* AR-receipt family glass surface: the shared .vas-widget-bg root already supplies
+   the gradient / white border / radius, so only the family drop-shadow is missing.
+   Add just that, scoped to this widget's container, to avoid altering the shared
+   .vas-widget-bg surface used by other (incl. AP) widgets. */
+.vas-arwidg-receivable-container {
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    border-radius: 0.875em;
+}
+
 .vas-arwidg-totalAmt-box {
     /*background: rgb(79,217,150);
     background: linear-gradient(160deg, rgba(79,217,150,1) 0%, rgba(40,189,191,1) 100%);*/
@@ -515,7 +524,13 @@ html[dir="rtl"] .vas-psdwidg-salesYear {
 
 .vas-arwidg-rtl-amt {
     display: flex;
-    font-size: 1rem;
+    /* AR-receipt family big stat value (dashboard-widgets.md §Widget Stat Values),
+       anchored on --dash-inline-size like the family KPI metric. */
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
 }
 
 .vas-arwidg-rec-listing {
@@ -582,7 +597,10 @@ html[dir="rtl"] .vas-psdwidg-salesYear {
 }
 
 .vas-arwidg-receivable-container {
-    font-size: 0.6em;
+    /* AR-receipt family Widget Root Anchor: one font-size lever; every inner
+       value below is em so the whole card rescales with the cell. Anchored on
+       --dash-inline-size (dashboard content width in px), falling back to 100vw. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
 }
 
 @media screen and (max-width: 1024px) {

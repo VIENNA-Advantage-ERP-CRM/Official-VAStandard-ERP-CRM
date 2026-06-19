@@ -1,0 +1,219 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Top Customers by Collections (VAS_013) — glass list widget. Bold md title +
+ * muted subtitle, then top-N customer rows (bold name + compact amount) each
+ * with a proportion bar relative to the top customer. Design: design.md
+ * "List Widget (FinanceListCard)" + Glass Widget + image_1. Per CLAUDE.md,
+ * every value is in `em` (1em = widget base font-size). Namespaced vas-tcr-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-tcr-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+    /*font-family: Roboto, sans-serif;*/
+}
+
+    .vas-tcr-root,
+    .vas-tcr-root * {
+        box-sizing: border-box;
+    }
+
+.vas-tcr-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── Glass card (pale green → white collections tint) ──────────────── */
+
+.vas-tcr-card {
+    /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
+       large dashboards instead of staying at the default 16px. cqi resolves against
+       .vas-tcr-root (container-type: inline-size). ~3-col list widget → 3cqi coefficient.
+       Shrink overrides below (@container max-width) reduce this further on narrow cells. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    /* Shared neutral glass surface (design.md): default widget surface, no semantic tint. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: .875em;
+    overflow: hidden;
+}
+
+/* ── Header: icon + bold title + muted subtitle ───────────────────── */
+
+.vas-tcr-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-tcr-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-tcr-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-tcr-title-group {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+/* Widget header — Medium (500). Shared dashboard-width-anchored title clamp
+   (dashboard-widgets.md §"Widget Header"): same resolved px in every widget
+   at any screen size. */
+.vas-tcr-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tcr-subtitle {
+    margin-top: 0.125em;
+    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
+       the subtitle renders the same px in every widget at any screen size. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #717182;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Ranked list — rows share the remaining height evenly ─────────── */
+
+/* Rows are anchored to the TOP with a fixed rhythm — they do NOT stretch to
+   fill the card. This keeps the spacing from the top identical whether 2 or 5
+   customers come back, instead of a couple of rows ballooning to fill height. */
+.vas-tcr-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 1.125em;
+    overflow: hidden;
+}
+
+/* Full list — distribute rows evenly from top edge to bottom edge so a
+   complete top-N set fills the card with no leftover gap underneath. `gap`
+   drops to 0 so space-between owns the spacing (the row's internal name→bar
+   gap is unaffected). Toggled from JS only when all topN rows are present. */
+.vas-tcr-list.vas-tcr-list--fill {
+    justify-content: space-evenly;
+    gap: 0;
+}
+
+.vas-tcr-row {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4375em;
+}
+
+.vas-tcr-row-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+}
+
+.vas-tcr-name {
+    /* Shared sm data token (dashboard-width-anchored, same px as sibling
+       widgets' rows). Was 0.875em (= 0.0109 of the base) which rendered larger
+       than the family sm rows. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+    color: #102C3F;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-tcr-amount {
+    /* Shared sm data token — matches .vas-tcr-name and sibling widgets' rows. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas-tcr-cur {
+    margin-inline-end: 0.1em;
+    font-weight: 700;
+}
+
+/* Proportion bar — track + data-driven fill (width set in JS). Fill anchors to
+   the inline-start edge, so it grows correctly in both LTR and RTL. */
+.vas-tcr-bar {
+    width: 100%;
+    height: 0.4375em;
+    border-radius: 999em;
+    background: #E2EDE4;
+    overflow: hidden;
+}
+
+.vas-tcr-bar-fill {
+    height: 100%;
+    border-radius: 999em;
+    background: linear-gradient(90deg, #2EA45A, #82D49E);
+}
+
+/* Empty state — top-anchored (same spacing from the top as a populated list),
+   not vertically centered in the card. */
+.vas-tcr-empty {
+    flex: 0 0 auto;
+    color: #748494;
+    font-size: 0.8125em;
+    padding: 0.25em 0;
+}
+
+/* ── Responsive (container queries on the widget cell) ────────────── */
+
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-tcr-card { font-size: 0.875em; }
+}
+
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-tcr-card {
+        font-size: 0.75em;
+        padding: 0.875em;
+    }
+}

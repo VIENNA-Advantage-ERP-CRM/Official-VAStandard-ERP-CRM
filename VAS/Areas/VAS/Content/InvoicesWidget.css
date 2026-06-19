@@ -1,0 +1,865 @@
+.vas-inv-root {
+    /* Always fill the dashboard cell width; height follows the host cell. */
+    width: 100%;
+    height: 100%;
+    /*font-family: Roboto, sans-serif;*/
+    /* Positioning context for the absolute busy overlay. */
+    position: relative;
+}
+
+/* Busy/loading overlay covering the whole card; the inner spinner uses the
+   core busy-indicator classes (vis-busyindicatorinnerwrap / vis_widgetloader). */
+.vas-inv-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+.vas-inv-card {
+    /* Card base unit: dashboard-width-anchored so the widget scales with the
+       dashboard's visible content area (design.md §Measurement Setup), with px bounds. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    width: 100%;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
+    border: 0.125em solid #fff;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15,61,97,0.06);
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: .875em;
+}
+
+.vas-inv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vas-inv-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas-inv-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #106AB0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-inv-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-inv-title {
+    /* Dashboard-width-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): resolves against --dash-inline-size, falling back to 100vw. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* "+ New invoice" action — quiet link-style button, blue. */
+.vas-inv-newbtn {
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    color: #1F83FF;
+    font-family: inherit;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.25em 0.375em;
+    border-radius: 0.375em;
+    white-space: nowrap;
+}
+
+.vas-inv-newbtn:hover {
+    background: #EAF8FF;
+}
+
+.vas-inv-newbtn-plus {
+    font-weight: 700;
+}
+
+.vas-inv-alert-banner {
+    margin: 0 1em 0.75em;
+    background: #FFF8E6;
+    border: 0.0625em solid #F5C94E;
+    border-radius: 0.625em;
+    padding: 0.625em 0.875em;
+    align-items: flex-start;
+    gap: 0.625em;
+}
+
+.vas-inv-alert-icon {
+    flex-shrink: 0;
+    margin-top: 0.125em;
+}
+
+.vas-inv-alert-text {
+    flex: 1;
+}
+
+.vas-inv-dup-title {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 700;
+    color: #7A4F00;
+    margin-bottom: 0.125em;
+}
+
+.vas-inv-dup-sub {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    color: #9A6500;
+}
+
+.vas-inv-table-wrap {
+    padding: 0 0.25em 0.25em;
+    flex: 1;
+    /* min-height:0 lets this flex child shrink so only the list scrolls; without it a tall list
+       would grow and push the footer pager out (design.md "Internal Content Must Not Resize The
+       Widget"). The header/footer regions stay fixed; only this region scrolls. */
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.vas-inv-table-head {
+    display: grid;
+    align-items: center;
+    padding: 0.375em 1em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    /* Freeze the header at the top of the scrolling body. Opaque background so rows
+       do not show through while scrolling underneath. */
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
+}
+
+.vas-inv-th {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.0375em;
+    /*text-transform: uppercase;*/
+}
+
+.vas-inv-th-customer {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.0375em;
+    /*text-transform: uppercase;*/
+    padding-left: 1em;
+}
+
+.vas-inv-row {
+    display: grid;
+    align-items: center;
+    padding: 0.505em 1em;
+    transition: background 0.15s;
+}
+
+.vas-inv-cell-id {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.vas-inv-cell-customer {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #3D5166;
+    padding-left: 1em;
+    /* Allow the cell to shrink inside the grid track instead of pushing other columns. */
+    min-width: 0;
+    line-height: 1.3;
+    /* Wrap to at most two lines, then ellipsis; break very long words so the text never
+       bleeds into the next column. Full name is shown via the title tooltip. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.vas-inv-cell-due {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #5F7283;
+}
+
+.vas-inv-status-chip {
+    display: inline-block;
+    padding: 0.25em 0.75em;
+    border-radius: 999em;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.vas-inv-cell-amount {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+    color: #102C3F;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Base-currency symbol prefixed before the amount (RTL-safe spacing). */
+.vas-inv-cur {
+    font-weight: inherit;
+    margin-inline-end: 0.08em;
+}
+
+/* "Review" action inside the duplicate banner. */
+.vas-inv-review-btn {
+    flex-shrink: 0;
+    align-self: center;
+    border: 0.0625em solid #E4D08A;
+    background: #fff;
+    color: #7A4F00;
+    font-family: inherit;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 600;
+    padding: 0.375em 0.875em;
+    border-radius: 0.5em;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.vas-inv-review-btn:hover {
+    background: #FFFBF0;
+}
+
+/* Row dividers are driven by a class, not inline styles. */
+.vas-inv-row-divided {
+    border-bottom: 0.0625em solid #EDF2F6;
+}
+
+.vas-inv-row:hover {
+    background: #F8FBFF;
+}
+
+/* Empty state when no attention rows are returned for the current page. */
+.vas-inv-nodata {
+    padding: 1.375em 1em;
+    text-align: center;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #748494;
+}
+
+/* ── Footer pager (design.md "Widget Footer Pager"): left "Showing X–Y of Z" helper +
+   right compact pager (prev · "X of N" · next). Left helper / right pager via space-between. ── */
+.vas-inv-footer {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    /*padding: 0.625em 1em 0.875em;*/
+    border-top: 0.0625em solid #EDF2F6;
+}
+
+/* Left helper text — result range, muted. */
+.vas-inv-footer-info {
+    /*font-family: Roboto, sans-serif;*/
+    font-weight: 400;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Right pager control — arrows + page text grouped as one compact unit. */
+.vas-inv-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+/* Rounded-square pager buttons (not circular): soft white surface, light border, blue icon. */
+.vas-inv-page-btn {
+    width: 2em;
+    height: 2em;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.5em;
+    background: #FBFDFF;
+    color: #0083DA;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.vas-inv-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+.vas-inv-page-btn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.vas-inv-page-text {
+    min-width: 3em;
+    text-align: center;
+    /*font-family: Roboto, sans-serif;*/
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 500;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Duplicate Invoice Review dialog — opened from the banner "Review" button.
+ * Ported from the approved duplicate_invoice_review.html design; all selectors
+ * are namespaced vas-dup-* and the overlay is appended to <body> so it is never
+ * clipped by the widget card's overflow. Direction (LTR/RTL) is inherited.
+ * ════════════════════════════════════════════════════════════════════════ */
+.vas-dup-overlay {
+    --vdup-primary: #0083DA;
+    --vdup-primary-hover: #0069AE;
+    --vdup-action-blue: #1F83FF;
+    --vdup-text: #102C3F;
+    --vdup-text-strong: #141414;
+    --vdup-text-secondary: #5F7283;
+    --vdup-text-muted: #748494;
+    --vdup-surface-2: #FBFDFF;
+    --vdup-surface-faint: #EEF6FF;
+    --vdup-divider: #EDF2F6;
+    --vdup-border: #E4EDF4;
+    --vdup-active-bg: #EAF8FF;
+    --vdup-pale-border: #BFE4FF;
+    --vdup-sec-enabled: #E5F3FB;
+    --vdup-warn-text: #9A6500;
+    --vdup-danger: #D14545;
+    --vdup-danger-bg: #FAD7D7;
+    --vdup-danger-text: #8F2D2D;
+    --vdup-radius-sm: 0.5em;
+    --vdup-radius-md: 0.875em;
+    --vdup-radius-lg: 1.125em;
+    --vdup-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    --vdup-shadow-lift: 0 1.125em 3em rgba(15, 61, 97, 0.18);
+
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(0.75rem, 3vw, 2.5rem);
+    background: rgba(0, 38, 64, 0.32);
+    -webkit-backdrop-filter: blur(0.125em);
+    backdrop-filter: blur(0.125em);
+    /*font-family: Roboto, system-ui, -apple-system, sans-serif;*/
+    color: var(--vdup-text);
+}
+
+.vas-dup-overlay.is-open { display: flex; }
+
+.vas-dup-overlay *,
+.vas-dup-overlay *::before,
+.vas-dup-overlay *::after { box-sizing: border-box; }
+
+.vas-dup-dialog {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    width: 100%;
+    max-width: 73.75em;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #FFFFFF;
+    border-radius: var(--vdup-radius-lg);
+    box-shadow: var(--vdup-shadow-lift);
+    /* Positioning context for the busy overlay below. */
+    position: relative;
+}
+
+/* Busy/loading overlay covering the dialog while a footer action is processing; the inner spinner
+   uses the core busy-indicator classes (vis-busyindicatorinnerwrap / vis_widgetloader). */
+.vas-dup-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: var(--vdup-radius-lg);
+    z-index: 10;
+}
+
+/* Header */
+.vas-dup-header {
+    flex: 0 0 auto;
+    min-height: 3.5em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.625em 1.25em;
+    border-bottom: 0.0625em solid var(--vdup-border);
+}
+
+.vas-dup-header-left { display: flex; align-items: center; gap: 0.75em; min-width: 0; }
+
+.vas-dup-header-icon {
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--vdup-radius-sm);
+    background: linear-gradient(180deg, var(--vdup-active-bg), #FFFFFF);
+    border: 0.0625em solid var(--vdup-pale-border);
+    color: var(--vdup-primary);
+}
+
+.vas-dup-header-icon svg { width: 1.125em; height: 1.125em; }
+.vas-dup-title-wrap { min-width: 0; }
+.vas-dup-title { font-size: 0.96875em; font-weight: 500; color: var(--vdup-text-strong); line-height: 1.2; }
+/* Shared dashboard-width-anchored sm clamp — matches the widget subtitles. */
+.vas-dup-subtitle { font-size: 0.75em; color: var(--vdup-text-secondary); margin-top: 0.125em; line-height: 1.2; }
+.vas-dup-header-right { display: flex; align-items: center; gap: 0.875em; flex: 0 0 auto; }
+
+.vas-dup-close {
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--vdup-radius-sm);
+    cursor: pointer;
+    color: var(--vdup-text-strong);
+}
+
+.vas-dup-close:hover { background: var(--vdup-divider); }
+.vas-dup-close svg { width: 1.25em; height: 1.25em; }
+
+/* Tabs (one per duplicate set) */
+.vas-dup-tabs {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: stretch;
+    padding: 0 0.75em;
+    border-bottom: 0.0625em solid var(--vdup-border);
+    overflow-x: auto;
+}
+
+.vas-dup-tab {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.75em 1em;
+    background: #FFFFFF;
+    border: none;
+    border-bottom: 0.125em solid transparent;
+    font-family: inherit;
+    font-size: 0.75em;
+    letter-spacing: 0.015625em;
+    color: var(--vdup-text-strong);
+    font-weight: 400;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.vas-dup-tab:hover { color: var(--vdup-primary-hover); background: var(--vdup-sec-enabled); }
+.vas-dup-tab[aria-selected="true"] { border-bottom-color: var(--vdup-text-strong); font-weight: 500; }
+
+.vas-dup-tab-badge {
+    min-width: 1.75em;
+    height: 1.25em;
+    padding: 0 0.5em;
+    border-radius: 999em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.625em;
+    font-weight: 700;
+    background: var(--vdup-active-bg);
+    color: var(--vdup-primary);
+}
+
+.vas-dup-tab[aria-selected="true"] .vas-dup-tab-badge { background: var(--vdup-primary); color: #FFFFFF; }
+.vas-dup-tab-dot { width: 0.5em; height: 0.5em; border-radius: 999em; flex: 0 0 auto; background: var(--vdup-danger); }
+
+/* Legend */
+.vas-dup-legend {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    flex-wrap: wrap;
+    padding: 0.625em 1.25em;
+    background: var(--vdup-surface-2);
+    border-bottom: 0.0625em solid var(--vdup-divider);
+    font-size: 0.6875em;
+    color: var(--vdup-text-muted);
+}
+
+.vas-dup-legend-item { display: flex; align-items: center; gap: 0.375em; }
+.vas-dup-legend-dot { width: 0.625em; height: 0.625em; border-radius: 999em; flex: 0 0 auto; }
+.vas-dup-legend-dot.match { background: #20A464; }
+.vas-dup-legend-dot.diff { background: var(--vdup-danger); }
+.vas-dup-legend-context { margin-left: auto; color: var(--vdup-text-secondary); font-weight: 500; }
+.vas-dup-legend-context b { color: var(--vdup-danger); font-weight: 700; }
+
+/* Body + panels */
+.vas-dup-body {
+    flex: 1 1 auto;
+    overflow: auto;
+    /* Reserve the vertical scrollbar gutter so its appearance never reflows the cards. */
+    scrollbar-gutter: stable;
+    padding: 1.25em;
+    background: linear-gradient(180deg, #F7FBFF 0%, #FFFFFF 7.5em);
+}
+
+.vas-dup-panel { display: none; }
+.vas-dup-panel.is-active { display: block; }
+
+.vas-dup-grid {
+    display: grid;
+    /* Cards stretch to fill the row evenly: 1 card -> full width, 2 -> 50% each, 3+ -> wrap.
+       auto-fit collapses unused tracks so the present cards expand via 1fr (no right-side gap). */
+    grid-template-columns: repeat(auto-fit, minmax(20em, 1fr));
+    gap: 1em;
+    /* Equal card heights across a row. */
+    align-items: stretch;
+}
+
+/* Invoice card */
+.vas-dup-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #FFFFFF;
+    border: 0.0625em solid var(--vdup-border);
+    border-radius: var(--vdup-radius-md);
+    box-shadow: var(--vdup-shadow);
+}
+
+.vas-dup-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.875em 1em;
+    background: linear-gradient(180deg, rgba(234, 248, 255, 0.7), rgba(255, 255, 255, 0.4));
+    border-bottom: 0.0625em solid var(--vdup-divider);
+}
+
+.vas-dup-card-no { font-size: 0.96875em; font-weight: 700; color: var(--vdup-text); letter-spacing: 0.0125em; }
+.vas-dup-card-date { font-size: 0.6875em; color: var(--vdup-text-secondary); margin-top: 0.125em; }
+
+.vas-dup-pill {
+    font-size: 0.625em;
+    font-weight: 700;
+    /*text-transform: uppercase;*/
+    letter-spacing: 0.025em;
+    padding: 0.3125em 0.625em;
+    border-radius: 999em;
+    white-space: nowrap;
+}
+
+/* Field list */
+.vas-dup-fields { padding: 0.5em 1em 0.75em; }
+
+.vas-dup-field {
+    display: grid;
+    grid-template-columns: 9em 1fr;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0.5em 0;
+    border-bottom: 0.0625em solid var(--vdup-divider);
+}
+
+.vas-dup-field:last-child { border-bottom: none; }
+/* Label and value each stay on one line and trim with an ellipsis when the text is too long. */
+.vas-dup-field-label {
+    font-size: 0.6875em;
+    color: var(--vdup-text-muted);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.vas-dup-field-value {
+    font-size: 0.75em;
+    color: var(--vdup-text);
+    font-weight: 500;
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+/* The text node truncates; the match/diff dot (::after) below stays beside it. */
+.vas-dup-field-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.vas-dup-field-value.is-diff { color: var(--vdup-danger-text); font-weight: 700; }
+
+.vas-dup-field-value.is-diff::after {
+    content: "";
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 0.5em;
+    height: 0.5em;
+    margin-left: 0.375em;
+    border-radius: 999em;
+    background: var(--vdup-danger);
+}
+
+/* Line items (placeholder note in this UI-shell view) */
+/* flex:1 lets the line area absorb the slack so equal-height cards keep the total at the bottom. */
+.vas-dup-lines-wrap { padding: 0.25em 1em 1em; flex: 1 1 auto; }
+.vas-dup-lines-title {
+    font-size: 0.6875em;
+    font-weight: 700;
+    /*text-transform: uppercase;*/
+    letter-spacing: 0.03125em;
+    color: var(--vdup-text-muted);
+    margin: 0.5em 0;
+}
+
+.vas-dup-lines-note {
+    font-size: 0.75em;
+    color: var(--vdup-text-muted);
+    padding: 0.75em;
+    border: 0.0625em dashed var(--vdup-border);
+    border-radius: var(--vdup-radius-sm);
+    background: var(--vdup-surface-2);
+}
+
+.vas-dup-dash { color: var(--vdup-text-muted); }
+
+.vas-dup-card-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.75em 1em;
+    border-top: 0.0625em solid var(--vdup-divider);
+    background: var(--vdup-surface-2);
+}
+
+.vas-dup-card-total .lbl { font-size: 0.6875em; color: var(--vdup-text-muted); /*text-transform: uppercase;*/ letter-spacing: 0.025em; }
+.vas-dup-card-total .val { font-size: 0.96875em; font-weight: 700; color: var(--vdup-text); }
+
+/* Footer */
+.vas-dup-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex-wrap: wrap;
+    padding: 0.875em 1.25em;
+    border-top: 0.0625em solid var(--vdup-border);
+    background: #FFFFFF;
+}
+
+.vas-dup-footer-note { font-size: 0.75em; color: var(--vdup-text-secondary); display: flex; align-items: center; gap: 0.5em; }
+.vas-dup-footer-note svg { width: 1em; height: 1em; color: var(--vdup-warn-text); flex: 0 0 auto; }
+.vas-dup-actions { display: flex; align-items: center; gap: 0.625em; flex-wrap: wrap; }
+
+.vas-dup-btn {
+    font-family: inherit;
+    font-size: 0.75em;
+    font-weight: 500;
+    border-radius: 999em;
+    padding: 0.5em 1.125em;
+    cursor: pointer;
+    border: 0.0625em solid transparent;
+    white-space: nowrap;
+}
+
+.vas-dup-btn.secondary { background: #FFFFFF; border-color: var(--vdup-primary); color: var(--vdup-primary); }
+.vas-dup-btn.secondary:hover { background: var(--vdup-surface-faint); }
+.vas-dup-btn.danger { background: #FFFFFF; border-color: var(--vdup-danger); color: var(--vdup-danger-text); }
+.vas-dup-btn.danger:hover { background: var(--vdup-danger-bg); }
+.vas-dup-btn.primary { background: var(--vdup-action-blue); color: #FFFFFF; }
+.vas-dup-btn.primary:hover { background: var(--vdup-primary); }
+
+/* Responsive */
+@media (max-width: 45em) {
+    .vas-dup-field { grid-template-columns: 7em 1fr; }
+    .vas-dup-footer { justify-content: stretch; }
+    .vas-dup-actions { width: 100%; }
+    .vas-dup-actions .vas-dup-btn { flex: 1 1 auto; text-align: center; }
+    .vas-dup-legend-context { margin-left: 0; flex-basis: 100%; }
+}
+
+@media (max-width: 30em) {
+    .vas-dup-field { grid-template-columns: 1fr; gap: 0.125em; }
+    .vas-dup-tab { padding: 0.75em 0.75em; }
+}
+
+/* ── Duplicate review: matching-field (green) dot + line-item table ──
+   These selectors live inside .vas-dup-overlay, so the --vdup-* variables cascade. */
+.vas-dup-field-value.is-match { color: var(--vdup-text); font-weight: 700; }
+
+.vas-dup-field-value.is-match::after {
+    content: "";
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 0.5em;
+    height: 0.5em;
+    margin-left: 0.375em;
+    border-radius: 999em;
+    background: #20A464;
+}
+
+.vas-dup-card-total .val.is-match { color: #0B6B45; }
+.vas-dup-card-total .val.is-diff { color: var(--vdup-danger-text); }
+
+/* Horizontal scroll wrapper so a wide line table never widens (fluctuates) the card. */
+.vas-dup-lines-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.vas-dup-lines-table {
+    width: 100%;
+    /* Auto layout so each column sizes to its own (nowrap) content — a wide
+       value like 4,860,000.00 in Unit Price / Amount can never overflow into
+       the next column. The per-column min-widths below are floors (headers stay
+       readable); when the combined width exceeds the card the .vas-dup-lines-scroll
+       wrapper scrolls horizontally instead of letting cells overlap. */
+    min-width: 36em;
+    table-layout: auto;
+    border-collapse: collapse;
+    font-size: 0.75em;
+}
+
+.vas-dup-lines-table thead th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--vdup-text-muted);
+    font-size: 0.6875em;
+    /*text-transform: uppercase;*/
+    letter-spacing: 0.025em;
+    padding: 0.25em 0.5em;
+    border-bottom: 0.0625em solid var(--vdup-divider);
+    white-space: nowrap;
+}
+
+.vas-dup-lines-table td {
+    padding: 0.375em 0.5em;
+    border-bottom: 0.0625em solid var(--vdup-divider);
+    color: var(--vdup-text);
+    vertical-align: top;
+}
+
+.vas-dup-lines-table tbody tr:last-child td { border-bottom: none; }
+
+/* Column-width FLOORS (min-width): Product, Attribute Set, Charge, Qty, Unit Price, Amount.
+   Numeric columns get a wider floor so big amounts have room; auto layout grows any column
+   further to fit its content so adjacent values never collide. */
+.vas-dup-lines-table th:nth-child(1), .vas-dup-lines-table td:nth-child(1) { min-width: 9em; max-width: 14em; }
+.vas-dup-lines-table th:nth-child(2), .vas-dup-lines-table td:nth-child(2) { min-width: 7.5em; max-width: 11em; }
+.vas-dup-lines-table th:nth-child(3), .vas-dup-lines-table td:nth-child(3) { min-width: 6em; max-width: 9em; }
+.vas-dup-lines-table th:nth-child(4), .vas-dup-lines-table td:nth-child(4) { min-width: 3.5em; }
+.vas-dup-lines-table th:nth-child(5), .vas-dup-lines-table td:nth-child(5) { min-width: 7em; }
+.vas-dup-lines-table th:nth-child(6), .vas-dup-lines-table td:nth-child(6) { min-width: 7em; }
+
+/* Text columns trim to one line (full value via the cell title tooltip); numeric columns
+   stay on one line and size to content so the figure is always fully visible. */
+.vas-dup-line-trunc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-dup-line-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding-left: 1em; }
+
+/* Smaller widths: compact the table (font + column widths) so it stays clean and needs less
+   horizontal scrolling; the ellipsis + tooltip keep long values readable. */
+@media (max-width: 40em) {
+    .vas-dup-lines-table { min-width: 28em; font-size: 0.75em; }
+    .vas-dup-lines-table thead th { font-size: 0.625em; padding: 0.25em 0.375em; }
+    .vas-dup-lines-table td { padding: 0.3125em 0.375em; }
+    .vas-dup-lines-table th:nth-child(1), .vas-dup-lines-table td:nth-child(1) { min-width: 7em; max-width: 11em; }
+    .vas-dup-lines-table th:nth-child(2), .vas-dup-lines-table td:nth-child(2) { min-width: 6em; max-width: 9em; }
+    .vas-dup-lines-table th:nth-child(3), .vas-dup-lines-table td:nth-child(3) { min-width: 5em; max-width: 7em; }
+    .vas-dup-lines-table th:nth-child(4), .vas-dup-lines-table td:nth-child(4) { min-width: 3em; }
+    .vas-dup-lines-table th:nth-child(5), .vas-dup-lines-table td:nth-child(5) { min-width: 6em; }
+    .vas-dup-lines-table th:nth-child(6), .vas-dup-lines-table td:nth-child(6) { min-width: 6em; }
+}
+
+/* Matching lines get a green left rail, differing lines a red one. */
+.vas-dup-line.is-matching td:first-child { box-shadow: inset 0.1875em 0 0 #20A464; }
+.vas-dup-line.is-differing td:first-child { box-shadow: inset 0.1875em 0 0 var(--vdup-danger); }
+
+/* Centered empty state when an invoice has no line items. */
+.vas-dup-lines-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 4em;
+    font-size: 0.75em;
+    color: var(--vdup-text-muted);
+    border: 0.0625em dashed var(--vdup-border);
+    border-radius: var(--vdup-radius-sm);
+    background: var(--vdup-surface-2);
+}
+
+/* ── Loading skeleton: same card structure as the final cards, so no layout shift ── */
+.vas-dup-card-skeleton { pointer-events: none; }
+
+.vas-dup-sk {
+    display: block;
+    border-radius: 0.375em;
+    background: linear-gradient(90deg, #eef3f8 25%, #f6f9fc 37%, #eef3f8 63%);
+    background-size: 400% 100%;
+    animation: vasDupShimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes vasDupShimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+
+.vas-dup-sk-no { width: 6em; height: 1em; margin-bottom: 0.375em; }
+.vas-dup-sk-date { width: 9em; height: 0.75em; }
+.vas-dup-sk-pill { width: 4em; height: 1.25em; border-radius: 999em; }
+.vas-dup-sk-label { width: 6em; height: 0.75em; }
+.vas-dup-sk-value { width: 100%; height: 0.75em; }
+.vas-dup-sk-lines { width: 100%; height: 5em; }
+.vas-dup-sk-total { width: 6em; height: 1em; }
+
+/* Honour reduced-motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+    .vas-dup-sk { animation: none; }
+}

@@ -1,4 +1,4 @@
-﻿@import "../PaymentRule.css";
+@import "../PaymentRule.css";
 @import "../style.css";
 @import "../PoReceiptTabPanel.css";
 @import "../VPaySelect.css";
@@ -12,6 +12,7 @@
 @import "../VAS_HighestSellingWidget.css";
 @import "../VAS_ExpectedDeliveryWidget.css";
 @import "../VAS_LeadConversation.css";
+
 @import "../VAS_025_TotalPurchasesWidget.css";
 @import "../VAS_024_TotalOutstandingWidget.css";
 @import "../VAS_018_OverduePayablesWidget.css";
@@ -23,5 +24,58 @@
 @import "../VAS_023_TopFiveVendorsWidget.css";
 @import "../VAS_020_PendingInvoicesWidget.css";
 @import "../VAS_026_VendorCreditUtilisationWidget.css";
-@import "../VAS_DocumentSearchWidgets.css";
 @import "../VAS_071_NewPaymentWidget.css";
+
+
+@import "../VAS_027_ClearedAPPaymentWidget.css";
+@import "../VAS_028_PaidThisMonthAPPaymentWidget.css";
+@import "../VAS_029_ScheduledAPPaymentWidget.css";
+@import "../VAS_030_BouncedAPPaymentWidget.css";
+@import "../VAS_031_UpcomingAPRunsWidget.css";
+@import "../VAS_032_RecentAPPaymentsWidget.css";
+
+@import "../VAS_033_PaymentMethodsWidget.css";
+@import "../VAS_046_ReconciliationStatusWidget.css";
+
+
+@import "../VAS_010_CashGlCashInWidget.css";
+
+@import "../VAS_CreateNewReceipt.css";
+@import "../VAS_CreateARInvoice.css";
+@import "../VAS_ReceiptSearch.css";
+@import "../TotalAmountReceivedThisMonthWidget.css";
+@import "../ExpectedThisWeekWidget.css";
+@import "../AutoAllocatedWidget.css";
+@import "../VAS_RecentReceiptsWidget.css";
+@import "../BouncedChequesWidget.css";
+@import "../CustomerPaidMethodWidget.css";
+@import "../VAS_001_CollectionEfficiencyWidget.css";
+@import "../VAS_003_OnAccountReceipts.css";
+@import "../VAS_011_UnreconciledReceipts.css";
+@import "../VAS_012_TodayReceipts.css";
+@import "../VAS_013_TopCustomerReceipts.css";
+@import "../VAS_014_DailyCollectionTrend.css";
+@import "../VAS_015_OutstandingVsReceived.css";
+@import "../VAS_034_ExpectedReceipts.css";
+@import "../VAS_035_MatchSuggestions.css";
+@import "../ExpectedThisWeekWidget.css";
+@import "../AgingReceivablesWidget.css";
+@import "../AvgDaysToPayWidget.css";
+@import "../InvoicesWidget.css";
+@import "../OutstandingSalesOrderWidget.css";
+@import "../OverdueWidget.css";
+@import "../PaidthismonthWidget.css";
+@import "../TopDebtorsWidget.css";
+
+@import "../VAS_041_GLJournalEntriesWidget.css";
+@import "../VAS_036_GLJournalUnpostedWidget.css";
+@import "../VAS_039_GLJournalPostedWidget.css";
+@import "../VAS_037_GLJournalTotalDebitWidget.css";
+@import "../VAS_038_GLJournalTotalCreditWidget.css";
+@import "../VAS_040_GLJournalNetDiffWidget.css";
+@import "../VAS_044_GLJournalRecentWidget.css";
+@import "../VAS_042_GLJournalVolumeWidget.css";
+@import "../VAS_043_GLJournalTopMovementWidget.css";
+@import "../VAS_045_GLJournalPendingWidget.css";
+
+@import "../SalesInvoiceCustomerSearchWidget.css";

@@ -1,0 +1,198 @@
+/* ==========================================================================
+   VAS GL Journal Posted KPI Widget
+   File  : VAS_039_GLJournalPostedWidget.css
+   Scope : .VAS-gljp-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljp-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ── KPI card container ──────────────────────────────────────────────────── */
+.VAS-gljp-root .kpi {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 1em;
+    border-radius: 0.875em;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Cream/mint variant — very light warm green tint */
+.VAS-gljp-root .kpi.kpi-cream {
+    background: linear-gradient(145deg, rgba(245, 255, 252, 0.97) 0%, rgba(209, 245, 236, 0.80) 100%);
+}
+
+/* ── Widget header row ───────────────────────────────────────────────────── */
+.VAS-gljp-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Icon well — green tint background, green stroke */
+.VAS-gljp-root .w-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 0.375em;
+    background: rgba(1, 157, 137, 0.13);
+    color: #0B6B45;
+}
+
+.VAS-gljp-root .w-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+    stroke: currentColor;
+}
+
+/* Title label */
+.VAS-gljp-root .w-title {
+    flex: 1;
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: #5F7283;
+    letter-spacing: 0.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Zoom / navigate icon link */
+.VAS-gljp-zoom {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: #748494;
+    font-size: 0.875em;
+    opacity: 0.55;
+    text-decoration: none !important;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.VAS-gljp-zoom:hover {
+    opacity: 1;
+    color: #019D89;
+}
+
+/* ── KPI value ───────────────────────────────────────────────────────────── */
+.VAS-gljp-root .kpi-value {
+    font-size: 2.125em;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    color: #102C3F;
+    display: flex;
+    align-items: baseline;
+    gap: 0.05em;
+}
+
+/* Success/green color for the value */
+.VAS-gljp-root .kpi-value.success {
+    color: #019D89;
+}
+
+/* Large percentage number */
+.VAS-gljp-root .VAS-gljp-num {
+    font-size: 1em;
+    font-weight: 700;
+}
+
+/* Smaller % symbol */
+.VAS-gljp-root .VAS-gljp-pct {
+    font-size: 0.5625em;
+    font-weight: 700;
+    color: #0B6B45;
+}
+
+/* ── Why section ─────────────────────────────────────────────────────────── */
+.VAS-gljp-root .kpi-why {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4em;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.5em;
+    padding: 0.45em 0.6em;
+    border: 1px solid rgba(1, 157, 137, 0.15);
+}
+
+.VAS-gljp-root .kpi-why-label {
+    font-size: 0.6875em;
+    font-weight: 700;
+    color: #019D89;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.VAS-gljp-root .kpi-why-text {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.4;
+}
+
+/* ── Responsive scaling ──────────────────────────────────────────────────── */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-gljp-root .kpi {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-gljp-root .kpi {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljp-root .kpi {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-gljp-root .kpi {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-gljp-root .kpi {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-gljp-root .kpi {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljp-root .kpi {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-gljp-root .kpi {
+        font-size: 11px;
+    }
+}
+
+/* RTL support */
+html[dir="rtl"] .VAS-gljp-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljp-root .kpi-why {
+    flex-direction: row-reverse;
+}

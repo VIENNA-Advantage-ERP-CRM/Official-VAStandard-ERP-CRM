@@ -1,0 +1,661 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Collection Efficiency Widget — glass dashboard card with a donut KPI +
+ * DSO / overdue summary, and a drill-down Overdue invoice aging modal.
+ * Design source: design.md / dashboard-widgets.md (Onfinity Dashboard
+ * Design System) + the supplied image_1 (widget) and image_2 (modal).
+ * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
+ * `.vas-ce-card` uses `font-size: clamp(16px, 5cqi, 24px)` so the whole
+ * card scales with the dashboard cell on large screens (5cqi = KPI/Summary
+ * ~2-col coefficient, matching sibling receipt widgets). `1em` on the dialog
+ * stays fixed — it is body-attached and not container-sized.
+ * Container queries scale the card on small dashboard cells;
+ * media queries scale the dialog on small viewports.
+ * Namespaced vas-ce-*.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas-ce-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    /*font-family: Roboto, sans-serif;*/
+}
+
+    .vas-ce-root,
+    .vas-ce-root * {
+        box-sizing: border-box;
+    }
+
+.vas-ce-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
+}
+
+/* ── Glass card shell (design.md §Glass Widget) ──────────────────── */
+
+.vas-ce-card {
+    /* Responsive root anchor: scale the whole card with the cell so it
+       fills larger dashboard cells on wide screens. cqi resolves against
+       .vas-ce-root (container-type: inline-size). 5cqi matches the
+       KPI/Summary (~2-col) sibling receipt widgets. Clamp keeps it
+       between 16px (default) and 24px (large cells). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
+    border: 0.125em solid #FFFFFF;
+    border-radius: 0.875em;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    padding: .875em;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: box-shadow 180ms ease;
+}
+
+    .vas-ce-card:hover {
+        box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
+    }
+
+    .vas-ce-card:focus-visible {
+        outline: 0.125em solid #0083DA;
+        outline-offset: 0.125em;
+    }
+
+/* ── Header: icon + title/subtitle (left), Aging hint (right) ───── */
+
+.vas-ce-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.875em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.vas-ce-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.vas-ce-icon-wrap {
+    /* Multi-line header (title + subtitle) → 2.25em per spec. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-ce-icon-wrap svg {
+        width: 1.15em;
+        height: 1.15em;
+        stroke: currentColor;
+    }
+
+.vas-ce-title-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-ce-title {
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): same resolved px in every widget at any screen size.
+       Weight Medium (500) per project request. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ce-subtitle {
+    margin-top: 0.125em;
+    /* Dashboard-width-anchored sm clamp (--dash-inline-size — the dashboard's
+       visible content width in px; falls back to 100vw when unset) so the
+       subtitle tracks the dashboard width like the title. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #717182;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ce-open-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    font-size: 0.75em;
+    color: #0083DA;
+    font-weight: 400;
+    flex-shrink: 0;
+}
+
+    .vas-ce-open-hint svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+/* ── Body: donut + meta block ─────────────────────────────────────── */
+
+.vas-ce-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625em;
+    text-align: center;
+}
+
+.vas-ce-donut {
+    width: 7em;
+    height: 7em;
+    min-height: 7em;
+    position: relative;
+    flex-shrink: 0;
+    /* Become a query container so the centred figure can size itself in cqi
+       relative to the DONUT (not the card) and always fit inside the ring. */
+    container-type: inline-size;
+}
+
+    .vas-ce-donut svg {
+        width: 100%;
+        height: 100%;
+    }
+
+.vas-ce-donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.375em;        /* keep the centred text clear of the ring */
+    min-width: 0;
+    text-align: center;
+}
+
+.vas-ce-percent {
+    /* Sized in cqi RELATIVE TO THE DONUT (.vas-ce-donut is container-type:
+       inline-size) so the figure always fits inside the ring — even the
+       widest value "100.00%" — and scales with the donut on any screen.
+       The em bounds clamp it on very small / very large donuts. */
+    font-size: clamp(0.8em, 18cqi, 1.6em);
+    font-weight: 700;
+    color: #0B6B45;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.vas-ce-on-time {
+    margin-top: 0.25em;
+    font-size: 0.625em;
+    line-height: 1;
+    font-weight: 400;
+    color: #748494;
+    letter-spacing: 0.0875em;
+    text-transform: uppercase;
+}
+
+.vas-ce-meta {
+    text-align: center;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.vas-ce-dso {
+    font-size: 1.1em;
+    color: #102C3F;
+    line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+    .vas-ce-dso strong { font-weight: 700; }
+
+.vas-ce-overdue {
+    margin-top: 0.25em;
+    font-size: 0.85em;
+    color: #748494;
+    line-height: 1.3;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.vas-ce-cur-inline {
+    margin-inline-end: 0.15em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+/* ── Card responsive ──────────────────────────────────────────────── */
+
+@container (max-width: 22em) {        /* ~352px */
+    .vas-ce-card { font-size: 0.875em; }
+    .vas-ce-donut { width: 6em; height: 6em; min-height: 6em; }
+    /* .vas-ce-percent now sizes in cqi against the donut, so it shrinks with
+       the smaller donut automatically — no manual override needed. */
+}
+
+@container (max-width: 16em) {        /* ~256px */
+    .vas-ce-open-hint span { display: none; }
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * Overdue invoice aging modal. Attached to <body>; fixed positioning.
+ * ─────────────────────────────────────────────────────────────────── */
+
+.vas-ce-body-lock {
+    overflow: hidden;
+}
+
+.vas-ce-dialog {
+    /*font-family: Roboto, sans-serif;*/
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+    .vas-ce-dialog,
+    .vas-ce-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-ce-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-ce-dialog-card {
+    position: relative;
+    min-height: 34em;
+    width: min(68em, 100%);
+    height: min(42em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-ce-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.vas-ce-dialog-hicon {
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
+    border: 0.0625em solid #BFE4FF;
+    color: #0083DA;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .vas-ce-dialog-hicon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
+
+.vas-ce-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-ce-dialog-title {
+    font-size: 1.125em;
+    font-weight: 400;
+    color: #141414;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ce-dialog-sub {
+    margin-top: 0.125em;
+    font-size: 0.75em;
+    color: #717182;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ce-dialog-close {
+    width: 2em;
+    height: 2em;
+    border-radius: 0.5em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* Family dialog close button — muted glyph, soft blue-gray hover
+       (matches the sibling dialogs). */
+    color: #5F7283;
+    flex-shrink: 0;
+}
+
+    .vas-ce-dialog-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+    .vas-ce-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+/* ── Modal body: only the table area scrolls ─────────────────────── */
+
+.vas-ce-dialog-body {
+    flex: 1 1 auto;
+    overflow: auto;
+    min-height: 0;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+.vas-ce-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.vas-ce-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+    .vas-ce-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        background: #FFFFFF;
+        z-index: 2;
+        font-size: 0.75em;            /* sm — 0.75em of the dialog base = shared data clamp */
+        font-weight: 400;
+        color: #748494;
+        text-align: left;
+        padding: 0.875em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .vas-ce-dialog-table thead th.vas-ce-d-th-amount {
+            text-align: right;
+        }
+
+    .vas-ce-dialog-table tbody td {
+        /* Tighter vertical padding (0.75em) so 10 page rows + thead +
+           header + footer fit comfortably inside the modal body without
+           leaving large empty space at the bottom. */
+        padding: 0.75em 0.75em;
+        border-bottom: 0.0625em solid #EDF2F6;
+        font-size: 0.75em;            /* sm — matches widget data px */
+        color: #102C3F;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .vas-ce-dialog-table tbody tr:hover td { background: #FBFDFF; }
+
+/* Column widths.
+   All five columns carry an explicit width so that — with
+   `table-layout: fixed` — any surplus table width is distributed
+   proportionally across every column instead of being dumped into a
+   single greedy `auto` column (which left a large dead gap after the
+   Customer cell). This keeps the columns proportionate, matching the
+   previous receipt modals. The Amount column stays wide enough for the
+   largest expected value ("Rs 1,203,947.00"). */
+.vas-ce-d-th-doc,    .vas-ce-d-td-doc    { width: 8em; }
+.vas-ce-d-th-cust,   .vas-ce-d-td-cust   { width: 15em; }
+.vas-ce-d-th-date,   .vas-ce-d-td-date   { width: 8em; color: #5F7283; }
+.vas-ce-d-th-age,    .vas-ce-d-td-age    { width: 7em; text-align: left; }
+.vas-ce-d-th-cur,    .vas-ce-d-td-cur    { width: 6em; }
+.vas-ce-d-th-amount, .vas-ce-d-td-amount { width: 12em; text-align: right; }
+
+.vas-ce-d-td-doc {
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
+    font-size: 0.8125em;
+    color: #5F7283;
+}
+
+.vas-ce-d-td-cust {
+    font-weight: 400;
+    color: #102C3F;
+    font-size: 0.9375em;
+}
+
+.vas-ce-d-td-cur {
+    color: #5F7283;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+
+.vas-ce-d-td-amount {
+    font-weight: 400;
+    color: #9A6500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.vas-ce-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Age chip — colour depends on bucket; matches Onfinity tinted-light pills. */
+.vas-ce-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.1875em 0.625em;
+    border-radius: 999em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.vas-ce-chip-danger {           /* > 30 days */
+    background: #FBE5E5;
+    color: #A33F3F;
+}
+
+.vas-ce-chip-warning {          /* 15..30 days */
+    background: #FCEAC7;
+    color: #9A6500;
+}
+
+.vas-ce-chip-success {          /* ≤ 14 days — shown in red (overdue) */
+    background: #FBE5E5;
+    color: #A33F3F;
+}
+
+.vas-ce-d-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;               /* sm — matches the table data */
+    background: #FFFFFF;
+}
+
+/* ── Bottom section: result-range helper (left) · pager (right) ──────── */
+
+.vas-ce-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.vas-ce-pager-helper {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+.vas-ce-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.vas-ce-pager-btn {
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.375em;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-ce-pager-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+    }
+
+    .vas-ce-pager-btn:hover:not(:disabled) {
+        background: #EAF8FF;
+        border-color: #BFE4FF;
+    }
+
+    .vas-ce-pager-btn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-ce-pager-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.875em;
+    font-weight: 400;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ── Dialog responsive ───────────────────────────────────────────── */
+
+@media (max-width: 48em) {            /* ~768px tablet */
+    .vas-ce-dialog { padding: 0; }
+    .vas-ce-dialog-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-ce-d-th-doc,   .vas-ce-d-td-doc   { width: 7em; }
+    .vas-ce-d-th-cust,  .vas-ce-d-td-cust  { width: 9em; }
+    .vas-ce-d-th-date,  .vas-ce-d-td-date  { width: 6em; }
+    .vas-ce-d-th-age,   .vas-ce-d-td-age   { width: 5em; }
+    .vas-ce-d-th-cur,   .vas-ce-d-td-cur   { width: 4.5em; }
+    .vas-ce-d-th-amount,.vas-ce-d-td-amount{ width: 7em; }
+}
+
+@media (max-width: 36em) {            /* ~576px phone */
+    .vas-ce-dialog-table thead th,
+    .vas-ce-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    /* Drop Due date on phones — Age chip already conveys urgency. */
+    .vas-ce-d-th-date,
+    .vas-ce-d-td-date { display: none; }
+
+    .vas-ce-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .vas-ce-pager-helper { flex: 1 1 100%; order: 2; text-align: center; }
+    .vas-ce-pager { order: 1; margin: 0 auto; }
+}

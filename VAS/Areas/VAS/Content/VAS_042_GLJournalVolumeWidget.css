@@ -1,0 +1,206 @@
+/* ==========================================================================
+   VAS GL Journal Volume by Day Chart Widget
+   File  : VAS_042_GLJournalVolumeWidget.css
+   Scope : .VAS-gljv-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljv-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ── Card container ──────────────────────────────────────────────────────── */
+.VAS-gljv-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1em;
+    border-radius: 0.875em;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, #FAFCFE 0%, #EEF6FF 100%);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljv-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+    margin-bottom: 0.5em;
+}
+
+/* Icon well */
+.VAS-gljv-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 0.375em;
+    background: rgba(0, 131, 218, 0.10);
+    color: #004E9A;
+}
+
+.VAS-gljv-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
+/* Title */
+.VAS-gljv-root .w-title {
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: #102C3F;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+/* Sub-label: "APR 1–18 · Count vs Value" */
+.VAS-gljv-sub {
+    font-size: 0.7em;
+    font-weight: 400;
+    color: #748494;
+    letter-spacing: 0.02em;
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Week / Month toggle button */
+.VAS-gljv-toggle {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #0083DA;
+    background: rgba(0, 131, 218, 0.07);
+    border: 1px solid rgba(0, 131, 218, 0.20);
+    border-radius: 0.35em;
+    padding: 0.2em 0.55em;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.12s;
+    white-space: nowrap;
+}
+
+.VAS-gljv-toggle:hover {
+    background: rgba(0, 131, 218, 0.14);
+}
+
+/* ── Chart area ──────────────────────────────────────────────────────────── */
+.VAS-gljv-chart-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: stretch;
+}
+
+/* The injected SVG fills the wrap */
+.VAS-gljv-chart-wrap svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ── Legend row ──────────────────────────────────────────────────────────── */
+.VAS-gljv-legend {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    margin-top: 0.5em;
+    padding-top: 0.4em;
+    border-top: 1px solid rgba(0, 131, 218, 0.08);
+}
+
+.VAS-gljv-leg-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.7em;
+    font-weight: 400;
+    color: #748494;
+    white-space: nowrap;
+}
+
+/* ── Legend swatches ─────────────────────────────────────────────────────── */
+.VAS-gljv-swatch {
+    display: inline-block;
+    width: 0.75em;
+    height: 0.75em;
+    border-radius: 0.15em;
+    flex-shrink: 0;
+}
+
+/* Posted — solid blue */
+.VAS-gljv-sw-posted {
+    background: #0083DA;
+    opacity: 0.85;
+}
+
+/* Weekend — faded blue */
+.VAS-gljv-sw-weekend {
+    background: rgba(0, 131, 218, 0.40);
+}
+
+/* This week — bright blue */
+.VAS-gljv-sw-week {
+    background: #1F83FF;
+}
+
+/* Net value trend — green line swatch */
+.VAS-gljv-sw-trend {
+    background: #019D89;
+    height: 0.2em;
+    border-radius: 999px;
+    align-self: center;
+    width: 1em;
+}
+
+/* ── Responsive scaling ──────────────────────────────────────────────────── */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-gljv-card {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-gljv-card {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljv-card {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-gljv-card {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-gljv-card {
+        font-size: 6px;
+    }
+}
+
+/* RTL support */
+html[dir="rtl"] .VAS-gljv-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljv-sub {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljv-legend {
+    flex-direction: row-reverse;
+}
