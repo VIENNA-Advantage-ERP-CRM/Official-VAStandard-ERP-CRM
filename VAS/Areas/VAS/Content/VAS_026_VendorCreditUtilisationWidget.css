@@ -1,0 +1,178 @@
+/* ==========================================================
+   VAS Vendor Credit Utilisation Widget  —  vas-vcuwdg-* namespace
+   ========================================================== */
+
+.vas-vcuwdg-root {
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---- Busy indicator overlay ---- */
+.vas-widget-busy-wrap {
+    position: absolute;
+    width: 98%;
+    height: 97%;
+    text-align: center;
+    z-index: 999;
+}
+
+.vas-vcuwdg-container {
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1em 1.14em 0.86em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    border-radius: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ---- Header ---- */
+.vas-vcuwdg-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.65em;
+    flex-shrink: 0;
+}
+
+.vas-vcuwdg-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.86em;
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-vcuwdg-title-icon {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    color: #5F7283;
+}
+
+.vas-vcuwdg-badge {
+    flex-shrink: 0;
+    font-size: 0.72em;
+    font-weight: 600;
+    color: #8F2D2D;
+    background: #FAD7D7;
+    border-radius: 999px;
+    padding: 0.15em 0.65em;
+    white-space: nowrap;
+    border: 1px solid rgba(209, 69, 69, 0.25);
+}
+
+/* ---- Scrollable vendor list ---- */
+.vas-vcuwdg-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55em;
+}
+
+.vas-vcuwdg-list::-webkit-scrollbar {
+    width: 3px;
+}
+
+.vas-vcuwdg-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+}
+
+/* ---- Progress row ---- */
+.vas-vcuwdg-prog {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+}
+
+.vas-vcuwdg-prog-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4em;
+}
+
+.vas-vcuwdg-prog-name {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.80em;
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-vcuwdg-breach-chip {
+    flex-shrink: 0;
+    display: inline-block;
+    font-size: 0.78em;
+    font-weight: 700;
+    color: #8F2D2D;
+    background: #FAD7D7;
+    border-radius: 999px;
+    padding: 0.05em 0.45em;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.vas-vcuwdg-prog-val {
+    flex-shrink: 0;
+    font-size: 0.74em;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.vas-vcuwdg-prog-val--normal   { color: #5F7283; }
+.vas-vcuwdg-prog-val--breached { color: #D14545; font-weight: 700; }
+
+/* ---- Progress track ---- */
+.vas-vcuwdg-prog-track {
+    width: 100%;
+    height: 0.38em;
+    background: rgba(0, 0, 0, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vas-vcuwdg-prog-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+    min-width: 2px;
+}
+
+.vas-vcuwdg-prog-fill--green { background: #20A464; }
+.vas-vcuwdg-prog-fill--amber { background: #D78B10; }
+.vas-vcuwdg-prog-fill--red   { background: #ED1C24; }
+
+/* ---- Empty state ---- */
+.vas-vcuwdg-empty {
+    font-size: 0.75em;
+    color: #748494;
+    padding: 0.5em 0;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1920px) { .vas-vcuwdg-container { font-size: 14px; } }
+@media (max-width: 1366px) { .vas-vcuwdg-container { font-size: 13px; } }
+@media (max-width: 1024px) { .vas-vcuwdg-container { font-size: 12px; } }
+@media (max-width: 900px)  { .vas-vcuwdg-container { font-size: 11.5px; } }
+@media (max-width: 768px)  { .vas-vcuwdg-container { font-size: 11px; } }
+@media (max-width: 680px)  { .vas-vcuwdg-container { font-size: 10.5px; } }
+@media (max-width: 480px)  { .vas-vcuwdg-container { font-size: 10px; } }
+@media (max-width: 320px)  { .vas-vcuwdg-container { font-size: 9px; } }

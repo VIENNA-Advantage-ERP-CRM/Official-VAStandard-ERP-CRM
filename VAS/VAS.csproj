@@ -237,6 +237,20 @@
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
+
+    <Compile Include="Areas\VAS\Controllers\VAS_016_AvgPaymentPeriodWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_017_MonthlyPurchaseSpendWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_018_OverduePayablesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_019_PayableAgingWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_020_PendingInvoicesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_021_RealTimeAlertsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_022_SpendByCategoryWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_023_TopFiveVendorsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_024_TotalOutstandingWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_025_TotalPurchasesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_026_VendorCreditUtilisationWidgetController.cs" />
+
+
     <Compile Include="Areas\VAS\Controllers\VAS_045_GLJournalPendingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
@@ -319,6 +333,20 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+
+    <Content Include="Areas\VAS\Content\VAS_016_AvgPaymentPeriodWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_017_MonthlyPurchaseSpendWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_018_OverduePayablesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_019_PayableAgingWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_020_PendingInvoicesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_021_RealTimeAlertsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_022_SpendByCategoryWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_023_TopFiveVendorsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_024_TotalOutstandingWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_025_TotalPurchasesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_026_VendorCreditUtilisationWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_071_NewPaymentWidget.css" />
+
     <Content Include="Areas\VAS\Content\VAS_010_CashGlCashInWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_003_OnAccountReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_011_UnreconciledReceipts.css" />
@@ -328,6 +356,7 @@
     <Content Include="Areas\VAS\Content\VAS_015_OutstandingVsReceived.css" />
     <Content Include="Areas\VAS\Content\VAS_035_MatchSuggestions.css" />
     <Content Include="Areas\VAS\Content\VAS_AvgDaysToPayWidget.css" />
+
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateNewReceipt.css" />
@@ -440,6 +469,22 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_042_GLJournalVolumeWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_040_GLJournalNetDiffWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_016_AvgPaymentPeriodWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_017_MonthlyPurchaseSpendWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_018_OverduePayablesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_019_PayableAgingWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_020_PendingInvoicesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_021_RealTimeAlertsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_022_SpendByCategoryWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_023_TopFiveVendorsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_024_TotalOutstandingWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_025_TotalPurchasesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_026_VendorCreditUtilisationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_067_APInvoiceSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_068_APPaymentSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_069_CashJournalSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_070_GLJournalSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_071_NewPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\SalesInvoiceCustomerSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_010_CashGlCashInWidget.js" />
@@ -454,6 +499,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_035_MatchSuggestions.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
+
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
