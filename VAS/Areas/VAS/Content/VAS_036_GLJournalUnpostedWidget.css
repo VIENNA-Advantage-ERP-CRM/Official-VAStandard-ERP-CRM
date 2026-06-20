@@ -537,6 +537,11 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     flex-shrink: 0;
 }
 
+.VAS-glju-detail-footer-spacer {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .VAS-glju-export,
 .VAS-glju-close-primary {
     height: 2.25em;
@@ -715,6 +720,19 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 
     .VAS-glju-dialog-footer {
         flex-wrap: wrap;
+    }
+
+    .VAS-glju-detail-footer-spacer {
+        display: none;
+    }
+
+    .VAS-glju-detail-dialog .VAS-glju-dialog-actions {
+        width: 100%;
+    }
+
+    .VAS-glju-detail-dialog .VAS-glju-export,
+    .VAS-glju-detail-dialog .VAS-glju-close-primary {
+        flex: 1;
     }
 
     .VAS-glju-detail-summary {

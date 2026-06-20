@@ -652,6 +652,8 @@
 
                         '<div class="VAS-glju-dialog-footer">' +
 
+                        '<span class="VAS-glju-detail-footer-spacer"></span>' +
+
                         '<div class="VAS-glju-dialog-actions">' +
 
                         '<button type="button" ' +
@@ -672,17 +674,6 @@
                             lbl(
                                 "VAS_036_PostJournal",
                                 "Post journal"
-                            )
-                        ) +
-                        "</button>" +
-
-                        '<button type="button" ' +
-                        'class="VAS-glju-close-primary ' +
-                        'VAS-glju-detail-close">' +
-                        esc(
-                            lbl(
-                                "VAS_Close",
-                                "Close"
                             )
                         ) +
                         "</button>" +
