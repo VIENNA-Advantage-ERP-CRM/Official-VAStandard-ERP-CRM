@@ -2795,6 +2795,7 @@
             var $iconBox;
             var $icon;
             var $title;
+            var $arrow;
             var $sub;
             var $footer;
 
@@ -2859,6 +2860,14 @@
                     'VAS_031_MessageNext7Days',
                     'Next 7 days'
                 )
+            );
+
+            $arrow = $(
+                '<span class="vas-upcoming-ap-runs-arrow" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>' +
+                '</span>'
             );
 
             $pager = $(
@@ -2935,7 +2944,9 @@
                 .append($titleRow)
                 .append($sub);
 
-            $head.append($headLeft);
+            $head
+                .append($headLeft)
+                .append($arrow);
 
             $pager
                 .append($pagerPrev)

@@ -244,6 +244,22 @@
     color: #102c3f;
 }
 
+.vas-finance-kpi-arrow {
+    width: 1.25em;
+    height: 1.25em;
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #6E7F91;
+}
+
+.vas-finance-kpi-arrow svg {
+    width: 100%;
+    height: 100%;
+}
+
 .vas-finance-kpi-body {
     flex: 1 1 auto;
     min-width: 0;

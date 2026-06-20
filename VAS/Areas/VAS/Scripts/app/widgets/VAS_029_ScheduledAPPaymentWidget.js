@@ -109,8 +109,16 @@
                 lbl('VAS_029_MessageScheduled', 'Due This Week')
             );
 
+            var $arrow = $(
+                '<span class="vas-scheduled-ap-payment-arrow" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>' +
+                '</span>'
+            );
+
             $iconBox.append($icon);
-            $header.append($iconBox).append($title);
+            $header.append($iconBox).append($title).append($arrow);
 
             $body = $('<div class="vas-scheduled-ap-payment-body">');
             $value = $('<div class="vas-scheduled-ap-payment-value">');
