@@ -13,6 +13,38 @@ using VAdvantage.Process;
 using VAdvantage.Utility;
 using VIS.Filters;
 
+/*
+ * GL Journal Recent Entries Controller
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Could Not Load Recent Entries        | VAS_044_LoadFailed
+ *  2  | Invalid Journal ID                   | VAS_044_InvalidJournalID
+ *  3  | Details Not Available                | VAS_044_DetailsNotAvailable
+ *  4  | Details Load Failed                  | VAS_044_DetailsLoadFailed
+ *  5  | Already Posted                       | VAS_044_AlreadyPosted
+ *  6  | Already Approved                     | VAS_044_AlreadyApproved
+ *  7  | Prepare Failed                       | VAS_044_PrepareFailed
+ *  8  | Invalid Approval Status              | VAS_044_ApproveInvalidStatus
+ *  9  | Approve Failed                       | VAS_044_ApproveFailed
+ * 10  | Approved Successfully                | VAS_044_ApprovedSuccessfully
+ * 11  | Complete Failed                      | VAS_044_CompleteFailed
+ * 12  | Must Approve Before Post             | VAS_044_MustApproveBeforePost
+ * 13  | Not Processed                        | VAS_044_NotProcessed
+ * 14  | No Accounting Schema                 | VAS_044_NoAccountingSchema
+ * 15  | Post Verification Failed             | VAS_044_PostVerificationFailed
+ * 16  | Posted Successfully                  | VAS_044_PostedSuccessfully
+ * 17  | Post Failed                          | VAS_044_PostFailed
+ * 18  | No Permission                        | VAS_044_NoPermission
+ * 19  | Inactive Journal                     | VAS_044_InactiveJournal
+ * 20  | Not Balanced                         | VAS_044_NotBalanced
+ * 21  | Not Convertible                      | VAS_044_NotConvertible
+ * 22  | Period Closed                        | VAS_044_PeriodClosed
+ * 23  | Invalid Account                      | VAS_044_InvalidAccount
+ * ---------------------------------------------------------------------
+ */
+
 namespace VAS.Controllers
 {
     /// <summary>

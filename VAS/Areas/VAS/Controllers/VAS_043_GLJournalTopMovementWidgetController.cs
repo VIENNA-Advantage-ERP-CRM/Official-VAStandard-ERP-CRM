@@ -8,6 +8,20 @@ using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 
+/*
+ * GL Journal Top Movement Controller
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | YTD                                  | VAS_043_YTD
+ *  2  | Top Ledger Movement                  | VAS_043_TopLedgerMovement
+ *  3  | No Data                              | VAS_043_NoData
+ *  4  | Top 10                               | VAS_043_Top10
+ *  5  | Could Not Load Data                  | VAS_043_ErrorLoadingData
+ * ---------------------------------------------------------------------
+ */
+
 namespace VAS.Controllers
 {
     public class VAS_043_GLJournalTopMovementWidgetController : Controller
@@ -322,7 +336,7 @@ ORDER BY TopMovement.RowNo";
                     : 0;
 
                 string periodLabel = isYtd
-                    ? GetMsg(ctx, "VAS_GLJTM_YTD", "YTD") + " " + yearName
+                    ? GetMsg(ctx, "VAS_043_YTD", "YTD") + " " + yearName
                     : periodName + " " + yearName;
 
                 DateTime displayStart = isYtd ? yearStart : periodStart;
@@ -333,10 +347,10 @@ ORDER BY TopMovement.RowNo";
                     {
                         success = true,
                         error = "",
-                        title = GetMsg(ctx, "VAS_GLJTM_Title", "Top Ledger Movement"),
+                        title = GetMsg(ctx, "VAS_043_TopLedgerMovement", "Top Ledger Movement"),
                         mainMetric = 0,
                         mainMetricText = "0",
-                        description = GetMsg(ctx, "VAS_GLJTM_NoData", "No data found"),
+                        description = GetMsg(ctx, "VAS_043_NoData", "No data found"),
                         badgeText = periodLabel,
                         dateFrom = displayStart == DateTime.MinValue ? "" : FormatDate(displayStart),
                         dateTo = periodEnd == DateTime.MinValue ? "" : FormatDate(periodEnd),
@@ -357,11 +371,11 @@ ORDER BY TopMovement.RowNo";
                 {
                     success = true,
                     error = "",
-                    title = GetMsg(ctx, "VAS_GLJTM_Title", "Top Ledger Movement"),
+                    title = GetMsg(ctx, "VAS_043_TopLedgerMovement", "Top Ledger Movement"),
                     mainMetric = totalCount,
                     mainMetricText = totalCount.ToString(),
                     description = periodLabel,
-                    badgeText = GetMsg(ctx, "VAS_GLJTM_Top10", "Top 10"),
+                    badgeText = GetMsg(ctx, "VAS_043_Top10", "Top 10"),
                     dateFrom = displayStart == DateTime.MinValue ? "" : FormatDate(displayStart),
                     dateTo = periodEnd == DateTime.MinValue ? "" : FormatDate(periodEnd),
                     currencyISO = isoCode,
@@ -387,7 +401,7 @@ ORDER BY TopMovement.RowNo";
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = false,
-                    error = GetMsg(ctx, "VAS_GLJTM_ErrorLoadingData", "Could not load data"),
+                    error = GetMsg(ctx, "VAS_043_ErrorLoadingData", "Could not load data"),
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
             }

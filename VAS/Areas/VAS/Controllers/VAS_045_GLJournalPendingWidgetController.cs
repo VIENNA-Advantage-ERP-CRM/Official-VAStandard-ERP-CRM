@@ -11,6 +11,36 @@ using VAdvantage.Model;
 using VAdvantage.Process;
 using VAdvantage.Utility;
 
+/*
+ * GL Journal Pending Action Queue Controller
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Approval                             | VAS_045_Approval
+ *  2  | Post                                 | VAS_045_Post
+ *  3  | Resubmit                             | VAS_045_Resubmit
+ *  4  | Draft                                | VAS_045_Draft
+ *  5  | Load Pending Queue Failed            | VAS_045_LoadPendingQueueFailed
+ *  6  | Journal Details Not Found            | VAS_045_JournalDetailsNotFound
+ *  7  | Journal Already Posted               | VAS_045_JournalAlreadyPosted
+ *  8  | Journal Already Approved             | VAS_045_JournalAlreadyApproved
+ *  9  | Invalid Approval Status              | VAS_045_InvalidApprovalStatus
+ * 10  | Journal Approved Successfully        | VAS_045_JournalApprovedSuccessfully
+ * 11  | Journal Must Be Approved             | VAS_045_JournalMustBeApproved
+ * 12  | Journal Posted Successfully          | VAS_045_JournalPostedSuccessfully
+ * 13  | No Accounting Schema                 | VAS_045_NoAccountingSchema
+ * 14  | Journal Posting Not Completed        | VAS_045_JournalPostingNotCompleted
+ * 15  | Journal Not Balanced                 | VAS_045_JournalNotBalanced
+ * 16  | Journal Not Convertible              | VAS_045_JournalNotConvertible
+ * 17  | Journal Period Closed                | VAS_045_JournalPeriodClosed
+ * 18  | Journal Invalid Account              | VAS_045_JournalInvalidAccount
+ * 19  | Journal Process Failed               | VAS_045_JournalProcessFailed
+ * 20  | Journal Inactive                     | VAS_045_JournalInactive
+ * 21  | Could Not Save Journal               | VAS_045_CouldNotSaveJournal
+ * ---------------------------------------------------------------------
+ */
+
 namespace VAS.Controllers
 {
     /// <summary>

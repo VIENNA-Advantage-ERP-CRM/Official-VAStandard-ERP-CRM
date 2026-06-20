@@ -43,14 +43,17 @@
  * VAS_044_DetailsNotLoaded             Journal details are not loaded.      لم يتم تحميل تفاصيل القيد
  * VAS_044_DetailsNotAvailable          Journal details are not available.   تفاصيل القيد غير متوفرة
  * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة الطباعة
+ * VAS_044_LoadFailed                   Could Not Load Recent Entries        
+ * VAS_044_InvalidJournalID             Invalid Journal ID                   
+ * VAS_044_DetailsLoadFailed            Could Not Load Journal Details       
  *
  * Shared Messages:
  *
  * Value                                English Text                          Arabic Text
  * ---------------------------------------------------------------------------------------------------------
  * VAS_DownloadPDF                      Download PDF                         تنزيل PDF
- * VAS_041_Approve                      Approve                              موافقة
- * VAS_041_PostJournal                  Post journal                         ترحيل القيد
+ * VAS_044_Approve                      Approve                              موافقة
+ * VAS_044_PostJournal                  Post journal                         ترحيل القيد
  * VAS_Close                            Close                                إغلاق
  *
  * Existing VIS Messages:
@@ -1367,7 +1370,7 @@
 
                         esc(
                             lbl(
-                                "VAS_041_Approve",
+                                "VAS_044_Approve",
                                 "Approve"
                             )
                         ) +
@@ -1380,7 +1383,7 @@
 
                         esc(
                             lbl(
-                                "VAS_041_PostJournal",
+                                "VAS_044_PostJournal",
                                 "Post Journal"
                             )
                         ) +
@@ -2580,7 +2583,7 @@
                                 "Approving..."
                             )
                             : lbl(
-                                "VAS_041_Approve",
+                                "VAS_044_Approve",
                                 "Approve"
                             )
                     );
@@ -2595,7 +2598,7 @@
                                 "Posting..."
                             )
                             : lbl(
-                                "VAS_041_PostJournal",
+                                "VAS_044_PostJournal",
                                 "Post Journal"
                             )
                     );

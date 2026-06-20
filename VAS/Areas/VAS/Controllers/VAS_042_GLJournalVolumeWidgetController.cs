@@ -8,14 +8,27 @@ using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 
+/*
+ * GL Journal Volume Controller
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Session Expired                      | VAS_042_SessionExpired
+ *  2  | Error Loading Data                   | VAS_042_ErrorLoadingData
+ *  3  | GL Journal Volume                    | VAS_042_GLJournalVolume
+ *  4  | No Data                              | VIS_NoData
+ * ---------------------------------------------------------------------
+ */
+
 namespace VAS.Controllers
 {
     /// <summary>
     /// Controller for the GL Journal Volume by Day chart widget.
     ///
     /// Labels / Message Keys
-    /// 1 | Session Expired        | VAS_SessionExpired
-    /// 2 | Error loading data     | VAS_ErrorLoadingData
+    /// 1 | Session Expired        | VAS_042_SessionExpired
+    /// 2 | Error loading data     | VAS_042_ErrorLoadingData
     /// 3 | GL Journal Volume      | VAS_042_GLJournalVolume
     /// 4 | No data available      | VIS_NoData
     /// </summary>
@@ -274,7 +287,7 @@ ORDER BY DailyData.DateAcct ASC";
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = false,
-                    error = GetMsg(ctx, "VAS_ErrorLoadingData", "Error loading data."),
+                    error = GetMsg(ctx, "VAS_042_ErrorLoadingData", "Error loading data."),
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
             }

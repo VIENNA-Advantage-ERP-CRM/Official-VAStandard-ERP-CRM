@@ -8,6 +8,26 @@ using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 
+/*
+ * GL Journal Total Debit Controller
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Invalid Column                       | VAS_037_InvalidColumn
+ *  2  | Invalid Alias                        | VAS_037_InvalidAlias
+ *  3  | Session Expired                      | VAS_037_SessionExpired
+ *  4  | Could Not Load Data                  | VAS_037_ErrorLoadingData
+ *  5  | Current Period Was Not Found         | VAS_037_PeriodNotFound
+ *  6  | Total Debit                          | VAS_037_TotalDebitTitle
+ *  7  | Total Credit                         | VAS_037_TotalCreditTitle
+ *  8  | Net Difference                       | VAS_037_NetDifferenceTitle
+ *  9  | Month                                | VAS_037_MonthBadge
+ * 10  | YTD                                  | VAS_037_YTDBadge
+ * 11  | Journal Count                        | VAS_037_JournalCountDescription
+ * ---------------------------------------------------------------------
+ */
+
 namespace VAS.Controllers
 {
     /// <summary>

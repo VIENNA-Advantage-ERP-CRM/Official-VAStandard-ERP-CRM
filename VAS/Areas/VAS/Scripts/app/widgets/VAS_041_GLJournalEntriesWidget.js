@@ -1,15 +1,36 @@
 /**
  * GL Journal Entries KPI Widget
+ * Purpose - Display monthly GL journal entries, details, approval, posting, export, and PDF actions.
  *
- * Supports:
- * 1. Monthly GL Journal count
- * 2. Monthly journal list
- * 3. Journal details popup
- * 4. Approve Journal
- * 5. Post Journal
- * 6. Export journal rows
- * 7. Print / Save journal details as PDF
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Entries                              | VAS_041_GLJEntries
+ *  2  | All Journal Entries                  | VAS_041_AllJournalEntries
+ *  3  | This Month                           | VAS_041_ThisMonth
+ *  4  | Close                                | VAS_Close
+ *  5  | Export                               | VAS_Export
+ *  6  | Download PDF                         | VAS_DownloadPDF
+ *  7  | Approve                              | VAS_041_Approve
+ *  8  | Post Journal                         | VAS_041_PostJournal
+ *  9  | Error Loading Data                   | VIS_Error
+ * 10  | No Data                              | VIS_NoData
+ * 11  | Journal No.                          | VAS_041_JournalNo
+ * 12  | Date                                 | VAS_041_Date
+ * 13  | Description                          | VAS_041_Description
+ * 14  | Status                               | VAS_041_Status
+ * 15  | Total Debit                          | VAS_041_TotalDebit
+ * 16  | Total Credit                         | VAS_041_TotalCredit
+ * 17  | No Journal Lines                     | VAS_041_NoJournalLines
+ * 18  | Journal Process Failed               | VAS_041_JournalProcessFailed
+ * 19  | Approving                            | VAS_041_Approving
+ * 20  | Posting                              | VAS_041_Posting
+ * 21  | Details Not Loaded                   | VAS_041_DetailsNotLoaded
+ * 22  | Details Not Available                | VAS_041_DetailsNotAvailable
+ * 23  | Could Not Open Print Window          | VAS_041_PrintWindowFailed
+ * ---------------------------------------------------------------------
  */
+
 
 ; VAS = window.VAS || {};
 
@@ -1575,7 +1596,7 @@
                     "<th>" +
                     esc(
                         lbl(
-                            "VAS_044_Date",
+                            "VAS_041_Date",
                             "Date"
                         )
                     ) +
@@ -1584,7 +1605,7 @@
                     "<th>" +
                     esc(
                         lbl(
-                            "VAS_044_Description",
+                            "VAS_041_Description",
                             "Description"
                         )
                     ) +
@@ -1593,7 +1614,7 @@
                     "<th>" +
                     esc(
                         lbl(
-                            "VAS_044_Status",
+                            "VAS_041_Status",
                             "Status"
                         )
                     ) +
@@ -2183,7 +2204,7 @@
 
                         esc(
                             lbl(
-                                "VAS_044_NoJournalLines",
+                                "VAS_041_NoJournalLines",
                                 "No journal lines."
                             )
                         ) +
@@ -2536,7 +2557,7 @@
                                         ) ||
 
                                         lbl(
-                                            "VAS_044_JournalProcessFailed",
+                                            "VAS_041_JournalProcessFailed",
                                             "Journal process failed."
                                         )
                                     );
@@ -2593,7 +2614,7 @@
                                     getAjaxErrorMessage(
                                         xhr,
                                         lbl(
-                                            "VAS_044_JournalProcessFailed",
+                                            "VAS_041_JournalProcessFailed",
                                             "Journal process failed."
                                         )
                                     )
@@ -2630,7 +2651,7 @@
                             actionType ===
                             "approve"
                             ? lbl(
-                                "VAS_044_Approving",
+                                "VAS_041_Approving",
                                 "Approving..."
                             )
                             : lbl(
@@ -2646,7 +2667,7 @@
                             actionType ===
                             "post"
                             ? lbl(
-                                "VAS_044_Posting",
+                                "VAS_041_Posting",
                                 "Posting..."
                             )
                             : lbl(
@@ -2670,7 +2691,7 @@
                 ) {
                     showProcessError(
                         lbl(
-                            "VAS_044_DetailsNotLoaded",
+                            "VAS_041_DetailsNotLoaded",
                             "Journal details are not loaded."
                         )
                     );
@@ -2692,7 +2713,7 @@
                 ) {
                     showProcessError(
                         lbl(
-                            "VAS_044_DetailsNotAvailable",
+                            "VAS_041_DetailsNotAvailable",
                             "Journal details are not available."
                         )
                     );
@@ -3059,7 +3080,7 @@
 
                                 showProcessError(
                                     lbl(
-                                        "VAS_044_PrintWindowFailed",
+                                        "VAS_041_PrintWindowFailed",
                                         "Could not open the print window."
                                     )
                                 );
@@ -3257,7 +3278,7 @@
                 window.alert(
                     message ||
                     lbl(
-                        "VAS_044_JournalProcessFailed",
+                        "VAS_041_JournalProcessFailed",
                         "Journal process failed."
                     )
                 );

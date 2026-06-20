@@ -1,10 +1,23 @@
 /**
  * GL Journal Top Ledger Movement Widget
- * Purpose  : Horizontal bar chart of the top 10 accounts by absolute net
- *            movement (DR − CR) for posted GL journals, in the accounting
- *            schema base currency. Supports month / YTD period toggle.
- * Tables   : GL_Journal, GL_JournalLine, C_ElementValue, C_AcctSchema, C_Currency
+ * Purpose - Horizontal bar chart of the top accounts by absolute net movement.
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Top Ledger Movement                  | VAS_043_TopLedgerMovement
+ *  2  | by value                             | VAS_043_ByValue
+ *  3  | Month                                | VAS_043_Month
+ *  4  | YTD                                  | VAS_043_YTD
+ *  5  | Loading                              | VIS_Loading
+ *  6  | No Data                              | VIS_NoData
+ *  7  | Previous                             | VIS_Previous
+ *  8  | Next                                 | VIS_Next
+ *  9  | Of                                   | VIS_Of
+ * 10  | Error Loading Data                   | VIS_Error
+ * ---------------------------------------------------------------------
  */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {

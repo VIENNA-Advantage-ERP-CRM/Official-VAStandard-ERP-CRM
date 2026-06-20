@@ -18,8 +18,8 @@
  *  4  | Previous                                    | VIS_Previous
  *  5  | Next                                        | VIS_Next
  *  6  | Close                                       | VAS_Close
- *  7  | Approve                                     | VAS_041_Approve
- *  8  | Post Journal                                | VAS_041_PostJournal
+ *  7  | Approve                                     | VAS_045_Approve
+ *  8  | Post Journal                                | VAS_045_PostJournal
  *  9  | Error Loading Data                          | VIS_Error
  * 10  | No Pending Journals                         | VIS_NoData
  * 11  | Invalid Journal ID                          | VAS_045_InvalidJournalID
@@ -47,6 +47,8 @@
  * 33  | Approving                                   | VAS_045_Approving
  * 34  | Posting                                     | VAS_045_Posting
  * 35  | Journal Process Failed                      | VAS_045_JournalProcessFailed
+ * 36  | Of                                          | VIS_Of
+ * 37  | Could Not Load Pending Queue                | VAS_045_LoadPendingQueueFailed
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -1312,7 +1314,7 @@
 
                     esc(
                         lbl(
-                            "VAS_041_Approve",
+                            "VAS_045_Approve",
                             "Approve"
                         )
                     ) +
@@ -1325,7 +1327,7 @@
 
                     esc(
                         lbl(
-                            "VAS_041_PostJournal",
+                            "VAS_045_PostJournal",
                             "Post Journal"
                         )
                     ) +
@@ -2616,7 +2618,7 @@
                             "Approving..."
                         )
                         : lbl(
-                            "VAS_041_Approve",
+                            "VAS_045_Approve",
                             "Approve"
                         )
                 );
@@ -2631,7 +2633,7 @@
                             "Posting..."
                         )
                         : lbl(
-                            "VAS_041_PostJournal",
+                            "VAS_045_PostJournal",
                             "Post Journal"
                         )
                 );

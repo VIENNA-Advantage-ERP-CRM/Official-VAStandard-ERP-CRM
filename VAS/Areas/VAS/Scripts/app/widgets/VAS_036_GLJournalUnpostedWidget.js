@@ -1,7 +1,24 @@
 /**
  * GL Journal Unposted KPI Widget
- * Purpose: Display unposted GL journals and journal details.
+ * Purpose - Display unposted GL journals and journal details.
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Unposted                             | VAS_036_GLJUnposted
+ *  2  | Drafts waiting                       | VAS_036_DraftsWaiting
+ *  3  | Unposted Journals                    | VAS_036_UnpostedJournals
+ *  4  | Journals waiting to be posted        | VAS_036_UnpostedSub
+ *  5  | Export                               | VAS_Export
+ *  6  | Close                                | VAS_Close
+ *  7  | Approve                              | VAS_036_Approve
+ *  8  | Post Journal                         | VAS_036_PostJournal
+ *  9  | Error Loading Data                   | VIS_Error
+ * 10  | No Data                              | VIS_NoData
+ * 11  | No Journal Lines                     | VAS_036_NoJournalLines
+ * ---------------------------------------------------------------------
  */
+
 
 ; VAS = window.VAS || {};
 
@@ -642,7 +659,7 @@
                         'VAS-glju-action-approve">' +
                         esc(
                             lbl(
-                                "VAS_041_Approve",
+                                "VAS_036_Approve",
                                 "Approve"
                             )
                         ) +
@@ -653,7 +670,7 @@
                         'VAS-glju-action-post">' +
                         esc(
                             lbl(
-                                "VAS_041_PostJournal",
+                                "VAS_036_PostJournal",
                                 "Post journal"
                             )
                         ) +
@@ -1339,7 +1356,7 @@
                         '<tr><td colspan="7">' +
                         esc(
                             lbl(
-                                "VAS_044_NoJournalLines",
+                                "VAS_036_NoJournalLines",
                                 "No journal lines."
                             )
                         ) +

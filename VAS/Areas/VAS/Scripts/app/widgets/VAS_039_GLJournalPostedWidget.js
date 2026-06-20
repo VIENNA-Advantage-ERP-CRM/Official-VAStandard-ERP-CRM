@@ -1,9 +1,17 @@
 /**
  * GL Journal Posted KPI Widget
- * Purpose  : Display the percentage of posted documents across
- *            GL_Journal and GL_JournalBatch.
- * Tables   : GL_Journal, GL_JournalBatch
+ * Purpose - Display the percentage of posted documents across GL journals.
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Posted                               | VAS_039_GLJPosted
+ *  2  | Posted documents.                    | VAS_039_PostedDocuments
+ *  3  | No Data                              | VIS_NoData
+ *  4  | Error Loading Data                   | VIS_Error
+ * ---------------------------------------------------------------------
  */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {

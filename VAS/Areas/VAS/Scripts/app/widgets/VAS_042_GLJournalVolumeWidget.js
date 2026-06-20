@@ -1,10 +1,24 @@
 /**
  * GL Journal Volume by Day Chart Widget
- * Purpose  : Bar chart of GL Journal count per day with a net-value trend
- *            line overlay. Bars are colour-coded: Posted, Weekend, This week.
- *            Supports a Week / Month period toggle.
- * Tables   : GL_Journal, GL_JournalLine, C_AcctSchema, C_Currency
+ * Purpose - Bar chart of GL journal count per day with a net-value trend line.
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Journal Volume by Day                | VAS_042_JournalVolumeByDay
+ *  2  | Count vs Value                       | VAS_042_CountVsValue
+ *  3  | Week                                 | VAS_042_Week
+ *  4  | Month                                | VAS_042_Month
+ *  5  | Posted                               | VAS_042_Posted
+ *  6  | Weekend                              | VAS_042_Weekend
+ *  7  | This week                            | VAS_042_ThisWeek
+ *  8  | Net value trend                      | VAS_042_NetValueTrend
+ *  9  | Entries                              | VAS_042_GLJEntries
+ * 10  | No Data                              | VIS_NoData
+ * 11  | Error Loading Data                   | VIS_Error
+ * ---------------------------------------------------------------------
  */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
@@ -127,7 +141,7 @@
             }
 
             var info = (d.DateStr || d.DayNum)
-                + ' - ' + d.JournalCount + ' ' + lbl('VAS_041_GLJEntries', 'Entries')
+                + ' - ' + d.JournalCount + ' ' + lbl('VAS_042_GLJEntries', 'Entries')
                 + ', ' + lbl('VAS_042_NetValueTrend', 'Net value trend')
                 + ': ' + fmtMoney(d.NetValue, currency, precision);
 
