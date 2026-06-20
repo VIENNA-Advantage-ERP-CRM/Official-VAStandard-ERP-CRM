@@ -1260,7 +1260,7 @@
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
-                    'VAS_033_UpcomingAPRunsWidget/GetUpcomingAPRuns',
+                    'VAS_031_UpcomingAPRunsWidget/GetUpcomingAPRuns',
 
                 type: 'GET',
                 dataType: 'json',
@@ -1965,7 +1965,7 @@
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
-                    'VAS_033_UpcomingAPRunsWidget/GetPaymentPopupLookups',
+                    'VAS_031_UpcomingAPRunsWidget/GetPaymentPopupLookups',
 
                 type: 'GET',
                 dataType: 'json',
@@ -2039,7 +2039,7 @@
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
-                    'VAS_033_UpcomingAPRunsWidget/GetUpcomingAPRunDetails',
+                    'VAS_031_UpcomingAPRunsWidget/GetUpcomingAPRunDetails',
 
                 type: 'GET',
                 dataType: 'json',
@@ -2442,7 +2442,7 @@
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
-                    'VAS_033_UpcomingAPRunsWidget/CreateUpcomingAPPayment',
+                    'VAS_031_UpcomingAPRunsWidget/CreateUpcomingAPPayment',
 
                 type: 'POST',
                 dataType: 'json',

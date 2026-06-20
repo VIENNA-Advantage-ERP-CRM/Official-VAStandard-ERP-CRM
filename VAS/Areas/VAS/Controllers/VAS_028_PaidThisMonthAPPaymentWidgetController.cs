@@ -25,11 +25,10 @@ namespace VAS.Controllers
             }
 
             IDataReader dr = null;
-            string sql = string.Empty;
 
             try
             {
-                sql = BuildPaidThisMonthSql(ctx);
+                string sql = BuildPaidThisMonthSql(ctx);
 
                 dr = DB.ExecuteReader(
                     sql,
@@ -128,7 +127,7 @@ namespace VAS.Controllers
                         title = GetMsg(
                             ctx,
                             "VAS_028_MessagePaidThisMonth",
-                            "Paid this month"
+                            "Paid This Month"
                         ),
 
                         subtitle = GetPaidThisMonthSubtitle(
@@ -144,7 +143,7 @@ namespace VAS.Controllers
                         description = GetMsg(
                             ctx,
                             "VAS_028_MessageOutgoingPaymentsPostedSoFar",
-                            "Outgoing payments posted so far"
+                            "Outgoing Payments Posted So Far"
                         ),
 
                         value = paidThisMonth,
@@ -166,14 +165,19 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could Not Load Data"
+                );
+
                 return Json(
                     new
                     {
                         error = true,
-                        errorText = ex.Message,
-                        sql = sql
+                        errorText = errorMessage
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -214,11 +218,10 @@ namespace VAS.Controllers
             }
 
             IDataReader dr = null;
-            string sql = string.Empty;
 
             try
             {
-                sql = BuildPaidThisMonthRowsSql(
+                string sql = BuildPaidThisMonthRowsSql(
                     ctx,
                     pageNo,
                     pageSize
@@ -344,9 +347,20 @@ namespace VAS.Controllers
                         );
                     }
 
+                    if (string.IsNullOrWhiteSpace(executionStatusName))
+                    {
+                        executionStatusName = executionStatus;
+                    }
+
                     string statusType = GetStatusType(
                         isReconciled,
                         executionStatus
+                    );
+
+                    string statusName = GetStatusMessage(
+                        ctx,
+                        statusType,
+                        executionStatusName
                     );
 
                     string paymentMethodName = GetPaymentMethodName(
@@ -425,16 +439,26 @@ namespace VAS.Controllers
 
                             paymentMethodName = paymentMethodName,
 
-                            isReconciled = isReconciled == "Y",
+                            isReconciled = string.Equals(
+                                isReconciled,
+                                "Y",
+                                StringComparison.OrdinalIgnoreCase
+                            ),
+
                             executionStatus = executionStatus,
 
-                            statusType = statusType,
+                            executionStatusName =
+                                executionStatusName,
 
-                            statusName = GetStatusMessage(
-                                ctx,
-                                statusType,
-                                executionStatusName
-                            )
+                            statusType = statusType,
+                            statusValue = executionStatus,
+                            statusName = statusName,
+
+                            status = new
+                            {
+                                value = executionStatus,
+                                name = statusName
+                            }
                         }
                     );
                 }
@@ -454,7 +478,7 @@ namespace VAS.Controllers
                         title = GetMsg(
                             ctx,
                             "VAS_028_MessagePaidThisMonth",
-                            "Paid this month"
+                            "Paid This Month"
                         ),
 
                         subtitle = GetRowsSubtitle(
@@ -477,14 +501,19 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could Not Load Data"
+                );
+
                 return Json(
                     new
                     {
                         error = true,
-                        errorText = ex.Message,
-                        sql = sql
+                        errorText = errorMessage
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -499,55 +528,25 @@ namespace VAS.Controllers
             Ctx ctx
         )
         {
-            DateTime monthStart = new DateTime(
-                DateTime.Today.Year,
-                DateTime.Today.Month,
-                1
-            );
-
-            DateTime nextMonthStart =
-                monthStart.AddMonths(1);
-
             string clientId = ctx
                 .GetAD_Client_ID()
-                .ToString(CultureInfo.InvariantCulture);
+                .ToString(
+                    CultureInfo.InvariantCulture
+                );
 
             string executionStatusFilter =
                 HasPaymentExecutionStatusColumn()
                     ? @"
-AND COALESCE(
+AND COALESCE
+(
     Payment.VA009_ExecutionStatus,
     'R'
-) NOT IN ('B', 'C')"
-                    : string.Empty;
-
-            string schemaCurrencySql = @"
-SchemaCurrency AS
+) NOT IN
 (
-    SELECT
-        ClientInfo.AD_Client_ID,
-        AcctSchema.C_Currency_ID,
-        Currency.StdPrecision,
-        Currency.ISO_Code,
-        Currency.CurSymbol AS Cur_Symbol
-
-    FROM AD_ClientInfo ClientInfo
-
-    INNER JOIN C_AcctSchema AcctSchema ON
-    (
-        AcctSchema.C_AcctSchema_ID =
-        ClientInfo.C_AcctSchema1_ID
-    )
-
-    INNER JOIN C_Currency Currency ON
-    (
-        Currency.C_Currency_ID =
-        AcctSchema.C_Currency_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-    AND ClientInfo.AD_Client_ID = " + clientId + @"
-)";
+    'B',
+    'C'
+)"
+                    : string.Empty;
 
             string paymentAccessSql = @"
 SELECT
@@ -559,19 +558,15 @@ SELECT
     Payment.C_ConversionType_ID,
     Payment.DateAcct,
     Payment.PayAmt
-
 FROM C_Payment Payment
-
 WHERE Payment.IsActive = 'Y'
 AND Payment.IsReceipt = 'N'
-AND Payment.DocStatus IN ('CO', 'CL')
-AND Payment.AD_Client_ID = " + clientId + @"
-
-AND Payment.DateAcct >= " +
-                ToSqlDate(monthStart) + @"
-
-AND Payment.DateAcct < " +
-                ToSqlDate(nextMonthStart) +
+AND Payment.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+AND Payment.AD_Client_ID = " + clientId +
                 executionStatusFilter;
 
             paymentAccessSql =
@@ -582,29 +577,113 @@ AND Payment.DateAcct < " +
                     MRole.SQL_RO
                 );
 
-            string sql = @"
-WITH " + schemaCurrencySql + @",
+            string amountSumExpression = @"
+COALESCE
+(
+    SUM
+    (
+        PaidThisMonthData.PaidAmount
+    ),
+    0
+)";
 
-PaymentFiltered AS
+            string sql = @"
+WITH SchemaCurrency AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        AcctSchema.C_Currency_ID,
+        Currency.StdPrecision,
+        Currency.ISO_Code,
+        Currency.CurSymbol AS Cur_Symbol
+    FROM AD_ClientInfo ClientInfo
+    INNER JOIN C_AcctSchema AcctSchema ON
+    (
+        AcctSchema.C_AcctSchema_ID =
+        ClientInfo.C_AcctSchema1_ID
+    )
+    INNER JOIN C_Currency Currency ON
+    (
+        Currency.C_Currency_ID =
+        AcctSchema.C_Currency_ID
+    )
+    WHERE ClientInfo.IsActive = 'Y'
+    AND ClientInfo.AD_Client_ID = " + clientId + @"
+),
+CurrentPeriod AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        MIN(Period.StartDate) AS DateFrom,
+        MAX(Period.EndDate) AS DateTo
+    FROM AD_ClientInfo ClientInfo
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+    WHERE ClientInfo.IsActive = 'Y'
+    AND YearData.IsActive = 'Y'
+    AND Period.IsActive = 'Y'
+    AND ClientInfo.AD_Client_ID = " + clientId + @"
+    AND CURRENT_DATE BETWEEN
+        Period.StartDate AND Period.EndDate
+    GROUP BY
+        ClientInfo.AD_Client_ID
+),
+PaymentSecured AS
 (
 " + paymentAccessSql + @"
 ),
-
+PaymentFiltered AS
+(
+    SELECT
+        Payment.C_Payment_ID,
+        Payment.AD_Client_ID,
+        Payment.AD_Org_ID,
+        Payment.C_BPartner_ID,
+        Payment.C_Currency_ID,
+        Payment.C_ConversionType_ID,
+        Payment.DateAcct,
+        Payment.PayAmt
+    FROM PaymentSecured Payment
+    INNER JOIN CurrentPeriod CurrentPeriod ON
+    (
+        CurrentPeriod.AD_Client_ID =
+        Payment.AD_Client_ID
+    )
+    WHERE Payment.DateAcct >=
+        CurrentPeriod.DateFrom
+    AND Payment.DateAcct <
+        CurrentPeriod.DateTo +
+        INTERVAL '1' DAY
+),
 PaidThisMonthData AS
 (
     SELECT
         Payment.C_Payment_ID,
         Payment.AD_Client_ID,
         Payment.C_BPartner_ID,
-
         CASE
             WHEN Payment.C_Currency_ID =
                  SchemaCurrency.C_Currency_ID
-            THEN COALESCE(Payment.PayAmt, 0)
-
+            THEN COALESCE
+            (
+                Payment.PayAmt,
+                0
+            )
             ELSE CurrencyConvert
             (
-                COALESCE(Payment.PayAmt, 0),
+                COALESCE
+                (
+                    Payment.PayAmt,
+                    0
+                ),
                 Payment.C_Currency_ID,
                 SchemaCurrency.C_Currency_ID,
                 Payment.DateAcct,
@@ -613,68 +692,68 @@ PaidThisMonthData AS
                 Payment.AD_Org_ID
             )
         END AS PaidAmount
-
     FROM PaymentFiltered Payment
-
     INNER JOIN SchemaCurrency SchemaCurrency ON
     (
         SchemaCurrency.AD_Client_ID =
         Payment.AD_Client_ID
     )
 )
-
 SELECT
     ROUND
     (
-        COALESCE
-        (
-            SUM(PaidThisMonthData.PaidAmount),
-            0
-        ),
+        " + CastNumberSql(amountSumExpression) + @",
         CAST
         (
-            COALESCE(
-                MAX(SchemaCurrency.StdPrecision),
+            COALESCE
+            (
+                MAX
+                (
+                    SchemaCurrency.StdPrecision
+                ),
                 2
             ) AS INTEGER
         )
     ) AS PaidThisMonth,
-
     COUNT
     (
         DISTINCT
         PaidThisMonthData.C_BPartner_ID
     ) AS VendorCount,
-
     COUNT
     (
         PaidThisMonthData.C_Payment_ID
     ) AS PaymentCount,
-
-    MAX(
+    MAX
+    (
         SchemaCurrency.C_Currency_ID
     ) AS C_Currency_ID,
-
-    MAX(
+    MAX
+    (
         SchemaCurrency.ISO_Code
     ) AS CurrencyISO,
-
-    MAX(
+    MAX
+    (
         SchemaCurrency.Cur_Symbol
     ) AS CurrencySymbol,
-
-    MAX(
+    MAX
+    (
         SchemaCurrency.StdPrecision
     ) AS StdPrecision,
-
-    " + ToSqlDate(monthStart) + @" AS DateFrom,
-
-    " + ToSqlDate(
-        nextMonthStart.AddDays(-1)
-    ) + @" AS DateTo
-
+    MAX
+    (
+        CurrentPeriod.DateFrom
+    ) AS DateFrom,
+    MAX
+    (
+        CurrentPeriod.DateTo
+    ) AS DateTo
 FROM SchemaCurrency SchemaCurrency
-
+LEFT OUTER JOIN CurrentPeriod CurrentPeriod ON
+(
+    CurrentPeriod.AD_Client_ID =
+    SchemaCurrency.AD_Client_ID
+)
 LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
 (
     PaidThisMonthData.AD_Client_ID =
@@ -690,15 +769,6 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
             int pageSize
         )
         {
-            DateTime monthStart = new DateTime(
-                DateTime.Today.Year,
-                DateTime.Today.Month,
-                1
-            );
-
-            DateTime nextMonthStart =
-                monthStart.AddMonths(1);
-
             int startRow =
                 ((pageNo - 1) * pageSize) + 1;
 
@@ -707,7 +777,9 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
 
             string clientId = ctx
                 .GetAD_Client_ID()
-                .ToString(CultureInfo.InvariantCulture);
+                .ToString(
+                    CultureInfo.InvariantCulture
+                );
 
             string language = ToSqlString(
                 ctx.GetAD_Language()
@@ -719,10 +791,15 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
             string executionStatusFilter =
                 hasExecutionStatus
                     ? @"
-AND COALESCE(
+AND COALESCE
+(
     Payment.VA009_ExecutionStatus,
     'R'
-) NOT IN ('B', 'C')"
+) NOT IN
+(
+    'B',
+    'C'
+)"
                     : string.Empty;
 
             string executionStatusColumn =
@@ -745,19 +822,15 @@ SELECT
     Payment.IsReconciled,
     Payment.PayAmt,
     " + executionStatusColumn + @"
-
 FROM C_Payment Payment
-
 WHERE Payment.IsActive = 'Y'
 AND Payment.IsReceipt = 'N'
-AND Payment.DocStatus IN ('CO', 'CL')
-AND Payment.AD_Client_ID = " + clientId + @"
-
-AND Payment.DateAcct >= " +
-                ToSqlDate(monthStart) + @"
-
-AND Payment.DateAcct < " +
-                ToSqlDate(nextMonthStart) +
+AND Payment.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+AND Payment.AD_Client_ID = " + clientId +
                 executionStatusFilter;
 
             paymentAccessSql =
@@ -778,152 +851,199 @@ AND Payment.DateAcct < " +
 StatusList AS
 (
     SELECT
-        RefList.Value,
-        RefList.Name AS ExecutionStatusName,
-        RefListTrl.Name AS TranslatedExecutionStatusName
-
-    FROM AD_Ref_List RefList
-
-    INNER JOIN AD_Reference ReferenceInfo ON
+        " + GetTextCastSql(
+                    "RefList.Value"
+                ) + @" AS StatusValue,
+        " + GetTextCastSql(
+                    "RefList.Name"
+                ) + @" AS ExecutionStatusName,
+        " + GetTextCastSql(
+                    "RefListTrl.Name"
+                ) + @" AS TranslatedExecutionStatusName
+    FROM AD_Reference ReferenceInfo
+    INNER JOIN AD_Ref_List RefList ON
     (
-        ReferenceInfo.AD_Reference_ID =
-        RefList.AD_Reference_ID
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
         RefListTrl.AD_Ref_List_ID =
         RefList.AD_Ref_List_ID
-
         AND RefListTrl.AD_Language =
-        " + language + @"
+            " + language + @"
     )
-
-    WHERE ReferenceInfo.Name =
+    WHERE ReferenceInfo.IsActive = 'Y'
+    AND RefList.IsActive = 'Y'
+    AND ReferenceInfo.Name =
         'VA009_ExecutionStatus'
 )";
 
                 statusColumns = @"
+StatusList.StatusValue,
 StatusList.ExecutionStatusName,
 StatusList.TranslatedExecutionStatusName,";
 
                 statusJoin = @"
 LEFT OUTER JOIN StatusList StatusList ON
 (
-    StatusList.Value =
-    Payment.VA009_ExecutionStatus
+    StatusList.StatusValue =
+    " + GetTextCastSql(
+                    "Payment.VA009_ExecutionStatus"
+                ) + @"
 )";
             }
             else
             {
                 statusColumns = @"
+NULL AS StatusValue,
 NULL AS ExecutionStatusName,
 NULL AS TranslatedExecutionStatusName,";
 
                 statusJoin = string.Empty;
             }
 
+            string amountExpression = CastNumberSql(
+                "COALESCE(Payment.PayAmt, 0)"
+            );
+
             string sql = @"
-WITH PaymentFiltered AS
+WITH CurrentPeriod AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        MIN(Period.StartDate) AS DateFrom,
+        MAX(Period.EndDate) AS DateTo
+    FROM AD_ClientInfo ClientInfo
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+    WHERE ClientInfo.IsActive = 'Y'
+    AND YearData.IsActive = 'Y'
+    AND Period.IsActive = 'Y'
+    AND ClientInfo.AD_Client_ID = " + clientId + @"
+    AND CURRENT_DATE BETWEEN
+        Period.StartDate AND Period.EndDate
+    GROUP BY
+        ClientInfo.AD_Client_ID
+),
+PaymentSecured AS
 (
 " + paymentAccessSql + @"
+),
+PaymentFiltered AS
+(
+    SELECT
+        Payment.C_Payment_ID,
+        Payment.AD_Client_ID,
+        Payment.AD_Org_ID,
+        Payment.C_BPartner_ID,
+        Payment.C_BankAccount_ID,
+        Payment.C_Currency_ID,
+        Payment.VA009_PaymentMethod_ID,
+        Payment.DateAcct,
+        Payment.DocumentNo,
+        Payment.DocStatus,
+        Payment.IsReconciled,
+        Payment.PayAmt,
+        Payment.VA009_ExecutionStatus,
+        CurrentPeriod.DateFrom,
+        CurrentPeriod.DateTo
+    FROM PaymentSecured Payment
+    INNER JOIN CurrentPeriod CurrentPeriod ON
+    (
+        CurrentPeriod.AD_Client_ID =
+        Payment.AD_Client_ID
+    )
+    WHERE Payment.DateAcct >=
+        CurrentPeriod.DateFrom
+    AND Payment.DateAcct <
+        CurrentPeriod.DateTo +
+        INTERVAL '1' DAY
 )
 " + statusListCte + @",
-
 PaidRows AS
 (
     SELECT
         Payment.C_Payment_ID,
         Payment.DateAcct AS PaymentDate,
         Payment.DocumentNo,
-
         BPartner.Name AS VendorName,
-
         Bank.Name AS BankName,
         BankAccount.Name AS BankAccountName,
         BankAccount.AccountNo,
-
         Payment.VA009_PaymentMethod_ID,
         PaymentMethod.VA009_Name AS PaymentMethodName,
-
         Payment.DocStatus,
         Payment.IsReconciled,
         Payment.VA009_ExecutionStatus,
-
         " + statusColumns + @"
-
         ROUND
         (
-            COALESCE(Payment.PayAmt, 0),
-            CAST(
-                PaymentCurrency.StdPrecision
-                AS INTEGER
+            " + amountExpression + @",
+            CAST
+            (
+                COALESCE
+                (
+                    PaymentCurrency.StdPrecision,
+                    2
+                ) AS INTEGER
             )
         ) AS Amount,
-
         Payment.C_Currency_ID,
         PaymentCurrency.StdPrecision,
         PaymentCurrency.ISO_Code AS CurrencyISO,
         PaymentCurrency.CurSymbol AS CurrencySymbol,
-
-        " + ToSqlDate(monthStart) + @" AS DateFrom,
-
-        " + ToSqlDate(
-            nextMonthStart.AddDays(-1)
-        ) + @" AS DateTo
-
+        Payment.DateFrom,
+        Payment.DateTo
     FROM PaymentFiltered Payment
-
     INNER JOIN C_Currency PaymentCurrency ON
     (
         PaymentCurrency.C_Currency_ID =
         Payment.C_Currency_ID
     )
-
     LEFT OUTER JOIN C_BPartner BPartner ON
     (
         BPartner.C_BPartner_ID =
         Payment.C_BPartner_ID
     )
-
     LEFT OUTER JOIN C_BankAccount BankAccount ON
     (
         BankAccount.C_BankAccount_ID =
         Payment.C_BankAccount_ID
     )
-
     LEFT OUTER JOIN C_Bank Bank ON
     (
         Bank.C_Bank_ID =
         BankAccount.C_Bank_ID
     )
-
     LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
     (
         PaymentMethod.VA009_PaymentMethod_ID =
         Payment.VA009_PaymentMethod_ID
     )
-
     " + statusJoin + @"
 ),
-
 NumberedRows AS
 (
     SELECT
         PaidRows.*,
-
         COUNT(1) OVER () AS TotalRecords,
-
         ROW_NUMBER() OVER
         (
             ORDER BY
                 PaidRows.PaymentDate DESC,
                 PaidRows.C_Payment_ID DESC
         ) AS RowNumber
-
     FROM PaidRows PaidRows
 )
-
 SELECT
     NumberedRows.C_Payment_ID,
     NumberedRows.PaymentDate,
@@ -937,6 +1057,7 @@ SELECT
     NumberedRows.DocStatus,
     NumberedRows.IsReconciled,
     NumberedRows.VA009_ExecutionStatus,
+    NumberedRows.StatusValue,
     NumberedRows.ExecutionStatusName,
     NumberedRows.TranslatedExecutionStatusName,
     NumberedRows.Amount,
@@ -947,35 +1068,51 @@ SELECT
     NumberedRows.DateFrom,
     NumberedRows.DateTo,
     NumberedRows.TotalRecords
-
 FROM NumberedRows NumberedRows
-
 WHERE NumberedRows.RowNumber >= " +
                 startRow.ToString(
                     CultureInfo.InvariantCulture
                 ) + @"
-
 AND NumberedRows.RowNumber <= " +
                 endRow.ToString(
                     CultureInfo.InvariantCulture
                 ) + @"
-
 ORDER BY
     NumberedRows.RowNumber";
 
             return sql;
         }
 
-        private string ToSqlDate(
-            DateTime date
+        private string CastNumberSql(
+            string expression
         )
         {
-            return "DATE '"
-                + date.Date.ToString(
-                    "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture
-                )
-                + "'";
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS NUMBER)";
+            }
+
+            return "CAST("
+                + expression
+                + " AS NUMERIC)";
+        }
+
+        private string GetTextCastSql(
+            string expression
+        )
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS VARCHAR2(4000))";
+            }
+
+            return "CAST("
+                + expression
+                + " AS VARCHAR(4000))";
         }
 
         private string ToSqlString(
@@ -993,18 +1130,17 @@ ORDER BY
             string sql = @"
 SELECT
     COUNT(1)
-
 FROM AD_Table TableData
-
 INNER JOIN AD_Column ColumnData ON
 (
     ColumnData.AD_Table_ID =
     TableData.AD_Table_ID
 )
-
 WHERE TableData.TableName = 'C_Payment'
 AND ColumnData.ColumnName =
-    'VA009_ExecutionStatus'";
+    'VA009_ExecutionStatus'
+AND TableData.IsActive = 'Y'
+AND ColumnData.IsActive = 'Y'";
 
             return Util.GetValueOfInt(
                 DB.ExecuteScalar(sql)
@@ -1024,18 +1160,17 @@ AND ColumnData.ColumnName =
         private JsonResult GetSessionExpiredResult()
         {
             Ctx ctx = Env.GetCtx();
-            string sessionExpired =
-                GetMsg(
-                    ctx,
-                    "SessionExpired",
-                    "Session Expired"
-                );
+
+            string sessionExpired = GetMsg(
+                ctx,
+                "SessionExpired",
+                "Session Expired"
+            );
 
             return Json(
                 new
                 {
                     error = true,
-
                     errorText = sessionExpired
                 },
                 JsonRequestBehavior.AllowGet
@@ -1060,19 +1195,19 @@ AND ColumnData.ColumnName =
                 : GetMsg(
                     ctx,
                     "VAS_028_MessageThisMonth",
-                    "This month"
+                    "This Month"
                 );
 
             string paymentLabel = paymentCount == 1
                 ? GetMsg(
                     ctx,
                     "VAS_028_MessagePayment",
-                    "payment"
+                    "Payment"
                 )
                 : GetMsg(
                     ctx,
                     "VAS_028_MessagePayments",
-                    "payments"
+                    "Payments"
                 );
 
             return periodText
@@ -1103,19 +1238,19 @@ AND ColumnData.ColumnName =
                 : GetMsg(
                     ctx,
                     "VAS_028_MessageThisMonth",
-                    "This month"
+                    "This Month"
                 );
 
             string paymentLabel = paymentCount == 1
                 ? GetMsg(
                     ctx,
                     "VAS_028_MessagePayment",
-                    "payment"
+                    "Payment"
                 )
                 : GetMsg(
                     ctx,
                     "VAS_028_MessagePayments",
-                    "payments"
+                    "Payments"
                 );
 
             return periodText
@@ -1132,16 +1267,10 @@ AND ColumnData.ColumnName =
             int precision
         )
         {
-            string currency =
-                !string.IsNullOrWhiteSpace(currencySymbol)
-                    ? currencySymbol
-                    : currencyISO;
-
-            return currency
-                + value.ToString(
-                    "N" + precision,
-                    CultureInfo.InvariantCulture
-                );
+            return value.ToString(
+                "N" + precision,
+                CultureInfo.InvariantCulture
+            );
         }
 
         private string GetStatusType(
@@ -1149,14 +1278,26 @@ AND ColumnData.ColumnName =
             string executionStatus
         )
         {
-            if (isReconciled == "Y")
+            if (string.Equals(
+                isReconciled,
+                "Y",
+                StringComparison.OrdinalIgnoreCase
+            ))
             {
                 return "cleared";
             }
 
             if (
-                executionStatus == "B" ||
-                executionStatus == "C"
+                string.Equals(
+                    executionStatus,
+                    "B",
+                    StringComparison.OrdinalIgnoreCase
+                ) ||
+                string.Equals(
+                    executionStatus,
+                    "C",
+                    StringComparison.OrdinalIgnoreCase
+                )
             )
             {
                 return "bounced";
@@ -1196,7 +1337,7 @@ AND ColumnData.ColumnName =
             return GetMsg(
                 ctx,
                 "VAS_032_MessageInTransit",
-                "In transit"
+                "In Transit"
             );
         }
 
@@ -1272,6 +1413,7 @@ AND ColumnData.ColumnName =
 
             return
                 !string.IsNullOrEmpty(message) &&
+                message != key &&
                 message != "[" + key + "]"
                     ? message
                     : fallback;

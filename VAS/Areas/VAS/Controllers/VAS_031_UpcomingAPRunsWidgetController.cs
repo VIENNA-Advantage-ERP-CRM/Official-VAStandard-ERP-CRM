@@ -16,10 +16,9 @@ namespace VAS.Controllers
     /// Displays AP payments scheduled during the next seven days and creates
     /// a new draft AP payment from the selected upcoming-payment information.
     /// </summary>
-    public class VAS_033_UpcomingAPRunsWidgetController : Controller
+    public class VAS_031_UpcomingAPRunsWidgetController : Controller
     {
         private const int MaximumRows = 30;
-        private const int UpcomingDays = 7;
 
         #region Upcoming AP Runs
 
@@ -190,24 +189,26 @@ namespace VAS.Controllers
                 CultureInfo.InvariantCulture
             );
 
-            DateTime dateFrom = DateTime.Today;
-            DateTime dateTo = dateFrom.AddDays(
-                UpcomingDays
-            );
+            string currentDateSql = DB.IsOracle()
+                ? "TRUNC(CURRENT_DATE)"
+                : "CURRENT_DATE";
 
-            string dateFilter = GetDateFilter(
-                "Payment.DateTrx",
-                dateFrom,
-                dateTo
-            );
+            string upcomingDateToSql = DB.IsOracle()
+                ? "TRUNC(CURRENT_DATE) + 7"
+                : "CURRENT_DATE + INTERVAL '7 day'";
+
+            string periodEndExclusiveSql = DB.IsOracle()
+                ? "PeriodRange.PeriodEndDate + 1"
+                : "PeriodRange.PeriodEndDate + INTERVAL '1 day'";
 
             string dateOnlySql = GetDateOnlySql(
                 "Payment.DateTrx"
             );
 
             /*
-             * MRole is applied only to the main physical C_Payment table.
-             * It is applied before the query is inserted into the CTE.
+             * Apply MRole only to the main physical C_Payment table.
+             * Period filtering is added later against the secured CTE so
+             * MRole never receives a CTE alias or derived table alias.
              */
             string paymentAccessSql = @"
 SELECT
@@ -223,8 +224,7 @@ FROM C_Payment Payment
 WHERE Payment.IsActive = 'Y'
 AND Payment.AD_Client_ID = " + clientIdSql + @"
 AND Payment.IsReceipt = 'N'
-AND Payment.DocStatus NOT IN ('VO', 'RE')"
-+ dateFilter;
+AND Payment.DocStatus NOT IN ('VO', 'RE')";
 
             paymentAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 paymentAccessSql,
@@ -280,9 +280,59 @@ WITH SchemaCurrency AS
     WHERE ClientInfo.IsActive = 'Y'
     AND ClientInfo.AD_Client_ID = " + clientIdSql + @"
 ),
-FilteredPayment AS
+CurrentPeriod AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        MIN(Period.StartDate) AS PeriodStartDate,
+        MAX(Period.EndDate) AS PeriodEndDate
+    FROM AD_ClientInfo ClientInfo
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+    WHERE ClientInfo.IsActive = 'Y'
+    AND YearData.IsActive = 'Y'
+    AND Period.IsActive = 'Y'
+    AND ClientInfo.AD_Client_ID = " + clientIdSql + @"
+    AND " + currentDateSql + @" BETWEEN
+        Period.StartDate AND Period.EndDate
+    GROUP BY
+        ClientInfo.AD_Client_ID
+),
+SecuredPayment AS
 (
 " + paymentAccessSql + @"
+),
+FilteredPayment AS
+(
+    SELECT
+        Payment.C_Payment_ID,
+        Payment.AD_Client_ID,
+        Payment.AD_Org_ID,
+        Payment.DateTrx,
+        Payment.C_Currency_ID,
+        Payment.C_ConversionType_ID,
+        Payment.PayAmt,
+        Payment.VA009_PaymentMethod_ID
+    FROM SecuredPayment Payment
+    INNER JOIN CurrentPeriod PeriodRange ON
+    (
+        PeriodRange.AD_Client_ID =
+        Payment.AD_Client_ID
+    )
+    WHERE Payment.DateTrx >= " + currentDateSql + @"
+    AND Payment.DateTrx < " + upcomingDateToSql + @"
+    AND Payment.DateTrx >=
+        PeriodRange.PeriodStartDate
+    AND Payment.DateTrx <
+        " + periodEndExclusiveSql + @"
 )
 SELECT
     " + dateOnlySql + @" AS RunDate,
