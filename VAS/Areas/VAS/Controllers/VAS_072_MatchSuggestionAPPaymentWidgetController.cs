@@ -6,6 +6,29 @@
  * Created by     : VAI145
  ******************************************************/
 
+/*
+ * AP Payment Match Suggestions Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                         | Message Key
+ * ---+--------------------------------------+--------------------------------
+ * 1  | Session Expired                      | SessionExpired
+ * 2  | Could not load AP payment...         | VAS_072_LoadError
+ * 3  | Could not complete allocation        | VAS_072_ApplyError
+ * 4  | Allocation completed successfully    | VAS_072_ApplySuccess
+ * 5  | Could not open allocation form       | VAS_072_OpenFormError
+ * 6  | Could not load match details         | VAS_072_LoadDetailError
+ * 7  | AP payment or purchase invoice...    | VAS_072_DetailNotFound
+ * 8  | Vendor matches                       | VAS_072_VendorMatches
+ * 9  | Vendor differs                       | VAS_072_VendorDiffers
+ * 10 | Amount matches                       | VAS_035_AmountMatches
+ * 11 | Amount differs                       | VAS_035_AmountDiffers
+ * 12 | Reference cited                      | VAS_035_ReferenceCited
+ * 13 | No reference cited                   | VAS_035_NoReferenceCited
+ * 14 | Within due window                    | VAS_035_WithinDueWindow
+ * 15 | Outside due window                   | VAS_035_OutsideDueWindow
+ */
+
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;

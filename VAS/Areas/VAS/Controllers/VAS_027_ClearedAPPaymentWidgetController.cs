@@ -1,4 +1,17 @@
 ﻿using System;
+/*
+ * Cleared AP Payment Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                                   | Message Key
+ * ---+------------------------------------------------+------------------------------------------
+ * 1  | Unreconciled                                   | VAS_027_messageCleared
+ * 2  | Of last month's AP payments reconciled         | VAS_027_messageAPPaymentClearedWhy
+ * 3  | Session Expired                                | SessionExpired
+ * 4  | Payments                                       | VAS_027_messagePayments
+ * 5  | Awaiting bank match                            | VAS_027_messageAwaitingBankMatch
+ */
+
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;

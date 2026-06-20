@@ -1,4 +1,16 @@
 ﻿using System;
+/*
+ * AP Payment Methods Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                                      | Message Key
+ * ---+---------------------------------------------------+--------------------------------
+ * 1  | Payment methods                                   | VAS_033_MessagePaymentMethods
+ * 2  | Upi is cheapest - shift small payments where...   | VAS_033_MessagePaymentMethodWhy
+ * 3  | Not Specified                                     | VAS_033_MessageNotSpecified
+ * 4  | Session Expired                                   | SessionExpired
+ */
+
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;

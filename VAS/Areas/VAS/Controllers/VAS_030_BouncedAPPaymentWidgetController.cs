@@ -1,4 +1,18 @@
 ﻿using System;
+/*
+ * Bounced AP Payment Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                         | Message Key
+ * ---+--------------------------------------+--------------------------------
+ * 1  | Bounced                              | VAS_030_MessageBounced
+ * 2  | Need re-issue                        | VAS_030_MessageNeedReissue
+ * 3  | Bounced AP payments                  | VAS_030_MessageBouncedAPPayments
+ * 4  | Could not load data                  | VAS_ErrorLoading
+ * 5  | Session Expired                      | SessionExpired
+ * 6  | Not Specified                        | VAS_030_MessageNotSpecified
+ */
+
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;

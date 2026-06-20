@@ -13,9 +13,9 @@
  *  6  | Could not load data                  | VAS_ErrorLoading
  *  7  | Not Specified                        | VAS_029_MessageNotSpecified
  *  8  | invoices                             | VAS_029_MessageInvoices
- *  9  | Showing                              | VIS_Showing
- * 10  | Of                                   | VIS_Of
- * 11  | Close                                | VIS_Close
+ *  9  | Showing                              | VAS_Showing
+ * 10  | Of                                   | VAS_Of
+ * 11  | Close                                | VAS_Close
  * 12  | Total due                            | VAS_029_MessageTotalDue
  * 13  | Vendors                              | VAS_029_MessageVendors
  * 14  | Payment methods                      | VAS_029_MessagePaymentMethods
@@ -26,8 +26,8 @@
  * 19  | Currency                             | VAS_PaymentCurrency
  * 20  | Amount                               | VAS_032_MessageAmount
  * 21  | Method                               | VAS_032_MessageMethod
- * 22  | Previous                             | VIS_Previous
- * 23  | Next                                 | VIS_Next
+ * 22  | Previous                             | VAS_Previous
+ * 23  | Next                                 | VAS_Next
  * 24  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
  * ─────────────────────────────────────────────────────────────────────
  */
@@ -436,9 +436,9 @@
             if ($pagerHelper) {
                 if (totalRecords > 0) {
                     $pagerHelper.text(
-                        lbl('VIS_Showing', 'Showing') + ' ' +
+                        lbl('VAS_Showing', 'Showing') + ' ' +
                         (from + 1) + '-' + to + ' ' +
-                        lbl('VIS_Of', 'of') + ' ' +
+                        lbl('VAS_Of', 'of') + ' ' +
                         totalRecords + ' ' +
                         lbl('VAS_029_MessageInvoices', 'invoices')
                     );
@@ -449,7 +449,7 @@
             }
 
             if ($pagerText) {
-                $pagerText.text(totalPages > 0 ? (pageNo + ' ' + lbl('VIS_Of', 'of') + ' ' + totalPages) : '');
+                $pagerText.text(totalPages > 0 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
             }
 
             if ($pagerPrev) {
@@ -570,7 +570,7 @@
                 '<div class="vas-scheduled-ap-payment-dialog-title"></div>' +
                 '<div class="vas-scheduled-ap-payment-dialog-subtitle"></div>' +
                 '</div>' +
-                '<button type="button" class="vas-scheduled-ap-payment-dialog-close" aria-label="' + escapeHtml(lbl('VIS_Close', 'Close')) + '">' +
+                '<button type="button" class="vas-scheduled-ap-payment-dialog-close" aria-label="' + escapeHtml(lbl('VAS_Close', 'Close')) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
                 '<line x1="18" y1="6" x2="6" y2="18"></line>' +
                 '<line x1="6" y1="6" x2="18" y2="18"></line>' +
@@ -606,11 +606,11 @@
                 '<div class="vas-scheduled-ap-payment-dialog-footer">' +
                 '<span class="vas-scheduled-ap-payment-pager-helper"></span>' +
                 '<div class="vas-scheduled-ap-payment-pager">' +
-                '<button type="button" class="vas-scheduled-ap-payment-pager-btn vas-scheduled-ap-payment-pager-prev" aria-label="' + escapeHtml(lbl('VIS_Previous', 'Previous')) + '">' +
+                '<button type="button" class="vas-scheduled-ap-payment-pager-btn vas-scheduled-ap-payment-pager-prev" aria-label="' + escapeHtml(lbl('VAS_Previous', 'Previous')) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
                 '</button>' +
                 '<span class="vas-scheduled-ap-payment-pager-text"></span>' +
-                '<button type="button" class="vas-scheduled-ap-payment-pager-btn vas-scheduled-ap-payment-pager-next" aria-label="' + escapeHtml(lbl('VIS_Next', 'Next')) + '">' +
+                '<button type="button" class="vas-scheduled-ap-payment-pager-btn vas-scheduled-ap-payment-pager-next" aria-label="' + escapeHtml(lbl('VAS_Next', 'Next')) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
                 '</button>' +
                 '</div>' +

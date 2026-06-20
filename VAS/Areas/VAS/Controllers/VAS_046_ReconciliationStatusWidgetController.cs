@@ -1,4 +1,16 @@
 using System;
+/*
+ * AP Reconciliation Status Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                         | Message Key
+ * ---+--------------------------------------+--------------------------------
+ * 1  | Reconciliation status                | VAS_046_ReconciliationStatus
+ * 2  | Matched to bills + bank              | VAS_046_MatchedToBillsBank
+ * 3  | Matched                              | VAS_046_Matched
+ * 4  | Session Expired                      | SessionExpired
+ */
+
 using System.Data;
 using System.Data.SqlClient;
 using System.Web.Mvc;

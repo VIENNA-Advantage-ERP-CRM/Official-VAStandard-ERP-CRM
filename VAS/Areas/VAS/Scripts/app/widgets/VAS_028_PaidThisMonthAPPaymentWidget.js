@@ -38,6 +38,43 @@
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
+/*
+ * Labels / Message Keys
+ * #  | Current Text                                      | Message Key
+ * ---+---------------------------------------------------+------------------------------
+ * 1  | Paid this month                                   | VAS_028_MessagePaidThisMonth
+ * 2  | Loading                                           | VAS_028_MessageLoading
+ * 3  | Could not load data                               | VAS_ErrorLoading
+ * 4  | vendor                                            | VAS_028_MessageVendor
+ * 5  | vendors                                           | VAS_028_MessageVendors
+ * 6  | Paid to                                           | VAS_028_MessagePaidTo
+ * 7  | so far this month.                                | VAS_028_MessageSoFarThisMonth
+ * 8  | No payments this month.                           | VAS_028_MessageNoPaymentsThisMonth
+ * 9  | No Data                                           | VAS_028_MessageNoData
+ * 10 | Cash paid                                         | VAS_028_MessageCashPaid
+ * 11 | payments                                          | VAS_028_MessagePayments
+ * 12 | Not Specified                                     | VAS_032_MessageNotSpecified
+ * 13 | Showing                                           | VAS_Showing
+ * 14 | of                                                | VAS_Of
+ * 15 | Cleared                                           | VAS_032_MessageCleared
+ * 16 | Bounced                                           | VAS_032_MessageBounced
+ * 17 | In transit                                        | VAS_032_MessageInTransit
+ * 18 | Close                                             | VAS_Close
+ * 19 | Total paid                                        | VAS_028_MessageTotalPaid
+ * 20 | Avg ticket                                        | VAS_028_MessageAvgTicket
+ * 21 | Largest                                           | VAS_028_MessageLargest
+ * 22 | Payment No.                                       | VAS_028_MessagePaymentNo
+ * 23 | Date                                              | VAS_032_MessageDate
+ * 24 | Vendor                                            | VAS_032_MessageVendor
+ * 25 | Bank account                                      | VAS_003_BankAccount
+ * 26 | Currency                                          | VAS_PaymentCurrency
+ * 27 | Amount                                            | VAS_032_MessageAmount
+ * 28 | Method                                            | VAS_032_MessageMethod
+ * 29 | Status                                            | VAS_032_MessageStatus
+ * 30 | Previous                                          | VAS_Previous
+ * 31 | Next                                              | VAS_Next
+ */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {

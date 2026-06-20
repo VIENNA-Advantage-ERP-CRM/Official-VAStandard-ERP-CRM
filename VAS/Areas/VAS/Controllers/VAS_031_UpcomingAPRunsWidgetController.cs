@@ -1,4 +1,28 @@
 using System;
+/*
+ * Upcoming AP Runs Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                         | Message Key
+ * ---+--------------------------------------+------------------------------------------
+ * 1  | Upcoming runs                        | VAS_031_MessageUpcomingRuns
+ * 2  | Next 7 days                          | VAS_031_MessageNext7Days
+ * 3  | Could not load data                  | VAS_ErrorLoading
+ * 4  | Transaction date must be in...        | VAS_031_MessageTransactionDateInvalid
+ * 5  | Organization is required.            | VAS_031_MessageOrganizationRequired
+ * 6  | Bank account is required.            | VAS_031_MessageBankAccountRequired
+ * 7  | Vendor is required.                  | VAS_031_MessageVendorRequired
+ * 8  | Currency is required.                | VAS_031_MessageCurrencyRequired
+ * 9  | Currency type is required.           | VAS_031_MessageConversionTypeRequired
+ * 10 | Document type is required.           | VAS_031_MessageDocumentTypeRequired
+ * 11 | Tender type is required.             | VAS_031_MessageTenderTypeRequired
+ * 12 | Transaction date is required.        | VAS_031_MessageTransactionDateRequired
+ * 13 | Payment amount must be greater...    | VAS_031_MessagePaymentAmountRequired
+ * 14 | Could not save AP payment.           | VAS_031_MessageCouldNotSaveAPPayment
+ * 15 | Upcoming AP payment created...       | VAS_031_MessagePaymentCreatedSuccessfully
+ * 16 | Session Expired                      | SessionExpired
+ */
+
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;

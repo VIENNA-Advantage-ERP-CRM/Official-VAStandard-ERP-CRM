@@ -1,4 +1,27 @@
 using System;
+/*
+ * Paid This Month AP Payment Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                         | Message Key
+ * ---+--------------------------------------+--------------------------------
+ * 1  | Paid this month                      | VAS_028_MessagePaidThisMonth
+ * 2  | Cash paid                            | VAS_028_MessageCashPaid
+ * 3  | Could not load data                  | VAS_ErrorLoading
+ * 4  | Session Expired                      | SessionExpired
+ * 5  | Paid to                              | VAS_028_MessagePaidTo
+ * 6  | so far this month.                   | VAS_028_MessageSoFarThisMonth
+ * 7  | No payments this month.              | VAS_028_MessageNoPaymentsThisMonth
+ * 8  | vendor                               | VAS_028_MessageVendor
+ * 9  | vendors                              | VAS_028_MessageVendors
+ * 10 | payment                              | VAS_028_MessagePayment
+ * 11 | payments                             | VAS_028_MessagePayments
+ * 12 | Not Specified                        | VAS_032_MessageNotSpecified
+ * 13 | Cleared                              | VAS_032_MessageCleared
+ * 14 | Bounced                              | VAS_032_MessageBounced
+ * 15 | In transit                           | VAS_032_MessageInTransit
+ */
+
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;

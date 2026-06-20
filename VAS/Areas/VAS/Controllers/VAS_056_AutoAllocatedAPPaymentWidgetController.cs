@@ -1,4 +1,14 @@
 using Newtonsoft.Json;
+/*
+ * Auto Allocated AP Payment Widget Controller
+ *
+ * Labels / Message Keys
+ * #  | Current Text                         | Message Key
+ * ---+--------------------------------------+--------------------------------
+ * 1  | Session Expired                      | SessionExpired
+ * 2  | Last 30 days                         | VAS_Last30Days
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Data;
