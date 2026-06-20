@@ -888,43 +888,163 @@ ORDER BY NumberedRows.PageRowNo";
                 new SqlParameter("@HighConfidenceScore", HighConfidenceScore)
             };
 
+
             try
             {
-                reader = DB.ExecuteReader(sql, parameters, null);
+                reader = DB.ExecuteReader(
+                    sql,
+                    parameters,
+                    null
+                );
 
                 while (reader != null && reader.Read())
                 {
                     MatchListRow row = new MatchListRow
                     {
-                        PaymentId = GetInt(reader, "C_Payment_ID"),
-                        InvoiceId = GetInt(reader, "C_Invoice_ID"),
-                        InvoicePayScheduleId = GetInt(reader, "C_InvoicePaySchedule_ID"),
-                        VendorId = GetInt(reader, "C_BPartner_ID"),
-                        VendorName = GetString(reader, "VendorName"),
-                        PaymentDocumentNo = GetString(reader, "PaymentDocumentNo"),
-                        InvoiceDocumentNo = GetString(reader, "InvoiceDocumentNo"),
-                        PaymentDate = GetDateTime(reader, "PaymentDate"),
-                        InvoiceDate = GetDateTime(reader, "InvoiceDate"),
-                        DueDate = GetDateTime(reader, "DueDate"),
-                        PaymentCurrencyId = GetInt(reader, "PaymentCurrencyId"),
-                        PaymentCurrencyISOCode = GetString(reader, "PaymentCurrencyISOCode"),
-                        PaymentCurrencySymbol = GetString(reader, "PaymentCurrencySymbol"),
-                        PaymentPrecision = NormalizePrecision(GetInt(reader, "PaymentPrecision", 2)),
-                        PaymentAllocatedAmount = GetDecimal(reader, "PaymentAllocatedAmount"),
-                        PaymentOpenAmount = GetDecimal(reader, "PaymentOpenAmount"),
-                        InvoiceOriginalAmount = GetDecimal(reader, "InvoiceOriginalAmount"),
-                        InvoiceAllocatedAmount = GetDecimal(reader, "InvoiceAllocatedAmount"),
-                        InvoiceOpenAmount = GetDecimal(reader, "InvoiceOpenAmount"),
-                        ReadyAmount = GetDecimal(reader, "ReadyAmount"),
-                        AccountingAmount = GetDecimal(reader, "AccountingAmount"),
-                        DifferenceAmount = GetDecimal(reader, "DifferenceAmount"),
-                        DifferencePercentage = GetDecimal(reader, "DifferencePercentage"),
-                        DateGapDays = GetRoundedInt(reader, "DateGapDays"),
-                        ReferenceMatch = GetInt(reader, "ReferenceMatch") == 1,
-                        Score = GetInt(reader, "MatchScore"),
-                        Confidence = GetString(reader, "MatchConfidence"),
+                        PaymentId = GetSafeInt(
+                            reader,
+                            "C_Payment_ID"
+                        ),
+
+                        InvoiceId = GetSafeInt(
+                            reader,
+                            "C_Invoice_ID"
+                        ),
+
+                        InvoicePayScheduleId = GetSafeInt(
+                            reader,
+                            "C_InvoicePaySchedule_ID"
+                        ),
+
+                        VendorId = GetSafeInt(
+                            reader,
+                            "C_BPartner_ID"
+                        ),
+
+                        VendorName = GetSafeString(
+                            reader,
+                            "VendorName"
+                        ),
+
+                        PaymentDocumentNo = GetSafeString(
+                            reader,
+                            "PaymentDocumentNo"
+                        ),
+
+                        InvoiceDocumentNo = GetSafeString(
+                            reader,
+                            "InvoiceDocumentNo"
+                        ),
+
+                        PaymentDate = GetSafeDateTime(
+                            reader,
+                            "PaymentDate"
+                        ),
+
+                        InvoiceDate = GetSafeDateTime(
+                            reader,
+                            "InvoiceDate"
+                        ),
+
+                        DueDate = GetSafeDateTime(
+                            reader,
+                            "DueDate"
+                        ),
+
+                        PaymentCurrencyId = GetSafeInt(
+                            reader,
+                            "PaymentCurrencyId"
+                        ),
+
+                        PaymentCurrencyISOCode = GetSafeString(
+                            reader,
+                            "PaymentCurrencyISOCode"
+                        ),
+
+                        PaymentCurrencySymbol = GetSafeString(
+                            reader,
+                            "PaymentCurrencySymbol"
+                        ),
+
+                        PaymentPrecision = NormalizePrecision(
+                            GetSafeInt(
+                                reader,
+                                "PaymentPrecision",
+                                2
+                            )
+                        ),
+
+                        PaymentAllocatedAmount = GetSafeDecimal(
+                            reader,
+                            "PaymentAllocatedAmount"
+                        ),
+
+                        PaymentOpenAmount = GetSafeDecimal(
+                            reader,
+                            "PaymentOpenAmount"
+                        ),
+
+                        InvoiceOriginalAmount = GetSafeDecimal(
+                            reader,
+                            "InvoiceOriginalAmount"
+                        ),
+
+                        InvoiceAllocatedAmount = GetSafeDecimal(
+                            reader,
+                            "InvoiceAllocatedAmount"
+                        ),
+
+                        InvoiceOpenAmount = GetSafeDecimal(
+                            reader,
+                            "InvoiceOpenAmount"
+                        ),
+
+                        ReadyAmount = GetSafeDecimal(
+                            reader,
+                            "ReadyAmount"
+                        ),
+
+                        AccountingAmount = GetSafeDecimal(
+                            reader,
+                            "AccountingAmount"
+                        ),
+
+                        DifferenceAmount = GetSafeDecimal(
+                            reader,
+                            "DifferenceAmount"
+                        ),
+
+                        DifferencePercentage = GetSafeDecimal(
+                            reader,
+                            "DifferencePercentage"
+                        ),
+
+                        DateGapDays = GetSafeRoundedInt(
+                            reader,
+                            "DateGapDays"
+                        ),
+
+                        ReferenceMatch =
+                            GetSafeDecimal(
+                                reader,
+                                "ReferenceMatch"
+                            ) == 1M,
+
+                        Score = GetSafeRoundedInt(
+                            reader,
+                            "MatchScore"
+                        ),
+
+                        Confidence = GetSafeString(
+                            reader,
+                            "MatchConfidence"
+                        ),
+
                         IsAutoApplicable = string.Equals(
-                            GetString(reader, "IsAutoApplicable"),
+                            GetSafeString(
+                                reader,
+                                "IsAutoApplicable"
+                            ),
                             "Y",
                             StringComparison.OrdinalIgnoreCase
                         )
@@ -934,13 +1054,51 @@ ORDER BY NumberedRows.PageRowNo";
 
                     if (!result.SummaryLoaded)
                     {
-                        result.SchemaCurrencyId = GetInt(reader, "SchemaCurrencyId");
-                        result.SchemaCurrencyISOCode = GetString(reader, "SchemaCurrencyISOCode");
-                        result.SchemaCurrencySymbol = GetString(reader, "SchemaCurrencySymbol");
-                        result.SchemaStdPrecision = NormalizePrecision(GetInt(reader, "SchemaStdPrecision", 2));
-                        result.TotalRecords = GetInt(reader, "TotalRecords");
-                        result.TotalAccountingAmount = GetDecimal(reader, "TotalAccountingAmount");
-                        result.HighConfidenceCount = GetInt(reader, "HighConfidenceCount");
+                        result.SchemaCurrencyId =
+                            GetSafeInt(
+                                reader,
+                                "SchemaCurrencyId"
+                            );
+
+                        result.SchemaCurrencyISOCode =
+                            GetSafeString(
+                                reader,
+                                "SchemaCurrencyISOCode"
+                            );
+
+                        result.SchemaCurrencySymbol =
+                            GetSafeString(
+                                reader,
+                                "SchemaCurrencySymbol"
+                            );
+
+                        result.SchemaStdPrecision =
+                            NormalizePrecision(
+                                GetSafeInt(
+                                    reader,
+                                    "SchemaStdPrecision",
+                                    2
+                                )
+                            );
+
+                        result.TotalRecords =
+                            GetSafeRoundedInt(
+                                reader,
+                                "TotalRecords"
+                            );
+
+                        result.TotalAccountingAmount =
+                            GetSafeDecimal(
+                                reader,
+                                "TotalAccountingAmount"
+                            );
+
+                        result.HighConfidenceCount =
+                            GetSafeRoundedInt(
+                                reader,
+                                "HighConfidenceCount"
+                            );
+
                         result.SummaryLoaded = true;
                     }
                 }
@@ -951,6 +1109,7 @@ ORDER BY NumberedRows.PageRowNo";
                     "VAS_072_ReadMatchSuggestionList",
                     ex
                 );
+
                 throw;
             }
             finally
@@ -1260,63 +1419,241 @@ FROM DetailScored DetailScored";
 
             try
             {
-                reader = DB.ExecuteReader(sql, parameters, null);
+                reader = DB.ExecuteReader(
+                    sql,
+                    parameters,
+                    null
+                );
 
                 if (reader != null && reader.Read())
                 {
-                    return new MatchDetailRow
+                    MatchDetailRow detailRow = new MatchDetailRow
                     {
-                        PaymentId = GetInt(reader, "C_Payment_ID"),
-                        PaymentVendorId = GetInt(reader, "PaymentVendorId"),
-                        InvoiceVendorId = GetInt(reader, "InvoiceVendorId"),
-                        VendorId = GetInt(reader, "PaymentVendorId"),
-                        VendorName = GetString(reader, "VendorName"),
-                        PaymentDocumentNo = GetString(reader, "PaymentDocumentNo"),
-                        PaymentDate = GetDateTime(reader, "PaymentDate"),
-                        PaymentMethodCode = GetString(reader, "PaymentMethodCode"),
-                        ReferenceNo = GetString(reader, "ReferenceNo"),
-                        BankName = GetString(reader, "BankName"),
-                        AccountNo = GetString(reader, "AccountNo"),
-                        PaymentCurrencyId = GetInt(reader, "PaymentCurrencyId"),
-                        PaymentCurrencyISOCode = GetString(reader, "PaymentCurrencyISOCode"),
-                        PaymentCurrencySymbol = GetString(reader, "PaymentCurrencySymbol"),
-                        PaymentPrecision = NormalizePrecision(GetInt(reader, "PaymentPrecision", 2)),
-                        PaymentOriginalAmount = GetDecimal(reader, "PaymentOriginalAmount"),
-                        PaymentAllocatedAmount = GetDecimal(reader, "PaymentAllocatedAmount"),
-                        PaymentOpenAmount = GetDecimal(reader, "PaymentOpenAmount"),
-                        InvoiceId = GetInt(reader, "C_Invoice_ID"),
-                        InvoicePayScheduleId = GetInt(reader, "C_InvoicePaySchedule_ID"),
-                        InvoiceDocumentNo = GetString(reader, "InvoiceDocumentNo"),
-                        InvoiceDate = GetDateTime(reader, "InvoiceDate"),
-                        DueDate = GetDateTime(reader, "DueDate"),
-                        PaymentTerms = GetString(reader, "PaymentTerms"),
-                        InvoiceCurrencyId = GetInt(reader, "InvoiceCurrencyId"),
-                        InvoiceCurrencyISOCode = GetString(reader, "InvoiceCurrencyISOCode"),
-                        InvoiceCurrencySymbol = GetString(reader, "InvoiceCurrencySymbol"),
-                        InvoicePrecision = NormalizePrecision(GetInt(reader, "InvoicePrecision", 2)),
-                        InvoiceOriginalAmount = GetDecimal(reader, "InvoiceOriginalAmount"),
-                        InvoiceAllocatedAmount = GetDecimal(reader, "InvoiceAllocatedAmount"),
-                        InvoiceOpenAmount = GetDecimal(reader, "InvoiceOpenAmount"),
-                        ReadyAmount = GetDecimal(reader, "ReadyAmount"),
-                        DifferenceAmount = GetDecimal(reader, "DifferenceAmount"),
-                        DifferencePercentage = GetDecimal(reader, "DifferencePercentage"),
-                        DateGapDays = GetRoundedInt(reader, "DateGapDays"),
-                        ReferenceMatch = GetInt(reader, "ReferenceMatch") == 1,
-                        Score = GetInt(reader, "MatchScore"),
-                        Confidence = GetString(reader, "MatchConfidence"),
+                        PaymentId = GetSafeInt(
+                            reader,
+                            "C_Payment_ID"
+                        ),
+
+                        PaymentVendorId = GetSafeInt(
+                            reader,
+                            "PaymentVendorId"
+                        ),
+
+                        InvoiceVendorId = GetSafeInt(
+                            reader,
+                            "InvoiceVendorId"
+                        ),
+
+                        VendorId = GetSafeInt(
+                            reader,
+                            "PaymentVendorId"
+                        ),
+
+                        VendorName = GetSafeString(
+                            reader,
+                            "VendorName"
+                        ),
+
+                        PaymentDocumentNo = GetSafeString(
+                            reader,
+                            "PaymentDocumentNo"
+                        ),
+
+                        PaymentDate = GetSafeDateTime(
+                            reader,
+                            "PaymentDate"
+                        ),
+
+                        PaymentMethodCode = GetSafeString(
+                            reader,
+                            "PaymentMethodCode"
+                        ),
+
+                        ReferenceNo = GetSafeString(
+                            reader,
+                            "ReferenceNo"
+                        ),
+
+                        BankName = GetSafeString(
+                            reader,
+                            "BankName"
+                        ),
+
+                        AccountNo = GetSafeString(
+                            reader,
+                            "AccountNo"
+                        ),
+
+                        PaymentCurrencyId = GetSafeInt(
+                            reader,
+                            "PaymentCurrencyId"
+                        ),
+
+                        PaymentCurrencyISOCode = GetSafeString(
+                            reader,
+                            "PaymentCurrencyISOCode"
+                        ),
+
+                        PaymentCurrencySymbol = GetSafeString(
+                            reader,
+                            "PaymentCurrencySymbol"
+                        ),
+
+                        PaymentPrecision = NormalizePrecision(
+                            GetSafeInt(
+                                reader,
+                                "PaymentPrecision",
+                                2
+                            )
+                        ),
+
+                        PaymentOriginalAmount = GetSafeDecimal(
+                            reader,
+                            "PaymentOriginalAmount"
+                        ),
+
+                        PaymentAllocatedAmount = GetSafeDecimal(
+                            reader,
+                            "PaymentAllocatedAmount"
+                        ),
+
+                        PaymentOpenAmount = GetSafeDecimal(
+                            reader,
+                            "PaymentOpenAmount"
+                        ),
+
+                        InvoiceId = GetSafeInt(
+                            reader,
+                            "C_Invoice_ID"
+                        ),
+
+                        InvoicePayScheduleId = GetSafeInt(
+                            reader,
+                            "C_InvoicePaySchedule_ID"
+                        ),
+
+                        InvoiceDocumentNo = GetSafeString(
+                            reader,
+                            "InvoiceDocumentNo"
+                        ),
+
+                        InvoiceDate = GetSafeDateTime(
+                            reader,
+                            "InvoiceDate"
+                        ),
+
+                        DueDate = GetSafeDateTime(
+                            reader,
+                            "DueDate"
+                        ),
+
+                        PaymentTerms = GetSafeString(
+                            reader,
+                            "PaymentTerms"
+                        ),
+
+                        InvoiceCurrencyId = GetSafeInt(
+                            reader,
+                            "InvoiceCurrencyId"
+                        ),
+
+                        InvoiceCurrencyISOCode = GetSafeString(
+                            reader,
+                            "InvoiceCurrencyISOCode"
+                        ),
+
+                        InvoiceCurrencySymbol = GetSafeString(
+                            reader,
+                            "InvoiceCurrencySymbol"
+                        ),
+
+                        InvoicePrecision = NormalizePrecision(
+                            GetSafeInt(
+                                reader,
+                                "InvoicePrecision",
+                                2
+                            )
+                        ),
+
+                        InvoiceOriginalAmount = GetSafeDecimal(
+                            reader,
+                            "InvoiceOriginalAmount"
+                        ),
+
+                        InvoiceAllocatedAmount = GetSafeDecimal(
+                            reader,
+                            "InvoiceAllocatedAmount"
+                        ),
+
+                        InvoiceOpenAmount = GetSafeDecimal(
+                            reader,
+                            "InvoiceOpenAmount"
+                        ),
+
+                        ReadyAmount = GetSafeDecimal(
+                            reader,
+                            "ReadyAmount"
+                        ),
+
+                        DifferenceAmount = GetSafeDecimal(
+                            reader,
+                            "DifferenceAmount"
+                        ),
+
+                        DifferencePercentage = GetSafeDecimal(
+                            reader,
+                            "DifferencePercentage"
+                        ),
+
+                        DateGapDays = GetSafeRoundedInt(
+                            reader,
+                            "DateGapDays"
+                        ),
+
+                        ReferenceMatch =
+                            GetSafeDecimal(
+                                reader,
+                                "ReferenceMatch"
+                            ) == 1M,
+
+                        Score = GetSafeRoundedInt(
+                            reader,
+                            "MatchScore"
+                        ),
+
+                        Confidence = GetSafeString(
+                            reader,
+                            "MatchConfidence"
+                        ),
+
                         IsAutoApplicable = string.Equals(
-                            GetString(reader, "IsAutoApplicable"),
+                            GetSafeString(
+                                reader,
+                                "IsAutoApplicable"
+                            ),
                             "Y",
                             StringComparison.OrdinalIgnoreCase
                         )
                     };
+
+                    return detailRow;
                 }
+            }
+            catch (Exception ex)
+            {
+                VLogger.Get().SaveError(
+                    "VAS_072_ReadMatchDetail",
+                    ex
+                );
+
+                throw;
             }
             finally
             {
                 CloseReader(reader);
             }
 
+            
             return null;
         }
 
@@ -2316,6 +2653,553 @@ AND
                 ? parsed
                 : Util.GetValueOfDecimal(value);
         }
+
+
+
+        private int GetColumnOrdinal(
+            IDataReader reader,
+            string columnName)
+        {
+            if (
+                reader == null ||
+                string.IsNullOrWhiteSpace(columnName)
+            )
+            {
+                return -1;
+            }
+
+            try
+            {
+                return reader.GetOrdinal(columnName);
+            }
+            catch
+            {
+                return -1;
+            }
+        }
+
+        private object GetSafeValue(
+            IDataReader reader,
+            string columnName)
+        {
+            int ordinal = GetColumnOrdinal(
+                reader,
+                columnName
+            );
+
+            if (ordinal < 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                if (reader.IsDBNull(ordinal))
+                {
+                    return null;
+                }
+
+                object value = reader.GetValue(ordinal);
+
+                if (
+                    value == null ||
+                    value == DBNull.Value
+                )
+                {
+                    return null;
+                }
+
+                return UnwrapProviderValue(value);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private object UnwrapProviderValue(
+            object value)
+        {
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
+            {
+                return null;
+            }
+
+            Type valueType = value.GetType();
+
+            /*
+             * يعالج الأنواع التي يرجعها Oracle Provider مثل:
+             * OracleDecimal
+             * OracleDate
+             * OracleTimeStamp
+             * OracleString
+             */
+            try
+            {
+                System.Reflection.PropertyInfo isNullProperty =
+                    valueType.GetProperty("IsNull");
+
+                if (
+                    isNullProperty != null &&
+                    isNullProperty.CanRead
+                )
+                {
+                    object isNullValue =
+                        isNullProperty.GetValue(
+                            value,
+                            null
+                        );
+
+                    if (
+                        isNullValue is bool &&
+                        (bool)isNullValue
+                    )
+                    {
+                        return null;
+                    }
+                }
+            }
+            catch
+            {
+                // Continue with normal conversion.
+            }
+
+            try
+            {
+                System.Reflection.PropertyInfo valueProperty =
+                    valueType.GetProperty("Value");
+
+                if (
+                    valueProperty != null &&
+                    valueProperty.CanRead
+                )
+                {
+                    object actualValue =
+                        valueProperty.GetValue(
+                            value,
+                            null
+                        );
+
+                    if (
+                        actualValue != null &&
+                        actualValue != DBNull.Value
+                    )
+                    {
+                        return actualValue;
+                    }
+                }
+            }
+            catch
+            {
+                // Return original provider value.
+            }
+
+            return value;
+        }
+
+        private int GetSafeInt(
+            IDataReader reader,
+            string columnName,
+            int fallback = 0)
+        {
+            object value = GetSafeValue(
+                reader,
+                columnName
+            );
+
+            if (value == null)
+            {
+                return fallback;
+            }
+
+            try
+            {
+                if (value is int)
+                {
+                    return (int)value;
+                }
+
+                if (value is short)
+                {
+                    return Convert.ToInt32(
+                        (short)value
+                    );
+                }
+
+                if (value is long)
+                {
+                    long longValue = (long)value;
+
+                    if (longValue > int.MaxValue)
+                    {
+                        return int.MaxValue;
+                    }
+
+                    if (longValue < int.MinValue)
+                    {
+                        return int.MinValue;
+                    }
+
+                    return Convert.ToInt32(longValue);
+                }
+
+                if (value is decimal)
+                {
+                    decimal decimalValue =
+                        (decimal)value;
+
+                    if (decimalValue > int.MaxValue)
+                    {
+                        return int.MaxValue;
+                    }
+
+                    if (decimalValue < int.MinValue)
+                    {
+                        return int.MinValue;
+                    }
+
+                    return Convert.ToInt32(
+                        Math.Round(
+                            decimalValue,
+                            0,
+                            MidpointRounding.AwayFromZero
+                        )
+                    );
+                }
+
+                if (value is double)
+                {
+                    double doubleValue =
+                        (double)value;
+
+                    if (doubleValue > int.MaxValue)
+                    {
+                        return int.MaxValue;
+                    }
+
+                    if (doubleValue < int.MinValue)
+                    {
+                        return int.MinValue;
+                    }
+
+                    return Convert.ToInt32(
+                        Math.Round(
+                            doubleValue,
+                            0,
+                            MidpointRounding.AwayFromZero
+                        )
+                    );
+                }
+
+                if (value is float)
+                {
+                    float floatValue =
+                        (float)value;
+
+                    if (floatValue > int.MaxValue)
+                    {
+                        return int.MaxValue;
+                    }
+
+                    if (floatValue < int.MinValue)
+                    {
+                        return int.MinValue;
+                    }
+
+                    return Convert.ToInt32(
+                        Math.Round(
+                            floatValue,
+                            0,
+                            MidpointRounding.AwayFromZero
+                        )
+                    );
+                }
+
+                return Convert.ToInt32(
+                    value,
+                    CultureInfo.InvariantCulture
+                );
+            }
+            catch
+            {
+                decimal parsedValue;
+
+                bool parsed = decimal.TryParse(
+                    Convert.ToString(
+                        value,
+                        CultureInfo.InvariantCulture
+                    ),
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out parsedValue
+                );
+
+                if (!parsed)
+                {
+                    return fallback;
+                }
+
+                if (parsedValue > int.MaxValue)
+                {
+                    return int.MaxValue;
+                }
+
+                if (parsedValue < int.MinValue)
+                {
+                    return int.MinValue;
+                }
+
+                return Convert.ToInt32(
+                    Math.Round(
+                        parsedValue,
+                        0,
+                        MidpointRounding.AwayFromZero
+                    )
+                );
+            }
+        }
+
+        private decimal GetSafeDecimal(
+            IDataReader reader,
+            string columnName,
+            decimal fallback = 0M)
+        {
+            object value = GetSafeValue(
+                reader,
+                columnName
+            );
+
+            if (value == null)
+            {
+                return fallback;
+            }
+
+            try
+            {
+                if (value is decimal)
+                {
+                    return (decimal)value;
+                }
+
+                if (value is int)
+                {
+                    return Convert.ToDecimal(
+                        (int)value
+                    );
+                }
+
+                if (value is long)
+                {
+                    return Convert.ToDecimal(
+                        (long)value
+                    );
+                }
+
+                if (value is double)
+                {
+                    return Convert.ToDecimal(
+                        (double)value
+                    );
+                }
+
+                if (value is float)
+                {
+                    return Convert.ToDecimal(
+                        (float)value
+                    );
+                }
+
+                return Convert.ToDecimal(
+                    value,
+                    CultureInfo.InvariantCulture
+                );
+            }
+            catch
+            {
+                decimal parsedValue;
+
+                bool parsed = decimal.TryParse(
+                    Convert.ToString(
+                        value,
+                        CultureInfo.InvariantCulture
+                    ),
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out parsedValue
+                );
+
+                if (parsed)
+                {
+                    return parsedValue;
+                }
+
+                try
+                {
+                    return Util.GetValueOfDecimal(value);
+                }
+                catch
+                {
+                    return fallback;
+                }
+            }
+        }
+
+        private int GetSafeRoundedInt(
+            IDataReader reader,
+            string columnName,
+            int fallback = 0)
+        {
+            decimal value = GetSafeDecimal(
+                reader,
+                columnName,
+                fallback
+            );
+
+            if (value > int.MaxValue)
+            {
+                return int.MaxValue;
+            }
+
+            if (value < int.MinValue)
+            {
+                return int.MinValue;
+            }
+
+            try
+            {
+                return Convert.ToInt32(
+                    Math.Round(
+                        value,
+                        0,
+                        MidpointRounding.AwayFromZero
+                    )
+                );
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private string GetSafeString(
+            IDataReader reader,
+            string columnName,
+            string fallback = "")
+        {
+            object value = GetSafeValue(
+                reader,
+                columnName
+            );
+
+            if (value == null)
+            {
+                return fallback;
+            }
+
+            try
+            {
+                string text = Convert.ToString(
+                    value,
+                    CultureInfo.InvariantCulture
+                );
+
+                return text ?? fallback;
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        private DateTime? GetSafeDateTime(
+            IDataReader reader,
+            string columnName)
+        {
+            int ordinal = GetColumnOrdinal(
+                reader,
+                columnName
+            );
+
+            if (ordinal < 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                if (reader.IsDBNull(ordinal))
+                {
+                    return null;
+                }
+
+                /*
+                 * الأفضل مع Oracle DATE وTIMESTAMP.
+                 */
+                return reader.GetDateTime(ordinal);
+            }
+            catch
+            {
+                object value = GetSafeValue(
+                    reader,
+                    columnName
+                );
+
+                if (value == null)
+                {
+                    return null;
+                }
+
+                if (value is DateTime)
+                {
+                    return (DateTime)value;
+                }
+
+                try
+                {
+                    return Convert.ToDateTime(
+                        value,
+                        CultureInfo.InvariantCulture
+                    );
+                }
+                catch
+                {
+                    DateTime parsedDate;
+
+                    string dateText = Convert.ToString(
+                        value,
+                        CultureInfo.InvariantCulture
+                    );
+
+                    bool parsed = DateTime.TryParse(
+                        dateText,
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.AllowWhiteSpaces,
+                        out parsedDate
+                    );
+
+                    if (parsed)
+                    {
+                        return parsedDate;
+                    }
+
+                    parsed = DateTime.TryParse(
+                        dateText,
+                        CultureInfo.CurrentCulture,
+                        DateTimeStyles.AllowWhiteSpaces,
+                        out parsedDate
+                    );
+
+                    return parsed
+                        ? parsedDate
+                        : (DateTime?)null;
+                }
+            }
+        }
+
+     
 
         private string GetString(
             IDataReader reader,
