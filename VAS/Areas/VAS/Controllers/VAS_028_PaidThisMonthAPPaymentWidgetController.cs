@@ -16,10 +16,10 @@ using System;
  * 9  | vendors                              | VAS_028_MessageVendors
  * 10 | payment                              | VAS_028_MessagePayment
  * 11 | payments                             | VAS_028_MessagePayments
- * 12 | Not Specified                        | VAS_032_MessageNotSpecified
- * 13 | Cleared                              | VAS_032_MessageCleared
- * 14 | Bounced                              | VAS_032_MessageBounced
- * 15 | In transit                           | VAS_032_MessageInTransit
+ * 12 | Not Specified                        | VAS_028_MessageNotSpecified
+ * 13 | Cleared                              | VAS_028_MessageCleared
+ * 14 | Bounced                              | VAS_028_MessageBounced
+ * 15 | In transit                           | VAS_028_MessageInTransit
  */
 
 using System.Collections.Generic;
@@ -1339,7 +1339,7 @@ AND ColumnData.IsActive = 'Y'";
             {
                 return GetMsg(
                     ctx,
-                    "VAS_032_MessageCleared",
+                    "VAS_028_MessageCleared",
                     "Cleared"
                 );
             }
@@ -1352,14 +1352,14 @@ AND ColumnData.IsActive = 'Y'";
                     ? executionStatusName
                     : GetMsg(
                         ctx,
-                        "VAS_032_MessageBounced",
+                        "VAS_028_MessageBounced",
                         "Bounced"
                     );
             }
 
             return GetMsg(
                 ctx,
-                "VAS_032_MessageInTransit",
+                "VAS_028_MessageInTransit",
                 "In Transit"
             );
         }
@@ -1373,7 +1373,7 @@ AND ColumnData.IsActive = 'Y'";
             {
                 return GetMsg(
                     ctx,
-                    "VAS_032_MessageNotSpecified",
+                    "VAS_028_MessageNotSpecified",
                     "Not Specified"
                 );
             }

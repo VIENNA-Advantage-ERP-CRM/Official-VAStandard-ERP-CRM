@@ -36,7 +36,7 @@
  * 28  | Vendor                                            | VAS_Vendor
  * 29  | Payment method                                    | VAS_072_PaymentMethod
  * 30  | Reference                                         | VAS_072_Reference
- * 31  | Bank account                                      | VAS_011_BankAccount
+ * 31  | Bank account                                      | VAS_072_BankAccount
  * 32  | Currency                                          | VAS_PaymentCurrency
  * 33  | Amount paid                                       | VAS_072_AmountPaid
  * 34  | Suggested invoice                                 | VAS_072_SuggestedInvoice
@@ -1597,7 +1597,7 @@
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_011_BankAccount",
+                        "VAS_072_BankAccount",
                         "Bank account"
                     ),
                     formatBankAccount(detail)

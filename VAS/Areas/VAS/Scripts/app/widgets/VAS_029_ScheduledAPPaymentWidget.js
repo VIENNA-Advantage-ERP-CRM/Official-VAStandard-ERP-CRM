@@ -21,11 +21,11 @@
  * 14  | Payment methods                      | VAS_029_MessagePaymentMethods
  * 15  | Invoice No.                          | VIS_InvoiceNo
  * 16  | Invoice date                         | VIS_InvoiceDate
- * 17  | Vendor                               | VAS_032_MessageVendor
+ * 17  | Vendor                               | VAS_029_MessageVendor
  * 18  | Due date                             | VIS_DueDate
  * 19  | Currency                             | VAS_PaymentCurrency
- * 20  | Amount                               | VAS_032_MessageAmount
- * 21  | Method                               | VAS_032_MessageMethod
+ * 20  | Amount                               | VAS_029_MessageAmount
+ * 21  | Method                               | VAS_029_MessageMethod
  * 22  | Previous                             | VAS_Previous
  * 23  | Next                                 | VAS_Next
  * 24  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
@@ -600,11 +600,11 @@
                 '<tr>' +
                 '<th class="vas-scheduled-ap-payment-th-doc">' + escapeHtml(lbl('VIS_InvoiceNo', 'Invoice No.')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-invdate">' + escapeHtml(lbl('VIS_InvoiceDate', 'Invoice date')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-vendor">' + escapeHtml(lbl('VAS_032_MessageVendor', 'Vendor')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-vendor">' + escapeHtml(lbl('VAS_029_MessageVendor', 'Vendor')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-duedate">' + escapeHtml(lbl('VIS_DueDate', 'Due date')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-currency">' + escapeHtml(lbl('VAS_PaymentCurrency', 'Currency')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-amount">' + escapeHtml(lbl('VAS_032_MessageAmount', 'Amount')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-method">' + escapeHtml(lbl('VAS_032_MessageMethod', 'Method')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-amount">' + escapeHtml(lbl('VAS_029_MessageAmount', 'Amount')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-method">' + escapeHtml(lbl('VAS_029_MessageMethod', 'Method')) + '</th>' +
                 '</tr>' +
                 '</thead>' +
                 '<tbody class="vas-scheduled-ap-payment-dialog-tbody"></tbody>' +

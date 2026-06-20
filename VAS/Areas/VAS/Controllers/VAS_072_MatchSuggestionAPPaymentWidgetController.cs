@@ -21,12 +21,12 @@
  * 7  | AP payment or purchase invoice...    | VAS_072_DetailNotFound
  * 8  | Vendor matches                       | VAS_072_VendorMatches
  * 9  | Vendor differs                       | VAS_072_VendorDiffers
- * 10 | Amount matches                       | VAS_035_AmountMatches
- * 11 | Amount differs                       | VAS_035_AmountDiffers
- * 12 | Reference cited                      | VAS_035_ReferenceCited
- * 13 | No reference cited                   | VAS_035_NoReferenceCited
- * 14 | Within due window                    | VAS_035_WithinDueWindow
- * 15 | Outside due window                   | VAS_035_OutsideDueWindow
+ * 10 | Amount matches                       | VAS_072_AmountMatches
+ * 11 | Amount differs                       | VAS_072_AmountDiffers
+ * 12 | Reference cited                      | VAS_072_ReferenceCited
+ * 13 | No reference cited                   | VAS_072_NoReferenceCited
+ * 14 | Within due window                    | VAS_072_WithinDueWindow
+ * 15 | Outside due window                   | VAS_072_OutsideDueWindow
  */
 
 using Newtonsoft.Json;

@@ -24,7 +24,7 @@
  * 16  | Organization                         | VAS_031_MessageOrganization
  * 17  | Bank Account                         | VAS_031_MessageBankAccount
  * 18  | Transaction Date                     | VAS_031_MessageTransactionDate
- * 19  | Vendor                               | VAS_032_MessageVendor
+ * 19  | Vendor                               | VAS_031_MessageVendor
  * 20  | Currency                             | VAS_PaymentCurrency
  * 21  | Currency Type                        | VAS_031_MessageCurrencyType
  * 22  | Spot                                 | VAS_031_MessageSpot
@@ -1672,7 +1672,7 @@
 
                 fieldHtml(
                     lbl(
-                        'VAS_032_MessageVendor',
+                        'VAS_031_MessageVendor',
                         'Vendor'
                     ),
 
