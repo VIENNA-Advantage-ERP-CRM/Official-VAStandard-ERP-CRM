@@ -1665,6 +1665,10 @@ FROM DetailScored DetailScored";
         /// Dedicated query for ApplyHighConfidence only.
         /// It returns only the IDs required by the allocation process.
         /// </summary>
+        /// <summary>
+        /// Returns all high-confidence matches using the same matching logic
+        /// as ReadMatchSuggestionList, but without pagination.
+        /// </summary>
         private List<HighConfidenceCandidateRow> ReadHighConfidenceCandidates(
             Ctx ctx)
         {
@@ -1680,23 +1684,33 @@ SELECT
     Payment.AD_Org_ID,
     Payment.C_Payment_ID,
     Payment.C_BPartner_ID,
+    Payment.DocumentNo,
     Payment.DateAcct,
     Payment.C_Currency_ID,
+    Payment.C_ConversionType_ID,
     Payment.PayAmt,
     Payment.VAS_UnAllocatedAmount,
     Payment.TrxNo,
     Payment.CheckNo,
-    Payment.DocumentNo
+    Payment.TenderType
 FROM C_Payment Payment
-WHERE Payment.IsActive='Y'
-AND Payment.Processed='Y'
-AND Payment.IsReceipt='N'
+WHERE Payment.IsActive = 'Y'
+AND Payment.Processed = 'Y'
+AND Payment.IsReceipt = 'N'
 AND Payment.DocStatus IN ('CO','CL')
-AND COALESCE(Payment.IsAllocated,'N')='N'
+AND COALESCE(Payment.IsAllocated,'N') = 'N'
 AND Payment.C_BPartner_ID IS NOT NULL
 AND Payment.C_CashLine_ID IS NULL
-AND (Payment.TenderType IS NULL OR Payment.TenderType<>'B')
-AND Payment.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)",
+AND
+(
+    Payment.TenderType IS NULL
+    OR Payment.TenderType <> 'B'
+)
+AND Payment.AD_Client_ID =
+(
+    SELECT QueryParameters.AD_Client_ID
+    FROM QueryParameters QueryParameters
+)",
                 "Payment",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -1711,16 +1725,22 @@ SELECT
     Invoice.C_BPartner_ID,
     Invoice.DocumentNo,
     Invoice.DateInvoiced,
-    Invoice.C_Currency_ID
+    Invoice.C_Currency_ID,
+    Invoice.GrandTotal,
+    Invoice.GrandTotalAfterWithholding
 FROM C_Invoice Invoice
-WHERE Invoice.IsActive='Y'
-AND Invoice.Processed='Y'
-AND Invoice.IsSOTrx='N'
-AND COALESCE(Invoice.IsReturnTrx,'N')='N'
+WHERE Invoice.IsActive = 'Y'
+AND Invoice.Processed = 'Y'
+AND Invoice.IsSOTrx = 'N'
+AND COALESCE(Invoice.IsReturnTrx,'N') = 'N'
 AND Invoice.DocStatus IN ('CO','CL')
-AND COALESCE(Invoice.IsPaid,'N')='N'
+AND COALESCE(Invoice.IsPaid,'N') = 'N'
 AND Invoice.C_BPartner_ID IS NOT NULL
-AND Invoice.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)",
+AND Invoice.AD_Client_ID =
+(
+    SELECT QueryParameters.AD_Client_ID
+    FROM QueryParameters QueryParameters
+)",
                 "Invoice",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -1736,9 +1756,8 @@ WITH QueryParameters AS
     SELECT
         @AD_Client_ID AS AD_Client_ID,
         @ExactTolerance AS ExactTolerance,
-        @MaximumDifferencePercentage AS MaximumDifferencePercentage,
         @HighConfidenceScore AS HighConfidenceScore"
-+ queryParametersFrom + @"
+                + queryParametersFrom + @"
 ),
 AccessiblePayments AS
 (
@@ -1752,188 +1771,577 @@ PaymentAllocated AS
 (
     SELECT
         AllocationLine.C_Payment_ID,
-        SUM(ABS(COALESCE(AllocationLine.Amount,0))) AS AllocatedAmount
+
+        SUM
+        (
+            ABS
+            (
+                COALESCE
+                (
+                    AllocationLine.Amount,
+                    0
+                )
+            )
+        ) AS AllocatedAmount
+
     FROM C_AllocationLine AllocationLine
+
     INNER JOIN C_AllocationHdr AllocationHeader ON
     (
-        AllocationHeader.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID
+        AllocationHeader.C_AllocationHdr_ID =
+        AllocationLine.C_AllocationHdr_ID
     )
-    WHERE AllocationHeader.IsActive='Y'
-    AND AllocationHeader.DocStatus IN ('CO','CL')
-    AND AllocationHeader.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
+
+    WHERE AllocationHeader.IsActive = 'Y'
+
+    AND AllocationHeader.DocStatus IN
+    (
+        'CO',
+        'CL'
+    )
+
+    AND AllocationHeader.AD_Client_ID =
+    (
+        SELECT QueryParameters.AD_Client_ID
+        FROM QueryParameters QueryParameters
+    )
+
     AND AllocationLine.C_Payment_ID IS NOT NULL
-    GROUP BY AllocationLine.C_Payment_ID
+
+    GROUP BY
+        AllocationLine.C_Payment_ID
 ),
 ScheduleAllocated AS
 (
     SELECT
         AllocationLine.C_InvoicePaySchedule_ID,
-        SUM(ABS(COALESCE(AllocationLine.Amount,0))) AS AllocatedAmount
+
+        SUM
+        (
+            ABS
+            (
+                COALESCE
+                (
+                    AllocationLine.Amount,
+                    0
+                )
+            )
+        ) AS AllocatedAmount
+
     FROM C_AllocationLine AllocationLine
+
     INNER JOIN C_AllocationHdr AllocationHeader ON
     (
-        AllocationHeader.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID
+        AllocationHeader.C_AllocationHdr_ID =
+        AllocationLine.C_AllocationHdr_ID
     )
-    WHERE AllocationHeader.IsActive='Y'
-    AND AllocationHeader.DocStatus IN ('CO','CL')
-    AND AllocationHeader.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
+
+    WHERE AllocationHeader.IsActive = 'Y'
+
+    AND AllocationHeader.DocStatus IN
+    (
+        'CO',
+        'CL'
+    )
+
+    AND AllocationHeader.AD_Client_ID =
+    (
+        SELECT QueryParameters.AD_Client_ID
+        FROM QueryParameters QueryParameters
+    )
+
     AND AllocationLine.C_InvoicePaySchedule_ID IS NOT NULL
-    GROUP BY AllocationLine.C_InvoicePaySchedule_ID
+
+    GROUP BY
+        AllocationLine.C_InvoicePaySchedule_ID
+),
+PaymentRowsBase AS
+(
+    SELECT
+        Payment.AD_Client_ID,
+        Payment.AD_Org_ID,
+        Payment.C_Payment_ID,
+        Payment.C_BPartner_ID,
+        Payment.DocumentNo AS PaymentDocumentNo,
+        Payment.DateAcct AS PaymentDate,
+
+        Payment.C_Currency_ID AS PaymentCurrencyId,
+
+        COALESCE
+        (
+            Payment.C_ConversionType_ID,
+            0
+        ) AS PaymentConversionTypeId,
+
+        COALESCE
+        (
+            PaymentAllocated.AllocatedAmount,
+            0
+        ) AS PaymentAllocatedAmount,
+
+        CASE
+            WHEN
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.PayAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    PaymentAllocated.AllocatedAmount,
+                    0
+                )
+                <= 0
+            THEN 0
+
+            WHEN
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.VAS_UnAllocatedAmount,
+                        0
+                    )
+                )
+                >
+                (
+                    SELECT QueryParameters.ExactTolerance
+                    FROM QueryParameters QueryParameters
+                )
+
+                AND ABS
+                (
+                    COALESCE
+                    (
+                        Payment.VAS_UnAllocatedAmount,
+                        0
+                    )
+                )
+                <
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.PayAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    PaymentAllocated.AllocatedAmount,
+                    0
+                )
+
+            THEN ABS
+            (
+                COALESCE
+                (
+                    Payment.VAS_UnAllocatedAmount,
+                    0
+                )
+            )
+
+            ELSE
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.PayAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    PaymentAllocated.AllocatedAmount,
+                    0
+                )
+        END AS PaymentOpenAmount,
+
+        COALESCE
+        (
+            Payment.TrxNo,
+            Payment.CheckNo,
+            Payment.DocumentNo
+        ) AS ReferenceNo
+
+    FROM AccessiblePayments Payment
+
+    LEFT OUTER JOIN PaymentAllocated PaymentAllocated ON
+    (
+        PaymentAllocated.C_Payment_ID =
+        Payment.C_Payment_ID
+    )
 ),
 PaymentRows AS
 (
     SELECT
-        Payment.C_Payment_ID,
-        Payment.C_BPartner_ID,
-        Payment.DateAcct AS PaymentDate,
-        Payment.C_Currency_ID,
-        COALESCE(Payment.TrxNo,Payment.CheckNo,Payment.DocumentNo) AS ReferenceNo,
-        CASE
-            WHEN ABS(COALESCE(Payment.PayAmt,0))-COALESCE(PaymentAllocated.AllocatedAmount,0)<=0 THEN 0
-            WHEN ABS(COALESCE(Payment.VAS_UnAllocatedAmount,0))>(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-            AND ABS(COALESCE(Payment.VAS_UnAllocatedAmount,0))<ABS(COALESCE(Payment.PayAmt,0))-COALESCE(PaymentAllocated.AllocatedAmount,0)
-                THEN ABS(COALESCE(Payment.VAS_UnAllocatedAmount,0))
-            ELSE ABS(COALESCE(Payment.PayAmt,0))-COALESCE(PaymentAllocated.AllocatedAmount,0)
-        END AS PaymentOpenAmount
-    FROM AccessiblePayments Payment
-    LEFT OUTER JOIN PaymentAllocated PaymentAllocated ON
+        PaymentRowsBase.*,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                PaymentRowsBase.C_BPartner_ID,
+                PaymentRowsBase.PaymentCurrencyId,
+                PaymentRowsBase.PaymentOpenAmount
+
+            ORDER BY
+                PaymentRowsBase.PaymentDate,
+                PaymentRowsBase.C_Payment_ID
+        ) AS MatchSequence
+
+    FROM PaymentRowsBase PaymentRowsBase
+
+    WHERE PaymentRowsBase.PaymentOpenAmount >
     (
-        PaymentAllocated.C_Payment_ID=Payment.C_Payment_ID
+        SELECT QueryParameters.ExactTolerance
+        FROM QueryParameters QueryParameters
     )
 ),
-InvoiceRows AS
+InvoiceRowsBase AS
 (
     SELECT
         Invoice.C_Invoice_ID,
         Invoice.C_BPartner_ID,
-        Invoice.C_Currency_ID,
         Invoice.DocumentNo AS InvoiceDocumentNo,
-        COALESCE(InvoicePaySchedule.DueDate,Invoice.DateInvoiced) AS DueDate,
+        Invoice.DateInvoiced AS InvoiceDate,
+
+        COALESCE
+        (
+            InvoicePaySchedule.DueDate,
+            Invoice.DateInvoiced
+        ) AS DueDate,
+
+        Invoice.C_Currency_ID AS InvoiceCurrencyId,
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
+
         CASE
-            WHEN ABS(COALESCE(InvoicePaySchedule.DueAmt,0))-COALESCE(ScheduleAllocated.AllocatedAmount,0)>0
-                THEN ABS(COALESCE(InvoicePaySchedule.DueAmt,0))-COALESCE(ScheduleAllocated.AllocatedAmount,0)
+            WHEN
+                ABS
+                (
+                    COALESCE
+                    (
+                        InvoicePaySchedule.DueAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocated.AllocatedAmount,
+                    0
+                )
+                > 0
+
+            THEN
+                ABS
+                (
+                    COALESCE
+                    (
+                        InvoicePaySchedule.DueAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocated.AllocatedAmount,
+                    0
+                )
+
             ELSE 0
         END AS InvoiceOpenAmount
+
     FROM AccessibleInvoices Invoice
+
     INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
     (
-        InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID
+        InvoicePaySchedule.C_Invoice_ID =
+        Invoice.C_Invoice_ID
     )
+
     LEFT OUTER JOIN ScheduleAllocated ScheduleAllocated ON
     (
-        ScheduleAllocated.C_InvoicePaySchedule_ID=InvoicePaySchedule.C_InvoicePaySchedule_ID
+        ScheduleAllocated.C_InvoicePaySchedule_ID =
+        InvoicePaySchedule.C_InvoicePaySchedule_ID
     )
-    WHERE InvoicePaySchedule.IsActive='Y'
-    AND COALESCE(InvoicePaySchedule.IsHoldPayment,'N')='N'
+
+    WHERE InvoicePaySchedule.IsActive = 'Y'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.IsHoldPayment,
+        'N'
+    ) = 'N'
 ),
-Candidates AS
+InvoiceRows AS
+(
+    SELECT
+        InvoiceRowsBase.*,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                InvoiceRowsBase.C_BPartner_ID,
+                InvoiceRowsBase.InvoiceCurrencyId,
+                InvoiceRowsBase.InvoiceOpenAmount
+
+            ORDER BY
+                InvoiceRowsBase.DueDate,
+                InvoiceRowsBase.C_Invoice_ID,
+                InvoiceRowsBase.C_InvoicePaySchedule_ID
+        ) AS MatchSequence
+
+    FROM InvoiceRowsBase InvoiceRowsBase
+
+    WHERE InvoiceRowsBase.InvoiceOpenAmount >
+    (
+        SELECT QueryParameters.ExactTolerance
+        FROM QueryParameters QueryParameters
+    )
+),
+CandidateMatches AS
 (
     SELECT
         PaymentRows.C_Payment_ID,
         InvoiceRows.C_Invoice_ID,
         InvoiceRows.C_InvoicePaySchedule_ID,
-        ABS(PaymentRows.PaymentOpenAmount-InvoiceRows.InvoiceOpenAmount) AS DifferenceAmount,
+
+        ABS
+        (
+            PaymentRows.PaymentOpenAmount
+            -
+            InvoiceRows.InvoiceOpenAmount
+        ) AS DifferenceAmount,
+
         CASE
-            WHEN InvoiceRows.InvoiceOpenAmount<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters) THEN 100
-            ELSE ABS(PaymentRows.PaymentOpenAmount-InvoiceRows.InvoiceOpenAmount)*100/InvoiceRows.InvoiceOpenAmount
+            WHEN InvoiceRows.InvoiceOpenAmount <=
+            (
+                SELECT QueryParameters.ExactTolerance
+                FROM QueryParameters QueryParameters
+            )
+            THEN 100
+
+            ELSE
+                ABS
+                (
+                    PaymentRows.PaymentOpenAmount
+                    -
+                    InvoiceRows.InvoiceOpenAmount
+                )
+                *
+                100
+                /
+                InvoiceRows.InvoiceOpenAmount
         END AS DifferencePercentage,
-        ABS(CAST(PaymentRows.PaymentDate AS DATE)-CAST(InvoiceRows.DueDate AS DATE)) AS DateGapDays,
+
+        ABS
+        (
+            CAST(PaymentRows.PaymentDate AS DATE)
+            -
+            CAST(InvoiceRows.DueDate AS DATE)
+        ) AS DateGapDays,
+
         CASE
             WHEN PaymentRows.ReferenceNo IS NOT NULL
             AND InvoiceRows.InvoiceDocumentNo IS NOT NULL
-            AND UPPER(PaymentRows.ReferenceNo) LIKE '%' || UPPER(InvoiceRows.InvoiceDocumentNo) || '%'
-                THEN 1
+
+            AND UPPER(PaymentRows.ReferenceNo) LIKE
+                '%' ||
+                UPPER(InvoiceRows.InvoiceDocumentNo) ||
+                '%'
+
+            THEN 1
+
             ELSE 0
         END AS ReferenceMatch
+
     FROM PaymentRows PaymentRows
+
     INNER JOIN InvoiceRows InvoiceRows ON
     (
-        InvoiceRows.C_BPartner_ID=PaymentRows.C_BPartner_ID
-        AND InvoiceRows.C_Currency_ID=PaymentRows.C_Currency_ID
+        InvoiceRows.C_BPartner_ID =
+        PaymentRows.C_BPartner_ID
+
+        AND InvoiceRows.InvoiceCurrencyId =
+        PaymentRows.PaymentCurrencyId
+
+        AND InvoiceRows.MatchSequence =
+        PaymentRows.MatchSequence
     )
-    WHERE PaymentRows.PaymentOpenAmount>(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-    AND InvoiceRows.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-    AND
+
+    WHERE ABS
     (
-        ABS(PaymentRows.PaymentOpenAmount-InvoiceRows.InvoiceOpenAmount)<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-        OR ABS(PaymentRows.PaymentOpenAmount-InvoiceRows.InvoiceOpenAmount)*100/InvoiceRows.InvoiceOpenAmount<=(SELECT QueryParameters.MaximumDifferencePercentage FROM QueryParameters QueryParameters)
+        PaymentRows.PaymentOpenAmount
+        -
+        InvoiceRows.InvoiceOpenAmount
+    )
+    <=
+    (
+        SELECT QueryParameters.ExactTolerance
+        FROM QueryParameters QueryParameters
     )
 ),
-ScoredCandidates AS
+ScoredMatches AS
 (
     SELECT
-        Candidates.*,
+        CandidateMatches.*,
+
         50
-        +CASE
-            WHEN Candidates.DifferenceAmount<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters) THEN 30
-            WHEN Candidates.DifferencePercentage<=5 THEN 20
+
+        + CASE
+            WHEN CandidateMatches.DifferenceAmount <=
+            (
+                SELECT QueryParameters.ExactTolerance
+                FROM QueryParameters QueryParameters
+            )
+            THEN 30
+
             ELSE 10
-        END
-        +CASE
-            WHEN Candidates.DateGapDays<=3 THEN 15
-            WHEN Candidates.DateGapDays<=7 THEN 10
+          END
+
+        + CASE
+            WHEN CandidateMatches.DateGapDays <= 3
+            THEN 15
+
+            WHEN CandidateMatches.DateGapDays <= 7
+            THEN 10
+
             ELSE 5
-        END
-        +CASE
-            WHEN Candidates.ReferenceMatch=1 THEN 5
+          END
+
+        + CASE
+            WHEN CandidateMatches.ReferenceMatch = 1
+            THEN 5
+
             ELSE 0
-        END AS MatchScore
-    FROM Candidates Candidates
+          END AS MatchScore
+
+    FROM CandidateMatches CandidateMatches
 ),
-RankedCandidates AS
+HighConfidenceMatches AS
 (
     SELECT
-        ScoredCandidates.*,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY ScoredCandidates.C_Payment_ID
-            ORDER BY ScoredCandidates.MatchScore DESC,ScoredCandidates.DifferencePercentage,ScoredCandidates.DateGapDays,ScoredCandidates.C_Invoice_ID,ScoredCandidates.C_InvoicePaySchedule_ID
-        ) AS PaymentRank,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY ScoredCandidates.C_InvoicePaySchedule_ID
-            ORDER BY ScoredCandidates.MatchScore DESC,ScoredCandidates.DifferencePercentage,ScoredCandidates.DateGapDays,ScoredCandidates.C_Payment_ID
-        ) AS ScheduleRank
-    FROM ScoredCandidates ScoredCandidates
+        ScoredMatches.*
+
+    FROM ScoredMatches ScoredMatches
+
+    WHERE ScoredMatches.MatchScore >=
+    (
+        SELECT QueryParameters.HighConfidenceScore
+        FROM QueryParameters QueryParameters
+    )
+
+    AND ScoredMatches.DifferenceAmount <=
+    (
+        SELECT QueryParameters.ExactTolerance
+        FROM QueryParameters QueryParameters
+    )
 )
 SELECT
-    RankedCandidates.C_Payment_ID,
-    RankedCandidates.C_Invoice_ID,
-    RankedCandidates.C_InvoicePaySchedule_ID
-FROM RankedCandidates RankedCandidates
-WHERE RankedCandidates.PaymentRank=1
-AND RankedCandidates.ScheduleRank=1
-AND RankedCandidates.MatchScore>=(SELECT QueryParameters.HighConfidenceScore FROM QueryParameters QueryParameters)
-AND RankedCandidates.DifferenceAmount<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-ORDER BY RankedCandidates.C_Payment_ID";
+    HighConfidenceMatches.C_Payment_ID,
+    HighConfidenceMatches.C_Invoice_ID,
+    HighConfidenceMatches.C_InvoicePaySchedule_ID
 
-            sql = sql.Replace("/*PAYMENT_ACCESS_SQL*/", paymentAccessSql);
-            sql = sql.Replace("/*INVOICE_ACCESS_SQL*/", invoiceAccessSql);
+FROM HighConfidenceMatches HighConfidenceMatches
+
+ORDER BY
+    HighConfidenceMatches.MatchScore DESC,
+    HighConfidenceMatches.DifferenceAmount,
+    HighConfidenceMatches.DateGapDays,
+    HighConfidenceMatches.C_Payment_ID,
+    HighConfidenceMatches.C_Invoice_ID,
+    HighConfidenceMatches.C_InvoicePaySchedule_ID";
+
+            sql = sql.Replace(
+                "/*PAYMENT_ACCESS_SQL*/",
+                paymentAccessSql
+            );
+
+            sql = sql.Replace(
+                "/*INVOICE_ACCESS_SQL*/",
+                invoiceAccessSql
+            );
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@ExactTolerance", ExactTolerance),
-                new SqlParameter("@MaximumDifferencePercentage", MaximumDifferencePercentage),
-                new SqlParameter("@HighConfidenceScore", HighConfidenceScore)
+        new SqlParameter(
+            "@AD_Client_ID",
+            ctx.GetAD_Client_ID()
+        ),
+
+        new SqlParameter(
+            "@ExactTolerance",
+            ExactTolerance
+        ),
+
+        new SqlParameter(
+            "@HighConfidenceScore",
+            HighConfidenceScore
+        )
             };
 
             try
             {
-                reader = DB.ExecuteReader(sql, parameters, null);
+                reader = DB.ExecuteReader(
+                    sql,
+                    parameters,
+                    null
+                );
 
-                while (reader != null && reader.Read())
+                while (
+                    reader != null &&
+                    reader.Read()
+                )
                 {
+                    int paymentId = GetSafeInt(
+                        reader,
+                        "C_Payment_ID"
+                    );
+
+                    int invoiceId = GetSafeInt(
+                        reader,
+                        "C_Invoice_ID"
+                    );
+
+                    int invoicePayScheduleId = GetSafeInt(
+                        reader,
+                        "C_InvoicePaySchedule_ID"
+                    );
+
+                    if (
+                        paymentId <= 0 ||
+                        invoiceId <= 0 ||
+                        invoicePayScheduleId <= 0
+                    )
+                    {
+                        continue;
+                    }
+
                     rows.Add(
                         new HighConfidenceCandidateRow
                         {
-                            PaymentId = GetInt(reader, "C_Payment_ID"),
-                            InvoiceId = GetInt(reader, "C_Invoice_ID"),
-                            InvoicePayScheduleId = GetInt(reader, "C_InvoicePaySchedule_ID")
+                            PaymentId = paymentId,
+                            InvoiceId = invoiceId,
+                            InvoicePayScheduleId =
+                                invoicePayScheduleId
                         }
                     );
                 }
+            }
+            catch (Exception ex)
+            {
+                VLogger.Get().SaveError(
+                    "VAS_072_ReadHighConfidenceCandidates",
+                    ex
+                );
+
+                throw;
             }
             finally
             {
@@ -1942,7 +2350,6 @@ ORDER BY RankedCandidates.C_Payment_ID";
 
             return rows;
         }
-
         #endregion
 
         #region Allocation Validation Query
