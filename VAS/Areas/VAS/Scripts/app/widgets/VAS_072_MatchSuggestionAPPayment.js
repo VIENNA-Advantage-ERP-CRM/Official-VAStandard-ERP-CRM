@@ -34,34 +34,34 @@
  * 26  | Vendor payment                                    | VAS_072_VendorPayment
  * 27  | Payment date                                      | VAS_PaymentDate
  * 28  | Vendor                                            | VAS_Vendor
- * 29  | Payment method                                    | VAS_035_PaymentMethod
- * 30  | Reference                                         | VAS_035_Reference
+ * 29  | Payment method                                    | VAS_072_PaymentMethod
+ * 30  | Reference                                         | VAS_072_Reference
  * 31  | Bank account                                      | VAS_011_BankAccount
  * 32  | Currency                                          | VAS_PaymentCurrency
  * 33  | Amount paid                                       | VAS_072_AmountPaid
- * 34  | Suggested invoice                                 | VAS_035_SuggestedInvoice
- * 35  | Invoice date                                      | VAS_035_InvoiceDate
- * 36  | Payment terms                                     | VAS_035_PaymentTerms
- * 37  | Due date                                          | VAS_035_DueDate
- * 38  | Grand total                                       | VAS_035_GrandTotal
- * 39  | Open amount                                       | VAS_035_OpenAmount
- * 40  | balance — fully settles the invoice               | VAS_035_FullySettles
- * 41  | still open after apply                            | VAS_035_StillOpen
- * 42  | Why this match                                    | VAS_035_WhyThisMatch
+ * 34  | Suggested invoice                                 | VAS_072_SuggestedInvoice
+ * 35  | Invoice date                                      | VAS_072_InvoiceDate
+ * 36  | Payment terms                                     | VAS_072_PaymentTerms
+ * 37  | Due date                                          | VAS_072_DueDate
+ * 38  | Grand total                                       | VAS_072_GrandTotal
+ * 39  | Open amount                                       | VAS_072_OpenAmount
+ * 40  | balance — fully settles the invoice               | VAS_072_FullySettles
+ * 41  | still open after apply                            | VAS_072_StillOpen
+ * 42  | Why this match                                    | VAS_072_WhyThisMatch
  * 43  | Vendor matches                                    | VAS_072_VendorMatches
  * 44  | Payment and invoice belong to the same vendor     | VAS_072_VendorMatchesDetail
- * 45  | Amount matches                                    | VAS_035_AmountMatches
- * 46  | Amount differs                                    | VAS_035_AmountDiffers
- * 47  | vs                                                | VAS_035_Vs
- * 48  | Reference cited                                   | VAS_035_ReferenceCited
- * 49  | No reference cited                                | VAS_035_NoReferenceCited
- * 50  | Within due window                                 | VAS_035_WithinDueWindow
- * 51  | Outside due window                                | VAS_035_OutsideDueWindow
- * 52  | Apply as part-payment                             | VAS_035_ApplyPartPayment
- * 53  | Apply allocation                                  | VAS_035_ApplyAllocation
+ * 45  | Amount matches                                    | VAS_072_AmountMatches
+ * 46  | Amount differs                                    | VAS_072_AmountDiffers
+ * 47  | vs                                                | VAS_072_Vs
+ * 48  | Reference cited                                   | VAS_072_ReferenceCited
+ * 49  | No reference cited                                | VAS_072_NoReferenceCited
+ * 50  | Within due window                                 | VAS_072_WithinDueWindow
+ * 51  | Outside due window                                | VAS_072_OutsideDueWindow
+ * 52  | Apply as part-payment                             | VAS_072_ApplyPartPayment
+ * 53  | Apply allocation                                  | VAS_072_ApplyAllocation
  * 54  | Close                                             | VAS_Close
  * 55  | High-confidence — safe to apply                   | VAS_072_HighConfidenceSafe
- * 56  | Skip                                              | VAS_035_Skip
+ * 56  | Skip                                              | VAS_072_Skip
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1583,14 +1583,14 @@
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_PaymentMethod",
+                        "VAS_072_PaymentMethod",
                         "Payment method"
                     ),
                     detail.paymentMethod
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_Reference",
+                        "VAS_072_Reference",
                         "Reference"
                     ),
                     detail.reference
@@ -1630,7 +1630,7 @@
                 '<span>' +
                 escapeHtml(
                     lbl(
-                        "VAS_035_SuggestedInvoice",
+                        "VAS_072_SuggestedInvoice",
                         "Suggested invoice"
                     )
                 ) +
@@ -1643,7 +1643,7 @@
                 "</div>" +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_InvoiceDate",
+                        "VAS_072_InvoiceDate",
                         "Invoice date"
                     ),
                     formatDate(detail.invoiceDate)
@@ -1654,21 +1654,21 @@
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_PaymentTerms",
+                        "VAS_072_PaymentTerms",
                         "Payment terms"
                     ),
                     detail.paymentTerms
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_DueDate",
+                        "VAS_072_DueDate",
                         "Due date"
                     ),
                     formatDate(detail.dueDate)
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_GrandTotal",
+                        "VAS_072_GrandTotal",
                         "Grand total"
                     ),
                     invoiceGrand
@@ -1682,7 +1682,7 @@
                 ) +
                 reviewPaneRow(
                     lbl(
-                        "VAS_035_OpenAmount",
+                        "VAS_072_OpenAmount",
                         "Open amount"
                     ),
                     invoiceOpen,
@@ -1701,11 +1701,11 @@
             var balanceLabel =
                 balance === 0
                     ? lbl(
-                        "VAS_035_FullySettles",
+                        "VAS_072_FullySettles",
                         "balance — fully settles the invoice"
                     )
                     : lbl(
-                        "VAS_035_StillOpen",
+                        "VAS_072_StillOpen",
                         "still open after apply"
                     );
 
@@ -1734,7 +1734,7 @@
                 'review-why-title">' +
                 escapeHtml(
                     lbl(
-                        "VAS_035_WhyThisMatch",
+                        "VAS_072_WhyThisMatch",
                         "Why this match"
                     )
                 ) +
@@ -1754,16 +1754,16 @@
                     !!detail.amountOk,
                     detail.amountOk
                         ? lbl(
-                            "VAS_035_AmountMatches",
+                            "VAS_072_AmountMatches",
                             "Amount matches"
                         )
                         : lbl(
-                            "VAS_035_AmountDiffers",
+                            "VAS_072_AmountDiffers",
                             "Amount differs"
                         ),
                     paymentAmount +
                     " " +
-                    lbl("VAS_035_Vs", "vs") +
+                    lbl("VAS_072_Vs", "vs") +
                     " " +
                     invoiceOpenPay
                 ) +
@@ -1771,11 +1771,11 @@
                     !!detail.referenceOk,
                     detail.referenceOk
                         ? lbl(
-                            "VAS_035_ReferenceCited",
+                            "VAS_072_ReferenceCited",
                             "Reference cited"
                         )
                         : lbl(
-                            "VAS_035_NoReferenceCited",
+                            "VAS_072_NoReferenceCited",
                             "No reference cited"
                         ),
                     detail.reference || ""
@@ -1784,11 +1784,11 @@
                     !!detail.dateOk,
                     detail.dateOk
                         ? lbl(
-                            "VAS_035_WithinDueWindow",
+                            "VAS_072_WithinDueWindow",
                             "Within due window"
                         )
                         : lbl(
-                            "VAS_035_OutsideDueWindow",
+                            "VAS_072_OutsideDueWindow",
                             "Outside due window"
                         ),
                     (
@@ -1826,11 +1826,11 @@
                     .text(
                         balance > 0
                             ? lbl(
-                                "VAS_035_ApplyPartPayment",
+                                "VAS_072_ApplyPartPayment",
                                 "Apply as part-payment"
                             )
                             : lbl(
-                                "VAS_035_ApplyAllocation",
+                                "VAS_072_ApplyAllocation",
                                 "Apply allocation"
                             )
                     )
@@ -2361,7 +2361,7 @@
                 classPrefix +
                 'review-skip">' +
                 escapeHtml(
-                    lbl("VAS_035_Skip", "Skip")
+                    lbl("VAS_072_Skip", "Skip")
                 ) +
                 "</button>" +
                 '<button type="button" class="' +
@@ -2373,7 +2373,7 @@
                 '<span>' +
                 escapeHtml(
                     lbl(
-                        "VAS_035_ApplyAllocation",
+                        "VAS_072_ApplyAllocation",
                         "Apply allocation"
                     )
                 ) +
