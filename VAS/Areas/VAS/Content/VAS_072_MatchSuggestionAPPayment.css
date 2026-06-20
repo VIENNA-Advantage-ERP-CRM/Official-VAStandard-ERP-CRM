@@ -266,8 +266,20 @@
 }
 
 .VAS-072-MatchSuggestionAPPayment-arrow {
+    align-items: center;
+    color: #748494;
+    display: flex;
+    flex-shrink: 0;
+    font-size: .875em;
     margin-inline: 0.25em;
-    color: #5f7283;
+    opacity: .55;
+    text-decoration: none !important;
+    transition: opacity .15s, color .15s;
+}
+
+.VAS-072-MatchSuggestionAPPayment-arrow svg {
+    width: 1em;
+    height: 1em;
 }
 
 .VAS-072-MatchSuggestionAPPayment-meta {
@@ -313,22 +325,19 @@
 }
 
 .VAS-072-MatchSuggestionAPPayment-chevron {
-    width: 1.125em;
-    height: 1.125em;
-    display: flex;
     align-items: center;
-    justify-content: center;
     color: #748494;
+    display: flex;
+    flex-shrink: 0;
+    font-size: .875em;
+    opacity: .55;
+    text-decoration: none !important;
+    transition: opacity .15s, color .15s;
 }
 
     .VAS-072-MatchSuggestionAPPayment-chevron svg {
-        width: 0.875em;
-        height: 0.875em;
-        fill: none;
-        stroke: currentColor;
-        stroke-width: 2.2;
-        stroke-linecap: round;
-        stroke-linejoin: round;
+        width: 1em;
+        height: 1em;
     }
 
 .VAS-072-MatchSuggestionAPPayment-footer {
