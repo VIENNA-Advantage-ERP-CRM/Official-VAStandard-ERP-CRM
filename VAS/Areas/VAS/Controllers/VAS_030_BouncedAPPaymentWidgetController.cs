@@ -1,18 +1,5 @@
-﻿using System;
-/*
- * Bounced AP Payment Widget Controller
- *
- * Labels / Message Keys
- * #  | Current Text                         | Message Key
- * ---+--------------------------------------+--------------------------------
- * 1  | Bounced                              | VAS_030_MessageBounced
- * 2  | Need re-issue                        | VAS_030_MessageNeedReissue
- * 3  | Bounced AP payments                  | VAS_030_MessageBouncedAPPayments
- * 4  | Could not load data                  | VAS_ErrorLoading
- * 5  | Session Expired                      | SessionExpired
- * 6  | Not Specified                        | VAS_030_MessageNotSpecified
- */
-
+﻿
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
@@ -35,6 +22,17 @@ namespace VAS.Controllers
     /// </summary>
     public class VAS_030_BouncedAPPaymentWidgetController : Controller
     {
+        /*
+         * Keep Reference names in one place.
+         * If the database uses a different reference name,
+         * change only these constants.
+         */
+        private const string TenderTypeReferenceName =
+            "C_Payment Tender Type";
+
+        private const string ExecutionStatusReferenceName =
+            "VA009_ExecutionStatus";
+
         /// <summary>
         /// Returns the number of bounced or rejected AP cheque payments
         /// during the current financial period.
@@ -50,38 +48,42 @@ namespace VAS.Controllers
                 return GetSessionExpiredResult();
             }
 
-            IDataReader dr = null;
+            IDataReader reader = null;
             string sql = string.Empty;
 
             try
             {
-                sql = BuildBouncedAPPaymentsSql(ctx);
+                sql = BuildBouncedAPPaymentsSql(
+                    ctx
+                );
 
-                dr = DB.ExecuteReader(
+                reader = DB.ExecuteReader(
                     sql,
                     null,
                     null
                 );
 
                 int bouncedPaymentCount = 0;
-
                 DateTime? dateFrom = null;
                 DateTime? dateTo = null;
 
-                if (dr != null && dr.Read())
+                if (
+                    reader != null &&
+                    reader.Read()
+                )
                 {
                     bouncedPaymentCount = GetInt(
-                        dr,
+                        reader,
                         "BouncedPaymentCount"
                     );
 
                     dateFrom = GetNullableDate(
-                        dr,
+                        reader,
                         "DateFrom"
                     );
 
                     dateTo = GetNullableDate(
-                        dr,
+                        reader,
                         "DateTo"
                     );
                 }
@@ -89,6 +91,9 @@ namespace VAS.Controllers
                 return Json(
                     new
                     {
+                        success = true,
+                        error = string.Empty,
+
                         title = GetMsg(
                             ctx,
                             "VAS_030_MessageBounced",
@@ -113,29 +118,45 @@ namespace VAS.Controllers
                             bouncedPaymentCount,
 
                         dateFrom =
-                            FormatNullableDate(dateFrom),
+                            FormatNullableDate(
+                                dateFrom
+                            ),
 
                         dateTo =
-                            FormatNullableDate(dateTo)
+                            FormatNullableDate(
+                                dateTo
+                            ),
+
+                        hasData =
+                            bouncedPaymentCount > 0
                     },
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
-                        error = true,
-                        errorText = ex.Message,
-                        sql = sql
+                        success = false,
+                        error = errorMessage,
+                        errorText = errorMessage,
+                        hasData = false
                     },
                     JsonRequestBehavior.AllowGet
                 );
             }
             finally
             {
-                CloseReader(dr);
+                CloseReader(
+                    reader
+                );
             }
         }
 
@@ -171,7 +192,7 @@ namespace VAS.Controllers
                 pageSize = 100;
             }
 
-            IDataReader dr = null;
+            IDataReader reader = null;
             string sql = string.Empty;
 
             try
@@ -182,7 +203,7 @@ namespace VAS.Controllers
                     pageSize
                 );
 
-                dr = DB.ExecuteReader(
+                reader = DB.ExecuteReader(
                     sql,
                     null,
                     null
@@ -192,104 +213,111 @@ namespace VAS.Controllers
                     new List<object>();
 
                 int totalRecords = 0;
-
                 DateTime? dateFrom = null;
                 DateTime? dateTo = null;
 
-                while (dr != null && dr.Read())
+                while (
+                    reader != null &&
+                    reader.Read()
+                )
                 {
                     totalRecords = GetInt(
-                        dr,
+                        reader,
                         "TotalRecords"
                     );
 
                     DateTime? paymentDate =
                         GetNullableDate(
-                            dr,
+                            reader,
                             "PaymentDate"
                         );
 
                     if (
                         !dateFrom.HasValue &&
-                        dr["DateFrom"] != DBNull.Value
+                        GetReaderValue(
+                            reader,
+                            "DateFrom"
+                        ) != DBNull.Value
                     )
                     {
                         dateFrom = GetNullableDate(
-                            dr,
+                            reader,
                             "DateFrom"
                         );
                     }
 
                     if (
                         !dateTo.HasValue &&
-                        dr["DateTo"] != DBNull.Value
+                        GetReaderValue(
+                            reader,
+                            "DateTo"
+                        ) != DBNull.Value
                     )
                     {
                         dateTo = GetNullableDate(
-                            dr,
+                            reader,
                             "DateTo"
                         );
                     }
 
                     string vendorName = GetString(
-                        dr,
+                        reader,
                         "VendorName",
                         string.Empty
                     );
 
                     string bankName = GetString(
-                        dr,
+                        reader,
                         "BankName",
                         string.Empty
                     );
 
                     string bankAccountName = GetString(
-                        dr,
+                        reader,
                         "BankAccountName",
                         string.Empty
                     );
 
-                    /*
-                     * Perform the fallback in C# instead of SQL CASE.
-                     * This avoids Oracle character-set compatibility errors.
-                     */
-                    if (string.IsNullOrWhiteSpace(bankName))
+                    if (string.IsNullOrWhiteSpace(
+                        bankName
+                    ))
                     {
-                        bankName = bankAccountName;
+                        bankName =
+                            bankAccountName;
                     }
 
                     string currencyISO = GetString(
-                        dr,
+                        reader,
                         "CurrencyISO",
                         string.Empty
                     );
 
                     string currencySymbol = GetString(
-                        dr,
+                        reader,
                         "CurrencySymbol",
                         string.Empty
                     );
 
-                    if (
-                        string.IsNullOrWhiteSpace(
-                            currencySymbol
-                        )
-                    )
+                    if (string.IsNullOrWhiteSpace(
+                        currencySymbol
+                    ))
                     {
-                        currencySymbol = currencyISO;
+                        currencySymbol =
+                            currencyISO;
                     }
 
-                    int stdPrecision = NormalizePrecision(
-                        GetInt(
-                            dr,
-                            "StdPrecision",
-                            2
-                        )
-                    );
+                    int stdPrecision =
+                        NormalizePrecision(
+                            GetInt(
+                                reader,
+                                "StdPrecision",
+                                2
+                            )
+                        );
 
                     decimal amount = Math.Round(
                         GetDecimal(
-                            dr,
+                            reader,
                             "Amount",
                             0
                         ),
@@ -298,71 +326,92 @@ namespace VAS.Controllers
                     );
 
                     string tenderType = GetString(
-                        dr,
+                        reader,
                         "TenderType",
                         string.Empty
                     );
 
                     string translatedTenderTypeName =
                         GetString(
-                            dr,
+                            reader,
                             "TranslatedTenderTypeName",
                             string.Empty
                         );
 
-                    string tenderTypeName = FirstNotEmpty(
-                        translatedTenderTypeName,
-
+                    string baseTenderTypeName =
                         GetString(
-                            dr,
+                            reader,
                             "TenderTypeName",
                             string.Empty
-                        ),
+                        );
 
-                        tenderType
-                    );
+                    /*
+                     * Method display order:
+                     *
+                     * 1. Current-language translated TenderType name.
+                     * 2. Base TenderType reference name.
+                     * 3. VA009 Payment Method name.
+                     * 4. Raw stored code only as the final fallback.
+                     */
+                    string tenderTypeName =
+                        FirstNotEmpty(
+                            translatedTenderTypeName,
+                            baseTenderTypeName,
+                            tenderType
+                        );
 
                     string paymentMethodName =
                         FirstNotEmpty(
+                            translatedTenderTypeName,
+                            baseTenderTypeName,
+
                             GetString(
-                                dr,
+                                reader,
                                 "PaymentMethodName",
                                 string.Empty
                             ),
 
-                            tenderTypeName
+                            tenderType,
+
+                            GetMsg(
+                                ctx,
+                                "VAS_030_MessageNotSpecified",
+                                "Not Specified"
+                            )
                         );
 
-                    string executionStatus = GetString(
-                        dr,
-                        "ExecutionStatus",
-                        string.Empty
-                    );
+                    string executionStatus =
+                        GetString(
+                            reader,
+                            "ExecutionStatus",
+                            string.Empty
+                        );
 
                     string translatedStatusName =
                         GetString(
-                            dr,
+                            reader,
                             "TranslatedStatusName",
                             string.Empty
                         );
 
-                    string statusName = FirstNotEmpty(
-                        translatedStatusName,
+                    string statusName =
+                        FirstNotEmpty(
+                            translatedStatusName,
 
-                        GetString(
-                            dr,
-                            "StatusName",
-                            string.Empty
-                        ),
+                            GetString(
+                                reader,
+                                "StatusName",
+                                string.Empty
+                            ),
 
-                        executionStatus,
+                            executionStatus,
 
-                        GetMsg(
-                            ctx,
-                            "VAS_030_MessageBounced",
-                            "Bounced"
-                        )
-                    );
+                            GetMsg(
+                                ctx,
+                                "VAS_030_MessageBounced",
+                                "Bounced"
+                            )
+                        );
 
                     string formattedDate =
                         paymentDate.HasValue
@@ -372,12 +421,12 @@ namespace VAS.Controllers
                             : string.Empty;
 
                     int paymentId = GetInt(
-                        dr,
+                        reader,
                         "PaymentID"
                     );
 
                     string paymentNo = GetString(
-                        dr,
+                        reader,
                         "PaymentNo",
                         string.Empty
                     );
@@ -399,7 +448,7 @@ namespace VAS.Controllers
                             bankName = bankName,
 
                             accountNo = GetString(
-                                dr,
+                                reader,
                                 "AccountNo",
                                 string.Empty
                             ),
@@ -407,7 +456,7 @@ namespace VAS.Controllers
                             amount = amount,
 
                             cCurrencyId = GetInt(
-                                dr,
+                                reader,
                                 "C_Currency_ID"
                             ),
 
@@ -424,13 +473,16 @@ namespace VAS.Controllers
                             stdPrecision =
                                 stdPrecision,
 
+                            /*
+                             * Return both stored value and display name.
+                             */
                             tenderType = tenderType,
 
                             tenderTypeName =
                                 tenderTypeName,
 
                             paymentMethodId = GetInt(
-                                dr,
+                                reader,
                                 "VA009_PaymentMethod_ID"
                             ),
 
@@ -467,6 +519,9 @@ namespace VAS.Controllers
                 return Json(
                     new
                     {
+                        success = true,
+                        error = string.Empty,
+
                         title = GetMsg(
                             ctx,
                             "VAS_030_MessageBounced",
@@ -478,33 +533,53 @@ namespace VAS.Controllers
                         pageNo = pageNo,
                         pageSize = pageSize,
 
-                        totalRecords = totalRecords,
-                        totalPages = totalPages,
+                        totalRecords =
+                            totalRecords,
+
+                        totalPages =
+                            totalPages,
 
                         dateFrom =
-                            FormatNullableDate(dateFrom),
+                            FormatNullableDate(
+                                dateFrom
+                            ),
 
                         dateTo =
-                            FormatNullableDate(dateTo)
+                            FormatNullableDate(
+                                dateTo
+                            ),
+
+                        hasData =
+                            rows.Count > 0
                     },
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
-                        error = true,
-                        errorText = ex.Message,
-                        sql = sql
+                        success = false,
+                        error = errorMessage,
+                        errorText = errorMessage,
+                        hasData = false,
+                        rows = new List<object>()
                     },
                     JsonRequestBehavior.AllowGet
                 );
             }
             finally
             {
-                CloseReader(dr);
+                CloseReader(
+                    reader
+                );
             }
         }
 
@@ -518,11 +593,11 @@ namespace VAS.Controllers
             bool hasExecutionStatusColumn =
                 HasPaymentExecutionStatusColumn();
 
-            string clientIdSql = ctx
-                .GetAD_Client_ID()
-                .ToString(
-                    CultureInfo.InvariantCulture
-                );
+            string clientIdSql =
+                ctx.GetAD_Client_ID()
+                    .ToString(
+                        CultureInfo.InvariantCulture
+                    );
 
             string bouncedStatusFilter =
                 BuildBouncedStatusFilter(
@@ -533,11 +608,13 @@ namespace VAS.Controllers
 PeriodRange AS
 (
     SELECT
-        MIN(
+        MIN
+        (
             Period.StartDate
         ) AS DateFrom,
 
-        MAX(
+        MAX
+        (
             Period.EndDate
         ) AS DateTo
 
@@ -556,6 +633,10 @@ PeriodRange AS
     )
 
     WHERE ClientInfo.IsActive = 'Y'
+
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
 
     AND ClientInfo.AD_Client_ID =
         " + clientIdSql + @"
@@ -588,14 +669,15 @@ AND Payment.TenderType = 'K'
 " + bouncedStatusFilter;
 
             paymentAccessSql =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    paymentAccessSql,
-                    "Payment",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        paymentAccessSql,
+                        "Payment",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
-            string sql = @"
+            return @"
 WITH
 " + periodRangeSql + @",
 
@@ -611,11 +693,13 @@ SELECT
         Payment.C_Payment_ID
     ) AS BouncedPaymentCount,
 
-    MIN(
+    MIN
+    (
         PeriodRange.DateFrom
     ) AS DateFrom,
 
-    MAX(
+    MAX
+    (
         PeriodRange.DateTo
     ) AS DateTo
 
@@ -631,8 +715,6 @@ LEFT OUTER JOIN PaymentFiltered Payment ON
             "PeriodRange.DateTo"
         ) + @"
 )";
-
-            return sql;
         }
 
         /// <summary>
@@ -660,15 +742,16 @@ LEFT OUTER JOIN PaymentFiltered Payment ON
                     paymentMethodDisplayColumn
                 );
 
-            string clientIdSql = ctx
-                .GetAD_Client_ID()
-                .ToString(
-                    CultureInfo.InvariantCulture
-                );
+            string clientIdSql =
+                ctx.GetAD_Client_ID()
+                    .ToString(
+                        CultureInfo.InvariantCulture
+                    );
 
-            string languageSql = ToSqlString(
-                ctx.GetAD_Language()
-            );
+            string languageSql =
+                ToSqlString(
+                    ctx.GetAD_Language()
+                );
 
             int startRow =
                 ((pageNo - 1) * pageSize) + 1;
@@ -707,9 +790,12 @@ LEFT OUTER JOIN PaymentFiltered Payment ON
 
             string paymentMethodNameColumn =
                 hasPaymentMethodDisplay
-                    ? paymentMethodDisplayColumn +
-                      " AS PaymentMethodName"
-                    : "NULL AS PaymentMethodName";
+                    ? CastText(
+                        paymentMethodDisplayColumn
+                    ) + " AS PaymentMethodName"
+                    : CastText(
+                        "NULL"
+                    ) + " AS PaymentMethodName";
 
             string paymentMethodJoin =
                 hasPaymentMethodDisplay
@@ -717,7 +803,7 @@ LEFT OUTER JOIN PaymentFiltered Payment ON
 LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 (
     PaymentMethod.VA009_PaymentMethod_ID =
-    Payment.VA009_PaymentMethod_ID
+        Payment.VA009_PaymentMethod_ID
 )"
                     : string.Empty;
 
@@ -725,11 +811,13 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 PeriodRange AS
 (
     SELECT
-        MIN(
+        MIN
+        (
             Period.StartDate
         ) AS DateFrom,
 
-        MAX(
+        MAX
+        (
             Period.EndDate
         ) AS DateTo
 
@@ -749,6 +837,10 @@ PeriodRange AS
 
     WHERE ClientInfo.IsActive = 'Y'
 
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
+
     AND ClientInfo.AD_Client_ID =
         " + clientIdSql + @"
 
@@ -762,77 +854,97 @@ PeriodRange AS
 )";
 
             /*
-             * Translated and base names are returned separately.
-             * The fallback is handled in C# to prevent ORA-12704.
+             * Execution Status List Reference.
              */
             string executionStatusListSql = @"
 ExecutionStatusList AS
 (
-    SELECT
+    SELECT DISTINCT
         " + CastText(
             "RefList.Value"
         ) + @" AS ReferenceValue,
 
-        RefList.Name AS StatusName,
+        " + CastText(
+            "RefList.Name"
+        ) + @" AS StatusName,
 
-        RefListTrl.Name AS TranslatedStatusName
+        " + CastText(
+            "RefListTrl.Name"
+        ) + @" AS TranslatedStatusName
 
     FROM AD_Reference ReferenceInfo
 
     INNER JOIN AD_Ref_List RefList ON
     (
-        RefList.AD_Reference_ID =
-        ReferenceInfo.AD_Reference_ID
+        ReferenceInfo.AD_Reference_ID =
+        RefList.AD_Reference_ID
     )
 
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefListTrl.AD_Ref_List_ID =
-        RefList.AD_Ref_List_ID
+        RefList.AD_Ref_List_ID =
+        RefListTrl.AD_Ref_List_ID
 
         AND RefListTrl.AD_Language =
         " + languageSql + @"
     )
 
     WHERE ReferenceInfo.Name =
-        'VA009_ExecutionStatus'
+        " + ToSqlString(
+            ExecutionStatusReferenceName
+        ) + @"
 
     AND ReferenceInfo.IsActive = 'Y'
 
     AND RefList.IsActive = 'Y'
 )";
 
+            /*
+             * Tender Type List Reference.
+             *
+             * Stored value:
+             * K
+             *
+             * Display value:
+             * TranslatedTenderTypeName or TenderTypeName.
+             */
             string tenderTypeListSql = @"
 TenderTypeList AS
 (
-    SELECT
+    SELECT DISTINCT
         " + CastText(
             "RefList.Value"
         ) + @" AS ReferenceValue,
 
-        RefList.Name AS TenderTypeName,
+        " + CastText(
+            "RefList.Name"
+        ) + @" AS TenderTypeName,
 
-        RefListTrl.Name AS TranslatedTenderTypeName
+        " + CastText(
+            "RefListTrl.Name"
+        ) + @" AS TranslatedTenderTypeName
 
     FROM AD_Reference ReferenceInfo
 
     INNER JOIN AD_Ref_List RefList ON
     (
-        RefList.AD_Reference_ID =
-        ReferenceInfo.AD_Reference_ID
+        ReferenceInfo.AD_Reference_ID =
+        RefList.AD_Reference_ID
     )
 
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefListTrl.AD_Ref_List_ID =
-        RefList.AD_Ref_List_ID
+        RefList.AD_Ref_List_ID =
+        RefListTrl.AD_Ref_List_ID
 
         AND RefListTrl.AD_Language =
         " + languageSql + @"
     )
 
     WHERE ReferenceInfo.Name =
-        'C_Payment TenderType'
+        " + ToSqlString(
+            TenderTypeReferenceName
+        ) + @"
 
     AND ReferenceInfo.IsActive = 'Y'
 
@@ -877,12 +989,13 @@ AND Payment.TenderType = 'K'
 " + bouncedStatusFilter;
 
             paymentAccessSql =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    paymentAccessSql,
-                    "Payment",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        paymentAccessSql,
+                        "Payment",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
             string rowsDataSql = @"
 RowsData AS
@@ -908,7 +1021,8 @@ RowsData AS
 
         Currency.CurSymbol AS CurrencySymbol,
 
-        COALESCE(
+        COALESCE
+        (
             Currency.StdPrecision,
             2
         ) AS StdPrecision,
@@ -977,17 +1091,21 @@ RowsData AS
     LEFT OUTER JOIN ExecutionStatusList ExecutionStatusList ON
     (
         ExecutionStatusList.ReferenceValue =
-        Payment.ExecutionStatus
+        " + CastText(
+            "Payment.ExecutionStatus"
+        ) + @"
     )
 
     LEFT OUTER JOIN TenderTypeList TenderTypeList ON
     (
         TenderTypeList.ReferenceValue =
-        Payment.TenderType
+        " + CastText(
+            "Payment.TenderType"
+        ) + @"
     )
 )";
 
-            string sql = @"
+            return @"
 WITH
 " + periodRangeSql + @",
 
@@ -1077,8 +1195,6 @@ AND NumberedRows.RowNumber <=
 
 ORDER BY
     NumberedRows.RowNumber";
-
-            return sql;
         }
 
         /// <summary>
@@ -1094,15 +1210,17 @@ ORDER BY
 AND 1 = 2";
             }
 
-            string bouncedStatus = ToSqlString(
-                X_C_Payment
-                    .VA009_EXECUTIONSTATUS_Bounced
-            );
+            string bouncedStatus =
+                ToSqlString(
+                    X_C_Payment
+                        .VA009_EXECUTIONSTATUS_Bounced
+                );
 
-            string rejectedStatus = ToSqlString(
-                X_C_Payment
-                    .VA009_EXECUTIONSTATUS_Rejected
-            );
+            string rejectedStatus =
+                ToSqlString(
+                    X_C_Payment
+                        .VA009_EXECUTIONSTATUS_Rejected
+                );
 
             return @"
 AND Payment.VA009_ExecutionStatus IN
@@ -1113,26 +1231,17 @@ AND Payment.VA009_ExecutionStatus IN
         }
 
         /// <summary>
-        /// Returns the current database date without the time component.
+        /// Returns the current database date without time.
         /// </summary>
         private string GetCurrentDateSql()
         {
-            if (DB.IsOracle())
-            {
-                return "TRUNC(CURRENT_DATE)";
-            }
-
-            return "CURRENT_DATE";
+            return DB.IsOracle()
+                ? "TRUNC(CURRENT_DATE)"
+                : "CURRENT_DATE";
         }
 
         /// <summary>
-        /// Converts an inclusive end date to an exclusive end date.
-        ///
-        /// Oracle:
-        /// DATE + INTEGER
-        ///
-        /// PostgreSQL:
-        /// DATE + INTEGER
+        /// Converts an inclusive end date into an exclusive end date.
         /// </summary>
         private string GetDateToExclusiveSql(
             string columnName
@@ -1222,13 +1331,19 @@ INNER JOIN AD_Column ColumnData ON
 )
 
 WHERE TableData.TableName =
-    " + ToSqlString(tableName) + @"
+    " + ToSqlString(
+                tableName
+            ) + @"
 
 AND ColumnData.ColumnName =
-    " + ToSqlString(columnName);
+    " + ToSqlString(
+                columnName
+            );
 
             return Util.GetValueOfInt(
-                DB.ExecuteScalar(sql)
+                DB.ExecuteScalar(
+                    sql
+                )
             ) > 0;
         }
 
@@ -1256,24 +1371,25 @@ AND ColumnData.ColumnName =
         )
         {
             return "'"
-                + (value ?? string.Empty)
-                    .Replace("'", "''")
+                + (
+                    value ??
+                    string.Empty
+                ).Replace(
+                    "'",
+                    "''"
+                )
                 + "'";
         }
 
         private Ctx GetContext()
         {
-            if (Session["ctx"] == null)
-            {
-                return null;
-            }
-
             return Session["ctx"] as Ctx;
         }
 
         private JsonResult GetSessionExpiredResult()
         {
             Ctx ctx = Env.GetCtx();
+
             string sessionExpired =
                 GetMsg(
                     ctx,
@@ -1284,8 +1400,10 @@ AND ColumnData.ColumnName =
             return Json(
                 new
                 {
-                    error = true,
-                    errorText = sessionExpired
+                    success = false,
+                    error = sessionExpired,
+                    errorText = sessionExpired,
+                    hasData = false
                 },
                 JsonRequestBehavior.AllowGet
             );
@@ -1297,16 +1415,28 @@ AND ColumnData.ColumnName =
             string fallback
         )
         {
+            if (ctx == null)
+            {
+                return fallback;
+            }
+
             string message = Msg.GetMsg(
                 ctx,
                 key
             );
 
-            return
-                !string.IsNullOrWhiteSpace(message) &&
-                message != "[" + key + "]"
-                    ? message
-                    : fallback;
+            if (
+                string.IsNullOrEmpty(
+                    message
+                ) ||
+                message == key ||
+                message == "[" + key + "]"
+            )
+            {
+                return fallback;
+            }
+
+            return message;
         }
 
         private string FirstNotEmpty(
@@ -1318,15 +1448,17 @@ AND ColumnData.ColumnName =
                 return string.Empty;
             }
 
-            for (int i = 0; i < values.Length; i++)
+            for (
+                int index = 0;
+                index < values.Length;
+                index++
+            )
             {
-                if (
-                    !string.IsNullOrWhiteSpace(
-                        values[i]
-                    )
-                )
+                if (!string.IsNullOrWhiteSpace(
+                    values[index]
+                ))
                 {
-                    return values[i];
+                    return values[index];
                 }
             }
 
@@ -1348,67 +1480,118 @@ AND ColumnData.ColumnName =
             return precision;
         }
 
+        private object GetReaderValue(
+            IDataRecord record,
+            string columnName
+        )
+        {
+            if (record == null)
+            {
+                return DBNull.Value;
+            }
+
+            for (
+                int index = 0;
+                index < record.FieldCount;
+                index++
+            )
+            {
+                if (string.Equals(
+                    record.GetName(index),
+                    columnName,
+                    StringComparison.OrdinalIgnoreCase
+                ))
+                {
+                    return record.GetValue(
+                        index
+                    );
+                }
+            }
+
+            return DBNull.Value;
+        }
+
         private int GetInt(
-            IDataReader reader,
+            IDataRecord record,
             string columnName,
             int fallback = 0
         )
         {
-            object value =
-                reader[columnName];
+            object value = GetReaderValue(
+                record,
+                columnName
+            );
 
-            return
+            if (
                 value == null ||
                 value == DBNull.Value
-                    ? fallback
-                    : Util.GetValueOfInt(
-                        value
-                    );
+            )
+            {
+                return fallback;
+            }
+
+            return Util.GetValueOfInt(
+                value
+            );
         }
 
         private decimal GetDecimal(
-            IDataReader reader,
+            IDataRecord record,
             string columnName,
             decimal fallback
         )
         {
-            object value =
-                reader[columnName];
+            object value = GetReaderValue(
+                record,
+                columnName
+            );
 
-            return
+            if (
                 value == null ||
                 value == DBNull.Value
-                    ? fallback
-                    : Util.GetValueOfDecimal(
-                        value
-                    );
+            )
+            {
+                return fallback;
+            }
+
+            return Util.GetValueOfDecimal(
+                value
+            );
         }
 
         private string GetString(
-            IDataReader reader,
+            IDataRecord record,
             string columnName,
             string fallback
         )
         {
-            object value =
-                reader[columnName];
+            object value = GetReaderValue(
+                record,
+                columnName
+            );
 
-            return
+            if (
                 value == null ||
                 value == DBNull.Value
-                    ? fallback
-                    : Util.GetValueOfString(
-                        value
-                    );
+            )
+            {
+                return fallback;
+            }
+
+            return Util.GetValueOfString(
+                value
+            );
         }
 
         private DateTime? GetNullableDate(
-            IDataReader reader,
+            IDataRecord record,
             string columnName
         )
         {
-            object value =
-                reader[columnName];
+            object value = GetReaderValue(
+                record,
+                columnName
+            );
 
             if (
                 value == null ||
@@ -1438,7 +1621,9 @@ AND ColumnData.ColumnName =
         )
         {
             return date.HasValue
-                ? FormatDate(date.Value)
+                ? FormatDate(
+                    date.Value
+                )
                 : string.Empty;
         }
 

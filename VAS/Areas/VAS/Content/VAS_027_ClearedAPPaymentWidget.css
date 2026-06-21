@@ -190,7 +190,6 @@
     transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 
-.vas-finance-kpi-card:hover,
 .vas-finance-kpi-card:focus-visible {
     border-color: rgba(0, 131, 218, 0.35);
     box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
