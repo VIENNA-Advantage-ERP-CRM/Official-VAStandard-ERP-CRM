@@ -272,14 +272,17 @@
                 },
 
                 complete: function () {
-                    if (
-                        isDisposed ||
-                        filterAtRequest !== activeFilter
-                    ) {
+                    if (isDisposed) {
                         return;
                     }
 
                     rowsLoading = false;
+
+                    if (filterAtRequest !== activeFilter) {
+                        loadRows();
+                        return;
+                    }
+
                     showDialogBusy(false);
 
                     updatePagerControlsForCurrentState();
@@ -627,23 +630,12 @@
                 return;
             }
 
-            if (
-                filter === activeFilter &&
-                tabState[filter].loaded
-            ) {
-                return;
-            }
-
             activeFilter = filter;
+            tabState[filter].pageNo = 1;
+            tabState[filter].loaded = false;
 
             updateActiveTabStyles();
-
-            if (!tabState[filter].loaded) {
-                loadRows();
-            }
-            else {
-                updatePagerControlsForCurrentState();
-            }
+            loadRows();
         }
 
         function updateActiveTabStyles() {

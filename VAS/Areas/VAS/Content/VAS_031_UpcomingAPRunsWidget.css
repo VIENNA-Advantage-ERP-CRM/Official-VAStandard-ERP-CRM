@@ -655,14 +655,20 @@
     .vas-upcoming-ap-runs-field-label span {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         flex: 0 0 auto;
-        padding: 0.1875em 0.5em;
-        border-radius: 0.3125em;
-        background: #c7efd9;
-        color: #087349;
-        font-size: 0.6875em;
-        font-weight: 800;
-        letter-spacing: 0.04em;
+        min-width: 4em;
+        padding: 0.1875em 0.4375em;
+        border: 1px solid rgba(1, 157, 137, 0.18);
+        border-radius: 999em;
+        background: rgba(1, 157, 137, 0.10);
+        color: #0b6b45;
+        font-size: 0.833333em;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: 0.075em;
+        text-transform: lowercase;
+        white-space: nowrap;
     }
 
 .vas-upcoming-ap-runs-field-value {

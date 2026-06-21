@@ -32,7 +32,7 @@
  * 24  | Tender Type                          | VAS_031_MessageTenderType
  * 25  | Payment Amount                       | VAS_031_MessagePaymentAmount
  * 26  | Document No.                         | VAS_031_MessageDocumentNo
- * 27  | PRE-FILLED                           | VAS_031_MessagePrefilled
+ * 27  | pre-filled                           | VAS_031_MessagePrefilled
  * 28  | Select                               | VAS_Select
  * 29  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
  * 30  | Review and save.                     | VAS_031_MessageReviewAndSave
@@ -604,7 +604,7 @@
                         escapeHtml(
                             lbl(
                                 'VAS_031_MessagePrefilled',
-                                'PRE-FILLED'
+                                'pre-filled'
                             )
                         ) +
                         '</span>'
