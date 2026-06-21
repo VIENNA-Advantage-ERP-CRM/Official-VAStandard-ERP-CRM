@@ -153,7 +153,7 @@
 /* Table */
 .VAS_052_cashbook-table {
     width: 100%;
-    min-width: 46em;
+    min-width: 54em;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0;
@@ -201,7 +201,15 @@
 .VAS_052_cashbook-desc {
     color: #102C3F !important;
     font-size: 0.8125em !important;
-    font-weight: 800 !important;
+}
+
+.VAS_052_cashbook-col-category,
+.VAS_052_cashbook-col-cash-type {
+    width: 8.5em;
+}
+
+.VAS_052_cashbook-cash-type-cell {
+    color: #60748A !important;
 }
 
 .VAS_052_cashbook-posted {
@@ -458,7 +466,7 @@
     }
 
     .VAS_052_cashbook-table {
-        min-width: 42em;
+        min-width: 50em;
     }
 }
 
@@ -488,7 +496,7 @@
     }
 
     .VAS_052_cashbook-table {
-        min-width: 38em;
+        min-width: 46em;
     }
 
     .VAS_052_cashbook-footer {

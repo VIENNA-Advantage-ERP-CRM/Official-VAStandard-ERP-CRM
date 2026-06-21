@@ -11,10 +11,11 @@
  *  2  | Today                                | VAS_047_PeriodToday
  *  3  | vs 7-day avg                         | VAS_047_Vs7DayAvg
  *  4  | receipts                             | VAS_047_Receipts
- *  5  | Loading…                             | VAS_Loading
- *  6  | No data available                    | VAS_NoData
- *  7  | Could not load data                  | VAS_ErrorLoading
- *  8  | Session Expired                      | VIS_SessionExpired
+ *  5  | Total cash received in cash journal  | VAS_047_Description
+ *     | today                                |
+ *  6  | No data available                    | VAS_047_NoData
+ *  7  | Could not load data                  | VAS_047_LoadError
+ *  8  | Session Expired                      | VAS_047_SessionExpired
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -231,30 +232,30 @@
                 dataType: 'json',
                 success: function (response) {
                     if (!response || typeof response !== 'object') {
-                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                        showState(true, lbl('VAS_047_LoadError', 'Could not load data'));
                         return;
                     }
 
-                    if (response.error === 'Session Expired') {
-                        showState(true, lbl('VIS_SessionExpired', 'Session Expired'));
+                    if (response.error === 'VAS_047_SessionExpired') {
+                        showState(true, lbl('VAS_047_SessionExpired', 'Session Expired'));
                         return;
                     }
 
                     if (!response.success) {
-                        var errMsg = response.error || lbl('VAS_ErrorLoading', 'Could not load data');
+                        var errMsg = response.error || lbl('VAS_047_LoadError', 'Could not load data');
                         showState(true, errMsg);
                         return;
                     }
 
                     if (!response.hasData) {
-                        showState(true, lbl('VAS_NoData', 'No data available'));
+                        showState(true, lbl('VAS_047_NoData', 'No data available'));
                         return;
                     }
 
                     renderData(response);
                 },
                 error: function () {
-                    showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    showState(true, lbl('VAS_047_LoadError', 'Could not load data'));
                 },
                 complete: function () {
                     showBusy(false);

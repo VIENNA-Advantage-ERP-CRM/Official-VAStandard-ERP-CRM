@@ -29,7 +29,7 @@ namespace VAS.Controllers
                     new
                     {
                         success = false,
-                        error = "Session Expired",
+                        error = "VAS_051_SessionExpired",
                         hasData = false
                     },
                     JsonRequestBehavior.AllowGet

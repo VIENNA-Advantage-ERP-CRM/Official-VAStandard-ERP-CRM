@@ -36,7 +36,7 @@ namespace VAS.Controllers
                 var sessionResult = new
                 {
                     success = false,
-                    error = "Session Expired",
+                    error = "VAS_054_SessionExpired",
                     hasData = false
                 };
 
@@ -358,12 +358,16 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 var errorResult = new
                 {
                     success = false,
-                    error = ex.Message,
+                    error = GetMsg(
+                        ctx,
+                        "VAS_054_LoadError",
+                        "Unable to load top counterparties"
+                    ),
                     hasData = false
                 };
 

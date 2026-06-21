@@ -22,6 +22,9 @@
  * 15  | Approve                              | VAS_053_Approve
  * 16  | Reject                               | VAS_053_Reject
  * 17  | Session Expired                      | VAS_053_SessionExpired
+ * 18  | Previous                             | VAS_053_Previous
+ * 19  | Next                                 | VAS_053_Next
+ * 20  | Of                                   | VAS_053_Of
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -228,9 +231,9 @@
 
             var $pager = $(
                 '<div class="VAS_053_approval-pager">' +
-                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-prev-' + widgetId + '" aria-label="' + lbl('VAS_Previous', 'Previous') + '">&lsaquo;</button>' +
+                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-prev-' + widgetId + '" aria-label="' + lbl('VAS_053_Previous', 'Previous') + '">&lsaquo;</button>' +
                 '<span class="VAS_053_approval-page-text" id="VAS_053_approval-page-text-' + widgetId + '"></span>' +
-                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-next-' + widgetId + '" aria-label="' + lbl('VAS_Next', 'Next') + '">&rsaquo;</button>' +
+                '<button type="button" class="VAS_053_approval-page-btn" id="VAS_053_approval-next-' + widgetId + '" aria-label="' + lbl('VAS_053_Next', 'Next') + '">&rsaquo;</button>' +
                 '</div>'
             );
 
@@ -293,7 +296,7 @@
             var $pageText = $root.find('#VAS_053_approval-page-text-' + widgetId);
 
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages : '');
+                $pageText.text(totalPages > 1 ? pageNo + ' ' + lbl('VAS_053_Of', 'of') + ' ' + totalPages : '');
             }
 
             if ($prev) {
@@ -447,6 +450,11 @@
 
                     if (!response) {
                         setState(lbl('VAS_053_LoadError', 'Unable to load approval queue'));
+                        return;
+                    }
+
+                    if (response.error === 'VAS_053_SessionExpired') {
+                        setState(lbl('VAS_053_SessionExpired', 'Session Expired'));
                         return;
                     }
 

@@ -1,6 +1,27 @@
 /**
  * Top Counterparties - Cash Journal
  * Purpose - Shows top net counterparties from cash journal lines.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Top Counterparties                   | VAS_054_TopCounterparties
+ *  2  | Last 30 Days                         | VAS_054_Last30Days
+ *  3  | All parties ->                       | VAS_054_AllParties
+ *  4  | No counterparties found              | VAS_054_NoData
+ *  5  | Unable to load top counterparties    | VAS_054_LoadError
+ *  6  | Previous                             | VAS_054_Previous
+ *  7  | Next                                 | VAS_054_Next
+ *  8  | Of                                   | VAS_054_Of
+ *  9  | Showing                              | VAS_054_Showing
+ * 10  | Session Expired                      | VAS_054_SessionExpired
+ * 11  | Customer                             | VAS_054_Customer
+ * 12  | Vendor                               | VAS_054_Vendor
+ * 13  | Bank                                 | VAS_054_Bank
+ * 14  | Cashbook                             | VAS_054_Cashbook
+ * 15  | Other                                | VAS_054_Other
+ * 16  | Unknown                              | VAS_054_Unknown
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
@@ -233,7 +254,7 @@
             $prevBtn = $('<button>', {
                 'type': 'button',
                 'class': 'VAS_054_counterparties-page-btn VAS_054_counterparties-prev',
-                'aria-label': lbl('VAS_Previous', 'Previous'),
+                'aria-label': lbl('VAS_054_Previous', 'Previous'),
                 'html': chevL
             });
 
@@ -244,7 +265,7 @@
             $nextBtn = $('<button>', {
                 'type': 'button',
                 'class': 'VAS_054_counterparties-page-btn VAS_054_counterparties-next',
-                'aria-label': lbl('VAS_Next', 'Next'),
+                'aria-label': lbl('VAS_054_Next', 'Next'),
                 'html': chevR
             });
 
@@ -315,7 +336,7 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl('VAS_054_Of', 'of') + ' ' + totalPages) : '');
             }
 
             if ($pageInfo) {
@@ -324,13 +345,13 @@
                     var to = Math.min(pageNo * pageSize, totalRecords);
 
                     $pageInfo.text(
-                        lbl('VAS_Showing', 'Showing') +
+                        lbl('VAS_054_Showing', 'Showing') +
                         ' ' +
                         from +
                         '–' +
                         to +
                         ' ' +
-                        lbl('VAS_Of', 'of') +
+                        lbl('VAS_054_Of', 'of') +
                         ' ' +
                         totalRecords
                     );
@@ -474,6 +495,11 @@
 
                     if (!data) {
                         setState('Empty response');
+                        return;
+                    }
+
+                    if (data.error === 'VAS_054_SessionExpired') {
+                        setState(lbl('VAS_054_SessionExpired', 'Session Expired'));
                         return;
                     }
 

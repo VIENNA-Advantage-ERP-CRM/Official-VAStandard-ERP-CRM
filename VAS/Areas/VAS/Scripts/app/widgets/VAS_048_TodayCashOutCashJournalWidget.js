@@ -244,6 +244,11 @@
                         return;
                     }
 
+                    if (response.error === 'VAS_048_SessionExpired') {
+                        setState(lbl('VAS_048_SessionExpired', 'Session Expired'));
+                        return;
+                    }
+
                     if (response.success === false || response.error) {
                         setState(response.error || lbl('VAS_048_LoadError', 'Unable to load cash out'));
                         return;

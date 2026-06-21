@@ -277,6 +277,11 @@
                         return;
                     }
 
+                    if (response.error === 'VAS_051_SessionExpired') {
+                        setState(lbl('VAS_051_SessionExpired', 'Session Expired'));
+                        return;
+                    }
+
                     if (response.success === false || response.error) {
                         setState(response.error || lbl('VAS_051_LoadError', 'Unable to load seven day cash flow'));
                         return;

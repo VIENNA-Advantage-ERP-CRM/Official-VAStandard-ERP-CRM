@@ -36,7 +36,7 @@ namespace VAS.Controllers
                     new
                     {
                         success = false,
-                        error = "Session Expired",
+                        error = "VAS_052_SessionExpired",
                         hasData = false
                     },
                     JsonRequestBehavior.AllowGet
@@ -204,6 +204,22 @@ namespace VAS.Controllers
                                     reader
                                 ),
 
+                            cashTypeValue =
+                                GetString(
+                                    reader,
+                                    "CashTypeValue"
+                                ),
+
+                            cashType =
+                                GetCashType(
+                                    reader
+                                ),
+
+                            cashTypeName =
+                                GetCashType(
+                                    reader
+                                ),
+
                             postedBy =
                                 GetPostedBy(
                                     ctx,
@@ -340,14 +356,15 @@ namespace VAS.Controllers
 
             string textType =
                 DB.IsOracle()
-                    ? "VARCHAR2(255)"
-                    : "VARCHAR(255)";
+                    ? "VARCHAR2(4000)"
+                    : "VARCHAR(4000)";
 
             string queryParametersSql = @"
 QueryParameters AS
 (
     SELECT
         @AD_Client_ID AS AD_Client_ID,
+        @AD_Language AS AD_Language,
         @C_CashBook_ID AS C_CashBook_ID,
         @StartRow AS StartRow,
         @EndRow AS EndRow"
@@ -453,7 +470,8 @@ SELECT
     CashLine.CreatedBy,
     CashLine.Description,
     CashLine.Amount,
-    CashLine.C_Charge_ID
+    CashLine.C_Charge_ID,
+    CashLine.CashType
 
 FROM C_CashLine CashLine
 
@@ -472,6 +490,84 @@ WHERE CashLine.IsActive = 'Y'";
 CashLineAccess AS
 (
 " + cashLineAccessSql + @"
+)";
+
+            string cashTypeReferenceSql = @"
+CashTypeReference AS
+(
+    SELECT DISTINCT
+        TRIM
+        (
+            CAST
+            (
+                RefList.Value
+                AS " + textType + @"
+            )
+        ) AS ReferenceValue,
+
+        TRIM
+        (
+            CAST
+            (
+                RefList.Name
+                AS " + textType + @"
+            )
+        ) AS BaseName,
+
+        TRIM
+        (
+            CAST
+            (
+                RefListTrl.Name
+                AS " + textType + @"
+            )
+        ) AS TranslatedName
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID =
+        TableInfo.AD_Table_ID
+    )
+
+    INNER JOIN AD_Reference ReferenceInfo ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        ColumnInfo.AD_Reference_Value_ID
+    )
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefListTrl.AD_Ref_List_ID =
+        RefList.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        (
+            SELECT
+                QueryParameters.AD_Language
+
+            FROM QueryParameters QueryParameters
+        )
+    )
+
+    WHERE TableInfo.TableName = 'C_CashLine'
+
+    AND ColumnInfo.ColumnName = 'CashType'
+
+    AND TableInfo.IsActive = 'Y'
+
+    AND ColumnInfo.IsActive = 'Y'
+
+    AND ReferenceInfo.IsActive = 'Y'
+
+    AND RefList.IsActive = 'Y'
 )";
 
             string convertedAmountExpression = @"
@@ -511,6 +607,21 @@ CashRows AS
         CashLine.Created,
         CashLine.Description,
         CashLine.Amount,
+
+        TRIM
+        (
+            CAST
+            (
+                CashLine.CashType
+                AS " + textType + @"
+            )
+        ) AS CashTypeValue,
+
+        CashTypeReference.BaseName
+            AS CashTypeBaseName,
+
+        CashTypeReference.TranslatedName
+            AS CashTypeTranslatedName,
 
         ROUND
         (
@@ -594,6 +705,19 @@ CashRows AS
         DateRange.TodayEnd
     )
 
+    LEFT OUTER JOIN CashTypeReference CashTypeReference ON
+    (
+        CashTypeReference.ReferenceValue =
+        TRIM
+        (
+            CAST
+            (
+                CashLine.CashType
+                AS " + textType + @"
+            )
+        )
+    )
+
     LEFT OUTER JOIN C_Charge Charge ON
     (
         CashLine.C_Charge_ID =
@@ -659,6 +783,9 @@ PagedRows AS
         CashRows.C_CashBook_ID,
         CashRows.CashBookName,
         CashRows.CategoryName,
+        CashRows.CashTypeValue,
+        CashRows.CashTypeBaseName,
+        CashRows.CashTypeTranslatedName,
         CashRows.PostedBy,
         CashRows.StdPrecision,
         CashRows.C_Currency_ID,
@@ -687,6 +814,7 @@ WITH
 " + dateRangeSql + @",
 " + schemaCurrencySql + @",
 " + cashLineAccessSqlCte + @",
+" + cashTypeReferenceSql + @",
 " + cashRowsSql + @"
 SELECT
     PagedRows.C_CashLine_ID,
@@ -696,6 +824,9 @@ SELECT
     PagedRows.C_CashBook_ID,
     PagedRows.CashBookName,
     PagedRows.CategoryName,
+    PagedRows.CashTypeValue,
+    PagedRows.CashTypeBaseName,
+    PagedRows.CashTypeTranslatedName,
     PagedRows.PostedBy,
     PagedRows.StdPrecision,
     PagedRows.C_Currency_ID,
@@ -730,6 +861,11 @@ ORDER BY
                     new SqlParameter(
                         "@AD_Client_ID",
                         ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@AD_Language",
+                        ctx.GetAD_Language()
                     ),
 
                     new SqlParameter(
@@ -841,6 +977,54 @@ ORDER BY
                     "Other"
                 )
                 : category;
+        }
+
+        private string GetCashType(
+            IDataReader reader
+        )
+        {
+            return FirstNotEmpty(
+                GetString(
+                    reader,
+                    "CashTypeTranslatedName"
+                ),
+                GetString(
+                    reader,
+                    "CashTypeBaseName"
+                ),
+                GetString(
+                    reader,
+                    "CashTypeValue"
+                )
+            );
+        }
+
+        private string FirstNotEmpty(
+            params string[] values
+        )
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            for (
+                int index = 0;
+                index < values.Length;
+                index++
+            )
+            {
+                if (
+                    !string.IsNullOrWhiteSpace(
+                        values[index]
+                    )
+                )
+                {
+                    return values[index];
+                }
+            }
+
+            return string.Empty;
         }
 
         private string GetCategoryClass(

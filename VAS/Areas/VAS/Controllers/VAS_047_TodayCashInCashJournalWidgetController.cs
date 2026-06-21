@@ -32,7 +32,7 @@ namespace VAS.Controllers
                     new
                     {
                         success = false,
-                        error = "Session Expired",
+                        error = "VAS_047_SessionExpired",
                         hasData = false
                     },
                     JsonRequestBehavior.AllowGet
@@ -172,8 +172,8 @@ namespace VAS.Controllers
 
                         title = GetMsg(
                             ctx,
-                            "VAS_047_TodayCashIn",
-                            "Today cash in"
+                            "VAS_047_CashInTitle",
+                            "Cash in"
                         ),
 
                         mainMetric =
@@ -192,20 +192,20 @@ namespace VAS.Controllers
 
                         description = GetMsg(
                             ctx,
-                            "VAS_047_TodayCashInDesc",
+                            "VAS_047_Description",
                             "Total cash received in cash journal today"
                         ),
 
                         badgeText = GetMsg(
                             ctx,
-                            "VAS_047_Today",
+                            "VAS_047_PeriodToday",
                             "Today"
                         ),
 
                         noDataText = GetMsg(
                             ctx,
-                            "VAS_047_NoCashInToday",
-                            "No cash in today"
+                            "VAS_047_NoData",
+                            "No data available"
                         ),
 
                         dateFrom =
@@ -255,8 +255,8 @@ namespace VAS.Controllers
 
                         error = GetMsg(
                             ctx,
-                            "VAS_047_TodayCashInLoadError",
-                            "Unable to load today cash in"
+                            "VAS_047_LoadError",
+                            "Could not load data"
                         ),
 
                         hasData = false

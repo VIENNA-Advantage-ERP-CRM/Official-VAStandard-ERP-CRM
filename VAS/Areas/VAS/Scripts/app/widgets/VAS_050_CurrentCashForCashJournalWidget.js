@@ -383,6 +383,11 @@
                         return;
                     }
 
+                    if (response.error === 'VAS_050_SessionExpired') {
+                        setState(lbl('VAS_050_SessionExpired', 'Session Expired'));
+                        return;
+                    }
+
                     if (response.success === false || response.error) {
                         setState(response.error || lbl('VAS_050_LoadError', 'Unable to load current cash'));
                         return;
