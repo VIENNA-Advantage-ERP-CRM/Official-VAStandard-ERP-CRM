@@ -56,8 +56,6 @@ namespace VAS.Controllers
     public class VAS_045_GLJournalPendingWidgetController : Controller
     {
 
-        private const string DocStatusReferenceName = "_Document Status";
-
         ///// <summary>
         ///// Returns pending GL journals (DocStatus IN DR, IP, AP, NA) ordered oldest-first,
         ///// capped at 15 display rows. TotalCount reflects all pending records.
@@ -404,43 +402,91 @@ JournalLineTotals AS
     GROUP BY
         GL_JournalLine.GL_Journal_ID
 ),
-DocumentStatusReference AS
+DocumentStatusReferenceSource AS
 (
-    SELECT DISTINCT
-        CAST(
+    SELECT
+        CAST
+        (
             RefList.Value AS " + textCastType + @"
         ) AS StatusValue,
 
-        CAST(
+        CAST
+        (
             RefList.Name AS " + textCastType + @"
         ) AS StatusBaseName,
 
-        CAST(
+        CAST
+        (
             RefListTrl.Name AS " + textCastType + @"
-        ) AS StatusTranslatedName
+        ) AS StatusTranslatedName,
 
-    FROM AD_Reference ReferenceInfo
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                CAST
+                (
+                    RefList.Value AS " + textCastType + @"
+                )
+
+            ORDER BY
+                CASE
+                    WHEN RefListTrl.Name IS NOT NULL
+                    THEN 0
+                    ELSE 1
+                END,
+                RefList.AD_Ref_List_ID
+        ) AS ReferenceRowNumber
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID =
+        TableInfo.AD_Table_ID
+    )
+
+    INNER JOIN AD_Reference ReferenceInfo ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        ColumnInfo.AD_Reference_Value_ID
+    )
 
     INNER JOIN AD_Ref_List RefList ON
     (
-        ReferenceInfo.AD_Reference_ID =
-        RefList.AD_Reference_ID
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
     )
 
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
-        RefList.AD_Ref_List_ID =
-        RefListTrl.AD_Ref_List_ID
+        RefListTrl.AD_Ref_List_ID =
+        RefList.AD_Ref_List_ID
 
         AND RefListTrl.AD_Language =
         @StatusLanguage
     )
 
-    WHERE ReferenceInfo.IsActive = 'Y'
-    AND RefList.IsActive = 'Y'
+    WHERE TableInfo.TableName =
+        'GL_Journal'
 
-    AND ReferenceInfo.Name =
-    @StatusReferenceName
+    AND ColumnInfo.ColumnName =
+        'DocStatus'
+
+    AND TableInfo.IsActive = 'Y'
+    AND ColumnInfo.IsActive = 'Y'
+    AND ReferenceInfo.IsActive = 'Y'
+    AND RefList.IsActive = 'Y'
+),
+DocumentStatusReference AS
+(
+    SELECT
+        DocumentStatusReferenceSource.StatusValue,
+        DocumentStatusReferenceSource.StatusBaseName,
+        DocumentStatusReferenceSource.StatusTranslatedName
+
+    FROM DocumentStatusReferenceSource DocumentStatusReferenceSource
+
+    WHERE DocumentStatusReferenceSource.ReferenceRowNumber = 1
 ),
 PendingRows AS
 (
@@ -542,8 +588,6 @@ ORDER BY
                  * 1. @SchemaClientID
                  * 2. @PendingClientID
                  * 3. @StatusLanguage
-                 * 4. @StatusReferenceName
-                 *
                  * Every bind variable appears exactly once.
                  */
                 SqlParameter[] parameters =
@@ -561,11 +605,6 @@ ORDER BY
             new SqlParameter(
                 "@StatusLanguage",
                 language
-            ),
-
-            new SqlParameter(
-                "@StatusReferenceName",
-                DocStatusReferenceName
             )
         };
 
