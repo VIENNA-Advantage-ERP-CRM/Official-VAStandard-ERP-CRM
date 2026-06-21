@@ -67,7 +67,7 @@
                 return sign + symbol + amount;
             }
 
-            return iso ? sign + amount + ' ' + iso : sign + amount;
+            return iso ? sign + iso + amount : sign + amount;
         }
 
         function renderAmount($target, item) {

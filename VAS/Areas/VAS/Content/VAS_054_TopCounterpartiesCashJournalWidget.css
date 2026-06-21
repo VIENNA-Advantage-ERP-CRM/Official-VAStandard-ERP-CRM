@@ -259,9 +259,9 @@
     white-space: nowrap;
     text-align: right;
     display: inline-flex;
-    align-items: flex-start;
+    align-items: baseline;
     justify-content: flex-end;
-    gap: 0.06em;
+    gap: 0;
     font-size: 0.8125em;
     line-height: 1;
     font-weight: 800;
@@ -301,6 +301,16 @@
     font-weight: 500;
     color: currentColor;
     opacity: 0.66;
+}
+
+.VAS_054_counterparties-amount .VAS-cash-amount-prefix,
+.VAS_054_counterparties-amount .VAS-cash-amount-decimal {
+    align-self: baseline;
+    margin-top: 0;
+    color: currentColor;
+    font-size: 1em;
+    font-weight: 800;
+    opacity: 1;
 }
 
 .VAS_054_counterparties-busy {

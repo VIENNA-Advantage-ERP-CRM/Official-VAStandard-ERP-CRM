@@ -82,14 +82,14 @@
             var sign = numericValue < 0 ? '-' : '';
 
             if (symbol) {
-                return sign + symbol + ' ' + amount;
+                return sign + symbol + amount;
             }
 
             if (iso) {
-                return sign + iso + ' ' + amount;
+                return sign + iso + amount;
             }
 
-            return id ? sign + '#' + id + ' ' + amount : sign + amount;
+            return id ? sign + '#' + id + amount : sign + amount;
         }
 
         function renderCurrencyAmount($target, value, currencySymbol, currencyISO, currencyId, precision) {

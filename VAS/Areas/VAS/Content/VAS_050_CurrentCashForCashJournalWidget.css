@@ -116,8 +116,9 @@
     white-space: nowrap;
     flex: 1 1 auto;
     display: flex;
-    align-items: flex-start;
-    gap: 0.08em;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0;
     font-size: 1.375em;
     line-height: 1;
     letter-spacing: 0;
@@ -159,6 +160,16 @@
     font-weight: 500;
     color: currentColor;
     opacity: 0.62;
+}
+
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix,
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-decimal {
+    align-self: baseline;
+    margin-top: 0;
+    color: currentColor;
+    font-size: 1em;
+    font-weight: 800;
+    opacity: 1;
 }
 
 .VAS_current-cash-cash-journal-value-positive {

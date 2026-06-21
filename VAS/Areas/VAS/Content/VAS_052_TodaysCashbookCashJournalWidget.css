@@ -232,7 +232,7 @@
     margin: 0;
 }
 
-.VAS_052_cashbook-col-amount .VAS-cash-amount-main {
+/*.VAS_052_cashbook-col-amount .VAS-cash-amount-main {
     display: inline-block;
     max-width: 4.5em;
     overflow: hidden;
@@ -241,7 +241,7 @@
     font-size: 1em;
     line-height: 1;
     color: currentColor;
-}
+}*/
 
 .VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
     display: inline-block;
@@ -250,6 +250,16 @@
     font-weight: 500;
     color: currentColor;
     opacity: 0.66;
+}
+
+.VAS_052_cashbook-col-amount .VAS-cash-amount-prefix,
+.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
+    margin: 0;
+    color: currentColor;
+    font-size: 1em;
+    font-weight: 800;
+    opacity: 1;
+    vertical-align: baseline;
 }
 
 .VAS_052_cashbook-in {

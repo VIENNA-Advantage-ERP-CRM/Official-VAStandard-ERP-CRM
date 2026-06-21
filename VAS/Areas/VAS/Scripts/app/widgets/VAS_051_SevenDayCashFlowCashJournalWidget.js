@@ -58,7 +58,7 @@
                 return sign + currencySymbol + amount;
             }
 
-            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+            return currencyISO ? sign + currencyISO + amount : sign + amount;
         }
 
         function showBusy(show) {
