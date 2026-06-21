@@ -2433,6 +2433,226 @@
             });
         }
 
+        function readPayDialogPayload() {
+            var payload = {};
+            var sourcePaymentId = 0;
+
+            var $fields =
+                $payDialogGrid
+                    ? $payDialogGrid.find(
+                        '[data-pay-field]'
+                    )
+                    : $();
+
+            $fields.each(function () {
+                var fieldName =
+                    $(this).attr(
+                        'data-pay-field'
+                    );
+
+                if (!fieldName) {
+                    return;
+                }
+
+                payload[fieldName] =
+                    $(this).val();
+            });
+
+            /*
+             * Payment الأصلية التي ظهرت في Upcoming.
+             */
+            sourcePaymentId = Number(
+                firstPositiveValue(
+                    selectedPaymentRow &&
+                    selectedPaymentRow.paymentId,
+
+                    selectedPaymentRow &&
+                    selectedPaymentRow.cPaymentId,
+
+                    selectedPaymentRow &&
+                    selectedPaymentRow.C_Payment_ID,
+
+                    selectedRun &&
+                    selectedRun.paymentId,
+
+                    selectedRun &&
+                    selectedRun.cPaymentId,
+
+                    0
+                )
+            );
+
+            payload.sourcePaymentId =
+                isNaN(sourcePaymentId)
+                    ? 0
+                    : sourcePaymentId;
+
+            payload.adOrgId =
+                Number(
+                    payload.adOrgId || 0
+                );
+
+            payload.bankAccountId =
+                Number(
+                    payload.bankAccountId || 0
+                );
+
+            payload.vendorId =
+                Number(
+                    payload.vendorId || 0
+                );
+
+            payload.currencyId =
+                Number(
+                    payload.currencyId || 0
+                );
+
+            payload.conversionTypeId =
+                Number(
+                    payload.conversionTypeId || 0
+                );
+
+            payload.docTypeId =
+                Number(
+                    payload.docTypeId || 0
+                );
+
+            payload.tenderType =
+                String(
+                    payload.tenderType || ''
+                ).trim();
+
+            payload.transactionDate =
+                formatDateForInput(
+                    payload.transactionDate || ''
+                );
+
+            payload.documentNo =
+                String(
+                    payload.documentNo || ''
+                ).trim();
+
+            payload.payAmt =
+                Number(
+                    payload.payAmt || 0
+                );
+
+            if (payload.sourcePaymentId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageSourcePaymentRequired',
+                        'Source scheduled payment is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.adOrgId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageOrganizationRequired',
+                        'Organization is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.bankAccountId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageBankAccountRequired',
+                        'Bank account is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.vendorId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageVendorRequired',
+                        'Vendor is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.currencyId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageCurrencyRequired',
+                        'Currency is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.conversionTypeId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageConversionTypeRequired',
+                        'Currency type is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.docTypeId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageDocumentTypeRequired',
+                        'Document type is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (!payload.tenderType) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageTenderTypeRequired',
+                        'Tender type is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (!payload.transactionDate) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageTransactionDateRequired',
+                        'Transaction date is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (
+                isNaN(payload.payAmt) ||
+                payload.payAmt <= 0
+            ) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessagePaymentAmountRequired',
+                        'Payment amount must be greater than zero.'
+                    )
+                );
+
+                return null;
+            }
+
+            return payload;
+        }
+
         function savePayDialog() {
             var payload;
 
