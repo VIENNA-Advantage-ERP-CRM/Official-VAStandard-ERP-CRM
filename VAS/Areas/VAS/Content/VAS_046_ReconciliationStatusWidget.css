@@ -136,6 +136,13 @@
     width: clamp(6em, 28%, 8.75em);
     height: clamp(6em, 28%, 8.75em);
     position: relative;
+    cursor: help;
+    outline: none;
+}
+
+.vas-reconciliation-status-donut:focus-visible {
+    border-radius: 50%;
+    box-shadow: 0 0 0 0.1875em rgba(0, 131, 218, 0.18);
 }
 
     .vas-reconciliation-status-donut svg {
@@ -194,6 +201,54 @@
     line-height: 1.2;
     letter-spacing: 0.0938em;
     color: #748494;
+}
+
+.vas-reconciliation-status-tooltip {
+    position: absolute;
+    z-index: 4;
+    width: max-content;
+    max-width: calc(100% - 1em);
+    padding: 0.625em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.5em;
+    background: #102c3f;
+    box-shadow: 0 0.5em 1.25em rgba(15, 61, 97, 0.22);
+    color: #ffffff;
+    font-size: 0.6875em;
+    line-height: 1.3;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+    transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+
+.vas-reconciliation-status-tooltip.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.vas-reconciliation-status-tooltip-title {
+    margin-bottom: 0.4375em;
+    color: #ffffff;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.vas-reconciliation-status-tooltip-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.25em;
+    min-width: 12em;
+    padding: 0.125em 0;
+    color: #c7d3dd;
+}
+
+.vas-reconciliation-status-tooltip-row strong {
+    color: #ffffff;
+    font-weight: 700;
+    text-align: end;
+    white-space: nowrap;
 }
 
 .vas-reconciliation-status-meta {

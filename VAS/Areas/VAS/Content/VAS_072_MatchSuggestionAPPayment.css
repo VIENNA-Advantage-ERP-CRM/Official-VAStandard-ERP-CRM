@@ -774,6 +774,14 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.62);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-busy.is-visible {
+    opacity: 1;
+    visibility: visible !important;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-banner {
@@ -1147,6 +1155,23 @@
     border: 0;
     background: #1f83ff;
     color: #ffffff;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-apply.is-loading::before {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+    border: 0.125em solid rgba(255, 255, 255, 0.45);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    content: "";
+    animation: VAS072ReviewApplySpin 0.7s linear infinite;
+}
+
+@keyframes VAS072ReviewApplySpin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
     .VAS-072-MatchSuggestionAPPayment-review-apply svg {

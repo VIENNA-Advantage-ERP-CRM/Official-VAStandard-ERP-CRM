@@ -1058,11 +1058,16 @@
             });
         }
 
-        function showReviewBusy(show) {
+        function showReviewBusy(show, showApplySpinner) {
             if (
                 $reviewBusy &&
                 $reviewBusy[0]
             ) {
+                $reviewBusy.toggleClass(
+                    "is-visible",
+                    Boolean(show)
+                );
+
                 $reviewBusy[0].style.visibility =
                     show
                         ? "visible"
@@ -1070,11 +1075,24 @@
             }
 
             if ($reviewApply) {
-                $reviewApply.prop(
-                    "disabled",
-                    Boolean(show) ||
-                    !currentReviewRow
-                );
+                $reviewApply
+                    .prop(
+                        "disabled",
+                        Boolean(show) ||
+                        !currentReviewRow
+                    )
+                    .toggleClass(
+                        "is-loading",
+                        Boolean(show) &&
+                        Boolean(showApplySpinner)
+                    )
+                    .attr(
+                        "aria-busy",
+                        Boolean(show) &&
+                        Boolean(showApplySpinner)
+                            ? "true"
+                            : "false"
+                    );
             }
         }
 
@@ -1896,6 +1914,7 @@
             var reloadAfterComplete = false;
 
             setBusy(true);
+            showReviewBusy(true, true);
 
             activeActionRequest = $.ajax({
                 url:
@@ -2016,6 +2035,7 @@
                     }
 
                     setBusy(false);
+                    showReviewBusy(false, true);
 
                     if (reloadAfterComplete) {
                         loadData();
