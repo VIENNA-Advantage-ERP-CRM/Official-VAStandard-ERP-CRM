@@ -2233,185 +2233,204 @@
          * القيم الخاصة باللستات تؤخذ فقط من الـ select الظاهر.
          * لا يتم الرجوع إلى Vendor قديم غير صالح.
          */
-        function readPayDialogPayload() {
-            var payload = {};
+        function savePayDialog() {
+            var payload;
 
-            var $fields =
-                $payDialogGrid
-                    ? $payDialogGrid.find(
-                        '[data-pay-field]'
-                    )
-                    : $();
+            if (
+                !selectedRun ||
+                !selectedPaymentRow ||
+                saveInProgress
+            ) {
+                return;
+            }
 
-            $fields.each(function () {
-                var fieldName =
-                    $(this).attr(
-                        'data-pay-field'
+            payload =
+                readPayDialogPayload();
+
+            if (!payload) {
+                return;
+            }
+
+            saveInProgress = true;
+
+            setPayDialogBusy(
+                true,
+                true
+            );
+
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_031_UpcomingAPRunsWidget/CreateUpcomingAPPayment',
+
+                type: 'POST',
+
+                dataType: 'json',
+
+                cache: false,
+
+                data: {
+                    /*
+                     * Payment الأصلية التي ظهرت في Upcoming.
+                     * الكونترولر يحدث حالتها إلى R.
+                     */
+                    sourcePaymentId:
+                        payload.sourcePaymentId,
+
+                    adOrgId:
+                        payload.adOrgId,
+
+                    bankAccountId:
+                        payload.bankAccountId,
+
+                    vendorId:
+                        payload.vendorId,
+
+                    currencyId:
+                        payload.currencyId,
+
+                    conversionTypeId:
+                        payload.conversionTypeId,
+
+                    docTypeId:
+                        payload.docTypeId,
+
+                    tenderType:
+                        payload.tenderType,
+
+                    transactionDate:
+                        payload.transactionDate,
+
+                    documentNo:
+                        payload.documentNo,
+
+                    payAmt:
+                        payload.payAmt
+                },
+
+                success: function (response) {
+                    var data =
+                        normalizeResponse(
+                            response
+                        );
+
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
+                        showPayError(
+                            (
+                                data &&
+                                (
+                                    data.error ||
+                                    data.errorText ||
+                                    data.message
+                                )
+                            ) ||
+                            lbl(
+                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'Could not save AP payment'
+                            )
+                        );
+
+                        return;
+                    }
+
+                    /*
+                     * نوقف حالة الحفظ قبل إغلاق الـpopup
+                     * لأن closePayDialog لا يغلقه إذا
+                     * saveInProgress = true.
+                     */
+                    saveInProgress = false;
+
+                    setPayDialogBusy(
+                        false,
+                        false
                     );
 
-                payload[fieldName] =
-                    $(this).val();
+                    /*
+                     * إفراغ السجلات القديمة حتى لا يبقى
+                     * القيد السابق مخزوناً داخل الـJS.
+                     */
+                    selectedPaymentRow = null;
+                    selectedRun = null;
+                    paymentRows = [];
+
+                    /*
+                     * إعادة تحميل Lookups في المرة القادمة.
+                     */
+                    popupLookups = null;
+
+                    /*
+                     * إغلاق الـpopup يدوياً.
+                     */
+                    if ($payDialog) {
+                        $payDialog.hide();
+                    }
+
+                    if ($payDialogGrid) {
+                        $payDialogGrid.empty();
+                    }
+
+                    if ($payDialogNotice) {
+                        $payDialogNotice
+                            .removeClass(
+                                'vas-upcoming-ap-runs-pay-error'
+                            )
+                            .text('');
+                    }
+
+                    $('body').removeClass(
+                        'vas-upcoming-ap-runs-body-lock'
+                    );
+
+                    /*
+                     * إعادة الصفحة إلى البداية.
+                     */
+                    pageNo = 1;
+
+                    /*
+                     * إعادة استدعاء GetUpcomingAPRuns.
+                     *
+                     * بما أن الكونترولر حدث:
+                     * VA009_ExecutionStatus = 'R'
+                     *
+                     * والكويري تعرض فقط الحالة I،
+                     * فلن يرجع القيد مرة ثانية.
+                     */
+                    loadData();
+                },
+
+                error: function (xhr) {
+                    showPayError(
+                        getAjaxErrorMessage(
+                            xhr,
+                            lbl(
+                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'Could not save AP payment'
+                            )
+                        )
+                    );
+                },
+
+                complete: function () {
+                    /*
+                     * إذا حدث خطأ، نعيد تفعيل زر الحفظ.
+                     *
+                     * في حالة النجاح تم تحويل
+                     * saveInProgress إلى false مسبقاً.
+                     */
+                    if (saveInProgress) {
+                        saveInProgress = false;
+
+                        setPayDialogBusy(
+                            false,
+                            false
+                        );
+                    }
+                }
             });
-
-            payload.adOrgId =
-                Number(
-                    payload.adOrgId || 0
-                );
-
-            payload.bankAccountId =
-                Number(
-                    payload.bankAccountId || 0
-                );
-
-            payload.vendorId =
-                Number(
-                    payload.vendorId || 0
-                );
-
-            payload.currencyId =
-                Number(
-                    payload.currencyId || 0
-                );
-
-            payload.conversionTypeId =
-                Number(
-                    payload.conversionTypeId ||
-                    0
-                );
-
-            payload.docTypeId =
-                Number(
-                    payload.docTypeId || 0
-                );
-
-            payload.tenderType =
-                String(
-                    payload.tenderType || ''
-                ).trim();
-
-            payload.transactionDate =
-                formatDateForInput(
-                    payload.transactionDate ||
-                    ''
-                );
-
-            payload.documentNo =
-                String(
-                    payload.documentNo || ''
-                ).trim();
-
-            payload.payAmt =
-                Number(
-                    payload.payAmt || 0
-                );
-
-            if (payload.adOrgId <= 0) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageOrganizationRequired',
-                        'Organization is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (
-                payload.bankAccountId <= 0
-            ) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageBankAccountRequired',
-                        'Bank account is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (payload.vendorId <= 0) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageVendorRequired',
-                        'Vendor is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (payload.currencyId <= 0) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageCurrencyRequired',
-                        'Currency is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (
-                payload.conversionTypeId <= 0
-            ) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageConversionTypeRequired',
-                        'Currency type is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (payload.docTypeId <= 0) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageDocumentTypeRequired',
-                        'Document type is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (!payload.tenderType) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageTenderTypeRequired',
-                        'Tender type is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (!payload.transactionDate) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageTransactionDateRequired',
-                        'Transaction date is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (
-                isNaN(payload.payAmt) ||
-                payload.payAmt <= 0
-            ) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessagePaymentAmountRequired',
-                        'Payment amount must be greater than zero.'
-                    )
-                );
-
-                return null;
-            }
-
-            return payload;
         }
 
         function savePayDialog() {

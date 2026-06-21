@@ -183,8 +183,13 @@ namespace VAS.Controllers
                     runs = runs
                 }, JsonRequestBehavior.AllowGet);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                VLogger.Get().SaveError(
+                    "VAS_031_GetUpcomingAPRuns",
+                    ex
+                );
+
                 string errorMessage = GetMsg(
                     ctx,
                     "VAS_ErrorLoading",
@@ -243,11 +248,13 @@ SELECT
     Payment.C_Currency_ID,
     Payment.C_ConversionType_ID,
     Payment.PayAmt,
-    Payment.VA009_PaymentMethod_ID
+    Payment.VA009_PaymentMethod_ID,
+    Payment.VA009_ExecutionStatus
 FROM C_Payment Payment
 WHERE Payment.IsActive = 'Y'
 AND Payment.AD_Client_ID = " + clientIdSql + @"
 AND Payment.IsReceipt = 'N'
+AND COALESCE(Payment.VA009_ExecutionStatus, 'I') = 'I'
 AND Payment.DocStatus NOT IN ('VO', 'RE')";
 
             paymentAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -344,7 +351,8 @@ FilteredPayment AS
         Payment.C_Currency_ID,
         Payment.C_ConversionType_ID,
         Payment.PayAmt,
-        Payment.VA009_PaymentMethod_ID
+        Payment.VA009_PaymentMethod_ID,
+        Payment.VA009_ExecutionStatus
     FROM SecuredPayment Payment
     INNER JOIN CurrentPeriod PeriodRange ON
     (
@@ -485,11 +493,13 @@ SELECT
     Payment.DateTrx,
     Payment.PayAmt,
     Payment.TenderType,
-    Payment.VA009_PaymentMethod_ID
+    Payment.VA009_PaymentMethod_ID,
+    Payment.VA009_ExecutionStatus
 FROM C_Payment Payment
 WHERE Payment.IsActive = 'Y'
 AND Payment.AD_Client_ID = " + clientIdSql + @"
 AND Payment.IsReceipt = 'N'
+AND COALESCE(Payment.VA009_ExecutionStatus, 'I') = 'I'
 AND Payment.DocStatus NOT IN ('VO', 'RE')"
 + GetDateFilter(
                     "Payment.DateTrx",
@@ -670,6 +680,7 @@ ORDER BY
                         )
                     );
 
+
                     rows.Add(new
                     {
                         paymentId = GetInt(
@@ -818,8 +829,13 @@ ORDER BY
                     rows = rows
                 }, JsonRequestBehavior.AllowGet);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                VLogger.Get().SaveError(
+                    "VAS_031_GetUpcomingAPRunDetails",
+                    ex
+                );
+
                 string errorMessage = GetMsg(
                     ctx,
                     "VAS_ErrorLoading",
@@ -1300,14 +1316,12 @@ ORDER BY
 
         #region Create AP Payment
 
-        /// <summary>
-        /// Creates a new draft AP Payment.
-        /// IsReceipt = false means AP Payment.
-        /// </summary>
+
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult CreateUpcomingAPPayment(
+            int sourcePaymentId,
             int adOrgId,
             int bankAccountId,
             int vendorId,
@@ -1331,6 +1345,15 @@ ORDER BY
                 });
             }
 
+            if (sourcePaymentId <= 0)
+            {
+                return GetValidationError(
+                    ctx,
+                    "VAS_031_MessageSourcePaymentRequired",
+                    "Source scheduled payment is required."
+                );
+            }
+
             JsonResult validationResult =
                 ValidateCreateRequest(
                     ctx,
@@ -1352,13 +1375,19 @@ ORDER BY
 
             DateTime dateTrx;
 
-            DateTime.TryParseExact(
+            if (!DateTime.TryParseExact(
                 transactionDate,
                 "yyyy-MM-dd",
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None,
-                out dateTrx
-            );
+                out dateTrx))
+            {
+                return GetValidationError(
+                    ctx,
+                    "VAS_031_MessageTransactionDateInvalid",
+                    "Transaction date must be in yyyy-MM-dd format."
+                );
+            }
 
             string trxName =
                 "CreateUpcomingAPPayment_" +
@@ -1372,6 +1401,58 @@ ORDER BY
 
             try
             {
+                MPayment sourcePayment = new MPayment(
+                    ctx,
+                    sourcePaymentId,
+                    trx
+                );
+
+                if (sourcePayment.GetC_Payment_ID() <= 0)
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageSourcePaymentNotFound",
+                            "The scheduled payment was not found."
+                        )
+                    );
+                }
+
+                if (
+                    sourcePayment.GetAD_Client_ID() !=
+                    ctx.GetAD_Client_ID()
+                )
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidSourcePayment",
+                            "The scheduled payment does not belong to the current client."
+                        )
+                    );
+                }
+
+                string currentExecutionStatus =
+                    Util.GetValueOfString(
+                        sourcePayment.Get_Value(
+                            "VA009_ExecutionStatus"
+                        )
+                    );
+
+                if (string.Equals(
+                    currentExecutionStatus,
+                    "R",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessagePaymentAlreadyExecuted",
+                            "The scheduled payment was already executed."
+                        )
+                    );
+                }
+
                 MOrg organization = new MOrg(
                     ctx,
                     adOrgId,
@@ -1379,57 +1460,35 @@ ORDER BY
                 );
 
                 if (
-                    organization.GetAD_Org_ID() <= 0
+                    organization.GetAD_Org_ID() <= 0 ||
+                    !organization.IsActive()
                 )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
                             "VAS_031_MessageOrganizationNotFound",
-                            "Organization not found."
+                            "Organization was not found or is inactive."
                         )
                     );
                 }
 
-                if (!organization.IsActive())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageOrganizationInactive",
-                            "Organization is inactive."
-                        )
-                    );
-                }
-
-                MBankAccount bankAccount =
-                    new MBankAccount(
-                        ctx,
-                        bankAccountId,
-                        trx
-                    );
+                MBankAccount bankAccount = new MBankAccount(
+                    ctx,
+                    bankAccountId,
+                    trx
+                );
 
                 if (
-                    bankAccount
-                        .GetC_BankAccount_ID() <= 0
+                    bankAccount.GetC_BankAccount_ID() <= 0 ||
+                    !bankAccount.IsActive()
                 )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
                             "VAS_031_MessageBankAccountNotFound",
-                            "Bank account not found."
-                        )
-                    );
-                }
-
-                if (!bankAccount.IsActive())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageBankAccountInactive",
-                            "Bank account is inactive."
+                            "Bank account was not found or is inactive."
                         )
                     );
                 }
@@ -1441,40 +1500,16 @@ ORDER BY
                 );
 
                 if (
-                    vendor.GetC_BPartner_ID() <= 0
+                    vendor.GetC_BPartner_ID() <= 0 ||
+                    !vendor.IsActive() ||
+                    !vendor.IsVendor()
                 )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageVendorNotFound",
-                            "Vendor not found."
-                        )
-                    );
-                }
-
-                if (!vendor.IsActive())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageVendorInactive",
-                            "Vendor is inactive."
-                        )
-                    );
-                }
-
-                /*
-                 * Keep this validation.
-                 * AP Payments must use a Business Partner configured as Vendor.
-                 */
-                if (!vendor.IsVendor())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
                             "VAS_031_MessageNotVendor",
-                            "Selected business partner is not configured as a vendor."
+                            "Selected business partner is not configured as an active vendor."
                         )
                     );
                 }
@@ -1486,25 +1521,15 @@ ORDER BY
                 );
 
                 if (
-                    currency.GetC_Currency_ID() <= 0
+                    currency.GetC_Currency_ID() <= 0 ||
+                    !currency.IsActive()
                 )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
                             "VAS_031_MessageCurrencyNotFound",
-                            "Currency not found."
-                        )
-                    );
-                }
-
-                if (!currency.IsActive())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageCurrencyInactive",
-                            "Currency is inactive."
+                            "Currency was not found or is inactive."
                         )
                     );
                 }
@@ -1517,26 +1542,15 @@ ORDER BY
                     );
 
                 if (
-                    conversionType
-                        .GetC_ConversionType_ID() <= 0
+                    conversionType.GetC_ConversionType_ID() <= 0 ||
+                    !conversionType.IsActive()
                 )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
                             "VAS_031_MessageConversionTypeNotFound",
-                            "Conversion type not found."
-                        )
-                    );
-                }
-
-                if (!conversionType.IsActive())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageConversionTypeInactive",
-                            "Conversion type is inactive."
+                            "Conversion type was not found or is inactive."
                         )
                     );
                 }
@@ -1555,7 +1569,7 @@ ORDER BY
                         GetMsg(
                             ctx,
                             "VAS_031_MessageAPPaymentDocumentTypeNotFound",
-                            "AP Payment document type was not found. Configure an active document type with DocBaseType APP."
+                            "AP Payment document type was not found."
                         )
                     );
                 }
@@ -1567,33 +1581,14 @@ ORDER BY
                 );
 
                 if (
-                    documentType.GetC_DocType_ID() <= 0
+                    documentType.GetC_DocType_ID() <= 0 ||
+                    !documentType.IsActive() ||
+                    !string.Equals(
+                        documentType.GetDocBaseType(),
+                        "APP",
+                        StringComparison.OrdinalIgnoreCase
+                    )
                 )
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageDocumentTypeNotFound",
-                            "AP Payment document type was not found."
-                        )
-                    );
-                }
-
-                if (!documentType.IsActive())
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageDocumentTypeInactive",
-                            "Document type is inactive."
-                        )
-                    );
-                }
-
-                if (!string.Equals(
-                    documentType.GetDocBaseType(),
-                    "APP",
-                    StringComparison.OrdinalIgnoreCase))
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -1628,10 +1623,6 @@ ORDER BY
                     adOrgId
                 );
 
-                /*
-                 * false = AP Payment
-                 * true  = AR Receipt
-                 */
                 payment.SetIsReceipt(
                     false
                 );
@@ -1684,6 +1675,11 @@ ORDER BY
                     false
                 );
 
+                payment.Set_Value(
+                    "VA009_ExecutionStatus",
+                    "R"
+                );
+
                 if (!string.IsNullOrWhiteSpace(
                     documentNo
                 ))
@@ -1695,15 +1691,59 @@ ORDER BY
 
                 if (!payment.Save())
                 {
-                    string modelError =
+                    throw new InvalidOperationException(
                         GetLastModelError(
                             ctx,
                             "VAS_031_MessageCouldNotSaveAPPayment",
                             "Could not save AP payment."
-                        );
+                        )
+                    );
+                }
+
+                if (!payment.ProcessIt(
+                    VAdvantage.Process.DocActionVariables.ACTION_COMPLETE
+                ))
+                {
+                    string processMessage =
+                        payment.GetProcessMsg();
+
+                    if (string.IsNullOrWhiteSpace(
+                        processMessage
+                    ))
+                    {
+                        processMessage =
+                            "Could not complete AP payment.";
+                    }
 
                     throw new InvalidOperationException(
-                        modelError
+                        processMessage
+                    );
+                }
+
+                if (!payment.Save())
+                {
+                    throw new InvalidOperationException(
+                        GetLastModelError(
+                            ctx,
+                            "VAS_031_MessageCouldNotCompleteAPPayment",
+                            "Could not complete AP payment."
+                        )
+                    );
+                }
+
+                sourcePayment.Set_Value(
+                    "VA009_ExecutionStatus",
+                    "R"
+                );
+
+                if (!sourcePayment.Save())
+                {
+                    throw new InvalidOperationException(
+                        GetLastModelError(
+                            ctx,
+                            "VAS_031_MessageCouldNotUpdateScheduledPayment",
+                            "Could not update the scheduled payment status."
+                        )
                     );
                 }
 
@@ -1713,26 +1753,18 @@ ORDER BY
                 {
                     success = true,
                     error = string.Empty,
-
-                    paymentId =
-                        payment.GetC_Payment_ID(),
-
-                    documentNo =
-                        payment.GetDocumentNo(),
-
-                    docStatus =
-                        payment.GetDocStatus(),
-
-                    docTypeId =
-                        resolvedDocTypeId,
-
-                    docTypeName =
-                        documentType.GetName(),
+                    sourcePaymentId = sourcePaymentId,
+                    paymentId = payment.GetC_Payment_ID(),
+                    documentNo = payment.GetDocumentNo(),
+                    docStatus = payment.GetDocStatus(),
+                    executionStatus = "R",
+                    docTypeId = resolvedDocTypeId,
+                    docTypeName = documentType.GetName(),
 
                     message = GetMsg(
                         ctx,
                         "VAS_031_MessagePaymentCreatedSuccessfully",
-                        "Upcoming AP payment created successfully."
+                        "Upcoming AP payment created and completed successfully."
                     )
                 });
             }
@@ -1749,10 +1781,15 @@ ORDER BY
                     errorText = ex.Message
                 });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 RollbackTransaction(
                     trx
+                );
+
+                VLogger.Get().SaveError(
+                    "VAS_031_CreateUpcomingAPPayment",
+                    ex
                 );
 
                 string errorMessage = GetMsg(
