@@ -115,6 +115,16 @@
     gap: 0.625em;
 }
 
+.VAS_053_approval-footer {
+    min-width: 0;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-top: 0.625em;
+    border-top: 1px solid rgba(212, 225, 234, 0.66);
+}
+
 .VAS_053_approval-page-btn {
     width: 2.25em;
     height: 2.25em;
@@ -176,9 +186,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5em;
-    overflow: hidden auto;
-    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
-    scrollbar-width: thin;
+    overflow: hidden;
 }
 
 .VAS_053_approval-list::-webkit-scrollbar {
@@ -276,8 +284,8 @@
 }
 
 .VAS_053_approval-side {
-    min-width: 0;
-    flex: 0 0 auto;
+    min-width: 11em;
+    flex: 0 0 11em;
     align-self: stretch;
     display: flex;
     flex-direction: column;
@@ -288,7 +296,8 @@
 
 .VAS_053_approval-amount {
     flex: 0 0 auto;
-    max-width: 6em;
+    width: 100%;
+    max-width: none;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -490,7 +499,12 @@
     }
 
     .VAS_053_approval-amount {
-        max-width: 5em;
+        max-width: none;
+    }
+
+    .VAS_053_approval-side {
+        min-width: 7em;
+        flex-basis: 7em;
     }
 }
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
@@ -55,13 +56,13 @@ namespace VAS.Controllers
 
                 if (dr != null && dr.Read())
                 {
-                    mainMetric = Util.GetValueOfDecimal(dr["MainMetric"]);
-                    avgDailyAmount = Util.GetValueOfDecimal(dr["AvgDailyAmount"]);
+                    stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                    mainMetric = GetRoundedDecimal(dr, "MainMetric", stdPrecision);
+                    avgDailyAmount = GetRoundedDecimal(dr, "AvgDailyAmount", stdPrecision);
                     recordCount = Util.GetValueOfInt(dr["RecordCount"]);
                     currencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
                     currencyISO = Util.GetValueOfString(dr["CurrencyISO"]);
                     currencySymbol = Util.GetValueOfString(dr["CurrencySymbol"]);
-                    stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
 
                     if (dr["DateFrom"] != DBNull.Value)
                     {
@@ -271,7 +272,7 @@ TodayData.CurrencyISO,
 TodayData.CurrencySymbol,
 TodayData.StdPrecision,
 TodayData.RecordCount,
-AverageData.AvgDailyAmount,
+ROUND(AverageData.AvgDailyAmount, TodayData.StdPrecision) AS AvgDailyAmount,
 DateRange.TodayDate AS DateFrom,
 DateRange.TodayDate AS DateTo
 FROM TodayData TodayData
@@ -288,6 +289,40 @@ INNER JOIN DateRange DateRange ON (1 = 1)";
                 Sql = sql,
                 Parameters = parameters
             };
+        }
+
+        private decimal GetRoundedDecimal(IDataReader reader, string columnName, int precision)
+        {
+            object value = reader[columnName];
+
+            if (value == null || value == DBNull.Value)
+            {
+                return 0;
+            }
+
+            precision = Math.Max(0, Math.Min(precision, 28));
+
+            decimal decimalValue;
+            string invariantText = value.ToString();
+
+            if (decimal.TryParse(invariantText, NumberStyles.Any, CultureInfo.InvariantCulture, out decimalValue)
+                || decimal.TryParse(value.ToString(), NumberStyles.Any, CultureInfo.CurrentCulture, out decimalValue))
+            {
+                return Math.Round(decimalValue, precision, MidpointRounding.AwayFromZero);
+            }
+
+            double doubleValue;
+
+            if (double.TryParse(invariantText, NumberStyles.Any, CultureInfo.InvariantCulture, out doubleValue)
+                && !double.IsNaN(doubleValue)
+                && !double.IsInfinity(doubleValue))
+            {
+                return Convert.ToDecimal(
+                    Math.Round(doubleValue, precision, MidpointRounding.AwayFromZero)
+                );
+            }
+
+            return 0;
         }
 
         private string GetTodayDateSql()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Model;
@@ -17,7 +18,7 @@ namespace VAS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetApprovalQueue()
+        public JsonResult GetApprovalQueue(int pageNo = 1, int pageSize = 2)
         {
             Ctx ctx = Session["ctx"] as Ctx;
 
@@ -151,6 +152,24 @@ namespace VAS.Controllers
                     });
                 }
 
+                pageSize = Math.Max(1, Math.Min(pageSize, 50));
+
+                int totalPages = pendingCount > 0
+                    ? (int)Math.Ceiling((decimal)pendingCount / pageSize)
+                    : 0;
+
+                pageNo = Math.Max(1, pageNo);
+
+                if (totalPages > 0 && pageNo > totalPages)
+                {
+                    pageNo = totalPages;
+                }
+
+                List<object> pagedItems = items
+                    .Skip((pageNo - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
                 return Json(new
                 {
                     success = true,
@@ -161,7 +180,10 @@ namespace VAS.Controllers
                     submittedByText = GetMsg(ctx, "VAS_053_SubmittedBy", "Submitted by"),
                     noDataText = GetMsg(ctx, "VAS_053_NoData", "No in-progress cash journals"),
                     pendingCount = pendingCount,
-                    items = items,
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+                    totalPages = totalPages,
+                    items = pagedItems,
                     hasData = pendingCount > 0
                 }, JsonRequestBehavior.AllowGet);
             }

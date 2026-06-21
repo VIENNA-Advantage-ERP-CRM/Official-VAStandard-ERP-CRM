@@ -34,7 +34,7 @@
         var isDisposed = false;
         var ajaxRequest = null;
         var pageNo = 1;
-        var pageSize = 3;
+        var pageSize = 2;
         var totalPages = 0;
 
         function lbl(key, fallback) {
@@ -234,8 +234,8 @@
                 '</div>'
             );
 
-            var $headerActions = $('<div>', {
-                'class': 'VAS_053_approval-header-actions'
+            var $footer = $('<div>', {
+                'class': 'VAS_053_approval-footer'
             });
 
             var $body = $('<div>', {
@@ -249,9 +249,9 @@
             });
 
             $titleRow.append($icon).append($title).append($meta);
-            $headerActions.append($pager);
-            $header.append($titleRow).append($headerActions);
-            $card.append($busy).append($header).append($body).append($state);
+            $header.append($titleRow);
+            $footer.append($pager);
+            $card.append($busy).append($header).append($body).append($state).append($footer);
             $root.append($card);
 
             bindEvents();
