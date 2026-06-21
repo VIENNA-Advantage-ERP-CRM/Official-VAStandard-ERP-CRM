@@ -1,3 +1,4 @@
+
 using CoreLibrary.DataBase;
 using Newtonsoft.Json;
 using System;
@@ -58,165 +59,425 @@ namespace VAS.Controllers
                 }), JsonRequestBehavior.AllowGet);
             }
 
-            bool isWeek = string.Compare(period, "week", StringComparison.OrdinalIgnoreCase) == 0;
+            bool isWeek = string.Compare(
+                period,
+                "week",
+                StringComparison.OrdinalIgnoreCase
+            ) == 0;
+
             DateTime today = DateTime.Now.Date;
 
-            int daysFromMonday = (int)today.DayOfWeek - (int)DayOfWeek.Monday;
+            int daysFromMonday =
+                (int)today.DayOfWeek -
+                (int)DayOfWeek.Monday;
 
             if (daysFromMonday < 0)
             {
                 daysFromMonday += 7;
             }
 
-            DateTime weekStart = today.AddDays(-daysFromMonday);
-            DateTime weekEndExclusive = weekStart.AddDays(7);
+            DateTime weekStart =
+                today.AddDays(
+                    -daysFromMonday
+                );
+
+            DateTime weekEndExclusive =
+                weekStart.AddDays(7);
 
             string dateFilter = isWeek
-                ? GetDateFilter("ProtectedJournal.DateAcct", weekStart, weekEndExclusive)
+                ? GetDateFilter(
+                    "ProtectedJournal.DateAcct",
+                    weekStart,
+                    weekEndExclusive
+                )
                 : @"
-AND ProtectedJournal.DateAcct >= PeriodRange.MonthDateFrom
-AND ProtectedJournal.DateAcct < " + GetDateToExclusiveExpression("PeriodRange.MonthDateTo");
+AND ProtectedJournal.DateAcct >=
+    PeriodRange.MonthDateFrom
 
-            string monthJoinType = isWeek ? "LEFT OUTER JOIN" : "INNER JOIN";
+AND ProtectedJournal.DateAcct <
+    " + GetDateToExclusiveExpression(
+                    "PeriodRange.MonthDateTo"
+                );
+
+            string monthJoinType =
+                isWeek
+                    ? "LEFT OUTER JOIN"
+                    : "INNER JOIN";
+
+            /*
+             * Oracle requires FROM DUAL for a parameter-only SELECT.
+             * PostgreSQL does not require a FROM clause.
+             */
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            /*
+             * PostgreSQL requires NUMERIC for:
+             *
+             * ROUND(value, precision)
+             *
+             * Oracle uses NUMBER.
+             */
+            string numericType =
+                DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
 
             string sql = @"
-WITH SchemaCurrency AS (
-    SELECT ClientInfo.AD_Client_ID,
-           AcctSchema.C_AcctSchema_ID,
-           AcctSchema.Name AS AcctSchemaName,
-           AcctSchema.C_Currency_ID AS C_Currency_ID,
-           Currency.StdPrecision,
-           Currency.ISO_Code AS ISO_Code,
-           CASE
-               WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
-               ELSE Currency.ISO_Code
-           END AS Cur_Symbol
+WITH QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID"
+        + queryParametersFrom + @"
+),
+SchemaCurrency AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        AcctSchema.C_AcctSchema_ID,
+        AcctSchema.Name AS AcctSchemaName,
+        AcctSchema.C_Currency_ID,
+        Currency.StdPrecision,
+        Currency.ISO_Code,
+
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END AS Cur_Symbol
+
     FROM AD_ClientInfo ClientInfo
-    INNER JOIN C_AcctSchema AcctSchema
-        ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
-    INNER JOIN C_Currency Currency
-        ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+
+    INNER JOIN C_AcctSchema AcctSchema ON
+    (
+        ClientInfo.C_AcctSchema1_ID =
+        AcctSchema.C_AcctSchema_ID
+    )
+
+    INNER JOIN C_Currency Currency ON
+    (
+        AcctSchema.C_Currency_ID =
+        Currency.C_Currency_ID
+    )
+
     WHERE ClientInfo.IsActive = 'Y'
+
     AND AcctSchema.IsActive = 'Y'
-    AND ClientInfo.AD_Client_ID = @AD_Client_ID
+
+    AND ClientInfo.AD_Client_ID =
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 ),
-PeriodRange AS (
-    SELECT ClientInfo.AD_Client_ID,
-           CurrentPeriod.StartDate AS MonthDateFrom,
-           CurrentPeriod.EndDate AS MonthDateTo,
-           CurrentPeriod.C_Year_ID
+PeriodRange AS
+(
+    SELECT
+        ClientInfo.AD_Client_ID,
+        CurrentPeriod.StartDate AS MonthDateFrom,
+        CurrentPeriod.EndDate AS MonthDateTo,
+        CurrentPeriod.C_Year_ID
+
     FROM AD_ClientInfo ClientInfo
-    INNER JOIN C_Year YearData
-        ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
-    INNER JOIN C_Period CurrentPeriod
-        ON (CurrentPeriod.C_Year_ID = YearData.C_Year_ID)
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period CurrentPeriod ON
+    (
+        CurrentPeriod.C_Year_ID =
+        YearData.C_Year_ID
+    )
+
     WHERE ClientInfo.IsActive = 'Y'
+
     AND CurrentPeriod.IsActive = 'Y'
-    AND ClientInfo.AD_Client_ID = @AD_Client_ID
-    AND CURRENT_DATE >= CurrentPeriod.StartDate
-    AND CURRENT_DATE < " + GetDateToExclusiveExpression("CurrentPeriod.EndDate") + @"
+
+    AND ClientInfo.AD_Client_ID =
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
+
+    AND CURRENT_DATE >=
+        CurrentPeriod.StartDate
+
+    AND CURRENT_DATE <
+        " + GetDateToExclusiveExpression(
+                    "CurrentPeriod.EndDate"
+                ) + @"
 ),
-ProtectedJournal AS (
+ProtectedJournal AS
+(
 " + BuildProtectedJournalSql(ctx) + @"
 ),
-JournalData AS (
-    SELECT ProtectedJournal.GL_Journal_ID,
-           ProtectedJournal.AD_Client_ID,
-           ProtectedJournal.AD_Org_ID,
-           ProtectedJournal.C_AcctSchema_ID,
-           ProtectedJournal.DateAcct,
-           GL_JournalLine.AmtAcctDr,
-           GL_JournalLine.AmtAcctCr
+JournalData AS
+(
+    SELECT
+        ProtectedJournal.GL_Journal_ID,
+        ProtectedJournal.AD_Client_ID,
+        ProtectedJournal.AD_Org_ID,
+        ProtectedJournal.C_AcctSchema_ID,
+        ProtectedJournal.DateAcct,
+        GL_JournalLine.AmtAcctDr,
+        GL_JournalLine.AmtAcctCr
+
     FROM ProtectedJournal ProtectedJournal
-    INNER JOIN SchemaCurrency SchemaCurrency
-        ON (SchemaCurrency.AD_Client_ID = ProtectedJournal.AD_Client_ID
-        AND SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
-    " + monthJoinType + @" PeriodRange PeriodRange
-        ON (PeriodRange.AD_Client_ID = ProtectedJournal.AD_Client_ID)
-    LEFT OUTER JOIN GL_JournalLine GL_JournalLine
-        ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID
-        AND GL_JournalLine.IsActive = 'Y')
+
+    INNER JOIN SchemaCurrency SchemaCurrency ON
+    (
+        SchemaCurrency.AD_Client_ID =
+        ProtectedJournal.AD_Client_ID
+
+        AND SchemaCurrency.C_AcctSchema_ID =
+        ProtectedJournal.C_AcctSchema_ID
+    )
+
+    " + monthJoinType + @" PeriodRange PeriodRange ON
+    (
+        PeriodRange.AD_Client_ID =
+        ProtectedJournal.AD_Client_ID
+    )
+
+    LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
+    (
+        ProtectedJournal.GL_Journal_ID =
+        GL_JournalLine.GL_Journal_ID
+
+        AND GL_JournalLine.IsActive = 'Y'
+    )
+
     WHERE 1 = 1
+
 " + dateFilter + @"
 ),
-DailyData AS (
-    SELECT JournalData.DateAcct,
-           COUNT(DISTINCT JournalData.GL_Journal_ID) AS JournalCount,
-           ROUND(COALESCE(SUM(COALESCE(JournalData.AmtAcctDr, 0) - COALESCE(JournalData.AmtAcctCr, 0)), 0), COALESCE(MAX(SchemaCurrency.StdPrecision), 2)) AS NetValue,
-           MAX(SchemaCurrency.Cur_Symbol) AS CurSymbol,
-           MAX(SchemaCurrency.ISO_Code) AS ISOCode,
-           COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
-           MAX(PeriodRange.MonthDateFrom) AS MonthDateFrom,
-           MAX(PeriodRange.MonthDateTo) AS MonthDateTo
+DailyData AS
+(
+    SELECT
+        JournalData.DateAcct,
+
+        COUNT
+        (
+            DISTINCT JournalData.GL_Journal_ID
+        ) AS JournalCount,
+
+        ROUND
+        (
+            CAST
+            (
+                COALESCE
+                (
+                    SUM
+                    (
+                        COALESCE
+                        (
+                            JournalData.AmtAcctDr,
+                            0
+                        )
+                        -
+                        COALESCE
+                        (
+                            JournalData.AmtAcctCr,
+                            0
+                        )
+                    ),
+                    0
+                )
+                AS " + numericType + @"
+            ),
+
+            CAST
+            (
+                COALESCE
+                (
+                    MAX
+                    (
+                        SchemaCurrency.StdPrecision
+                    ),
+                    2
+                )
+                AS INTEGER
+            )
+        ) AS NetValue,
+
+        MAX
+        (
+            SchemaCurrency.Cur_Symbol
+        ) AS CurSymbol,
+
+        MAX
+        (
+            SchemaCurrency.ISO_Code
+        ) AS ISOCode,
+
+        COALESCE
+        (
+            MAX
+            (
+                SchemaCurrency.StdPrecision
+            ),
+            2
+        ) AS StdPrecision,
+
+        MAX
+        (
+            PeriodRange.MonthDateFrom
+        ) AS MonthDateFrom,
+
+        MAX
+        (
+            PeriodRange.MonthDateTo
+        ) AS MonthDateTo
+
     FROM JournalData JournalData
-    INNER JOIN SchemaCurrency SchemaCurrency
-        ON (SchemaCurrency.AD_Client_ID = JournalData.AD_Client_ID
-        AND SchemaCurrency.C_AcctSchema_ID = JournalData.C_AcctSchema_ID)
-    LEFT OUTER JOIN PeriodRange PeriodRange
-        ON (PeriodRange.AD_Client_ID = JournalData.AD_Client_ID)
-    GROUP BY JournalData.DateAcct
+
+    INNER JOIN SchemaCurrency SchemaCurrency ON
+    (
+        SchemaCurrency.AD_Client_ID =
+        JournalData.AD_Client_ID
+
+        AND SchemaCurrency.C_AcctSchema_ID =
+        JournalData.C_AcctSchema_ID
+    )
+
+    LEFT OUTER JOIN PeriodRange PeriodRange ON
+    (
+        PeriodRange.AD_Client_ID =
+        JournalData.AD_Client_ID
+    )
+
+    GROUP BY
+        JournalData.DateAcct
 )
-SELECT DailyData.DateAcct,
-       DailyData.JournalCount,
-       DailyData.NetValue,
-       DailyData.CurSymbol,
-       DailyData.ISOCode,
-       DailyData.StdPrecision,
-       DailyData.MonthDateFrom,
-       DailyData.MonthDateTo
+SELECT
+    DailyData.DateAcct,
+    DailyData.JournalCount,
+    DailyData.NetValue,
+    DailyData.CurSymbol,
+    DailyData.ISOCode,
+    DailyData.StdPrecision,
+    DailyData.MonthDateFrom,
+    DailyData.MonthDateTo
+
 FROM DailyData DailyData
-ORDER BY DailyData.DateAcct ASC";
+
+ORDER BY
+    DailyData.DateAcct ASC";
 
             SqlParameter[] parameters =
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                new SqlParameter(
+                    "@AD_Client_ID",
+                    ctx.GetAD_Client_ID()
+                )
             };
 
             try
             {
-                DataSet ds = DB.ExecuteDataset(sql, parameters, null);
+                DataSet ds =
+                    DB.ExecuteDataset(
+                        sql,
+                        parameters,
+                        null
+                    );
 
-                Dictionary<int, int> countMap = new Dictionary<int, int>();
-                Dictionary<int, decimal> netMap = new Dictionary<int, decimal>();
+                Dictionary<int, int> countMap =
+                    new Dictionary<int, int>();
+
+                Dictionary<int, decimal> netMap =
+                    new Dictionary<int, decimal>();
 
                 string curSymbol = "";
                 string isoCode = "";
                 int stdPrecision = 2;
+
                 DateTime? monthDateFrom = null;
                 DateTime? monthDateTo = null;
 
-                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                if (
+                    ds != null &&
+                    ds.Tables.Count > 0 &&
+                    ds.Tables[0].Rows.Count > 0
+                )
                 {
-                    foreach (DataRow row in ds.Tables[0].Rows)
+                    foreach (
+                        DataRow row in
+                        ds.Tables[0].Rows
+                    )
                     {
-                        DateTime? dateAcct = Util.GetValueOfDateTime(row["DateAcct"]);
+                        DateTime? dateAcct =
+                            Util.GetValueOfDateTime(
+                                row["DateAcct"]
+                            );
 
                         if (!dateAcct.HasValue)
                         {
                             continue;
                         }
 
-                        int ymd = ToYmd(dateAcct.Value);
+                        int ymd =
+                            ToYmd(
+                                dateAcct.Value
+                            );
 
-                        countMap[ymd] = Util.GetValueOfInt(row["JournalCount"]);
-                        netMap[ymd] = Decimal.Round(
-                            Util.GetValueOfDecimal(row["NetValue"]),
-                            GetSafePrecision(Util.GetValueOfInt(row["StdPrecision"])),
-                            MidpointRounding.AwayFromZero
-                        );
+                        countMap[ymd] =
+                            Util.GetValueOfInt(
+                                row["JournalCount"]
+                            );
 
-                        curSymbol = Util.GetValueOfString(row["CurSymbol"]);
-                        isoCode = Util.GetValueOfString(row["ISOCode"]);
-                        stdPrecision = GetSafePrecision(Util.GetValueOfInt(row["StdPrecision"]));
+                        netMap[ymd] =
+                            Decimal.Round(
+                                Util.GetValueOfDecimal(
+                                    row["NetValue"]
+                                ),
+                                GetSafePrecision(
+                                    Util.GetValueOfInt(
+                                        row["StdPrecision"]
+                                    )
+                                ),
+                                MidpointRounding.AwayFromZero
+                            );
+
+                        curSymbol =
+                            Util.GetValueOfString(
+                                row["CurSymbol"]
+                            );
+
+                        isoCode =
+                            Util.GetValueOfString(
+                                row["ISOCode"]
+                            );
+
+                        stdPrecision =
+                            GetSafePrecision(
+                                Util.GetValueOfInt(
+                                    row["StdPrecision"]
+                                )
+                            );
 
                         if (!monthDateFrom.HasValue)
                         {
-                            monthDateFrom = Util.GetValueOfDateTime(row["MonthDateFrom"]);
+                            monthDateFrom =
+                                Util.GetValueOfDateTime(
+                                    row["MonthDateFrom"]
+                                );
                         }
 
                         if (!monthDateTo.HasValue)
                         {
-                            monthDateTo = Util.GetValueOfDateTime(row["MonthDateTo"]);
+                            monthDateTo =
+                                Util.GetValueOfDateTime(
+                                    row["MonthDateTo"]
+                                );
                         }
                     }
                 }
@@ -226,134 +487,283 @@ ORDER BY DailyData.DateAcct ASC";
 
                 if (isWeek)
                 {
-                    dateFrom = weekStart;
-                    dateToExclusive = weekEndExclusive;
+                    dateFrom =
+                        weekStart;
+
+                    dateToExclusive =
+                        weekEndExclusive;
                 }
                 else
                 {
-                    dateFrom = monthDateFrom.HasValue
-                        ? monthDateFrom.Value.Date
-                        : new DateTime(today.Year, today.Month, 1);
+                    dateFrom =
+                        monthDateFrom.HasValue
+                            ? monthDateFrom.Value.Date
+                            : new DateTime(
+                                today.Year,
+                                today.Month,
+                                1
+                            );
 
-                    dateToExclusive = monthDateTo.HasValue
-                        ? monthDateTo.Value.Date.AddDays(1)
-                        : dateFrom.AddMonths(1);
+                    dateToExclusive =
+                        monthDateTo.HasValue
+                            ? monthDateTo.Value.Date.AddDays(1)
+                            : dateFrom.AddMonths(1);
                 }
 
-                List<object> days = new List<object>();
+                List<object> days =
+                    new List<object>();
 
-                for (DateTime date = dateFrom; date < dateToExclusive; date = date.AddDays(1))
+                for (
+                    DateTime date = dateFrom;
+                    date < dateToExclusive;
+                    date = date.AddDays(1)
+                )
                 {
-                    int ymd = ToYmd(date);
+                    int ymd =
+                        ToYmd(date);
 
-                    int journalCount = countMap.ContainsKey(ymd) ? countMap[ymd] : 0;
-                    decimal netValue = netMap.ContainsKey(ymd) ? netMap[ymd] : 0m;
+                    int journalCount =
+                        countMap.ContainsKey(ymd)
+                            ? countMap[ymd]
+                            : 0;
 
-                    bool isWeekendDay = date.DayOfWeek == DayOfWeek.Saturday || date.DayOfWeek == DayOfWeek.Sunday;
-                    bool isThisWeek = date >= weekStart && date < weekEndExclusive;
+                    decimal netValue =
+                        netMap.ContainsKey(ymd)
+                            ? netMap[ymd]
+                            : 0m;
+
+                    bool isWeekendDay =
+                        date.DayOfWeek ==
+                            DayOfWeek.Saturday ||
+                        date.DayOfWeek ==
+                            DayOfWeek.Sunday;
+
+                    bool isThisWeek =
+                        date >= weekStart &&
+                        date < weekEndExclusive;
 
                     days.Add(new
                     {
-                        DayNum = date.Day,
-                        DateStr = date.ToString("MMM dd"),
-                        DayOfWeek = (int)date.DayOfWeek,
-                        JournalCount = journalCount,
-                        NetValue = netValue,
-                        IsWeekend = isWeekendDay,
-                        IsThisWeek = isThisWeek
+                        DayNum =
+                            date.Day,
+
+                        DateStr =
+                            date.ToString(
+                                "MMM dd"
+                            ),
+
+                        DayOfWeek =
+                            (int)date.DayOfWeek,
+
+                        JournalCount =
+                            journalCount,
+
+                        NetValue =
+                            netValue,
+
+                        IsWeekend =
+                            isWeekendDay,
+
+                        IsThisWeek =
+                            isThisWeek
                     });
                 }
 
-                string periodLabel = BuildPeriodLabel(dateFrom, dateToExclusive.AddDays(-1));
+                string periodLabel =
+                    BuildPeriodLabel(
+                        dateFrom,
+                        dateToExclusive.AddDays(-1)
+                    );
 
-                return Json(JsonConvert.SerializeObject(new
-                {
-                    success = true,
-                    error = "",
-                    title = GetMsg(ctx, "VAS_042_GLJournalVolume", "GL Journal Volume"),
-                    Days = days,
-                    PeriodLabel = periodLabel,
-                    Period = isWeek ? "week" : "month",
-                    CurSymbol = curSymbol,
-                    ISOCode = isoCode,
-                    StdPrecision = stdPrecision,
-                    dateFrom = FormatDate(dateFrom),
-                    dateTo = FormatDate(dateToExclusive.AddDays(-1)),
-                    hasData = days.Count > 0
-                }), JsonRequestBehavior.AllowGet);
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            success = true,
+                            error = "",
+
+                            title = GetMsg(
+                                ctx,
+                                "VAS_042_GLJournalVolume",
+                                "GL Journal Volume"
+                            ),
+
+                            Days =
+                                days,
+
+                            PeriodLabel =
+                                periodLabel,
+
+                            Period =
+                                isWeek
+                                    ? "week"
+                                    : "month",
+
+                            CurSymbol =
+                                curSymbol,
+
+                            ISOCode =
+                                isoCode,
+
+                            StdPrecision =
+                                stdPrecision,
+
+                            dateFrom =
+                                FormatDate(
+                                    dateFrom
+                                ),
+
+                            dateTo =
+                                FormatDate(
+                                    dateToExclusive.AddDays(-1)
+                                ),
+
+                            hasData =
+                                days.Count > 0
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch
             {
-                return Json(JsonConvert.SerializeObject(new
-                {
-                    success = false,
-                    error = GetMsg(ctx, "VAS_042_ErrorLoadingData", "Error loading data."),
-                    hasData = false
-                }), JsonRequestBehavior.AllowGet);
+                return Json(
+                    JsonConvert.SerializeObject(
+                        new
+                        {
+                            success = false,
+
+                            error = GetMsg(
+                                ctx,
+                                "VAS_042_ErrorLoadingData",
+                                "Error loading data."
+                            ),
+
+                            hasData = false
+                        }
+                    ),
+                    JsonRequestBehavior.AllowGet
+                );
             }
         }
 
-        private string BuildProtectedJournalSql(Ctx ctx)
+        private string BuildProtectedJournalSql(
+            Ctx ctx
+        )
         {
             string sql = @"
-SELECT GL_Journal.GL_Journal_ID,
-       GL_Journal.AD_Client_ID,
-       GL_Journal.AD_Org_ID,
-       GL_Journal.C_AcctSchema_ID,
-       GL_Journal.DocumentNo,
-       GL_Journal.DateAcct
-FROM GL_Journal GL_Journal
-WHERE GL_Journal.IsActive = 'Y'
-AND GL_Journal.AD_Client_ID = @AD_Client_ID";
+SELECT
+    GL_Journal.GL_Journal_ID,
+    GL_Journal.AD_Client_ID,
+    GL_Journal.AD_Org_ID,
+    GL_Journal.C_AcctSchema_ID,
+    GL_Journal.DocumentNo,
+    GL_Journal.DateAcct
 
-            sql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql,
-                "GL_Journal",
-                MRole.SQL_FULLYQUALIFIED,
-                MRole.SQL_RO
-            );
+FROM GL_Journal GL_Journal
+
+WHERE GL_Journal.IsActive = 'Y'
+
+AND GL_Journal.AD_Client_ID =
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)";
+
+            sql =
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        sql,
+                        "GL_Journal",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
             return sql;
         }
 
-        private string GetDateFilter(string columnName, DateTime dateFrom, DateTime dateTo)
+        private string GetDateFilter(
+            string columnName,
+            DateTime dateFrom,
+            DateTime dateTo
+        )
         {
-            string dateFromText = FormatDate(dateFrom);
-            string dateToText = FormatDate(dateTo);
+            string dateFromText =
+                FormatDate(
+                    dateFrom
+                );
+
+            string dateToText =
+                FormatDate(
+                    dateTo
+                );
 
             if (DB.IsOracle())
             {
                 return @"
-AND " + columnName + @" >= TO_DATE('" + dateFromText + @"', 'YYYY-MM-DD')
-AND " + columnName + @" < TO_DATE('" + dateToText + @"', 'YYYY-MM-DD')";
+AND " + columnName + @" >=
+    TO_DATE
+    (
+        '" + dateFromText + @"',
+        'YYYY-MM-DD'
+    )
+
+AND " + columnName + @" <
+    TO_DATE
+    (
+        '" + dateToText + @"',
+        'YYYY-MM-DD'
+    )";
             }
 
             return @"
-AND " + columnName + @" >= DATE '" + dateFromText + @"'
-AND " + columnName + @" < DATE '" + dateToText + @"'";
+AND " + columnName + @" >=
+    DATE '" + dateFromText + @"'
+
+AND " + columnName + @" <
+    DATE '" + dateToText + @"'";
         }
 
-        private string GetDateToExclusiveExpression(string dateColumn)
+        private string GetDateToExclusiveExpression(
+            string dateColumn
+        )
         {
             if (DB.IsOracle())
             {
-                return dateColumn + " + 1";
+                return
+                    dateColumn +
+                    " + 1";
             }
 
-            return dateColumn + " + INTERVAL '1 day'";
+            return
+                dateColumn +
+                " + INTERVAL '1 day'";
         }
 
-        private string FormatDate(DateTime date)
+        private string FormatDate(
+            DateTime date
+        )
         {
-            return date.ToString("yyyy-MM-dd");
+            return date.ToString(
+                "yyyy-MM-dd"
+            );
         }
 
-        private int ToYmd(DateTime date)
+        private int ToYmd(
+            DateTime date
+        )
         {
-            return date.Year * 10000 + date.Month * 100 + date.Day;
+            return
+                date.Year * 10000 +
+                date.Month * 100 +
+                date.Day;
         }
 
-        private int GetSafePrecision(int precision)
+        private int GetSafePrecision(
+            int precision
+        )
         {
             if (precision < 0)
             {
@@ -363,19 +773,42 @@ AND " + columnName + @" < DATE '" + dateToText + @"'";
             return precision;
         }
 
-        private string BuildPeriodLabel(DateTime dateFrom, DateTime dateTo)
+        private string BuildPeriodLabel(
+            DateTime dateFrom,
+            DateTime dateTo
+        )
         {
-            bool sameMonth = dateFrom.Month == dateTo.Month && dateFrom.Year == dateTo.Year;
-            string endFormat = sameMonth ? "d" : "MMM d";
+            bool sameMonth =
+                dateFrom.Month == dateTo.Month &&
+                dateFrom.Year == dateTo.Year;
 
-            return dateFrom.ToString("MMM d") + " – " + dateTo.ToString(endFormat);
+            string endFormat =
+                sameMonth
+                    ? "d"
+                    : "MMM d";
+
+            return
+                dateFrom.ToString("MMM d") +
+                " – " +
+                dateTo.ToString(endFormat);
         }
 
-        private string GetMsg(Ctx ctx, string key, string fallback)
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback
+        )
         {
-            string msg = Msg.GetMsg(ctx, key);
+            string msg =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
 
-            if (string.IsNullOrEmpty(msg) || msg == key)
+            if (
+                string.IsNullOrEmpty(msg) ||
+                msg == key
+            )
             {
                 return fallback;
             }
@@ -384,3 +817,4 @@ AND " + columnName + @" < DATE '" + dateToText + @"'";
         }
     }
 }
+
