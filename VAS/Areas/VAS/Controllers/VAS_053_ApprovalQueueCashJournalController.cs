@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -18,183 +19,468 @@ namespace VAS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetApprovalQueue(int pageNo = 1, int pageSize = 2)
+        public JsonResult GetApprovalQueue(
+            int pageNo = 1,
+            int pageSize = 2
+        )
         {
-            Ctx ctx = Session["ctx"] as Ctx;
+            Ctx ctx =
+                Session["ctx"] as Ctx;
 
             if (ctx == null)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = "Session Expired",
-                    hasData = false
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        success = false,
+                        error = "Session Expired",
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
 
-            IDataReader reader = null;
+            IDataReader reader =
+                null;
 
             try
             {
+                /*
+                 * Latest workflow process for every C_Cash record.
+                 *
+                 * This query uses only ANSI SQL supported by
+                 * Oracle and PostgreSQL.
+                 */
                 string workflowSql = @"
-                    SELECT WorkflowProcess.Record_ID,
-                           WorkflowProcess.TextMsg AS WorkflowMessage,
-                           WorkflowProcess.Priority,
-                           WorkflowProcess.Created AS WorkflowCreated,
-                           WorkflowProcess.AD_WF_Process_ID
-                    FROM AD_WF_Process WorkflowProcess
-                    WHERE WorkflowProcess.IsActive='Y'
-                    AND WorkflowProcess.AD_Table_ID=(SELECT AD_Table.AD_Table_ID
-                        FROM AD_Table AD_Table
-                        WHERE AD_Table.TableName='C_Cash')
-                    AND NOT EXISTS (SELECT 1
-                        FROM AD_WF_Process WorkflowProcess2
-                        WHERE WorkflowProcess2.IsActive='Y'
-                        AND WorkflowProcess2.AD_Table_ID=WorkflowProcess.AD_Table_ID
-                        AND WorkflowProcess2.Record_ID=WorkflowProcess.Record_ID
-                        AND (
-                            WorkflowProcess2.Created > WorkflowProcess.Created
-                            OR (
-                                WorkflowProcess2.Created=WorkflowProcess.Created
-                                AND WorkflowProcess2.AD_WF_Process_ID > WorkflowProcess.AD_WF_Process_ID
-                                )
-                            )
-                    )";
+SELECT
+    WorkflowProcess.Record_ID,
+    WorkflowProcess.TextMsg AS WorkflowMessage,
+    WorkflowProcess.Priority,
+    WorkflowProcess.Created AS WorkflowCreated,
+    WorkflowProcess.AD_WF_Process_ID
 
-                string queueSql = @"
-                    SELECT CashHeader.C_Cash_ID,
-                           CashHeader.DocumentNo,
-                           CashHeader.Created,
-                           CashHeader.CreatedBy,
-                           CashHeader.StatementDate,
-                           CashHeader.EndingBalance,
-                           CashHeader.DocStatus,
-                           CashBook.Name AS CashBookName,
-                           CreatedBy.Name AS CreatedByName,
-                           Currency.ISO_Code AS CurrencyISO,
-                           Currency.CurSymbol AS CurrencySymbol,
-                           Currency.StdPrecision,
-                           LatestWorkflow.WorkflowMessage,
-                           LatestWorkflow.Priority
-                    FROM C_Cash CashHeader
-                    INNER JOIN C_CashBook CashBook
-                        ON (CashHeader.C_CashBook_ID=CashBook.C_CashBook_ID)
-                    INNER JOIN C_Currency Currency
-                        ON (CashBook.C_Currency_ID=Currency.C_Currency_ID)
-                    LEFT OUTER JOIN AD_User CreatedBy
-                        ON (CashHeader.CreatedBy=CreatedBy.AD_User_ID)
-                    LEFT OUTER JOIN LatestWorkflow LatestWorkflow
-                        ON (LatestWorkflow.Record_ID=CashHeader.C_Cash_ID)
-                    WHERE CashHeader.IsActive='Y'
-                    AND CashBook.IsActive='Y'
-                    AND CashHeader.DocStatus='IP'";
+FROM AD_WF_Process WorkflowProcess
 
-                queueSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    queueSql,
-                    "CashHeader",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+INNER JOIN AD_Table TableInfo ON
+(
+    TableInfo.AD_Table_ID =
+    WorkflowProcess.AD_Table_ID
+)
+
+WHERE WorkflowProcess.IsActive = 'Y'
+
+AND TableInfo.IsActive = 'Y'
+
+AND TableInfo.TableName = 'C_Cash'
+
+AND NOT EXISTS
+(
+    SELECT
+        1
+
+    FROM AD_WF_Process WorkflowProcess2
+
+    WHERE WorkflowProcess2.IsActive = 'Y'
+
+    AND WorkflowProcess2.AD_Table_ID =
+        WorkflowProcess.AD_Table_ID
+
+    AND WorkflowProcess2.Record_ID =
+        WorkflowProcess.Record_ID
+
+    AND
+    (
+        WorkflowProcess2.Created >
+        WorkflowProcess.Created
+
+        OR
+        (
+            WorkflowProcess2.Created =
+            WorkflowProcess.Created
+
+            AND WorkflowProcess2.AD_WF_Process_ID >
+            WorkflowProcess.AD_WF_Process_ID
+        )
+    )
+)";
+
+                /*
+                 * Apply MRole only to the main physical table query.
+                 *
+                 * Do not apply MRole to:
+                 * - the final WITH query
+                 * - the ProtectedCash CTE alias
+                 * - LatestWorkflow
+                 * - joined aliases
+                 */
+                string protectedCashSql = @"
+SELECT
+    CashHeader.C_Cash_ID,
+    CashHeader.AD_Client_ID,
+    CashHeader.AD_Org_ID,
+    CashHeader.C_CashBook_ID,
+    CashHeader.DocumentNo,
+    CashHeader.Created,
+    CashHeader.CreatedBy,
+    CashHeader.StatementDate,
+    CashHeader.EndingBalance,
+    CashHeader.DocStatus
+
+FROM C_Cash CashHeader
+
+WHERE CashHeader.IsActive = 'Y'
+
+AND CashHeader.DocStatus = 'IP'";
+
+                protectedCashSql =
+                    MRole.GetDefault(ctx)
+                        .AddAccessSQL(
+                            protectedCashSql,
+                            "CashHeader",
+                            MRole.SQL_FULLYQUALIFIED,
+                            MRole.SQL_RO
+                        );
+
+                /*
+                 * Join only after C_Cash has already been
+                 * protected by MRole.
+                 */
+                string approvalQueueSql = @"
+ApprovalQueue AS
+(
+    SELECT
+        ProtectedCash.C_Cash_ID,
+        ProtectedCash.DocumentNo,
+        ProtectedCash.Created,
+        ProtectedCash.CreatedBy,
+        ProtectedCash.StatementDate,
+        ProtectedCash.EndingBalance,
+        ProtectedCash.DocStatus,
+
+        CashBook.Name AS CashBookName,
+
+        CreatedByUser.Name AS CreatedByName,
+
+        Currency.ISO_Code AS CurrencyISO,
+
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END AS CurrencySymbol,
+
+        Currency.StdPrecision,
+
+        LatestWorkflow.WorkflowMessage,
+        LatestWorkflow.Priority
+
+    FROM ProtectedCash ProtectedCash
+
+    INNER JOIN C_CashBook CashBook ON
+    (
+        ProtectedCash.C_CashBook_ID =
+        CashBook.C_CashBook_ID
+    )
+
+    INNER JOIN C_Currency Currency ON
+    (
+        CashBook.C_Currency_ID =
+        Currency.C_Currency_ID
+    )
+
+    LEFT OUTER JOIN AD_User CreatedByUser ON
+    (
+        ProtectedCash.CreatedBy =
+        CreatedByUser.AD_User_ID
+    )
+
+    LEFT OUTER JOIN LatestWorkflow LatestWorkflow ON
+    (
+        LatestWorkflow.Record_ID =
+        ProtectedCash.C_Cash_ID
+    )
+
+    WHERE CashBook.IsActive = 'Y'
+
+    AND Currency.IsActive = 'Y'
+)";
 
                 string sql = @"
-                    WITH LatestWorkflow AS (
-                        " + workflowSql + @"
-                    )
-                    SELECT ApprovalQueue.C_Cash_ID,
-                           ApprovalQueue.DocumentNo,
-                           ApprovalQueue.Created,
-                           ApprovalQueue.CreatedBy,
-                           ApprovalQueue.StatementDate,
-                           ApprovalQueue.EndingBalance,
-                           ApprovalQueue.DocStatus,
-                           ApprovalQueue.CashBookName,
-                           ApprovalQueue.CreatedByName,
-                           ApprovalQueue.CurrencyISO,
-                           ApprovalQueue.CurrencySymbol,
-                           ApprovalQueue.StdPrecision,
-                           ApprovalQueue.WorkflowMessage,
-                           ApprovalQueue.Priority
-                    FROM (" + queueSql.Trim() + @") ApprovalQueue
-                    ORDER BY ApprovalQueue.Created DESC,
-                             ApprovalQueue.C_Cash_ID DESC";
+WITH LatestWorkflow AS
+(
+" + workflowSql + @"
+),
+ProtectedCash AS
+(
+" + protectedCashSql + @"
+),
+" + approvalQueueSql + @"
+SELECT
+    ApprovalQueue.C_Cash_ID,
+    ApprovalQueue.DocumentNo,
+    ApprovalQueue.Created,
+    ApprovalQueue.CreatedBy,
+    ApprovalQueue.StatementDate,
+    ApprovalQueue.EndingBalance,
+    ApprovalQueue.DocStatus,
+    ApprovalQueue.CashBookName,
+    ApprovalQueue.CreatedByName,
+    ApprovalQueue.CurrencyISO,
+    ApprovalQueue.CurrencySymbol,
+    ApprovalQueue.StdPrecision,
+    ApprovalQueue.WorkflowMessage,
+    ApprovalQueue.Priority
 
-                List<object> items = new List<object>();
-                int pendingCount = 0;
+FROM ApprovalQueue ApprovalQueue
 
-                reader = DB.ExecuteReader(sql, null, null);
+ORDER BY
+    ApprovalQueue.Created DESC,
+    ApprovalQueue.C_Cash_ID DESC";
 
-                while (reader.Read())
+                List<object> items =
+                    new List<object>();
+
+                int pendingCount =
+                    0;
+
+                reader =
+                    DB.ExecuteReader(
+                        sql,
+                        null,
+                        null
+                    );
+
+                while (
+                    reader != null &&
+                    reader.Read()
+                )
                 {
                     pendingCount++;
 
-                    int priority = GetInt(reader, "Priority");
+                    int priority =
+                        GetInt(
+                            reader,
+                            "Priority"
+                        );
 
-                    string workflowMessage = GetString(reader, "WorkflowMessage");
-                    workflowMessage = ShortText(workflowMessage, 90);
+                    string workflowMessage =
+                        GetString(
+                            reader,
+                            "WorkflowMessage"
+                        );
 
-                    items.Add(new
+                    workflowMessage =
+                        ShortText(
+                            workflowMessage,
+                            90
+                        );
+
+                    items.Add(
+                        new
+                        {
+                            cCashId =
+                                GetInt(
+                                    reader,
+                                    "C_Cash_ID"
+                                ),
+
+                            documentNo =
+                                GetString(
+                                    reader,
+                                    "DocumentNo"
+                                ),
+
+                            title =
+                                GetTitle(
+                                    ctx,
+                                    reader
+                                ),
+
+                            cashBookName =
+                                GetString(
+                                    reader,
+                                    "CashBookName"
+                                ),
+
+                            createdByName =
+                                GetString(
+                                    reader,
+                                    "CreatedByName"
+                                ),
+
+                            created =
+                                FormatDbDateTime(
+                                    reader["Created"]
+                                ),
+
+                            relativeTime =
+                                GetRelativeTime(
+                                    ctx,
+                                    reader["Created"]
+                                ),
+
+                            amount =
+                                GetDecimal(
+                                    reader,
+                                    "EndingBalance"
+                                ),
+
+                            currencyISO =
+                                GetString(
+                                    reader,
+                                    "CurrencyISO"
+                                ),
+
+                            currencySymbol =
+                                GetString(
+                                    reader,
+                                    "CurrencySymbol"
+                                ),
+
+                            stdPrecision =
+                                GetInt(
+                                    reader,
+                                    "StdPrecision",
+                                    2
+                                ),
+
+                            workflowMessage =
+                                workflowMessage,
+
+                            priority =
+                                priority,
+
+                            priorityText =
+                                GetPriorityText(
+                                    ctx,
+                                    priority
+                                ),
+
+                            priorityClass =
+                                GetPriorityClass(
+                                    priority
+                                )
+                        }
+                    );
+                }
+
+                pageSize =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            pageSize,
+                            50
+                        )
+                    );
+
+                int totalPages =
+                    pendingCount > 0
+                        ? (int)Math.Ceiling(
+                            (decimal)pendingCount /
+                            pageSize
+                        )
+                        : 0;
+
+                pageNo =
+                    Math.Max(
+                        1,
+                        pageNo
+                    );
+
+                if (
+                    totalPages > 0 &&
+                    pageNo > totalPages
+                )
+                {
+                    pageNo =
+                        totalPages;
+                }
+
+                List<object> pagedItems =
+                    items
+                        .Skip(
+                            (pageNo - 1) *
+                            pageSize
+                        )
+                        .Take(
+                            pageSize
+                        )
+                        .ToList();
+
+                return Json(
+                    new
                     {
-                        cCashId = GetInt(reader, "C_Cash_ID"),
-                        documentNo = GetString(reader, "DocumentNo"),
-                        title = GetTitle(ctx, reader),
-                        cashBookName = GetString(reader, "CashBookName"),
-                        createdByName = GetString(reader, "CreatedByName"),
-                        created = FormatDbDateTime(reader["Created"]),
-                        relativeTime = GetRelativeTime(ctx, reader["Created"]),
-                        amount = GetDecimal(reader, "EndingBalance"),
-                        currencyISO = GetString(reader, "CurrencyISO"),
-                        currencySymbol = GetString(reader, "CurrencySymbol"),
-                        stdPrecision = GetInt(reader, "StdPrecision", 2),
-                        workflowMessage = workflowMessage,
-                        priority = priority,
-                        priorityText = GetPriorityText(ctx, priority),
-                        priorityClass = GetPriorityClass(priority)
-                    });
-                }
+                        success = true,
+                        error = string.Empty,
 
-                pageSize = Math.Max(1, Math.Min(pageSize, 50));
+                        title = GetMsg(
+                            ctx,
+                            "VAS_053_ApprovalQueue",
+                            "Approval Queue"
+                        ),
 
-                int totalPages = pendingCount > 0
-                    ? (int)Math.Ceiling((decimal)pendingCount / pageSize)
-                    : 0;
+                        pendingText = GetMsg(
+                            ctx,
+                            "VAS_053_Pending",
+                            "Pending"
+                        ),
 
-                pageNo = Math.Max(1, pageNo);
+                        viewAllText = GetMsg(
+                            ctx,
+                            "VAS_053_ViewAll",
+                            "View all ->"
+                        ),
 
-                if (totalPages > 0 && pageNo > totalPages)
-                {
-                    pageNo = totalPages;
-                }
+                        submittedByText = GetMsg(
+                            ctx,
+                            "VAS_053_SubmittedBy",
+                            "Submitted by"
+                        ),
 
-                List<object> pagedItems = items
-                    .Skip((pageNo - 1) * pageSize)
-                    .Take(pageSize)
-                    .ToList();
+                        noDataText = GetMsg(
+                            ctx,
+                            "VAS_053_NoData",
+                            "No in-progress cash journals"
+                        ),
 
-                return Json(new
-                {
-                    success = true,
-                    error = string.Empty,
-                    title = GetMsg(ctx, "VAS_053_ApprovalQueue", "Approval Queue"),
-                    pendingText = GetMsg(ctx, "VAS_053_Pending", "Pending"),
-                    viewAllText = GetMsg(ctx, "VAS_053_ViewAll", "View all ->"),
-                    submittedByText = GetMsg(ctx, "VAS_053_SubmittedBy", "Submitted by"),
-                    noDataText = GetMsg(ctx, "VAS_053_NoData", "No in-progress cash journals"),
-                    pendingCount = pendingCount,
-                    pageNo = pageNo,
-                    pageSize = pageSize,
-                    totalPages = totalPages,
-                    items = pagedItems,
-                    hasData = pendingCount > 0
-                }, JsonRequestBehavior.AllowGet);
+                        pendingCount =
+                            pendingCount,
+
+                        pageNo =
+                            pageNo,
+
+                        pageSize =
+                            pageSize,
+
+                        totalPages =
+                            totalPages,
+
+                        items =
+                            pagedItems,
+
+                        hasData =
+                            pendingCount > 0
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch (Exception)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = GetMsg(ctx, "VAS_053_LoadError", "Unable to load approval queue"),
-                    hasData = false
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error = GetMsg(
+                            ctx,
+                            "VAS_053_LoadError",
+                            "Unable to load approval queue"
+                        ),
+
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             finally
             {
@@ -206,45 +492,96 @@ namespace VAS.Controllers
             }
         }
 
-        private string GetTitle(Ctx ctx, IDataReader reader)
+        private string GetTitle(
+            Ctx ctx,
+            IDataReader reader
+        )
         {
-            string documentNo = GetString(reader, "DocumentNo");
-            string cashBookName = GetString(reader, "CashBookName");
+            string documentNo =
+                GetString(
+                    reader,
+                    "DocumentNo"
+                );
 
-            if (!string.IsNullOrWhiteSpace(documentNo) && !string.IsNullOrWhiteSpace(cashBookName))
+            string cashBookName =
+                GetString(
+                    reader,
+                    "CashBookName"
+                );
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    documentNo
+                ) &&
+                !string.IsNullOrWhiteSpace(
+                    cashBookName
+                )
+            )
             {
-                return documentNo + " - " + cashBookName;
+                return
+                    documentNo +
+                    " - " +
+                    cashBookName;
             }
 
-            if (!string.IsNullOrWhiteSpace(documentNo))
+            if (
+                !string.IsNullOrWhiteSpace(
+                    documentNo
+                )
+            )
             {
                 return documentNo;
             }
 
-            if (!string.IsNullOrWhiteSpace(cashBookName))
+            if (
+                !string.IsNullOrWhiteSpace(
+                    cashBookName
+                )
+            )
             {
                 return cashBookName;
             }
 
-            return GetMsg(ctx, "VAS_053_CashJournal", "Cash Journal");
+            return GetMsg(
+                ctx,
+                "VAS_053_CashJournal",
+                "Cash Journal"
+            );
         }
 
-        private string GetPriorityText(Ctx ctx, int priority)
+        private string GetPriorityText(
+            Ctx ctx,
+            int priority
+        )
         {
             if (priority >= 8)
             {
-                return GetMsg(ctx, "VAS_053_High", "High");
+                return GetMsg(
+                    ctx,
+                    "VAS_053_High",
+                    "High"
+                );
             }
 
             if (priority >= 4)
             {
-                return GetMsg(ctx, "VAS_053_Medium", "Med");
+                return GetMsg(
+                    ctx,
+                    "VAS_053_Medium",
+                    "Med"
+                );
             }
 
-            return GetMsg(ctx, "VAS_053_Low", "Low");
+            return GetMsg(
+                ctx,
+                "VAS_053_Low",
+                "Low"
+            );
         }
 
-        private string GetPriorityClass(int priority)
+        private string GetPriorityClass(
+            int priority
+        )
         {
             if (priority >= 8)
             {
@@ -259,50 +596,127 @@ namespace VAS.Controllers
             return "low";
         }
 
-        private string GetRelativeTime(Ctx ctx, object value)
+        private string GetRelativeTime(
+            Ctx ctx,
+            object value
+        )
         {
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return string.Empty;
             }
 
             DateTime created;
 
-            if (!DateTime.TryParse(value.ToString(), out created))
+            if (
+                !DateTime.TryParse(
+                    value.ToString(),
+                    out created
+                )
+            )
             {
                 return string.Empty;
             }
 
-            TimeSpan elapsed = DateTime.Now - created;
+            TimeSpan elapsed =
+                DateTime.Now -
+                created;
 
             if (elapsed.TotalMinutes < 1)
             {
-                return GetMsg(ctx, "VAS_053_JustNow", "just now");
+                return GetMsg(
+                    ctx,
+                    "VAS_053_JustNow",
+                    "just now"
+                );
             }
 
             if (elapsed.TotalHours < 1)
             {
-                return Math.Max(1, Convert.ToInt32(Math.Floor(elapsed.TotalMinutes))) + "m " + GetMsg(ctx, "VAS_053_Ago", "ago");
+                return
+                    Math.Max(
+                        1,
+                        Convert.ToInt32(
+                            Math.Floor(
+                                elapsed.TotalMinutes
+                            )
+                        )
+                    ) +
+                    "m " +
+                    GetMsg(
+                        ctx,
+                        "VAS_053_Ago",
+                        "ago"
+                    );
             }
 
             if (elapsed.TotalDays < 1)
             {
-                return Math.Max(1, Convert.ToInt32(Math.Floor(elapsed.TotalHours))) + "h " + GetMsg(ctx, "VAS_053_Ago", "ago");
+                return
+                    Math.Max(
+                        1,
+                        Convert.ToInt32(
+                            Math.Floor(
+                                elapsed.TotalHours
+                            )
+                        )
+                    ) +
+                    "h " +
+                    GetMsg(
+                        ctx,
+                        "VAS_053_Ago",
+                        "ago"
+                    );
             }
 
             if (elapsed.TotalDays < 2)
             {
-                return GetMsg(ctx, "VAS_053_Yesterday", "yesterday");
+                return GetMsg(
+                    ctx,
+                    "VAS_053_Yesterday",
+                    "yesterday"
+                );
             }
 
-            return Math.Max(1, Convert.ToInt32(Math.Floor(elapsed.TotalDays))) + "d " + GetMsg(ctx, "VAS_053_Ago", "ago");
+            return
+                Math.Max(
+                    1,
+                    Convert.ToInt32(
+                        Math.Floor(
+                            elapsed.TotalDays
+                        )
+                    )
+                ) +
+                "d " +
+                GetMsg(
+                    ctx,
+                    "VAS_053_Ago",
+                    "ago"
+                );
         }
 
-        private string GetMsg(Ctx ctx, string key, string fallback)
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback
+        )
         {
-            string msg = Msg.GetMsg(ctx, key);
+            string msg =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
 
-            if (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]")
+            if (
+                string.IsNullOrEmpty(
+                    msg
+                ) ||
+                msg == key ||
+                msg == "[" + key + "]"
+            )
             {
                 return fallback;
             }
@@ -310,76 +724,155 @@ namespace VAS.Controllers
             return msg;
         }
 
-        private string FormatDbDateTime(object value)
+        private string FormatDbDateTime(
+            object value
+        )
         {
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return string.Empty;
             }
 
             DateTime dateValue;
 
-            if (DateTime.TryParse(value.ToString(), out dateValue))
+            if (
+                DateTime.TryParse(
+                    value.ToString(),
+                    out dateValue
+                )
+            )
             {
-                return dateValue.ToString("yyyy-MM-dd HH:mm");
+                return dateValue.ToString(
+                    "yyyy-MM-dd HH:mm"
+                );
             }
 
             return string.Empty;
         }
 
-        private string ShortText(string text, int maxLength)
+        private string ShortText(
+            string text,
+            int maxLength
+        )
         {
-            if (string.IsNullOrWhiteSpace(text))
+            if (
+                string.IsNullOrWhiteSpace(
+                    text
+                )
+            )
             {
                 return string.Empty;
             }
 
-            text = text.Replace("\r", " ").Replace("\n", " ").Trim();
+            text =
+                text
+                    .Replace(
+                        "\r",
+                        " "
+                    )
+                    .Replace(
+                        "\n",
+                        " "
+                    )
+                    .Trim();
 
-            while (text.Contains("  "))
+            while (
+                text.Contains(
+                    "  "
+                )
+            )
             {
-                text = text.Replace("  ", " ");
+                text =
+                    text.Replace(
+                        "  ",
+                        " "
+                    );
             }
 
-            if (text.Length <= maxLength)
+            if (
+                text.Length <=
+                maxLength
+            )
             {
                 return text;
             }
 
-            return text.Substring(0, maxLength) + "...";
+            return
+                text.Substring(
+                    0,
+                    maxLength
+                ) +
+                "...";
         }
 
-        private decimal GetDecimal(IDataReader reader, string columnName)
+        private decimal GetDecimal(
+            IDataReader reader,
+            string columnName
+        )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return 0;
             }
 
             decimal result;
-            return decimal.TryParse(value.ToString(), out result) ? result : 0;
+
+            return decimal.TryParse(
+                value.ToString(),
+                out result
+            )
+                ? result
+                : 0;
         }
 
-        private int GetInt(IDataReader reader, string columnName, int fallback = 0)
+        private int GetInt(
+            IDataReader reader,
+            string columnName,
+            int fallback = 0
+        )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return fallback;
             }
 
             int result;
-            return int.TryParse(value.ToString(), out result) ? result : fallback;
+
+            return int.TryParse(
+                value.ToString(),
+                out result
+            )
+                ? result
+                : fallback;
         }
 
-        private string GetString(IDataReader reader, string columnName)
+        private string GetString(
+            IDataReader reader,
+            string columnName
+        )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return string.Empty;
             }
@@ -388,3 +881,4 @@ namespace VAS.Controllers
         }
     }
 }
+

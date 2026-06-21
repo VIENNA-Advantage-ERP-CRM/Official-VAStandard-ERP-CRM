@@ -25,110 +25,265 @@ namespace VAS.Controllers
 
             if (ctx == null)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = "Session Expired",
-                    hasData = false
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        success = false,
+                        error = "Session Expired",
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
 
             IDataReader reader = null;
 
             try
             {
-                SqlQueryData queryData = BuildSevenDayCashFlowSql(ctx);
+                SqlQueryData queryData =
+                    BuildSevenDayCashFlowSql(ctx);
 
-                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
+                reader = DB.ExecuteReader(
+                    queryData.Sql,
+                    queryData.Parameters,
+                    null
+                );
 
-                List<object> items = new List<object>();
+                List<object> items =
+                    new List<object>();
 
                 int stdPrecision = 2;
                 int currencyId = 0;
-                string currencyISO = string.Empty;
-                string currencySymbol = string.Empty;
+
+                string currencyISO =
+                    string.Empty;
+
+                string currencySymbol =
+                    string.Empty;
 
                 decimal totalCashIn = 0;
                 decimal totalCashOut = 0;
                 decimal totalNet = 0;
+
                 int totalLineCount = 0;
 
                 DateTime? dateFrom = null;
                 DateTime? dateTo = null;
 
-                while (reader != null && reader.Read())
+                while (
+                    reader != null &&
+                    reader.Read()
+                )
                 {
-                    DateTime cashFlowDateValue = Util.GetValueOfDateTime(reader["CashFlowDate"]) ?? DateTime.Now;
-                    string cashFlowDate = FormatDate(cashFlowDateValue);
-                    string dayLabel = cashFlowDateValue.ToString("ddd");
+                    DateTime cashFlowDateValue =
+                        Util.GetValueOfDateTime(
+                            reader["CashFlowDate"]
+                        ) ?? DateTime.Now;
 
-                    decimal cashInAmount = GetDecimal(reader, "CashInAmount");
-                    decimal cashOutAmount = GetDecimal(reader, "CashOutAmount");
-                    decimal netAmount = GetDecimal(reader, "NetAmount");
-                    int lineCount = GetInt(reader, "LineCount");
+                    string cashFlowDate =
+                        FormatDate(
+                            cashFlowDateValue
+                        );
 
-                    stdPrecision = GetInt(reader, "StdPrecision", stdPrecision);
-                    currencyId = GetInt(reader, "C_Currency_ID", currencyId);
-                    currencyISO = GetString(reader, "CurrencyISO");
-                    currencySymbol = GetString(reader, "CurrencySymbol");
+                    string dayLabel =
+                        cashFlowDateValue.ToString(
+                            "ddd"
+                        );
+
+                    decimal cashInAmount =
+                        GetDecimal(
+                            reader,
+                            "CashInAmount"
+                        );
+
+                    decimal cashOutAmount =
+                        GetDecimal(
+                            reader,
+                            "CashOutAmount"
+                        );
+
+                    decimal netAmount =
+                        GetDecimal(
+                            reader,
+                            "NetAmount"
+                        );
+
+                    int lineCount =
+                        GetInt(
+                            reader,
+                            "LineCount"
+                        );
+
+                    stdPrecision =
+                        GetInt(
+                            reader,
+                            "StdPrecision",
+                            stdPrecision
+                        );
+
+                    currencyId =
+                        GetInt(
+                            reader,
+                            "C_Currency_ID",
+                            currencyId
+                        );
+
+                    currencyISO =
+                        GetString(
+                            reader,
+                            "CurrencyISO"
+                        );
+
+                    currencySymbol =
+                        GetString(
+                            reader,
+                            "CurrencySymbol"
+                        );
 
                     if (!dateFrom.HasValue)
                     {
-                        dateFrom = cashFlowDateValue;
+                        dateFrom =
+                            cashFlowDateValue;
                     }
 
-                    dateTo = cashFlowDateValue;
+                    dateTo =
+                        cashFlowDateValue;
 
-                    totalCashIn += cashInAmount;
-                    totalCashOut += cashOutAmount;
-                    totalNet += netAmount;
-                    totalLineCount += lineCount;
+                    totalCashIn +=
+                        cashInAmount;
 
-                    items.Add(new
-                    {
-                        date = cashFlowDate,
-                        dayLabel = dayLabel,
-                        cashInAmount = cashInAmount,
-                        cashOutAmount = cashOutAmount,
-                        netAmount = netAmount,
-                        lineCount = lineCount,
-                        currencyISO = currencyISO,
-                        currencySymbol = currencySymbol,
-                        stdPrecision = stdPrecision,
-                        tooltip = dayLabel + " " + cashFlowDate
-                            + " | In: " + cashInAmount.ToString()
-                            + " | Out: " + cashOutAmount.ToString()
-                            + " | Net: " + netAmount.ToString()
-                    });
+                    totalCashOut +=
+                        cashOutAmount;
+
+                    totalNet +=
+                        netAmount;
+
+                    totalLineCount +=
+                        lineCount;
+
+                    items.Add(
+                        new
+                        {
+                            date =
+                                cashFlowDate,
+
+                            dayLabel =
+                                dayLabel,
+
+                            cashInAmount =
+                                cashInAmount,
+
+                            cashOutAmount =
+                                cashOutAmount,
+
+                            netAmount =
+                                netAmount,
+
+                            lineCount =
+                                lineCount,
+
+                            currencyISO =
+                                currencyISO,
+
+                            currencySymbol =
+                                currencySymbol,
+
+                            stdPrecision =
+                                stdPrecision,
+
+                            tooltip =
+                                dayLabel +
+                                " " +
+                                cashFlowDate +
+                                " | In: " +
+                                cashInAmount.ToString() +
+                                " | Out: " +
+                                cashOutAmount.ToString() +
+                                " | Net: " +
+                                netAmount.ToString()
+                        }
+                    );
                 }
 
-                return Json(new
-                {
-                    success = true,
-                    error = string.Empty,
-                    title = GetMsg(ctx, "VAS_051_SevenDayCashFlow", "7-Day Cash Flow"),
-                    metaText = GetMsg(ctx, "VAS_051_Last7Days", "Last 7 days"),
-                    dateFrom = dateFrom.HasValue ? FormatDate(dateFrom.Value) : "",
-                    dateTo = dateTo.HasValue ? FormatDate(dateTo.Value) : "",
-                    currencyISO = currencyISO,
-                    currencySymbol = currencySymbol,
-                    cCurrencyId = currencyId,
-                    stdPrecision = stdPrecision,
-                    items = items,
-                    totalCashIn = totalCashIn,
-                    totalCashOut = totalCashOut,
-                    totalNet = totalNet,
-                    hasData = totalLineCount > 0
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        success = true,
+                        error = string.Empty,
+
+                        title = GetMsg(
+                            ctx,
+                            "VAS_051_SevenDayCashFlow",
+                            "7-Day Cash Flow"
+                        ),
+
+                        metaText = GetMsg(
+                            ctx,
+                            "VAS_051_Last7Days",
+                            "Last 7 days"
+                        ),
+
+                        dateFrom =
+                            dateFrom.HasValue
+                                ? FormatDate(
+                                    dateFrom.Value
+                                )
+                                : "",
+
+                        dateTo =
+                            dateTo.HasValue
+                                ? FormatDate(
+                                    dateTo.Value
+                                )
+                                : "",
+
+                        currencyISO =
+                            currencyISO,
+
+                        currencySymbol =
+                            currencySymbol,
+
+                        cCurrencyId =
+                            currencyId,
+
+                        stdPrecision =
+                            stdPrecision,
+
+                        items =
+                            items,
+
+                        totalCashIn =
+                            totalCashIn,
+
+                        totalCashOut =
+                            totalCashOut,
+
+                        totalNet =
+                            totalNet,
+
+                        hasData =
+                            totalLineCount > 0
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch (Exception)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = GetMsg(ctx, "VAS_051_LoadError", "Unable to load seven day cash flow"),
-                    hasData = false
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error = GetMsg(
+                            ctx,
+                            "VAS_051_LoadError",
+                            "Unable to load seven day cash flow"
+                        ),
+
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             finally
             {
@@ -140,91 +295,242 @@ namespace VAS.Controllers
             }
         }
 
-        private SqlQueryData BuildSevenDayCashFlowSql(Ctx ctx)
+        private SqlQueryData BuildSevenDayCashFlowSql(
+            Ctx ctx
+        )
         {
-            string todayDateSql = GetTodayDateSql();
-            string cashFlowDateSql = GetDateOnlySql("CashFlowDays.CashFlowDate");
+            string todayDateSql =
+                GetTodayDateSql();
+
+            string cashFlowDateSql =
+                GetDateOnlySql(
+                    "CashFlowDays.CashFlowDate"
+                );
+
+            /*
+             * Oracle requires FROM DUAL for a parameter-only SELECT.
+             * PostgreSQL does not require a FROM clause.
+             */
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            /*
+             * PostgreSQL requires NUMERIC for:
+             * ROUND(value, precision)
+             *
+             * Oracle uses NUMBER.
+             */
+            string numericType =
+                DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
+
+            /*
+             * The bind variable appears once only.
+             * All other CTEs read AD_Client_ID from QueryParameters.
+             */
+            string queryParametersSql = @"
+QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID"
+        + queryParametersFrom + @"
+)";
 
             string dateRangeSql = @"
 DateRange AS
 (
-SELECT
-" + todayDateSql + @" AS TodayDate,
-CAST(" + todayDateSql + @" - 6 AS TIMESTAMP) AS DateFrom,
-CAST(" + todayDateSql + @" + 1 AS TIMESTAMP) AS DateTo
-FROM AD_ClientInfo ClientInfo
-WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+    SELECT
+        " + todayDateSql + @" AS TodayDate,
+
+        CAST
+        (
+            " + todayDateSql + @" - 6
+            AS TIMESTAMP
+        ) AS DateFrom,
+
+        CAST
+        (
+            " + todayDateSql + @" + 1
+            AS TIMESTAMP
+        ) AS DateTo
+
+    FROM QueryParameters QueryParameters
 )";
 
+            /*
+             * Creates seven rows without database-specific
+             * CONNECT BY or GENERATE_SERIES syntax.
+             */
             string dateSeedSql = @"
 DateSeed AS
 (
-SELECT 0 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
-UNION ALL
-SELECT 1 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
-UNION ALL
-SELECT 2 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
-UNION ALL
-SELECT 3 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
-UNION ALL
-SELECT 4 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
-UNION ALL
-SELECT 5 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
-UNION ALL
-SELECT 6 AS DayOffset FROM AD_ClientInfo ClientInfo WHERE ClientInfo.IsActive = 'Y' AND ClientInfo.AD_Client_ID = @AD_Client_ID
+    SELECT
+        0 AS DayOffset
+
+    FROM QueryParameters QueryParameters
+
+    UNION ALL
+
+    SELECT
+        1 AS DayOffset
+
+    FROM QueryParameters QueryParameters
+
+    UNION ALL
+
+    SELECT
+        2 AS DayOffset
+
+    FROM QueryParameters QueryParameters
+
+    UNION ALL
+
+    SELECT
+        3 AS DayOffset
+
+    FROM QueryParameters QueryParameters
+
+    UNION ALL
+
+    SELECT
+        4 AS DayOffset
+
+    FROM QueryParameters QueryParameters
+
+    UNION ALL
+
+    SELECT
+        5 AS DayOffset
+
+    FROM QueryParameters QueryParameters
+
+    UNION ALL
+
+    SELECT
+        6 AS DayOffset
+
+    FROM QueryParameters QueryParameters
 )";
 
             string cashFlowDaysSql = @"
 CashFlowDays AS
 (
-SELECT
-CAST(DateRange.TodayDate - (6 - DateSeed.DayOffset) AS DATE) AS CashFlowDate,
-CAST(DateRange.TodayDate - (6 - DateSeed.DayOffset) AS TIMESTAMP) AS DateStart,
-CAST(DateRange.TodayDate - (6 - DateSeed.DayOffset) + 1 AS TIMESTAMP) AS DateEnd,
-DateSeed.DayOffset
-FROM DateRange DateRange
-INNER JOIN DateSeed DateSeed ON (1 = 1)
+    SELECT
+        CAST
+        (
+            DateRange.TodayDate -
+            (
+                6 -
+                DateSeed.DayOffset
+            )
+            AS DATE
+        ) AS CashFlowDate,
+
+        CAST
+        (
+            DateRange.TodayDate -
+            (
+                6 -
+                DateSeed.DayOffset
+            )
+            AS TIMESTAMP
+        ) AS DateStart,
+
+        CAST
+        (
+            DateRange.TodayDate -
+            (
+                6 -
+                DateSeed.DayOffset
+            )
+            +
+            1
+            AS TIMESTAMP
+        ) AS DateEnd,
+
+        DateSeed.DayOffset
+
+    FROM DateRange DateRange
+
+    INNER JOIN DateSeed DateSeed ON
+    (
+        1 = 1
+    )
 )";
 
             string schemaCurrencySql = @"
 SchemaCurrency AS
 (
-SELECT
-ClientInfo.AD_Client_ID,
-AcctSchema.C_Currency_ID AS C_Currency_ID,
-Currency.StdPrecision,
-TRIM(CAST(Currency.ISO_Code AS CHAR(255))) AS ISO_Code,
-CASE WHEN Currency.CurSymbol IS NOT NULL THEN TRIM(CAST(Currency.CurSymbol AS CHAR(255))) ELSE TRIM(CAST(Currency.ISO_Code AS CHAR(255))) END AS Cur_Symbol
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
-INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
-WHERE ClientInfo.IsActive = 'Y'
-AND ClientInfo.AD_Client_ID = @AD_Client_ID
+    SELECT
+        ClientInfo.AD_Client_ID,
+
+        AcctSchema.C_Currency_ID
+            AS C_Currency_ID,
+
+        Currency.StdPrecision,
+
+        Currency.ISO_Code
+            AS ISO_Code,
+
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END AS Cur_Symbol
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_AcctSchema AcctSchema ON
+    (
+        ClientInfo.C_AcctSchema1_ID =
+        AcctSchema.C_AcctSchema_ID
+    )
+
+    INNER JOIN C_Currency Currency ON
+    (
+        AcctSchema.C_Currency_ID =
+        Currency.C_Currency_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND AcctSchema.IsActive = 'Y'
+
+    AND Currency.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 )";
 
+            /*
+             * MRole is applied only to the main physical table.
+             */
             string cashLineAccessSql = @"
 SELECT
-CashLine.C_CashLine_ID,
-CashLine.C_Cash_ID,
-CashLine.Amount
+    CashLine.C_CashLine_ID,
+    CashLine.C_Cash_ID,
+    CashLine.Amount
+
 FROM C_CashLine CashLine
+
 WHERE CashLine.IsActive = 'Y'";
 
-            /*
-             * MRole Handling:
-             * Apply MRole only on the main physical table C_CashLine CashLine.
-             * Do not apply MRole on the final WITH query.
-             * Do not apply MRole on CTE aliases.
-             * Do not apply MRole on joined aliases.
-             * Do not apply MRole on a query that already contains INNER JOIN.
-             */
-            cashLineAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                cashLineAccessSql,
-                "CashLine",
-                MRole.SQL_FULLYQUALIFIED,
-                MRole.SQL_RO
-            );
+            cashLineAccessSql =
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        cashLineAccessSql,
+                        "CashLine",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
             string cashLineAccessCteSql = @"
 CashLineAccess AS
@@ -235,68 +541,283 @@ CashLineAccess AS
             string cashDataSql = @"
 CashData AS
 (
-SELECT
-CashLine.C_CashLine_ID,
-CashLine.Amount,
-CashHeader.C_Cash_ID,
-CashHeader.StatementDate,
-CashHeader.DateAcct,
-CashHeader.AD_Client_ID,
-CashHeader.AD_Org_ID,
-CashBook.C_Currency_ID AS CashBookCurrency_ID
-FROM CashLineAccess CashLine
-INNER JOIN C_Cash CashHeader ON (CashLine.C_Cash_ID = CashHeader.C_Cash_ID)
-INNER JOIN C_CashBook CashBook ON (CashHeader.C_CashBook_ID = CashBook.C_CashBook_ID)
-INNER JOIN DateRange DateRange ON (CAST(CashHeader.StatementDate AS TIMESTAMP) >= DateRange.DateFrom AND CAST(CashHeader.StatementDate AS TIMESTAMP) < DateRange.DateTo)
-WHERE CashHeader.IsActive = 'Y'
-AND CashBook.IsActive = 'Y'
-AND CashHeader.DocStatus IN ('CO', 'CL')
+    SELECT
+        CashLine.C_CashLine_ID,
+        CashLine.Amount,
+
+        CashHeader.C_Cash_ID,
+        CashHeader.StatementDate,
+        CashHeader.DateAcct,
+        CashHeader.AD_Client_ID,
+        CashHeader.AD_Org_ID,
+
+        CashBook.C_Currency_ID
+            AS CashBookCurrency_ID
+
+    FROM CashLineAccess CashLine
+
+    INNER JOIN C_Cash CashHeader ON
+    (
+        CashLine.C_Cash_ID =
+        CashHeader.C_Cash_ID
+    )
+
+    INNER JOIN C_CashBook CashBook ON
+    (
+        CashHeader.C_CashBook_ID =
+        CashBook.C_CashBook_ID
+    )
+
+    INNER JOIN DateRange DateRange ON
+    (
+        CAST
+        (
+            CashHeader.StatementDate
+            AS TIMESTAMP
+        ) >=
+        DateRange.DateFrom
+
+        AND CAST
+        (
+            CashHeader.StatementDate
+            AS TIMESTAMP
+        ) <
+        DateRange.DateTo
+    )
+
+    WHERE CashHeader.IsActive = 'Y'
+
+    AND CashBook.IsActive = 'Y'
+
+    AND CashHeader.AD_Client_ID =
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
+
+    AND CashHeader.DocStatus IN
+    (
+        'CO',
+        'CL'
+    )
 )";
 
             string convertedAmountExpression = @"
-CASE WHEN CashData.C_CashLine_ID IS NULL THEN 0 WHEN CashData.CashBookCurrency_ID = SchemaCurrency.C_Currency_ID THEN COALESCE(CashData.Amount, 0) ELSE CurrencyConvert(COALESCE(CashData.Amount, 0), CashData.CashBookCurrency_ID, SchemaCurrency.C_Currency_ID, CashData.DateAcct, 0, CashData.AD_Client_ID, CashData.AD_Org_ID) END";
+CASE
+    WHEN CashData.C_CashLine_ID IS NULL
+    THEN 0
+
+    WHEN CashData.CashBookCurrency_ID =
+        SchemaCurrency.C_Currency_ID
+    THEN
+        COALESCE
+        (
+            CashData.Amount,
+            0
+        )
+
+    ELSE
+        CurrencyConvert
+        (
+            COALESCE
+            (
+                CashData.Amount,
+                0
+            ),
+            CashData.CashBookCurrency_ID,
+            SchemaCurrency.C_Currency_ID,
+            CashData.DateAcct,
+            0,
+            CashData.AD_Client_ID,
+            CashData.AD_Org_ID
+        )
+END";
 
             string cashFlowDataSql = @"
 CashFlowData AS
 (
-SELECT
-" + cashFlowDateSql + @" AS CashFlowDate,
-CashFlowDays.DayOffset,
-ROUND(
-COALESCE(
-SUM(
-CASE WHEN " + convertedAmountExpression + @" > 0 THEN " + convertedAmountExpression + @" ELSE 0 END
-),
-0
-),
-COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-) AS CashInAmount,
-ROUND(
-COALESCE(
-SUM(
-CASE WHEN " + convertedAmountExpression + @" < 0 THEN 0 - (" + convertedAmountExpression + @") ELSE 0 END
-),
-0
-),
-COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-) AS CashOutAmount,
-ROUND(
-COALESCE(SUM(" + convertedAmountExpression + @"), 0),
-COALESCE(MAX(SchemaCurrency.StdPrecision), 2)
-) AS NetAmount,
-COUNT(CashData.C_CashLine_ID) AS LineCount,
-COALESCE(MAX(SchemaCurrency.StdPrecision), 2) AS StdPrecision,
-MAX(SchemaCurrency.C_Currency_ID) AS C_Currency_ID,
-MAX(SchemaCurrency.ISO_Code) AS CurrencyISO,
-MAX(SchemaCurrency.Cur_Symbol) AS CurrencySymbol
-FROM CashFlowDays CashFlowDays
-INNER JOIN SchemaCurrency SchemaCurrency ON (1 = 1)
-LEFT OUTER JOIN CashData CashData ON (CashData.AD_Client_ID = SchemaCurrency.AD_Client_ID AND CAST(CashData.StatementDate AS TIMESTAMP) >= CashFlowDays.DateStart AND CAST(CashData.StatementDate AS TIMESTAMP) < CashFlowDays.DateEnd)
-GROUP BY " + cashFlowDateSql + @", CashFlowDays.DayOffset
+    SELECT
+        " + cashFlowDateSql + @" AS CashFlowDate,
+
+        CashFlowDays.DayOffset,
+
+        ROUND
+        (
+            CAST
+            (
+                COALESCE
+                (
+                    SUM
+                    (
+                        CASE
+                            WHEN
+                            (
+                                " + convertedAmountExpression + @"
+                            ) > 0
+
+                            THEN
+                                " + convertedAmountExpression + @"
+
+                            ELSE 0
+                        END
+                    ),
+                    0
+                )
+                AS " + numericType + @"
+            ),
+
+            CAST
+            (
+                COALESCE
+                (
+                    MAX
+                    (
+                        SchemaCurrency.StdPrecision
+                    ),
+                    2
+                )
+                AS INTEGER
+            )
+        ) AS CashInAmount,
+
+        ROUND
+        (
+            CAST
+            (
+                COALESCE
+                (
+                    SUM
+                    (
+                        CASE
+                            WHEN
+                            (
+                                " + convertedAmountExpression + @"
+                            ) < 0
+
+                            THEN
+                                0 -
+                                (
+                                    " + convertedAmountExpression + @"
+                                )
+
+                            ELSE 0
+                        END
+                    ),
+                    0
+                )
+                AS " + numericType + @"
+            ),
+
+            CAST
+            (
+                COALESCE
+                (
+                    MAX
+                    (
+                        SchemaCurrency.StdPrecision
+                    ),
+                    2
+                )
+                AS INTEGER
+            )
+        ) AS CashOutAmount,
+
+        ROUND
+        (
+            CAST
+            (
+                COALESCE
+                (
+                    SUM
+                    (
+                        " + convertedAmountExpression + @"
+                    ),
+                    0
+                )
+                AS " + numericType + @"
+            ),
+
+            CAST
+            (
+                COALESCE
+                (
+                    MAX
+                    (
+                        SchemaCurrency.StdPrecision
+                    ),
+                    2
+                )
+                AS INTEGER
+            )
+        ) AS NetAmount,
+
+        COUNT
+        (
+            CashData.C_CashLine_ID
+        ) AS LineCount,
+
+        COALESCE
+        (
+            MAX
+            (
+                SchemaCurrency.StdPrecision
+            ),
+            2
+        ) AS StdPrecision,
+
+        MAX
+        (
+            SchemaCurrency.C_Currency_ID
+        ) AS C_Currency_ID,
+
+        MAX
+        (
+            SchemaCurrency.ISO_Code
+        ) AS CurrencyISO,
+
+        MAX
+        (
+            SchemaCurrency.Cur_Symbol
+        ) AS CurrencySymbol
+
+    FROM CashFlowDays CashFlowDays
+
+    INNER JOIN SchemaCurrency SchemaCurrency ON
+    (
+        1 = 1
+    )
+
+    LEFT OUTER JOIN CashData CashData ON
+    (
+        CashData.AD_Client_ID =
+        SchemaCurrency.AD_Client_ID
+
+        AND CAST
+        (
+            CashData.StatementDate
+            AS TIMESTAMP
+        ) >=
+        CashFlowDays.DateStart
+
+        AND CAST
+        (
+            CashData.StatementDate
+            AS TIMESTAMP
+        ) <
+        CashFlowDays.DateEnd
+    )
+
+    GROUP BY
+        " + cashFlowDateSql + @",
+        CashFlowDays.DayOffset
 )";
 
             string sql = @"
-WITH " + dateRangeSql + @",
+WITH
+" + queryParametersSql + @",
+" + dateRangeSql + @",
 " + dateSeedSql + @",
 " + cashFlowDaysSql + @",
 " + schemaCurrencySql + @",
@@ -304,27 +825,37 @@ WITH " + dateRangeSql + @",
 " + cashDataSql + @",
 " + cashFlowDataSql + @"
 SELECT
-CashFlowData.CashFlowDate,
-CashFlowData.CashInAmount,
-CashFlowData.CashOutAmount,
-CashFlowData.NetAmount,
-CashFlowData.LineCount,
-CashFlowData.StdPrecision,
-CashFlowData.C_Currency_ID,
-CashFlowData.CurrencyISO,
-CashFlowData.CurrencySymbol
-FROM CashFlowData CashFlowData
-ORDER BY CashFlowData.DayOffset";
+    CashFlowData.CashFlowDate,
+    CashFlowData.CashInAmount,
+    CashFlowData.CashOutAmount,
+    CashFlowData.NetAmount,
+    CashFlowData.LineCount,
+    CashFlowData.StdPrecision,
+    CashFlowData.C_Currency_ID,
+    CashFlowData.CurrencyISO,
+    CashFlowData.CurrencySymbol
 
-            SqlParameter[] parameters = new SqlParameter[]
-            {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
-            };
+FROM CashFlowData CashFlowData
+
+ORDER BY
+    CashFlowData.DayOffset";
+
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
 
             return new SqlQueryData
             {
-                Sql = sql,
-                Parameters = parameters
+                Sql =
+                    sql,
+
+                Parameters =
+                    parameters
             };
         }
 
@@ -332,32 +863,62 @@ ORDER BY CashFlowData.DayOffset";
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE)";
+                return
+                    "TRUNC(CURRENT_DATE)";
             }
 
-            return "CURRENT_DATE";
+            return
+                "CURRENT_DATE";
         }
 
-        private string GetDateOnlySql(string columnName)
+        private string GetDateOnlySql(
+            string columnName
+        )
         {
             if (DB.IsOracle())
             {
-                return "CAST(TRUNC(" + columnName + ") AS DATE)";
+                return
+                    "CAST(TRUNC("
+                    + columnName
+                    + ") AS DATE)";
             }
 
-            return "CAST(" + columnName + " AS DATE)";
+            return
+                "CAST("
+                + columnName
+                + " AS DATE)";
         }
 
-        private string FormatDate(DateTime date)
+        private string FormatDate(
+            DateTime date
+        )
         {
-            return date.ToString("yyyy-MM-dd");
+            return date.ToString(
+                "yyyy-MM-dd"
+            );
         }
 
-        private string GetMsg(Ctx ctx, string key, string fallback)
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback
+        )
         {
-            string msg = Msg.GetMsg(ctx, key);
+            string msg =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
 
-            if (string.IsNullOrEmpty(msg) || msg == key || msg == "[" + key + "]")
+            if (
+                string.IsNullOrEmpty(
+                    msg
+                )
+                ||
+                msg == key
+                ||
+                msg == "[" + key + "]"
+            )
             {
                 return fallback;
             }
@@ -365,37 +926,71 @@ ORDER BY CashFlowData.DayOffset";
             return msg;
         }
 
-        private decimal GetDecimal(IDataReader reader, string columnName)
+        private decimal GetDecimal(
+            IDataReader reader,
+            string columnName
+        )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return 0;
             }
 
             decimal result;
-            return decimal.TryParse(value.ToString(), out result) ? result : 0;
+
+            return decimal.TryParse(
+                value.ToString(),
+                out result
+            )
+                ? result
+                : 0;
         }
 
-        private int GetInt(IDataReader reader, string columnName, int fallback = 0)
+        private int GetInt(
+            IDataReader reader,
+            string columnName,
+            int fallback = 0
+        )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return fallback;
             }
 
             int result;
-            return int.TryParse(value.ToString(), out result) ? result : fallback;
+
+            return int.TryParse(
+                value.ToString(),
+                out result
+            )
+                ? result
+                : fallback;
         }
 
-        private string GetString(IDataReader reader, string columnName)
+        private string GetString(
+            IDataReader reader,
+            string columnName
+        )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            if (value == null || value == DBNull.Value)
+            if (
+                value == null ||
+                value == DBNull.Value
+            )
             {
                 return string.Empty;
             }
@@ -405,8 +1000,17 @@ ORDER BY CashFlowData.DayOffset";
 
         private class SqlQueryData
         {
-            public string Sql { get; set; }
-            public SqlParameter[] Parameters { get; set; }
+            public string Sql
+            {
+                get;
+                set;
+            }
+
+            public SqlParameter[] Parameters
+            {
+                get;
+                set;
+            }
         }
     }
 }
