@@ -1,4 +1,6 @@
-﻿using System;
+﻿
+using System;
+
 /*
  * Scheduled AP Payment Widget Controller
  *
@@ -17,6 +19,7 @@
 
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
@@ -54,15 +57,17 @@ namespace VAS.Controllers
             }
 
             IDataReader dr = null;
-            string sql = string.Empty;
 
             try
             {
-                sql = BuildScheduledAPPaymentThisWeekSql(ctx);
+                SqlQueryData queryData =
+                    BuildScheduledAPPaymentThisWeekSql(
+                        ctx
+                    );
 
                 dr = DB.ExecuteReader(
-                    sql,
-                    null,
+                    queryData.Sql,
+                    queryData.Parameters,
                     null
                 );
 
@@ -76,136 +81,183 @@ namespace VAS.Controllers
                 string dateFrom = string.Empty;
                 string dateTo = string.Empty;
 
-                List<object> groups = new List<object>();
+                List<object> groups =
+                    new List<object>();
 
-                while (dr != null && dr.Read())
+                while (
+                    dr != null &&
+                    dr.Read()
+                )
                 {
-                    decimal scheduledAmount = GetDecimal(
-                        dr,
-                        "ScheduledAmount",
-                        0
-                    );
+                    decimal scheduledAmount =
+                        GetDecimal(
+                            dr,
+                            "ScheduledAmount",
+                            0
+                        );
 
-                    int groupCurrencyId = GetInt(
-                        dr,
-                        "C_Currency_ID"
-                    );
-
-                    int groupPrecision = NormalizePrecision(
+                    int groupCurrencyId =
                         GetInt(
                             dr,
-                            "StdPrecision",
-                            2
+                            "C_Currency_ID"
+                        );
+
+                    int groupPrecision =
+                        NormalizePrecision(
+                            GetInt(
+                                dr,
+                                "StdPrecision",
+                                2
+                            )
+                        );
+
+                    string groupCurrencyISO =
+                        GetString(
+                            dr,
+                            "CurrencyISO",
+                            string.Empty
+                        );
+
+                    string groupCurrencySymbol =
+                        GetString(
+                            dr,
+                            "CurrencySymbol",
+                            string.Empty
+                        );
+
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            groupCurrencySymbol
                         )
-                    );
-
-                    string groupCurrencyISO = GetString(
-                        dr,
-                        "CurrencyISO",
-                        string.Empty
-                    );
-
-                    string groupCurrencySymbol = GetString(
-                        dr,
-                        "CurrencySymbol",
-                        string.Empty
-                    );
-
-                    /*
-                     * The fallback is performed in C# instead of SQL CASE
-                     * to avoid Oracle character-set incompatibility errors.
-                     */
-                    if (string.IsNullOrWhiteSpace(groupCurrencySymbol))
+                    )
                     {
-                        groupCurrencySymbol = groupCurrencyISO;
+                        groupCurrencySymbol =
+                            groupCurrencyISO;
                     }
 
-                    string paymentMethodDisplay = GetString(
-                        dr,
-                        "PaymentMethodDisplay",
-                        string.Empty
-                    );
+                    string paymentMethodDisplay =
+                        GetString(
+                            dr,
+                            "PaymentMethodDisplay",
+                            string.Empty
+                        );
 
-                    string paymentRule = GetString(
-                        dr,
-                        "PaymentRule",
-                        string.Empty
-                    );
+                    string paymentRule =
+                        GetString(
+                            dr,
+                            "PaymentRule",
+                            string.Empty
+                        );
 
-                    string paymentMethodName = FirstNotEmpty(
-                        paymentMethodDisplay,
-                        paymentRule,
-                        GetMsg(
-                            ctx,
-                            "VAS_029_MessageNotSpecified",
-                            "Not Specified"
-                        )
-                    );
+                    string paymentMethodName =
+                        FirstNotEmpty(
+                            paymentMethodDisplay,
+                            paymentRule,
+                            GetMsg(
+                                ctx,
+                                "VAS_029_MessageNotSpecified",
+                                "Not Specified"
+                            )
+                        );
 
-                    scheduledAmountThisWeek += scheduledAmount;
+                    scheduledAmountThisWeek +=
+                        scheduledAmount;
 
                     if (cCurrencyId == 0)
                     {
-                        cCurrencyId = groupCurrencyId;
-                        precision = groupPrecision;
-                        currencyISO = groupCurrencyISO;
-                        currencySymbol = groupCurrencySymbol;
+                        cCurrencyId =
+                            groupCurrencyId;
+
+                        precision =
+                            groupPrecision;
+
+                        currencyISO =
+                            groupCurrencyISO;
+
+                        currencySymbol =
+                            groupCurrencySymbol;
                     }
 
                     if (
-                        string.IsNullOrWhiteSpace(dateFrom) &&
-                        dr["DateFrom"] != DBNull.Value
+                        string.IsNullOrWhiteSpace(
+                            dateFrom
+                        ) &&
+                        dr["DateFrom"] !=
+                        DBNull.Value
                     )
                     {
-                        dateFrom = FormatDate(
-                            Util.GetValueOfDateTime(
-                                dr["DateFrom"]
-                            )
-                        );
+                        dateFrom =
+                            FormatDate(
+                                Util.GetValueOfDateTime(
+                                    dr["DateFrom"]
+                                )
+                            );
                     }
 
                     if (
-                        string.IsNullOrWhiteSpace(dateTo) &&
-                        dr["DateTo"] != DBNull.Value
+                        string.IsNullOrWhiteSpace(
+                            dateTo
+                        ) &&
+                        dr["DateTo"] !=
+                        DBNull.Value
                     )
                     {
-                        dateTo = FormatDate(
-                            Util.GetValueOfDateTime(
-                                dr["DateTo"]
-                            )
-                        );
+                        dateTo =
+                            FormatDate(
+                                Util.GetValueOfDateTime(
+                                    dr["DateTo"]
+                                )
+                            );
                     }
 
-                    scheduledAmount = Math.Round(
-                        scheduledAmount,
-                        groupPrecision,
-                        MidpointRounding.AwayFromZero
-                    );
+                    scheduledAmount =
+                        Math.Round(
+                            scheduledAmount,
+                            groupPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
                     groups.Add(
                         new
                         {
-                            paymentMethodName = paymentMethodName,
+                            paymentMethodName =
+                                paymentMethodName,
 
-                            value = scheduledAmount,
-                            scheduledAmount = scheduledAmount,
+                            value =
+                                scheduledAmount,
 
-                            cCurrencyId = groupCurrencyId,
-                            currencyISO = groupCurrencyISO,
-                            currencySymbol = groupCurrencySymbol,
-                            symbol = groupCurrencySymbol,
-                            precision = groupPrecision
+                            scheduledAmount =
+                                scheduledAmount,
+
+                            cCurrencyId =
+                                groupCurrencyId,
+
+                            currencyISO =
+                                groupCurrencyISO,
+
+                            currencySymbol =
+                                groupCurrencySymbol,
+
+                            symbol =
+                                groupCurrencySymbol,
+
+                            precision =
+                                groupPrecision
                         }
                     );
                 }
 
-                precision = NormalizePrecision(precision);
+                precision =
+                    NormalizePrecision(
+                        precision
+                    );
 
-                scheduledAmountThisWeek = Math.Round(
-                    scheduledAmountThisWeek,
-                    precision,
-                    MidpointRounding.AwayFromZero
-                );
+                scheduledAmountThisWeek =
+                    Math.Round(
+                        scheduledAmountThisWeek,
+                        precision,
+                        MidpointRounding.AwayFromZero
+                    );
 
                 return Json(
                     new
@@ -222,21 +274,35 @@ namespace VAS.Controllers
                             "Scheduled for payment this week"
                         ),
 
-                        value = scheduledAmountThisWeek,
+                        value =
+                            scheduledAmountThisWeek,
 
                         scheduledAmountThisWeek =
                             scheduledAmountThisWeek,
 
-                        groups = groups,
+                        groups =
+                            groups,
 
-                        cCurrencyId = cCurrencyId,
-                        currencyISO = currencyISO,
-                        currencySymbol = currencySymbol,
-                        symbol = currencySymbol,
-                        precision = precision,
+                        cCurrencyId =
+                            cCurrencyId,
 
-                        dateFrom = dateFrom,
-                        dateTo = dateTo
+                        currencyISO =
+                            currencyISO,
+
+                        currencySymbol =
+                            currencySymbol,
+
+                        symbol =
+                            currencySymbol,
+
+                        precision =
+                            precision,
+
+                        dateFrom =
+                            dateFrom,
+
+                        dateTo =
+                            dateTo
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -291,23 +357,24 @@ namespace VAS.Controllers
             }
 
             IDataReader dr = null;
-            string sql = string.Empty;
 
             try
             {
-                sql = BuildScheduledAPPaymentRowsSql(
-                    ctx,
-                    pageNo,
-                    pageSize
-                );
+                SqlQueryData queryData =
+                    BuildScheduledAPPaymentRowsSql(
+                        ctx,
+                        pageNo,
+                        pageSize
+                    );
 
                 dr = DB.ExecuteReader(
-                    sql,
-                    null,
+                    queryData.Sql,
+                    queryData.Parameters,
                     null
                 );
 
-                List<object> rows = new List<object>();
+                List<object> rows =
+                    new List<object>();
 
                 int totalRecords = 0;
                 int vendorCount = 0;
@@ -316,51 +383,71 @@ namespace VAS.Controllers
                 string dateFrom = string.Empty;
                 string dateTo = string.Empty;
 
-                while (dr != null && dr.Read())
+                while (
+                    dr != null &&
+                    dr.Read()
+                )
                 {
-                    totalRecords = GetInt(
-                        dr,
-                        "TotalRecords"
-                    );
+                    totalRecords =
+                        GetInt(
+                            dr,
+                            "TotalRecords"
+                        );
 
-                    vendorCount = GetInt(
-                        dr,
-                        "VendorCount"
-                    );
+                    vendorCount =
+                        GetInt(
+                            dr,
+                            "VendorCount"
+                        );
 
-                    paymentMethodCount = GetInt(
-                        dr,
-                        "PaymentMethodCount"
-                    );
+                    paymentMethodCount =
+                        GetInt(
+                            dr,
+                            "PaymentMethodCount"
+                        );
 
                     if (
-                        string.IsNullOrWhiteSpace(dateFrom) &&
-                        dr["DateFrom"] != DBNull.Value
+                        string.IsNullOrWhiteSpace(
+                            dateFrom
+                        ) &&
+                        dr["DateFrom"] !=
+                        DBNull.Value
                     )
                     {
-                        dateFrom = FormatDate(
-                            Util.GetValueOfDateTime(
-                                dr["DateFrom"]
-                            )
-                        );
+                        dateFrom =
+                            FormatDate(
+                                Util.GetValueOfDateTime(
+                                    dr["DateFrom"]
+                                )
+                            );
                     }
 
                     if (
-                        string.IsNullOrWhiteSpace(dateTo) &&
-                        dr["DateTo"] != DBNull.Value
+                        string.IsNullOrWhiteSpace(
+                            dateTo
+                        ) &&
+                        dr["DateTo"] !=
+                        DBNull.Value
                     )
                     {
-                        dateTo = FormatDate(
-                            Util.GetValueOfDateTime(
-                                dr["DateTo"]
-                            )
-                        );
+                        dateTo =
+                            FormatDate(
+                                Util.GetValueOfDateTime(
+                                    dr["DateTo"]
+                                )
+                            );
                     }
 
-                    DateTime? invoiceDate = null;
-                    DateTime? dueDate = null;
+                    DateTime? invoiceDate =
+                        null;
 
-                    if (dr["InvoiceDate"] != DBNull.Value)
+                    DateTime? dueDate =
+                        null;
+
+                    if (
+                        dr["InvoiceDate"] !=
+                        DBNull.Value
+                    )
                     {
                         invoiceDate =
                             Util.GetValueOfDateTime(
@@ -368,7 +455,10 @@ namespace VAS.Controllers
                             );
                     }
 
-                    if (dr["DueDate"] != DBNull.Value)
+                    if (
+                        dr["DueDate"] !=
+                        DBNull.Value
+                    )
                     {
                         dueDate =
                             Util.GetValueOfDateTime(
@@ -376,39 +466,44 @@ namespace VAS.Controllers
                             );
                     }
 
-                    string paymentMethodDisplay = GetString(
-                        dr,
-                        "PaymentMethodDisplay",
-                        string.Empty
-                    );
+                    string paymentMethodDisplay =
+                        GetString(
+                            dr,
+                            "PaymentMethodDisplay",
+                            string.Empty
+                        );
 
-                    string paymentRule = GetString(
-                        dr,
-                        "PaymentRule",
-                        string.Empty
-                    );
+                    string paymentRule =
+                        GetString(
+                            dr,
+                            "PaymentRule",
+                            string.Empty
+                        );
 
-                    string paymentMethodName = FirstNotEmpty(
-                        paymentMethodDisplay,
-                        paymentRule,
-                        GetMsg(
-                            ctx,
-                            "VAS_029_MessageNotSpecified",
-                            "Not Specified"
-                        )
-                    );
+                    string paymentMethodName =
+                        FirstNotEmpty(
+                            paymentMethodDisplay,
+                            paymentRule,
+                            GetMsg(
+                                ctx,
+                                "VAS_029_MessageNotSpecified",
+                                "Not Specified"
+                            )
+                        );
 
-                    string invoiceCurrency = GetString(
-                        dr,
-                        "InvoiceCurrency",
-                        string.Empty
-                    );
+                    string invoiceCurrency =
+                        GetString(
+                            dr,
+                            "InvoiceCurrency",
+                            string.Empty
+                        );
 
-                    string invoiceCurrencySymbol = GetString(
-                        dr,
-                        "InvoiceCurrencySymbol",
-                        string.Empty
-                    );
+                    string invoiceCurrencySymbol =
+                        GetString(
+                            dr,
+                            "InvoiceCurrencySymbol",
+                            string.Empty
+                        );
 
                     if (
                         string.IsNullOrWhiteSpace(
@@ -420,57 +515,64 @@ namespace VAS.Controllers
                             invoiceCurrency;
                     }
 
-                    int rowPrecision = NormalizePrecision(
-                        GetInt(
-                            dr,
-                            "StdPrecision",
-                            2
-                        )
-                    );
+                    int rowPrecision =
+                        NormalizePrecision(
+                            GetInt(
+                                dr,
+                                "StdPrecision",
+                                2
+                            )
+                        );
 
-                    decimal dueAmount = Math.Round(
-                        GetDecimal(
-                            dr,
-                            "DueAmount",
-                            0
-                        ),
-                        rowPrecision,
-                        MidpointRounding.AwayFromZero
-                    );
+                    decimal dueAmount =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "DueAmount",
+                                0
+                            ),
+                            rowPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
                     rows.Add(
                         new
                         {
-                            invoiceId = GetInt(
-                                dr,
-                                "C_Invoice_ID"
-                            ),
+                            invoiceId =
+                                GetInt(
+                                    dr,
+                                    "C_Invoice_ID"
+                                ),
 
-                            documentNo = GetString(
-                                dr,
-                                "DocumentNo",
-                                string.Empty
-                            ),
+                            documentNo =
+                                GetString(
+                                    dr,
+                                    "DocumentNo",
+                                    string.Empty
+                                ),
 
-                            invoiceDate = invoiceDate.HasValue
-                                ? invoiceDate.Value.ToString(
-                                    "yyyy-MM-dd",
-                                    CultureInfo.InvariantCulture
-                                )
-                                : string.Empty,
+                            invoiceDate =
+                                invoiceDate.HasValue
+                                    ? invoiceDate.Value.ToString(
+                                        "yyyy-MM-dd",
+                                        CultureInfo.InvariantCulture
+                                    )
+                                    : string.Empty,
 
-                            dueDate = dueDate.HasValue
-                                ? dueDate.Value.ToString(
-                                    "yyyy-MM-dd",
-                                    CultureInfo.InvariantCulture
-                                )
-                                : string.Empty,
+                            dueDate =
+                                dueDate.HasValue
+                                    ? dueDate.Value.ToString(
+                                        "yyyy-MM-dd",
+                                        CultureInfo.InvariantCulture
+                                    )
+                                    : string.Empty,
 
-                            vendor = GetString(
-                                dr,
-                                "VendorName",
-                                string.Empty
-                            ),
+                            vendor =
+                                GetString(
+                                    dr,
+                                    "VendorName",
+                                    string.Empty
+                                ),
 
                             invoiceCurrency =
                                 invoiceCurrency,
@@ -478,8 +580,11 @@ namespace VAS.Controllers
                             invoiceCurrencySymbol =
                                 invoiceCurrencySymbol,
 
-                            amount = dueAmount,
-                            precision = rowPrecision,
+                            amount =
+                                dueAmount,
+
+                            precision =
+                                rowPrecision,
 
                             paymentMethodName =
                                 paymentMethodName
@@ -487,33 +592,45 @@ namespace VAS.Controllers
                     );
                 }
 
-                int totalPages = totalRecords > 0
-                    ? Convert.ToInt32(
-                        Math.Ceiling(
-                            (decimal)totalRecords /
-                            pageSize
+                int totalPages =
+                    totalRecords > 0
+                        ? Convert.ToInt32(
+                            Math.Ceiling(
+                                (decimal)totalRecords /
+                                pageSize
+                            )
                         )
-                    )
-                    : 0;
+                        : 0;
 
                 return Json(
                     new
                     {
-                        rows = rows,
+                        rows =
+                            rows,
 
-                        pageNo = pageNo,
-                        pageSize = pageSize,
+                        pageNo =
+                            pageNo,
 
-                        totalRecords = totalRecords,
-                        totalPages = totalPages,
+                        pageSize =
+                            pageSize,
 
-                        vendorCount = vendorCount,
+                        totalRecords =
+                            totalRecords,
+
+                        totalPages =
+                            totalPages,
+
+                        vendorCount =
+                            vendorCount,
 
                         paymentMethodCount =
                             paymentMethodCount,
 
-                        dateFrom = dateFrom,
-                        dateTo = dateTo
+                        dateFrom =
+                            dateFrom,
+
+                        dateTo =
+                            dateTo
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -535,10 +652,7 @@ namespace VAS.Controllers
             }
         }
 
-        /// <summary>
-        /// Builds the KPI query grouped by payment method.
-        /// </summary>
-        private string BuildScheduledAPPaymentThisWeekSql(
+        private SqlQueryData BuildScheduledAPPaymentThisWeekSql(
             Ctx ctx
         )
         {
@@ -555,24 +669,21 @@ namespace VAS.Controllers
                     paymentMethodDisplayColumn
                 );
 
-            string clientIdSql = ctx
-                .GetAD_Client_ID()
-                .ToString(
-                    CultureInfo.InvariantCulture
-                );
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            string numericType =
+                DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
 
             string paymentMethodIdSelect =
                 hasPaymentMethod
                     ? "COALESCE(Invoice.VA009_PaymentMethod_ID, 0)"
                     : "0";
 
-            /*
-             * Do not use CASE between PaymentRule and payment-method name.
-             * Oracle can raise ORA-12704 when the character sets differ.
-             *
-             * Both values are returned separately and the fallback
-             * is handled in C#.
-             */
             string paymentMethodDisplaySelect =
                 hasPaymentMethodDisplayColumn
                     ? paymentMethodDisplayColumn
@@ -588,6 +699,14 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 )"
                     : string.Empty;
 
+            string queryParametersSql = @"
+QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID"
+        + queryParametersFrom + @"
+)";
+
             string weekRangeSql = @"
 WeekRange AS
 (
@@ -598,12 +717,7 @@ WeekRange AS
 
         " + GetWeekEndDisplaySql() + @" AS DateTo
 
-    FROM AD_ClientInfo ClientInfo
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    FROM QueryParameters QueryParameters
 )";
 
             string schemaCurrencySql = @"
@@ -637,7 +751,12 @@ SchemaCurrency AS
     WHERE ClientInfo.IsActive = 'Y'
 
     AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 )";
 
             string invoiceAccessSql = @"
@@ -651,7 +770,6 @@ SELECT
     Invoice.C_ConversionType_ID,
     Invoice.IsReturnTrx,
     Invoice.PaymentRule" +
-
                 (
                     hasPaymentMethod
                         ? @",
@@ -664,31 +782,66 @@ FROM C_Invoice Invoice
 WHERE Invoice.IsActive = 'Y'
 
 AND Invoice.AD_Client_ID =
-    " + clientIdSql + @"
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
 
 AND Invoice.IsSOTrx = 'N'
 
-AND Invoice.DocStatus IN ('CO', 'CL')";
+AND Invoice.DocStatus IN
+(
+    'CO',
+    'CL'
+)";
 
             invoiceAccessSql =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    invoiceAccessSql,
-                    "Invoice",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        invoiceAccessSql,
+                        "Invoice",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
+
+            string convertedAmountExpression = @"
+CASE
+    WHEN Invoice.C_Currency_ID =
+         SchemaCurrency.C_Currency_ID
+
+    THEN COALESCE
+    (
+        InvoicePaySchedule.DueAmt,
+        0
+    )
+
+    ELSE CurrencyConvert
+    (
+        COALESCE
+        (
+            InvoicePaySchedule.DueAmt,
+            0
+        ),
+        Invoice.C_Currency_ID,
+        SchemaCurrency.C_Currency_ID,
+        Invoice.DateAcct,
+        Invoice.C_ConversionType_ID,
+        Invoice.AD_Client_ID,
+        Invoice.AD_Org_ID
+    )
+END";
 
             string sql = @"
 WITH
+" + queryParametersSql + @",
 " + weekRangeSql + @",
-
 " + schemaCurrencySql + @",
-
 InvoiceFiltered AS
 (
 " + invoiceAccessSql + @"
 ),
-
 ScheduledData AS
 (
     SELECT
@@ -697,71 +850,42 @@ ScheduledData AS
 
         SchemaCurrency.C_Currency_ID,
 
-        SchemaCurrency.ISO_Code AS CurrencyISO,
+        SchemaCurrency.ISO_Code
+            AS CurrencyISO,
 
-        SchemaCurrency.CurSymbol AS CurrencySymbol,
+        SchemaCurrency.CurSymbol
+            AS CurrencySymbol,
 
         SchemaCurrency.StdPrecision,
 
-        " + paymentMethodIdSelect + @" AS PaymentMethod_ID,
+        " + paymentMethodIdSelect + @"
+            AS PaymentMethod_ID,
 
-        " + paymentMethodDisplaySelect + @" AS PaymentMethodDisplay,
+        " + paymentMethodDisplaySelect + @"
+            AS PaymentMethodDisplay,
 
         Invoice.PaymentRule,
 
-        CASE
-            WHEN COALESCE(
-                Invoice.IsReturnTrx,
-                'N'
-            ) = 'Y'
-            THEN
-                -CASE
-                    WHEN Invoice.C_Currency_ID =
-                         SchemaCurrency.C_Currency_ID
-                    THEN COALESCE(
-                        InvoicePaySchedule.DueAmt,
-                        0
-                    )
+        CAST
+        (
+            CASE
+                WHEN COALESCE
+                (
+                    Invoice.IsReturnTrx,
+                    'N'
+                ) = 'Y'
 
-                    ELSE CurrencyConvert
+                THEN
+                    0 -
                     (
-                        COALESCE(
-                            InvoicePaySchedule.DueAmt,
-                            0
-                        ),
-                        Invoice.C_Currency_ID,
-                        SchemaCurrency.C_Currency_ID,
-                        Invoice.DateAcct,
-                        Invoice.C_ConversionType_ID,
-                        Invoice.AD_Client_ID,
-                        Invoice.AD_Org_ID
-                    )
-                END
-
-            ELSE
-                CASE
-                    WHEN Invoice.C_Currency_ID =
-                         SchemaCurrency.C_Currency_ID
-                    THEN COALESCE(
-                        InvoicePaySchedule.DueAmt,
-                        0
+                        " + convertedAmountExpression + @"
                     )
 
-                    ELSE CurrencyConvert
-                    (
-                        COALESCE(
-                            InvoicePaySchedule.DueAmt,
-                            0
-                        ),
-                        Invoice.C_Currency_ID,
-                        SchemaCurrency.C_Currency_ID,
-                        Invoice.DateAcct,
-                        Invoice.C_ConversionType_ID,
-                        Invoice.AD_Client_ID,
-                        Invoice.AD_Org_ID
-                    )
-                END
-        END AS ScheduledAmount,
+                ELSE
+                    " + convertedAmountExpression + @"
+            END
+            AS " + numericType + @"
+        ) AS ScheduledAmount,
 
         WeekRange.DateFrom,
         WeekRange.DateTo
@@ -788,66 +912,72 @@ ScheduledData AS
         AND InvoicePaySchedule.DueDate <
         WeekRange.DateToExclusive
     )
-
-    " + paymentMethodJoin + @"
+"
+    + paymentMethodJoin + @"
 
     WHERE InvoicePaySchedule.IsActive = 'Y'
 
-    AND COALESCE(
+    AND COALESCE
+    (
         InvoicePaySchedule.VA009_IsPaid,
         'N'
     ) <> 'Y'
 
-    AND COALESCE(
+    AND COALESCE
+    (
         InvoicePaySchedule.DueAmt,
         0
     ) > 0
 )
-
 SELECT
     ScheduledData.PaymentMethod_ID,
-
     ScheduledData.PaymentMethodDisplay,
-
     ScheduledData.PaymentRule,
-
     ScheduledData.C_Currency_ID,
-
     ScheduledData.CurrencyISO,
-
     ScheduledData.CurrencySymbol,
 
-    MAX(
+    MAX
+    (
         ScheduledData.StdPrecision
     ) AS StdPrecision,
 
     ROUND
     (
-        COALESCE
+        CAST
         (
-            SUM(
-                ScheduledData.ScheduledAmount
-            ),
-            0
+            COALESCE
+            (
+                SUM
+                (
+                    ScheduledData.ScheduledAmount
+                ),
+                0
+            )
+            AS " + numericType + @"
         ),
 
         CAST
         (
             COALESCE
             (
-                MAX(
+                MAX
+                (
                     ScheduledData.StdPrecision
                 ),
                 2
-            ) AS INTEGER
+            )
+            AS INTEGER
         )
     ) AS ScheduledAmount,
 
-    MIN(
+    MIN
+    (
         ScheduledData.DateFrom
     ) AS DateFrom,
 
-    MAX(
+    MAX
+    (
         ScheduledData.DateTo
     ) AS DateTo
 
@@ -861,27 +991,35 @@ GROUP BY
     ScheduledData.CurrencyISO,
     ScheduledData.CurrencySymbol
 
-HAVING SUM(
+HAVING SUM
+(
     ScheduledData.ScheduledAmount
 ) > 0
 
 ORDER BY
-    ScheduledAmount DESC";
+    ScheduledAmount DESC,
+    ScheduledData.PaymentMethod_ID";
 
-            return sql;
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
+
+            return new SqlQueryData
+            {
+                Sql =
+                    sql,
+
+                Parameters =
+                    parameters
+            };
         }
 
-        /// <summary>
-        /// Builds the paginated scheduled-payment rows query.
-        ///
-        /// ROW_NUMBER is used because it works on both
-        /// Oracle and PostgreSQL.
-        ///
-        /// DISTINCT aggregate counts are calculated in a regular
-        /// aggregate CTE because PostgreSQL does not support:
-        /// COUNT(DISTINCT column) OVER().
-        /// </summary>
-        private string BuildScheduledAPPaymentRowsSql(
+        private SqlQueryData BuildScheduledAPPaymentRowsSql(
             Ctx ctx,
             int pageNo,
             int pageSize
@@ -900,27 +1038,21 @@ ORDER BY
                     paymentMethodDisplayColumn
                 );
 
-            string clientIdSql = ctx
-                .GetAD_Client_ID()
-                .ToString(
-                    CultureInfo.InvariantCulture
-                );
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            string numericType =
+                DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
 
             int startRow =
                 ((pageNo - 1) * pageSize) + 1;
 
             int endRow =
                 pageNo * pageSize;
-
-            string startRowSql =
-                startRow.ToString(
-                    CultureInfo.InvariantCulture
-                );
-
-            string endRowSql =
-                endRow.ToString(
-                    CultureInfo.InvariantCulture
-                );
 
             string paymentMethodIdSelect =
                 hasPaymentMethod
@@ -942,6 +1074,16 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 )"
                     : string.Empty;
 
+            string queryParametersSql = @"
+QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID,
+        @StartRow AS StartRow,
+        @EndRow AS EndRow"
+        + queryParametersFrom + @"
+)";
+
             string weekRangeSql = @"
 WeekRange AS
 (
@@ -952,12 +1094,7 @@ WeekRange AS
 
         " + GetWeekEndDisplaySql() + @" AS DateTo
 
-    FROM AD_ClientInfo ClientInfo
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    FROM QueryParameters QueryParameters
 )";
 
             string invoiceAccessSql = @"
@@ -973,7 +1110,6 @@ SELECT
     Invoice.C_ConversionType_ID,
     Invoice.IsReturnTrx,
     Invoice.PaymentRule" +
-
                 (
                     hasPaymentMethod
                         ? @",
@@ -986,73 +1122,118 @@ FROM C_Invoice Invoice
 WHERE Invoice.IsActive = 'Y'
 
 AND Invoice.AD_Client_ID =
-    " + clientIdSql + @"
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
 
 AND Invoice.IsSOTrx = 'N'
 
-AND Invoice.DocStatus IN ('CO', 'CL')";
+AND Invoice.DocStatus IN
+(
+    'CO',
+    'CL'
+)";
 
             invoiceAccessSql =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    invoiceAccessSql,
-                    "Invoice",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        invoiceAccessSql,
+                        "Invoice",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
+
+            string dueAmountExpression = @"
+CASE
+    WHEN COALESCE
+    (
+        Invoice.IsReturnTrx,
+        'N'
+    ) = 'Y'
+
+    THEN
+        0 -
+        COALESCE
+        (
+            InvoicePaySchedule.DueAmt,
+            0
+        )
+
+    ELSE
+        COALESCE
+        (
+            InvoicePaySchedule.DueAmt,
+            0
+        )
+END";
 
             string sql = @"
 WITH
+" + queryParametersSql + @",
 " + weekRangeSql + @",
-
 InvoiceFiltered AS
 (
 " + invoiceAccessSql + @"
 ),
-
 ScheduledRowsData AS
 (
     SELECT
         Invoice.C_Invoice_ID,
         Invoice.C_BPartner_ID,
-
         Invoice.DocumentNo,
 
-        Invoice.DateInvoiced AS InvoiceDate,
+        Invoice.DateInvoiced
+            AS InvoiceDate,
 
         InvoicePaySchedule.DueDate,
 
-        BPartner.Name AS VendorName,
+        BPartner.Name
+            AS VendorName,
 
-        Currency.ISO_Code AS InvoiceCurrency,
+        Currency.ISO_Code
+            AS InvoiceCurrency,
 
-        Currency.CurSymbol AS InvoiceCurrencySymbol,
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END AS InvoiceCurrencySymbol,
 
-        COALESCE(
+        COALESCE
+        (
             Currency.StdPrecision,
             2
         ) AS StdPrecision,
 
-        " + paymentMethodIdSelect + @" AS PaymentMethod_ID,
+        " + paymentMethodIdSelect + @"
+            AS PaymentMethod_ID,
 
-        " + paymentMethodDisplaySelect + @" AS PaymentMethodDisplay,
+        " + paymentMethodDisplaySelect + @"
+            AS PaymentMethodDisplay,
 
         Invoice.PaymentRule,
 
-        CASE
-            WHEN COALESCE(
-                Invoice.IsReturnTrx,
-                'N'
-            ) = 'Y'
-            THEN -COALESCE(
-                InvoicePaySchedule.DueAmt,
-                0
-            )
+        ROUND
+        (
+            CAST
+            (
+                " + dueAmountExpression + @"
+                AS " + numericType + @"
+            ),
 
-            ELSE COALESCE(
-                InvoicePaySchedule.DueAmt,
-                0
+            CAST
+            (
+                COALESCE
+                (
+                    Currency.StdPrecision,
+                    2
+                )
+                AS INTEGER
             )
-        END AS DueAmount,
+        ) AS DueAmount,
 
         WeekRange.DateFrom,
         WeekRange.DateTo
@@ -1085,42 +1266,41 @@ ScheduledRowsData AS
         Currency.C_Currency_ID =
         Invoice.C_Currency_ID
     )
-
-    " + paymentMethodJoin + @"
+"
+    + paymentMethodJoin + @"
 
     WHERE InvoicePaySchedule.IsActive = 'Y'
 
-    AND COALESCE(
+    AND COALESCE
+    (
         InvoicePaySchedule.VA009_IsPaid,
         'N'
     ) <> 'Y'
 
-    AND COALESCE(
+    AND COALESCE
+    (
         InvoicePaySchedule.DueAmt,
         0
     ) > 0
 ),
-
 SummaryData AS
 (
     SELECT
-        COUNT(1) AS TotalRecords,
+        COUNT(1)
+            AS TotalRecords,
 
         COUNT
         (
-            DISTINCT
-            ScheduledRowsData.C_BPartner_ID
+            DISTINCT ScheduledRowsData.C_BPartner_ID
         ) AS VendorCount,
 
         COUNT
         (
-            DISTINCT
-            ScheduledRowsData.PaymentMethod_ID
+            DISTINCT ScheduledRowsData.PaymentMethod_ID
         ) AS PaymentMethodCount
 
     FROM ScheduledRowsData ScheduledRowsData
 ),
-
 NumberedRows AS
 (
     SELECT
@@ -1143,14 +1323,13 @@ NumberedRows AS
         ROW_NUMBER() OVER
         (
             ORDER BY
-                ScheduledRowsData.DueDate ASC,
-                ScheduledRowsData.DocumentNo ASC,
-                ScheduledRowsData.C_Invoice_ID ASC
+                ScheduledRowsData.DueDate,
+                ScheduledRowsData.DocumentNo,
+                ScheduledRowsData.C_Invoice_ID
         ) AS RowNumber
 
     FROM ScheduledRowsData ScheduledRowsData
 )
-
 SELECT
     NumberedRows.C_Invoice_ID,
     NumberedRows.C_BPartner_ID,
@@ -1167,76 +1346,101 @@ SELECT
     NumberedRows.DueAmount,
     NumberedRows.DateFrom,
     NumberedRows.DateTo,
-
     SummaryData.TotalRecords,
     SummaryData.VendorCount,
     SummaryData.PaymentMethodCount
 
 FROM NumberedRows NumberedRows
 
-CROSS JOIN SummaryData SummaryData
+INNER JOIN SummaryData SummaryData ON
+(
+    1 = 1
+)
 
 WHERE NumberedRows.RowNumber >=
-    " + startRowSql + @"
+(
+    SELECT
+        QueryParameters.StartRow
+
+    FROM QueryParameters QueryParameters
+)
 
 AND NumberedRows.RowNumber <=
-    " + endRowSql + @"
+(
+    SELECT
+        QueryParameters.EndRow
+
+    FROM QueryParameters QueryParameters
+)
 
 ORDER BY
     NumberedRows.RowNumber";
 
-            return sql;
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@StartRow",
+                        startRow
+                    ),
+
+                    new SqlParameter(
+                        "@EndRow",
+                        endRow
+                    )
+                };
+
+            return new SqlQueryData
+            {
+                Sql =
+                    sql,
+
+                Parameters =
+                    parameters
+            };
         }
 
-        /// <summary>
-        /// Returns today's date without the time.
-        /// </summary>
         private string GetWeekStartSql()
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE)";
+                return
+                    "TRUNC(CURRENT_DATE)";
             }
 
-            /*
-             * PostgreSQL CURRENT_DATE has no time component.
-             */
-            return "CURRENT_DATE";
+            return
+                "CURRENT_DATE";
         }
 
-        /// <summary>
-        /// Returns the exclusive end date: today + 7 days.
-        /// </summary>
         private string GetWeekEndExclusiveSql()
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE) + 7";
+                return
+                    "TRUNC(CURRENT_DATE) + 7";
             }
 
-            /*
-             * PostgreSQL supports DATE + INTEGER.
-             * This keeps the result as a DATE.
-             */
-            return "CURRENT_DATE + 7";
+            return
+                "CURRENT_DATE + 7";
         }
 
-        /// <summary>
-        /// Returns the displayed end date: today + 6 days.
-        /// </summary>
         private string GetWeekEndDisplaySql()
         {
             if (DB.IsOracle())
             {
-                return "TRUNC(CURRENT_DATE) + 6";
+                return
+                    "TRUNC(CURRENT_DATE) + 6";
             }
 
-            return "CURRENT_DATE + 6";
+            return
+                "CURRENT_DATE + 6";
         }
 
-        /// <summary>
-        /// Determines which payment-method description column exists.
-        /// </summary>
         private string GetPaymentMethodDisplayColumn(
             bool hasPaymentMethod
         )
@@ -1248,17 +1452,20 @@ ORDER BY
 
             if (HasPaymentMethodVA009NameColumn())
             {
-                return "PaymentMethod.VA009_Name";
+                return
+                    "PaymentMethod.VA009_Name";
             }
 
             if (HasPaymentMethodNameColumn())
             {
-                return "PaymentMethod.Name";
+                return
+                    "PaymentMethod.Name";
             }
 
             if (HasPaymentMethodValueColumn())
             {
-                return "PaymentMethod.Value";
+                return
+                    "PaymentMethod.Value";
             }
 
             return string.Empty;
@@ -1313,11 +1520,11 @@ INNER JOIN AD_Column ColumnData ON
     TableData.AD_Table_ID
 )
 
-WHERE TableData.TableName = " +
-                ToSqlString(tableName) + @"
+WHERE TableData.TableName = "
+                + ToSqlString(tableName) + @"
 
-AND ColumnData.ColumnName = " +
-                ToSqlString(columnName);
+AND ColumnData.ColumnName = "
+                + ToSqlString(columnName);
 
             return Util.GetValueOfInt(
                 DB.ExecuteScalar(sql)
@@ -1346,7 +1553,9 @@ AND ColumnData.ColumnName = " +
 
         private JsonResult GetSessionExpiredResult()
         {
-            Ctx ctx = Env.GetCtx();
+            Ctx ctx =
+                Env.GetCtx();
+
             string sessionExpired =
                 GetMsg(
                     ctx,
@@ -1370,13 +1579,16 @@ AND ColumnData.ColumnName = " +
             string fallback
         )
         {
-            string msg = Msg.GetMsg(
-                ctx,
-                key
-            );
+            string msg =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
 
             return
-                !string.IsNullOrWhiteSpace(msg) &&
+                !string.IsNullOrWhiteSpace(
+                    msg
+                ) &&
                 msg != "[" + key + "]"
                     ? msg
                     : fallback;
@@ -1391,9 +1603,17 @@ AND ColumnData.ColumnName = " +
                 return string.Empty;
             }
 
-            for (int i = 0; i < values.Length; i++)
+            for (
+                int i = 0;
+                i < values.Length;
+                i++
+            )
             {
-                if (!string.IsNullOrWhiteSpace(values[i]))
+                if (
+                    !string.IsNullOrWhiteSpace(
+                        values[i]
+                    )
+                )
                 {
                     return values[i];
                 }
@@ -1406,7 +1626,10 @@ AND ColumnData.ColumnName = " +
             int precision
         )
         {
-            if (precision < 0 || precision > 28)
+            if (
+                precision < 0 ||
+                precision > 28
+            )
             {
                 return 2;
             }
@@ -1420,12 +1643,16 @@ AND ColumnData.ColumnName = " +
             int fallback = 0
         )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            return value == null ||
-                   value == DBNull.Value
-                ? fallback
-                : Util.GetValueOfInt(value);
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? fallback
+                    : Util.GetValueOfInt(
+                        value
+                    );
         }
 
         private decimal GetDecimal(
@@ -1434,12 +1661,16 @@ AND ColumnData.ColumnName = " +
             decimal fallback
         )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            return value == null ||
-                   value == DBNull.Value
-                ? fallback
-                : Util.GetValueOfDecimal(value);
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? fallback
+                    : Util.GetValueOfDecimal(
+                        value
+                    );
         }
 
         private string GetString(
@@ -1448,24 +1679,29 @@ AND ColumnData.ColumnName = " +
             string fallback
         )
         {
-            object value = reader[columnName];
+            object value =
+                reader[columnName];
 
-            return value == null ||
-                   value == DBNull.Value
-                ? fallback
-                : Util.GetValueOfString(value);
+            return
+                value == null ||
+                value == DBNull.Value
+                    ? fallback
+                    : Util.GetValueOfString(
+                        value
+                    );
         }
 
         private string FormatDate(
             DateTime? date
         )
         {
-            return date.HasValue
-                ? date.Value.ToString(
-                    "yyyy-MM-dd",
-                    CultureInfo.InvariantCulture
-                )
-                : string.Empty;
+            return
+                date.HasValue
+                    ? date.Value.ToString(
+                        "yyyy-MM-dd",
+                        CultureInfo.InvariantCulture
+                    )
+                    : string.Empty;
         }
 
         private void CloseReader(
@@ -1480,5 +1716,21 @@ AND ColumnData.ColumnName = " +
             reader.Close();
             reader.Dispose();
         }
+
+        private class SqlQueryData
+        {
+            public string Sql
+            {
+                get;
+                set;
+            }
+
+            public SqlParameter[] Parameters
+            {
+                get;
+                set;
+            }
+        }
     }
 }
+

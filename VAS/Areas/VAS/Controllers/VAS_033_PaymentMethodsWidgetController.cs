@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 /*
  * AP Payment Methods Widget Controller
  *
@@ -13,6 +14,7 @@
 
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
@@ -23,12 +25,6 @@ using VIS.Filters;
 
 namespace VAS.Controllers
 {
-    /*
-     * Labels / Message Keys
-     * 1 | Payment methods                                        | VAS_033_MessagePaymentMethods
-     * 2 | Upi is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
-     * 3 | Not Specified                                          | VAS_033_MessageNotSpecified
-     */
     public class VAS_033_PaymentMethodsWidgetController : Controller
     {
         private const string PeriodFilterMonth = "MONTH";
@@ -62,14 +58,18 @@ namespace VAS.Controllers
                 bool isYTD =
                     periodFilter == PeriodFilterYTD;
 
-                sql = BuildPaymentMethodsSql(
-                    ctx,
-                    isYTD
-                );
+                SqlQueryData queryData =
+                    BuildPaymentMethodsSql(
+                        ctx,
+                        isYTD
+                    );
+
+                sql =
+                    queryData.Sql;
 
                 dr = DB.ExecuteReader(
-                    sql,
-                    null,
+                    queryData.Sql,
+                    queryData.Parameters,
                     null
                 );
 
@@ -144,6 +144,18 @@ namespace VAS.Controllers
                             GetString(
                                 dr,
                                 "PaymentMethodName",
+                                string.Empty
+                            ),
+
+                            GetString(
+                                dr,
+                                "TranslatedPaymentRuleName",
+                                string.Empty
+                            ),
+
+                            GetString(
+                                dr,
+                                "PaymentRuleName",
                                 string.Empty
                             ),
 
@@ -329,7 +341,7 @@ namespace VAS.Controllers
             }
         }
 
-        private string BuildPaymentMethodsSql(
+        private SqlQueryData BuildPaymentMethodsSql(
             Ctx ctx,
             bool isYTD
         )
@@ -340,10 +352,10 @@ namespace VAS.Controllers
             bool hasPaymentRule =
                 HasPaymentRuleColumn();
 
-            string clientIdSql =
-                ctx.GetAD_Client_ID().ToString(
-                    CultureInfo.InvariantCulture
-                );
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
 
             string paymentMethodNameColumn =
                 hasPaymentMethod
@@ -366,12 +378,12 @@ namespace VAS.Controllers
             string paymentMethodNameSelect =
                 usePaymentMethodTable
                     ? paymentMethodNameColumn
-                    : "NULL";
+                    : GetTextCastSql("NULL");
 
             string paymentRuleSelect =
                 hasPaymentRule
-                    ? "Payment.PaymentRule"
-                    : "NULL";
+                    ? GetTextCastSql("Payment.PaymentRule")
+                    : GetTextCastSql("NULL");
 
             string paymentMethodColumnInAccess =
                 hasPaymentMethod
@@ -401,11 +413,32 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
     " + paymentMethodNameColumn
                     : string.Empty;
 
+            string paymentRuleJoin =
+                hasPaymentRule
+                    ? @"
+LEFT OUTER JOIN PaymentRuleReference PaymentRuleReference ON
+(
+    PaymentRuleReference.ReferenceValue =
+    " + GetTextCastSql("Payment.PaymentRule") + @"
+)"
+                    : string.Empty;
+
             string paymentRuleGroupBy =
                 hasPaymentRule
                     ? @",
-    Payment.PaymentRule"
+    " + GetTextCastSql("Payment.PaymentRule") + @",
+    PaymentRuleReference.PaymentRuleName,
+    PaymentRuleReference.TranslatedPaymentRuleName"
                     : string.Empty;
+
+            string queryParametersSql = @"
+QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID,
+        @AD_Language AS AD_Language"
+        + queryParametersFrom + @"
+)";
 
             string schemaCurrencySql = @"
 SchemaCurrency AS
@@ -419,7 +452,11 @@ SchemaCurrency AS
 
         Currency.ISO_Code,
 
-        Currency.CurSymbol
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END AS CurSymbol
 
     FROM AD_ClientInfo ClientInfo
 
@@ -438,17 +475,29 @@ SchemaCurrency AS
     WHERE ClientInfo.IsActive = 'Y'
 
     AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 )";
 
             string currentPeriodSql = @"
-CurrentPeriod AS
+CurrentPeriodSource AS
 (
     SELECT
         Period.C_Period_ID,
         Period.C_Year_ID,
         Period.StartDate,
-        Period.EndDate
+        Period.EndDate,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                Period.StartDate DESC,
+                Period.C_Period_ID DESC
+        ) AS PeriodRowNumber
 
     FROM AD_ClientInfo ClientInfo
 
@@ -466,16 +515,35 @@ CurrentPeriod AS
 
     WHERE ClientInfo.IsActive = 'Y'
 
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
+
     AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 
     AND " + GetCurrentDateSql() + @" >=
         Period.StartDate
 
     AND " + GetCurrentDateSql() + @" <
-        " + GetDateToExclusiveSql(
-            "Period.EndDate"
-        ) + @"
+        " + GetDateToExclusiveSql("Period.EndDate") + @"
+),
+CurrentPeriod AS
+(
+    SELECT
+        CurrentPeriodSource.C_Period_ID,
+        CurrentPeriodSource.C_Year_ID,
+        CurrentPeriodSource.StartDate,
+        CurrentPeriodSource.EndDate
+
+    FROM CurrentPeriodSource CurrentPeriodSource
+
+    WHERE CurrentPeriodSource.PeriodRowNumber = 1
 )";
 
             string periodRangeSql;
@@ -486,19 +554,19 @@ CurrentPeriod AS
 PeriodRange AS
 (
     SELECT
-        MIN(
+        MIN
+        (
             Period.StartDate
         ) AS StartDate,
 
-        MAX(
+        MAX
+        (
             CurrentPeriod.EndDate
         ) AS EndDate,
 
         MAX
         (
-            " + GetDateToExclusiveSql(
-                "CurrentPeriod.EndDate"
-            ) + @"
+            " + GetDateToExclusiveSql("CurrentPeriod.EndDate") + @"
         ) AS EndDateExclusive
 
     FROM CurrentPeriod CurrentPeriod
@@ -509,7 +577,9 @@ PeriodRange AS
         CurrentPeriod.C_Year_ID
     )
 
-    WHERE Period.StartDate <=
+    WHERE Period.IsActive = 'Y'
+
+    AND Period.StartDate <=
         CurrentPeriod.EndDate
 )";
             }
@@ -523,13 +593,99 @@ PeriodRange AS
 
         CurrentPeriod.EndDate AS EndDate,
 
-        " + GetDateToExclusiveSql(
-            "CurrentPeriod.EndDate"
-        ) + @" AS EndDateExclusive
+        " + GetDateToExclusiveSql("CurrentPeriod.EndDate") + @" AS EndDateExclusive
 
     FROM CurrentPeriod CurrentPeriod
 )";
             }
+
+            string paymentRuleReferenceSql =
+                hasPaymentRule
+                    ? @",
+PaymentRuleReferenceSource AS
+(
+    SELECT
+        " + GetTextCastSql("RefList.Value") + @" AS ReferenceValue,
+
+        " + GetTextCastSql("RefList.Name") + @" AS PaymentRuleName,
+
+        " + GetTextCastSql("RefListTrl.Name") + @" AS TranslatedPaymentRuleName,
+
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                " + GetTextCastSql("RefList.Value") + @"
+
+            ORDER BY
+                CASE
+                    WHEN RefListTrl.Name IS NOT NULL
+                    THEN 0
+                    ELSE 1
+                END,
+
+                RefList.AD_Ref_List_ID
+        ) AS ReferenceRowNumber
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID =
+        TableInfo.AD_Table_ID
+    )
+
+    INNER JOIN AD_Reference ReferenceInfo ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        ColumnInfo.AD_Reference_Value_ID
+    )
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefListTrl.AD_Ref_List_ID =
+        RefList.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        (
+            SELECT
+                QueryParameters.AD_Language
+
+            FROM QueryParameters QueryParameters
+        )
+    )
+
+    WHERE TableInfo.TableName =
+        'C_Payment'
+
+    AND ColumnInfo.ColumnName =
+        'PaymentRule'
+
+    AND TableInfo.IsActive = 'Y'
+
+    AND ColumnInfo.IsActive = 'Y'
+
+    AND ReferenceInfo.IsActive = 'Y'
+
+    AND RefList.IsActive = 'Y'
+),
+PaymentRuleReference AS
+(
+    SELECT
+        PaymentRuleReferenceSource.ReferenceValue,
+        PaymentRuleReferenceSource.PaymentRuleName,
+        PaymentRuleReferenceSource.TranslatedPaymentRuleName
+
+    FROM PaymentRuleReferenceSource PaymentRuleReferenceSource
+
+    WHERE PaymentRuleReferenceSource.ReferenceRowNumber = 1
+)"
+                    : string.Empty;
 
             string paymentAccessSql = @"
 SELECT
@@ -556,7 +712,12 @@ WHERE Payment.IsActive = 'Y'
 AND Payment.IsReceipt = 'N'
 
 AND Payment.AD_Client_ID =
-    " + clientIdSql + @"
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
 
 AND Payment.DocStatus IN
 (
@@ -585,51 +746,59 @@ PaymentData AS
         " + paymentRuleSelect + @"
             AS PaymentRule,
 
-        COUNT(
+        " + (hasPaymentRule ? "PaymentRuleReference.PaymentRuleName" : GetTextCastSql("NULL")) + @"
+            AS PaymentRuleName,
+
+        " + (hasPaymentRule ? "PaymentRuleReference.TranslatedPaymentRuleName" : GetTextCastSql("NULL")) + @"
+            AS TranslatedPaymentRuleName,
+
+        COUNT
+        (
             Payment.C_Payment_ID
         ) AS PaymentCount,
 
         ROUND
         (
-            CAST
+            " + CastNumberSql(@"
+COALESCE
+(
+    SUM
+    (
+        CASE
+            WHEN Payment.C_Currency_ID =
+                 SchemaCurrency.C_Currency_ID
+
+            THEN COALESCE
+            (
+                Payment.PayAmt,
+                0
+            )
+
+            ELSE CurrencyConvert
             (
                 COALESCE
                 (
-                    SUM
-                    (
-                        CASE
-                            WHEN Payment.C_Currency_ID =
-                                 SchemaCurrency.C_Currency_ID
-
-                            THEN COALESCE(
-                                Payment.PayAmt,
-                                0
-                            )
-
-                            ELSE CurrencyConvert
-                            (
-                                COALESCE(
-                                    Payment.PayAmt,
-                                    0
-                                ),
-                                Payment.C_Currency_ID,
-                                SchemaCurrency.C_Currency_ID,
-                                Payment.DateAcct,
-                                Payment.C_ConversionType_ID,
-                                Payment.AD_Client_ID,
-                                Payment.AD_Org_ID
-                            )
-                        END
-                    ),
+                    Payment.PayAmt,
                     0
-                ) AS NUMERIC
-            ),
+                ),
+                Payment.C_Currency_ID,
+                SchemaCurrency.C_Currency_ID,
+                Payment.DateAcct,
+                Payment.C_ConversionType_ID,
+                Payment.AD_Client_ID,
+                Payment.AD_Org_ID
+            )
+        END
+    ),
+    0
+)") + @",
 
             CAST
             (
                 COALESCE
                 (
-                    MAX(
+                    MAX
+                    (
                         SchemaCurrency.StdPrecision
                     ),
                     2
@@ -637,19 +806,23 @@ PaymentData AS
             )
         ) AS PaymentAmount,
 
-        MAX(
+        MAX
+        (
             SchemaCurrency.C_Currency_ID
         ) AS C_Currency_ID,
 
-        MAX(
+        MAX
+        (
             SchemaCurrency.StdPrecision
         ) AS StdPrecision,
 
-        MAX(
+        MAX
+        (
             SchemaCurrency.ISO_Code
         ) AS CurrencyISO,
 
-        MAX(
+        MAX
+        (
             SchemaCurrency.CurSymbol
         ) AS CurrencySymbol
 
@@ -669,8 +842,9 @@ PaymentData AS
         AND Payment.DateAcct <
             PeriodRange.EndDateExclusive
     )
-
-    " + paymentMethodJoin + @"
+"
+    + paymentMethodJoin
+    + paymentRuleJoin + @"
 
     GROUP BY
         " + paymentMethodIdSelect +
@@ -680,23 +854,24 @@ PaymentData AS
 
             string sql = @"
 WITH
+" + queryParametersSql + @",
 " + schemaCurrencySql + @",
-
 " + currentPeriodSql + @",
-
-" + periodRangeSql + @",
-
+" + periodRangeSql + @"
+" + paymentRuleReferenceSql + @",
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
 ),
-
 " + paymentDataSql + @"
-
 SELECT
     PaymentData.PaymentMethodName,
 
     PaymentData.PaymentRule,
+
+    PaymentData.PaymentRuleName,
+
+    PaymentData.TranslatedPaymentRuleName,
 
     PaymentData.PaymentCount,
 
@@ -716,7 +891,28 @@ ORDER BY
     PaymentData.PaymentAmount DESC,
     PaymentData.PaymentMethodName ASC";
 
-            return sql;
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@AD_Language",
+                        ctx.GetAD_Language()
+                    )
+                };
+
+            return new SqlQueryData
+            {
+                Sql =
+                    sql,
+
+                Parameters =
+                    parameters
+            };
         }
 
         private DateRangeResult GetPeriodDateRange(
@@ -724,18 +920,33 @@ ORDER BY
             bool isYTD
         )
         {
-            string clientIdSql =
-                ctx.GetAD_Client_ID().ToString(
-                    CultureInfo.InvariantCulture
-                );
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            string queryParametersSql = @"
+QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID"
+        + queryParametersFrom + @"
+)";
 
             string currentPeriodSql = @"
-CurrentPeriod AS
+CurrentPeriodSource AS
 (
     SELECT
         Period.C_Year_ID,
         Period.StartDate,
-        Period.EndDate
+        Period.EndDate,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                Period.StartDate DESC,
+                Period.C_Period_ID DESC
+        ) AS PeriodRowNumber
 
     FROM AD_ClientInfo ClientInfo
 
@@ -753,16 +964,34 @@ CurrentPeriod AS
 
     WHERE ClientInfo.IsActive = 'Y'
 
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
+
     AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 
     AND " + GetCurrentDateSql() + @" >=
         Period.StartDate
 
     AND " + GetCurrentDateSql() + @" <
-        " + GetDateToExclusiveSql(
-            "Period.EndDate"
-        ) + @"
+        " + GetDateToExclusiveSql("Period.EndDate") + @"
+),
+CurrentPeriod AS
+(
+    SELECT
+        CurrentPeriodSource.C_Year_ID,
+        CurrentPeriodSource.StartDate,
+        CurrentPeriodSource.EndDate
+
+    FROM CurrentPeriodSource CurrentPeriodSource
+
+    WHERE CurrentPeriodSource.PeriodRowNumber = 1
 )";
 
             string sql;
@@ -771,14 +1000,16 @@ CurrentPeriod AS
             {
                 sql = @"
 WITH
+" + queryParametersSql + @",
 " + currentPeriodSql + @"
-
 SELECT
-    MIN(
+    MIN
+    (
         Period.StartDate
     ) AS DateFrom,
 
-    MAX(
+    MAX
+    (
         CurrentPeriod.EndDate
     ) AS DateTo
 
@@ -790,15 +1021,17 @@ INNER JOIN C_Period Period ON
     CurrentPeriod.C_Year_ID
 )
 
-WHERE Period.StartDate <=
+WHERE Period.IsActive = 'Y'
+
+AND Period.StartDate <=
     CurrentPeriod.EndDate";
             }
             else
             {
                 sql = @"
 WITH
+" + queryParametersSql + @",
 " + currentPeriodSql + @"
-
 SELECT
     CurrentPeriod.StartDate AS DateFrom,
 
@@ -807,13 +1040,22 @@ SELECT
 FROM CurrentPeriod CurrentPeriod";
             }
 
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
+
             IDataReader dr = null;
 
             try
             {
                 dr = DB.ExecuteReader(
                     sql,
-                    null,
+                    parameters,
                     null
                 );
 
@@ -863,13 +1105,6 @@ FROM CurrentPeriod CurrentPeriod";
             string columnName
         )
         {
-            if (DB.IsOracle())
-            {
-                return "TRUNC("
-                    + columnName
-                    + ") + 1";
-            }
-
             return "CAST("
                 + columnName
                 + " AS DATE) + 1";
@@ -957,6 +1192,38 @@ AND ColumnData.ColumnName =
             return Util.GetValueOfInt(
                 DB.ExecuteScalar(sql)
             ) > 0;
+        }
+
+        private string CastNumberSql(
+            string expression
+        )
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS NUMBER)";
+            }
+
+            return "CAST("
+                + expression
+                + " AS NUMERIC)";
+        }
+
+        private string GetTextCastSql(
+            string expression
+        )
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS VARCHAR2(4000))";
+            }
+
+            return "CAST("
+                + expression
+                + " AS VARCHAR(4000))";
         }
 
         private string ToSqlString(
@@ -1110,6 +1377,7 @@ AND ColumnData.ColumnName =
 
             return
                 !string.IsNullOrWhiteSpace(msg) &&
+                msg != key &&
                 msg != "[" + key + "]"
                     ? msg
                     : fallback;
@@ -1169,6 +1437,21 @@ AND ColumnData.ColumnName =
             }
 
             public DateTime? DateTo
+            {
+                get;
+                set;
+            }
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql
+            {
+                get;
+                set;
+            }
+
+            public SqlParameter[] Parameters
             {
                 get;
                 set;

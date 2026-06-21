@@ -1,4 +1,6 @@
+
 using System;
+
 /*
  * Recent AP Payments Widget Controller
  *
@@ -17,6 +19,7 @@ using System;
 
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
@@ -27,16 +30,6 @@ using VIS.Filters;
 
 namespace VAS.Controllers
 {
-    /*
-     * Labels / Message Keys
-     * 1 | Recent payments | VAS_032_MessageRecentPayments
-     * 2 | + New payment   | VAS_032_MessageNewPayment
-     * 3 | Review          | VAS_032_MessageReview
-     * 4 | Bounced         | VAS_032_MessageBounced
-     * 5 | Cleared         | VAS_032_MessageCleared
-     * 6 | In transit      | VAS_032_MessageInTransit
-     * 7 | Not Specified   | VAS_032_MessageNotSpecified
-     */
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
         [AjaxAuthorizeAttribute]
@@ -55,11 +48,17 @@ namespace VAS.Controllers
 
             try
             {
-                sql = BuildRecentPaymentsSql(ctx);
+                SqlQueryData queryData =
+                    BuildRecentPaymentsSql(
+                        ctx
+                    );
+
+                sql =
+                    queryData.Sql;
 
                 dr = DB.ExecuteReader(
-                    sql,
-                    null,
+                    queryData.Sql,
+                    queryData.Parameters,
                     null
                 );
 
@@ -131,18 +130,14 @@ namespace VAS.Controllers
             }
         }
 
-        private string BuildRecentPaymentsSql(Ctx ctx)
+        private SqlQueryData BuildRecentPaymentsSql(
+            Ctx ctx
+        )
         {
-            string clientIdSql =
-                ctx.GetAD_Client_ID()
-                    .ToString(
-                        CultureInfo.InvariantCulture
-                    );
-
-            string languageSql =
-                ToSqlString(
-                    ctx.GetAD_Language()
-                );
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
 
             bool hasPaymentMethodColumn =
                 HasColumn(
@@ -158,7 +153,9 @@ namespace VAS.Controllers
 
             string paymentMethodDisplayColumn =
                 hasPaymentMethodColumn
-                    ? GetPaymentMethodDisplayColumn("PaymentMethod")
+                    ? GetPaymentMethodDisplayColumn(
+                        "PaymentMethod"
+                    )
                     : string.Empty;
 
             bool usePaymentMethodJoin =
@@ -203,22 +200,56 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
             string executionStatusListCte =
                 hasExecutionStatusColumn
                     ? @",
-
-ExecutionStatusList AS
+ExecutionStatusListSource AS
 (
     SELECT
-        RefList.Value AS StatusValue,
+        " + GetTextCastSql(
+            "RefList.Value"
+        ) + @" AS StatusValue,
 
-        RefList.Name AS BaseStatusName,
+        " + GetTextCastSql(
+            "RefList.Name"
+        ) + @" AS BaseStatusName,
 
-        RefListTrl.Name AS TranslatedStatusName
+        " + GetTextCastSql(
+            "RefListTrl.Name"
+        ) + @" AS TranslatedStatusName,
 
-    FROM AD_Ref_List RefList
+        ROW_NUMBER() OVER
+        (
+            PARTITION BY
+                " + GetTextCastSql(
+                    "RefList.Value"
+                ) + @"
+
+            ORDER BY
+                CASE
+                    WHEN RefListTrl.Name IS NOT NULL
+                    THEN 0
+                    ELSE 1
+                END,
+
+                RefList.AD_Ref_List_ID
+        ) AS StatusRowNumber
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID =
+        TableInfo.AD_Table_ID
+    )
 
     INNER JOIN AD_Reference ReferenceInfo ON
     (
         ReferenceInfo.AD_Reference_ID =
-        RefList.AD_Reference_ID
+        ColumnInfo.AD_Reference_Value_ID
+    )
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
     )
 
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
@@ -227,15 +258,38 @@ ExecutionStatusList AS
         RefList.AD_Ref_List_ID
 
         AND RefListTrl.AD_Language =
-            " + languageSql + @"
+        (
+            SELECT
+                QueryParameters.AD_Language
+
+            FROM QueryParameters QueryParameters
+        )
     )
 
-    WHERE ReferenceInfo.Name =
+    WHERE TableInfo.TableName =
+        'C_Payment'
+
+    AND ColumnInfo.ColumnName =
         'VA009_ExecutionStatus'
+
+    AND TableInfo.IsActive = 'Y'
+
+    AND ColumnInfo.IsActive = 'Y'
 
     AND ReferenceInfo.IsActive = 'Y'
 
     AND RefList.IsActive = 'Y'
+),
+ExecutionStatusList AS
+(
+    SELECT
+        ExecutionStatusListSource.StatusValue,
+        ExecutionStatusListSource.BaseStatusName,
+        ExecutionStatusListSource.TranslatedStatusName
+
+    FROM ExecutionStatusListSource ExecutionStatusListSource
+
+    WHERE ExecutionStatusListSource.StatusRowNumber = 1
 )"
                     : string.Empty;
 
@@ -245,32 +299,53 @@ ExecutionStatusList AS
 LEFT OUTER JOIN ExecutionStatusList ExecutionStatusList ON
 (
     ExecutionStatusList.StatusValue =
-    Payment.VA009_ExecutionStatus
+    " + GetTextCastSql(
+        "Payment.VA009_ExecutionStatus"
+    ) + @"
 )"
                     : string.Empty;
 
             string executionStatusValueSelect =
                 hasExecutionStatusColumn
-                    ? "Payment.VA009_ExecutionStatus"
-                    : "NULL";
+                    ? GetTextCastSql(
+                        "Payment.VA009_ExecutionStatus"
+                    )
+                    : GetTextCastSql(
+                        "NULL"
+                    );
 
             string executionStatusNameSelect =
                 hasExecutionStatusColumn
                     ? "ExecutionStatusList.BaseStatusName"
-                    : "NULL";
+                    : GetTextCastSql(
+                        "NULL"
+                    );
 
             string translatedExecutionStatusNameSelect =
                 hasExecutionStatusColumn
                     ? "ExecutionStatusList.TranslatedStatusName"
-                    : "NULL";
+                    : GetTextCastSql(
+                        "NULL"
+                    );
 
             string executionStatusGroupBy =
                 hasExecutionStatusColumn
                     ? @",
-    Payment.VA009_ExecutionStatus,
+    " + GetTextCastSql(
+        "Payment.VA009_ExecutionStatus"
+    ) + @",
     ExecutionStatusList.BaseStatusName,
     ExecutionStatusList.TranslatedStatusName"
                     : string.Empty;
+
+            string queryParametersSql = @"
+QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID,
+        @AD_Language AS AD_Language"
+        + queryParametersFrom + @"
+)";
 
             string schemaCurrencyCte = @"
 SchemaCurrency AS
@@ -284,7 +359,11 @@ SchemaCurrency AS
 
         Currency.ISO_Code,
 
-        Currency.CurSymbol
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END AS CurSymbol
 
     FROM AD_ClientInfo ClientInfo
 
@@ -303,7 +382,12 @@ SchemaCurrency AS
     WHERE ClientInfo.IsActive = 'Y'
 
     AND ClientInfo.AD_Client_ID =
-        " + clientIdSql + @"
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
 )";
 
             string paymentAccessSql = @"
@@ -330,9 +414,9 @@ SELECT
 
     Payment.IsReconciled,
 
-    Payment.PayAmt" +
-                paymentMethodColumnInAccess +
-                executionStatusColumnInAccess + @"
+    Payment.PayAmt"
+        + paymentMethodColumnInAccess
+        + executionStatusColumnInAccess + @"
 
 FROM C_Payment Payment
 
@@ -341,7 +425,12 @@ WHERE Payment.IsActive = 'Y'
 AND Payment.IsReceipt = 'N'
 
 AND Payment.AD_Client_ID =
-    " + clientIdSql + @"
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
 
 AND Payment.DocStatus IN
 (
@@ -390,14 +479,13 @@ COALESCE
 
             string sql = @"
 WITH
+" + queryParametersSql + @",
 " + schemaCurrencyCte + @",
-
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
-)
-" + executionStatusListCte + @"
-
+)"
+    + executionStatusListCte + @"
 SELECT
     Payment.C_Payment_ID,
 
@@ -416,20 +504,24 @@ SELECT
 
     Bank.Name AS BankName,
 
-    MAX(
+    MAX
+    (
         Invoice.DocumentNo
     ) AS InvoiceDocumentNo,
 
-    MAX(
+    MAX
+    (
         SalesOrder.DocumentNo
     ) AS OrderDocumentNo,
 
     CASE
-        WHEN MAX(
+        WHEN MAX
+        (
             Invoice.C_Invoice_ID
         ) IS NOT NULL
 
-        OR MAX(
+        OR MAX
+        (
             SalesOrder.C_Order_ID
         ) IS NOT NULL
 
@@ -452,13 +544,16 @@ SELECT
 
     ROUND
     (
-        " + CastNumberSql(amountExpression) + @",
+        " + CastNumberSql(
+            amountExpression
+        ) + @",
 
         CAST
         (
             COALESCE
             (
-                MAX(
+                MAX
+                (
                     SchemaCurrency.StdPrecision
                 ),
                 2
@@ -466,19 +561,23 @@ SELECT
         )
     ) AS Amount,
 
-    MAX(
+    MAX
+    (
         SchemaCurrency.C_Currency_ID
     ) AS C_Currency_ID,
 
-    MAX(
+    MAX
+    (
         SchemaCurrency.StdPrecision
     ) AS StdPrecision,
 
-    MAX(
+    MAX
+    (
         SchemaCurrency.ISO_Code
     ) AS CurrencyISO,
 
-    MAX(
+    MAX
+    (
         SchemaCurrency.CurSymbol
     ) AS CurrencySymbol
 
@@ -495,9 +594,8 @@ LEFT OUTER JOIN C_BPartner BPartner ON
     BPartner.C_BPartner_ID =
     Payment.C_BPartner_ID
 )
-
-" + paymentMethodJoin + @"
-
+"
+    + paymentMethodJoin + @"
 LEFT OUTER JOIN C_BankAccount BankAccount ON
 (
     BankAccount.C_BankAccount_ID =
@@ -527,9 +625,8 @@ LEFT OUTER JOIN C_Order SalesOrder ON
     SalesOrder.C_Order_ID =
     Invoice.C_Order_ID
 )
-
-" + executionStatusJoin + @"
-
+"
+    + executionStatusJoin + @"
 GROUP BY
     Payment.C_Payment_ID,
     Payment.DateAcct,
@@ -545,15 +642,36 @@ GROUP BY
     Payment.C_ConversionType_ID,
     Payment.AD_Client_ID,
     Payment.AD_Org_ID,
-    SchemaCurrency.C_Currency_ID" +
-                paymentMethodGroupBy +
-                executionStatusGroupBy + @"
+    SchemaCurrency.C_Currency_ID"
+    + paymentMethodGroupBy
+    + executionStatusGroupBy + @"
 
 ORDER BY
     Payment.DateAcct DESC,
     Payment.C_Payment_ID DESC";
 
-            return sql;
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@AD_Language",
+                        ctx.GetAD_Language()
+                    )
+                };
+
+            return new SqlQueryData
+            {
+                Sql =
+                    sql,
+
+                Parameters =
+                    parameters
+            };
         }
 
         private void AddPaymentRow(
@@ -641,7 +759,9 @@ ORDER BY
                         dr,
                         "ExecutionStatusName",
                         string.Empty
-                    )
+                    ),
+
+                    executionStatus
                 );
 
             string statusType =
@@ -780,6 +900,16 @@ ORDER BY
 
                     statusName =
                         statusText,
+
+                    status =
+                        new
+                        {
+                            value =
+                                executionStatus,
+
+                            name =
+                                statusText
+                        },
 
                     amount =
                         amount,
@@ -929,14 +1059,29 @@ AND ColumnData.ColumnName =
         {
             if (DB.IsOracle())
             {
-                return "CAST(" +
-                    expression +
-                    " AS NUMBER)";
+                return "CAST("
+                    + expression
+                    + " AS NUMBER)";
             }
 
-            return "CAST(" +
-                expression +
-                " AS NUMERIC)";
+            return "CAST("
+                + expression
+                + " AS NUMERIC)";
+        }
+
+        private string GetTextCastSql(
+            string expression)
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS VARCHAR2(4000))";
+            }
+
+            return "CAST("
+                + expression
+                + " AS VARCHAR(4000))";
         }
 
         private string ToSqlString(
@@ -960,14 +1105,24 @@ AND ColumnData.ColumnName =
 
         private JsonResult GetSessionExpiredResult()
         {
-            Ctx ctx = Env.GetCtx();
-            string sessionExpired = GetMsg(ctx, "SessionExpired", "Session Expired");
+            Ctx ctx =
+                Env.GetCtx();
+
+            string sessionExpired =
+                GetMsg(
+                    ctx,
+                    "SessionExpired",
+                    "Session Expired"
+                );
 
             return Json(
                 new
                 {
-                    error = sessionExpired,
-                    errorText = sessionExpired
+                    error =
+                        sessionExpired,
+
+                    errorText =
+                        sessionExpired
                 },
                 JsonRequestBehavior.AllowGet
             );
@@ -981,9 +1136,17 @@ AND ColumnData.ColumnName =
                 return string.Empty;
             }
 
-            for (int i = 0; i < values.Length; i++)
+            for (
+                int i = 0;
+                i < values.Length;
+                i++
+            )
             {
-                if (!string.IsNullOrWhiteSpace(values[i]))
+                if (
+                    !string.IsNullOrWhiteSpace(
+                        values[i]
+                    )
+                )
                 {
                     return values[i];
                 }
@@ -1018,7 +1181,9 @@ AND ColumnData.ColumnName =
                 value == null ||
                 value == DBNull.Value
                     ? fallback
-                    : Util.GetValueOfInt(value);
+                    : Util.GetValueOfInt(
+                        value
+                    );
         }
 
         private decimal GetDecimal(
@@ -1033,7 +1198,9 @@ AND ColumnData.ColumnName =
                 value == null ||
                 value == DBNull.Value
                     ? fallback
-                    : Util.GetValueOfDecimal(value);
+                    : Util.GetValueOfDecimal(
+                        value
+                    );
         }
 
         private string GetString(
@@ -1048,7 +1215,9 @@ AND ColumnData.ColumnName =
                 value == null ||
                 value == DBNull.Value
                     ? fallback
-                    : Util.GetValueOfString(value);
+                    : Util.GetValueOfString(
+                        value
+                    );
         }
 
         private DateTime? GetNullableDate(
@@ -1066,7 +1235,9 @@ AND ColumnData.ColumnName =
                 return null;
             }
 
-            return Util.GetValueOfDateTime(value);
+            return Util.GetValueOfDateTime(
+                value
+            );
         }
 
         private string FormatDate(
@@ -1092,7 +1263,10 @@ AND ColumnData.ColumnName =
                 );
 
             return
-                !string.IsNullOrWhiteSpace(msg) &&
+                !string.IsNullOrWhiteSpace(
+                    msg
+                ) &&
+                msg != key &&
                 msg != "[" + key + "]"
                     ? msg
                     : fallback;
@@ -1108,6 +1282,21 @@ AND ColumnData.ColumnName =
 
             reader.Close();
             reader.Dispose();
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql
+            {
+                get;
+                set;
+            }
+
+            public SqlParameter[] Parameters
+            {
+                get;
+                set;
+            }
         }
     }
 }

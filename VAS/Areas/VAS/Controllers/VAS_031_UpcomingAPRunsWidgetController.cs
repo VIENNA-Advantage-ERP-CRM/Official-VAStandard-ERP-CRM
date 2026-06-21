@@ -224,11 +224,10 @@ namespace VAS.Controllers
 
             string upcomingDateToSql = DB.IsOracle()
                 ? "TRUNC(CURRENT_DATE) + 7"
-                : "CURRENT_DATE + INTERVAL '7 day'";
+                : "CURRENT_DATE + 7";
 
-            string periodEndExclusiveSql = DB.IsOracle()
-                ? "PeriodRange.PeriodEndDate + 1"
-                : "PeriodRange.PeriodEndDate + INTERVAL '1 day'";
+            string periodEndExclusiveSql =
+                "CAST(PeriodRange.PeriodEndDate AS DATE) + 1";
 
             string dateOnlySql = GetDateOnlySql(
                 "Payment.DateTrx"

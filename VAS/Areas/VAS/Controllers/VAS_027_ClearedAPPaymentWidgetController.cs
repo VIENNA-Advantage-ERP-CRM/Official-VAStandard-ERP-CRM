@@ -1,4 +1,6 @@
-﻿using System;
+﻿
+using System;
+
 /*
  * Cleared AP Payment Widget Controller
  *
@@ -97,12 +99,14 @@ namespace VAS.Controllers
 
                 if (totalPayments > 0)
                 {
-                    clearedPercentage = Math.Round(
-                        clearedPayments * 100M /
-                        totalPayments,
-                        2,
-                        MidpointRounding.AwayFromZero
-                    );
+                    clearedPercentage =
+                        Math.Round(
+                            clearedPayments *
+                            100M /
+                            totalPayments,
+                            2,
+                            MidpointRounding.AwayFromZero
+                        );
                 }
 
                 return Json(
@@ -120,19 +124,33 @@ namespace VAS.Controllers
                             "Of last month's AP payments reconciled"
                         ),
 
-                        value = clearedPercentage,
-                        clearedPercentage = clearedPercentage,
-                        totalPayments = totalPayments,
-                        clearedPayments = clearedPayments,
+                        value =
+                            clearedPercentage,
+
+                        clearedPercentage =
+                            clearedPercentage,
+
+                        totalPayments =
+                            totalPayments,
+
+                        clearedPayments =
+                            clearedPayments,
+
                         precision = 2,
 
-                        dateFrom = dateFrom.HasValue
-                            ? FormatDate(dateFrom.Value)
-                            : "",
+                        dateFrom =
+                            dateFrom.HasValue
+                                ? FormatDate(
+                                    dateFrom.Value
+                                )
+                                : "",
 
-                        dateTo = dateTo.HasValue
-                            ? FormatDate(dateTo.Value)
-                            : ""
+                        dateTo =
+                            dateTo.HasValue
+                                ? FormatDate(
+                                    dateTo.Value
+                                )
+                                : ""
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -184,37 +202,65 @@ namespace VAS.Controllers
             }
 
             string paymentAccessSql =
-                BuildUnreconciledPaymentAccessSql(ctx);
+                BuildUnreconciledPaymentAccessSql(
+                    ctx
+                );
 
             string paymentsDataSql =
-                BuildPaymentsDataSql(paymentAccessSql);
+                BuildPaymentsDataSql(
+                    paymentAccessSql
+                );
+
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
 
             string summarySql = @"
-WITH PaymentsData AS
+WITH QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID"
+        + queryParametersFrom + @"
+),
+PaymentsData AS
 (
 " + paymentsDataSql + @"
 )
 SELECT
-COUNT(1) AS TotalRecords,
-NVL(
-SUM(PaymentsData.Pay_Amount),
-0
-) AS TotalAmount,
-MIN(
-PaymentsData.Trx_Date
-) AS OldestDate,
-NVL(
-SUM(
-PaymentsData.Auto_Match_Candidate
-),
-0
-) AS AutoMatchCandidates,
-COUNT(
-DISTINCT PaymentsData.C_Currency_ID
-) AS CurrencyCount
+    COUNT(1) AS TotalRecords,
+
+    COALESCE
+    (
+        SUM
+        (
+            PaymentsData.Pay_Amount
+        ),
+        0
+    ) AS TotalAmount,
+
+    MIN
+    (
+        PaymentsData.Trx_Date
+    ) AS OldestDate,
+
+    COALESCE
+    (
+        SUM
+        (
+            PaymentsData.Auto_Match_Candidate
+        ),
+        0
+    ) AS AutoMatchCandidates,
+
+    COUNT
+    (
+        DISTINCT PaymentsData.C_Currency_ID
+    ) AS CurrencyCount
+
 FROM PaymentsData PaymentsData";
 
-            SqlParameter[] parameters =
+            SqlParameter[] summaryParameters =
             {
                 new SqlParameter(
                     "@AD_Client_ID",
@@ -235,23 +281,27 @@ FROM PaymentsData PaymentsData";
             DateTime? oldestDate = null;
             DateTime currentDate = DateTime.Today;
 
-            string summaryCurrencyIso = "";
-            string summaryCurrencySymbol = "";
+            string summaryCurrencyIso =
+                string.Empty;
+
+            string summaryCurrencySymbol =
+                string.Empty;
 
             int summaryPrecision = 2;
 
             IDataReader summaryReader = null;
             IDataReader rowsReader = null;
 
-            string rowsSql = "";
+            string rowsSql = string.Empty;
 
             try
             {
-                summaryReader = DB.ExecuteReader(
-                    summarySql,
-                    parameters,
-                    null
-                );
+                summaryReader =
+                    DB.ExecuteReader(
+                        summarySql,
+                        summaryParameters,
+                        null
+                    );
 
                 if (
                     summaryReader != null &&
@@ -260,12 +310,16 @@ FROM PaymentsData PaymentsData";
                 {
                     totalRecords =
                         Util.GetValueOfInt(
-                            summaryReader["TotalRecords"]
+                            summaryReader[
+                                "TotalRecords"
+                            ]
                         );
 
                     totalAmount =
                         Util.GetValueOfDecimal(
-                            summaryReader["TotalAmount"]
+                            summaryReader[
+                                "TotalAmount"
+                            ]
                         );
 
                     autoMatchCandidates =
@@ -277,7 +331,9 @@ FROM PaymentsData PaymentsData";
 
                     currencyCount =
                         Util.GetValueOfInt(
-                            summaryReader["CurrencyCount"]
+                            summaryReader[
+                                "CurrencyCount"
+                            ]
                         );
 
                     if (
@@ -287,7 +343,9 @@ FROM PaymentsData PaymentsData";
                     {
                         oldestDate =
                             Util.GetValueOfDateTime(
-                                summaryReader["OldestDate"]
+                                summaryReader[
+                                    "OldestDate"
+                                ]
                             );
                     }
                 }
@@ -295,14 +353,15 @@ FROM PaymentsData PaymentsData";
                 CloseReader(summaryReader);
                 summaryReader = null;
 
-                totalPages = totalRecords > 0
-                    ? Convert.ToInt32(
-                        Math.Ceiling(
-                            (decimal)totalRecords /
-                            pageSize
+                totalPages =
+                    totalRecords > 0
+                        ? Convert.ToInt32(
+                            Math.Ceiling(
+                                (decimal)totalRecords /
+                                pageSize
+                            )
                         )
-                    )
-                    : 0;
+                        : 0;
 
                 if (
                     totalPages > 0 &&
@@ -319,59 +378,104 @@ FROM PaymentsData PaymentsData";
                     pageNo * pageSize;
 
                 rowsSql = @"
-WITH PaymentsData AS
+WITH QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID,
+        @StartRow AS StartRow,
+        @EndRow AS EndRow"
+        + queryParametersFrom + @"
+),
+PaymentsData AS
 (
 " + paymentsDataSql + @"
 ),
 NumberedData AS
 (
-SELECT
-PaymentsData.Payment_ID,
-PaymentsData.Trx_Date,
-PaymentsData.Document_No,
-PaymentsData.Vendor_Name,
-PaymentsData.Bank_Name,
-PaymentsData.Account_No,
-PaymentsData.Pay_Amount,
-PaymentsData.C_Currency_ID,
-PaymentsData.Payment_Currency,
-PaymentsData.Payment_Currency_Symbol,
-PaymentsData.Std_Precision,
-PaymentsData.Payment_Method,
-ROW_NUMBER() OVER
-(
-ORDER BY
-PaymentsData.Trx_Date DESC,
-PaymentsData.Document_No DESC,
-PaymentsData.Payment_ID DESC
-) AS RowNumber
-FROM PaymentsData PaymentsData
+    SELECT
+        PaymentsData.Payment_ID,
+        PaymentsData.Trx_Date,
+        PaymentsData.Document_No,
+        PaymentsData.Vendor_Name,
+        PaymentsData.Bank_Name,
+        PaymentsData.Account_No,
+        PaymentsData.Pay_Amount,
+        PaymentsData.C_Currency_ID,
+        PaymentsData.Payment_Currency,
+        PaymentsData.Payment_Currency_Symbol,
+        PaymentsData.Std_Precision,
+        PaymentsData.Payment_Method,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                PaymentsData.Trx_Date DESC,
+                PaymentsData.Document_No DESC,
+                PaymentsData.Payment_ID DESC
+        ) AS RowNumber
+
+    FROM PaymentsData PaymentsData
 )
 SELECT
-NumberedData.Payment_ID,
-NumberedData.Trx_Date,
-NumberedData.Document_No,
-NumberedData.Vendor_Name,
-NumberedData.Bank_Name,
-NumberedData.Account_No,
-NumberedData.Pay_Amount,
-NumberedData.C_Currency_ID,
-NumberedData.Payment_Currency,
-NumberedData.Payment_Currency_Symbol,
-NumberedData.Std_Precision,
-NumberedData.Payment_Method,
-CURRENT_DATE AS CurrentDate
-FROM NumberedData NumberedData
-WHERE NumberedData.RowNumber >= " + startRow + @"
-AND NumberedData.RowNumber <= " + endRow + @"
-ORDER BY
-NumberedData.RowNumber";
+    NumberedData.Payment_ID,
+    NumberedData.Trx_Date,
+    NumberedData.Document_No,
+    NumberedData.Vendor_Name,
+    NumberedData.Bank_Name,
+    NumberedData.Account_No,
+    NumberedData.Pay_Amount,
+    NumberedData.C_Currency_ID,
+    NumberedData.Payment_Currency,
+    NumberedData.Payment_Currency_Symbol,
+    NumberedData.Std_Precision,
+    NumberedData.Payment_Method,
+    CURRENT_DATE AS CurrentDate
 
-                rowsReader = DB.ExecuteReader(
-                    rowsSql,
-                    parameters,
-                    null
-                );
+FROM NumberedData NumberedData
+
+WHERE NumberedData.RowNumber >=
+(
+    SELECT
+        QueryParameters.StartRow
+
+    FROM QueryParameters QueryParameters
+)
+
+AND NumberedData.RowNumber <=
+(
+    SELECT
+        QueryParameters.EndRow
+
+    FROM QueryParameters QueryParameters
+)
+
+ORDER BY
+    NumberedData.RowNumber";
+
+                SqlParameter[] rowsParameters =
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
+
+                    new SqlParameter(
+                        "@StartRow",
+                        startRow
+                    ),
+
+                    new SqlParameter(
+                        "@EndRow",
+                        endRow
+                    )
+                };
+
+                rowsReader =
+                    DB.ExecuteReader(
+                        rowsSql,
+                        rowsParameters,
+                        null
+                    );
 
                 while (
                     rowsReader != null &&
@@ -385,7 +489,9 @@ NumberedData.RowNumber";
                     {
                         DateTime? databaseDate =
                             Util.GetValueOfDateTime(
-                                rowsReader["CurrentDate"]
+                                rowsReader[
+                                    "CurrentDate"
+                                ]
                             );
 
                         if (databaseDate.HasValue)
@@ -397,7 +503,9 @@ NumberedData.RowNumber";
 
                     DateTime? trxDate =
                         Util.GetValueOfDateTime(
-                            rowsReader["Trx_Date"]
+                            rowsReader[
+                                "Trx_Date"
+                            ]
                         );
 
                     int rowPrecision = 2;
@@ -420,32 +528,43 @@ NumberedData.RowNumber";
                         rowPrecision = 2;
                     }
 
-                    decimal amount = Math.Round(
-                        Util.GetValueOfDecimal(
-                            rowsReader["Pay_Amount"]
-                        ),
-                        rowPrecision,
-                        MidpointRounding.AwayFromZero
-                    );
+                    decimal amount =
+                        Math.Round(
+                            Util.GetValueOfDecimal(
+                                rowsReader[
+                                    "Pay_Amount"
+                                ]
+                            ),
+                            rowPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
                     string documentNo =
                         Util.GetValueOfString(
-                            rowsReader["Document_No"]
+                            rowsReader[
+                                "Document_No"
+                            ]
                         );
 
                     string vendor =
                         Util.GetValueOfString(
-                            rowsReader["Vendor_Name"]
+                            rowsReader[
+                                "Vendor_Name"
+                            ]
                         );
 
                     string bankName =
                         Util.GetValueOfString(
-                            rowsReader["Bank_Name"]
+                            rowsReader[
+                                "Bank_Name"
+                            ]
                         );
 
                     string accountNo =
                         Util.GetValueOfString(
-                            rowsReader["Account_No"]
+                            rowsReader[
+                                "Account_No"
+                            ]
                         );
 
                     string currencyIso =
@@ -490,25 +609,45 @@ NumberedData.RowNumber";
                         {
                             paymentId =
                                 Util.GetValueOfInt(
-                                    rowsReader["Payment_ID"]
+                                    rowsReader[
+                                        "Payment_ID"
+                                    ]
                                 ),
 
-                            date = trxDate.HasValue
-                                ? trxDate.Value.ToString(
-                                    "yyyy-MM-dd",
-                                    CultureInfo.InvariantCulture
-                                )
-                                : "",
+                            date =
+                                trxDate.HasValue
+                                    ? trxDate.Value.ToString(
+                                        "yyyy-MM-dd",
+                                        CultureInfo.InvariantCulture
+                                    )
+                                    : "",
 
-                            paymentNo = documentNo,
-                            vendor = vendor,
-                            bankName = bankName,
-                            accountNo = accountNo,
-                            amount = amount,
-                            currencyIso = currencyIso,
-                            curSymbol = currencySymbol,
-                            stdPrecision = rowPrecision,
-                            method = paymentMethod,
+                            paymentNo =
+                                documentNo,
+
+                            vendor =
+                                vendor,
+
+                            bankName =
+                                bankName,
+
+                            accountNo =
+                                accountNo,
+
+                            amount =
+                                amount,
+
+                            currencyIso =
+                                currencyIso,
+
+                            curSymbol =
+                                currencySymbol,
+
+                            stdPrecision =
+                                rowPrecision,
+
+                            method =
+                                paymentMethod,
 
                             whyUnreconciled =
                                 GetUnreconciledReason(
@@ -522,17 +661,18 @@ NumberedData.RowNumber";
                     );
                 }
 
-                int oldestDays = oldestDate.HasValue
-                    ? Math.Max(
-                        0,
-                        Convert.ToInt32(
-                            (
-                                currentDate.Date -
-                                oldestDate.Value.Date
-                            ).TotalDays
+                int oldestDays =
+                    oldestDate.HasValue
+                        ? Math.Max(
+                            0,
+                            Convert.ToInt32(
+                                (
+                                    currentDate.Date -
+                                    oldestDate.Value.Date
+                                ).TotalDays
+                            )
                         )
-                    )
-                    : 0;
+                        : 0;
 
                 int autoMatchRate =
                     totalRecords > 0
@@ -553,35 +693,51 @@ NumberedData.RowNumber";
                 return Json(
                     new
                     {
-                        rows = rows,
-                        pageNo = pageNo,
-                        pageSize = pageSize,
-                        totalRecords = totalRecords,
-                        totalPages = totalPages,
+                        rows =
+                            rows,
 
-                        totalAmount = hasMixedCurrencies
-                            ? 0
-                            : Math.Round(
-                                totalAmount,
-                                summaryPrecision,
-                                MidpointRounding.AwayFromZero
-                            ),
+                        pageNo =
+                            pageNo,
 
-                        currencyIso = hasMixedCurrencies
-                            ? ""
-                            : summaryCurrencyIso,
+                        pageSize =
+                            pageSize,
 
-                        curSymbol = hasMixedCurrencies
-                            ? ""
-                            : summaryCurrencySymbol,
+                        totalRecords =
+                            totalRecords,
 
-                        stdPrecision = summaryPrecision,
+                        totalPages =
+                            totalPages,
+
+                        totalAmount =
+                            hasMixedCurrencies
+                                ? 0
+                                : Math.Round(
+                                    totalAmount,
+                                    summaryPrecision,
+                                    MidpointRounding.AwayFromZero
+                                ),
+
+                        currencyIso =
+                            hasMixedCurrencies
+                                ? ""
+                                : summaryCurrencyIso,
+
+                        curSymbol =
+                            hasMixedCurrencies
+                                ? ""
+                                : summaryCurrencySymbol,
+
+                        stdPrecision =
+                            summaryPrecision,
 
                         hasMixedCurrencies =
                             hasMixedCurrencies,
 
-                        oldestDays = oldestDays,
-                        autoMatchRate = autoMatchRate
+                        oldestDays =
+                            oldestDays,
+
+                        autoMatchRate =
+                            autoMatchRate
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -610,134 +766,218 @@ NumberedData.RowNumber";
             Ctx ctx
         )
         {
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            string textType =
+                DB.IsOracle()
+                    ? "VARCHAR2(4000)"
+                    : "VARCHAR(4000)";
+
             string paymentAccessSql = @"
 SELECT
-Payment.C_Payment_ID,
-Payment.DateTrx,
-CAST(
-Payment.IsReconciled AS VARCHAR2(1)
-) AS IsReconciled
+    Payment.C_Payment_ID,
+    Payment.DateTrx,
+
+    CAST
+    (
+        Payment.IsReconciled
+        AS " + textType + @"
+    ) AS IsReconciled
+
 FROM C_Payment Payment
-WHERE CAST(
-Payment.IsActive AS VARCHAR2(1)
+
+WHERE CAST
+(
+    Payment.IsActive
+    AS " + textType + @"
 ) = 'Y'
-AND CAST(
-Payment.IsReceipt AS VARCHAR2(1)
+
+AND CAST
+(
+    Payment.IsReceipt
+    AS " + textType + @"
 ) = 'N'
-AND CAST(
-Payment.DocStatus AS VARCHAR2(2)
-) IN ('CO', 'CL')";
+
+AND CAST
+(
+    Payment.DocStatus
+    AS " + textType + @"
+) IN
+(
+    'CO',
+    'CL'
+)
+
+AND Payment.AD_Client_ID =
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)";
 
             paymentAccessSql =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    paymentAccessSql,
-                    "Payment",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        paymentAccessSql,
+                        "Payment",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
             string sql = @"
-WITH CurrentPeriod AS
+WITH QueryParameters AS
 (
-SELECT
-YearData.C_Calendar_ID,
-Period.StartDate,
-Period.EndDate
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_Year YearData ON
-(
-YearData.C_Calendar_ID =
-ClientInfo.C_Calendar_ID
-)
-INNER JOIN C_Period Period ON
-(
-Period.C_Year_ID =
-YearData.C_Year_ID
-)
-WHERE CAST(
-ClientInfo.IsActive AS VARCHAR2(1)
-) = 'Y'
-AND ClientInfo.AD_Client_ID =
-@AD_Client_ID
-AND CURRENT_DATE >=
-Period.StartDate
-AND CURRENT_DATE <
-Period.EndDate + 1
+    SELECT
+        @AD_Client_ID AS AD_Client_ID"
+        + queryParametersFrom + @"
 ),
-PreviousPeriodEnd AS
+CurrentPeriodSource AS
 (
-SELECT
-MAX(Period.EndDate) AS DateTo
-FROM CurrentPeriod CurrentPeriod
-INNER JOIN C_Year YearData ON
+    SELECT
+        YearData.C_Calendar_ID,
+        Period.C_Period_ID,
+        Period.StartDate,
+        Period.EndDate,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                Period.StartDate DESC,
+                Period.C_Period_ID DESC
+        ) AS PeriodRowNumber
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
+
+    AND CURRENT_DATE >=
+        Period.StartDate
+
+    AND CURRENT_DATE <
+        Period.EndDate + 1
+),
+CurrentPeriod AS
 (
-YearData.C_Calendar_ID =
-CurrentPeriod.C_Calendar_ID
-)
-INNER JOIN C_Period Period ON
+    SELECT
+        CurrentPeriodSource.C_Calendar_ID,
+        CurrentPeriodSource.C_Period_ID,
+        CurrentPeriodSource.StartDate,
+        CurrentPeriodSource.EndDate
+
+    FROM CurrentPeriodSource CurrentPeriodSource
+
+    WHERE CurrentPeriodSource.PeriodRowNumber = 1
+),
+PreviousPeriodSource AS
 (
-Period.C_Year_ID =
-YearData.C_Year_ID
-)
-WHERE Period.EndDate <
-CurrentPeriod.StartDate
+    SELECT
+        Period.C_Period_ID,
+        Period.StartDate,
+        Period.EndDate,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                Period.EndDate DESC,
+                Period.C_Period_ID DESC
+        ) AS PeriodRowNumber
+
+    FROM CurrentPeriod CurrentPeriod
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+        CurrentPeriod.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+        YearData.C_Year_ID
+    )
+
+    WHERE Period.EndDate <
+        CurrentPeriod.StartDate
 ),
 PeriodRange AS
 (
-SELECT
-Period.StartDate AS DateFrom,
-Period.EndDate AS DateTo
-FROM CurrentPeriod CurrentPeriod
-INNER JOIN C_Year YearData ON
-(
-YearData.C_Calendar_ID =
-CurrentPeriod.C_Calendar_ID
-)
-INNER JOIN C_Period Period ON
-(
-Period.C_Year_ID =
-YearData.C_Year_ID
-)
-INNER JOIN PreviousPeriodEnd PreviousPeriodEnd ON
-(
-PreviousPeriodEnd.DateTo =
-Period.EndDate
-)
+    SELECT
+        PreviousPeriodSource.StartDate
+            AS DateFrom,
+
+        PreviousPeriodSource.EndDate
+            AS DateTo
+
+    FROM PreviousPeriodSource PreviousPeriodSource
+
+    WHERE PreviousPeriodSource.PeriodRowNumber = 1
 ),
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
 )
 SELECT
-COUNT(
-PaymentFiltered.C_Payment_ID
-) AS TotalPayments,
-NVL
-(
-SUM
-(
-CASE
-WHEN PaymentFiltered.IsReconciled =
-'Y'
-THEN 1
-ELSE 0
-END
-),
-0
-) AS ClearedPayments,
-MIN(
-PeriodRange.DateFrom
-) AS DateFrom,
-MAX(
-PeriodRange.DateTo
-) AS DateTo
+    COUNT
+    (
+        PaymentFiltered.C_Payment_ID
+    ) AS TotalPayments,
+
+    COALESCE
+    (
+        SUM
+        (
+            CASE
+                WHEN PaymentFiltered.IsReconciled = 'Y'
+                THEN 1
+                ELSE 0
+            END
+        ),
+        0
+    ) AS ClearedPayments,
+
+    MIN
+    (
+        PeriodRange.DateFrom
+    ) AS DateFrom,
+
+    MAX
+    (
+        PeriodRange.DateTo
+    ) AS DateTo
+
 FROM PaymentFiltered PaymentFiltered
+
 INNER JOIN PeriodRange PeriodRange ON
 (
-PaymentFiltered.DateTrx >=
-PeriodRange.DateFrom
-AND PaymentFiltered.DateTrx <
-PeriodRange.DateTo + 1
+    PaymentFiltered.DateTrx >=
+        PeriodRange.DateFrom
+
+    AND PaymentFiltered.DateTrx <
+        PeriodRange.DateTo + 1
 )";
 
             SqlParameter[] parameters =
@@ -750,8 +990,11 @@ PeriodRange.DateTo + 1
 
             return new SqlQueryData
             {
-                Sql = sql,
-                Parameters = parameters
+                Sql =
+                    sql,
+
+                Parameters =
+                    parameters
             };
         }
 
@@ -759,97 +1002,156 @@ PeriodRange.DateTo + 1
             Ctx ctx
         )
         {
+            string textType =
+                DB.IsOracle()
+                    ? "VARCHAR2(4000)"
+                    : "VARCHAR(4000)";
+
             string paymentRoleSql = @"
 SELECT
-Payment.C_Payment_ID,
-Payment.DateTrx,
-CAST(
-Payment.DocumentNo AS NVARCHAR2(100)
-) AS DocumentNo,
-Payment.C_BPartner_ID,
-Payment.C_BankAccount_ID,
-Payment.C_Currency_ID,
-Payment.VA009_PaymentMethod_ID,
-Payment.PayAmt
+    Payment.C_Payment_ID,
+    Payment.DateTrx,
+
+    CAST
+    (
+        Payment.DocumentNo
+        AS " + textType + @"
+    ) AS DocumentNo,
+
+    Payment.C_BPartner_ID,
+    Payment.C_BankAccount_ID,
+    Payment.C_Currency_ID,
+    Payment.VA009_PaymentMethod_ID,
+    Payment.PayAmt
+
 FROM C_Payment Payment
-WHERE CAST(
-Payment.IsActive AS VARCHAR2(1)
+
+WHERE CAST
+(
+    Payment.IsActive
+    AS " + textType + @"
 ) = 'Y'
-AND CAST(
-Payment.IsReceipt AS VARCHAR2(1)
+
+AND CAST
+(
+    Payment.IsReceipt
+    AS " + textType + @"
 ) = 'N'
-AND CAST(
-Payment.DocStatus AS VARCHAR2(2)
-) IN ('CO', 'CL')
+
+AND CAST
+(
+    Payment.DocStatus
+    AS " + textType + @"
+) IN
+(
+    'CO',
+    'CL'
+)
+
 AND
 (
-Payment.IsReconciled IS NULL
-OR CAST(
-Payment.IsReconciled AS VARCHAR2(1)
-) = 'N'
+    Payment.IsReconciled IS NULL
+
+    OR CAST
+    (
+        Payment.IsReconciled
+        AS " + textType + @"
+    ) = 'N'
 )
+
+AND Payment.AD_Client_ID =
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
+
 AND EXISTS
 (
-SELECT
-1
-FROM AD_ClientInfo ClientInfo
-INNER JOIN C_Year CurrentYear ON
-(
-CurrentYear.C_Calendar_ID =
-ClientInfo.C_Calendar_ID
-)
-INNER JOIN C_Period CurrentPeriod ON
-(
-CurrentPeriod.C_Year_ID =
-CurrentYear.C_Year_ID
-)
-INNER JOIN C_Year PreviousYear ON
-(
-PreviousYear.C_Calendar_ID =
-CurrentYear.C_Calendar_ID
-)
-INNER JOIN C_Period PreviousPeriod ON
-(
-PreviousPeriod.C_Year_ID =
-PreviousYear.C_Year_ID
-)
-WHERE CAST(
-ClientInfo.IsActive AS VARCHAR2(1)
-) = 'Y'
-AND ClientInfo.AD_Client_ID =
-@AD_Client_ID
-AND CURRENT_DATE >=
-CurrentPeriod.StartDate
-AND CURRENT_DATE <
-CurrentPeriod.EndDate + 1
-AND PreviousPeriod.EndDate =
-(
-SELECT
-MAX(PeriodData.EndDate)
-FROM C_Period PeriodData
-INNER JOIN C_Year YearData ON
-(
-PeriodData.C_Year_ID =
-YearData.C_Year_ID
-)
-WHERE YearData.C_Calendar_ID =
-CurrentYear.C_Calendar_ID
-AND PeriodData.EndDate <
-CurrentPeriod.StartDate
-)
-AND Payment.DateTrx >=
-PreviousPeriod.StartDate
-AND Payment.DateTrx <
-PreviousPeriod.EndDate + 1
+    SELECT
+        1
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year CurrentYear ON
+    (
+        CurrentYear.C_Calendar_ID =
+        ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period CurrentPeriod ON
+    (
+        CurrentPeriod.C_Year_ID =
+        CurrentYear.C_Year_ID
+    )
+
+    INNER JOIN C_Year PreviousYear ON
+    (
+        PreviousYear.C_Calendar_ID =
+        CurrentYear.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period PreviousPeriod ON
+    (
+        PreviousPeriod.C_Year_ID =
+        PreviousYear.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+    (
+        SELECT
+            QueryParameters.AD_Client_ID
+
+        FROM QueryParameters QueryParameters
+    )
+
+    AND CURRENT_DATE >=
+        CurrentPeriod.StartDate
+
+    AND CURRENT_DATE <
+        CurrentPeriod.EndDate + 1
+
+    AND PreviousPeriod.EndDate =
+    (
+        SELECT
+            MAX
+            (
+                PeriodData.EndDate
+            )
+
+        FROM C_Period PeriodData
+
+        INNER JOIN C_Year YearData ON
+        (
+            PeriodData.C_Year_ID =
+            YearData.C_Year_ID
+        )
+
+        WHERE YearData.C_Calendar_ID =
+            CurrentYear.C_Calendar_ID
+
+        AND PeriodData.EndDate <
+            CurrentPeriod.StartDate
+    )
+
+    AND Payment.DateTrx >=
+        PreviousPeriod.StartDate
+
+    AND Payment.DateTrx <
+        PreviousPeriod.EndDate + 1
 )";
 
             paymentRoleSql =
-                MRole.GetDefault(ctx).AddAccessSQL(
-                    paymentRoleSql,
-                    "Payment",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        paymentRoleSql,
+                        "Payment",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
             return paymentRoleSql;
         }
@@ -858,62 +1160,100 @@ PreviousPeriod.EndDate + 1
             string paymentAccessSql
         )
         {
+            string textType =
+                DB.IsOracle()
+                    ? "VARCHAR2(4000)"
+                    : "VARCHAR(4000)";
+
             return @"
 SELECT
-PaymentAccess.C_Payment_ID AS Payment_ID,
-PaymentAccess.DateTrx AS Trx_Date,
+    PaymentAccess.C_Payment_ID
+        AS Payment_ID,
 
-CAST(
-PaymentAccess.DocumentNo AS NVARCHAR2(100)
-) AS Document_No,
+    PaymentAccess.DateTrx
+        AS Trx_Date,
 
-CAST(
-BPartner.Name AS NVARCHAR2(200)
-) AS Vendor_Name,
+    CAST
+    (
+        PaymentAccess.DocumentNo
+        AS " + textType + @"
+    ) AS Document_No,
 
-CASE
-WHEN Bank.Name IS NOT NULL
-THEN CAST(
-Bank.Name AS NVARCHAR2(200)
-)
-ELSE CAST(
-BankAccount.Name AS NVARCHAR2(200)
-)
-END AS Bank_Name,
+    CAST
+    (
+        BPartner.Name
+        AS " + textType + @"
+    ) AS Vendor_Name,
 
-CAST(
-BankAccount.AccountNo AS NVARCHAR2(100)
-) AS Account_No,
+    CASE
+        WHEN Bank.Name IS NOT NULL
+        THEN
+            CAST
+            (
+                Bank.Name
+                AS " + textType + @"
+            )
 
-PaymentAccess.PayAmt AS Pay_Amount,
-PaymentAccess.C_Currency_ID,
+        ELSE
+            CAST
+            (
+                BankAccount.Name
+                AS " + textType + @"
+            )
+    END AS Bank_Name,
 
-CAST(
-Currency.ISO_Code AS NVARCHAR2(20)
-) AS Payment_Currency,
+    CAST
+    (
+        BankAccount.AccountNo
+        AS " + textType + @"
+    ) AS Account_No,
 
-CASE
-WHEN Currency.CurSymbol IS NOT NULL
-THEN CAST(
-Currency.CurSymbol AS NVARCHAR2(20)
-)
-ELSE CAST(
-Currency.ISO_Code AS NVARCHAR2(20)
-)
-END AS Payment_Currency_Symbol,
+    PaymentAccess.PayAmt
+        AS Pay_Amount,
 
-Currency.StdPrecision AS Std_Precision,
+    PaymentAccess.C_Currency_ID,
 
-CAST(
-PaymentMethod.VA009_Name AS NVARCHAR2(200)
-) AS Payment_Method,
+    CAST
+    (
+        Currency.ISO_Code
+        AS " + textType + @"
+    ) AS Payment_Currency,
 
-CASE
-WHEN PaymentAccess.C_BankAccount_ID > 0
-AND PaymentAccess.DocumentNo IS NOT NULL
-THEN 1
-ELSE 0
-END AS Auto_Match_Candidate
+    CASE
+        WHEN Currency.CurSymbol IS NOT NULL
+        THEN
+            CAST
+            (
+                Currency.CurSymbol
+                AS " + textType + @"
+            )
+
+        ELSE
+            CAST
+            (
+                Currency.ISO_Code
+                AS " + textType + @"
+            )
+    END AS Payment_Currency_Symbol,
+
+    Currency.StdPrecision
+        AS Std_Precision,
+
+    CAST
+    (
+        PaymentMethod.VA009_Name
+        AS " + textType + @"
+    ) AS Payment_Method,
+
+    CASE
+        WHEN PaymentAccess.C_BankAccount_ID > 0
+
+        AND PaymentAccess.DocumentNo IS NOT NULL
+
+        THEN 1
+
+        ELSE 0
+    END AS Auto_Match_Candidate
 
 FROM
 (
@@ -922,32 +1262,32 @@ FROM
 
 INNER JOIN C_BPartner BPartner ON
 (
-BPartner.C_BPartner_ID =
-PaymentAccess.C_BPartner_ID
+    BPartner.C_BPartner_ID =
+    PaymentAccess.C_BPartner_ID
 )
 
 LEFT OUTER JOIN C_BankAccount BankAccount ON
 (
-BankAccount.C_BankAccount_ID =
-PaymentAccess.C_BankAccount_ID
+    BankAccount.C_BankAccount_ID =
+    PaymentAccess.C_BankAccount_ID
 )
 
 LEFT OUTER JOIN C_Bank Bank ON
 (
-Bank.C_Bank_ID =
-BankAccount.C_Bank_ID
+    Bank.C_Bank_ID =
+    BankAccount.C_Bank_ID
 )
 
 INNER JOIN C_Currency Currency ON
 (
-Currency.C_Currency_ID =
-PaymentAccess.C_Currency_ID
+    Currency.C_Currency_ID =
+    PaymentAccess.C_Currency_ID
 )
 
 LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 (
-PaymentMethod.VA009_PaymentMethod_ID =
-PaymentAccess.VA009_PaymentMethod_ID
+    PaymentMethod.VA009_PaymentMethod_ID =
+    PaymentAccess.VA009_PaymentMethod_ID
 )";
         }
 
@@ -967,7 +1307,11 @@ PaymentAccess.VA009_PaymentMethod_ID
                 return "Missing bank account";
             }
 
-            if (string.IsNullOrWhiteSpace(documentNo))
+            if (
+                string.IsNullOrWhiteSpace(
+                    documentNo
+                )
+            )
             {
                 return "Reference mismatch";
             }
@@ -999,6 +1343,7 @@ PaymentAccess.VA009_PaymentMethod_ID
         private JsonResult GetSessionExpiredResult()
         {
             Ctx ctx = Env.GetCtx();
+
             string sessionExpired =
                 GetMsg(
                     ctx,
@@ -1009,8 +1354,11 @@ PaymentAccess.VA009_PaymentMethod_ID
             return Json(
                 new
                 {
-                    error = sessionExpired,
-                    errorText = sessionExpired
+                    error =
+                        sessionExpired,
+
+                    errorText =
+                        sessionExpired
                 },
                 JsonRequestBehavior.AllowGet
             );
@@ -1032,13 +1380,16 @@ PaymentAccess.VA009_PaymentMethod_ID
             string fallback
         )
         {
-            string message = Msg.GetMsg(
-                ctx,
-                key
-            );
+            string message =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
 
             return
-                !string.IsNullOrWhiteSpace(message) &&
+                !string.IsNullOrWhiteSpace(
+                    message
+                ) &&
                 message != "[" + key + "]"
                     ? message
                     : fallback;
@@ -1073,3 +1424,4 @@ PaymentAccess.VA009_PaymentMethod_ID
         }
     }
 }
+

@@ -812,7 +812,9 @@ SummaryRows AS
         BestMatches.*,
         COUNT(1) OVER () AS TotalRecords,
         ROUND(
-            SUM(BestMatches.AccountingAmount) OVER (),
+            " + CastNumberSql(@"
+SUM(BestMatches.AccountingAmount) OVER ()
+") + @",
             CAST(BestMatches.SchemaStdPrecision AS INTEGER)
         ) AS TotalAccountingAmount,
         SUM(
@@ -1653,7 +1655,7 @@ FROM DetailScored DetailScored";
                 CloseReader(reader);
             }
 
-            
+
             return null;
         }
 
@@ -2839,6 +2841,20 @@ AND InvoiceRow.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM Que
 
         #region Helpers
 
+        private string CastNumberSql(string expression)
+        {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + expression
+                    + " AS NUMBER)";
+            }
+
+            return "CAST("
+                + expression
+                + " AS NUMERIC)";
+        }
+
         private Ctx GetContext()
         {
             return Session["ctx"] as Ctx;
@@ -3606,7 +3622,7 @@ AND
             }
         }
 
-     
+
 
         private string GetString(
             IDataReader reader,
