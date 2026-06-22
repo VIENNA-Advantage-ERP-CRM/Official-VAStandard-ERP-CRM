@@ -79,3 +79,5 @@
 @import "../VAS_045_GLJournalPendingWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
+
+@import "../VAS_081_MaterialReceiptRegisterWidget.css"; @import "../VAS_082_NewGRNWidget.css"; @import "../VAS_083_OpenGRNsWidget.css"; @import "../VAS_084_PendingInspectionWidget.css"; @import "../VAS_085_POFulfilmentWidget.css"; @import "../VAS_086_QAHoldsWidget.css"; @import "../VAS_087_ReceiptAgingWidget.css"; @import "../VAS_088_ReceiptQueueWidget.css"; @import "../VAS_089_ReceiptsMTDWidget.css"; @import "../VAS_090_ReceivingActionsWidget.css";

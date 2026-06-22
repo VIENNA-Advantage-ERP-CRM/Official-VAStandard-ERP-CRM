@@ -187,3 +187,5 @@ import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+
+import "../app/widgets/VAS_081_MaterialReceiptRegisterWidget.js"; import "../app/widgets/VAS_082_NewGRNWidget.js"; import "../app/widgets/VAS_083_OpenGRNsWidget.js"; import "../app/widgets/VAS_084_PendingInspectionWidget.js"; import "../app/widgets/VAS_085_POFulfilmentWidget.js"; import "../app/widgets/VAS_086_QAHoldsWidget.js"; import "../app/widgets/VAS_087_ReceiptAgingWidget.js"; import "../app/widgets/VAS_088_ReceiptQueueWidget.js"; import "../app/widgets/VAS_089_ReceiptsMTDWidget.js"; import "../app/widgets/VAS_090_ReceivingActionsWidget.js";

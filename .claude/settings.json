@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/MSI/Desktop/react form s/react \\(3\\)/react \\(2\\)/VaReact/Official-VAStandard-ERP-CRM/VAS/Areas/VAS/Controllers/**)"
+    ]
+  }
+}
