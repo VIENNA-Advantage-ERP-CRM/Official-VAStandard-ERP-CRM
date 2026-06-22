@@ -155,6 +155,7 @@
     <Compile Include="Areas\VAS\Controllers\AgingReceivablesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AlertSQLGenerateController.cs" />
     <Compile Include="Areas\VAS\Controllers\AutoAllocatedController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
     <Compile Include="Areas\VAS\Controllers\CalloutOrderController.cs" />
@@ -276,6 +277,7 @@
     <Content Include="Areas\VAS\Content\Images\cube-icon.png" />
     <Content Include="Areas\VAS\Content\Images\dummy.jpg" />
     <Content Include="Areas\VAS\Content\InvoicesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_065_APInvoicePanel.css" />
     <Content Include="Areas\VAS\Content\OutstandingSalesOrderWidget.css" />
     <Content Include="Areas\VAS\Content\OverdueWidget.css" />
     <Content Include="Areas\VAS\Content\PaidthismonthWidget.css" />
@@ -362,6 +364,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_065_APInvoicePanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\CashJournal\VAS_NewCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AutoAllocatedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\BouncedChequesWidget.js" />
