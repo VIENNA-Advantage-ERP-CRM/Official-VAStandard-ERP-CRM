@@ -210,7 +210,7 @@
                 safeNumber(value);
 
             if (numericValue === 0) {
-                $target.text('-');
+                $target.text('-').attr('title', '-');
                 return;
             }
 
@@ -234,6 +234,8 @@
                 amount.match(
                     /([.,]\d+)$/
                 );
+
+            $target.attr('title', formatCurrencyAmount(numericValue, data));
 
             $target
                 .empty()
@@ -764,6 +766,10 @@
 
                 'text':
                     entry.timeText ||
+                    '',
+
+                'title':
+                    entry.timeText ||
                     ''
             }).appendTo($row);
 
@@ -772,6 +778,10 @@
                     'VAS_052_cashbook-col-doc-no',
 
                 'text':
+                    entry.documentNo ||
+                    '-',
+
+                'title':
                     entry.documentNo ||
                     '-'
             }).appendTo($row);
@@ -791,6 +801,13 @@
                         categoryClass,
 
                     'text':
+                        entry.charge ||
+                        lbl(
+                            'VAS_052_Other',
+                            'Other'
+                        ),
+
+                    'title':
                         entry.charge ||
                         lbl(
                             'VAS_052_Other',
@@ -817,6 +834,9 @@
                             'VAS_052_cashbook-cash-type',
 
                         'text':
+                            cashTypeText,
+
+                        'title':
                             cashTypeText
                     })
                 );
@@ -832,6 +852,13 @@
                     'VAS_052_cashbook-posted',
 
                 'text':
+                    entry.postedBy ||
+                    lbl(
+                        'VAS_052_System',
+                        'System'
+                    ),
+
+                'title':
                     entry.postedBy ||
                     lbl(
                         'VAS_052_System',
@@ -870,6 +897,10 @@
                     'VAS_052_cashbook-desc',
 
                 'text':
+                    entry.description ||
+                    '',
+
+                'title':
                     entry.description ||
                     ''
             }).appendTo($row);

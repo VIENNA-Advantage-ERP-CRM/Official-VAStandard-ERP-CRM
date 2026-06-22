@@ -619,7 +619,9 @@
             var rcptLbl = lbl('VAS_047_Receipts', 'receipts');
             var descText = vs7day + ' \u00B7 ' + receiptCount + ' ' + rcptLbl;
 
-            $root.find('#VAS-047-cj-desc-' + uid).text(descText);
+            $root.find('#VAS-047-cj-desc-' + uid)
+                .text(descText)
+                .attr('title', descText);
         }
 
         /* ── Load data from controller ──────────────────────────────── */

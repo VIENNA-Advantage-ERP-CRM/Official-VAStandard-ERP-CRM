@@ -545,7 +545,8 @@
                 }));
 
             $root.find('#VAS_050_current-cash-description-' + widgetId)
-                .text('');
+                .text('')
+                .attr('title', '');
 
             $root.find('.VAS_current-cash-cash-journal-footer').hide();
         }
@@ -569,7 +570,7 @@
             renderCashBookOptions(data.cashBooks || []);
 
             $root.find('#VAS_050_current-cash-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_050_current-cash-title-' + widgetId).text(title);
+            $root.find('#VAS_050_current-cash-title-' + widgetId).text(title).attr('title', title);
 
             $root.find('#VAS_050_current-cash-value-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-value-positive VAS_current-cash-cash-journal-value-negative VAS_current-cash-cash-journal-value-neutral')
@@ -588,8 +589,10 @@
                     'text': formatSignedAmount(balance < 0 ? 0 - footerAmount : footerAmount, data.currencySymbol, data.currencyISO, data.stdPrecision, true)
                 }));
 
+            var description = data.description || getStatusText(balance);
             $root.find('#VAS_050_current-cash-description-' + widgetId)
-                .text(data.description || getStatusText(balance));
+                .text(description)
+                .attr('title', description);
         }
 
         function loadData() {

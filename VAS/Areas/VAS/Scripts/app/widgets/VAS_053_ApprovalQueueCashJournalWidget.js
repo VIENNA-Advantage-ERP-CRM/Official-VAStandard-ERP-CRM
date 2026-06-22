@@ -104,18 +104,6 @@
                 }));
         }
 
-        function truncateText(text, maxLength) {
-            var value = text || '';
-
-            value = value.replace(/\s+/g, ' ').trim();
-
-            if (value.length <= maxLength) {
-                return value;
-            }
-
-            return value.substring(0, maxLength - 3) + '...';
-        }
-
         function getApproveIcon() {
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                 '<polyline points="20 6 9 17 4 12"></polyline>' +
@@ -294,6 +282,9 @@
             var $prev = $root.find('#VAS_053_approval-prev-' + widgetId);
             var $next = $root.find('#VAS_053_approval-next-' + widgetId);
             var $pageText = $root.find('#VAS_053_approval-page-text-' + widgetId);
+            var $footer = $root.find('.VAS_053_approval-footer');
+
+            $footer.toggle(totalPages > 1);
 
             if ($pageText) {
                 $pageText.text(totalPages > 1 ? pageNo + ' ' + lbl('VAS_053_Of', 'of') + ' ' + totalPages : '');
@@ -335,8 +326,10 @@
             if (totalPages > 0 && pageNo > totalPages) { pageNo = totalPages; }
 
             $root.find('#VAS_053_approval-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_053_approval-title-' + widgetId).text(data.title || lbl('VAS_053_ApprovalQueue', 'Approval Queue'));
-            $root.find('#VAS_053_approval-meta-' + widgetId).text(safeNumber(data.pendingCount).toLocaleString(window.navigator.language) + ' ' + (data.pendingText || lbl('VAS_053_Pending', 'Pending')));
+            var title = data.title || lbl('VAS_053_ApprovalQueue', 'Approval Queue');
+            var metaText = safeNumber(data.pendingCount).toLocaleString(window.navigator.language) + ' ' + (data.pendingText || lbl('VAS_053_Pending', 'Pending'));
+            $root.find('#VAS_053_approval-title-' + widgetId).text(title).attr('title', title);
+            $root.find('#VAS_053_approval-meta-' + widgetId).text(metaText).attr('title', metaText);
             $root.find('#VAS_053_approval-view-all-' + widgetId).text(data.viewAllText || lbl('VAS_053_ViewAll', 'View all ->'));
             updatePager();
 
@@ -362,7 +355,8 @@
 
                 var $title = $('<span>', {
                     'class': 'VAS_053_approval-row-title',
-                    'text': item.title || item.documentNo || '-'
+                    'text': item.title || item.documentNo || '-',
+                    'title': item.title || item.documentNo || '-'
                 });
 
                 var $priority = $('<span>', {
@@ -370,15 +364,16 @@
                     'text': item.priorityText || ''
                 });
 
-                var subText = (data.submittedByText || lbl('VAS_053_SubmittedBy', 'Submitted by')) + ' ' + (item.createdByName || '-') + ' · ' + (item.relativeTime || '');
+                var subText = (data.submittedByText || lbl('VAS_053_SubmittedBy', 'Submitted by')) + ' ' + (item.createdByName || '-') + (item.relativeTime ? ' · ' + item.relativeTime : '');
                 var $sub = $('<div>', {
                     'class': 'VAS_053_approval-row-sub',
-                    'text': subText
+                    'text': subText,
+                    'title': subText
                 });
 
                 var $message = $('<div>', {
                     'class': 'VAS_053_approval-message',
-                    'text': truncateText(item.workflowMessage || '', 68),
+                    'text': item.workflowMessage || '',
                     'title': item.workflowMessage || ''
                 });
 
@@ -388,14 +383,6 @@
                 });
 
                 renderAmount($amount, item);
-
-                var $side = $('<div>', {
-                    'class': 'VAS_053_approval-side'
-                });
-
-                var $actions = $('<div>', {
-                    'class': 'VAS_053_approval-actions'
-                });
 
                 //var $approve = $('<button>', {
                 //    'type': 'button',
@@ -409,16 +396,14 @@
                 //    'aria-label': lbl('VAS_053_Reject', 'Reject')
                 //}).html(getRejectIcon());
 
-                $top.append($title).append($priority);
+                $top.append($title).append($priority).append($amount);
                 $main.append($top).append($sub);
 
                 if (item.workflowMessage) {
                     $main.append($message);
                 }
 
-               // $actions.append($approve).append($reject);
-                $side.append($amount).append($actions);
-                $row.append($main).append($side);
+                $row.append($main);
                 $list.append($row);
             });
         }

@@ -403,11 +403,15 @@
 
             clearState();
 
+            var title = data.title || lbl('VAS_054_TopCounterparties', 'Top Counterparties');
+            var metaText = data.metaText || lbl('VAS_054_Last30Days', 'Last 30 Days');
             $root.find('#VAS_054_counterparties-title-' + widgetId)
-                .text(data.title || lbl('VAS_054_TopCounterparties', 'Top Counterparties'));
+                .text(title)
+                .attr('title', title);
 
             $root.find('#VAS_054_counterparties-meta-' + widgetId)
-                .text(data.metaText || lbl('VAS_054_Last30Days', 'Last 30 Days'));
+                .text(metaText)
+                .attr('title', metaText);
 
             $list.empty();
 
@@ -428,12 +432,14 @@
 
                 var $name = $('<div>', {
                     'class': 'VAS_054_counterparties-name',
-                    'text': item.name || '-'
+                    'text': item.name || '-',
+                    'title': item.name || '-'
                 });
 
                 var $chip = $('<span>', {
                     'class': 'VAS_054_counterparties-chip VAS_054_counterparties-chip-' + (item.typeClass || 'other'),
-                    'text': item.typeText || ''
+                    'text': item.typeText || '',
+                    'title': item.typeText || ''
                 });
 
                 var $count = $('<span>', {

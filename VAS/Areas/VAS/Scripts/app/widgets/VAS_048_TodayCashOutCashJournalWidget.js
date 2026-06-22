@@ -465,7 +465,8 @@
                 .text('');
 
             $root.find('#VAS_048_today-cash-out-description-' + $self.AD_UserHomeWidgetID)
-                .text('');
+                .text('')
+                .attr('title', '');
 
             $root.find('.VAS_today-cash-out-cash-journal-footer').hide();
         }
@@ -485,13 +486,13 @@
             var footerText = lbl('VAS_048_VsSevenDayAvg', 'vs 7-day avg') + ' · ' + disbursementCount.toLocaleString(window.navigator.language) + ' ' + lbl('VAS_048_Disbursements', 'disbursements');
 
             $root.find('#VAS_048_today-cash-out-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_048_today-cash-out-title-' + widgetId).text(title);
-            $root.find('#VAS_048_today-cash-out-date-' + widgetId).text(dateText);
+            $root.find('#VAS_048_today-cash-out-title-' + widgetId).text(title).attr('title', title);
+            $root.find('#VAS_048_today-cash-out-date-' + widgetId).text(dateText).attr('title', dateText);
             renderCurrencyAmount($root.find('#VAS_048_today-cash-out-value-' + widgetId), amount, data.currencySymbol, data.currencyISO, data.stdPrecision);
             $root.find('#VAS_048_today-cash-out-value-' + widgetId).show();
             $root.find('.VAS_today-cash-out-cash-journal-footer').show();
             $root.find('#VAS_048_today-cash-out-delta-text-' + widgetId).text(formatPercent(deltaPercent));
-            $root.find('#VAS_048_today-cash-out-description-' + widgetId).text(footerText);
+            $root.find('#VAS_048_today-cash-out-description-' + widgetId).text(footerText).attr('title', footerText);
 
             var $delta = $root.find('#VAS_048_today-cash-out-delta-' + widgetId);
             $delta.removeClass('VAS_today-cash-out-cash-journal-delta-up VAS_today-cash-out-cash-journal-delta-down');

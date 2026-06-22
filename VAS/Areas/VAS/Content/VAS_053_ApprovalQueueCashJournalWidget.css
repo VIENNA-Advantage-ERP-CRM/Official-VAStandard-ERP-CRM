@@ -186,7 +186,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.5em;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-inline-end: 0.125em;
 }
 
 .VAS_053_approval-list::-webkit-scrollbar {
@@ -207,7 +209,7 @@
     min-height: 4em;
     flex: 0 0 auto;
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 0.625em;
     padding: 0.625em 0.75em;
     border: 1px solid rgba(212, 225, 234, 0.86);
@@ -226,12 +228,15 @@
 
 .VAS_053_approval-row-top {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
     gap: 0.375em;
+    row-gap: 0.5em;
     min-width: 0;
 }
 
 .VAS_053_approval-row-title {
+    flex: 1 1 9em;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -270,15 +275,25 @@
 .VAS_053_approval-row-sub,
 .VAS_053_approval-message {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-size: 0.6875em;
     line-height: 1.25;
     color: #5F7283;
 }
 
+.VAS_053_approval-row-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .VAS_053_approval-message {
+    display: -webkit-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     margin-top: 0.125em;
     color: #7C8795;
 }
@@ -296,19 +311,19 @@
 
 .VAS_053_approval-amount {
     flex: 0 0 auto;
-    width: 100%;
-    max-width: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: auto;
+    max-width: 100%;
+    margin-inline-start: auto;
+    overflow: visible;
     white-space: nowrap;
     text-align: right;
     display: inline-flex;
     align-items: baseline;
     justify-content: flex-end;
     gap: 0;
-    font-size: 0.8125em;
+    font-size: 0.6875em;
     line-height: 1;
-    font-weight: 800;
+    font-weight: 700;
     color: #102C3F;
 }
 
@@ -353,7 +368,7 @@
     margin-top: 0;
     color: currentColor;
     font-size: 1em;
-    font-weight: 800;
+    font-weight: 700;
     opacity: 1;
 }
 

@@ -219,7 +219,8 @@
                 .text('');
 
             $root.find('#VAS_049_net-cash-description-' + widgetId)
-                .text('');
+                .text('')
+                .attr('title', '');
 
             $root.find('.VAS_net-cash-cash-journal-footer').hide();
         }
@@ -238,8 +239,8 @@
             var deltaClass = getStateClass(deltaAmount, 'VAS_net-cash-cash-journal-delta');
 
             $root.find('#VAS_049_net-cash-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_049_net-cash-title-' + widgetId).text(title);
-            $root.find('#VAS_049_net-cash-date-' + widgetId).text(dateText);
+            $root.find('#VAS_049_net-cash-title-' + widgetId).text(title).attr('title', title);
+            $root.find('#VAS_049_net-cash-date-' + widgetId).text(dateText).attr('title', dateText);
 
             $root.find('#VAS_049_net-cash-value-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-value-positive VAS_net-cash-cash-journal-value-negative VAS_net-cash-cash-journal-value-neutral')
@@ -256,8 +257,10 @@
             $root.find('#VAS_049_net-cash-delta-text-' + widgetId)
                 .text(formatSignedAmount(deltaAmount, data.currencySymbol, data.currencyISO, data.stdPrecision));
 
+            var description = data.description || getStatusText(netAmount);
             $root.find('#VAS_049_net-cash-description-' + widgetId)
-                .text(data.description || getStatusText(netAmount));
+                .text(description)
+                .attr('title', description);
         }
 
         function loadData() {

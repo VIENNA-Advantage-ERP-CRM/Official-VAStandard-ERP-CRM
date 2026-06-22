@@ -352,7 +352,8 @@
 
             var $name = $('<span>', {
                 'class': 'VAS_055_cash-category-name',
-                'text': item.name || lbl('VAS_055_Other', 'Other')
+                'text': item.name || lbl('VAS_055_Other', 'Other'),
+                'title': item.name || lbl('VAS_055_Other', 'Other')
             });
 
             var $percent = $('<span>', {
@@ -414,8 +415,10 @@
                 : (pageSize > 0 ? Math.ceil(totalRecords / pageSize) : 0);
 
             $root.find('#VAS_055_cash-category-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_055_cash-category-title-' + widgetId).text(data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category'));
-            $root.find('#VAS_055_cash-category-meta-' + widgetId).text(data.metaText || lbl('VAS_055_Today', 'Today'));
+            var title = data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category');
+            var metaText = data.metaText || lbl('VAS_055_Today', 'Today');
+            $root.find('#VAS_055_cash-category-title-' + widgetId).text(title).attr('title', title);
+            $root.find('#VAS_055_cash-category-meta-' + widgetId).text(metaText).attr('title', metaText);
             $root.find('#VAS_055_cash-category-why-' + widgetId).text(data.whyLabel || lbl('VAS_055_Why', 'Why'));
             $root.find('#VAS_055_cash-category-why-text-' + widgetId).text(data.whyText || lbl('VAS_055_WhyText', 'Grouped by cash type for today.'));
 

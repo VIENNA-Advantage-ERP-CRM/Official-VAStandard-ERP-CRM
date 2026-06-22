@@ -207,7 +207,8 @@
 
             var $label = $('<div>', {
                 'class': 'VAS_051_cash-flow-day-label',
-                'text': item.dayLabel || ''
+                'text': item.dayLabel || '',
+                'title': item.dayLabel || ''
             });
 
             $bars.append($inBar).append($outBar);
@@ -226,7 +227,8 @@
             var $body = $root.find('#VAS_051_cash-flow-body-' + widgetId);
 
             $root.find('#VAS_051_cash-flow-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_051_cash-flow-title-' + widgetId).text(data.title || lbl('VAS_051_SevenDayCashFlow', '7-Day Cash Flow'));
+            var title = data.title || lbl('VAS_051_SevenDayCashFlow', '7-Day Cash Flow');
+            $root.find('#VAS_051_cash-flow-title-' + widgetId).text(title).attr('title', title);
             $root.find('#VAS_051_cash-flow-meta-' + widgetId).text(lbl('VAS_051_InVsOut', 'IN VS OUT'));
 
             $body.empty();
