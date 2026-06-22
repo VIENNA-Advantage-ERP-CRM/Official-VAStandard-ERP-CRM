@@ -3832,6 +3832,7 @@ namespace VAdvantage.Model
                                 {
                                     lHist = new MOrderlineHistory(GetCtx(), 0, Get_TrxName());
                                     lHist.SetClientOrg(_lines[i]);
+                                    lHist.Set_ValueNoCheck("C_Order_ID", GetC_Order_ID());
                                     lHist.SetC_OrderLine_ID(_lines[i].Get_ID());
                                     lHist.SetC_Charge_ID(_lines[i].GetC_Charge_ID());
                                     lHist.SetC_Frequency_ID(_lines[i].GetC_Frequency_ID());
@@ -3980,6 +3981,7 @@ namespace VAdvantage.Model
                             {
                                 lHist = new MOrderlineHistory(GetCtx(), 0, Get_TrxName());
                                 lHist.SetClientOrg(_lines[i]);
+                                lHist.Set_ValueNoCheck("C_Order_ID", GetC_Order_ID());
                                 lHist.SetC_OrderLine_ID(_lines[i].Get_ID());
                                 lHist.SetC_Charge_ID(_lines[i].GetC_Charge_ID());
                                 lHist.SetC_Frequency_ID(_lines[i].GetC_Frequency_ID());

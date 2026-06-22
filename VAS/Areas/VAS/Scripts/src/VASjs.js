@@ -113,6 +113,24 @@ import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 
 import "../app/widgets/RequestWidget.js";
+import "../app/widgets/VAS_025_TotalPurchasesWidget.js";
+import "../app/widgets/VAS_024_TotalOutstandingWidget.js";
+import "../app/widgets/VAS_018_OverduePayablesWidget.js";
+import "../app/widgets/VAS_016_AvgPaymentPeriodWidget.js";
+import "../app/widgets/VAS_019_PayableAgingWidget.js";
+import "../app/widgets/VAS_017_MonthlyPurchaseSpendWidget.js";
+import "../app/widgets/VAS_022_SpendByCategoryWidget.js";
+import "../app/widgets/VAS_021_RealTimeAlertsWidget.js";
+import "../app/widgets/VAS_023_TopFiveVendorsWidget.js";
+import "../app/widgets/VAS_020_PendingInvoicesWidget.js";
+import "../app/widgets/VAS_026_VendorCreditUtilisationWidget.js";
+import "../app/widgets/VAS_067_APInvoiceSearchWidget.js";
+import "../app/widgets/VAS_068_APPaymentSearchWidget.js";
+import "../app/widgets/VAS_069_CashJournalSearchWidget.js";
+import "../app/widgets/VAS_070_GLJournalSearchWidget.js";
+import "../app/widgets/VAS_071_NewPaymentWidget.js";
+
+import "../app/widgets/RequestWidget.js";
 
 import "../app/widgets/VAS_027_ClearedAPPaymentWidget.js";
 import "../app/widgets/VAS_028_PaidThisMonthAPPaymentWidget.js";
