@@ -1,7 +1,9 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
@@ -13,20 +15,21 @@ namespace VAS.Controllers
 {
     /// <summary>
     /// Module Name : Cash Journal
-    /// Purpose     : Provides latest cash book ending balance
-    ///               for Current Cash dashboard widget.
+    /// Purpose     : Provides the latest cash journal ending balance
+    ///               and its related cash journal lines.
     /// </summary>
     public class VAS_050_CurrentCashForCashJournalController : Controller
     {
         /// <summary>
-        /// Gets latest ending balance for selected Cash Book / Drawer.
+        /// Returns the ending balance of the latest accessible cash journal.
+        ///
+        /// Latest means:
+        /// 1. Highest StatementDate.
+        /// 2. Highest C_Cash_ID when more than one record has the same date.
+        ///
+        /// When cashBookId is greater than zero, the latest journal is selected
+        /// only from that Cash Book.
         /// </summary>
-        /// <param name="cashBookId">
-        /// Selected C_CashBook_ID.
-        /// Pass 0 to use the first accessible drawer
-        /// with a latest cash journal.
-        /// </param>
-        /// <returns>JSON response for Current Cash widget.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetCurrentCash(
@@ -42,29 +45,664 @@ namespace VAS.Controllers
                     new
                     {
                         success = false,
-                        error = "VAS_050_SessionExpired",
+                        error = GetMsg(
+                            Env.GetCtx(),
+                            "VAS_050_SessionExpired",
+                            "Session Expired"
+                        ),
                         hasData = false
                     },
                     JsonRequestBehavior.AllowGet
                 );
             }
 
-            IDataReader reader =
-                null;
-
-            IDataReader cashBookReader =
-                null;
+            IDataReader reader = null;
+            IDataReader cashBookReader = null;
 
             try
             {
                 List<object> cashBooks =
+                    ReadCashBooks(
+                        ctx,
+                        ref cashBookReader
+                    );
+
+                SqlQueryData queryData =
+                    BuildCurrentCashSql(
+                        ctx,
+                        cashBookId
+                    );
+
+                reader =
+                    DB.ExecuteReader(
+                        queryData.Sql,
+                        queryData.Parameters,
+                        null
+                    );
+
+                if (
+                    reader == null ||
+                    !reader.Read()
+                )
+                {
+                    return Json(
+                        new
+                        {
+                            success = true,
+                            error = string.Empty,
+                            hasData = false,
+
+                            title = GetMsg(
+                                ctx,
+                                "VAS_050_CurrentCash",
+                                "Current Cash"
+                            ),
+
+                            mainMetric = 0,
+                            mainMetricText = "0",
+                            footerAmount = 0,
+
+                            description = GetMsg(
+                                ctx,
+                                "VAS_050_NoCashLeft",
+                                "No Cash Left"
+                            ),
+
+                            badgeText = GetMsg(
+                                ctx,
+                                "VAS_050_Live",
+                                "Live"
+                            ),
+
+                            cCashId = 0,
+                            cCashBookId = 0,
+                            cashBookName = string.Empty,
+                            documentNo = string.Empty,
+                            statementDate = string.Empty,
+                            dateAcct = string.Empty,
+
+                            currencyISO = string.Empty,
+                            currencySymbol = string.Empty,
+                            cCurrencyId = 0,
+                            stdPrecision = 2,
+
+                            cashBooks = cashBooks
+                        },
+                        JsonRequestBehavior.AllowGet
+                    );
+                }
+
+                int stdPrecision =
+                    NormalizePrecision(
+                        GetInt(
+                            reader,
+                            "StdPrecision",
+                            2
+                        )
+                    );
+
+                decimal currentBalance =
+                    GetRoundedDecimal(
+                        reader,
+                        "CurrentBalance",
+                        stdPrecision
+                    );
+
+                DateTime? statementDate =
+                    GetDate(
+                        reader,
+                        "StatementDate"
+                    );
+
+                DateTime? dateAcct =
+                    GetDate(
+                        reader,
+                        "DateAcct"
+                    );
+
+                return Json(
+                    new
+                    {
+                        success = true,
+                        error = string.Empty,
+                        hasData = true,
+
+                        title = GetMsg(
+                            ctx,
+                            "VAS_050_CurrentCash",
+                            "Current Cash"
+                        ),
+
+                        mainMetric =
+                            currentBalance,
+
+                        mainMetricText =
+                            currentBalance.ToString(
+                                "F" + stdPrecision,
+                                CultureInfo.InvariantCulture
+                            ),
+
+                        footerAmount =
+                            Math.Abs(
+                                currentBalance
+                            ),
+
+                        description =
+                            GetCurrentCashDescription(
+                                ctx,
+                                currentBalance
+                            ),
+
+                        badgeText = GetMsg(
+                            ctx,
+                            "VAS_050_Live",
+                            "Live"
+                        ),
+
+                        cCashId =
+                            GetInt(
+                                reader,
+                                "C_Cash_ID"
+                            ),
+
+                        cCashBookId =
+                            GetInt(
+                                reader,
+                                "C_CashBook_ID"
+                            ),
+
+                        cashBookName =
+                            GetString(
+                                reader,
+                                "CashBookName"
+                            ),
+
+                        documentNo =
+                            GetString(
+                                reader,
+                                "DocumentNo"
+                            ),
+
+                        statementDate =
+                            statementDate.HasValue
+                                ? FormatDate(
+                                    statementDate.Value
+                                )
+                                : string.Empty,
+
+                        dateAcct =
+                            dateAcct.HasValue
+                                ? FormatDate(
+                                    dateAcct.Value
+                                )
+                                : string.Empty,
+
+                        currencyISO =
+                            GetString(
+                                reader,
+                                "CurrencyISO"
+                            ),
+
+                        currencySymbol =
+                            GetString(
+                                reader,
+                                "CurrencySymbol"
+                            ),
+
+                        cCurrencyId =
+                            GetInt(
+                                reader,
+                                "C_Currency_ID"
+                            ),
+
+                        stdPrecision =
+                            stdPrecision,
+
+                        cashBooks =
+                            cashBooks
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+            catch (Exception ex)
+            {
+                VLogger.Get().SaveError(
+                    "VAS_050_GetCurrentCash",
+                    ex
+                );
+
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error = GetMsg(
+                            ctx,
+                            "VAS_050_LoadError",
+                            "Unable To Load Current Cash"
+                        ),
+
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+            finally
+            {
+                CloseReader(
+                    reader
+                );
+
+                CloseReader(
+                    cashBookReader
+                );
+            }
+        }
+
+        /// <summary>
+        /// Returns one page of C_CashLine records belonging to the same
+        /// latest C_Cash record displayed by GetCurrentCash.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCurrentCashRows(
+            int cashBookId,
+            int pageNo = 1,
+            int pageSize = 6
+        )
+        {
+            Ctx ctx =
+                Session["ctx"] as Ctx;
+
+            if (ctx == null)
+            {
+                return Json(
+                    new
+                    {
+                        success = false,
+                        error = GetMsg(
+                            Env.GetCtx(),
+                            "VAS_050_SessionExpired",
+                            "Session Expired"
+                        ),
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+
+            pageNo =
+                Math.Max(
+                    pageNo,
+                    1
+                );
+
+            pageSize =
+                Math.Max(
+                    1,
+                    Math.Min(
+                        pageSize,
+                        50
+                    )
+                );
+
+            IDataReader reader = null;
+
+            try
+            {
+                SqlQueryData queryData =
+                    BuildCurrentCashRowsSql(
+                        ctx,
+                        cashBookId,
+                        pageNo,
+                        pageSize
+                    );
+
+                reader =
+                    DB.ExecuteReader(
+                        queryData.Sql,
+                        queryData.Parameters,
+                        null
+                    );
+
+                List<object> rows =
                     new List<object>();
 
-                /*
-                 * Apply MRole only to the physical C_CashBook query.
-                 * Append ORDER BY after MRole is applied.
-                 */
-                string cashBookAccessSql = @"
+                int totalRecords = 0;
+                int stdPrecision = 2;
+                decimal totalAmount = 0;
+
+                int selectedCashId = 0;
+                int selectedCashBookId = 0;
+
+                string cashBookName =
+                    string.Empty;
+
+                string documentNo =
+                    string.Empty;
+
+                string selectedStatementDate =
+                    string.Empty;
+
+                string selectedDateAcct =
+                    string.Empty;
+
+                while (
+                    reader != null &&
+                    reader.Read()
+                )
+                {
+                    totalRecords =
+                        GetInt(
+                            reader,
+                            "TotalRecords"
+                        );
+
+                    stdPrecision =
+                        NormalizePrecision(
+                            GetInt(
+                                reader,
+                                "StdPrecision",
+                                2
+                            )
+                        );
+
+                    totalAmount =
+                        GetRoundedDecimal(
+                            reader,
+                            "TotalAmount",
+                            stdPrecision
+                        );
+
+                    selectedCashId =
+                        GetInt(
+                            reader,
+                            "C_Cash_ID"
+                        );
+
+                    selectedCashBookId =
+                        GetInt(
+                            reader,
+                            "C_CashBook_ID"
+                        );
+
+                    cashBookName =
+                        GetString(
+                            reader,
+                            "CashBookName"
+                        );
+
+                    documentNo =
+                        GetString(
+                            reader,
+                            "DocumentNo"
+                        );
+
+                    DateTime? statementDate =
+                        GetDate(
+                            reader,
+                            "StatementDate"
+                        );
+
+                    DateTime? dateAcct =
+                        GetDate(
+                            reader,
+                            "DateAcct"
+                        );
+
+                    selectedStatementDate =
+                        statementDate.HasValue
+                            ? FormatDate(
+                                statementDate.Value
+                            )
+                            : string.Empty;
+
+                    selectedDateAcct =
+                        dateAcct.HasValue
+                            ? FormatDate(
+                                dateAcct.Value
+                            )
+                            : string.Empty;
+
+                    int cashLineId =
+                        GetInt(
+                            reader,
+                            "C_CashLine_ID"
+                        );
+
+                    if (cashLineId <= 0)
+                    {
+                        continue;
+                    }
+
+                    string cashTypeValue =
+                        GetString(
+                            reader,
+                            "CashTypeValue"
+                        );
+
+                    string cashTypeName =
+                        FirstNotEmpty(
+                            GetString(
+                                reader,
+                                "CashTypeTranslatedName"
+                            ),
+
+                            GetString(
+                                reader,
+                                "CashTypeBaseName"
+                            ),
+
+                            cashTypeValue
+                        );
+
+                    string docStatusValue =
+                        GetString(
+                            reader,
+                            "DocStatus"
+                        );
+
+                    string docStatusName =
+                        FirstNotEmpty(
+                            GetString(
+                                reader,
+                                "StatusTranslatedName"
+                            ),
+
+                            GetString(
+                                reader,
+                                "StatusBaseName"
+                            ),
+
+                            docStatusValue
+                        );
+
+                    rows.Add(
+                        new
+                        {
+                            cCashId =
+                                selectedCashId,
+
+                            cCashBookId =
+                                selectedCashBookId,
+
+                            cCashLineId =
+                                cashLineId,
+
+                            documentNo =
+                                documentNo,
+
+                            statementDate =
+                                selectedStatementDate,
+
+                            dateAcct =
+                                selectedDateAcct,
+
+                            description =
+                                GetString(
+                                    reader,
+                                    "Description"
+                                ),
+
+                            amount =
+                                GetRoundedDecimal(
+                                    reader,
+                                    "Amount",
+                                    stdPrecision
+                                ),
+
+                            cashTypeValue =
+                                cashTypeValue,
+
+                            cashTypeName =
+                                cashTypeName,
+
+                            cChargeId =
+                                GetInt(
+                                    reader,
+                                    "C_Charge_ID"
+                                ),
+
+                            chargeName =
+                                GetString(
+                                    reader,
+                                    "ChargeName"
+                                ),
+
+                            cashBookName =
+                                cashBookName,
+
+                            docStatusValue =
+                                docStatusValue,
+
+                            docStatusName =
+                                docStatusName,
+
+                            currencyISO =
+                                GetString(
+                                    reader,
+                                    "CurrencyISO"
+                                ),
+
+                            currencySymbol =
+                                GetString(
+                                    reader,
+                                    "CurrencySymbol"
+                                ),
+
+                            stdPrecision =
+                                stdPrecision
+                        }
+                    );
+                }
+
+                int totalPages =
+                    totalRecords <= 0
+                        ? 0
+                        : Convert.ToInt32(
+                            Math.Ceiling(
+                                (decimal)totalRecords /
+                                pageSize
+                            )
+                        );
+
+                return Json(
+                    new
+                    {
+                        success = true,
+                        error = string.Empty,
+
+                        title = GetMsg(
+                            ctx,
+                            "VAS_050_DialogTitle",
+                            "Current Cash Details"
+                        ),
+
+                        rows =
+                            rows,
+
+                        pageNo =
+                            pageNo,
+
+                        pageSize =
+                            pageSize,
+
+                        totalRecords =
+                            totalRecords,
+
+                        totalPages =
+                            totalPages,
+
+                        totalAmount =
+                            totalAmount,
+
+                        stdPrecision =
+                            stdPrecision,
+
+                        cCashId =
+                            selectedCashId,
+
+                        cCashBookId =
+                            selectedCashBookId,
+
+                        cashBookName =
+                            cashBookName,
+
+                        documentNo =
+                            documentNo,
+
+                        statementDate =
+                            selectedStatementDate,
+
+                        dateAcct =
+                            selectedDateAcct,
+
+                        hasData =
+                            totalRecords > 0
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+            catch (Exception ex)
+            {
+                VLogger.Get().SaveError(
+                    "VAS_050_GetCurrentCashRows",
+                    ex
+                );
+
+                return Json(
+                    new
+                    {
+                        success = false,
+
+                        error = GetMsg(
+                            ctx,
+                            "VAS_050_LoadError",
+                            "Could Not Load Data"
+                        ),
+
+                        hasData = false
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+            finally
+            {
+                CloseReader(
+                    reader
+                );
+            }
+        }
+
+        private List<object> ReadCashBooks(
+            Ctx ctx,
+            ref IDataReader reader
+        )
+        {
+            List<object> result =
+                new List<object>();
+
+            string sql = @"
 SELECT
     CashBook.C_CashBook_ID,
     CashBook.Name
@@ -74,91 +712,87 @@ FROM C_CashBook CashBook
 WHERE CashBook.IsActive = 'Y'
 
 AND CashBook.AD_Client_ID =
-    @ListClientID";
+    @AD_Client_ID";
 
-                cashBookAccessSql =
-                    MRole.GetDefault(ctx)
-                        .AddAccessSQL(
-                            cashBookAccessSql,
-                            "CashBook",
-                            MRole.SQL_FULLYQUALIFIED,
-                            MRole.SQL_RO
-                        );
+            sql =
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        sql,
+                        "CashBook",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
-                string cashBookListSql =
-                    cashBookAccessSql + @"
+            sql += @"
 
 ORDER BY
     CashBook.Name,
     CashBook.C_CashBook_ID";
 
-                SqlParameter[] cashBookParameters =
-                    new SqlParameter[]
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    )
+                };
+
+            reader =
+                DB.ExecuteReader(
+                    sql,
+                    parameters,
+                    null
+                );
+
+            while (
+                reader != null &&
+                reader.Read()
+            )
+            {
+                result.Add(
+                    new
                     {
-                        new SqlParameter(
-                            "@ListClientID",
-                            ctx.GetAD_Client_ID()
-                        )
-                    };
+                        cCashBookId =
+                            GetInt(
+                                reader,
+                                "C_CashBook_ID"
+                            ),
 
-                cashBookReader =
-                    DB.ExecuteReader(
-                        cashBookListSql,
-                        cashBookParameters,
-                        null
-                    );
+                        name =
+                            GetString(
+                                reader,
+                                "Name"
+                            )
+                    }
+                );
+            }
 
-                while (
-                    cashBookReader != null &&
-                    cashBookReader.Read()
-                )
-                {
-                    cashBooks.Add(
-                        new
-                        {
-                            cCashBookId =
-                                GetInt(
-                                    cashBookReader,
-                                    "C_CashBook_ID"
-                                ),
+            CloseReader(
+                reader
+            );
 
-                            name =
-                                GetString(
-                                    cashBookReader,
-                                    "Name"
-                                )
-                        }
-                    );
-                }
+            reader = null;
 
-                if (cashBookReader != null)
-                {
-                    cashBookReader.Close();
-                    cashBookReader.Dispose();
-                    cashBookReader = null;
-                }
+            return result;
+        }
 
-                /*
-                 * Oracle requires FROM DUAL for a parameter-only SELECT.
-                 * PostgreSQL does not require a FROM clause.
-                 */
-                string queryParametersFrom =
-                    DB.IsOracle()
-                        ? " FROM DUAL"
-                        : string.Empty;
+        private SqlQueryData BuildCurrentCashSql(
+            Ctx ctx,
+            int cashBookId
+        )
+        {
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
 
-                /*
-                 * PostgreSQL requires NUMERIC as the first argument
-                 * of ROUND(value, precision).
-                 *
-                 * Oracle uses NUMBER.
-                 */
-                string numericType =
-                    DB.IsOracle()
-                        ? "NUMBER"
-                        : "NUMERIC";
+            string numericType =
+                DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
 
-                string queryParametersSql = @"
+            string queryParametersSql = @"
 QueryParameters AS
 (
     SELECT
@@ -167,38 +801,33 @@ QueryParameters AS
         + queryParametersFrom + @"
 )";
 
-                string schemaCurrencySql = @"
+            string schemaCurrencySql = @"
 SchemaCurrency AS
 (
     SELECT
         ClientInfo.AD_Client_ID,
-
-        AcctSchema.C_Currency_ID
-            AS C_Currency_ID,
-
+        AcctSchema.C_Currency_ID,
         Currency.StdPrecision,
-
-        Currency.ISO_Code
-            AS ISO_Code,
+        Currency.ISO_Code,
 
         CASE
             WHEN Currency.CurSymbol IS NOT NULL
             THEN Currency.CurSymbol
             ELSE Currency.ISO_Code
-        END AS Cur_Symbol
+        END AS CurSymbol
 
     FROM AD_ClientInfo ClientInfo
 
     INNER JOIN C_AcctSchema AcctSchema ON
     (
-        ClientInfo.C_AcctSchema1_ID =
-        AcctSchema.C_AcctSchema_ID
+        AcctSchema.C_AcctSchema_ID =
+        ClientInfo.C_AcctSchema1_ID
     )
 
     INNER JOIN C_Currency Currency ON
     (
-        AcctSchema.C_Currency_ID =
-        Currency.C_Currency_ID
+        Currency.C_Currency_ID =
+        AcctSchema.C_Currency_ID
     )
 
     WHERE ClientInfo.IsActive = 'Y'
@@ -216,16 +845,7 @@ SchemaCurrency AS
     )
 )";
 
-                /*
-                 * Apply MRole only to the main physical C_Cash table.
-                 *
-                 * Do not apply MRole to:
-                 * - the final WITH query
-                 * - ProtectedCash CTE
-                 * - RankedCash CTE
-                 * - secondary aliases
-                 */
-                string protectedCashSql = @"
+            string protectedCashSql = @"
 SELECT
     CashHeader.C_Cash_ID,
     CashHeader.AD_Client_ID,
@@ -254,59 +874,70 @@ AND CashHeader.DocStatus IN
     'DR',
     'CO',
     'CL'
-)";
+)
 
-                protectedCashSql =
-                    MRole.GetDefault(ctx)
-                        .AddAccessSQL(
-                            protectedCashSql,
-                            "CashHeader",
-                            MRole.SQL_FULLYQUALIFIED,
-                            MRole.SQL_RO
-                        );
-
-                string protectedCashCteSql = @"
-ProtectedCash AS
+AND
 (
-" + protectedCashSql + @"
+    (
+        SELECT
+            QueryParameters.C_CashBook_ID
+
+        FROM QueryParameters QueryParameters
+    ) <= 0
+
+    OR CashHeader.C_CashBook_ID =
+    (
+        SELECT
+            QueryParameters.C_CashBook_ID
+
+        FROM QueryParameters QueryParameters
+    )
 )";
 
-                string convertedEndingBalanceExpression = @"
+            protectedCashSql =
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        protectedCashSql,
+                        "CashHeader",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
+
+            string convertedBalanceSql = @"
 CASE
     WHEN CashBook.C_Currency_ID =
         SchemaCurrency.C_Currency_ID
 
-    THEN
+    THEN COALESCE
+    (
+        ProtectedCash.EndingBalance,
+        0
+    )
+
+    ELSE CurrencyConvert
+    (
         COALESCE
         (
             ProtectedCash.EndingBalance,
             0
-        )
-
-    ELSE
-        CurrencyConvert
-        (
-            COALESCE
-            (
-                ProtectedCash.EndingBalance,
-                0
-            ),
-            CashBook.C_Currency_ID,
-            SchemaCurrency.C_Currency_ID,
-            ProtectedCash.DateAcct,
-            0,
-            ProtectedCash.AD_Client_ID,
-            ProtectedCash.AD_Org_ID
-        )
+        ),
+        CashBook.C_Currency_ID,
+        SchemaCurrency.C_Currency_ID,
+        ProtectedCash.DateAcct,
+        0,
+        ProtectedCash.AD_Client_ID,
+        ProtectedCash.AD_Org_ID
+    )
 END";
 
-                /*
-                 * ROW_NUMBER is compatible with Oracle and PostgreSQL.
-                 *
-                 * It replaces the correlated NOT EXISTS lookup and
-                 * deterministically selects the latest journal per Cash Book.
-                 */
-                string rankedCashSql = @"
+            string sql = @"
+WITH
+" + queryParametersSql + @",
+" + schemaCurrencySql + @",
+ProtectedCash AS
+(
+" + protectedCashSql + @"
+),
 RankedCash AS
 (
     SELECT
@@ -324,7 +955,7 @@ RankedCash AS
         (
             CAST
             (
-                " + convertedEndingBalanceExpression + @"
+                " + convertedBalanceSql + @"
                 AS " + numericType + @"
             ),
 
@@ -345,20 +976,16 @@ RankedCash AS
             2
         ) AS StdPrecision,
 
-        SchemaCurrency.C_Currency_ID
-            AS C_Currency_ID,
+        SchemaCurrency.C_Currency_ID,
 
         SchemaCurrency.ISO_Code
             AS CurrencyISO,
 
-        SchemaCurrency.Cur_Symbol
+        SchemaCurrency.CurSymbol
             AS CurrencySymbol,
 
         ROW_NUMBER() OVER
         (
-            PARTITION BY
-                ProtectedCash.C_CashBook_ID
-
             ORDER BY
                 ProtectedCash.StatementDate DESC,
                 ProtectedCash.C_Cash_ID DESC
@@ -368,8 +995,8 @@ RankedCash AS
 
     INNER JOIN C_CashBook CashBook ON
     (
-        ProtectedCash.C_CashBook_ID =
-        CashBook.C_CashBook_ID
+        CashBook.C_CashBook_ID =
+        ProtectedCash.C_CashBook_ID
     )
 
     INNER JOIN SchemaCurrency SchemaCurrency ON
@@ -382,27 +1009,167 @@ RankedCash AS
 
     AND CashBook.AD_Client_ID =
         ProtectedCash.AD_Client_ID
+)
+SELECT
+    RankedCash.C_Cash_ID,
+    RankedCash.C_CashBook_ID,
+    RankedCash.CashBookName,
+    RankedCash.DocumentNo,
+    RankedCash.StatementDate,
+    RankedCash.DateAcct,
+    RankedCash.CurrentBalance,
+    RankedCash.StdPrecision,
+    RankedCash.C_Currency_ID,
+    RankedCash.CurrencyISO,
+    RankedCash.CurrencySymbol
 
-    AND
-    (
-        (
-            SELECT
-                QueryParameters.C_CashBook_ID
+FROM RankedCash RankedCash
 
-            FROM QueryParameters QueryParameters
-        ) <= 0
+WHERE RankedCash.RowNumber = 1";
 
-        OR CashBook.C_CashBook_ID =
-        (
-            SELECT
-                QueryParameters.C_CashBook_ID
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
 
-            FROM QueryParameters QueryParameters
+                    new SqlParameter(
+                        "@C_CashBook_ID",
+                        cashBookId
+                    )
+                };
+
+            return new SqlQueryData
+            {
+                Sql = sql,
+                Parameters = parameters
+            };
+        }
+
+        private SqlQueryData BuildCurrentCashRowsSql(
+            Ctx ctx,
+            int cashBookId,
+            int pageNo,
+            int pageSize
         )
+        {
+            string queryParametersFrom =
+                DB.IsOracle()
+                    ? " FROM DUAL"
+                    : string.Empty;
+
+            string numericType =
+                DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
+
+            string textType =
+                DB.IsOracle()
+                    ? "VARCHAR2(4000)"
+                    : "VARCHAR(4000)";
+
+            int startRow =
+                ((pageNo - 1) * pageSize) + 1;
+
+            int endRow =
+                pageNo * pageSize;
+
+            string protectedCashSql = @"
+SELECT
+    CashHeader.C_Cash_ID,
+    CashHeader.AD_Client_ID,
+    CashHeader.AD_Org_ID,
+    CashHeader.C_CashBook_ID,
+    CashHeader.DocumentNo,
+    CashHeader.StatementDate,
+    CashHeader.DateAcct,
+    CashHeader.EndingBalance,
+    CashHeader.DocStatus
+
+FROM C_Cash CashHeader
+
+WHERE CashHeader.IsActive = 'Y'
+
+AND CashHeader.AD_Client_ID =
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
+
+AND CashHeader.DocStatus IN
+(
+    'DR',
+    'CO',
+    'CL'
+)
+
+AND
+(
+    (
+        SELECT
+            QueryParameters.C_CashBook_ID
+
+        FROM QueryParameters QueryParameters
+    ) <= 0
+
+    OR CashHeader.C_CashBook_ID =
+    (
+        SELECT
+            QueryParameters.C_CashBook_ID
+
+        FROM QueryParameters QueryParameters
     )
 )";
 
-                string latestCashSql = @"
+            protectedCashSql =
+                MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        protectedCashSql,
+                        "CashHeader",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
+
+            string sql = @"
+WITH QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID,
+        @C_CashBook_ID AS C_CashBook_ID,
+        @AD_Language AS AD_Language,
+        @StartRow AS StartRow,
+        @EndRow AS EndRow"
+        + queryParametersFrom + @"
+),
+ProtectedCash AS
+(
+" + protectedCashSql + @"
+),
+RankedCash AS
+(
+    SELECT
+        ProtectedCash.C_Cash_ID,
+        ProtectedCash.AD_Client_ID,
+        ProtectedCash.AD_Org_ID,
+        ProtectedCash.C_CashBook_ID,
+        ProtectedCash.DocumentNo,
+        ProtectedCash.StatementDate,
+        ProtectedCash.DateAcct,
+        ProtectedCash.DocStatus,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                ProtectedCash.StatementDate DESC,
+                ProtectedCash.C_Cash_ID DESC
+        ) AS RowNumber
+
+    FROM ProtectedCash ProtectedCash
+),
 LatestCash AS
 (
     SELECT
@@ -413,402 +1180,439 @@ LatestCash AS
         RankedCash.DocumentNo,
         RankedCash.StatementDate,
         RankedCash.DateAcct,
-        RankedCash.CashBookName,
-        RankedCash.CurrentBalance,
-        RankedCash.StdPrecision,
-        RankedCash.C_Currency_ID,
-        RankedCash.CurrencyISO,
-        RankedCash.CurrencySymbol
+        RankedCash.DocStatus
 
     FROM RankedCash RankedCash
 
     WHERE RankedCash.RowNumber = 1
-)";
+),
+StatusReference AS
+(
+    SELECT DISTINCT
+        TRIM
+        (
+            CAST
+            (
+                RefList.Value
+                AS " + textType + @"
+            )
+        ) AS StatusValue,
 
-                string sql = @"
-WITH
-" + queryParametersSql + @",
-" + schemaCurrencySql + @",
-" + protectedCashCteSql + @",
-" + rankedCashSql + @",
-" + latestCashSql + @"
+        TRIM
+        (
+            CAST
+            (
+                RefList.Name
+                AS " + textType + @"
+            )
+        ) AS BaseName,
+
+        TRIM
+        (
+            CAST
+            (
+                RefListTrl.Name
+                AS " + textType + @"
+            )
+        ) AS TranslatedName
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID =
+        TableInfo.AD_Table_ID
+    )
+
+    INNER JOIN AD_Reference ReferenceInfo ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        ColumnInfo.AD_Reference_Value_ID
+    )
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefListTrl.AD_Ref_List_ID =
+        RefList.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        (
+            SELECT
+                QueryParameters.AD_Language
+
+            FROM QueryParameters QueryParameters
+        )
+
+        AND RefListTrl.IsActive = 'Y'
+    )
+
+    WHERE TableInfo.TableName = 'C_Cash'
+
+    AND ColumnInfo.ColumnName = 'DocStatus'
+
+    AND TableInfo.IsActive = 'Y'
+
+    AND ColumnInfo.IsActive = 'Y'
+
+    AND ReferenceInfo.IsActive = 'Y'
+
+    AND RefList.IsActive = 'Y'
+),
+CashTypeReference AS
+(
+    SELECT DISTINCT
+        TRIM
+        (
+            CAST
+            (
+                RefList.Value
+                AS " + textType + @"
+            )
+        ) AS CashTypeValue,
+
+        TRIM
+        (
+            CAST
+            (
+                RefList.Name
+                AS " + textType + @"
+            )
+        ) AS BaseName,
+
+        TRIM
+        (
+            CAST
+            (
+                RefListTrl.Name
+                AS " + textType + @"
+            )
+        ) AS TranslatedName
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID =
+        TableInfo.AD_Table_ID
+    )
+
+    INNER JOIN AD_Reference ReferenceInfo ON
+    (
+        ReferenceInfo.AD_Reference_ID =
+        ColumnInfo.AD_Reference_Value_ID
+    )
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        RefList.AD_Reference_ID =
+        ReferenceInfo.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefListTrl.AD_Ref_List_ID =
+        RefList.AD_Ref_List_ID
+
+        AND RefListTrl.AD_Language =
+        (
+            SELECT
+                QueryParameters.AD_Language
+
+            FROM QueryParameters QueryParameters
+        )
+
+        AND RefListTrl.IsActive = 'Y'
+    )
+
+    WHERE TableInfo.TableName = 'C_CashLine'
+
+    AND ColumnInfo.ColumnName = 'CashType'
+
+    AND TableInfo.IsActive = 'Y'
+
+    AND ColumnInfo.IsActive = 'Y'
+
+    AND ReferenceInfo.IsActive = 'Y'
+
+    AND RefList.IsActive = 'Y'
+),
+CashLineRows AS
+(
+    SELECT
+        LatestCash.C_Cash_ID,
+        LatestCash.C_CashBook_ID,
+        LatestCash.DocumentNo,
+        LatestCash.StatementDate,
+        LatestCash.DateAcct,
+        LatestCash.DocStatus,
+
+        StatusReference.BaseName
+            AS StatusBaseName,
+
+        StatusReference.TranslatedName
+            AS StatusTranslatedName,
+
+        CashLine.C_CashLine_ID,
+        CashLine.Description,
+        CashLine.Amount,
+        CashLine.C_Charge_ID,
+
+        TRIM
+        (
+            CAST
+            (
+                CashLine.CashType
+                AS " + textType + @"
+            )
+        ) AS CashTypeValue,
+
+        CashTypeReference.BaseName
+            AS CashTypeBaseName,
+
+        CashTypeReference.TranslatedName
+            AS CashTypeTranslatedName,
+
+        Charge.Name
+            AS ChargeName,
+
+        CashBook.Name
+            AS CashBookName,
+
+        Currency.ISO_Code
+            AS CurrencyISO,
+
+        Currency.CurSymbol
+            AS CurrencySymbol,
+
+        COALESCE
+        (
+            Currency.StdPrecision,
+            2
+        ) AS StdPrecision
+
+    FROM LatestCash LatestCash
+
+    INNER JOIN C_CashLine CashLine ON
+    (
+        CashLine.C_Cash_ID =
+        LatestCash.C_Cash_ID
+    )
+
+    INNER JOIN C_CashBook CashBook ON
+    (
+        CashBook.C_CashBook_ID =
+        LatestCash.C_CashBook_ID
+
+        AND CashBook.IsActive = 'Y'
+    )
+
+    INNER JOIN C_Currency Currency ON
+    (
+        Currency.C_Currency_ID =
+        CashBook.C_Currency_ID
+
+        AND Currency.IsActive = 'Y'
+    )
+
+    LEFT OUTER JOIN C_Charge Charge ON
+    (
+        Charge.C_Charge_ID =
+        CashLine.C_Charge_ID
+    )
+
+    LEFT OUTER JOIN StatusReference StatusReference ON
+    (
+        StatusReference.StatusValue =
+        TRIM
+        (
+            CAST
+            (
+                LatestCash.DocStatus
+                AS " + textType + @"
+            )
+        )
+    )
+
+    LEFT OUTER JOIN CashTypeReference CashTypeReference ON
+    (
+        CashTypeReference.CashTypeValue =
+        TRIM
+        (
+            CAST
+            (
+                CashLine.CashType
+                AS " + textType + @"
+            )
+        )
+    )
+
+    WHERE CashLine.IsActive = 'Y'
+),
+NumberedRows AS
+(
+    SELECT
+        CashLineRows.C_Cash_ID,
+        CashLineRows.C_CashBook_ID,
+        CashLineRows.DocumentNo,
+        CashLineRows.StatementDate,
+        CashLineRows.DateAcct,
+        CashLineRows.DocStatus,
+        CashLineRows.StatusBaseName,
+        CashLineRows.StatusTranslatedName,
+        CashLineRows.C_CashLine_ID,
+        CashLineRows.Description,
+        CashLineRows.Amount,
+        CashLineRows.C_Charge_ID,
+        CashLineRows.CashTypeValue,
+        CashLineRows.CashTypeBaseName,
+        CashLineRows.CashTypeTranslatedName,
+        CashLineRows.ChargeName,
+        CashLineRows.CashBookName,
+        CashLineRows.CurrencyISO,
+        CashLineRows.CurrencySymbol,
+        CashLineRows.StdPrecision,
+
+        COUNT
+        (
+            1
+        ) OVER () AS TotalRecords,
+
+        ROUND
+        (
+            CAST
+            (
+                SUM
+                (
+                    COALESCE
+                    (
+                        CashLineRows.Amount,
+                        0
+                    )
+                ) OVER ()
+                AS " + numericType + @"
+            ),
+
+            CAST
+            (
+                CashLineRows.StdPrecision
+                AS INTEGER
+            )
+        ) AS TotalAmount,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                CashLineRows.C_CashLine_ID
+        ) AS RowNo
+
+    FROM CashLineRows CashLineRows
+)
 SELECT
-    LatestCash.C_Cash_ID,
-    LatestCash.C_CashBook_ID,
-    LatestCash.CashBookName,
-    LatestCash.DocumentNo,
-    LatestCash.StatementDate,
-    LatestCash.DateAcct,
-    LatestCash.CurrentBalance,
-    LatestCash.StdPrecision,
-    LatestCash.C_Currency_ID,
-    LatestCash.CurrencyISO,
-    LatestCash.CurrencySymbol
+    NumberedRows.C_Cash_ID,
+    NumberedRows.C_CashBook_ID,
+    NumberedRows.DocumentNo,
+    NumberedRows.StatementDate,
+    NumberedRows.DateAcct,
+    NumberedRows.DocStatus,
+    NumberedRows.StatusBaseName,
+    NumberedRows.StatusTranslatedName,
+    NumberedRows.C_CashLine_ID,
+    NumberedRows.Description,
+    NumberedRows.Amount,
+    NumberedRows.C_Charge_ID,
+    NumberedRows.CashTypeValue,
+    NumberedRows.CashTypeBaseName,
+    NumberedRows.CashTypeTranslatedName,
+    NumberedRows.ChargeName,
+    NumberedRows.CashBookName,
+    NumberedRows.CurrencyISO,
+    NumberedRows.CurrencySymbol,
+    NumberedRows.StdPrecision,
+    NumberedRows.TotalRecords,
+    NumberedRows.TotalAmount
 
-FROM LatestCash LatestCash
+FROM NumberedRows NumberedRows
+
+WHERE NumberedRows.RowNo >=
+(
+    SELECT
+        QueryParameters.StartRow
+
+    FROM QueryParameters QueryParameters
+)
+
+AND NumberedRows.RowNo <=
+(
+    SELECT
+        QueryParameters.EndRow
+
+    FROM QueryParameters QueryParameters
+)
 
 ORDER BY
-    LatestCash.CashBookName,
-    LatestCash.C_CashBook_ID";
+    NumberedRows.RowNo";
 
-                SqlParameter[] parameters =
-                    new SqlParameter[]
-                    {
-                        new SqlParameter(
-                            "@AD_Client_ID",
-                            ctx.GetAD_Client_ID()
-                        ),
-
-                        new SqlParameter(
-                            "@C_CashBook_ID",
-                            cashBookId
-                        )
-                    };
-
-                reader =
-                    DB.ExecuteReader(
-                        sql,
-                        parameters,
-                        null
-                    );
-
-                int selectedCashBookId =
-                    0;
-
-                int cashId =
-                    0;
-
-                int stdPrecision =
-                    2;
-
-                int currencyId =
-                    0;
-
-                decimal currentBalance =
-                    0;
-
-                string cashBookName =
-                    string.Empty;
-
-                string documentNo =
-                    string.Empty;
-
-                string statementDate =
-                    string.Empty;
-
-                string currencyISO =
-                    string.Empty;
-
-                string currencySymbol =
-                    string.Empty;
-
-                bool selectedRowRead =
-                    false;
-
-                while (
-                    reader != null &&
-                    reader.Read()
-                )
+            SqlParameter[] parameters =
+                new SqlParameter[]
                 {
-                    if (!selectedRowRead)
-                    {
-                        selectedRowRead =
-                            true;
+                    new SqlParameter(
+                        "@AD_Client_ID",
+                        ctx.GetAD_Client_ID()
+                    ),
 
-                        selectedCashBookId =
-                            GetInt(
-                                reader,
-                                "C_CashBook_ID"
-                            );
+                    new SqlParameter(
+                        "@C_CashBook_ID",
+                        cashBookId
+                    ),
 
-                        cashId =
-                            GetInt(
-                                reader,
-                                "C_Cash_ID"
-                            );
+                    new SqlParameter(
+                        "@AD_Language",
+                        ctx.GetAD_Language()
+                    ),
 
-                        cashBookName =
-                            GetString(
-                                reader,
-                                "CashBookName"
-                            );
+                    new SqlParameter(
+                        "@StartRow",
+                        startRow
+                    ),
 
-                        documentNo =
-                            GetString(
-                                reader,
-                                "DocumentNo"
-                            );
+                    new SqlParameter(
+                        "@EndRow",
+                        endRow
+                    )
+                };
 
-                        statementDate =
-                            FormatDbDate(
-                                reader["StatementDate"]
-                            );
-
-                        currentBalance =
-                            GetDecimal(
-                                reader,
-                                "CurrentBalance"
-                            );
-
-                        stdPrecision =
-                            GetInt(
-                                reader,
-                                "StdPrecision",
-                                2
-                            );
-
-                        currencyId =
-                            GetInt(
-                                reader,
-                                "C_Currency_ID"
-                            );
-
-                        currencyISO =
-                            GetString(
-                                reader,
-                                "CurrencyISO"
-                            );
-
-                        currencySymbol =
-                            GetString(
-                                reader,
-                                "CurrencySymbol"
-                            );
-                    }
-                }
-
-                if (!selectedRowRead)
-                {
-                    return Json(
-                        new
-                        {
-                            success = true,
-                            error = string.Empty,
-                            hasData = false,
-
-                            title = GetMsg(
-                                ctx,
-                                "VAS_050_CurrentCash",
-                                "Current cash"
-                            ),
-
-                            mainMetric = 0,
-                            mainMetricText = "0",
-                            footerAmount = 0,
-
-                            description = GetMsg(
-                                ctx,
-                                "VAS_050_NoCashLeft",
-                                "no cash left"
-                            ),
-
-                            badgeText = GetMsg(
-                                ctx,
-                                "VAS_050_Live",
-                                "Live"
-                            ),
-
-                            cashBooks =
-                                cashBooks
-                        },
-                        JsonRequestBehavior.AllowGet
-                    );
-                }
-
-                decimal footerAmount =
-                    Math.Abs(
-                        currentBalance
-                    );
-
-                return Json(
-                    new
-                    {
-                        success = true,
-                        error = string.Empty,
-
-                        title = GetMsg(
-                            ctx,
-                            "VAS_050_CurrentCash",
-                            "Current cash"
-                        ),
-
-                        mainMetric =
-                            currentBalance,
-
-                        mainMetricText =
-                            currentBalance.ToString(),
-
-                        footerAmount =
-                            footerAmount,
-
-                        description =
-                            GetCurrentCashDescription(
-                                ctx,
-                                currentBalance
-                            ),
-
-                        badgeText = GetMsg(
-                            ctx,
-                            "VAS_050_Live",
-                            "Live"
-                        ),
-
-                        cCashId =
-                            cashId,
-
-                        cCashBookId =
-                            selectedCashBookId,
-
-                        cashBookName =
-                            cashBookName,
-
-                        documentNo =
-                            documentNo,
-
-                        statementDate =
-                            statementDate,
-
-                        currencyISO =
-                            currencyISO,
-
-                        currencySymbol =
-                            currencySymbol,
-
-                        cCurrencyId =
-                            currencyId,
-
-                        stdPrecision =
-                            stdPrecision,
-
-                        cashBooks =
-                            cashBooks,
-
-                        hasData = true
-                    },
-                    JsonRequestBehavior.AllowGet
-                );
-            }
-            catch (Exception ex)
+            return new SqlQueryData
             {
-                VLogger.Get().SaveError(
-                    "GetCurrentCash",
-                    ex
-                );
-
-                return Json(
-                    new
-                    {
-                        success = false,
-
-                        error = GetMsg(
-                            ctx,
-                            "VAS_050_LoadError",
-                            "Unable to load current cash"
-                        ),
-
-                        hasData = false
-                    },
-                    JsonRequestBehavior.AllowGet
-                );
-            }
-            finally
-            {
-                if (reader != null)
-                {
-                    reader.Close();
-                    reader.Dispose();
-                }
-
-                if (cashBookReader != null)
-                {
-                    cashBookReader.Close();
-                    cashBookReader.Dispose();
-                }
-            }
+                Sql = sql,
+                Parameters = parameters
+            };
         }
 
-        /// <summary>
-        /// Formats date using fixed yyyy-MM-dd pattern.
-        /// </summary>
-        private string FormatDate(
-            DateTime date
+        private int NormalizePrecision(
+            int precision
         )
         {
-            return date.ToString(
-                "yyyy-MM-dd"
-            );
-        }
-
-        /// <summary>
-        /// Gets translated message with fallback.
-        /// </summary>
-        private string GetMsg(
-            Ctx ctx,
-            string key,
-            string fallback
-        )
-        {
-            string msg =
-                Msg.GetMsg(
-                    ctx,
-                    key
-                );
-
             if (
-                string.IsNullOrEmpty(
-                    msg
-                )
-                ||
-                msg == key
-                ||
-                msg == "[" + key + "]"
+                precision < 0 ||
+                precision > 28
             )
             {
-                return fallback;
+                return 2;
             }
 
-            return msg;
+            return precision;
         }
 
-        /// <summary>
-        /// Gets status message for current cash balance.
-        /// </summary>
-        private string GetCurrentCashDescription(
-            Ctx ctx,
-            decimal currentBalance
-        )
-        {
-            if (currentBalance < 0)
-            {
-                return GetMsg(
-                    ctx,
-                    "VAS_050_ShortOfFloat",
-                    "short of float"
-                );
-            }
-
-            if (currentBalance > 0)
-            {
-                return GetMsg(
-                    ctx,
-                    "VAS_050_CashOnHand",
-                    "cash on hand"
-                );
-            }
-
-            return GetMsg(
-                ctx,
-                "VAS_050_NoCashLeft",
-                "no cash left"
-            );
-        }
-
-        /// <summary>
-        /// Safely reads decimal value from data reader.
-        /// </summary>
-        private decimal GetDecimal(
+        private decimal GetRoundedDecimal(
             IDataReader reader,
-            string columnName
+            string columnName,
+            int precision
         )
         {
             object value =
@@ -822,19 +1626,82 @@ ORDER BY
                 return 0;
             }
 
-            decimal result;
+            precision =
+                NormalizePrecision(
+                    precision
+                );
 
-            return decimal.TryParse(
-                value.ToString(),
-                out result
+            decimal decimalValue;
+
+            string invariantText =
+                Convert.ToString(
+                    value,
+                    CultureInfo.InvariantCulture
+                );
+
+            if (
+                decimal.TryParse(
+                    invariantText,
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out decimalValue
+                )
             )
-                ? result
-                : 0;
+            {
+                return Math.Round(
+                    decimalValue,
+                    precision,
+                    MidpointRounding.AwayFromZero
+                );
+            }
+
+            double doubleValue;
+
+            if (
+                double.TryParse(
+                    invariantText,
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out doubleValue
+                )
+                &&
+                !double.IsNaN(
+                    doubleValue
+                )
+                &&
+                !double.IsInfinity(
+                    doubleValue
+                )
+            )
+            {
+                double roundedDouble =
+                    Math.Round(
+                        doubleValue,
+                        precision,
+                        MidpointRounding.AwayFromZero
+                    );
+
+                if (
+                    roundedDouble <=
+                    Convert.ToDouble(
+                        decimal.MaxValue
+                    )
+                    &&
+                    roundedDouble >=
+                    Convert.ToDouble(
+                        decimal.MinValue
+                    )
+                )
+                {
+                    return Convert.ToDecimal(
+                        roundedDouble
+                    );
+                }
+            }
+
+            return 0;
         }
 
-        /// <summary>
-        /// Safely reads integer value from data reader.
-        /// </summary>
         private int GetInt(
             IDataReader reader,
             string columnName,
@@ -855,16 +1722,18 @@ ORDER BY
             int result;
 
             return int.TryParse(
-                value.ToString(),
+                Convert.ToString(
+                    value,
+                    CultureInfo.InvariantCulture
+                ),
+                NumberStyles.Any,
+                CultureInfo.InvariantCulture,
                 out result
             )
                 ? result
                 : fallback;
         }
 
-        /// <summary>
-        /// Safely reads string value from data reader.
-        /// </summary>
         private string GetString(
             IDataReader reader,
             string columnName
@@ -881,39 +1750,172 @@ ORDER BY
                 return string.Empty;
             }
 
-            return value.ToString();
+            return Convert.ToString(
+                value,
+                CultureInfo.InvariantCulture
+            );
         }
 
-        /// <summary>
-        /// Safely formats a database date value.
-        /// </summary>
-        private string FormatDbDate(
-            object value
+        private DateTime? GetDate(
+            IDataReader reader,
+            string columnName
         )
         {
+            object value =
+                reader[columnName];
+
             if (
                 value == null ||
                 value == DBNull.Value
             )
             {
-                return string.Empty;
+                return null;
             }
 
             DateTime dateValue;
 
             if (
-                DateTime.TryParse(
-                    value.ToString(),
-                    out dateValue
-                )
+                value is DateTime
             )
             {
-                return FormatDate(
-                    dateValue
-                );
+                return (DateTime)value;
+            }
+
+            return DateTime.TryParse(
+                Convert.ToString(
+                    value,
+                    CultureInfo.InvariantCulture
+                ),
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out dateValue
+            )
+                ? dateValue
+                : (DateTime?)null;
+        }
+
+        private string FirstNotEmpty(
+            params string[] values
+        )
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            for (
+                int index = 0;
+                index < values.Length;
+                index++
+            )
+            {
+                if (
+                    !string.IsNullOrWhiteSpace(
+                        values[index]
+                    )
+                )
+                {
+                    return values[index];
+                }
             }
 
             return string.Empty;
+        }
+
+        private string FormatDate(
+            DateTime date
+        )
+        {
+            return date.ToString(
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture
+            );
+        }
+
+        private string GetCurrentCashDescription(
+            Ctx ctx,
+            decimal currentBalance
+        )
+        {
+            if (currentBalance < 0)
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_050_ShortOfFloat",
+                    "Short Of Float"
+                );
+            }
+
+            if (currentBalance > 0)
+            {
+                return GetMsg(
+                    ctx,
+                    "VAS_050_CashOnHand",
+                    "Cash On Hand"
+                );
+            }
+
+            return GetMsg(
+                ctx,
+                "VAS_050_NoCashLeft",
+                "No Cash Left"
+            );
+        }
+
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback
+        )
+        {
+            string message =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
+
+            if (
+                string.IsNullOrEmpty(
+                    message
+                )
+                ||
+                message == key
+                ||
+                message == "[" + key + "]"
+            )
+            {
+                return fallback;
+            }
+
+            return message;
+        }
+
+        private void CloseReader(
+            IDataReader reader
+        )
+        {
+            if (reader == null)
+            {
+                return;
+            }
+
+            reader.Close();
+            reader.Dispose();
+        }
+
+        private class SqlQueryData
+        {
+            public string Sql
+            {
+                get;
+                set;
+            }
+
+            public SqlParameter[] Parameters
+            {
+                get;
+                set;
+            }
         }
     }
 }

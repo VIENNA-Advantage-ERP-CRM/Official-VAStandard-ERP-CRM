@@ -51,6 +51,24 @@
     position: relative; /* anchor for absolute overlay states */
 }
 
+.VAS-047-today-cash-in-cash-journal-action {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    cursor: default;
+}
+
+.VAS-047-today-cash-in-cash-journal-action:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: -4px;
+}
+
 /* ── Header row ───────────────────────────────────────────────────────── */
 .VAS-047-today-cash-in-cash-journal-header {
     flex: 0 0 auto;
@@ -171,7 +189,7 @@
     text-overflow: ellipsis;
     font-size: 1em;
     line-height: 1;
-    font-weight: 800;
+    font-weight: 700;
     color: #087246;
 }
 
@@ -190,7 +208,7 @@
     margin-top: 0;
     color: currentColor;
     font-size: 1em;
-    font-weight: 800;
+    font-weight: 700;
     opacity: 1;
 }
 
@@ -273,6 +291,10 @@
         display: flex;
     }
 
+.VAS-047-today-cash-in-cash-journal-state {
+    pointer-events: none;
+}
+
 /* ── Compact / small breakpoint ──────────────────────────────────────── */
 @media (max-width: 32.5em) {
     .VAS-047-today-cash-in-cash-journal-root {
@@ -316,4 +338,421 @@
 .VAS-047-today-cash-in-cash-journal-period {
     background: #FBFDFF;
     border: 1px solid #E4EDF4;
+}
+
+/* ── Cash receipt drill-down dialog ─────────────────────────────────── */
+.VAS-047-cash-in-body-lock {
+    overflow: hidden;
+}
+
+.VAS-047-cash-in-dialog,
+.VAS-047-cash-in-dialog * {
+    box-sizing: border-box;
+}
+
+.VAS-047-cash-in-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1rem;
+}
+
+.VAS-047-cash-in-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.VAS-047-cash-in-dialog-card {
+    position: relative;
+    width: min(64rem, 100%);
+    height: min(33rem, 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #E4EDF4;
+    border-radius: 16px;
+    background: #FFFFFF;
+    box-shadow: 0 24px 48px rgba(15, 61, 97, 0.22);
+}
+
+.VAS-047-cash-in-dialog-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 16px 16px 18px;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.VAS-047-cash-in-dialog-icon {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #EAF8FF;
+    border: 1px solid #BFE4FF;
+    color: #0083DA;
+    box-shadow: 0 8px 18px rgba(31, 131, 255, 0.15);
+}
+
+.VAS-047-cash-in-dialog-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.VAS-047-cash-in-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-047-cash-in-dialog-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #102C3F;
+    font-size: 1.125rem;
+    line-height: 1.2;
+    font-weight: 700;
+}
+
+.VAS-047-cash-in-dialog-subtitle {
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    font-weight: 400;
+}
+
+.VAS-047-cash-in-dialog-close {
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #5F7283;
+    cursor: pointer;
+}
+
+.VAS-047-cash-in-dialog-close svg {
+    width: 20px;
+    height: 20px;
+}
+
+.VAS-047-cash-in-dialog-close:hover,
+.VAS-047-cash-in-dialog-close:focus-visible {
+    background: #F3F7FB;
+    color: #102C3F;
+    outline: none;
+}
+
+.VAS-047-cash-in-dialog-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 18px 22px;
+}
+
+.VAS-047-cash-in-dialog-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.VAS-047-cash-in-dialog-table {
+    width: 100%;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    overflow: hidden;
+}
+
+.VAS-047-cash-in-dialog-table thead th {
+    padding: 12px 12px;
+    border-bottom: 1px solid #E4EDF4;
+    background: #F3F7FB;
+    color: #748494;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: capitalize;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-047-cash-in-dialog-table tbody td {
+    padding: 13px 12px;
+    border-bottom: 1px solid #EDF2F6;
+    color: #5F7283;
+    font-size: 0.8125rem;
+    line-height: 1.3;
+    font-weight: 400;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-047-cash-in-dialog-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.VAS-047-cash-in-dialog-table tbody tr:hover td {
+    background: #F8FBFE;
+}
+
+.VAS-047-cash-in-th-document,
+.VAS-047-cash-in-td-document {
+    width: 8rem;
+}
+
+.VAS-047-cash-in-th-date,
+.VAS-047-cash-in-td-date {
+    width: 7rem;
+}
+
+.VAS-047-cash-in-th-description,
+.VAS-047-cash-in-td-description {
+    width: 11rem;
+}
+
+.VAS-047-cash-in-th-type,
+.VAS-047-cash-in-td-type {
+    width: 8rem;
+}
+
+.VAS-047-cash-in-th-charge,
+.VAS-047-cash-in-td-charge {
+    width: 8rem;
+}
+
+.VAS-047-cash-in-th-book,
+.VAS-047-cash-in-td-book {
+    width: 9rem;
+}
+
+.VAS-047-cash-in-th-amount,
+.VAS-047-cash-in-td-amount {
+    width: 10rem;
+    text-align: right !important;
+}
+
+.VAS-047-cash-in-td-document {
+    color: #5F7283;
+    font-family: "Roboto Mono", Roboto, monospace;
+}
+
+.VAS-047-cash-in-td-description {
+    color: #102C3F;
+    font-weight: 500;
+}
+
+.VAS-047-cash-in-td-amount {
+    color: #0B6B45 !important;
+    font-weight: 700 !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-047-cash-in-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS-047-cash-in-type-pill {
+    display: inline-flex;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #EEF6FF;
+    color: #0F69AC;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    font-weight: 700;
+}
+
+.VAS-047-cash-in-dialog-empty {
+    padding: 36px 16px !important;
+    text-align: center;
+    color: #748494 !important;
+}
+
+.VAS-047-cash-in-dialog-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 18px;
+    border-top: 1px solid #EDF2F6;
+    background: #FAFCFE;
+}
+
+.VAS-047-cash-in-pager-helper {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-047-cash-in-dialog-actions,
+.VAS-047-cash-in-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+}
+
+.VAS-047-cash-in-dialog-actions {
+    gap: 12px;
+}
+
+.VAS-047-cash-in-pager {
+    gap: 8px;
+}
+
+.VAS-047-cash-in-pager-btn {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    background: #FBFDFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+.VAS-047-cash-in-pager-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.VAS-047-cash-in-pager-btn:hover:not(:disabled) {
+    border-color: #BFE4FF;
+    background: #EAF8FF;
+}
+
+.VAS-047-cash-in-pager-btn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.VAS-047-cash-in-pager-text {
+    min-width: 4.5rem;
+    color: #102C3F;
+    font-size: 0.875rem;
+    line-height: 1.2;
+    font-weight: 500;
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-047-cash-in-dialog-close-action {
+    min-width: 88px;
+    height: 38px;
+    padding: 0 18px;
+    border: 0;
+    border-radius: 8px;
+    background: #0083DA;
+    color: #FFFFFF;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(31, 131, 255, 0.20);
+}
+
+.VAS-047-cash-in-dialog-close-action:hover,
+.VAS-047-cash-in-dialog-close-action:focus-visible {
+    background: #0069AE;
+    outline: none;
+}
+
+@media (max-width: 48rem) {
+    .VAS-047-cash-in-dialog {
+        padding: 0;
+    }
+
+    .VAS-047-cash-in-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .VAS-047-cash-in-dialog-body {
+        padding: 14px;
+    }
+
+    .VAS-047-cash-in-th-description,
+    .VAS-047-cash-in-td-description {
+        width: 10rem;
+    }
+
+    .VAS-047-cash-in-th-book,
+    .VAS-047-cash-in-td-book {
+        width: 8rem;
+    }
+}
+
+@media (max-width: 36rem) {
+    .VAS-047-cash-in-th-description,
+    .VAS-047-cash-in-td-description,
+    .VAS-047-cash-in-th-book,
+    .VAS-047-cash-in-td-book {
+        display: none;
+    }
+
+    .VAS-047-cash-in-dialog-footer {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .VAS-047-cash-in-pager-helper {
+        flex: 1 1 100%;
+        order: 2;
+    }
+
+    .VAS-047-cash-in-dialog-actions {
+        width: 100%;
+        justify-content: space-between;
+        order: 1;
+    }
 }

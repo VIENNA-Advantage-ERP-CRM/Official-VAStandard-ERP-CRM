@@ -15,6 +15,22 @@
  *  8  | cash on hand                         | VAS_050_CashOnHand
  *  9  | no cash left                         | VAS_050_NoCashLeft
  * 10  | Session Expired                      | VAS_050_SessionExpired
+ * 11  | Cash Book Balance History            | VAS_050_DialogTitle
+ * 12  | Journals for the selected cash book  | VAS_050_DialogSubtitle
+ * 13  | Document No.                         | VAS_050_DocumentNo
+ * 14  | Beginning Balance                    | VAS_050_BeginningBalance
+ * 15  | Ending Balance                       | VAS_050_EndingBalance
+ * 16  | Status                               | VAS_050_Status
+ * 17  | Statement Difference                 | VAS_050_StatementDifference
+ * 18  | Currency                             | VAS_050_Currency
+ * 19  | Close                                | VAS_050_Close
+ * 20  | No cash journals found               | VAS_050_NoJournals
+ * 21  | journal                              | VAS_050_Journal
+ * 22  | journals                             | VAS_050_Journals
+ * 23  | Showing                              | VAS_050_Showing
+ * 24  | of                                   | VAS_050_Of
+ * 25  | Previous                             | VAS_050_Previous
+ * 26  | Next                                 | VAS_050_Next
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -27,11 +43,30 @@
         var $root = null;
         var isDisposed = false;
         var ajaxRequest = null;
+        var rowsRequest = null;
         var selectedCashBookId = 0;
+        var $dialog = null;
+        var $dialogTbody = null;
+        var $dialogBusy = null;
+        var $pagerHelper = null;
+        var $pagerPrev = null;
+        var $pagerNext = null;
+        var $pagerText = null;
+        var $previousFocus = null;
+        var rowsLoading = false;
+        var pageNo = 1;
+        var pageSize = 6;
+        var totalPages = 0;
+        var totalRecords = 0;
+        var eventNamespace = '';
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
             return text && text !== key && text !== '[' + key + ']' ? text : fallback;
+        }
+
+        function escapeHtml(value) {
+            return $('<div>').text(value === null || value === undefined ? '' : String(value)).html();
         }
 
         function getPrecision(precision) {
@@ -85,6 +120,13 @@
         function safeNumber(value) {
             var numberValue = Number(value || 0);
             return isNaN(numberValue) ? 0 : numberValue;
+        }
+
+        function formatAmount(value, precision) {
+            return safeNumber(value).toLocaleString(window.navigator.language, {
+                minimumFractionDigits: getPrecision(precision),
+                maximumFractionDigits: getPrecision(precision)
+            });
         }
 
         function formatSignedAmount(value, currencySymbol, currencyISO, precision, showPositiveSign) {
@@ -160,6 +202,181 @@
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="12" x2="18" y2="12"></line></svg>';
         }
 
+        function showDialogBusy(show) {
+            if ($dialogBusy && $dialogBusy[0]) {
+                $dialogBusy[0].style.visibility = show ? 'visible' : 'hidden';
+            }
+        }
+
+        function renderDialogMessage(message) {
+            if ($dialogTbody) {
+                $dialogTbody.html('<tr><td class="VAS-047-cash-in-dialog-empty" colspan="7">' + escapeHtml(message) + '</td></tr>');
+            }
+        }
+
+        function getStatusTone(value) {
+            value = String(value || '').toUpperCase();
+            if (value === 'CO' || value === 'CL') { return ' is-success'; }
+            if (value === 'DR' || value === 'IP') { return ' is-info'; }
+            if (value === 'VO' || value === 'RE') { return ' is-danger'; }
+            return ' is-warning';
+        }
+
+        function renderDialogRows(rows) {
+            $dialogTbody.empty();
+
+            if (!rows || !rows.length) {
+                renderDialogMessage(lbl('VAS_050_NoJournals', 'No cash journals found'));
+                return;
+            }
+
+            $.each(rows, function (index, row) {
+                var documentNo = row.documentNo || '-';
+                var cashDate = row.statementDate || '-';
+                var cashType = row.cashTypeName || row.cashTypeValue || '-';
+                var charge = row.chargeName || '-';
+                var currencyLabel = row.currencyISO || row.currencySymbol || '';
+                var amountText = formatAmount(row.amount, row.stdPrecision);
+                var amountWithCurrency = currencyLabel ? currencyLabel + ' ' + amountText : amountText;
+                var status = row.docStatusName || row.docStatusValue || '-';
+                var description = row.description || '-';
+
+                $dialogTbody.append(
+                    '<tr>' +
+                    '<td class="VAS-050-current-cash-td-document" style="text-align:left" title="' + escapeHtml(documentNo) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(documentNo) + '</span></td>' +
+                    '<td class="VAS-050-current-cash-td-date" style="text-align:left" title="' + escapeHtml(cashDate) + '">' + escapeHtml(cashDate) + '</td>' +
+                    '<td class="VAS-050-current-cash-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
+                    '<td class="VAS-050-current-cash-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
+                    '<td class="VAS-050-current-cash-td-amount" style="text-align:left" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
+                    '<td class="VAS-050-current-cash-td-status" style="text-align:left" title="' + escapeHtml(status) + '"><span class="VAS-050-current-cash-status' + getStatusTone(row.docStatusValue) + '">' + escapeHtml(status) + '</span></td>' +
+                    '<td class="VAS-050-current-cash-td-description" style="text-align:left" title="' + escapeHtml(description) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(description) + '</span></td>' +
+                    '</tr>'
+                );
+            });
+        }
+
+        function updateDialogPager() {
+            var from = totalRecords ? ((pageNo - 1) * pageSize) + 1 : 0;
+            var to = Math.min(pageNo * pageSize, totalRecords);
+
+            if ($pagerHelper) {
+                $pagerHelper.text(totalRecords ?
+                    lbl('VAS_050_Showing', 'Showing') + ' ' + from + '\u2013' + to + ' ' +
+                    lbl('VAS_050_Of', 'of') + ' ' + totalRecords + ' ' +
+                    lbl(totalRecords === 1 ? 'VAS_050_Journal' : 'VAS_050_Journals', totalRecords === 1 ? 'journal' : 'journals') : '');
+            }
+            if ($pagerText) {
+                $pagerText.text(totalPages ? pageNo + ' ' + lbl('VAS_050_Of', 'of') + ' ' + totalPages : '');
+            }
+            if ($pagerPrev) { $pagerPrev.prop('disabled', rowsLoading || pageNo <= 1); }
+            if ($pagerNext) { $pagerNext.prop('disabled', rowsLoading || totalPages <= 1 || pageNo >= totalPages); }
+        }
+
+        function loadDialogRows() {
+            if (!$dialogTbody || rowsLoading || selectedCashBookId <= 0) {
+                if (selectedCashBookId <= 0) { renderDialogMessage(lbl('VAS_050_NoJournals', 'No cash journals found')); }
+                return;
+            }
+
+            rowsLoading = true;
+            showDialogBusy(true);
+            updateDialogPager();
+            rowsRequest = $.ajax({
+                url: VIS.Application.contextUrl + 'VAS/VAS_050_CurrentCashForCashJournal/GetCurrentCashRows',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                data: { cashBookId: selectedCashBookId, pageNo: pageNo, pageSize: pageSize },
+                success: function (response) {
+                    if (!response || response.success === false || response.error) {
+                        renderDialogMessage(response && response.error === 'VAS_050_SessionExpired' ?
+                            lbl('VAS_050_SessionExpired', 'Session Expired') :
+                            (response && response.error) || lbl('VAS_050_LoadError', 'Could not load data'));
+                        return;
+                    }
+                    pageNo = Number(response.pageNo || pageNo);
+                    totalPages = Number(response.totalPages || 0);
+                    totalRecords = Number(response.totalRecords || 0);
+                    renderDialogRows(response.rows || []);
+                },
+                error: function () { renderDialogMessage(lbl('VAS_050_LoadError', 'Could not load data')); },
+                complete: function () {
+                    rowsLoading = false;
+                    rowsRequest = null;
+                    showDialogBusy(false);
+                    updateDialogPager();
+                }
+            });
+        }
+
+        function openDialog() {
+            if (!$dialog) { return; }
+            $previousFocus = $(document.activeElement);
+            pageNo = 1;
+            totalPages = 0;
+            totalRecords = 0;
+            $dialog.css('display', 'flex');
+            $('body').addClass('VAS-047-cash-in-body-lock');
+            $dialog.find('.VAS-047-cash-in-dialog-close').trigger('focus');
+            loadDialogRows();
+        }
+
+        function closeDialog() {
+            if (!$dialog) { return; }
+            if (rowsRequest && rowsRequest.readyState !== 4) { rowsRequest.abort(); }
+            $dialog.hide();
+            $('body').removeClass('VAS-047-cash-in-body-lock');
+            if ($previousFocus && $previousFocus.length) { $previousFocus.trigger('focus'); }
+            $previousFocus = null;
+        }
+
+        function createDialog() {
+            var uid = $self.AD_UserHomeWidgetID;
+            var titleId = 'VAS-050-current-cash-dialog-title-' + uid;
+            var heading = function (key, fallback, cssClass) {
+                var text = escapeHtml(lbl(key, fallback));
+                return '<th class="' + cssClass + '" title="' + text + '" style="text-align:left">' + text + '</th>';
+            };
+
+            $dialog = $(
+                '<div class="VAS-047-cash-in-dialog VAS-050-current-cash-dialog" style="display:none" role="dialog" aria-modal="true" aria-labelledby="' + titleId + '">' +
+                '<div class="VAS-047-cash-in-dialog-scrim"></div><div class="VAS-047-cash-in-dialog-card">' +
+                '<div class="VAS-047-cash-in-dialog-header"><div class="VAS-047-cash-in-dialog-icon" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M8 15h3"/></svg></div>' +
+                '<div class="VAS-047-cash-in-dialog-title-group"><div class="VAS-047-cash-in-dialog-title" id="' + titleId + '">' + escapeHtml(lbl('VAS_050_DialogTitle', 'Cash Book Balance History')) + '</div>' +
+                '<div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_050_DialogSubtitle', 'Journals for the selected cash book')) + '</div></div>' +
+                '<button type="button" class="VAS-047-cash-in-dialog-close" aria-label="' + escapeHtml(lbl('VAS_050_Close', 'Close')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+                '<div class="VAS-047-cash-in-dialog-body"><div class="VAS-047-cash-in-dialog-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
+                '<table class="VAS-047-cash-in-dialog-table VAS-050-current-cash-table"><thead><tr>' +
+                heading('VAS_050_DocumentNo', 'Document No.', 'VAS-050-current-cash-th-document') +
+                heading('VAS_050_CashDate', 'Cash Date', 'VAS-050-current-cash-th-date') +
+                heading('VAS_050_CashType', 'Cash Type', 'VAS-050-current-cash-th-type') +
+                heading('VAS_050_Charge', 'Charge', 'VAS-050-current-cash-th-charge') +
+                heading('VAS_050_Amount', 'Amount', 'VAS-050-current-cash-th-amount') +
+                heading('VAS_050_Status', 'Status', 'VAS-050-current-cash-th-status') +
+                heading('VAS_050_Description', 'Description', 'VAS-050-current-cash-th-description') +
+                '</tr></thead><tbody class="VAS-047-cash-in-dialog-tbody"></tbody></table></div>' +
+                '<div class="VAS-047-cash-in-dialog-footer"><span class="VAS-047-cash-in-pager-helper"></span><div class="VAS-047-cash-in-dialog-actions">' +
+                '<div class="VAS-047-cash-in-pager"><button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-prev" aria-label="' + escapeHtml(lbl('VAS_050_Previous', 'Previous')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>' +
+                '<span class="VAS-047-cash-in-pager-text"></span><button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-next" aria-label="' + escapeHtml(lbl('VAS_050_Next', 'Next')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button></div>' +
+                '<button type="button" class="VAS-047-cash-in-dialog-close-action">' + escapeHtml(lbl('VAS_050_Close', 'Close')) + '</button></div></div></div></div>'
+            );
+
+            $dialogTbody = $dialog.find('.VAS-047-cash-in-dialog-tbody');
+            $dialogBusy = $dialog.find('.VAS-047-cash-in-dialog-busy');
+            $pagerHelper = $dialog.find('.VAS-047-cash-in-pager-helper');
+            $pagerPrev = $dialog.find('.VAS-047-cash-in-pager-prev');
+            $pagerNext = $dialog.find('.VAS-047-cash-in-pager-next');
+            $pagerText = $dialog.find('.VAS-047-cash-in-pager-text');
+            showDialogBusy(false);
+            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-close-action, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
+            $pagerPrev.on('click', function () { if (!rowsLoading && pageNo > 1) { pageNo--; loadDialogRows(); } });
+            $pagerNext.on('click', function () { if (!rowsLoading && pageNo < totalPages) { pageNo++; loadDialogRows(); } });
+            eventNamespace = '.VAS050CurrentCash' + String(uid).replace(/[^A-Za-z0-9]/g, '');
+            $(document).on('keydown' + eventNamespace, function (event) { if (event.key === 'Escape' && $dialog.is(':visible')) { closeDialog(); } });
+            $('body').append($dialog);
+        }
+
         function buildLayout() {
             var widgetId = $self.AD_UserHomeWidgetID;
 
@@ -171,6 +388,12 @@
             var $card = $('<section>', {
                 'class': 'VAS_current-cash-cash-journal-card',
                 'aria-label': lbl('VAS_050_CurrentCash', 'Current cash')
+            });
+
+            var $action = $('<button>', {
+                'type': 'button',
+                'class': 'VAS_current-cash-cash-journal-action',
+                'aria-label': lbl('VAS_050_DialogTitle', 'Cash Book Balance History')
             });
 
             var $busy = $('<div>', {
@@ -236,22 +459,31 @@
                 'text': getStatusText(0)
             });
 
+            var $cashDate = $('<span>', {
+                'class': 'VAS_current-cash-cash-journal-cash-date',
+                'id': 'VAS_050_current-cash-cash-date-' + widgetId
+            });
+
             var $state = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-state',
                 'id': 'VAS_050_current-cash-state-' + widgetId
             });
 
             $delta.html(getTrendIcon(0)).append($deltaText);
-            $footer.append($delta).append($description);
+            $footer.append($delta).append($description).append($cashDate);
             $filter.append($select).append($separator).append($live);
             $header.append($title).append($filter);
-            $card.append($busy).append($header).append($value).append($footer).append($state);
+            $card.append($action).append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
+
+            $action.on('click', openDialog);
 
             $select.on('change', function () {
                 selectedCashBookId = Number($(this).val() || 0);
                 loadData();
             });
+
+            createDialog();
         }
 
         function renderCashBookOptions(cashBooks) {
@@ -309,6 +541,9 @@
             $root.find('#VAS_050_current-cash-description-' + widgetId)
                 .text('');
 
+            $root.find('#VAS_050_current-cash-cash-date-' + widgetId)
+                .text('');
+
             $root.find('.VAS_current-cash-cash-journal-footer').hide();
         }
 
@@ -352,6 +587,9 @@
 
             $root.find('#VAS_050_current-cash-description-' + widgetId)
                 .text(data.description || getStatusText(balance));
+
+            $root.find('#VAS_050_current-cash-cash-date-' + widgetId)
+                .text(data.statementDate || '');
         }
 
         function loadData() {
@@ -430,12 +668,29 @@
                 ajaxRequest.abort();
             }
 
+            if (rowsRequest && rowsRequest.readyState !== 4) {
+                rowsRequest.abort();
+            }
+
+            if (eventNamespace) {
+                $(document).off(eventNamespace);
+            }
+
+            $('body').removeClass('VAS-047-cash-in-body-lock');
+
+            if ($dialog) {
+                $dialog.remove();
+            }
+
             if ($root) {
                 $root.off();
                 $root.remove();
             }
 
             ajaxRequest = null;
+            rowsRequest = null;
+            $dialog = null;
+            $dialogTbody = null;
             $root = null;
             $self = null;
         };

@@ -427,16 +427,16 @@
                         'Time'
                     ) +
                     '</th>' +
-                    '<th>' +
+                    '<th class="VAS_052_cashbook-col-doc-no">' +
                     lbl(
-                        'VAS_052_Description',
-                        'Description'
+                        'VAS_052_DocumentNo',
+                        'Document No'
                     ) +
                     '</th>' +
                     '<th class="VAS_052_cashbook-col-category">' +
                     lbl(
-                        'VAS_052_Category',
-                        'Category'
+                        'VAS_052_Charge',
+                        'Charge'
                     ) +
                     '</th>' +
                     '<th class="VAS_052_cashbook-col-cash-type">' +
@@ -461,6 +461,12 @@
                     lbl(
                         'VAS_052_Out',
                         'Out'
+                    ) +
+                    '</th>' +
+                    '<th>' +
+                    lbl(
+                        'VAS_052_Description',
+                        'Description'
                     ) +
                     '</th>' +
                     '</tr>' +
@@ -763,11 +769,11 @@
 
             $('<td>', {
                 'class':
-                    'VAS_052_cashbook-desc',
+                    'VAS_052_cashbook-col-doc-no',
 
                 'text':
-                    entry.description ||
-                    ''
+                    entry.documentNo ||
+                    '-'
             }).appendTo($row);
 
             var $categoryCell =
@@ -785,7 +791,7 @@
                         categoryClass,
 
                     'text':
-                        entry.category ||
+                        entry.charge ||
                         lbl(
                             'VAS_052_Other',
                             'Other'
@@ -858,6 +864,15 @@
                 entry.cashOutAmount,
                 data
             );
+
+            $('<td>', {
+                'class':
+                    'VAS_052_cashbook-desc',
+
+                'text':
+                    entry.description ||
+                    ''
+            }).appendTo($row);
 
             return $row;
         }

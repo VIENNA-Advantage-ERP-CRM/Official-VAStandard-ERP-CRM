@@ -187,13 +187,7 @@ namespace VAS.Controllers
                                     reader["Created"]
                                 ),
 
-                            description =
-                                GetDescription(
-                                    ctx,
-                                    reader
-                                ),
-
-                            category =
+                            charge =
                                 GetCategory(
                                     ctx,
                                     reader
@@ -234,7 +228,19 @@ namespace VAS.Controllers
                             cashOutAmount =
                                 amount < 0
                                     ? Math.Abs(amount)
-                                    : 0
+                                    : 0,
+
+                            documentNo =
+                                GetString(
+                                    reader,
+                                    "DocumentNo"
+                                ),
+
+                            description =
+                                GetDescription(
+                                    ctx,
+                                    reader
+                                )
                         }
                     );
                 }
@@ -644,6 +650,9 @@ CashRows AS
 
         CashHeader.C_CashBook_ID,
 
+        CashHeader.DocumentNo
+            AS DocumentNo,
+
         CashBook.Name
             AS CashBookName,
 
@@ -781,6 +790,7 @@ PagedRows AS
         CashRows.Description,
         CashRows.ConvertedAmount,
         CashRows.C_CashBook_ID,
+        CashRows.DocumentNo,
         CashRows.CashBookName,
         CashRows.CategoryName,
         CashRows.CashTypeValue,
@@ -822,6 +832,7 @@ SELECT
     PagedRows.Description,
     PagedRows.ConvertedAmount,
     PagedRows.C_CashBook_ID,
+    PagedRows.DocumentNo,
     PagedRows.CashBookName,
     PagedRows.CategoryName,
     PagedRows.CashTypeValue,

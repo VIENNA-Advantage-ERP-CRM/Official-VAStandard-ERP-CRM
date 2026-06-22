@@ -42,6 +42,24 @@
     color: rgba(255, 255, 255, 0.92);
 }
 
+.VAS_current-cash-cash-journal-action {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+
+.VAS_current-cash-cash-journal-action:focus-visible {
+    outline: 2px solid #168FEA;
+    outline-offset: -3px;
+}
+
 .VAS_current-cash-cash-journal-row {
     display: flex;
     align-items: center;
@@ -64,6 +82,8 @@
 }
 
 .VAS_current-cash-cash-journal-filter {
+    position: relative;
+    z-index: 3;
     flex-shrink: 0;
     max-width: 45%;
     min-width: 0;
@@ -148,7 +168,7 @@
     text-overflow: ellipsis;
     font-size: 1em;
     line-height: 1;
-    font-weight: 800;
+    font-weight: 700;
     color: currentColor;
 }
 
@@ -168,7 +188,7 @@
     margin-top: 0;
     color: currentColor;
     font-size: 1em;
-    font-weight: 800;
+    font-weight: 700;
     opacity: 1;
 }
 
@@ -269,6 +289,70 @@
     text-align: center;
     border-radius: 14px;
 }
+
+/* Drill-down uses the canonical cash-journal popup skin from VAS_047. */
+.VAS-050-current-cash-dialog .VAS-047-cash-in-dialog-icon {
+    background: linear-gradient(145deg, #168FEA, #0876CE);
+}
+
+.VAS-050-current-cash-table {
+    table-layout: fixed;
+}
+
+.VAS-050-current-cash-th-document,
+.VAS-050-current-cash-td-document {
+    width: 18%;
+}
+
+.VAS-050-current-cash-th-amount,
+.VAS-050-current-cash-td-amount {
+    width: 17%;
+    text-align: right;
+}
+
+.VAS-050-current-cash-th-status,
+.VAS-050-current-cash-td-status {
+    width: 16%;
+}
+
+.VAS-050-current-cash-th-currency,
+.VAS-050-current-cash-td-currency {
+    width: 15%;
+    text-align: center;
+}
+
+.VAS-050-current-cash-td-amount {
+    color: #102C3F;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.VAS-050-current-cash-td-currency {
+    color: #60748A;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.VAS-050-current-cash-status {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.28rem 0.65rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #EEF3F8;
+    color: #60748A;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS-050-current-cash-status.is-success { background: #E5F5EE; color: #0B6F55; }
+.VAS-050-current-cash-status.is-info { background: #E4F2FC; color: #0876B9; }
+.VAS-050-current-cash-status.is-warning { background: #FFF0D6; color: #9B6200; }
+.VAS-050-current-cash-status.is-danger { background: #FCE8E8; color: #A94747; }
 
 .VAS_current-cash-cash-journal-state.is-visible {
     display: flex;
