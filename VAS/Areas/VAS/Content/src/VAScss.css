@@ -67,3 +67,12 @@
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
 
+@import "../VAS_ProductSearchWidget.css";
+@import "../VAS_NewStockAdjustmentWidget.css";
+@import "../VAS_TotalStockQtyWidget.css";
+@import "../VAS_TotalInventoryValueWidget.css";
+@import "../VAS_LowStockCountWidget.css";
+@import "../VAS_PendingGRNsWidget.css";
+@import "../VAS_WarehouseStockWidget.css";
+@import "../VAS_TopValueItemsWidget.css";
+

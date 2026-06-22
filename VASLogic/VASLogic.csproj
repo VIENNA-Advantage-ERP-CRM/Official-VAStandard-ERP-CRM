@@ -148,6 +148,15 @@
 
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
+    <Compile Include="Models\VAS_InventoryWidgetSupport.cs" />
+    <Compile Include="Models\VAS_LowStockCountWidgetModel.cs" />
+    <Compile Include="Models\VAS_PendingGRNsWidgetModel.cs" />
+    <Compile Include="Models\VAS_TotalInventoryValueWidgetModel.cs" />
+    <Compile Include="Models\VAS_TotalStockQtyWidgetModel.cs" />
+    <Compile Include="Models\VAS_NewStockAdjustmentWidgetModel.cs" />
+    <Compile Include="Models\VAS_ProductSearchWidgetModel.cs" />
+    <Compile Include="Models\VAS_TopValueItemsWidgetModel.cs" />
+    <Compile Include="Models\VAS_WarehouseStockWidgetModel.cs" />
 
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
     <Compile Include="Models\VAS_013_TopCustomerReceiptsModel.cs" />
