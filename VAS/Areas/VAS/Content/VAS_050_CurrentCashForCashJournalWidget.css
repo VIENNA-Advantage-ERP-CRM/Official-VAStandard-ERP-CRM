@@ -49,15 +49,18 @@
     width: 100%;
     height: 100%;
     padding: 0;
-    border: 0;
+    border: 0 !important;
     border-radius: inherit;
     background: transparent;
     cursor: pointer;
 }
 
+.VAS_current-cash-cash-journal-action:active,
+.VAS_current-cash-cash-journal-action:focus,
 .VAS_current-cash-cash-journal-action:focus-visible {
-    outline: 2px solid #168FEA;
-    outline-offset: -3px;
+    border: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
 }
 
 .VAS_current-cash-cash-journal-row {
@@ -290,9 +293,60 @@
     border-radius: 14px;
 }
 
+.VAS_current-cash-cash-journal-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+    min-width: 0;
+    max-width: 65%;
+}
+
+.VAS_current-cash-cash-journal-header-tools .VAS_current-cash-cash-journal-filter {
+    max-width: calc(100% - 1.5em);
+}
+
+.VAS_current-cash-cash-journal-row .VAS-glje-zoom {
+    position: relative;
+    z-index: 4;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 1.125em;
+    width: 1.125em;
+    height: 1.125em;
+    color: #748494 !important;
+    font-size: 0.875em;
+    opacity: 0.75 !important;
+    text-decoration: none !important;
+    transition: opacity 0.15s, color 0.15s;
+    pointer-events: none;
+}
+
+.VAS_current-cash-cash-journal-row .VAS-glje-zoom svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+[dir="rtl"] .VAS_current-cash-cash-journal-row .VAS-glje-zoom svg {
+    transform: rotate(180deg);
+}
+
 /* Drill-down uses the canonical cash-journal popup skin from VAS_047. */
 .VAS-050-current-cash-dialog .VAS-047-cash-in-dialog-icon {
     background: linear-gradient(145deg, #168FEA, #0876CE);
+    border-color: #0876CE;
+    color: #FFFFFF;
+    box-shadow: 0 8px 18px rgba(8, 118, 206, 0.24);
+}
+
+.VAS-050-current-cash-dialog .VAS-047-cash-in-dialog-icon svg {
+    display: block;
+    width: 22px;
+    height: 22px;
+    color: #FFFFFF;
+    opacity: 1;
 }
 
 .VAS-050-current-cash-table {

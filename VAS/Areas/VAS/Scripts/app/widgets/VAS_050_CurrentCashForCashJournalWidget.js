@@ -432,6 +432,16 @@
                 'text': lbl('VAS_050_Live', 'Live')
             });
 
+            var $zoom = $('<span>', {
+                'class': 'VAS-glje-zoom',
+                'aria-hidden': 'true',
+                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>'
+            });
+
+            var $headerTools = $('<div>', {
+                'class': 'VAS_current-cash-cash-journal-header-tools'
+            });
+
             var $value = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-value VAS_current-cash-cash-journal-value-neutral',
                 'id': 'VAS_050_current-cash-value-' + widgetId
@@ -459,20 +469,16 @@
                 'text': getStatusText(0)
             });
 
-            var $cashDate = $('<span>', {
-                'class': 'VAS_current-cash-cash-journal-cash-date',
-                'id': 'VAS_050_current-cash-cash-date-' + widgetId
-            });
-
             var $state = $('<div>', {
                 'class': 'VAS_current-cash-cash-journal-state',
                 'id': 'VAS_050_current-cash-state-' + widgetId
             });
 
             $delta.html(getTrendIcon(0)).append($deltaText);
-            $footer.append($delta).append($description).append($cashDate);
+            $footer.append($delta).append($description);
             $filter.append($select).append($separator).append($live);
-            $header.append($title).append($filter);
+            $headerTools.append($filter).append($zoom);
+            $header.append($title).append($headerTools);
             $card.append($action).append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
 
@@ -541,9 +547,6 @@
             $root.find('#VAS_050_current-cash-description-' + widgetId)
                 .text('');
 
-            $root.find('#VAS_050_current-cash-cash-date-' + widgetId)
-                .text('');
-
             $root.find('.VAS_current-cash-cash-journal-footer').hide();
         }
 
@@ -587,9 +590,6 @@
 
             $root.find('#VAS_050_current-cash-description-' + widgetId)
                 .text(data.description || getStatusText(balance));
-
-            $root.find('#VAS_050_current-cash-cash-date-' + widgetId)
-                .text(data.statementDate || '');
         }
 
         function loadData() {

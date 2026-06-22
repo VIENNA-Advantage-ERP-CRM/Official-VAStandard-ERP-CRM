@@ -384,6 +384,16 @@
                 'text': lbl('VAS_048_Today', 'Today')
             });
 
+            var $zoom = $('<span>', {
+                'class': 'VAS-glje-zoom',
+                'aria-hidden': 'true',
+                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>'
+            });
+
+            var $headerTools = $('<div>', {
+                'class': 'VAS_today-cash-out-cash-journal-header-tools'
+            });
+
             var $value = $('<div>', {
                 'class': 'VAS_today-cash-out-cash-journal-value',
                 'id': 'VAS_048_today-cash-out-value-' + widgetId
@@ -432,7 +442,8 @@
 
             $delta.append($icon).append($deltaText);
             $footer.append($delta).append($description);
-            $header.append($title).append($date);
+            $headerTools.append($date).append($zoom);
+            $header.append($title).append($headerTools);
             $card.append($busy).append($header).append($value).append($footer).append($state).append($action);
             $root.append($card);
         }
