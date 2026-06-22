@@ -288,6 +288,14 @@
     <Compile Include="Areas\VAS\Controllers\VPayPrintController.cs" />
     <Compile Include="Areas\VAS\Controllers\VPaySelectController.cs" />
     <Compile Include="Areas\VAS\Controllers\VTrxMaterialController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_073_LowStockCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_074_PendingGRNsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_075_TotalInventoryValueWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_076_TotalStockQtyWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_077_NewStockAdjustmentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_078_ProductSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_079_TopValueItemsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_080_WarehouseStockWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_032_RecentAPPaymentsWidget.js" />
@@ -381,6 +389,14 @@
     <Content Include="Areas\VAS\Content\VAS_ReceiptSearch.css" />
     <Content Include="Areas\VAS\Content\VAS_RecentReceiptsWidget.css" />
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
+    <Content Include="Areas\VAS\Content\VAS_073_LowStockCountWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_074_PendingGRNsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_075_TotalInventoryValueWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_076_TotalStockQtyWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_077_NewStockAdjustmentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_078_ProductSearchWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_079_TopValueItemsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_080_WarehouseStockWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
@@ -495,6 +511,14 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_035_MatchSuggestions.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_073_LowStockCountWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_074_PendingGRNsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_075_TotalInventoryValueWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_076_TotalStockQtyWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_077_NewStockAdjustmentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_078_ProductSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_079_TopValueItemsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_080_WarehouseStockWidget.js" />
 
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
