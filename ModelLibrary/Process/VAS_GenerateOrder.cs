@@ -90,10 +90,10 @@ namespace ModelLibrary.Process
                 throw new ArgumentException("VAS_Opportunity_ID == 0");
             }
             MOpportunity fromOpportunity = new MOpportunity(GetCtx(), _VAS_Opportunity_ID, Get_TrxName());
-            if (fromOpportunity.GetGenerate_Order().Trim() == "Y")
-            {
-                throw new ArgumentException("Sales Order already generated");
-            }
+            //if (fromOpportunity.GetGenerate_Order().Trim() == "Y")
+            //{
+            //    throw new ArgumentException("Sales Order already generated");
+            //}
 
             // if Business Partner or Prospect is not selected then gives error
             if (fromOpportunity.GetC_BPartner_ID() == 0 && fromOpportunity.GetC_BPartnerSR_ID() == 0)
