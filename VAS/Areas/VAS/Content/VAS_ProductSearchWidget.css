@@ -1,0 +1,606 @@
+/* Overall Inventory Product Search Widget. All selectors are MPC-prefixed. */
+
+.MPC-product-search-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-block: 1.125em;
+    overflow: visible;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-product-search-root,
+.MPC-product-search-root * {
+    box-sizing: border-box;
+}
+
+.MPC-product-search-pill {
+    width: 80%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    padding: 1em 1.125em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    backdrop-filter: blur(10px);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.MPC-product-search-pill:focus-within {
+    border-color: #BFE4FF;
+    box-shadow: 0 10px 24px rgba(0, 131, 218, 0.12);
+}
+
+.MPC-product-search-icon {
+    width: 1.125em;
+    height: 1.125em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: #0083DA;
+}
+
+.MPC-product-search-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.MPC-product-search-input-wrap {
+    position: relative;
+    min-width: 0;
+    flex: 1 1 0%;
+}
+
+.MPC-product-search-pill .MPC-product-search-input,
+.MPC-product-search-pill .MPC-product-search-input:focus {
+    width: 100%;
+    min-width: 0;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 none !important;
+    border-radius: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: 0.875em;
+    line-height: 1.3;
+}
+
+.MPC-product-search-pill .MPC-product-search-input::placeholder {
+    color: #9F9F9F;
+}
+
+.MPC-product-search-helper {
+    flex: 0 0 auto;
+    color: #748494;
+    font-size: 0.6875em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.MPC-product-search-suggest {
+    position: absolute;
+    inset-inline: 0;
+    top: calc(100% + 0.375em);
+    z-index: 1060;
+    display: none;
+    padding: 6px;
+    overflow: hidden;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(15, 61, 97, 0.18);
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0105), 18px);
+}
+
+.MPC-product-search-suggest.is-open {
+    display: block;
+}
+
+.MPC-product-search-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.625em 0.875em;
+    border-bottom: 1px solid #EDF2F6;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+
+.MPC-product-search-option:last-child {
+    border-bottom: 0;
+}
+
+.MPC-product-search-option:hover,
+.MPC-product-search-option.is-active {
+    background: #EEF8FF;
+}
+
+.MPC-product-search-option-icon {
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: #0083DA;
+    background: rgba(0, 131, 218, 0.10);
+    border-radius: 8px;
+}
+
+.MPC-product-search-option-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-product-search-option-main {
+    min-width: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+.MPC-product-search-option-name,
+.MPC-product-search-option-meta,
+.MPC-product-search-option-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-product-search-option-name {
+    color: #102C3F;
+    font-size: 0.875em;
+    font-weight: 400;
+}
+
+.MPC-product-search-option-meta {
+    margin-block-start: 0.125em;
+    color: #748494;
+    font-size: 0.75em;
+}
+
+.MPC-product-search-option-value {
+    max-width: 9em;
+    flex: 0 0 auto;
+    color: #0083DA;
+    font-size: 0.8125em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    text-align: end;
+}
+
+.MPC-product-search-suggest-state {
+    padding: 1em;
+    color: #748494;
+    font-size: 0.8125em;
+    text-align: center;
+}
+
+.MPC-product-search-modal-open {
+    overflow: hidden !important;
+}
+
+.MPC-product-search-dialog-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-product-search-dialog-wrap.is-open {
+    display: flex;
+}
+
+.MPC-product-search-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 38, 64, 0.28);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-product-search-dialog {
+    position: relative;
+    width: min(980px, 100%);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+}
+
+.MPC-product-search-dialog-titlebar {
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 0 0 auto;
+    padding-inline: 20px;
+    background: rgba(255, 255, 255, 0.94);
+    border-bottom: 1px solid #1F83FF;
+}
+
+.MPC-product-search-dialog-title-left {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.MPC-product-search-dialog-title-left h2 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: #141414;
+    font-size: 1rem;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-product-search-dialog-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding-inline: 10px;
+    flex: 0 0 auto;
+    color: #0F69AC;
+    background: #EEF6FF;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.MPC-product-search-dialog-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0;
+    color: #141414;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.MPC-product-search-dialog-close:hover {
+    color: #0083DA;
+    background: #EEF6FF;
+}
+
+.MPC-product-search-dialog-close svg {
+    width: 20px;
+    height: 20px;
+}
+
+.MPC-product-search-dialog-body {
+    min-height: 0;
+    padding: 22px 24px 24px;
+    overflow: auto;
+}
+
+.MPC-product-search-dialog-state,
+.MPC-product-search-empty {
+    padding: 32px 12px;
+    color: #748494;
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+.MPC-product-search-dialog-error {
+    color: #A33F3F;
+}
+
+.MPC-product-search-hero {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-block-end: 18px;
+    padding: 18px;
+    flex-wrap: wrap;
+    background: linear-gradient(135deg, #EAF8FF, #F4FBFF);
+    border: 1px solid #BFE4FF;
+    border-radius: 14px;
+}
+
+.MPC-product-search-hero-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;
+    border-radius: 16px;
+    box-shadow: 0 8px 18px rgba(31, 131, 255, 0.14);
+}
+
+.MPC-product-search-hero-icon svg {
+    width: 32px;
+    height: 32px;
+}
+
+.MPC-product-search-hero-main {
+    min-width: 180px;
+    flex: 1 1 220px;
+}
+
+.MPC-product-search-hero-name {
+    overflow: hidden;
+    color: #102C3F;
+    font-size: 1.15rem;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-product-search-chips {
+    display: flex;
+    gap: 8px;
+    margin-block-start: 8px;
+    flex-wrap: wrap;
+}
+
+.MPC-product-search-chip {
+    padding: 3px 10px;
+    color: #5F7283;
+    background: rgba(16, 44, 63, 0.05);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+}
+
+.MPC-product-search-stats {
+    display: flex;
+    gap: 10px;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.MPC-product-search-stat {
+    min-width: 92px;
+    max-width: 138px;
+    padding: 8px 12px;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 10px;
+}
+
+.MPC-product-search-stat-label {
+    color: #748494;
+    font-size: 0.6875rem;
+}
+
+.MPC-product-search-stat-value {
+    margin-block-start: 2px;
+    overflow: hidden;
+    color: #102C3F;
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-product-search-stat-value.is-warning {
+    color: #D78B10;
+}
+
+.MPC-product-search-stat-value.is-success {
+    color: #0B6B45;
+}
+
+.MPC-product-search-tabs {
+    display: inline-flex;
+    gap: 4px;
+    max-width: 100%;
+    margin-block-end: 16px;
+    padding: 4px;
+    overflow-x: auto;
+    background: #EEF6FF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+}
+
+.MPC-product-search-tab {
+    padding: 7px 14px;
+    flex: 0 0 auto;
+    color: #5F7283;
+    background: transparent;
+    border: 0;
+    border-radius: 9px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.MPC-product-search-tab:hover {
+    color: #0083DA;
+}
+
+.MPC-product-search-tab.is-active {
+    color: #0083DA;
+    background: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(15, 61, 97, 0.10);
+    font-weight: 400;
+}
+
+.MPC-product-search-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 24px;
+}
+
+.MPC-product-search-field {
+    min-width: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid #D7D7D7;
+}
+
+.MPC-product-search-field-label {
+    color: #5F7283;
+    font-size: 0.75rem;
+}
+
+.MPC-product-search-field-value {
+    margin-block-start: 6px;
+    overflow: hidden;
+    color: #102C3F;
+    font-size: 1rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-product-search-field-value.is-strong {
+    font-weight: 400;
+}
+
+.MPC-product-search-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-block-end: 10px;
+    color: #748494;
+    font-size: 0.78rem;
+}
+
+.MPC-product-search-note svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    color: #0083DA;
+}
+
+.MPC-product-search-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.MPC-product-search-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.MPC-product-search-table th,
+.MPC-product-search-table td {
+    overflow: hidden;
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-product-search-table th {
+    padding: 6px 8px;
+    color: #748494;
+    border-bottom: 1px solid #EDF2F6;
+    font-size: 0.75rem;
+    font-weight: 400;
+    text-transform: capitalize;
+}
+
+.MPC-product-search-table td {
+    padding: 9px 8px;
+    color: #5F7283;
+    border-bottom: 1px solid #EDF2F6;
+    font-size: 0.8125rem;
+}
+
+.MPC-product-search-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.MPC-product-search-table td.is-primary {
+    color: #102C3F;
+    font-weight: 400;
+}
+
+.MPC-product-search-table th.is-right,
+.MPC-product-search-table td.is-right {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-product-search-table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+    color: #748494;
+    font-size: 0.75rem;
+}
+
+.MPC-product-search-table-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.MPC-product-search-table-page {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    color: #0083DA;
+    font-size: 14px;
+    background: transparent;
+    border: 1px solid #E4EDF4;
+    border-radius: 6px;
+}
+
+.MPC-product-search-table-page:disabled {
+    color: #B8C6D2;
+}
+
+@container (max-width: 50em) {
+    .MPC-product-search-pill {
+        width: 92%;
+    }
+
+    .MPC-product-search-helper {
+        display: none;
+    }
+}
+
+@media (max-width: 760px) {
+    .MPC-product-search-dialog-wrap {
+        padding: 12px;
+    }
+
+    .MPC-product-search-dialog-body {
+        padding: 16px;
+    }
+
+    .MPC-product-search-form-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .MPC-product-search-stats {
+        justify-content: flex-start;
+    }
+}

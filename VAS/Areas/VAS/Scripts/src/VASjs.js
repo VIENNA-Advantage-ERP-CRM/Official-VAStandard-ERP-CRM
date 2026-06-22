@@ -187,3 +187,13 @@ import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+
+import "../app/widgets/VAS_ProductSearchWidget.js";
+import "../app/widgets/VAS_NewStockAdjustmentWidget.js";
+import "../app/widgets/VAS_TotalStockQtyWidget.js";
+import "../app/widgets/VAS_TotalInventoryValueWidget.js";
+import "../app/widgets/VAS_LowStockCountWidget.js";
+import "../app/widgets/VAS_PendingGRNsWidget.js";
+import "../app/widgets/VAS_WarehouseStockWidget.js";
+import "../app/widgets/VAS_TopValueItemsWidget.js";
+
