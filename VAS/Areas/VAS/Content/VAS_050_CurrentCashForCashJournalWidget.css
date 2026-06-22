@@ -139,7 +139,7 @@
     white-space: nowrap;
     flex: 1 1 auto;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: flex-start;
     gap: 0;
     font-size: 1.375em;
@@ -187,7 +187,7 @@
 
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix,
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-decimal {
-    align-self: baseline;
+    align-self: center;
     margin-top: 0;
     color: currentColor;
     font-size: 1em;
