@@ -439,14 +439,22 @@
 .vas-apinv-alloc-empty { font-size: 0.8em; color: var(--apinv-muted); padding: 0.6em 0; }
 
 .vas-apinv-fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8em 1em; }
-.vas-apinv-field { display: flex; flex-direction: column; gap: 0.4em; }
+.vas-apinv-field { display: flex; flex-direction: column; /*gap: 0.4em;*/ }
 .vas-apinv-field.span2 { grid-column: 1 / -1; }
     .vas-apinv-field label {font-size: 0.7em; font-weight: 500; color: var(--apinv-text-2); letter-spacing: .02em; margin-bottom: 0px !important;
     }
-.vas-apinv-field .control { display: flex; align-items: center; gap: 0.5em; border: 0.07em solid var(--apinv-border); border-radius: var(--apinv-r-sm); background: #fff; padding: 0 0.7em; height: 2.7em; transition: border-color .15s, box-shadow .15s; }
-.vas-apinv-field .control:focus-within { border-color: var(--apinv-action); box-shadow: 0 0 0 0.2em rgba(31, 131, 255, .12); }
+/* Small plain icon beside the field label (no box / border / background). */
+.vas-apinv-field-ic { margin-right: 0.45em; color: var(--apinv-muted); font-size: 0.95em; }
+/* Borderless field design: underline only (no box / radius / fill). */
+.vas-apinv-field .control { display: flex; align-items: center; gap: 0.5em; border: none; border-bottom: 0.07em solid var(--apinv-border); border-radius: 0; background: transparent; padding: 0 0.1em; height: 2.7em; transition: border-color .15s; }
+.vas-apinv-field .control:focus-within { border-bottom-color: var(--apinv-action); box-shadow: none; }
 .vas-apinv-field .control .pfx { font-size: 0.875em; color: var(--apinv-muted); }
 .vas-apinv-field input, .vas-apinv-field select { border: none; outline: none; background: none; font-family: inherit; font-size: 0.95em; color: var(--apinv-text); width: 100%; padding: 0; }
+/* Hide the browser's native date-picker indicator (right-side calendar icon) -
+   the field already shows its own leading calendar icon. */
+.vas-apinv-field input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+.vas-apinv-field input[type="date"]::-webkit-inner-spin-button { display: none; }
+.vas-apinv-field input[type="date"] { -moz-appearance: textfield; appearance: textfield; }
 /* Left breathing room for the dropdown value and its option list. */
 .vas-apinv-field select { cursor: pointer; padding-left: 0.35em; }
 .vas-apinv-field select option { padding-left: 0.35em; }
@@ -463,8 +471,8 @@
 .vas-apinv-settle .note { font-size: 0.7em; color: var(--apinv-warning); margin-top: 0.55em; display: none; }
 .vas-apinv-settle .note.show { display: block; }
 .vas-apinv-settle .note.err { color: var(--apinv-danger); font-weight: 500; }
-.vas-apinv-field .control.invalid { border-color: var(--apinv-danger); }
-.vas-apinv-field .control.invalid:focus-within { box-shadow: 0 0 0 0.2em rgba(209, 69, 69, .14); }
+.vas-apinv-field .control.invalid { border-bottom-color: var(--apinv-danger); }
+.vas-apinv-field .control.invalid:focus-within { box-shadow: none; }
 
 .vas-apinv-m-foot { display: flex; align-items: center; justify-content: flex-end; gap: 0.6em; padding: 1em 1.4em; border-top: 0.07em solid var(--apinv-divider); background: #fff; position: sticky; bottom: 0; }
 .vas-apinv-m-foot .spacer { margin-right: auto; font-size: 0.75em; color: var(--apinv-muted); }

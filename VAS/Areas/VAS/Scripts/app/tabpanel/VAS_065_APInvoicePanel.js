@@ -1316,15 +1316,15 @@
 
             var $grid = $('<div class="vas-apinv-fgrid"></div>');
             var $amtField = field(lbl("VAS_065_PaymentAmount", "Payment Amount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
-                '</span><input class="js-pay-amt" type="text" inputmode="decimal" /></div>');
-            var $dateField = field(lbl("VAS_065_PaymentDate", "Payment Date"), '<div class="control"><input class="js-pay-date" type="date" /></div>');
+                '</span><input class="js-pay-amt" type="text" inputmode="decimal" /></div>', "fa fa-calculator");
+            var $dateField = field(lbl("VAS_065_PaymentDate", "Payment Date"), '<div class="control"><input class="js-pay-date" type="date" /></div>', "fa fa-calendar");
             var $methodSel = $('<select class="js-pay-method"></select>');
             // Empty placeholder so nothing is selected by default.
             $methodSel.append($('<option></option>').val("").text(lbl("VAS_065_SelectOption", "Select")));
             (meta.PaymentMethods || []).forEach(function (m) {
                 $methodSel.append($('<option></option>').val(m.VA009_PaymentMethod_ID).text(m.Name));
             });
-            var $methodField = field(lbl("PaymentMethod"), $('<div class="control sel"></div>').append($methodSel));
+            var $methodField = field(lbl("PaymentMethod"), $('<div class="control sel"></div>').append($methodSel), "fa fa-credit-card");
             var $bankSel = $('<select class="js-pay-bank"></select>');
             // Empty placeholder so nothing is selected by default.
             $bankSel.append($('<option></option>').val("").text(lbl("VAS_065_SelectOption", "Select")));
@@ -1332,27 +1332,27 @@
                 var t = (b.BankName || "") + (b.AccountNo ? " · ****" + b.AccountNo.slice(-4) : "") + (b.CurrencyISO ? " . " + b.CurrencyISO : "");
                 $bankSel.append($('<option></option>').val(b.C_BankAccount_ID).text(t));
             });
-            var $bankField = field(lbl("VAS_065_BankAccount", "Bank Account"), $('<div class="control sel"></div>').append($bankSel));
+            var $bankField = field(lbl("VAS_065_BankAccount", "Bank Account"), $('<div class="control sel"></div>').append($bankSel), "fa fa-university");
             // Currency selector (My Currency only) - defaults to the invoice currency.
             var $currencySel = $('<select class="js-pay-currency"></select>');
             (meta.Currencies || []).forEach(function (c) {
                 $currencySel.append($('<option></option>').val(c.C_Currency_ID).text(c.ISO_Code || c.CurSymbol));
             });
             $currencySel.val(meta.C_Currency_ID);
-            var $currencyField = field(lbl("Currency"), $('<div class="control sel"></div>').append($currencySel));
+            var $currencyField = field(lbl("Currency"), $('<div class="control sel"></div>').append($currencySel), "fa fa-money");
             // Conversion type selector - defaults to the invoice conversion type (else default).
             var $convTypeSel = $('<select class="js-pay-convtype"></select>');
             (meta.ConversionTypes || []).forEach(function (t) {
                 $convTypeSel.append($('<option></option>').val(t.C_ConversionType_ID).text(t.Name));
             });
             if (meta.C_ConversionType_ID) $convTypeSel.val(meta.C_ConversionType_ID);
-            var $convTypeField = field(lbl("VAS_065_ConversionType", "Conversion Type"), $('<div class="control sel"></div>').append($convTypeSel));
+            var $convTypeField = field(lbl("VAS_065_ConversionType", "Conversion Type"), $('<div class="control sel"></div>').append($convTypeSel), "fa fa-exchange");
             var $discField = field(lbl("VAS_065_Discount", "Discount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
-                '</span><input class="js-pay-disc" type="text" inputmode="decimal" value="0.00" /></div>');
-            var $refField = field(lbl("VAS_Reference"), '<div class="control"><input class="js-pay-ref" type="text" /></div>');
+                '</span><input class="js-pay-disc" type="text" inputmode="decimal" value="0.00" /></div>', "fa fa-tag");
+            var $refField = field(lbl("VAS_Reference"), '<div class="control"><input class="js-pay-ref" type="text" /></div>', "fa fa-file-text-o");
             // Check date - shown only when the selected payment method is a cheque; the
             // check date and reference are then mandatory (validated on submit).
-            var $checkDateField = field(lbl("VAS_065_CheckDate", "Check date"), '<div class="control"><input class="js-pay-checkdate" type="date" /></div>');
+            var $checkDateField = field(lbl("VAS_065_CheckDate", "Check date"), '<div class="control"><input class="js-pay-checkdate" type="date" /></div>', "fa fa-calendar-check-o");
             $checkDateField.hide();
 
             // Column order: Bank account, Currency, Payment date, Conversion type, Payment
@@ -1614,6 +1614,14 @@
 
             $payAmt.on("input", recompute);
             $payDisc.on("input", recompute);
+            // On blur, round the entered amount / discount to the selected currency's
+            // precision and show it with that many decimals.
+            function roundFieldToCurrency($inp) {
+                $inp.val(roundTo(parseNum($inp.val()), payCtx.prec).toFixed(payCtx.prec >= 0 ? payCtx.prec : 0));
+                recompute();
+            }
+            $payAmt.on("blur", function () { roundFieldToCurrency($payAmt); });
+            $payDisc.on("blur", function () { roundFieldToCurrency($payDisc); });
             // Selecting a bank account sets the currency to the bank's currency, then
             // converts. Changing the currency or the conversion type re-converts. Changing
             // the payment date re-converts only when the currency differs from the invoice.
@@ -1911,10 +1919,24 @@
             });
         }
 
-        function field(labelText, controlHtml) {
+        function field(labelText, controlHtml, iconCls) {
             var $f = $('<div class="vas-apinv-field"></div>');
             $f.append($('<label></label>').text(labelText));
-            $f.append(controlHtml);
+            // Small plain icon inside the control, before the input (no box), as in the design.
+            var $control = $(controlHtml);
+            if (iconCls) $control.prepend($('<i class="vas-apinv-field-ic ' + iconCls + '" aria-hidden="true"></i>'));
+            // Make the whole date field open the native picker (its native right-side
+            // indicator is hidden in CSS). showPicker() must run from a user gesture.
+            var $dateInput = $control.find('input[type="date"]');
+            if ($dateInput.length) {
+                $control.css("cursor", "pointer").on("click", function () {
+                    var el = $dateInput[0];
+                    if (el && typeof el.showPicker === "function") {
+                        try { el.showPicker(); } catch (e) { /* unsupported / not allowed */ }
+                    }
+                });
+            }
+            $f.append($control);
             return $f;
         }
 
