@@ -1106,29 +1106,37 @@
                 for (var i = start; i < end; i++) {
                     (function (r) {
                         var selected = isCreditSelected(r);
-                        var $row = $('<div class="vas-apinv-credit-row"></div>');
+                        var locked = selected && state.allocationCreated;
+                        // 4-column table row (document / date / status / amount) matching
+                        // the Payment schedule layout.
+                        var $row = $('<div class="vas-apinv-t4-row vas-apinv-credit-t4row"></div>');
                         if (selected) $row.addClass("on");
-                        if (selected && state.allocationCreated) $row.addClass("locked");
-                        $row.append('<span class="chk"><i class="fa fa-check"></i></span>');
-                        var label = (r.SourceType === "PAYMENT"
-                            ? lbl("VAS_065_OnAccountPayment", "On-account payment - {0}")
-                            : lbl("VAS_065_VendorCreditNote", "Vendor credit note - {0}")).replace("{0}", r.DocumentNo || "");
-                        var $cl = $('<div class="cl"></div>');
-                        $cl.append($('<div class="a"></div>').text(label));
-                        $cl.append($('<div class="b"></div>').text(fmtDate(r.Date)));
-                        $row.append($cl);
-                        // Primary amount in the source's own (payment) currency; when that
-                        // differs from the invoice currency also show the invoice-currency
-                        // equivalent (current date, AvailableAmountInv = 0 when no rate).
+                        if (locked) $row.addClass("locked");
+                        else $row.addClass("selectable");
+
+                        // Show the source document type + document no (no generic
+                        // "On-account payment" literal).
+                        var docLabel = (r.DocTypeName ? r.DocTypeName + " - " : "") + (r.DocumentNo || "");
+                        $row.append($('<div class="col-a p"></div>').text(docLabel || (r.DocumentNo || "")));
+                        $row.append($('<div class="col-b c"></div>').text(fmtDate(r.Date)));
+
+                        // Status pill: Available -> Selected -> Allocated.
+                        var stText, stCls;
+                        if (locked) { stText = lbl("VAS_065_Allocated", "Allocated"); stCls = "ok"; }
+                        else if (selected) { stText = lbl("Selected"); stCls = "info"; }
+                        else { stText = lbl("VAS_065_Available", "Available"); stCls = "warn"; }
+                        $row.append($('<div class="col-c"></div>').append(
+                            $('<span class="vas-apinv-spill ' + stCls + '"></span>').text(stText)));
+
+                        // Amount in the source's own (payment) currency; when that differs
+                        // from the invoice currency also show the invoice-currency equivalent
+                        // (current date, AvailableAmountInv = 0 when no rate).
                         var rSym = r.CurSymbol || cur;
                         var rPrec = (r.StdPrecision >= 0) ? r.StdPrecision : p;
-                        var $amt = $('<div class="amt"></div>');
-                        $amt.append($('<div class="av"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec)));
+                        var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec));
                         if (r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID) {
-                            $amt.append($('<div class="av-conv"></div>').text("≈ " + fmtAmountCur(r.AvailableAmountInv, cur, p)));
+                            $amt.append($('<div class="conv"></div>').text("≈ " + fmtAmountCur(r.AvailableAmountInv, cur, p)));
                         }
-                        $amt.append($('<div class="ap"></div>').text(selected && state.allocationCreated
-                            ? lbl("VAS_065_Allocated", "Allocated") : lbl("Selected")));
                         $row.append($amt);
                         $row.on("click", function () {
                             if (state.allocationCreated) return;
@@ -1189,10 +1197,19 @@
 
             // Apply on-account & credits
             if (allRows.length) {
-                var $sec = $('<div class="vas-apinv-m-sec"></div>');
+                var $sec = $('<div class="vas-apinv-m-sec vas-apinv-m-sec-boxed"></div>');
                 $sec.append($('<div class="vas-apinv-m-sec-h"></div>')
                     .append($('<span class="t"></span>').text(lbl("VAS_065_ApplyOnAccountCredits", "Apply on-account & credits")))
                     .append($('<span class="hint"></span>').text(lbl("VAS_065_UseTheseFirst", "Use these first - no new cash"))));
+
+                // Column header row (Document / Date / Status / Amount) matching the
+                // Payment schedule table layout.
+                var $cHead = $('<div class="vas-apinv-t4-head"></div>');
+                $cHead.append($('<span></span>').text(lbl("VAS_065_PaymentCredit", "Payment / credit")));
+                $cHead.append($('<span></span>').text(lbl("VAS_065_Date", "Date")));
+                $cHead.append($('<span></span>').text(lbl("VAS_065_Status", "Status")));
+                $cHead.append($('<span class="right"></span>').text(lbl("Amount")));
+                $sec.append($cHead);
 
                 $creditRows = $('<div class="js-credit-rows"></div>');
                 $creditFoot = $('<div class="vas-apinv-block-foot js-credit-foot" style="display:none;"></div>');

@@ -890,6 +890,7 @@ namespace VASLogic.Models
                               p.AD_Org_ID,
                               p.C_Payment_ID,
                               p.DocumentNo,
+                              pdt.Name AS DocTypeName,
                               p.DateTrx,
                               p.DateAcct,
                               p.C_Currency_ID,
@@ -901,6 +902,7 @@ namespace VASLogic.Models
                               ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) AS AvailableAmount
                            FROM C_Payment p
                            INNER JOIN C_Currency pcur ON (p.C_Currency_ID = pcur.C_Currency_ID)
+                           LEFT JOIN C_DocType pdt ON (p.C_DocType_ID = pdt.C_DocType_ID)
                            WHERE p.AD_Client_ID = @AD_Client_ID
                              AND p.C_BPartner_ID = @C_BPartner_ID
                              AND p.IsReceipt = 'N'
@@ -937,6 +939,7 @@ namespace VASLogic.Models
                 {
                     SourceType = "PAYMENT",
                     Id = Util.GetValueOfInt(r["C_Payment_ID"]),
+                    DocTypeName = Util.GetValueOfString(r["DocTypeName"]),
                     DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                     Date = Util.GetValueOfDateTime(r["DateTrx"]),
                     DateAcct = Util.GetValueOfDateTime(r["DateAcct"]),
@@ -960,6 +963,7 @@ namespace VASLogic.Models
                               cn.C_Invoice_ID,
                               cn.AD_Org_ID,
                               cn.DocumentNo,
+                              cndt.Name AS DocTypeName,
                               cn.DateInvoiced,
                               cn.DateAcct,
                               cn.C_Currency_ID,
@@ -970,6 +974,7 @@ namespace VASLogic.Models
                               COALESCE(cn.GrandTotalAfterWithholding, cn.GrandTotal) AS CreditAmount
                            FROM C_Invoice cn
                            INNER JOIN C_Currency cncur ON (cn.C_Currency_ID = cncur.C_Currency_ID)
+                           LEFT JOIN C_DocType cndt ON (cn.C_DocType_ID = cndt.C_DocType_ID)
                            WHERE cn.AD_Client_ID = @AD_Client_ID
                              AND cn.C_BPartner_ID = @C_BPartner_ID
                              AND cn.IsSOTrx = 'N'
@@ -996,6 +1001,7 @@ namespace VASLogic.Models
                 {
                     SourceType = "CREDITNOTE",
                     Id = cnId,
+                    DocTypeName = Util.GetValueOfString(r["DocTypeName"]),
                     DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                     Date = Util.GetValueOfDateTime(r["DateInvoiced"]),
                     DateAcct = Util.GetValueOfDateTime(r["DateAcct"]),
@@ -1031,10 +1037,10 @@ namespace VASLogic.Models
                              AND i.DocStatus IN ('CO','CL')
                              AND COALESCE(i.IsPaid, 'N') = 'N'
                              AND COALESCE(ips.VA009_IsPaid, 'N') = 'N'
-                             AND i.C_Invoice_ID <> @C_Invoice_ID
-                           GROUP BY i.C_Invoice_ID, i.DocumentNo
-                           ORDER BY i.DocumentNo";
+                             AND i.C_Invoice_ID <> @C_Invoice_ID";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += @" GROUP BY i.C_Invoice_ID, i.DocumentNo
+                           ORDER BY i.DocumentNo";
 
             DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[]
             {
@@ -2308,6 +2314,9 @@ namespace VASLogic.Models
             public string SourceType { get; set; }   // PAYMENT | CREDITNOTE
             public int Id { get; set; }
             public int AD_Org_ID { get; set; }
+            // Document type name of the source (e.g. "AP Payment", "AP Credit Memo").
+            // Shown with the document no in the UI instead of a generic literal.
+            public string DocTypeName { get; set; }
             public string DocumentNo { get; set; }
             public DateTime? Date { get; set; }
             // Accounting date of the source document. Cross-currency selections are

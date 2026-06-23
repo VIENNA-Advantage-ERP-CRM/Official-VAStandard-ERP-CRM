@@ -380,6 +380,12 @@
 .vas-apinv-m-stat.green .v { color: var(--apinv-success-deep); }
 
 .vas-apinv-m-sec { margin-top: 1.1em; }
+/* Boxed section — card look matching the Invoice details block. Uses only vars
+   available in the modal (scrim) scope; the table padding is zeroed so its rows
+   align to the box padding. */
+.vas-apinv-m-sec-boxed { background: #fff; border: 0.07em solid var(--apinv-border); border-radius: var(--apinv-r-md); box-shadow: 0 0.15em 0.5em rgba(15, 61, 97, .06); padding: 1em 1.1em; }
+.vas-apinv-m-sec-boxed .vas-apinv-t4-head,
+.vas-apinv-m-sec-boxed .vas-apinv-t4-row { padding-left: 0.7em; padding-right: 0; }
 .vas-apinv-m-sec-h { display: flex; align-items: center; justify-content: space-between; gap: 0.6em; margin-bottom: 0.6em; }
 .vas-apinv-m-sec-h .t { font-size: 0.95em; font-weight: 700; }
 .vas-apinv-m-sec-h .hint { font-size: 0.7em; color: var(--apinv-muted); }
@@ -406,6 +412,18 @@
 .vas-apinv-credit-row .amt .ap, .vas-apinv-open-invoice-row .amt .ap { font-size: 0.62em; color: var(--apinv-success); font-weight: 500; margin-top: 0.1em; opacity: 0; }
 .vas-apinv-credit-row.on .amt .ap, .vas-apinv-open-invoice-row.on .amt .ap { opacity: 1; }
 .vas-apinv-credit-row.locked, .vas-apinv-open-invoice-row.locked { cursor: default; opacity: .84; }
+
+/* On-account & credits list rendered as the 4-column table (matches Payment schedule). */
+.vas-apinv-credit-t4row.selectable { cursor: pointer; }
+.vas-apinv-credit-t4row.selectable:hover { background: var(--apinv-surface-faint); }
+.vas-apinv-credit-t4row.on { background: #F2F9FF; box-shadow: inset 0.2em 0 0 var(--apinv-primary); }
+.vas-apinv-credit-t4row.locked { cursor: default; opacity: .84; }
+.vas-apinv-credit-t4row .col-d .conv { font-size: 0.82em; color: var(--apinv-muted); font-weight: 500; margin-top: 0.05em; }
+/* Lighter typography: roomier rows, non-bold document column, default text
+   color (no primary/accent colour). */
+.vas-apinv-credit-t4row { padding-top: 1.05em; padding-bottom: 1.05em; }
+.vas-apinv-credit-t4row .col-a.p { font-weight: 400; }
+.vas-apinv-credit-t4row .col-d.amt { font-weight: 600; }
 
 .vas-apinv-credit-actions, .vas-apinv-allocation-actions {
     display: flex; align-items: center; justify-content: space-between; gap: 0.6em; flex-wrap: wrap;
