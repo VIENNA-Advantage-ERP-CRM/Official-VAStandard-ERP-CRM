@@ -146,6 +146,11 @@
                     data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     linePage = 0;
                     render();
+                    // New record -> always start at the top (the scroll position must not
+                    // carry over from the previously selected record).
+                    if ($root && $root[0]) {
+                        $root.scrollTop(0);
+                    }
                     showBusy(false);
                 },
                 error: function (err) { console.log(err); showBusy(false); }
@@ -256,7 +261,7 @@
             // is read-only (disabled) unless there is an open balance and the doc is CO/CL.
             $a.append($('<button type="button" class="vas-apinv-btn is-primary"></button>')
                 .text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate credit note")
-                           : lbl("VAS_065_RecordPayment", "Record payment"))
+                    : lbl("VAS_065_RecordPayment", "Record payment"))
                 .prop("disabled", !canPay)
                 .on("click", function () { if (canPay) openPaymentModal(); }));
 
@@ -367,7 +372,7 @@
             if (data.IsPaid) {
                 steps.push({ t: lbl("VAS_065_Paid", "Paid"), sub: "", done: true });
             } else if (+data.OpenAmount > 0 && (data.DocStatus === "CO" || data.DocStatus === "CL")) {
-                steps.push({ t: lbl("VAS_065_PaymentDue", "Payment due"), sub: data.DueDate ? lbl("DueDate") + " " + fmtDate(data.DueDate) : "", done: false, active: true });
+                steps.push({ t: lbl("VAS_065_PaymentDue", "Payment Due"), sub: data.DueDate ? lbl("DueDate") + " " + fmtDate(data.DueDate) : "", done: false, active: true });
             }
 
             if (steps.length < 2) return null;
@@ -404,8 +409,8 @@
                 { k: lbl("VAS_065_PostedStatus", "Posted Status"), v: data.PostedName || (data.Posted ? data.Posted : "") },
                 { k: lbl("VAS_065_PaymentTerms", "Payment Terms"), v: data.PaymentTermName },
                 { k: lbl("VAS_065_PaymentMethod", "Payment Method"), v: data.PaymentMethodName },
-                { k: lbl("VAS_065_InvoiceCurrency", "Invoice currency"), v: data.CurISO },
-                { k: lbl("VAS_065_AccountingCurrency", "Accounting currency"), v: data.AcctCurISO },
+                { k: lbl("VAS_065_InvoiceCurrency", "Invoice Currency"), v: data.CurISO },
+                { k: lbl("VAS_065_AccountingCurrency", "Accounting Currency"), v: data.AcctCurISO },
                 { k: lbl("VAS_065_Representative", "Representative"), v: data.RepresentativeName }
             ];
             var visible = rows.filter(function (r) { return r.v != null && String(r.v).length > 0; });
@@ -486,7 +491,7 @@
                 '<div class="vas-apinv-block-foot js-foot" style="display:none;"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_LineItems", "Line items"));
+            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_LineItems", "Line Items"));
             $sec.find(".js-count").text(lbl("VAS_065_GoodsLinesCount", "{0} goods lines").replace("{0}", goodsCount));
             $sec.find(".js-c-desc").text(lbl("Description"));
             $sec.find(".js-c-qty").text(lbl("Quantity"));
@@ -593,15 +598,15 @@
                 '</div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-wh-h").text(lbl("VAS_065_WithholdingDetails", "Withholding details"));
+            $sec.find(".vas-apinv-wh-h").text(lbl("VAS_065_WithholdingDetails", "Withholding Details"));
             $sec.find(".vas-apinv-wh-r").text(lbl("VAS_065_AppliedBeforeVendorPayment", "Applied before vendor payment"));
-            $sec.find(".js-k1").text(lbl("VAS_065_WithholdingType", "Withholding type"));
+            $sec.find(".js-k1").text(lbl("VAS_065_WithholdingType", "Withholding Type"));
             $sec.find(".js-v1").text(w.TypeName || lbl("VAS_065_Withholding", "Withholding"));
-            $sec.find(".js-k2").text(lbl("VAS_065_BaseAmount", "Base amount"));
+            $sec.find(".js-k2").text(lbl("VAS_065_BaseAmount", "Base Amount"));
             $sec.find(".js-v2").text(fmtAmount(w.Base));
             $sec.find(".js-k3").text(lbl("VAS_065_Rate", "Rate"));
             $sec.find(".js-v3").text(fmtPct(w.Rate));
-            $sec.find(".js-k4").text(lbl("VAS_065_WithheldAmount", "Withheld amount"));
+            $sec.find(".js-k4").text(lbl("VAS_065_WithheldAmount", "Withholding Amount"));
             $sec.find(".js-v4").text(fmtAmount(w.Amount));
             return $sec;
         }
@@ -721,24 +726,32 @@
                 '<div class="vas-apinv-kv js-kv"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_GoodsReceiptMatching", "Goods receipt & matching"));
+            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching"));
             $sec.find(".js-st").text(lbl("Matched"));
 
             var $kv = $sec.find(".js-kv");
+            // Receipt/order docs, dates and warehouse can each be several distinct values
+            // (comma-separated). Join the distinct received dates through fmtDate so the
+            // formatting matches the rest of the UI.
+            var receivedOn = (gr.ReceivedDates && gr.ReceivedDates.length)
+                ? gr.ReceivedDates.map(function (d) { return fmtDate(d); }).join(", ")
+                : fmtDate(gr.ReceivedDate);
             kvRow($kv, lbl("VAS_065_ReceiptGRN", "Receipt (GRN)"), gr.ReceiptDocumentNo);
             kvRow($kv, lbl("VAS_065_PurchaseOrder", "Purchase order"), gr.OrderDocumentNo);
-            kvRow($kv, lbl("VAS_065_ReceivedOn", "Received on"), fmtDate(gr.ReceivedDate));
+            kvRow($kv, lbl("VAS_065_ReceivedOn", "Received On"), receivedOn);
             kvRow($kv, lbl("QtyReceived"), fmtNumber(gr.TotalReceived, 0) + " " +
-                lbl("VAS_065_UnitsCount", "units").replace("{0}", "").trim());
+                lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim());
             kvRow($kv, lbl("VAS_065_Warehouse", "Warehouse"), gr.WarehouseName);
-            kvRow($kv, lbl("VAS_065_PriceVariance", "Price variance"), fmtAmount(gr.PriceVariance));
+            kvRow($kv, lbl("VAS_065_PriceVariance", "Price Variance"), fmtAmount(gr.PriceVariance));
             return $sec;
         }
         function kvRow($kv, k, v) {
             if (v == null || String(v).length === 0) return;
+            // Show the full value as a hover title so large (comma-separated) details
+            // stay readable even when the value is long.
             $kv.append($('<div class="vas-apinv-kv-r"></div>')
                 .append($('<span class="vas-apinv-kv-k"></span>').text(k))
-                .append($('<span class="vas-apinv-kv-v"></span>').text(v)));
+                .append($('<span class="vas-apinv-kv-v"></span>').text(v).attr("title", String(v))));
         }
 
         function buildPaymentSchedule() {
@@ -755,10 +768,11 @@
                 '<span class="js-h1"></span><span class="js-h2"></span><span class="js-h3"></span><span class="right js-h4"></span>' +
                 '</div>' +
                 '<div class="js-rows"></div>' +
+                '<div class="vas-apinv-block-foot js-sched-pager" style="display:none;"></div>' +
                 '<div class="vas-apinv-block-foot js-foot"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_PaymentSchedule", "Payment schedule"));
+            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_PaymentSchedule", "Payment Schedule"));
             $sec.find(".js-sum").text((data.PaymentTermName ? data.PaymentTermName + " · " : "") +
                 lbl("VAS_065_InstalmentCount", "{0} instalment(s)").replace("{0}", sched.length));
             $sec.find(".js-h1").text(lbl("VAS_065_Schedule", "Schedule"));
@@ -767,22 +781,58 @@
             $sec.find(".js-h4").text(lbl("Amount"));
 
             var $rows = $sec.find(".js-rows");
+            var $pager = $sec.find(".js-sched-pager");
+            var SCHED_PER_PAGE = 5;
+            var schedPage = 0;
+            var pct = Math.round(100 / sched.length);
+
+            // Totals are computed over ALL schedules, independent of the page shown.
             var totalOpen = 0, anyHold = false;
-            sched.forEach(function (s, idx) {
+            sched.forEach(function (s) {
                 if (!s.IsPaid) totalOpen += +s.DueAmt || 0;
                 if (s.IsHold) anyHold = true;
-                var pct = Math.round(100 / sched.length);
-                var $r = $('<div class="vas-apinv-t4-row"></div>');
-                $r.append($('<div class="col-a p"></div>').text(
-                    lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (idx + 1)).replace("{1}", pct)));
-                $r.append($('<div class="col-b c"></div>').text(fmtDate(s.DueDate)));
-                var statusKey = s.Status === "Paid" ? "VAS_065_Paid" : (s.Status === "OnHold" ? "VAS_065_OnHold" : "Open");
-                var statusCls = s.Status === "Paid" ? "ok" : (s.Status === "OnHold" ? "warn" : "warn");
-                $r.append($('<div class="col-c"></div>').append(
-                    $('<span class="vas-apinv-spill ' + statusCls + '"></span>').text(lbl(statusKey))));
-                $r.append($('<div class="col-d amt"></div>').text(fmtAmount(s.DueAmt)));
-                $rows.append($r);
             });
+
+            // Renders the current page of schedule rows (5 per page) and the pager.
+            function renderSchedRows() {
+                $rows.empty();
+                var total = sched.length;
+                var paged = total > SCHED_PER_PAGE;
+                var start = paged ? schedPage * SCHED_PER_PAGE : 0;
+                var end = paged ? Math.min(start + SCHED_PER_PAGE, total) : total;
+
+                for (var i = start; i < end; i++) {
+                    var s = sched[i];
+                    var $r = $('<div class="vas-apinv-t4-row"></div>');
+                    $r.append($('<div class="col-a p"></div>').text(
+                        lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (i + 1)).replace("{1}", pct)));
+                    $r.append($('<div class="col-b c"></div>').text(fmtDate(s.DueDate)));
+                    var statusKey = s.Status === "Paid" ? "VAS_065_Paid" : (s.Status === "OnHold" ? "VAS_065_OnHold" : "Open");
+                    var statusCls = s.Status === "Paid" ? "ok" : "warn";
+                    $r.append($('<div class="col-c"></div>').append(
+                        $('<span class="vas-apinv-spill ' + statusCls + '"></span>').text(lbl(statusKey))));
+                    $r.append($('<div class="col-d amt"></div>').text(fmtAmount(s.DueAmt)));
+                    $rows.append($r);
+                }
+
+                if (paged) {
+                    $pager.empty().show();
+                    var pageCount = Math.ceil(total / SCHED_PER_PAGE);
+                    $pager.append($('<span></span>').text(
+                        lbl("VAS_065_Showing", "Showing {0} of {1}")
+                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
+                    var $nav = $('<span class="vas-apinv-pager"></span>');
+                    var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
+                    var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
+                    $prev.prop("disabled", schedPage <= 0).on("click", function () { if (schedPage > 0) { schedPage--; renderSchedRows(); } });
+                    $next.prop("disabled", schedPage >= pageCount - 1).on("click", function () { if (schedPage < pageCount - 1) { schedPage++; renderSchedRows(); } });
+                    $nav.append($prev).append($next);
+                    $pager.append($nav);
+                } else {
+                    $pager.hide();
+                }
+            }
+            renderSchedRows();
 
             var $foot = $sec.find(".js-foot");
             $foot.append($('<span></span>').text(
@@ -896,10 +946,11 @@
                 '<div class="vas-apinv-je-head"></div>' +
                 '<div class="js-rows"></div>' +
                 '<div class="vas-apinv-je-total"></div>' +
+                '<div class="vas-apinv-block-foot js-je-pager" style="display:none;"></div>' +
                 '<div class="vas-apinv-block-foot js-foot"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_PostedJournalEntry", "Posted journal entry"));
+            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_PostedJournalEntry", "Posted Entry"));
             $sec.find(".js-st").text(lbl("VAS_065_Posted", "Posted"));
 
             var $head = $sec.find(".vas-apinv-je-head").css("grid-template-columns", tmpl);
@@ -908,19 +959,51 @@
             });
 
             var $rows = $sec.find(".js-rows");
-            pj.Rows.forEach(function (jr) {
-                var $r = $('<div class="vas-apinv-je-row"></div>').css("grid-template-columns", tmpl);
-                cols.forEach(function (c) {
-                    if (c.num) {
-                        $r.append(jeAmt(c.get(jr), c.key === "Dr" ? "dr" : "cr", acctCur, acctPrec));
-                    } else if (c.key === "Account") {
-                        $r.append($('<div class="acct"></div>').append($('<div class="code"></div>').text(c.get(jr))));
-                    } else {
-                        $r.append($('<div class="dimc"></div>').text(c.get(jr)));
-                    }
-                });
-                $rows.append($r);
-            });
+            var $jePager = $sec.find(".js-je-pager");
+            var JE_PER_PAGE = 10;
+            var jePage = 0;
+
+            // Renders the current page of journal rows (10 per page) and the pager.
+            function renderJeRows() {
+                $rows.empty();
+                var total = pj.Rows.length;
+                var paged = total > JE_PER_PAGE;
+                var start = paged ? jePage * JE_PER_PAGE : 0;
+                var end = paged ? Math.min(start + JE_PER_PAGE, total) : total;
+
+                for (var i = start; i < end; i++) {
+                    var jr = pj.Rows[i];
+                    var $r = $('<div class="vas-apinv-je-row"></div>').css("grid-template-columns", tmpl);
+                    cols.forEach(function (c) {
+                        if (c.num) {
+                            $r.append(jeAmt(c.get(jr), c.key === "Dr" ? "dr" : "cr", acctCur, acctPrec));
+                        } else if (c.key === "Account") {
+                            $r.append($('<div class="acct"></div>').append($('<div class="code"></div>').text(c.get(jr))));
+                        } else {
+                            $r.append($('<div class="dimc"></div>').text(c.get(jr)));
+                        }
+                    });
+                    $rows.append($r);
+                }
+
+                if (paged) {
+                    $jePager.empty().show();
+                    var pageCount = Math.ceil(total / JE_PER_PAGE);
+                    $jePager.append($('<span></span>').text(
+                        lbl("VAS_065_Showing", "Showing {0} of {1}")
+                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
+                    var $nav = $('<span class="vas-apinv-pager"></span>');
+                    var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
+                    var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
+                    $prev.prop("disabled", jePage <= 0).on("click", function () { if (jePage > 0) { jePage--; renderJeRows(); } });
+                    $next.prop("disabled", jePage >= pageCount - 1).on("click", function () { if (jePage < pageCount - 1) { jePage++; renderJeRows(); } });
+                    $nav.append($prev).append($next);
+                    $jePager.append($nav);
+                } else {
+                    $jePager.hide();
+                }
+            }
+            renderJeRows();
 
             var $tot = $sec.find(".vas-apinv-je-total").css("grid-template-columns", tmpl);
             cols.forEach(function (c, idx) {
@@ -1020,7 +1103,7 @@
                 '<button type="button" class="vas-apinv-m-x" aria-label="Close"><i class="fa fa-times"></i></button>' +
                 '</div>'
             );
-            $head.find(".js-title").text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate credit note") : lbl("VAS_065_RecordPayment", "Record payment"));
+            $head.find(".js-title").text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate Credit Note") : lbl("VAS_065_RecordPayment", "Record Payment"));
             $head.find(".js-sub").text((data.BPName || "") + " · " + (data.DocumentNo || ""));
             $head.find(".vas-apinv-m-x").on("click", closeModal);
             $modal.append($head);
@@ -1030,23 +1113,20 @@
 
             // Stats
             var $stats = $('<div class="vas-apinv-m-stats"></div>');
-            statCard($stats, lbl("VAS_065_VendorOutstanding", "Vendor outstanding"), fmtAmountCur(meta.VendorOutstanding, cur, p), "");
-            statCard($stats, lbl("VAS_065_GrossInvoice", "Gross invoice"), fmtAmountCur(meta.GrossInvoice, cur, p), "amber");
+            statCard($stats, lbl("VAS_065_VendorOutstanding", "Vendor Outstanding"), fmtAmountCur(meta.VendorOutstanding, cur, p), "");
+            statCard($stats, lbl("VAS_065_GrossInvoice", "Gross Invoice"), fmtAmountCur(meta.GrossInvoice, cur, p), "amber");
             if (+meta.Withholding > 0) statCard($stats, lbl("VAS_065_Withholding", "Withholding"), fmtAmountCur(meta.Withholding, cur, p), "amber");
-            statCard($stats, lbl("VAS_065_NetPayable", "Net payable"), fmtAmountCur(meta.NetPayable, cur, p), "green");
-            if (isCN) {
-                statCard($stats, lbl("VAS_065_CreditNoteAmount", "Credit note amount"), fmtAmountCur(meta.CreditNoteAmount, cur, p), "amber");
-                statCard($stats, lbl("VAS_065_OpenInvoicesAvailable", "Open invoices available"), fmtAmountCur(meta.OpenInvoicesAvailable, cur, p), "green");
-            } else {
-                statCard($stats, lbl("VAS_065_AvailableToApply", "Available to apply"), fmtAmountCur(meta.AvailableToApply, cur, p), "green");
-            }
+            statCard($stats, lbl("VAS_065_NetPayable", "Net Payable"), fmtAmountCur(meta.NetPayable, cur, p), "green");
+            statCard($stats, lbl("VAS_065_AvailableToApply", "Available to Apply"), fmtAmountCur(meta.AvailableToApply, cur, p), "green");
             $bodyM.append($stats);
 
-            if (isCN) buildCreditNoteSection($bodyM, p, cur);
-            else buildInvoicePaymentSections($bodyM, p, cur);
+            // Both AP invoices (API) and AP credit notes (APC) use the same modal body
+            // (on-account credits + record payment); only the amount sign differs, which is
+            // applied when the allocation / payment is created on the server.
+            buildInvoicePaymentSections($bodyM, p, cur);
 
             $form.append($bodyM);
-            $form.append(buildModalFooter(isCN));
+            $form.append(buildModalFooter(false));
             $modal.append($form);
 
             // Success view (hidden initially)
@@ -1135,7 +1215,7 @@
                         var rPrec = (r.StdPrecision >= 0) ? r.StdPrecision : p;
                         var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec));
                         if (r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID) {
-                            $amt.append($('<div class="conv"></div>').text("≈ " + fmtAmountCur(r.AvailableAmountInv, cur, p)));
+                            $amt.append($('<div class="conv"></div>').text(fmtAmountCur(r.AvailableAmountInv, cur, p)));
                         }
                         $row.append($amt);
                         $row.on("click", function () {
@@ -1200,12 +1280,12 @@
                 var $sec = $('<div class="vas-apinv-m-sec vas-apinv-m-sec-boxed"></div>');
                 $sec.append($('<div class="vas-apinv-m-sec-h"></div>')
                     .append($('<span class="t"></span>').text(lbl("VAS_065_ApplyOnAccountCredits", "Apply on-account & credits")))
-                    .append($('<span class="hint"></span>').text(lbl("VAS_065_UseTheseFirst", "Use these first - no new cash"))));
+                    .append($('<span class="hint"></span>').text(lbl("VAS_065_UseTheseFirst", "Use these first - no new payment"))));
 
                 // Column header row (Document / Date / Status / Amount) matching the
                 // Payment schedule table layout.
                 var $cHead = $('<div class="vas-apinv-t4-head"></div>');
-                $cHead.append($('<span></span>').text(lbl("VAS_065_PaymentCredit", "Payment / credit")));
+                $cHead.append($('<span></span>').text(lbl("VAS_065_PaymentCredit", "Payment / Credit")));
                 $cHead.append($('<span></span>').text(lbl("VAS_065_Date", "Date")));
                 $cHead.append($('<span></span>').text(lbl("VAS_065_Status", "Status")));
                 $cHead.append($('<span class="right"></span>').text(lbl("Amount")));
@@ -1218,8 +1298,8 @@
 
                 var $actions = $('<div class="vas-apinv-credit-actions"></div>');
                 var $summary = $('<span class="summary js-credit-summary"></span>').text(lbl("VAS_065_SelectCreditsHint", "Select available payments or credits to allocate before recording a new payment."));
-                var $applyBtn = $('<button type="button" class="vas-apinv-btn is-outline js-apply-credits"></button>')
-                    .text(lbl("VAS_065_ApplySelectedCredits", "Apply selected credits")).prop("disabled", true);
+                var $applyBtn = $('<button type="button" class="vas-apinv-btn is-primary js-apply-credits"></button>')
+                    .text(lbl("VAS_065_ApplySelectedCredits", "Apply Selected Credits")).prop("disabled", true);
                 $actions.append($summary).append($applyBtn);
                 $sec.append($actions);
                 $sec.append($('<div class="vas-apinv-alloc-status js-alloc-status"></div>').text(lbl("VAS_065_AllocationStatusMsg", "Allocation transaction created. Remaining balance is now available for new payment.")));
@@ -1231,13 +1311,13 @@
             // New payment form
             var $pay = $('<div class="vas-apinv-m-sec js-newpay"></div>');
             $pay.append($('<div class="vas-apinv-m-sec-h"></div>')
-                .append($('<span class="t"></span>').text(lbl("VAS_065_NewPayment", "New payment")))
+                .append($('<span class="t"></span>').text(lbl("VAS_065_NewPayment", "New Payment")))
                 .append($('<span class="hint"></span>').text(lbl("VAS_065_ForBalanceAfterCredits", "For the balance after credits"))));
 
             var $grid = $('<div class="vas-apinv-fgrid"></div>');
-            var $amtField = field(lbl("VAS_065_PaymentAmount", "Payment amount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
+            var $amtField = field(lbl("VAS_065_PaymentAmount", "Payment Amount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
                 '</span><input class="js-pay-amt" type="text" inputmode="decimal" /></div>');
-            var $dateField = field(lbl("VAS_065_PaymentDate", "Payment date"), '<div class="control"><input class="js-pay-date" type="date" /></div>');
+            var $dateField = field(lbl("VAS_065_PaymentDate", "Payment Date"), '<div class="control"><input class="js-pay-date" type="date" /></div>');
             var $methodSel = $('<select class="js-pay-method"></select>');
             // Empty placeholder so nothing is selected by default.
             $methodSel.append($('<option></option>').val("").text(lbl("VAS_065_SelectOption", "Select")));
@@ -1252,7 +1332,7 @@
                 var t = (b.BankName || "") + (b.AccountNo ? " · ****" + b.AccountNo.slice(-4) : "") + (b.CurrencyISO ? " . " + b.CurrencyISO : "");
                 $bankSel.append($('<option></option>').val(b.C_BankAccount_ID).text(t));
             });
-            var $bankField = field(lbl("VAS_065_BankAccount", "Bank account"), $('<div class="control sel"></div>').append($bankSel));
+            var $bankField = field(lbl("VAS_065_BankAccount", "Bank Account"), $('<div class="control sel"></div>').append($bankSel));
             // Currency selector (My Currency only) - defaults to the invoice currency.
             var $currencySel = $('<select class="js-pay-currency"></select>');
             (meta.Currencies || []).forEach(function (c) {
@@ -1266,14 +1346,40 @@
                 $convTypeSel.append($('<option></option>').val(t.C_ConversionType_ID).text(t.Name));
             });
             if (meta.C_ConversionType_ID) $convTypeSel.val(meta.C_ConversionType_ID);
-            var $convTypeField = field(lbl("VAS_065_ConversionType", "Conversion type"), $('<div class="control sel"></div>').append($convTypeSel));
-            var $discField = field(lbl("VAS_065_CashDiscount", "Cash discount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
+            var $convTypeField = field(lbl("VAS_065_ConversionType", "Conversion Type"), $('<div class="control sel"></div>').append($convTypeSel));
+            var $discField = field(lbl("VAS_065_Discount", "Discount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
                 '</span><input class="js-pay-disc" type="text" inputmode="decimal" value="0.00" /></div>');
             var $refField = field(lbl("VAS_Reference"), '<div class="control"><input class="js-pay-ref" type="text" /></div>');
+            // Check date - shown only when the selected payment method is a cheque; the
+            // check date and reference are then mandatory (validated on submit).
+            var $checkDateField = field(lbl("VAS_065_CheckDate", "Check date"), '<div class="control"><input class="js-pay-checkdate" type="date" /></div>');
+            $checkDateField.hide();
 
-            $grid.append($amtField).append($currencyField).append($convTypeField).append($dateField).append($methodField).append($bankField).append($discField).append($refField);
+            // Column order: Bank account, Currency, Payment date, Conversion type, Payment
+            // method, Payment amount, Cash discount, Reference, [Check date]. The check-date
+            // column appears (after Reference / Check no) only for cheque methods.
+            $grid.append($bankField).append($currencyField).append($dateField).append($convTypeField)
+                .append($methodField).append($amtField).append($discField).append($refField).append($checkDateField);
             $pay.append($grid);
             $bodyM.append($pay);
+
+            // For cheque payment methods (VA009 base type "S"): show the check-date column
+            // and rename the Reference column to "Check no". Otherwise hide the check date
+            // and restore the "Reference" label.
+            var $refLabel = $refField.find("label");
+            function methodIsCheck() {
+                var id = parseInt($methodSel.val(), 10) || 0;
+                if (!id) return false;
+                var m = (meta.PaymentMethods || []).filter(function (x) { return +x.VA009_PaymentMethod_ID === id; })[0];
+                return !!(m && m.BaseType === "S");
+            }
+            function toggleCheckDate() {
+                var isCheck = methodIsCheck();
+                $checkDateField.toggle(isCheck);
+                $refLabel.text(isCheck ? lbl("VAS_065_CheckNo", "Check no") : lbl("VAS_Reference"));
+            }
+            $methodSel.on("change", toggleCheckDate);
+            toggleCheckDate();
 
             // Settlement summary
             var $settle = $(
@@ -1288,15 +1394,15 @@
                 '<div class="note js-over"></div>' +
                 '</div>'
             );
-            $settle.find(".js-sk1").text(lbl("VAS_065_GrossInvoiceTotal", "Gross invoice total"));
+            $settle.find(".js-sk1").text(lbl("VAS_065_GrossInvoiceTotal", "Gross Invoice Total"));
             $settle.find(".js-sv1").text(fmtAmountCur(meta.GrossInvoice, cur, p));
-            $settle.find(".js-sk2").text(lbl("VAS_065_LessWithholding", "Less withholding"));
+            $settle.find(".js-sk2").text(lbl("VAS_065_LessWithholding", "Less Withholding"));
             $settle.find(".js-sv2").text(fmtAmountCur(meta.Withholding, cur, p));
             if (!(+meta.Withholding > 0)) $settle.find(".js-wh-row").hide();
-            $settle.find(".js-sk4").text(lbl("VAS_065_NewPayment", "New payment"));
-            $settle.find(".js-sk5").text(lbl("VAS_065_CashDiscount", "Cash discount"));
-            $settle.find(".js-sk6").text(lbl("VAS_065_SettlingThisInvoice", "Settling this invoice"));
-            $settle.find(".js-sk7").text(lbl("VAS_065_RemainingBalance", "Remaining balance"));
+            $settle.find(".js-sk4").text(lbl("VAS_065_NewPayment", "New Payment"));
+            $settle.find(".js-sk5").text(lbl("VAS_065_Discount", "Discount"));
+            $settle.find(".js-sk6").text(lbl("VAS_065_SettlingThisInvoice", "Settling this Invoice"));
+            $settle.find(".js-sk7").text(lbl("VAS_065_RemainingBalance", "Remaining Balance"));
             $settle.find(".js-over").text(lbl("VAS_065_OverpaymentNote", "Overpayment will be held as a vendor advance (on account)."));
             $bodyM.append($settle);
 
@@ -1623,12 +1729,14 @@
                 });
                 if (!ids.length) return;
                 $allocBtn.prop("disabled", true);
+                showModalBusy(true);   // busy indicator while the credit note is allocated
                 $.ajax({
                     url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/AllocateCreditNote",
                     type: "POST",
                     dataType: "json",
                     data: { payload: JSON.stringify({ C_Invoice_ID: $self.record_ID, C_Invoice_IDs: ids }) },
                     success: function (raw) {
+                        showModalBusy(false);
                         var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                         if (resp && resp.Success) {
                             $bodyM.find(".vas-apinv-open-invoice-row.on").addClass("locked").find(".ap").text(lbl("VAS_065_Allocated", "Allocated"));
@@ -1643,7 +1751,7 @@
                             error((resp && resp.Message) || lbl("VAS_065_ActionFailed", "The action could not be completed."));
                         }
                     },
-                    error: function (xhr) { $allocBtn.prop("disabled", false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
+                    error: function (xhr) { showModalBusy(false); $allocBtn.prop("disabled", false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
                 });
             });
 
@@ -1697,6 +1805,23 @@
                 return;
             }
 
+            // Cheque payments require a check date and a reference number.
+            var payIsCheck = (meta.PaymentMethods || []).some(function (m) {
+                return +m.VA009_PaymentMethod_ID === methodId && m.BaseType === "S";
+            });
+            var checkDate = $bodyM.find(".js-pay-checkdate").val();
+            var refNo = $bodyM.find(".js-pay-ref").val();
+            if (payIsCheck) {
+                if (!checkDate) {
+                    error(lbl("VAS_065_CheckDateRequired", "Check date is required for check payments."));
+                    return;
+                }
+                if (!refNo || !String(refNo).trim()) {
+                    error(lbl("VAS_065_ReferenceRequired", "Check number is required for check payments."));
+                    return;
+                }
+            }
+
             // Guard: applied credits + new payment + discount cannot exceed the open due
             // (compared in the payment currency).
             var rate = payCtx.rate || 1;
@@ -1717,15 +1842,18 @@
                 VA009_PaymentMethod_ID: methodId,
                 DateTrx: $bodyM.find(".js-pay-date").val(),
                 DiscountAmt: disc,
-                ReferenceNo: $bodyM.find(".js-pay-ref").val()
+                ReferenceNo: refNo,
+                CheckDate: checkDate
             };
             var $submit = $scrim.find(".js-submit").prop("disabled", true);
+            showModalBusy(true);   // busy indicator while the payment is recorded
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/RecordPayment",
                 type: "POST",
                 dataType: "json",
                 data: { payload: JSON.stringify(payload) },
                 success: function (raw) {
+                    showModalBusy(false);
                     var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (resp && resp.Success) {
                         // The recorded payment is in the bank-account currency.
@@ -1737,7 +1865,7 @@
                         error((resp && resp.Message) || lbl("VAS_065_ActionFailed", "The action could not be completed."));
                     }
                 },
-                error: function (xhr) { $submit.prop("disabled", false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
+                error: function (xhr) { showModalBusy(false); $submit.prop("disabled", false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
             });
         }
 

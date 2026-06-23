@@ -259,7 +259,7 @@
 .vas-apinv-two-col .vas-apinv-block { margin-top: 0; height: 100%; }
 
 /* ---------- 4-col schedule ---------- */
-.vas-apinv-t4-head, .vas-apinv-t4-row { display: grid; align-items: center; gap: 0.8em; padding: 0 1.1em; grid-template-columns: 1.5fr 1fr 1fr 1fr; }
+.vas-apinv-t4-head, .vas-apinv-t4-row { display: grid; align-items: center; gap: 0.7em; padding: 0 1.1em; grid-template-columns: 1.5fr 1fr 1fr 1.7fr; }
 .vas-apinv-t4-head { padding-bottom: 0.7em; border-bottom: 0.07em solid var(--apinv-divider); }
 .vas-apinv-t4-head span { font-size: 0.7em; letter-spacing: .04em; text-transform: uppercase; color: var(--apinv-muted); }
 .vas-apinv-t4-head .right { text-align: right; }

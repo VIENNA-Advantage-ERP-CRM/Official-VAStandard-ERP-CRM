@@ -84,6 +84,7 @@ namespace VASLogic.Models
                               cntry.Name           AS BPCountry,
                               loc.Postal,
                               i.C_Currency_ID,
+                              i.C_ConversionType_ID,
                               cur.ISO_Code         AS CurrencyISOCode,
                               cur.CurSymbol        AS CurrencySymbol,
                               cur.StdPrecision     AS StdPrecision,
@@ -167,6 +168,7 @@ namespace VASLogic.Models
             data.BPCountry = Util.GetValueOfString(r["BPCountry"]);
             data.BPPostal = Util.GetValueOfString(r["Postal"]);
             data.C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]);
+            data.C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]);
             data.CurISO = Util.GetValueOfString(r["CurrencyISOCode"]);
             data.CurSymbol = Util.GetValueOfString(r["CurrencySymbol"]);
             data.StdPrecision = Util.GetValueOfInt(r["StdPrecision"]);
@@ -518,6 +520,13 @@ namespace VASLogic.Models
             if (ds == null || ds.Tables.Count == 0) return gr;
 
             decimal totalRecvQty = 0m, maxPriceVar = 0m, totalQtyVar = 0m;
+            // Collect DISTINCT receipt/order doc nos, warehouses and received dates across
+            // all matched lines (in first-seen order) so they can be shown comma-separated
+            // instead of keeping only the first value.
+            List<string> recvDocs = new List<string>();
+            List<string> orderDocs = new List<string>();
+            List<string> warehouses = new List<string>();
+            List<DateTime> recvDates = new List<DateTime>();
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 GoodsReceiptRow row = new GoodsReceiptRow();
@@ -535,11 +544,19 @@ namespace VASLogic.Models
                 totalQtyVar += Math.Abs(row.QuantityVariance);
                 if (Math.Abs(row.PriceVariance) > Math.Abs(maxPriceVar)) maxPriceVar = row.PriceVariance;
 
-                if (string.IsNullOrEmpty(gr.ReceiptDocumentNo)) gr.ReceiptDocumentNo = row.ReceiptDocumentNo;
-                if (string.IsNullOrEmpty(gr.OrderDocumentNo)) gr.OrderDocumentNo = row.OrderDocumentNo;
-                if (!gr.ReceivedDate.HasValue) gr.ReceivedDate = row.ReceivedDate;
-                if (string.IsNullOrEmpty(gr.WarehouseName)) gr.WarehouseName = row.WarehouseName;
+                if (!string.IsNullOrEmpty(row.ReceiptDocumentNo) && !recvDocs.Contains(row.ReceiptDocumentNo)) recvDocs.Add(row.ReceiptDocumentNo);
+                if (!string.IsNullOrEmpty(row.OrderDocumentNo) && !orderDocs.Contains(row.OrderDocumentNo)) orderDocs.Add(row.OrderDocumentNo);
+                if (!string.IsNullOrEmpty(row.WarehouseName) && !warehouses.Contains(row.WarehouseName)) warehouses.Add(row.WarehouseName);
+                if (row.ReceivedDate.HasValue && !recvDates.Contains(row.ReceivedDate.Value.Date)) recvDates.Add(row.ReceivedDate.Value.Date);
             }
+            // All distinct values, comma-separated. ReceivedDate keeps the first date for
+            // the single-date consumers (matched-receipt step); ReceivedDates carries the
+            // full distinct list for the comma-separated detail.
+            gr.ReceiptDocumentNo = string.Join(", ", recvDocs);
+            gr.OrderDocumentNo = string.Join(", ", orderDocs);
+            gr.WarehouseName = string.Join(", ", warehouses);
+            gr.ReceivedDates = recvDates;
+            gr.ReceivedDate = recvDates.Count > 0 ? (DateTime?)recvDates[0] : null;
             gr.LineCount = gr.Rows.Count;
             gr.TotalReceived = totalRecvQty;
             gr.PriceVariance = maxPriceVar;
@@ -733,7 +750,10 @@ namespace VASLogic.Models
             PaymentModalMeta meta = new PaymentModalMeta();
             APInvoicePanelData head = new APInvoicePanelData();
             LoadHeader(ctx, C_Invoice_ID, head);
-            if (head.C_Invoice_ID <= 0) return meta;
+            if (head.C_Invoice_ID <= 0)
+            {
+                return meta;
+            }
 
             MRole role = MRole.GetDefault(ctx);
 
@@ -750,44 +770,48 @@ namespace VASLogic.Models
             meta.RecordMode = head.IsAPCreditNote ? "AP_CREDIT_NOTE_ALLOCATION" : "AP_INVOICE_PAYMENT";
             meta.VendorOutstanding = GetVendorOutstanding(ctx, head.AD_Client_ID, head.C_BPartner_ID);
 
+            // AP invoices (API) and AP credit notes (APC) use the SAME modal (on-account
+            // credits + record payment); the only difference is the amount sign, applied
+            // when the allocation / payment is created. The UI works with the positive open
+            // amount, so the credit-note open is taken as an absolute value here.
             if (head.IsAPCreditNote)
             {
-                meta.CreditNoteAmount = Math.Abs(head.NetPayable) - GetAllocatedAmount(C_Invoice_ID);
-                if (meta.CreditNoteAmount < 0) meta.CreditNoteAmount = 0m;
-                meta.OpenInvoices = LoadOpenInvoicesForCredit(ctx, head.AD_Client_ID, head.C_BPartner_ID, C_Invoice_ID);
-                decimal totalOpen = 0m;
-                foreach (OpenInvoiceRow oi in meta.OpenInvoices) totalOpen += oi.OpenAmount;
-                meta.OpenInvoicesAvailable = totalOpen;
+                meta.CreditNoteAmount = Math.Max(0m, Math.Abs(head.NetPayable) - GetAllocatedAmount(C_Invoice_ID));
+                meta.NetOpenAmount = meta.CreditNoteAmount;
             }
             else
             {
                 meta.NetOpenAmount = head.OpenAmount;
-                meta.OnAccountPayments = LoadOnAccountPayments(ctx, head.AD_Client_ID, head.C_BPartner_ID, head.IsAPCreditNote);
-                meta.CreditNotes = LoadVendorCreditNotes(ctx, head.AD_Client_ID, head.C_BPartner_ID);
-                // "Available to apply" is shown in the invoice currency: convert each
-                // on-account payment / credit note to the invoice currency on the current
-                // date and sum the converted amounts.
-                decimal avail = 0;
-                foreach (AvailableCreditRow c in meta.OnAccountPayments)
-                {
-                    ConvertRowToInvoiceCurrency(ctx, c, head);
-                    avail += c.AvailableAmountInv;
-                }
-                foreach (AvailableCreditRow c in meta.CreditNotes)
-                {
-                    ConvertRowToInvoiceCurrency(ctx, c, head);
-                    avail += c.AvailableAmountInv;
-                }
-                meta.AvailableToApply = avail;
-                meta.BankAccounts = LoadBankAccounts(role);
-                meta.PaymentMethods = LoadPaymentMethods(role);
-                // Currency + conversion-type selectors on the modal.
-                meta.Currencies = LoadCurrencies(ctx, head.AD_Client_ID);
-                meta.ConversionTypes = LoadConversionTypes(ctx, head.AD_Client_ID);
-                meta.C_ConversionType_ID = Util.GetValueOfInt(DB.ExecuteScalar(
-                    "SELECT COALESCE(C_ConversionType_ID, 0) FROM C_Invoice WHERE C_Invoice_ID = @id",
-                    new SqlParameter[] { new SqlParameter("@id", C_Invoice_ID) }, null));
             }
+
+            meta.OnAccountPayments = LoadOnAccountPayments(ctx, head.AD_Client_ID, head.C_BPartner_ID, head.IsAPCreditNote);
+            // Vendor credit notes are offsetting sources for an invoice; they do not apply
+            // to another credit note, so the list is empty in credit-note mode.
+            //meta.CreditNotes = head.IsAPCreditNote
+            //    ? new List<AvailableCreditRow>()
+            //    : LoadVendorCreditNotes(ctx, head.AD_Client_ID, head.C_BPartner_ID);
+
+            // "Available to apply" is shown in the invoice currency: convert each
+            // on-account payment / credit note to the invoice currency on the current
+            // date and sum the converted amounts.
+            decimal avail = 0;
+            foreach (AvailableCreditRow c in meta.OnAccountPayments)
+            {
+                ConvertRowToInvoiceCurrency(ctx, c, head);
+                avail += c.AvailableAmountInv;
+            }
+            //foreach (AvailableCreditRow c in meta.CreditNotes)
+            //{
+            //    ConvertRowToInvoiceCurrency(ctx, c, head);
+            //    avail += c.AvailableAmountInv;
+            //}
+            meta.AvailableToApply = avail;
+            meta.BankAccounts = LoadBankAccounts(role, head.AD_Org_ID);
+            meta.PaymentMethods = LoadPaymentMethods(role, head.AD_Org_ID);
+            // Currency + conversion-type selectors on the modal.
+            meta.Currencies = LoadCurrencies(ctx, head.AD_Client_ID);
+            meta.ConversionTypes = LoadConversionTypes(role, head.AD_Client_ID, head.AD_Org_ID);
+            meta.C_ConversionType_ID = head.C_ConversionType_ID;
             return meta;
         }
 
@@ -797,7 +821,7 @@ namespace VASLogic.Models
             List<CurrencyOption> list = new List<CurrencyOption>();
             string sql = @"SELECT C_Currency_ID, ISO_Code, CurSymbol, StdPrecision
                              FROM C_Currency
-                            WHERE IsActive = 'Y'
+                            WHERE IsActive = 'Y' AND IsMyCurrency = 'Y' 
                               AND AD_Client_ID IN (0, @AD_Client_ID)
                             ORDER BY ISO_Code";
             DataSet ds = DB.ExecuteDataset(sql,
@@ -816,17 +840,19 @@ namespace VASLogic.Models
             return list;
         }
 
-        /// <summary>Active conversion (rate) types of the client.</summary>
-        private List<ConversionTypeOption> LoadConversionTypes(Ctx ctx, int AD_Client_ID)
+        /// <summary>Active conversion (rate) types of the invoice org, role-restricted.</summary>
+        private List<ConversionTypeOption> LoadConversionTypes(MRole role, int AD_Client_ID, int AD_Org_ID)
         {
             List<ConversionTypeOption> list = new List<ConversionTypeOption>();
-            string sql = @"SELECT C_ConversionType_ID, Name, COALESCE(IsDefault, 'N') AS IsDefault
-                             FROM C_ConversionType
-                            WHERE IsActive = 'Y'
-                              AND AD_Client_ID IN (0, @AD_Client_ID)
+            string sql = @"SELECT ct.C_ConversionType_ID, ct.Name, COALESCE(ct.IsDefault, 'N') AS IsDefault
+                             FROM C_ConversionType ct
+                            WHERE ct.IsActive = 'Y'
+                              AND ct.AD_Client_ID IN (0, @AD_Client_ID)
+                              AND ct.AD_Org_ID IN (0, @AD_Org_ID)
                             ORDER BY IsDefault DESC, Name";
+            sql = role.AddAccessSQL(sql, "ct", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
             DataSet ds = DB.ExecuteDataset(sql,
-                new SqlParameter[] { new SqlParameter("@AD_Client_ID", AD_Client_ID) }, null);
+                new SqlParameter[] { new SqlParameter("@AD_Client_ID", AD_Client_ID), new SqlParameter("@AD_Org_ID", AD_Org_ID) }, null);
             if (ds == null || ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
             {
@@ -1066,9 +1092,11 @@ namespace VASLogic.Models
         }
 
         /// <summary>Active bank accounts (deposit/withdraw targets).</summary>
-        private List<BankAccountOption> LoadBankAccounts(MRole role)
+        private List<BankAccountOption> LoadBankAccounts(MRole role, int AD_Org_ID)
         {
             List<BankAccountOption> list = new List<BankAccountOption>();
+            // Bank accounts of the invoice organization (or shared org 0), further
+            // restricted to the orgs the role can access.
             string sql = @"SELECT ba.C_BankAccount_ID, ba.AccountNo, b.Name AS BankName,
                                   ba.C_Currency_ID, cur.ISO_Code AS CurrencyISO,
                                   cur.CurSymbol AS CurSymbol, cur.StdPrecision AS StdPrecision, ba.IsDefault
@@ -1076,10 +1104,12 @@ namespace VASLogic.Models
                              INNER JOIN C_Bank b ON (ba.C_Bank_ID = b.C_Bank_ID)
                              INNER JOIN C_Currency cur ON (ba.C_Currency_ID = cur.C_Currency_ID)
                             WHERE ba.IsActive = 'Y'
+                              AND ba.AD_Org_ID IN (0, @AD_Org_ID)
                             ORDER BY ba.IsDefault DESC, b.Name";
             sql = role.AddAccessSQL(sql, "ba", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            DataSet ds = DB.ExecuteDataset(sql, null, null);
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@AD_Org_ID", AD_Org_ID) }, null);
             if (ds == null || ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
             {
@@ -1099,17 +1129,21 @@ namespace VASLogic.Models
         }
 
         /// <summary>Active payment methods (with base type for tender).</summary>
-        private List<PaymentMethodOption> LoadPaymentMethods(MRole role)
+        private List<PaymentMethodOption> LoadPaymentMethods(MRole role, int AD_Org_ID)
         {
             List<PaymentMethodOption> list = new List<PaymentMethodOption>();
+            // Payment methods of the invoice organization (or shared org 0), further
+            // restricted to the orgs the role can access.
             string sql = @"SELECT pm.VA009_PaymentMethod_ID, pm.VA009_Name, pm.VA009_PaymentBaseType
                              FROM VA009_PaymentMethod pm
                             WHERE pm.IsActive = 'Y'
+                              AND pm.AD_Org_ID IN (0, @AD_Org_ID)
                             ORDER BY pm.VA009_Name";
             try
             {
                 sql = role.AddAccessSQL(sql, "pm", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-                DataSet ds = DB.ExecuteDataset(sql, null, null);
+                DataSet ds = DB.ExecuteDataset(sql,
+                    new SqlParameter[] { new SqlParameter("@AD_Org_ID", AD_Org_ID) }, null);
                 if (ds == null || ds.Tables.Count == 0) return list;
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
@@ -1368,16 +1402,16 @@ namespace VASLogic.Models
                         }
                     }
                     // No (more) schedules: book the remainder against the invoice only.
-                    if (srcRem > 0)
-                    {
-                        if (!CreateCreditAllocLines(ctx, hdr, inv, src, srcRem, 0, trx, result))
-                        {
-                            // CreateCreditAllocLines already rolled back on failure.
-                            trx.Close();
-                            trx = null;
-                            return result;
-                        }
-                    }
+                    //if (srcRem > 0)
+                    //{
+                    //    if (!CreateCreditAllocLines(ctx, hdr, inv, src, srcRem, 0, trx, result))
+                    //    {
+                    //        // CreateCreditAllocLines already rolled back on failure.
+                    //        trx.Close();
+                    //        trx = null;
+                    //        return result;
+                    //    }
+                    //}
 
                     appliedAlloc += useAlloc;
                     remainingAlloc -= useAlloc;
@@ -1719,13 +1753,26 @@ namespace VASLogic.Models
 
                 payment.SetDateTrx(txDate);
                 payment.SetDateAcct(txDate);
-                payment.SetPayAmt(payAmt);
-                if (req.DiscountAmt > 0) payment.SetDiscountAmt(req.DiscountAmt);
-
-                if (baseType.Equals(MPayment.TENDERTYPE_Check))
+                payment.SetPaymentAmount(inv.IsReturnTrx() ? decimal.Negate(payAmt) : payAmt);
+                if (req.DiscountAmt > 0)
                 {
+                    payment.SetDiscountAmt(inv.IsReturnTrx() ? decimal.Negate(req.DiscountAmt) : req.DiscountAmt);
+                }
+                payment.SetPayAmt(inv.IsReturnTrx() ? decimal.Negate(payAmt + req.DiscountAmt) : (payAmt + req.DiscountAmt));
+
+                // VA009_PaymentBaseType code 'S' = Check (per the codebase remap in
+                // MPaymentModel.GetBPartnerDetail; it maps to tender type 'K').
+                if (baseType == "S")
+                {
+                    // Cheque payments require a check date and a reference (cheque no).
+                    if (!req.CheckDate.HasValue || string.IsNullOrEmpty(req.ReferenceNo))
+                    {
+                        result.Message = Msg.GetMsg(ctx, "VAS_065_CheckDateRefRequired");
+                        trx.Rollback();
+                        return result;
+                    }
                     payment.SetTenderType(MPayment.TENDERTYPE_Check);
-                    payment.SetCheckDate(txDate);
+                    payment.SetCheckDate(req.CheckDate.Value);
                     payment.SetCheckNo(req.ReferenceNo);
                 }
                 else
@@ -1736,8 +1783,6 @@ namespace VASLogic.Models
                         payment.SetTrxNo(req.ReferenceNo);
                     }
                 }
-
-
 
                 // Resolve the amount against unpaid pay schedules in due-date order
                 // (lowest first). The amount cascades: each schedule is filled up to its
@@ -1762,8 +1807,10 @@ namespace VASLogic.Models
                         // them in the payment currency so the cascade and the over/under
                         // amounts stay consistent with the recorded payment.
                         if (payCurrency != invCurrency)
+                        {
                             due = MConversionRate.Convert(ctx, due, invCurrency, payCurrency, txDate, convTypeId,
                                 inv.GetAD_Client_ID(), inv.GetAD_Org_ID());
+                        }
                         decimal alloc = Math.Min(rem, due);
                         if (alloc <= 0) continue;
                         planSchedId.Add(Util.GetValueOfInt(sr["C_InvoicePaySchedule_ID"]));
@@ -1781,25 +1828,22 @@ namespace VASLogic.Models
                     if (planSchedId.Count == 1)
                     {
                         payment.SetC_InvoicePaySchedule_ID(planSchedId[0]);
-                        // OverUnder = DueAmt - Amount (>0 underpayment, 0 when exact).
-                        decimal ou = planDue[0] - planAlloc[0];
-                        payment.SetOverUnderAmt(ou);
+                        // OverUnder = DueAmt - Amount - Discount (>0 underpayment, 0 when exact).
+                        decimal ou = planDue[0] - planAlloc[0] - req.DiscountAmt;
+                        payment.SetOverUnderAmt(inv.IsReturnTrx() ? decimal.Negate(ou) : ou);
                         payment.SetIsOverUnderPayment(ou != 0);
                     }
-                    //else
-                    //{
-                    //    // Invoice without an explicit pay schedule.
-                    //    decimal ou = open - payAmt;
-                    //    payment.SetOverUnderAmt(ou);
-                    //    payment.SetIsOverUnderPayment(ou != 0);
-                    //}
                 }
                 else
                 {
                     // Case 3: amount spans several schedules -> applied via payment allocate
-                    // lines below; the header itself carries no invoice/schedule link.
+                    // lines below; the header itself carries no invoice/schedule link. The
+                    // discount is distributed onto the allocate lines (MPayment.AllocateIt
+                    // uses the per-line discount, not the header), so clear the header
+                    // discount here to avoid counting it twice.
                     payment.SetOverUnderAmt(0);
                     payment.SetIsOverUnderPayment(false);
+                    payment.SetDiscountAmt(0);
                 }
 
                 payment.SetDocStatus(MPayment.DOCSTATUS_InProgress);
@@ -1813,10 +1857,31 @@ namespace VASLogic.Models
 
                 if (planSchedId.Count > 1)
                 {
+                    // Cascade the cash discount across the schedules that actually have a
+                    // payment allocate entry (planSchedId), in order: each schedule absorbs
+                    // discount up to its due amount (a schedule's due is never less than the
+                    // discount applied to it) and any remainder carries to the next schedule.
+                    // Discount is never applied to a schedule with no payment entry, so any
+                    // leftover after the last covered schedule is simply not applied. Shares
+                    // are positive magnitudes (compared on absolute values, since credit-note
+                    // dues are negative); the credit-note sign is applied when the value is set
+                    // on the allocate line.
+                    //   e.g. discount 20, schedule 1 due 100 -> 20 on schedule 1.
+                    //        discount 20, schedule 1 due 15  -> 15 on schedule 1, 5 on the next.
+                    decimal[] discShare = new decimal[planSchedId.Count];
+                    decimal remDisc = req.DiscountAmt;
+                    for (int i = 0; i < planSchedId.Count && remDisc > 0; i++)
+                    {
+                        decimal share = Math.Min(remDisc, Math.Abs(planDue[i]));
+                        discShare[i] = share;
+                        remDisc -= share;
+                    }
+
                     for (int i = 0; i < planSchedId.Count; i++)
                     {
                         decimal due = planDue[i];
                         decimal alloc = planAlloc[i];
+                        decimal disc = discShare[i];
 
                         MPaymentAllocate pa = new MPaymentAllocate(ctx, 0, trx);
                         pa.SetAD_Client_ID(payment.GetAD_Client_ID());
@@ -1824,11 +1889,12 @@ namespace VASLogic.Models
                         pa.SetC_Payment_ID(payment.GetC_Payment_ID());
                         pa.SetC_Invoice_ID(req.C_Invoice_ID);
                         pa.SetC_InvoicePaySchedule_ID(planSchedId[i]);
-                        pa.SetAmount(alloc);
+                        pa.SetAmount(inv.IsReturnTrx() ? decimal.Negate(alloc) : alloc);
+                        pa.SetDiscountAmt(inv.IsReturnTrx() ? decimal.Negate(disc) : disc);
                         pa.SetInvoiceAmt(due);
-                        // When this schedule is only partly covered, record the shortfall so
-                        // Amount + OverUnderAmt = InvoiceAmt stays balanced (0 when fully paid).
-                        pa.SetOverUnderAmt(due - alloc);
+                        // Keep Amount + Discount + OverUnderAmt = InvoiceAmt balanced
+                        // (OverUnderAmt = the shortfall, 0 when the schedule is fully settled).
+                        pa.SetOverUnderAmt(inv.IsReturnTrx() ? decimal.Negate(due - alloc - disc) : (due - alloc - disc));
                         if (!pa.Save(trx))
                         {
                             result.Message = RetrieveErr(ctx, "VAS_065_PaymentSaveFailed");
@@ -1839,12 +1905,21 @@ namespace VASLogic.Models
                 }
 
                 bool processed;
-                try { processed = payment.ProcessIt(MPayment.DOCACTION_Complete); }
-                catch (Exception pex) { processed = false; result.Message = pex.Message; }
+                try
+                {
+                    processed = payment.ProcessIt(MPayment.DOCACTION_Complete);
+                }
+                catch (Exception pex)
+                {
+                    processed = false;
+                    result.Message = pex.Message;
+                }
                 if (!processed)
                 {
                     if (string.IsNullOrEmpty(result.Message))
+                    {
                         result.Message = RetrieveErr(ctx, "VAS_065_PaymentCompleteFailed");
+                    }
                     trx.Rollback();
                     return result;
                 }
@@ -1858,14 +1933,33 @@ namespace VASLogic.Models
             }
             catch (Exception ex)
             {
-                try { if (trx != null) trx.Rollback(); } catch { /* ignore */ }
+                try
+                {
+                    if (trx != null)
+                    {
+                        trx.Rollback();
+                    }
+                }
+                catch
+                { /* ignore */
+                }
                 result.Message = ex.Message;
             }
             finally
             {
                 // trx was started -> it must be closed and nulled before returning
                 // (runs on every exit path, including the early validation returns).
-                if (trx != null) { try { trx.Close(); } catch { /* ignore */ } trx = null; }
+                if (trx != null)
+                {
+                    try
+                    {
+                        trx.Close();
+                    }
+                    catch
+                    { /* ignore */
+                    }
+                    trx = null;
+                }
             }
             return result;
         }
@@ -1989,33 +2083,38 @@ namespace VASLogic.Models
         private bool CreateCreditAllocLines(Ctx ctx, MAllocationHdr hdr, MInvoice inv, AllocationSource src,
             decimal amount, int C_InvoicePaySchedule_ID, Trx trx, AllocationResult result)
         {
-            if (src.SourceType == "PAYMENT")
+            //if (src.SourceType == "PAYMENT")
+            //{
+            // On-account payment -> invoice: a single line carrying the positive applied
+            // amount with both the invoice and payment references. The posting derives
+            // DR/CR from those references, so the amount is NOT negated (matches the
+            // payment->invoice line in PaymentAllocation.SavePaymentData).
+            MAllocationLine line = new MAllocationLine(hdr, inv.IsReturnTrx() ? amount : decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
+            line.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
+            line.SetPaymentInfo(src.Id, 0);
+            if (C_InvoicePaySchedule_ID > 0) line.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
+            if (!line.Save(trx))
             {
-                // On-account payment -> invoice: a single line carrying the positive applied
-                // amount with both the invoice and payment references. The posting derives
-                // DR/CR from those references, so the amount is NOT negated (matches the
-                // payment->invoice line in PaymentAllocation.SavePaymentData).
-                MAllocationLine line = new MAllocationLine(hdr, decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
-                line.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
-                line.SetPaymentInfo(src.Id, 0);
-                if (C_InvoicePaySchedule_ID > 0) line.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
-                if (!line.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+                result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed");
+                trx.Rollback();
+                return false;
             }
-            else // CREDITNOTE -> balanced invoice-to-invoice pair (invoice +, credit note -)
-            {
-                // Credit note -> invoice is an invoice-to-invoice settlement: the two lines
-                // must cross-reference each other via Ref_C_Invoice_ID (as SavePaymentData
-                // does), otherwise the allocation is not tracked/posted as a paired netting.
-                MAllocationLine inLine = new MAllocationLine(hdr, amount, Env.ZERO, Env.ZERO, Env.ZERO);
-                inLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
-                inLine.SetPaymentInfo(src.Id, 0);
-                if (C_InvoicePaySchedule_ID > 0) inLine.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
-                if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+            //}
+            //else // CREDITNOTE -> balanced invoice-to-invoice pair (invoice +, credit note -)
+            //{
+            //    // Credit note -> invoice is an invoice-to-invoice settlement: the two lines
+            //    // must cross-reference each other via Ref_C_Invoice_ID (as SavePaymentData
+            //    // does), otherwise the allocation is not tracked/posted as a paired netting.
+            //    MAllocationLine inLine = new MAllocationLine(hdr, amount, Env.ZERO, Env.ZERO, Env.ZERO);
+            //    inLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
+            //    inLine.SetPaymentInfo(src.Id, 0);
+            //    if (C_InvoicePaySchedule_ID > 0) inLine.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
+            //    if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
 
-                //MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
-                //cnLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, src.Id);
-                //if (!cnLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
-            }
+            //    //MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
+            //    //cnLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, src.Id);
+            //    //if (!cnLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+            //}
             return true;
         }
 
@@ -2102,6 +2201,7 @@ namespace VASLogic.Models
             public string BPCountry { get; set; }
             public string BPPostal { get; set; }
             public int C_Currency_ID { get; set; }
+            public int C_ConversionType_ID { get; set; }
             public string CurISO { get; set; }
             public string CurSymbol { get; set; }
             public string AcctCurISO { get; set; }
@@ -2198,6 +2298,8 @@ namespace VASLogic.Models
             public string ReceiptDocumentNo { get; set; }
             public string OrderDocumentNo { get; set; }
             public DateTime? ReceivedDate { get; set; }
+            // Distinct received dates across the matched lines (comma-separated in the UI).
+            public List<DateTime> ReceivedDates { get; set; }
             public decimal TotalReceived { get; set; }
             public string WarehouseName { get; set; }
             public decimal PriceVariance { get; set; }
@@ -2392,6 +2494,8 @@ namespace VASLogic.Models
             public DateTime? DateTrx { get; set; }
             public decimal DiscountAmt { get; set; }
             public string ReferenceNo { get; set; }
+            // Cheque date - mandatory (with ReferenceNo) when the payment method is a cheque.
+            public DateTime? CheckDate { get; set; }
         }
 
         public class AllocationResult
