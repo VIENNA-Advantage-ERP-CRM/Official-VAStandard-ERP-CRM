@@ -50,6 +50,32 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>Converts the invoice open amount into the selected bank account's currency.</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult ConvertOpenAmount(int C_Invoice_ID, int C_Currency_ID, int C_ConversionType_ID, decimal Amount, string Date)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                System.DateTime parsedDate;
+                var req = new VAS_065_APInvoicePanelModel.ConvertAmountRequest
+                {
+                    C_Invoice_ID = C_Invoice_ID,
+                    C_Currency_ID = C_Currency_ID,
+                    C_ConversionType_ID = C_ConversionType_ID,
+                    Amount = Amount,
+                    Date = System.DateTime.TryParse(Date, System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out parsedDate)
+                        ? (System.DateTime?)parsedDate : null
+                };
+                VAS_065_APInvoicePanelModel model = new VAS_065_APInvoicePanelModel();
+                retJSON = JsonConvert.SerializeObject(model.ConvertOpenAmount(ctx, req));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Applies the selected on-account payments / vendor credit notes to the invoice.</summary>
         [HttpPost]
         [AjaxAuthorizeAttribute]

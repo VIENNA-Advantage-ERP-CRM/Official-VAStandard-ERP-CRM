@@ -81,6 +81,13 @@
             } catch (e) { return d.toDateString(); }
         }
 
+        /* Normalises a date value to its yyyy-mm-dd portion for equality comparison. */
+        function acctKey(value) {
+            if (!value) return "";
+            var s = (value instanceof Date) ? value.toISOString() : String(value);
+            return s.slice(0, 10);
+        }
+
         /* Whole-day difference between a date and today (positive = future, negative = past). */
         function dayDelta(value) {
             if (!value) return 0;
@@ -960,6 +967,41 @@
             });
         }
 
+        // Toggle the modal-scoped busy overlay (created in renderModal).
+        function showModalBusy(show) {
+            if (!$scrim) return;
+            $scrim.find(".vas-apinv-m-busy").toggleClass("show", !!show);
+        }
+
+        // Re-fetch the modal meta and rebuild the modal so it reflects the new state
+        // (reduced open balance, consumed credits) after an allocation is created and
+        // completed. The busy overlay stays up until renderModal swaps in the fresh modal.
+        // When allocDocNo is given, a success confirmation carrying the allocation
+        // document (record) number is shown once the refreshed modal is in place.
+        function refreshPaymentModal(allocDocNo) {
+            if (!data || !data.C_Invoice_ID) return;
+            showModalBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetPaymentModalMeta",
+                type: "GET",
+                dataType: "json",
+                data: { C_Invoice_ID: $self.record_ID },
+                success: function (raw) {
+                    meta = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (!meta || !meta.C_BPartner_ID) {
+                        showModalBusy(false);
+                        info(lbl("VAS_065_LoadFailed", "Could not load the requested information."));
+                        return;
+                    }
+                    renderModal();   // rebuilds the scrim/modal fresh (clears the busy overlay)
+                    if (allocDocNo) {
+                        info(lbl("VAS_065_AllocationCreatedNo", "Allocation document {0} created successfully.").replace("{0}", allocDocNo));
+                    }
+                },
+                error: function (err) { showModalBusy(false); console.log(err); info(lbl("VAS_065_LoadFailed", "Could not load the requested information.")); }
+            });
+        }
+
         function renderModal() {
             removeModal();
             var isCN = meta.RecordMode === "AP_CREDIT_NOTE_ALLOCATION";
@@ -1010,6 +1052,11 @@
             // Success view (hidden initially)
             $modal.append(buildSuccessView());
 
+            // Modal-scoped busy overlay (shown while an allocation is created/completed).
+            // The scrim is at body level above the panel, so the panel busy indicator
+            // cannot cover it - this overlay sits inside the modal instead.
+            $modal.append('<div class="vas-apinv-m-busy" aria-hidden="true"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+
             $("body").append($scrim);
             // Force reflow then open for the transition.
             void $scrim[0].offsetWidth;
@@ -1037,6 +1084,108 @@
             var invOpen = +meta.NetOpenAmount || +meta.NetPayable || 0;
 
             var state = { applied: 0, allocationCreated: false, selected: {} };
+            var CREDITS_PER_PAGE = 5;
+            var creditPage = 0;
+            var $creditRows = null, $creditFoot = null;
+
+            // Selection is tracked in the state model (keyed by source) so it survives
+            // paging - only the current page of rows lives in the DOM at any time.
+            function creditKey(r) { return r.SourceType + ":" + r.Id; }
+            function isCreditSelected(r) { return !!state.selected[creditKey(r)]; }
+            function selectedCreditRows() { return allRows.filter(isCreditSelected); }
+
+            // Renders the current page of credit rows (and the pager when > 5 rows).
+            function renderCreditRows() {
+                if (!$creditRows) return;
+                $creditRows.empty();
+                var total = allRows.length;
+                var paged = total > CREDITS_PER_PAGE;
+                var start = paged ? creditPage * CREDITS_PER_PAGE : 0;
+                var end = paged ? Math.min(start + CREDITS_PER_PAGE, total) : total;
+
+                for (var i = start; i < end; i++) {
+                    (function (r) {
+                        var selected = isCreditSelected(r);
+                        var $row = $('<div class="vas-apinv-credit-row"></div>');
+                        if (selected) $row.addClass("on");
+                        if (selected && state.allocationCreated) $row.addClass("locked");
+                        $row.append('<span class="chk"><i class="fa fa-check"></i></span>');
+                        var label = (r.SourceType === "PAYMENT"
+                            ? lbl("VAS_065_OnAccountPayment", "On-account payment - {0}")
+                            : lbl("VAS_065_VendorCreditNote", "Vendor credit note - {0}")).replace("{0}", r.DocumentNo || "");
+                        var $cl = $('<div class="cl"></div>');
+                        $cl.append($('<div class="a"></div>').text(label));
+                        $cl.append($('<div class="b"></div>').text(fmtDate(r.Date)));
+                        $row.append($cl);
+                        // Primary amount in the source's own (payment) currency; when that
+                        // differs from the invoice currency also show the invoice-currency
+                        // equivalent (current date, AvailableAmountInv = 0 when no rate).
+                        var rSym = r.CurSymbol || cur;
+                        var rPrec = (r.StdPrecision >= 0) ? r.StdPrecision : p;
+                        var $amt = $('<div class="amt"></div>');
+                        $amt.append($('<div class="av"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec)));
+                        if (r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID) {
+                            $amt.append($('<div class="av-conv"></div>').text("≈ " + fmtAmountCur(r.AvailableAmountInv, cur, p)));
+                        }
+                        $amt.append($('<div class="ap"></div>').text(selected && state.allocationCreated
+                            ? lbl("VAS_065_Allocated", "Allocated") : lbl("Selected")));
+                        $row.append($amt);
+                        $row.on("click", function () {
+                            if (state.allocationCreated) return;
+                            if (!isCreditSelected(r)) {
+                                // Single-currency rule: only sources sharing the currency of
+                                // the already-selected rows can be added at one time. When the
+                                // source currency differs from the invoice currency, all
+                                // selected sources must also share one accounting date AND one
+                                // conversion type (one conversion basis per allocation).
+                                var curConflict = false, dateConflict = false, convConflict = false;
+                                var crossCur = r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID;
+                                selectedCreditRows().forEach(function (other) {
+                                    if (other.C_Currency_ID !== r.C_Currency_ID) curConflict = true;
+                                    if (crossCur && acctKey(other.DateAcct) !== acctKey(r.DateAcct)) dateConflict = true;
+                                    if (crossCur && (other.C_ConversionType_ID || 0) !== (r.C_ConversionType_ID || 0)) convConflict = true;
+                                });
+                                if (curConflict) {
+                                    info(lbl("VAS_065_SingleCurrencyOnly", "Only payments or credits of a single currency can be selected at a time."));
+                                    return;
+                                }
+                                if (dateConflict) {
+                                    info(lbl("VAS_065_SameAcctDateOnly", "For a different currency, only payments with the same accounting date can be selected together."));
+                                    return;
+                                }
+                                if (convConflict) {
+                                    info(lbl("VAS_065_SameConvTypeOnly", "For a different currency, only payments with the same conversion type can be selected together."));
+                                    return;
+                                }
+                                state.selected[creditKey(r)] = true;
+                            } else {
+                                delete state.selected[creditKey(r)];
+                            }
+                            renderCreditRows();
+                            updateCreditSummary();
+                            recompute();
+                        });
+                        $creditRows.append($row);
+                    })(allRows[i]);
+                }
+
+                if (paged) {
+                    $creditFoot.empty().show();
+                    var pageCount = Math.ceil(total / CREDITS_PER_PAGE);
+                    $creditFoot.append($('<span></span>').text(
+                        lbl("VAS_065_Showing", "Showing {0} of {1}")
+                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
+                    var $nav = $('<span class="vas-apinv-pager"></span>');
+                    var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
+                    var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
+                    $prev.prop("disabled", creditPage <= 0).on("click", function () { if (creditPage > 0) { creditPage--; renderCreditRows(); } });
+                    $next.prop("disabled", creditPage >= pageCount - 1).on("click", function () { if (creditPage < pageCount - 1) { creditPage++; renderCreditRows(); } });
+                    $nav.append($prev).append($next);
+                    $creditFoot.append($nav);
+                } else {
+                    $creditFoot.hide();
+                }
+            }
 
             // Apply on-account & credits
             if (allRows.length) {
@@ -1045,29 +1194,10 @@
                     .append($('<span class="t"></span>').text(lbl("VAS_065_ApplyOnAccountCredits", "Apply on-account & credits")))
                     .append($('<span class="hint"></span>').text(lbl("VAS_065_UseTheseFirst", "Use these first - no new cash"))));
 
-                allRows.forEach(function (r, idx) {
-                    var $row = $('<div class="vas-apinv-credit-row"></div>');
-                    $row.append('<span class="chk"><i class="fa fa-check"></i></span>');
-                    var label = (r.SourceType === "PAYMENT"
-                        ? lbl("VAS_065_OnAccountPayment", "On-account payment - {0}")
-                        : lbl("VAS_065_VendorCreditNote", "Vendor credit note - {0}")).replace("{0}", r.DocumentNo || "");
-                    var $cl = $('<div class="cl"></div>');
-                    $cl.append($('<div class="a"></div>').text(label));
-                    $cl.append($('<div class="b"></div>').text(fmtDate(r.Date)));
-                    $row.append($cl);
-                    var $amt = $('<div class="amt"></div>');
-                    $amt.append($('<div class="av"></div>').text(fmtAmountCur(r.AvailableAmount, cur, p)));
-                    $amt.append($('<div class="ap"></div>').text(lbl("Selected")));
-                    $row.append($amt);
-                    $row.data("src", r);
-                    $row.on("click", function () {
-                        if (state.allocationCreated || $row.hasClass("locked")) return;
-                        $row.toggleClass("on");
-                        updateCreditSummary();
-                        recompute();
-                    });
-                    $sec.append($row);
-                });
+                $creditRows = $('<div class="js-credit-rows"></div>');
+                $creditFoot = $('<div class="vas-apinv-block-foot js-credit-foot" style="display:none;"></div>');
+                $sec.append($creditRows).append($creditFoot);
+                renderCreditRows();
 
                 var $actions = $('<div class="vas-apinv-credit-actions"></div>');
                 var $summary = $('<span class="summary js-credit-summary"></span>').text(lbl("VAS_065_SelectCreditsHint", "Select available payments or credits to allocate before recording a new payment."));
@@ -1092,21 +1222,39 @@
                 '</span><input class="js-pay-amt" type="text" inputmode="decimal" /></div>');
             var $dateField = field(lbl("VAS_065_PaymentDate", "Payment date"), '<div class="control"><input class="js-pay-date" type="date" /></div>');
             var $methodSel = $('<select class="js-pay-method"></select>');
+            // Empty placeholder so nothing is selected by default.
+            $methodSel.append($('<option></option>').val("").text(lbl("VAS_065_SelectOption", "Select")));
             (meta.PaymentMethods || []).forEach(function (m) {
                 $methodSel.append($('<option></option>').val(m.VA009_PaymentMethod_ID).text(m.Name));
             });
             var $methodField = field(lbl("PaymentMethod"), $('<div class="control sel"></div>').append($methodSel));
             var $bankSel = $('<select class="js-pay-bank"></select>');
+            // Empty placeholder so nothing is selected by default.
+            $bankSel.append($('<option></option>').val("").text(lbl("VAS_065_SelectOption", "Select")));
             (meta.BankAccounts || []).forEach(function (b) {
                 var t = (b.BankName || "") + (b.AccountNo ? " · ****" + b.AccountNo.slice(-4) : "") + (b.CurrencyISO ? " . " + b.CurrencyISO : "");
                 $bankSel.append($('<option></option>').val(b.C_BankAccount_ID).text(t));
             });
             var $bankField = field(lbl("VAS_065_BankAccount", "Bank account"), $('<div class="control sel"></div>').append($bankSel));
+            // Currency selector (My Currency only) - defaults to the invoice currency.
+            var $currencySel = $('<select class="js-pay-currency"></select>');
+            (meta.Currencies || []).forEach(function (c) {
+                $currencySel.append($('<option></option>').val(c.C_Currency_ID).text(c.ISO_Code || c.CurSymbol));
+            });
+            $currencySel.val(meta.C_Currency_ID);
+            var $currencyField = field(lbl("Currency"), $('<div class="control sel"></div>').append($currencySel));
+            // Conversion type selector - defaults to the invoice conversion type (else default).
+            var $convTypeSel = $('<select class="js-pay-convtype"></select>');
+            (meta.ConversionTypes || []).forEach(function (t) {
+                $convTypeSel.append($('<option></option>').val(t.C_ConversionType_ID).text(t.Name));
+            });
+            if (meta.C_ConversionType_ID) $convTypeSel.val(meta.C_ConversionType_ID);
+            var $convTypeField = field(lbl("VAS_065_ConversionType", "Conversion type"), $('<div class="control sel"></div>').append($convTypeSel));
             var $discField = field(lbl("VAS_065_CashDiscount", "Cash discount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
                 '</span><input class="js-pay-disc" type="text" inputmode="decimal" value="0.00" /></div>');
             var $refField = field(lbl("VAS_Reference"), '<div class="control"><input class="js-pay-ref" type="text" /></div>');
 
-            $grid.append($amtField).append($dateField).append($methodField).append($bankField).append($discField).append($refField);
+            $grid.append($amtField).append($currencyField).append($convTypeField).append($dateField).append($methodField).append($bankField).append($discField).append($refField);
             $pay.append($grid);
             $bodyM.append($pay);
 
@@ -1115,7 +1263,6 @@
                 '<div class="vas-apinv-settle">' +
                 '<div class="srow"><span class="k js-sk1"></span><span class="v js-sv1"></span></div>' +
                 '<div class="srow js-wh-row"><span class="k js-sk2"></span><span class="v js-sv2"></span></div>' +
-                '<div class="srow"><span class="k js-sk3"></span><span class="v green js-credit"></span></div>' +
                 '<div class="srow"><span class="k js-sk4"></span><span class="v js-pay"></span></div>' +
                 '<div class="srow"><span class="k js-sk5"></span><span class="v js-disc"></span></div>' +
                 '<div class="srow tot"><span class="k js-sk6"></span><span class="v js-settle"></span></div>' +
@@ -1129,7 +1276,6 @@
             $settle.find(".js-sk2").text(lbl("VAS_065_LessWithholding", "Less withholding"));
             $settle.find(".js-sv2").text(fmtAmountCur(meta.Withholding, cur, p));
             if (!(+meta.Withholding > 0)) $settle.find(".js-wh-row").hide();
-            $settle.find(".js-sk3").text(lbl("VAS_065_CreditOnAccountApplied", "Credit / on-account applied"));
             $settle.find(".js-sk4").text(lbl("VAS_065_NewPayment", "New payment"));
             $settle.find(".js-sk5").text(lbl("VAS_065_CashDiscount", "Cash discount"));
             $settle.find(".js-sk6").text(lbl("VAS_065_SettlingThisInvoice", "Settling this invoice"));
@@ -1141,15 +1287,103 @@
             var $payAmt = $bodyM.find(".js-pay-amt");
             var $payDisc = $bodyM.find(".js-pay-disc");
             $bodyM.find(".js-pay-date").val(new Date().toISOString().slice(0, 10));
-            $payAmt.val((invOpen).toFixed(p));
+
+            // Payment currency context. The payment is settled in the bank-account
+            // currency: initially the invoice currency, but once a bank account with a
+            // different currency is selected (or the payment date changes) the open
+            // amount is converted and the field's symbol / precision follow that
+            // currency. `rate` is the invoice -> payment multiply rate (1 when same).
+            // This object is mutated in place so closures keep a live reference.
+            var payCtx = { curId: meta.C_Currency_ID, sym: cur, prec: p, rate: 1, noRate: false };
 
             function parseNum(s) { var n = parseFloat(String(s).replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; }
+            function roundTo(v, prec) { var f = Math.pow(10, prec >= 0 ? prec : 0); return Math.round((+v || 0) * f) / f; }
+
+            // Open amount still to settle (invoice currency) after any applied credits.
+            function invRemaining() { return Math.max(0, invOpen - state.applied); }
+            // The same, expressed in the current payment currency.
+            function payRemaining() { return roundTo(invRemaining() * payCtx.rate, payCtx.prec); }
+            function payTotalBase() { return roundTo(invOpen * payCtx.rate, payCtx.prec); }
+
+            function selectedBank() {
+                var id = parseInt($bankSel.val(), 10) || 0;
+                var list = meta.BankAccounts || [];
+                for (var i = 0; i < list.length; i++) if (list[i].C_BankAccount_ID === id) return list[i];
+                return null;
+            }
+            function selectedCurrencyId() { return parseInt($currencySel.val(), 10) || meta.C_Currency_ID; }
+            function selectedConvTypeId() { return parseInt($convTypeSel.val(), 10) || 0; }
+            function currencyOption(id) {
+                var list = meta.Currencies || [];
+                for (var i = 0; i < list.length; i++) if (list[i].C_Currency_ID === id) return list[i];
+                return null;
+            }
+
+            // Reflect the payment-currency symbol/precision in the amount + discount
+            // fields and reset the amount to the (converted) open balance.
+            function syncPayUI(resetAmount) {
+                $payAmt.closest(".control").find(".pfx").text(payCtx.sym);
+                $payDisc.closest(".control").find(".pfx").text(payCtx.sym);
+                if (resetAmount) $payAmt.val(payRemaining().toFixed(payCtx.prec));
+            }
+
+            // Resolve the payment currency from the selected currency + conversion type and
+            // (when it differs from the invoice currency) convert the open amount via the
+            // server on the chosen payment date.
+            function applyPaymentCurrency(forceReset) {
+                var curId = selectedCurrencyId();
+                if (curId === meta.C_Currency_ID) {
+                    // Invoice currency: no conversion needed. Reset the amount only when the
+                    // basis actually changed (currency/bank selection), not on a same-currency
+                    // date / conversion-type change.
+                    payCtx.curId = meta.C_Currency_ID; payCtx.sym = cur; payCtx.prec = p; payCtx.rate = 1; payCtx.noRate = false;
+                    syncPayUI(!!forceReset);
+                    recompute();
+                    return;
+                }
+                var opt = currencyOption(curId);
+                var payDate = $bodyM.find(".js-pay-date").val();
+                showBusy(true);
+                $.ajax({
+                    url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/ConvertOpenAmount",
+                    type: "GET",
+                    dataType: "json",
+                    data: { C_Invoice_ID: $self.record_ID, C_Currency_ID: curId, C_ConversionType_ID: selectedConvTypeId(), Amount: invRemaining(), Date: payDate },
+                    success: function (raw) {
+                        showBusy(false);
+                        var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                        if (resp && resp.Success) {
+                            payCtx.curId = resp.C_Currency_ID;
+                            payCtx.sym = resp.CurSymbol || (opt && opt.CurSymbol) || cur;
+                            payCtx.prec = (resp.StdPrecision >= 0) ? resp.StdPrecision : p;
+                            payCtx.rate = (resp.Rate > 0) ? resp.Rate : 1;
+                            payCtx.noRate = false;
+                            syncPayUI(true);
+                            recompute();
+                        } else {
+                            // No conversion rate: keep the selected currency but set the amount
+                            // to ZERO (cannot record without a rate).
+                            payCtx.curId = (resp && resp.C_Currency_ID) ? resp.C_Currency_ID : curId;
+                            payCtx.sym = (resp && resp.CurSymbol) || (opt && opt.CurSymbol) || cur;
+                            payCtx.prec = (resp && resp.StdPrecision >= 0) ? resp.StdPrecision : (opt && opt.StdPrecision >= 0 ? opt.StdPrecision : p);
+                            payCtx.rate = 0;
+                            payCtx.noRate = true;
+                            syncPayUI(false);
+                            $payAmt.val((0).toFixed(payCtx.prec));
+                            recompute();
+                            error((resp && resp.Message) || lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency."));
+                        }
+                    },
+                    error: function (xhr) { showBusy(false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
+                });
+            }
 
             function selectedCreditAmount() {
+                // Worked entirely in the invoice currency (AvailableAmountInv), over the
+                // state-model selection (so off-page selections still count).
                 var remaining = invOpen, total = 0;
-                $bodyM.find(".vas-apinv-credit-row.on").each(function () {
-                    var r = $(this).data("src");
-                    var use = Math.min(+r.AvailableAmount, remaining);
+                selectedCreditRows().forEach(function (r) {
+                    var use = Math.min(+r.AvailableAmountInv, remaining);
                     if (use > 0) { total += use; remaining -= use; }
                 });
                 return total;
@@ -1171,51 +1405,61 @@
             }
 
             function recompute() {
-                var credit = state.applied;
+                // All settlement figures are shown in the payment (bank) currency.
+                var rate = payCtx.rate, prec = payCtx.prec, sym = payCtx.sym;
+                var creditPay = roundTo(state.applied * rate, prec);
+                var totalBase = payTotalBase();
                 var disc = parseNum($payDisc.val());
                 var pay = parseNum($payAmt.val());
-                var settle = Math.min(credit + pay + disc, invOpen);
-                var over = Math.max(0, (credit + pay + disc) - invOpen);
-                var remain = Math.max(0, invOpen - credit - pay - disc);
+                var settle = Math.min(creditPay + pay + disc, totalBase);
+                var over = Math.max(0, (creditPay + pay + disc) - totalBase);
+                var remain = Math.max(0, totalBase - creditPay - pay - disc);
                 // Applied amount (credits + new payment + discount) may not exceed the
                 // open invoice due amount; overpayment is blocked rather than advanced.
                 var exceedsOpen = over > 1e-6;
 
-                $settle.find(".js-credit").text(fmtAmountCur(credit, cur, p));
-                $settle.find(".js-pay").text(fmtAmountCur(pay, cur, p));
-                $settle.find(".js-disc").text(fmtAmountCur(disc, cur, p));
-                $settle.find(".js-settle").text(fmtAmountCur(settle, cur, p));
-                $settle.find(".js-remain").text(fmtAmountCur(remain, cur, p));
-                $settle.find(".js-bar").css("width", Math.min(100, (settle / (invOpen || 1)) * 100) + "%");
+                $settle.find(".js-sv1").text(fmtAmountCur(meta.GrossInvoice * rate, sym, prec));
+                $settle.find(".js-sv2").text(fmtAmountCur(meta.Withholding * rate, sym, prec));
+                $settle.find(".js-pay").text(fmtAmountCur(pay, sym, prec));
+                $settle.find(".js-disc").text(fmtAmountCur(disc, sym, prec));
+                $settle.find(".js-settle").text(fmtAmountCur(settle, sym, prec));
+                $settle.find(".js-remain").text(fmtAmountCur(remain, sym, prec));
+                $settle.find(".js-bar").css("width", Math.min(100, (settle / (totalBase || 1)) * 100) + "%");
 
-                $payAmt.closest(".control").toggleClass("invalid", exceedsOpen);
+                // No conversion rate for the selected bank currency blocks recording.
+                var noRate = !!payCtx.noRate;
+                $payAmt.closest(".control").toggleClass("invalid", exceedsOpen || noRate);
                 $settle.find(".js-over")
-                    .text(lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount"))
-                    .toggleClass("err show", exceedsOpen);
+                    .text(noRate
+                        ? lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency.")
+                        : lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount"))
+                    .toggleClass("err show", exceedsOpen || noRate);
 
                 var $submit = $scrim.find(".js-submit");
-                $submit.prop("disabled", exceedsOpen)
-                    .text(pay <= 0 && credit > 0 ? lbl("VAS_065_CompleteSettlement", "Complete settlement") : lbl("VAS_065_RecordPayment", "Record payment"));
+                $submit.prop("disabled", exceedsOpen || noRate)
+                    .text(pay <= 0 && creditPay > 0 ? lbl("VAS_065_CompleteSettlement", "Complete settlement") : lbl("VAS_065_RecordPayment", "Record payment"));
 
                 var $foot = $scrim.find(".js-foot-msg");
-                if (exceedsOpen) { $foot.text(lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount")); }
+                if (noRate) { $foot.text(lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency.")); }
+                else if (exceedsOpen) { $foot.text(lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount")); }
                 else if (remain <= 1e-6) { $foot.text(lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")); }
-                else { $foot.text(lbl("VAS_065_WillRemainOpen", "{0} will remain open").replace("{0}", fmtAmountCur(remain, cur, p))); }
+                else { $foot.text(lbl("VAS_065_WillRemainOpen", "{0} will remain open").replace("{0}", fmtAmountCur(remain, sym, prec))); }
             }
 
             function applySelectedCredits() {
                 var sel = selectedCreditAmount();
                 if (sel <= 0 || state.allocationCreated) return;
 
+                // Sources carry their FULL available amount in the source (payment) currency;
+                // the server caps them against the invoice open (converted to that currency)
+                // so the source amount is never converted twice.
                 var sources = [];
-                var remaining = invOpen;
-                $bodyM.find(".vas-apinv-credit-row.on").each(function () {
-                    var r = $(this).data("src");
-                    var use = Math.min(+r.AvailableAmount, remaining);
-                    if (use > 0) { sources.push({ SourceType: r.SourceType, Id: r.Id, Amount: use }); remaining -= use; }
+                selectedCreditRows().forEach(function (r) {
+                    if (+r.AvailableAmount > 0) sources.push({ SourceType: r.SourceType, Id: r.Id, Amount: +r.AvailableAmount });
                 });
 
                 var $btn = $bodyM.find(".js-apply-credits").prop("disabled", true);
+                showModalBusy(true);   // busy indicator while the allocation document is created
                 $.ajax({
                     url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/ApplyCredits",
                     type: "POST",
@@ -1224,20 +1468,18 @@
                     success: function (raw) {
                         var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                         if (resp && resp.Success) {
-                            state.applied = +resp.AppliedAmount || sel;
-                            state.allocationCreated = true;
-                            $bodyM.find(".vas-apinv-credit-row.on").addClass("locked")
-                                .find(".ap").text(lbl("VAS_065_Allocated", "Allocated"));
-                            $bodyM.find(".js-alloc-status").addClass("show");
-                            $payAmt.val((Math.max(0, invOpen - state.applied)).toFixed(p));
-                            updateCreditSummary();
-                            recompute();
+                            // Allocation created & completed -> refresh the modal with fresh
+                            // server state (open balance, remaining credits) and confirm with
+                            // the allocation document (record) number. The busy overlay stays
+                            // up until the rebuilt modal replaces it.
+                            refreshPaymentModal(resp.DocumentNo);
                         } else {
+                            showModalBusy(false);
                             $btn.prop("disabled", false);
                             error((resp && resp.Message) || lbl("VAS_065_ActionFailed", "The action could not be completed."));
                         }
                     },
-                    error: function (xhr) { $btn.prop("disabled", false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
+                    error: function (xhr) { showModalBusy(false); $btn.prop("disabled", false); console.log(xhr); error(lbl("VAS_065_ActionFailed", "The action could not be completed.")); }
                 });
             }
 
@@ -1245,10 +1487,24 @@
             $bodyM.data("updateCreditSummary", updateCreditSummary);
             $bodyM.data("recompute", recompute);
             $bodyM.data("applySelectedCredits", applySelectedCredits);
-            $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum }; });
+            $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum, payCtx: payCtx }; });
 
             $payAmt.on("input", recompute);
             $payDisc.on("input", recompute);
+            // Selecting a bank account sets the currency to the bank's currency, then
+            // converts. Changing the currency or the conversion type re-converts. Changing
+            // the payment date re-converts only when the currency differs from the invoice.
+            $bankSel.on("change", function () {
+                var bank = selectedBank();
+                if (bank && bank.C_Currency_ID) $currencySel.val(bank.C_Currency_ID);
+                applyPaymentCurrency(true);
+            });
+            $currencySel.on("change", function () { applyPaymentCurrency(true); });
+            $convTypeSel.on("change", function () { applyPaymentCurrency(true); });
+            $bodyM.find(".js-pay-date").on("change", function () { applyPaymentCurrency(false); });
+
+            // Initial state: invoice currency (case 5). Set the amount to the open balance.
+            $payAmt.val((invOpen).toFixed(p));
             updateCreditSummary();
             recompute();
 
@@ -1398,12 +1654,13 @@
             var getState = $bodyM.data("getPayState");
             if (!getState) return;
             var st = getState();
+            var payCtx = st.payCtx || { curId: meta.C_Currency_ID, sym: (meta.CurSymbol || meta.ISO_Code || ""), prec: (meta.StdPrecision >= 0 ? meta.StdPrecision : 2), rate: 1 };
             var pay = st.parseNum(st.payAmt.val());
             var disc = st.parseNum(st.payDisc.val());
 
             if (pay <= 0 && st.state.applied > 0) {
-                // Settlement is fully covered by the already-created allocation.
-                var p = meta.StdPrecision >= 0 ? meta.StdPrecision : 2;
+                // Settlement is fully covered by the already-created allocation (shown in
+                // the invoice currency - the allocation is in invoice currency).
                 var cur = meta.CurSymbol || meta.ISO_Code || "";
                 showSuccess(lbl("VAS_065_CreditApplied", "Credit applied"), lbl("VAS_065_CreditAppliedMsg", "The selected on-account payment and credit have been allocated to this invoice."), [
                     { k: lbl("VAS_065_AllocationCreated", "Allocation created"), v: fmtAmountCur(st.state.applied, cur, meta.StdPrecision) }
@@ -1411,19 +1668,36 @@
                 return;
             }
 
-            // Guard: applied credits + new payment + discount cannot exceed the open due.
-            var applied = +st.state.applied || 0;
-            if ((applied + pay + disc) - st.invOpen > 1e-6) {
+            // Payment method and bank account are mandatory before recording a payment.
+            var bankId = parseInt($bodyM.find(".js-pay-bank").val(), 10) || 0;
+            var methodId = parseInt($bodyM.find(".js-pay-method").val(), 10) || 0;
+            if (methodId <= 0) {
+                error(lbl("VAS_065_PaymentMethodRequired", "Please select a payment method."));
+                return;
+            }
+            if (bankId <= 0) {
+                error(lbl("VAS_065_BankAccountRequired", "Please select a bank account."));
+                return;
+            }
+
+            // Guard: applied credits + new payment + discount cannot exceed the open due
+            // (compared in the payment currency).
+            var rate = payCtx.rate || 1;
+            var totalBase = st.invOpen * rate;
+            var creditPay = (+st.state.applied || 0) * rate;
+            if ((creditPay + pay + disc) - totalBase > 1e-6) {
                 error(lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount"));
                 return;
             }
 
+            // Case 4: the payment is recorded in the bank-account currency.
             var payload = {
                 C_Invoice_ID: $self.record_ID,
                 PayAmt: pay,
-                C_Currency_ID: meta.C_Currency_ID,
-                C_BankAccount_ID: parseInt($bodyM.find(".js-pay-bank").val(), 10) || 0,
-                VA009_PaymentMethod_ID: parseInt($bodyM.find(".js-pay-method").val(), 10) || 0,
+                C_Currency_ID: payCtx.curId || meta.C_Currency_ID,
+                C_ConversionType_ID: parseInt($bodyM.find(".js-pay-convtype").val(), 10) || 0,
+                C_BankAccount_ID: bankId,
+                VA009_PaymentMethod_ID: methodId,
                 DateTrx: $bodyM.find(".js-pay-date").val(),
                 DiscountAmt: disc,
                 ReferenceNo: $bodyM.find(".js-pay-ref").val()
@@ -1437,10 +1711,10 @@
                 success: function (raw) {
                     var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (resp && resp.Success) {
-                        var cur = meta.CurSymbol || meta.ISO_Code || "";
+                        // The recorded payment is in the bank-account currency.
                         showSuccess(lbl("VAS_065_PaymentRecorded", "Payment recorded"),
                             lbl("VAS_065_PaymentRecordedMsg", "The payment {0} and allocation have been created against the net payable amount.").replace("{0}", resp.DocumentNo || ""),
-                            [{ k: lbl("VAS_065_NewPayment", "New payment"), v: fmtAmountCur(resp.PayAmt, cur, meta.StdPrecision) }]);
+                            [{ k: lbl("VAS_065_NewPayment", "New payment"), v: fmtAmountCur(resp.PayAmt, payCtx.sym, payCtx.prec) }]);
                     } else {
                         $submit.prop("disabled", false);
                         error((resp && resp.Message) || lbl("VAS_065_ActionFailed", "The action could not be completed."));
@@ -1476,7 +1750,8 @@
         function showSuccess(title, message, recapRows) {
             if (!$scrim) return;
             $scrim.find(".js-form").hide();
-            var $s = $scrim.find(".js-success").show();
+            // Use flex (not .show()'s display:block) so the success body can scroll.
+            var $s = $scrim.find(".js-success").css("display", "flex");
             $s.find(".js-ok-title").text(title);
             $s.find(".js-ok-msg").text(message);
             var $recap = $s.find(".js-ok-recap").empty();

@@ -230,9 +230,17 @@ namespace VASLogic.Models
         /// </summary>
         private decimal GetAllocatedAmount(int C_Invoice_ID)
         {
-            string sql = @"SELECT COALESCE(SUM(ABS(al.Amount)), 0)
+            // Allocation lines are stored in the allocation header currency, which may
+            // differ from the invoice currency (cross-currency apply). Convert each line
+            // amount to the invoice currency on the allocation accounting date, using the
+            // allocation conversion type and org, before summing.
+            string sql = @"SELECT COALESCE(SUM(ABS(
+                                 currencyConvert(al.Amount, ah.C_Currency_ID, i.C_Currency_ID,
+                                                 ah.DateAcct, i.C_ConversionType_ID,
+                                                 ah.AD_Client_ID, ah.AD_Org_ID))), 0)
                              FROM C_AllocationLine al
                              INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+                             INNER JOIN C_Invoice i ON (al.C_Invoice_ID = i.C_Invoice_ID)
                             WHERE al.C_Invoice_ID = @C_Invoice_ID
                               AND al.IsActive = 'Y'
                               AND ah.IsActive = 'Y'
@@ -754,18 +762,102 @@ namespace VASLogic.Models
             else
             {
                 meta.NetOpenAmount = head.OpenAmount;
-                meta.OnAccountPayments = LoadOnAccountPayments(ctx, head.AD_Client_ID, head.C_BPartner_ID);
+                meta.OnAccountPayments = LoadOnAccountPayments(ctx, head.AD_Client_ID, head.C_BPartner_ID, head.IsAPCreditNote);
                 meta.CreditNotes = LoadVendorCreditNotes(ctx, head.AD_Client_ID, head.C_BPartner_ID);
+                // "Available to apply" is shown in the invoice currency: convert each
+                // on-account payment / credit note to the invoice currency on the current
+                // date and sum the converted amounts.
                 decimal avail = 0;
                 foreach (AvailableCreditRow c in meta.OnAccountPayments)
-                    avail += c.AvailableAmount;
+                {
+                    ConvertRowToInvoiceCurrency(ctx, c, head);
+                    avail += c.AvailableAmountInv;
+                }
                 foreach (AvailableCreditRow c in meta.CreditNotes)
-                    avail += c.AvailableAmount;
+                {
+                    ConvertRowToInvoiceCurrency(ctx, c, head);
+                    avail += c.AvailableAmountInv;
+                }
                 meta.AvailableToApply = avail;
                 meta.BankAccounts = LoadBankAccounts(role);
                 meta.PaymentMethods = LoadPaymentMethods(role);
+                // Currency + conversion-type selectors on the modal.
+                meta.Currencies = LoadCurrencies(ctx, head.AD_Client_ID);
+                meta.ConversionTypes = LoadConversionTypes(ctx, head.AD_Client_ID);
+                meta.C_ConversionType_ID = Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT COALESCE(C_ConversionType_ID, 0) FROM C_Invoice WHERE C_Invoice_ID = @id",
+                    new SqlParameter[] { new SqlParameter("@id", C_Invoice_ID) }, null));
             }
             return meta;
+        }
+
+        /// <summary>Active currencies of the client (the "My Currency" list for the modal).</summary>
+        private List<CurrencyOption> LoadCurrencies(Ctx ctx, int AD_Client_ID)
+        {
+            List<CurrencyOption> list = new List<CurrencyOption>();
+            string sql = @"SELECT C_Currency_ID, ISO_Code, CurSymbol, StdPrecision
+                             FROM C_Currency
+                            WHERE IsActive = 'Y'
+                              AND AD_Client_ID IN (0, @AD_Client_ID)
+                            ORDER BY ISO_Code";
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@AD_Client_ID", AD_Client_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0) return list;
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                list.Add(new CurrencyOption
+                {
+                    C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]),
+                    ISO_Code = Util.GetValueOfString(r["ISO_Code"]),
+                    CurSymbol = Util.GetValueOfString(r["CurSymbol"]),
+                    StdPrecision = Util.GetValueOfInt(r["StdPrecision"])
+                });
+            }
+            return list;
+        }
+
+        /// <summary>Active conversion (rate) types of the client.</summary>
+        private List<ConversionTypeOption> LoadConversionTypes(Ctx ctx, int AD_Client_ID)
+        {
+            List<ConversionTypeOption> list = new List<ConversionTypeOption>();
+            string sql = @"SELECT C_ConversionType_ID, Name, COALESCE(IsDefault, 'N') AS IsDefault
+                             FROM C_ConversionType
+                            WHERE IsActive = 'Y'
+                              AND AD_Client_ID IN (0, @AD_Client_ID)
+                            ORDER BY IsDefault DESC, Name";
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@AD_Client_ID", AD_Client_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0) return list;
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                list.Add(new ConversionTypeOption
+                {
+                    C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]),
+                    Name = Util.GetValueOfString(r["Name"]),
+                    IsDefault = Util.GetValueOfString(r["IsDefault"]) == "Y"
+                });
+            }
+            return list;
+        }
+
+        /// <summary>
+        /// Sets <see cref="AvailableCreditRow.AvailableAmountInv"/> = the row's available
+        /// amount converted into the invoice currency on the current date (default
+        /// conversion type). When no conversion rate exists the converted amount is 0.
+        /// </summary>
+        private void ConvertRowToInvoiceCurrency(Ctx ctx, AvailableCreditRow row, APInvoicePanelData head)
+        {
+            if (row.C_Currency_ID <= 0 || row.C_Currency_ID == head.C_Currency_ID)
+            {
+                row.AvailableAmountInv = row.AvailableAmount;
+                return;
+            }
+            decimal rate = MConversionRate.GetRate(row.C_Currency_ID, head.C_Currency_ID, row.DateAcct, row.C_ConversionType_ID,
+                head.AD_Client_ID, row.AD_Org_ID);
+            row.AvailableAmountInv = (rate == 0)
+                ? 0m
+                : MConversionRate.Convert(ctx, row.AvailableAmount, row.C_Currency_ID, head.C_Currency_ID,
+                    row.DateAcct, row.C_ConversionType_ID, head.AD_Client_ID, row.AD_Org_ID);
         }
 
         /// <summary>Sum of open AP schedules for the vendor (outstanding position).</summary>
@@ -791,15 +883,24 @@ namespace VASLogic.Models
         }
 
         /// <summary>Available (unallocated) on-account vendor payments.</summary>
-        private List<AvailableCreditRow> LoadOnAccountPayments(Ctx ctx, int AD_Client_ID, int C_BPartner_ID)
+        private List<AvailableCreditRow> LoadOnAccountPayments(Ctx ctx, int AD_Client_ID, int C_BPartner_ID, bool IsCreditNote)
         {
             List<AvailableCreditRow> list = new List<AvailableCreditRow>();
             string sql = @"SELECT
+                              p.AD_Org_ID,
                               p.C_Payment_ID,
                               p.DocumentNo,
                               p.DateTrx,
-                              (ABS(COALESCE(p.PayAmt, 0)) - ABS(COALESCE(p.AllocatedAmt, 0))) AS AvailableAmount
+                              p.DateAcct,
+                              p.C_Currency_ID,
+                              p.C_ConversionType_ID,
+                              pcur.CurSymbol AS CurSymbol,
+                              pcur.ISO_Code  AS ISO_Code,
+                              pcur.StdPrecision AS StdPrecision,
+                              (ABS(COALESCE(p.vas_unallocatedamount, 0))) AS VAS_UnAllocatedAmount,
+                              ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) AS AvailableAmount
                            FROM C_Payment p
+                           INNER JOIN C_Currency pcur ON (p.C_Currency_ID = pcur.C_Currency_ID)
                            WHERE p.AD_Client_ID = @AD_Client_ID
                              AND p.C_BPartner_ID = @C_BPartner_ID
                              AND p.IsReceipt = 'N'
@@ -822,14 +923,30 @@ namespace VASLogic.Models
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 decimal avail = Util.GetValueOfDecimal(r["AvailableAmount"]);
-                if (avail <= 0) continue;
+                // for AP Payment < 0, AP Credit Note
+                if (avail > 0 && !IsCreditNote)
+                {
+                    continue;
+                }
+                // for AP Payment > 0, AP Invoive
+                else if (avail <= 0 && IsCreditNote)
+                {
+                    continue;
+                }
                 list.Add(new AvailableCreditRow
                 {
                     SourceType = "PAYMENT",
                     Id = Util.GetValueOfInt(r["C_Payment_ID"]),
                     DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                     Date = Util.GetValueOfDateTime(r["DateTrx"]),
-                    AvailableAmount = avail
+                    DateAcct = Util.GetValueOfDateTime(r["DateAcct"]),
+                    AvailableAmount = Math.Abs(avail),
+                    AD_Org_ID = Util.GetValueOfInt(r["AD_Org_ID"]),
+                    C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]),
+                    C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]),
+                    CurSymbol = Util.GetValueOfString(r["CurSymbol"]),
+                    ISO_Code = Util.GetValueOfString(r["ISO_Code"]),
+                    StdPrecision = Util.GetValueOfInt(r["StdPrecision"])
                 });
             }
             return list;
@@ -841,10 +958,18 @@ namespace VASLogic.Models
             List<AvailableCreditRow> list = new List<AvailableCreditRow>();
             string sql = @"SELECT
                               cn.C_Invoice_ID,
+                              cn.AD_Org_ID,
                               cn.DocumentNo,
                               cn.DateInvoiced,
+                              cn.DateAcct,
+                              cn.C_Currency_ID,
+                              cn.C_ConversionType_ID,
+                              cncur.CurSymbol AS CurSymbol,
+                              cncur.ISO_Code  AS ISO_Code,
+                              cncur.StdPrecision AS StdPrecision,
                               COALESCE(cn.GrandTotalAfterWithholding, cn.GrandTotal) AS CreditAmount
                            FROM C_Invoice cn
+                           INNER JOIN C_Currency cncur ON (cn.C_Currency_ID = cncur.C_Currency_ID)
                            WHERE cn.AD_Client_ID = @AD_Client_ID
                              AND cn.C_BPartner_ID = @C_BPartner_ID
                              AND cn.IsSOTrx = 'N'
@@ -873,7 +998,14 @@ namespace VASLogic.Models
                     Id = cnId,
                     DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
                     Date = Util.GetValueOfDateTime(r["DateInvoiced"]),
-                    AvailableAmount = credit
+                    DateAcct = Util.GetValueOfDateTime(r["DateAcct"]),
+                    AvailableAmount = credit,
+                    AD_Org_ID = Util.GetValueOfInt(r["AD_Org_ID"]),
+                    C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]),
+                    C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]),
+                    CurSymbol = Util.GetValueOfString(r["CurSymbol"]),
+                    ISO_Code = Util.GetValueOfString(r["ISO_Code"]),
+                    StdPrecision = Util.GetValueOfInt(r["StdPrecision"])
                 });
             }
             return list;
@@ -932,7 +1064,8 @@ namespace VASLogic.Models
         {
             List<BankAccountOption> list = new List<BankAccountOption>();
             string sql = @"SELECT ba.C_BankAccount_ID, ba.AccountNo, b.Name AS BankName,
-                                  ba.C_Currency_ID, cur.ISO_Code AS CurrencyISO, ba.IsDefault
+                                  ba.C_Currency_ID, cur.ISO_Code AS CurrencyISO,
+                                  cur.CurSymbol AS CurSymbol, cur.StdPrecision AS StdPrecision, ba.IsDefault
                              FROM C_BankAccount ba
                              INNER JOIN C_Bank b ON (ba.C_Bank_ID = b.C_Bank_ID)
                              INNER JOIN C_Currency cur ON (ba.C_Currency_ID = cur.C_Currency_ID)
@@ -949,7 +1082,10 @@ namespace VASLogic.Models
                     C_BankAccount_ID = Util.GetValueOfInt(r["C_BankAccount_ID"]),
                     BankName = Util.GetValueOfString(r["BankName"]),
                     AccountNo = Util.GetValueOfString(r["AccountNo"]),
+                    C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]),
                     CurrencyISO = Util.GetValueOfString(r["CurrencyISO"]),
+                    CurSymbol = Util.GetValueOfString(r["CurSymbol"]),
+                    StdPrecision = Util.GetValueOfInt(r["StdPrecision"]),
                     IsDefault = Util.GetValueOfString(r["IsDefault"]) == "Y"
                 });
             }
@@ -986,6 +1122,73 @@ namespace VASLogic.Models
             return list;
         }
 
+        /// <summary>
+        /// Converts an invoice open amount into a chosen target currency on a given
+        /// date using a chosen conversion type (both selected on the modal). Returns
+        /// the converted amount plus the target currency symbol / ISO / precision so
+        /// the modal can re-format the payment amount field. When the target currency
+        /// matches the invoice currency the amount is returned unchanged (rate = 1).
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="req">invoice, target currency, conversion type, amount (invoice currency) and date</param>
+        /// <returns>converted amount + target currency metadata</returns>
+        public ConvertAmountResult ConvertOpenAmount(Ctx ctx, ConvertAmountRequest req)
+        {
+            ConvertAmountResult res = new ConvertAmountResult();
+            if (req == null || req.C_Invoice_ID <= 0 || req.C_Currency_ID <= 0)
+            {
+                res.Message = Msg.GetMsg(ctx, "VAS_065_InvalidRequest");
+                return res;
+            }
+
+            // Invoice currency + client/org.
+            DataSet ds = DB.ExecuteDataset(
+                @"SELECT C_Currency_ID, AD_Client_ID, AD_Org_ID
+                    FROM C_Invoice WHERE C_Invoice_ID = @C_Invoice_ID",
+                new SqlParameter[] { new SqlParameter("@C_Invoice_ID", req.C_Invoice_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            {
+                res.Message = Msg.GetMsg(ctx, "VAS_065_InvoiceNotFound");
+                return res;
+            }
+            DataRow ir = ds.Tables[0].Rows[0];
+            int invCurrency = Util.GetValueOfInt(ir["C_Currency_ID"]);
+            int adClient = Util.GetValueOfInt(ir["AD_Client_ID"]);
+            int adOrg = Util.GetValueOfInt(ir["AD_Org_ID"]);
+
+            int targetCurrency = req.C_Currency_ID;
+            int convType = req.C_ConversionType_ID;   // 0 -> default conversion type
+
+            MCurrency targetCur = MCurrency.Get(ctx, targetCurrency);
+            res.C_Currency_ID = targetCurrency;
+            res.CurSymbol = targetCur.GetCurSymbol();
+            res.ISO_Code = targetCur.GetISO_Code();
+            res.StdPrecision = targetCur.GetStdPrecision();
+
+            DateTime convDate = req.Date ?? DateTime.Today;
+
+            if (targetCurrency == invCurrency)
+            {
+                res.IsSameCurrency = true;
+                res.Rate = 1m;
+                res.ConvertedAmount = req.Amount;
+                res.Success = true;
+                return res;
+            }
+
+            decimal rate = MConversionRate.GetRate(invCurrency, targetCurrency, convDate, convType, adClient, adOrg);
+            if (rate == 0)
+            {
+                res.Message = Msg.GetMsg(ctx, "VAS_065_NoConversionRate");
+                return res;
+            }
+            res.Rate = rate;
+            res.ConvertedAmount = MConversionRate.Convert(ctx, req.Amount, invCurrency, targetCurrency,
+                convDate, convType, adClient, adOrg);
+            res.Success = true;
+            return res;
+        }
+
         #endregion
 
         #region Write actions
@@ -1014,78 +1217,206 @@ namespace VASLogic.Models
                 if (inv.GetC_Invoice_ID() <= 0 || inv.IsSOTrx())
                 {
                     result.Message = Msg.GetMsg(ctx, "VAS_065_InvoiceNotFound");
+                    trx.Rollback();
+                    trx.Close();
+                    trx = null;
                     return result;
                 }
+
+                int invCurrency = inv.GetC_Currency_ID();
 
                 decimal open = Math.Abs(inv.GetGrandTotal(false)) - GetAllocatedAmount(req.C_Invoice_ID);
                 if (open <= 0)
                 {
                     result.Message = Msg.GetMsg(ctx, "VAS_065_NoOpenBalance");
+                    trx.Rollback();
+                    trx.Close();
+                    trx = null;
                     return result;
                 }
 
-                MAllocationHdr hdr = new MAllocationHdr(ctx, true, DateTime.Today,
-                    inv.GetC_Currency_ID(), Msg.GetMsg(ctx, "VAS_065_AllocApplyCredits"), trx);
-                hdr.SetAD_Org_ID(inv.GetAD_Org_ID());
+                // The allocation is created in the source (payment / credit note) currency,
+                // dated to the source document date, booked in the source organization and
+                // using the source conversion type. The UI restricts a selection to a single
+                // currency + conversion type, so these come from the selected sources.
+                int allocCurrency = invCurrency;
+                DateTime allocDate = DateTime.Today;
+                int allocOrg = inv.GetAD_Org_ID();
+                int allocConvType = inv.GetC_ConversionType_ID();
+                if (!ResolveSourceCurrencyDate(req.Sources, trx, out allocCurrency, out allocDate, out allocOrg, out allocConvType))
+                {
+                    result.Message = Msg.GetMsg(ctx, "VAS_065_SingleCurrencyOnly");
+                    trx.Rollback();
+                    trx.Close();
+                    trx = null;
+                    return result;
+                }
+                if (allocOrg <= 0) allocOrg = inv.GetAD_Org_ID();
+                // Fall back to the invoice conversion type when the source has none.
+                int useConvType = allocConvType > 0 ? allocConvType : inv.GetC_ConversionType_ID();
+
+                // Invoice open amount expressed in the allocation (payment) currency. The
+                // source amounts already arrive in the payment currency, so ONLY the invoice
+                // open / schedule dues are converted - the source amounts are used as-is,
+                // which avoids a double conversion of the source amount.
+                decimal openAlloc = open;
+                if (allocCurrency != invCurrency)
+                {
+                    if (MConversionRate.GetRate(invCurrency, allocCurrency, allocDate, useConvType,
+                            inv.GetAD_Client_ID(), allocOrg) == 0)
+                    {
+                        result.Message = Msg.GetMsg(ctx, "VAS_065_NoConversionRate");
+                        trx.Rollback();
+                        trx.Close();
+                        trx = null;
+                        return result;
+                    }
+                    openAlloc = MConversionRate.Convert(ctx, open, invCurrency, allocCurrency, allocDate, useConvType,
+                        inv.GetAD_Client_ID(), allocOrg);
+                }
+
+                // Open invoice pay-schedules (due-date order). Each schedule is loaded so it
+                // can be split BEFORE the allocation line is created; schedRemaining tracks
+                // the unallocated balance in the allocation (payment) currency.
+                List<MInvoicePaySchedule> schedObjs = new List<MInvoicePaySchedule>();
+                List<decimal> schedRemaining = new List<decimal>();
+                DataSet schedDs = DB.ExecuteDataset(
+                    @"SELECT C_InvoicePaySchedule_ID, DueAmt FROM C_InvoicePaySchedule
+                       WHERE C_Invoice_ID = @C_Invoice_ID AND COALESCE(VA009_IsPaid,'N') = 'N'
+                       ORDER BY DueDate, C_InvoicePaySchedule_ID",
+                    new SqlParameter[] { new SqlParameter("@C_Invoice_ID", req.C_Invoice_ID) }, trx);
+                if (schedDs != null && schedDs.Tables.Count > 0)
+                {
+                    foreach (DataRow sr in schedDs.Tables[0].Rows)
+                    {
+                        decimal due = Util.GetValueOfDecimal(sr["DueAmt"]);
+                        if (allocCurrency != invCurrency)
+                            due = MConversionRate.Convert(ctx, due, invCurrency, allocCurrency, allocDate, useConvType,
+                                inv.GetAD_Client_ID(), allocOrg);
+                        schedObjs.Add(new MInvoicePaySchedule(ctx, Util.GetValueOfInt(sr["C_InvoicePaySchedule_ID"]), trx));
+                        schedRemaining.Add(due);
+                    }
+                }
+
+                MAllocationHdr hdr = new MAllocationHdr(ctx, true, allocDate,
+                    allocCurrency, Msg.GetMsg(ctx, "VAS_065_AllocApplyCredits"), trx);
+                // Allocation is booked in the payment (source) organization.
+                hdr.SetAD_Org_ID(allocOrg);
+                // Use the source conversion type for the allocation -> invoice currency rate.
+                if (useConvType > 0) hdr.SetC_ConversionType_ID(useConvType);
                 if (!hdr.Save(trx))
                 {
                     result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed");
                     trx.Rollback();
+                    trx.Close();
+                    trx = null;
                     return result;
                 }
 
-                decimal applied = 0m, remaining = open;
+                // Source amounts are already in the allocation (payment) currency; cap them
+                // against the invoice open (also in the payment currency) and cascade across
+                // the open schedules - splitting each schedule before the line so every line
+                // references a schedule sized exactly to its portion.
+                decimal appliedAlloc = 0m, remainingAlloc = openAlloc;
+                int schedIdx = 0;
                 foreach (AllocationSource src in req.Sources)
                 {
-                    if (remaining <= 0) break;
-                    decimal use = Math.Min(src.Amount, remaining);
-                    if (use <= 0) continue;
+                    if (remainingAlloc <= 0) break;
+                    decimal useAlloc = Math.Min(src.Amount, remainingAlloc);
+                    if (useAlloc <= 0) continue;
 
-                    if (src.SourceType == "PAYMENT")
+                    decimal srcRem = useAlloc;
+                    while (srcRem > 0 && schedIdx < schedObjs.Count)
                     {
-                        // Payment applied directly to the invoice.
-                        MAllocationLine line = new MAllocationLine(hdr, use, Env.ZERO, Env.ZERO, Env.ZERO);
-                        line.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
-                        line.SetPaymentInfo(src.Id, 0);
-                        if (!line.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return result; }
-                    }
-                    else // CREDITNOTE -> two balanced lines (invoice +, credit note -)
-                    {
-                        MAllocationLine inLine = new MAllocationLine(hdr, use, Env.ZERO, Env.ZERO, Env.ZERO);
-                        inLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
-                        if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return result; }
+                        if (schedRemaining[schedIdx] <= 0) { schedIdx++; continue; }
+                        decimal portion = Math.Min(srcRem, schedRemaining[schedIdx]);
+                        bool fullConsume = portion >= schedRemaining[schedIdx] - (decimal)0.0001;
+                        decimal portionInv = portion;
+                        if (allocCurrency != invCurrency)
+                        {
+                            portionInv = MConversionRate.Convert(ctx, portion, allocCurrency, invCurrency, allocDate, useConvType,
+                                inv.GetAD_Client_ID(), allocOrg);
+                        }
 
-                        MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(use), Env.ZERO, Env.ZERO, Env.ZERO);
-                        cnLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, src.Id);
-                        if (!cnLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return result; }
+                        bool ok;
+                        int refSchedId = PrepareScheduleLine(ctx, schedObjs, schedIdx, portionInv, fullConsume, trx, result, out ok);
+                        if (!ok)
+                        {
+                            // PrepareScheduleLine already rolled back on failure.
+                            trx.Close();
+                            trx = null;
+                            return result;
+                        }
+                        if (!CreateCreditAllocLines(ctx, hdr, inv, src, portion, refSchedId, trx, result))
+                        {
+                            // CreateCreditAllocLines already rolled back on failure.
+                            trx.Close();
+                            trx = null;
+                            return result;
+                        }
+                        schedRemaining[schedIdx] -= portion;
+                        srcRem -= portion;
+                        if (schedRemaining[schedIdx] <= 0)
+                        {
+                            schedIdx++;
+                        }
                     }
-                    applied += use;
-                    remaining -= use;
+                    // No (more) schedules: book the remainder against the invoice only.
+                    if (srcRem > 0)
+                    {
+                        if (!CreateCreditAllocLines(ctx, hdr, inv, src, srcRem, 0, trx, result))
+                        {
+                            // CreateCreditAllocLines already rolled back on failure.
+                            trx.Close();
+                            trx = null;
+                            return result;
+                        }
+                    }
+
+                    appliedAlloc += useAlloc;
+                    remainingAlloc -= useAlloc;
                 }
 
-                if (applied <= 0)
+                if (appliedAlloc <= 0)
                 {
                     result.Message = Msg.GetMsg(ctx, "VAS_065_NothingSelected");
                     trx.Rollback();
+                    trx.Close();
+                    trx = null;
                     return result;
                 }
 
-                if (!CompleteAllocation(hdr, trx, ctx, result)) return result;
+                if (!CompleteAllocation(hdr, trx, ctx, result))
+                {
+                    // CompleteAllocation already rolled back on failure.
+                    trx.Close();
+                    trx = null;
+                    return result;
+                }
+
+                // Applied amount returned in the invoice currency for the UI settlement
+                // (single back-conversion of the applied total - not of each source amount).
+                decimal appliedInv = appliedAlloc;
+                if (allocCurrency != invCurrency)
+                    appliedInv = MConversionRate.Convert(ctx, appliedAlloc, allocCurrency, invCurrency, allocDate, useConvType,
+                        inv.GetAD_Client_ID(), allocOrg);
 
                 trx.Commit();
                 result.Success = true;
                 result.DocumentNo = hdr.GetDocumentNo();
-                result.AppliedAmount = applied;
-                result.RemainingAmount = Math.Max(0m, open - applied);
+                result.AppliedAmount = appliedInv;
+                result.RemainingAmount = Math.Max(0m, open - appliedInv);
             }
             catch (Exception ex)
             {
-                try { trx.Rollback(); } catch { /* ignore */ }
+                try { if (trx != null) trx.Rollback(); } catch { /* ignore */ }
                 result.Message = ex.Message;
             }
             finally
             {
-                try { trx.Close(); } catch { /* ignore */ }
+                // trx was started -> it must be closed and nulled before returning
+                // (runs on every exit path, including the early validation returns).
+                if (trx != null) { try { trx.Close(); } catch { /* ignore */ } trx = null; }
             }
             return result;
         }
@@ -1123,9 +1454,18 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                MAllocationHdr hdr = new MAllocationHdr(ctx, true, DateTime.Today,
-                    cn.GetC_Currency_ID(), Msg.GetMsg(ctx, "VAS_065_AllocCreditNote"), trx);
+                // The allocation is created in the credit-note currency; the target open
+                // invoices (and their schedules) are converted into this currency on the
+                // allocation date using the credit-note conversion type.
+                int allocCurrency = cn.GetC_Currency_ID();
+                DateTime allocDate = DateTime.Today;
+                int allocConvType = cn.GetC_ConversionType_ID();
+
+                MAllocationHdr hdr = new MAllocationHdr(ctx, true, allocDate,
+                    allocCurrency, Msg.GetMsg(ctx, "VAS_065_AllocCreditNote"), trx);
                 hdr.SetAD_Org_ID(cn.GetAD_Org_ID());
+                // Use the credit note conversion type for the allocation currency rate.
+                if (allocConvType > 0) hdr.SetC_ConversionType_ID(allocConvType);
                 if (!hdr.Save(trx))
                 {
                     result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed");
@@ -1137,17 +1477,84 @@ namespace VASLogic.Models
                 foreach (int openInvId in req.C_Invoice_IDs)
                 {
                     if (remaining <= 0) break;
-                    decimal invOpen = Math.Abs(GetInvoiceOpen(ctx, openInvId, trx));
-                    decimal use = Math.Min(invOpen, remaining);
+
+                    // Target invoice currency / client / org.
+                    DataSet tds = DB.ExecuteDataset(
+                        "SELECT C_Currency_ID, AD_Client_ID, AD_Org_ID FROM C_Invoice WHERE C_Invoice_ID = @id",
+                        new SqlParameter[] { new SqlParameter("@id", openInvId) }, trx);
+                    if (tds == null || tds.Tables.Count == 0 || tds.Tables[0].Rows.Count == 0) continue;
+                    int tCur = Util.GetValueOfInt(tds.Tables[0].Rows[0]["C_Currency_ID"]);
+                    int tClient = Util.GetValueOfInt(tds.Tables[0].Rows[0]["AD_Client_ID"]);
+                    int tOrg = Util.GetValueOfInt(tds.Tables[0].Rows[0]["AD_Org_ID"]);
+
+                    decimal tOpen = Math.Abs(GetInvoiceOpen(ctx, openInvId, trx));   // target currency
+                    if (tOpen <= 0) continue;
+
+                    // Target open expressed in the allocation (credit-note) currency.
+                    decimal tOpenAlloc = tOpen;
+                    if (tCur != allocCurrency)
+                    {
+                        if (MConversionRate.GetRate(tCur, allocCurrency, allocDate, allocConvType, tClient, tOrg) == 0)
+                        {
+                            result.Message = Msg.GetMsg(ctx, "VAS_065_NoConversionRate");
+                            trx.Rollback();
+                            return result;
+                        }
+                        tOpenAlloc = MConversionRate.Convert(ctx, tOpen, tCur, allocCurrency, allocDate, allocConvType, tClient, tOrg);
+                    }
+
+                    decimal use = Math.Min(tOpenAlloc, remaining);
                     if (use <= 0) continue;
 
-                    MAllocationLine inLine = new MAllocationLine(hdr, use, Env.ZERO, Env.ZERO, Env.ZERO);
-                    inLine.SetDocInfo(cn.GetC_BPartner_ID(), 0, openInvId);
-                    if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return result; }
+                    // Open schedules of the target invoice. Loaded so each can be split BEFORE
+                    // its allocation line; schedRemaining tracks the unallocated balance in the
+                    // allocation (credit-note) currency.
+                    List<MInvoicePaySchedule> schedObjs = new List<MInvoicePaySchedule>();
+                    List<decimal> schedRemaining = new List<decimal>();
+                    DataSet schedDs = DB.ExecuteDataset(
+                        @"SELECT C_InvoicePaySchedule_ID, DueAmt FROM C_InvoicePaySchedule
+                           WHERE C_Invoice_ID = @id AND COALESCE(VA009_IsPaid,'N') = 'N'
+                           ORDER BY DueDate, C_InvoicePaySchedule_ID",
+                        new SqlParameter[] { new SqlParameter("@id", openInvId) }, trx);
+                    if (schedDs != null && schedDs.Tables.Count > 0)
+                    {
+                        foreach (DataRow sr in schedDs.Tables[0].Rows)
+                        {
+                            decimal due = Util.GetValueOfDecimal(sr["DueAmt"]);
+                            if (tCur != allocCurrency)
+                                due = MConversionRate.Convert(ctx, due, tCur, allocCurrency, allocDate, allocConvType, tClient, tOrg);
+                            schedObjs.Add(new MInvoicePaySchedule(ctx, Util.GetValueOfInt(sr["C_InvoicePaySchedule_ID"]), trx));
+                            schedRemaining.Add(due);
+                        }
+                    }
 
-                    MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(use), Env.ZERO, Env.ZERO, Env.ZERO);
-                    cnLine.SetDocInfo(cn.GetC_BPartner_ID(), 0, req.C_Invoice_ID);
-                    if (!cnLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return result; }
+                    // Cascade the applied amount across the target schedules, splitting each
+                    // schedule before its line so every line references a schedule sized
+                    // exactly to its portion (in the target invoice currency).
+                    decimal srcRem = use;
+                    int schedIdx = 0;
+                    while (srcRem > 0 && schedIdx < schedObjs.Count)
+                    {
+                        if (schedRemaining[schedIdx] <= 0) { schedIdx++; continue; }
+                        decimal portion = Math.Min(srcRem, schedRemaining[schedIdx]);
+                        bool fullConsume = portion >= schedRemaining[schedIdx] - (decimal)0.0001;
+                        decimal portionInv = portion;
+                        if (tCur != allocCurrency)
+                            portionInv = MConversionRate.Convert(ctx, portion, allocCurrency, tCur, allocDate, allocConvType, tClient, tOrg);
+                        bool ok;
+                        int refSchedId = PrepareScheduleLine(ctx, schedObjs, schedIdx, portionInv, fullConsume, trx, result, out ok);
+                        if (!ok) return result;
+                        if (!CreateCreditNoteAllocLines(ctx, hdr, cn.GetC_BPartner_ID(), openInvId, req.C_Invoice_ID, portion, refSchedId, trx, result))
+                            return result;
+                        schedRemaining[schedIdx] -= portion;
+                        srcRem -= portion;
+                        if (schedRemaining[schedIdx] <= 0) schedIdx++;
+                    }
+                    if (srcRem > 0)
+                    {
+                        if (!CreateCreditNoteAllocLines(ctx, hdr, cn.GetC_BPartner_ID(), openInvId, req.C_Invoice_ID, srcRem, 0, trx, result))
+                            return result;
+                    }
 
                     applied += use;
                     remaining -= use;
@@ -1170,12 +1577,14 @@ namespace VASLogic.Models
             }
             catch (Exception ex)
             {
-                try { trx.Rollback(); } catch { /* ignore */ }
+                try { if (trx != null) trx.Rollback(); } catch { /* ignore */ }
                 result.Message = ex.Message;
             }
             finally
             {
-                try { trx.Close(); } catch { /* ignore */ }
+                // trx was started -> it must be closed and nulled before returning
+                // (runs on every exit path, including the early validation returns).
+                if (trx != null) { try { trx.Close(); } catch { /* ignore */ } trx = null; }
             }
             return result;
         }
@@ -1219,14 +1628,40 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                decimal payAmt = req.PayAmt > 0 ? req.PayAmt : open;
+                // Payment is recorded in the bank-account currency (req.C_Currency_ID).
+                // When it differs from the invoice currency every amount below is in the
+                // payment currency, so the invoice open amount and each schedule due
+                // amount are converted on the payment date using the invoice conversion
+                // type (matching the standard payment-screen behaviour).
+                int invCurrency = inv.GetC_Currency_ID();
+                int payCurrency = req.C_Currency_ID > 0 ? req.C_Currency_ID : invCurrency;
+                DateTime txDate = req.DateTrx ?? DateTime.Today;
+                // Use the conversion type chosen on the modal; fall back to the invoice's.
+                int convTypeId = req.C_ConversionType_ID > 0 ? req.C_ConversionType_ID : inv.GetC_ConversionType_ID();
+
+                decimal openPay = open;
+                if (payCurrency != invCurrency)
+                {
+                    decimal payRate = MConversionRate.GetRate(invCurrency, payCurrency, txDate, convTypeId,
+                        inv.GetAD_Client_ID(), inv.GetAD_Org_ID());
+                    if (payRate == 0)
+                    {
+                        result.Message = Msg.GetMsg(ctx, "VAS_065_NoConversionRate");
+                        return result;
+                    }
+                    openPay = MConversionRate.Convert(ctx, open, invCurrency, payCurrency, txDate, convTypeId,
+                        inv.GetAD_Client_ID(), inv.GetAD_Org_ID());
+                }
+
+                decimal payAmt = req.PayAmt > 0 ? req.PayAmt : openPay;
                 if (payAmt <= 0)
                 {
                     result.Message = Msg.GetMsg(ctx, "VAS_065_AmountMustBePositive");
                     return result;
                 }
-                // Case 4: the amount cannot exceed the open invoice due amount.
-                if (payAmt - open > (decimal)0.0001)
+                // Case 4: the amount cannot exceed the open invoice due amount
+                // (compared in the payment currency).
+                if (payAmt - openPay > (decimal)0.0001)
                 {
                     result.Message = Msg.GetMsg(ctx, "VAS_065_AmountExceedsOpen");
                     return result;
@@ -1267,16 +1702,15 @@ namespace VASLogic.Models
                 payment.SetC_BPartner_ID(inv.GetC_BPartner_ID());
                 payment.SetC_BPartner_Location_ID(inv.GetC_BPartner_Location_ID());
                 payment.SetC_Currency_ID(req.C_Currency_ID > 0 ? req.C_Currency_ID : inv.GetC_Currency_ID());
-                if (inv.GetC_ConversionType_ID() > 0)
+                if (convTypeId > 0)
                 {
-                    payment.SetC_ConversionType_ID(inv.GetC_ConversionType_ID());
+                    payment.SetC_ConversionType_ID(convTypeId);
                 }
                 if (req.VA009_PaymentMethod_ID > 0)
                 {
                     payment.SetVA009_PaymentMethod_ID(req.VA009_PaymentMethod_ID);
                 }
 
-                DateTime txDate = req.DateTrx ?? DateTime.Today;
                 payment.SetDateTrx(txDate);
                 payment.SetDateAcct(txDate);
                 payment.SetPayAmt(payAmt);
@@ -1318,6 +1752,12 @@ namespace VASLogic.Models
                     {
                         if (rem <= 0) break;
                         decimal due = Util.GetValueOfDecimal(sr["DueAmt"]);
+                        // Schedule due amounts are stored in the invoice currency; express
+                        // them in the payment currency so the cascade and the over/under
+                        // amounts stay consistent with the recorded payment.
+                        if (payCurrency != invCurrency)
+                            due = MConversionRate.Convert(ctx, due, invCurrency, payCurrency, txDate, convTypeId,
+                                inv.GetAD_Client_ID(), inv.GetAD_Org_ID());
                         decimal alloc = Math.Min(rem, due);
                         if (alloc <= 0) continue;
                         planSchedId.Add(Util.GetValueOfInt(sr["C_InvoicePaySchedule_ID"]));
@@ -1412,14 +1852,184 @@ namespace VASLogic.Models
             }
             catch (Exception ex)
             {
-                try { trx.Rollback(); } catch { /* ignore */ }
+                try { if (trx != null) trx.Rollback(); } catch { /* ignore */ }
                 result.Message = ex.Message;
             }
             finally
             {
-                try { trx.Close(); } catch { /* ignore */ }
+                // trx was started -> it must be closed and nulled before returning
+                // (runs on every exit path, including the early validation returns).
+                if (trx != null) { try { trx.Close(); } catch { /* ignore */ } trx = null; }
             }
             return result;
+        }
+
+        /// <summary>
+        /// Prepares the invoice pay-schedule an allocation line will reference, splitting it
+        /// BEFORE the line is created (mirrors PaymentAllocation.cs). When the portion only
+        /// partly settles the schedule, the EXISTING schedule (at <paramref name="idx"/>) is
+        /// resized to the paid portion (in invoice currency) - this is the schedule the line
+        /// references - and a NEW schedule is created for the remaining open balance, which
+        /// replaces the list slot so the next portion splits the remainder. When the portion
+        /// settles the whole remaining due, the existing schedule is referenced as-is.
+        /// Returns the C_InvoicePaySchedule_ID to set on the allocation line (0 on failure).
+        /// </summary>
+        private int PrepareScheduleLine(Ctx ctx, List<MInvoicePaySchedule> schedObjs, int idx, decimal portionInv, bool fullConsume, Trx trx, AllocationResult result, out bool ok)
+        {
+            ok = true;
+            MInvoicePaySchedule sch = schedObjs[idx];
+            if (fullConsume)
+            {
+                // Whole remaining due is settled - reference the schedule itself (no resize,
+                // so a cross-currency full payment does not alter the invoice schedule).
+                return sch.GetC_InvoicePaySchedule_ID();
+            }
+
+            decimal curDue = sch.GetDueAmt();
+
+            // New schedule carrying the remaining open balance; it becomes the current
+            // schedule so subsequent portions split it further.
+            MInvoicePaySchedule remainder = new MInvoicePaySchedule(ctx, 0, trx);
+            PO.CopyValues(sch, remainder);
+            remainder.SetAD_Client_ID(sch.GetAD_Client_ID());
+            remainder.SetAD_Org_ID(sch.GetAD_Org_ID());
+            remainder.ByPassValidatePayScheduleCondition(true);
+            remainder.SetDueAmt(curDue - portionInv);
+            if (!remainder.Save(trx))
+            {
+                result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed");
+                trx.Rollback();
+                ok = false;
+                return 0;
+            }
+
+            // Resize the existing schedule to the paid portion - the line references this.
+            sch.ByPassValidatePayScheduleCondition(true);
+            sch.SetDueAmt(portionInv);
+            if (!sch.Save(trx))
+            {
+                result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed");
+                trx.Rollback();
+                ok = false;
+                return 0;
+            }
+
+            int refId = sch.GetC_InvoicePaySchedule_ID();
+            schedObjs[idx] = remainder;   // next portion splits the remainder
+            return refId;
+        }
+
+        /// <summary>
+        /// Resolves the common currency, the (first) source document date and the
+        /// (first) source organization for the selected allocation sources. The
+        /// allocation is created in this currency, dated to this date and booked in
+        /// this organization. Returns false when the selection mixes currencies (the
+        /// UI already restricts this, so it is a defensive guard).
+        /// </summary>
+        private bool ResolveSourceCurrencyDate(List<AllocationSource> sources, Trx trx, out int currency, out DateTime date, out int org, out int convType)
+        {
+            currency = 0;
+            date = DateTime.Today;
+            org = 0;
+            convType = 0;
+            bool first = true;
+            foreach (AllocationSource src in sources)
+            {
+                int cur, srcOrg, srcConv;
+                DateTime? dt;
+                if (src.SourceType == "PAYMENT")
+                {
+                    DataSet ds = DB.ExecuteDataset("SELECT C_Currency_ID, DateTrx, AD_Org_ID, COALESCE(C_ConversionType_ID,0) AS C_ConversionType_ID FROM C_Payment WHERE C_Payment_ID = @id",
+                        new SqlParameter[] { new SqlParameter("@id", src.Id) }, trx);
+                    if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) continue;
+                    cur = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]);
+                    dt = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateTrx"]);
+                    srcOrg = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                    srcConv = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]);
+                }
+                else
+                {
+                    DataSet ds = DB.ExecuteDataset("SELECT C_Currency_ID, DateInvoiced, AD_Org_ID, COALESCE(C_ConversionType_ID,0) AS C_ConversionType_ID FROM C_Invoice WHERE C_Invoice_ID = @id",
+                        new SqlParameter[] { new SqlParameter("@id", src.Id) }, trx);
+                    if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) continue;
+                    cur = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_Currency_ID"]);
+                    dt = Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["DateInvoiced"]);
+                    srcOrg = Util.GetValueOfInt(ds.Tables[0].Rows[0]["AD_Org_ID"]);
+                    srcConv = Util.GetValueOfInt(ds.Tables[0].Rows[0]["C_ConversionType_ID"]);
+                }
+                if (first)
+                {
+                    currency = cur;
+                    if (dt.HasValue) date = dt.Value;
+                    org = srcOrg;
+                    convType = srcConv;
+                    first = false;
+                }
+                else if (cur != currency || srcConv != convType)
+                {
+                    return false;   // mixed currency / conversion type in one allocation
+                }
+            }
+            return currency > 0;
+        }
+
+        /// <summary>
+        /// Creates the allocation line(s) that apply <paramref name="amount"/> (allocation
+        /// currency) of a single source to the target invoice, optionally referencing the
+        /// invoice pay-schedule being settled. On-account payments produce one line linked
+        /// to the payment; vendor credit notes produce a balanced pair (invoice +, credit
+        /// note -). Returns false (and rolls back) on save failure.
+        /// </summary>
+        private bool CreateCreditAllocLines(Ctx ctx, MAllocationHdr hdr, MInvoice inv, AllocationSource src,
+            decimal amount, int C_InvoicePaySchedule_ID, Trx trx, AllocationResult result)
+        {
+            if (src.SourceType == "PAYMENT")
+            {
+                // On-account payment -> invoice: a single line carrying the positive applied
+                // amount with both the invoice and payment references. The posting derives
+                // DR/CR from those references, so the amount is NOT negated (matches the
+                // payment->invoice line in PaymentAllocation.SavePaymentData).
+                MAllocationLine line = new MAllocationLine(hdr, decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
+                line.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
+                line.SetPaymentInfo(src.Id, 0);
+                if (C_InvoicePaySchedule_ID > 0) line.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
+                if (!line.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+            }
+            else // CREDITNOTE -> balanced invoice-to-invoice pair (invoice +, credit note -)
+            {
+                // Credit note -> invoice is an invoice-to-invoice settlement: the two lines
+                // must cross-reference each other via Ref_C_Invoice_ID (as SavePaymentData
+                // does), otherwise the allocation is not tracked/posted as a paired netting.
+                MAllocationLine inLine = new MAllocationLine(hdr, amount, Env.ZERO, Env.ZERO, Env.ZERO);
+                inLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, inv.GetC_Invoice_ID());
+                inLine.SetPaymentInfo(src.Id, 0);
+                if (C_InvoicePaySchedule_ID > 0) inLine.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
+                if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+
+                //MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
+                //cnLine.SetDocInfo(inv.GetC_BPartner_ID(), 0, src.Id);
+                //if (!cnLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Creates the balanced allocation line pair for a credit-note allocation: a
+        /// positive line on the target invoice (optionally referencing the schedule it
+        /// settles) and a negative line on the credit note. Returns false on save failure.
+        /// </summary>
+        private bool CreateCreditNoteAllocLines(Ctx ctx, MAllocationHdr hdr, int C_BPartner_ID,
+            int targetInvoiceId, int creditNoteId, decimal amount, int C_InvoicePaySchedule_ID, Trx trx, AllocationResult result)
+        {
+            MAllocationLine inLine = new MAllocationLine(hdr, amount, Env.ZERO, Env.ZERO, Env.ZERO);
+            inLine.SetDocInfo(C_BPartner_ID, 0, targetInvoiceId);
+            if (C_InvoicePaySchedule_ID > 0) inLine.SetC_InvoicePaySchedule_ID(C_InvoicePaySchedule_ID);
+            if (!inLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+
+            MAllocationLine cnLine = new MAllocationLine(hdr, Decimal.Negate(amount), Env.ZERO, Env.ZERO, Env.ZERO);
+            cnLine.SetDocInfo(C_BPartner_ID, 0, creditNoteId);
+            if (!cnLine.Save(trx)) { result.Message = RetrieveErr(ctx, "VAS_065_AllocationFailed"); trx.Rollback(); return false; }
+            return true;
         }
 
         /// <summary>Open amount for an invoice from its unpaid schedules (else grand total - allocated).</summary>
@@ -1657,6 +2267,8 @@ namespace VASLogic.Models
             public string CurSymbol { get; set; }
             public string ISO_Code { get; set; }
             public int StdPrecision { get; set; }
+            // Invoice conversion type - used to default the modal's conversion-type select.
+            public int C_ConversionType_ID { get; set; }
             public string RecordMode { get; set; }
             public bool IsAPCreditNote { get; set; }
             public decimal VendorOutstanding { get; set; }
@@ -1672,15 +2284,46 @@ namespace VASLogic.Models
             public List<OpenInvoiceRow> OpenInvoices { get; set; }
             public List<BankAccountOption> BankAccounts { get; set; }
             public List<PaymentMethodOption> PaymentMethods { get; set; }
+            public List<CurrencyOption> Currencies { get; set; }
+            public List<ConversionTypeOption> ConversionTypes { get; set; }
+        }
+
+        public class CurrencyOption
+        {
+            public int C_Currency_ID { get; set; }
+            public string ISO_Code { get; set; }
+            public string CurSymbol { get; set; }
+            public int StdPrecision { get; set; }
+        }
+
+        public class ConversionTypeOption
+        {
+            public int C_ConversionType_ID { get; set; }
+            public string Name { get; set; }
+            public bool IsDefault { get; set; }
         }
 
         public class AvailableCreditRow
         {
             public string SourceType { get; set; }   // PAYMENT | CREDITNOTE
             public int Id { get; set; }
+            public int AD_Org_ID { get; set; }
             public string DocumentNo { get; set; }
             public DateTime? Date { get; set; }
+            // Accounting date of the source document. Cross-currency selections are
+            // restricted to a single accounting date (one conversion date per allocation).
+            public DateTime? DateAcct { get; set; }
             public decimal AvailableAmount { get; set; }
+            // Currency of the source document (the payment / credit note).
+            public int C_Currency_ID { get; set; }
+            public int C_ConversionType_ID { get; set; }
+            public string CurSymbol { get; set; }
+            public string ISO_Code { get; set; }
+            public int StdPrecision { get; set; }
+            // AvailableAmount converted into the invoice currency on the current date
+            // (0 when no conversion rate is available). The UI shows / sums this value
+            // with the invoice currency symbol.
+            public decimal AvailableAmountInv { get; set; }
         }
 
         public class OpenInvoiceRow
@@ -1696,7 +2339,10 @@ namespace VASLogic.Models
             public int C_BankAccount_ID { get; set; }
             public string BankName { get; set; }
             public string AccountNo { get; set; }
+            public int C_Currency_ID { get; set; }
             public string CurrencyISO { get; set; }
+            public string CurSymbol { get; set; }
+            public int StdPrecision { get; set; }
             public bool IsDefault { get; set; }
         }
 
@@ -1731,6 +2377,7 @@ namespace VASLogic.Models
             public int C_Invoice_ID { get; set; }
             public decimal PayAmt { get; set; }
             public int C_Currency_ID { get; set; }
+            public int C_ConversionType_ID { get; set; }   // selected conversion type (0 = default/invoice)
             public int C_BankAccount_ID { get; set; }
             public int VA009_PaymentMethod_ID { get; set; }
             public DateTime? DateTrx { get; set; }
@@ -1753,6 +2400,28 @@ namespace VASLogic.Models
             public int C_Payment_ID { get; set; }
             public string DocumentNo { get; set; }
             public decimal PayAmt { get; set; }
+            public string Message { get; set; }
+        }
+
+        public class ConvertAmountRequest
+        {
+            public int C_Invoice_ID { get; set; }
+            public int C_Currency_ID { get; set; }        // target (selected) currency
+            public int C_ConversionType_ID { get; set; }  // selected conversion type (0 = default)
+            public decimal Amount { get; set; }           // amount in the invoice (from) currency
+            public DateTime? Date { get; set; }           // payment date driving the rate lookup
+        }
+
+        public class ConvertAmountResult
+        {
+            public bool Success { get; set; }
+            public decimal ConvertedAmount { get; set; }
+            public decimal Rate { get; set; }       // invoice -> bank multiply rate (1 when same)
+            public int C_Currency_ID { get; set; }  // bank-account currency
+            public string CurSymbol { get; set; }
+            public string ISO_Code { get; set; }
+            public int StdPrecision { get; set; }
+            public bool IsSameCurrency { get; set; }
             public string Message { get; set; }
         }
 
