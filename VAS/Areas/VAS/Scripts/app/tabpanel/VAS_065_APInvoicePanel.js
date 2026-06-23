@@ -755,8 +755,11 @@
         }
 
         function buildPaymentSchedule() {
-            var sched = data.PaymentSchedule || [];
-            if (!sched.length) return null;
+            // Server-side paged: data.PaymentSchedule is the FIRST page; total/open/hold
+            // come from the server aggregate (data.ScheduleTotal/OpenAmount/AnyHold).
+            var firstPage = data.PaymentSchedule || [];
+            var total = data.ScheduleTotal || firstPage.length;
+            if (!total) return null;
 
             var $sec = $(
                 '<section class="vas-apinv-block">' +
@@ -774,7 +777,7 @@
             );
             $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_PaymentSchedule", "Payment Schedule"));
             $sec.find(".js-sum").text((data.PaymentTermName ? data.PaymentTermName + " · " : "") +
-                lbl("VAS_065_InstalmentCount", "{0} instalment(s)").replace("{0}", sched.length));
+                lbl("VAS_065_InstalmentCount", "{0} instalment(s)").replace("{0}", total));
             $sec.find(".js-h1").text(lbl("VAS_065_Schedule", "Schedule"));
             $sec.find(".js-h2").text(lbl("DueDate"));
             $sec.find(".js-h3").text(lbl("VAS_065_Status", "Status"));
@@ -784,28 +787,17 @@
             var $pager = $sec.find(".js-sched-pager");
             var SCHED_PER_PAGE = 5;
             var schedPage = 0;
-            var pct = Math.round(100 / sched.length);
+            var curRows = firstPage;
+            var pct = Math.round(100 / (total || 1));
 
-            // Totals are computed over ALL schedules, independent of the page shown.
-            var totalOpen = 0, anyHold = false;
-            sched.forEach(function (s) {
-                if (!s.IsPaid) totalOpen += +s.DueAmt || 0;
-                if (s.IsHold) anyHold = true;
-            });
-
-            // Renders the current page of schedule rows (5 per page) and the pager.
             function renderSchedRows() {
                 $rows.empty();
-                var total = sched.length;
-                var paged = total > SCHED_PER_PAGE;
-                var start = paged ? schedPage * SCHED_PER_PAGE : 0;
-                var end = paged ? Math.min(start + SCHED_PER_PAGE, total) : total;
-
-                for (var i = start; i < end; i++) {
-                    var s = sched[i];
+                var start = schedPage * SCHED_PER_PAGE;
+                curRows.forEach(function (s, idx) {
+                    var absIdx = start + idx;
                     var $r = $('<div class="vas-apinv-t4-row"></div>');
                     $r.append($('<div class="col-a p"></div>').text(
-                        lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (i + 1)).replace("{1}", pct)));
+                        lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (absIdx + 1)).replace("{1}", pct)));
                     $r.append($('<div class="col-b c"></div>').text(fmtDate(s.DueDate)));
                     var statusKey = s.Status === "Paid" ? "VAS_065_Paid" : (s.Status === "OnHold" ? "VAS_065_OnHold" : "Open");
                     var statusCls = s.Status === "Paid" ? "ok" : "warn";
@@ -813,33 +805,52 @@
                         $('<span class="vas-apinv-spill ' + statusCls + '"></span>').text(lbl(statusKey))));
                     $r.append($('<div class="col-d amt"></div>').text(fmtAmount(s.DueAmt)));
                     $rows.append($r);
-                }
+                });
 
-                if (paged) {
+                if (total > SCHED_PER_PAGE) {
                     $pager.empty().show();
                     var pageCount = Math.ceil(total / SCHED_PER_PAGE);
+                    var end = start + curRows.length;
                     $pager.append($('<span></span>').text(
                         lbl("VAS_065_Showing", "Showing {0} of {1}")
                             .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
                     var $nav = $('<span class="vas-apinv-pager"></span>');
                     var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
                     var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                    $prev.prop("disabled", schedPage <= 0).on("click", function () { if (schedPage > 0) { schedPage--; renderSchedRows(); } });
-                    $next.prop("disabled", schedPage >= pageCount - 1).on("click", function () { if (schedPage < pageCount - 1) { schedPage++; renderSchedRows(); } });
+                    $prev.prop("disabled", schedPage <= 0).on("click", function () { if (schedPage > 0) gotoSchedPage(schedPage - 1); });
+                    $next.prop("disabled", schedPage >= pageCount - 1).on("click", function () { if (schedPage < pageCount - 1) gotoSchedPage(schedPage + 1); });
                     $nav.append($prev).append($next);
                     $pager.append($nav);
                 } else {
                     $pager.hide();
                 }
             }
+
+            // Fetch a schedule page from the server, then re-render.
+            function gotoSchedPage(p) {
+                showBusy(true);
+                $.ajax({
+                    url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetSchedulePage",
+                    type: "GET", dataType: "json",
+                    data: { C_Invoice_ID: $self.record_ID, page: p, pageSize: SCHED_PER_PAGE },
+                    success: function (raw) {
+                        showBusy(false);
+                        curRows = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                        if (!curRows) curRows = [];
+                        schedPage = p;
+                        renderSchedRows();
+                    },
+                    error: function (err) { showBusy(false); console.log(err); }
+                });
+            }
             renderSchedRows();
 
             var $foot = $sec.find(".js-foot");
             $foot.append($('<span></span>').text(
-                lbl("VAS_065_PaymentHold", "Payment hold: {0}").replace("{0}", anyHold ? lbl("Y") : lbl("N")) +
+                lbl("VAS_065_PaymentHold", "Payment hold: {0}").replace("{0}", data.ScheduleAnyHold ? lbl("Y") : lbl("N")) +
                 " · " + lbl("VAS_065_AwaitingPayment", "awaiting payment")));
             $foot.append($('<span></span>').html(
-                lbl("Open") + " <b>" + escapeHtml(fmtAmount(totalOpen)) + "</b>"));
+                lbl("Open") + " <b>" + escapeHtml(fmtAmount(data.ScheduleOpenAmount)) + "</b>"));
             return $sec;
         }
 
@@ -962,17 +973,16 @@
             var $jePager = $sec.find(".js-je-pager");
             var JE_PER_PAGE = 10;
             var jePage = 0;
+            // Server-side paged: pj.Rows is the FIRST page; pj.Total is the row count and
+            // pj.TotalDr/TotalCr are aggregates over all fact lines. Columns are derived
+            // from the first page and kept stable across pages.
+            var curRows = pj.Rows || [];
+            var jeTotal = pj.Total || curRows.length;
 
-            // Renders the current page of journal rows (10 per page) and the pager.
             function renderJeRows() {
                 $rows.empty();
-                var total = pj.Rows.length;
-                var paged = total > JE_PER_PAGE;
-                var start = paged ? jePage * JE_PER_PAGE : 0;
-                var end = paged ? Math.min(start + JE_PER_PAGE, total) : total;
-
-                for (var i = start; i < end; i++) {
-                    var jr = pj.Rows[i];
+                var start = jePage * JE_PER_PAGE;
+                curRows.forEach(function (jr) {
                     var $r = $('<div class="vas-apinv-je-row"></div>').css("grid-template-columns", tmpl);
                     cols.forEach(function (c) {
                         if (c.num) {
@@ -984,24 +994,42 @@
                         }
                     });
                     $rows.append($r);
-                }
+                });
 
-                if (paged) {
+                if (jeTotal > JE_PER_PAGE) {
                     $jePager.empty().show();
-                    var pageCount = Math.ceil(total / JE_PER_PAGE);
+                    var pageCount = Math.ceil(jeTotal / JE_PER_PAGE);
+                    var end = start + curRows.length;
                     $jePager.append($('<span></span>').text(
                         lbl("VAS_065_Showing", "Showing {0} of {1}")
-                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
+                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", jeTotal)));
                     var $nav = $('<span class="vas-apinv-pager"></span>');
                     var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
                     var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                    $prev.prop("disabled", jePage <= 0).on("click", function () { if (jePage > 0) { jePage--; renderJeRows(); } });
-                    $next.prop("disabled", jePage >= pageCount - 1).on("click", function () { if (jePage < pageCount - 1) { jePage++; renderJeRows(); } });
+                    $prev.prop("disabled", jePage <= 0).on("click", function () { if (jePage > 0) gotoJePage(jePage - 1); });
+                    $next.prop("disabled", jePage >= pageCount - 1).on("click", function () { if (jePage < pageCount - 1) gotoJePage(jePage + 1); });
                     $nav.append($prev).append($next);
                     $jePager.append($nav);
                 } else {
                     $jePager.hide();
                 }
+            }
+            // Fetch a journal page from the server, then re-render.
+            function gotoJePage(p) {
+                showBusy(true);
+                $.ajax({
+                    url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetPostedJournalPage",
+                    type: "GET", dataType: "json",
+                    data: { C_Invoice_ID: $self.record_ID, page: p, pageSize: JE_PER_PAGE },
+                    success: function (raw) {
+                        showBusy(false);
+                        var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                        curRows = (resp && resp.Rows) ? resp.Rows : [];
+                        jePage = p;
+                        renderJeRows();
+                    },
+                    error: function (err) { showBusy(false); console.log(err); }
+                });
             }
             renderJeRows();
 
@@ -1156,11 +1184,11 @@
 
         /* AP invoice mode: apply credits + new payment + settlement */
         function buildInvoicePaymentSections($bodyM, p, cur) {
-            var onAccount = meta.OnAccountPayments || [];
-            var credits = meta.CreditNotes || [];
-            var allRows = [];
-            onAccount.forEach(function (r) { allRows.push(r); });
-            credits.forEach(function (r) { allRows.push(r); });
+            // Server-side paged: meta.OnAccountPayments is the FIRST page and
+            // meta.OnAccountPaymentsTotal the total count. curCredits holds the page
+            // currently in the DOM.
+            var curCredits = meta.OnAccountPayments || [];
+            var creditTotal = meta.OnAccountPaymentsTotal || curCredits.length;
             var invOpen = +meta.NetOpenAmount || +meta.NetPayable || 0;
 
             var state = { applied: 0, allocationCreated: false, selected: {} };
@@ -1168,22 +1196,24 @@
             var creditPage = 0;
             var $creditRows = null, $creditFoot = null;
 
-            // Selection is tracked in the state model (keyed by source) so it survives
-            // paging - only the current page of rows lives in the DOM at any time.
+            // Selection stores the FULL row object (keyed by source) so a selection on a
+            // page that is no longer in the DOM still survives and can be applied.
             function creditKey(r) { return r.SourceType + ":" + r.Id; }
             function isCreditSelected(r) { return !!state.selected[creditKey(r)]; }
-            function selectedCreditRows() { return allRows.filter(isCreditSelected); }
+            function selectedCreditRows() {
+                return Object.keys(state.selected).map(function (k) { return state.selected[k]; });
+            }
 
             // Renders the current page of credit rows (and the pager when > 5 rows).
             function renderCreditRows() {
                 if (!$creditRows) return;
                 $creditRows.empty();
-                var total = allRows.length;
+                var total = creditTotal;
                 var paged = total > CREDITS_PER_PAGE;
-                var start = paged ? creditPage * CREDITS_PER_PAGE : 0;
-                var end = paged ? Math.min(start + CREDITS_PER_PAGE, total) : total;
+                var start = creditPage * CREDITS_PER_PAGE;
+                var end = start + curCredits.length;
 
-                for (var i = start; i < end; i++) {
+                for (var i = 0; i < curCredits.length; i++) {
                     (function (r) {
                         var selected = isCreditSelected(r);
                         var locked = selected && state.allocationCreated;
@@ -1245,7 +1275,7 @@
                                     info(lbl("VAS_065_SameConvTypeOnly", "For a different currency, only payments with the same conversion type can be selected together."));
                                     return;
                                 }
-                                state.selected[creditKey(r)] = true;
+                                state.selected[creditKey(r)] = r;
                             } else {
                                 delete state.selected[creditKey(r)];
                             }
@@ -1254,7 +1284,7 @@
                             recompute();
                         });
                         $creditRows.append($row);
-                    })(allRows[i]);
+                    })(curCredits[i]);
                 }
 
                 if (paged) {
@@ -1266,8 +1296,8 @@
                     var $nav = $('<span class="vas-apinv-pager"></span>');
                     var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
                     var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                    $prev.prop("disabled", creditPage <= 0).on("click", function () { if (creditPage > 0) { creditPage--; renderCreditRows(); } });
-                    $next.prop("disabled", creditPage >= pageCount - 1).on("click", function () { if (creditPage < pageCount - 1) { creditPage++; renderCreditRows(); } });
+                    $prev.prop("disabled", creditPage <= 0).on("click", function () { if (creditPage > 0) gotoCreditPage(creditPage - 1); });
+                    $next.prop("disabled", creditPage >= pageCount - 1).on("click", function () { if (creditPage < pageCount - 1) gotoCreditPage(creditPage + 1); });
                     $nav.append($prev).append($next);
                     $creditFoot.append($nav);
                 } else {
@@ -1275,8 +1305,35 @@
                 }
             }
 
+            // Fetch a page of on-account payments from the server, then re-render. The
+            // selection state survives because it stores full row objects (not page rows).
+            function gotoCreditPage(p) {
+                if (state.allocationCreated) return;
+                showModalBusy(true);
+                $.ajax({
+                    url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetOnAccountPaymentsPage",
+                    type: "GET", dataType: "json",
+                    // Pass vendor / credit-note flag / invoice currency from meta so the
+                    // server does not re-query the invoice header on every page.
+                    data: {
+                        C_BPartner_ID: meta.C_BPartner_ID,
+                        IsCreditNote: !!meta.IsAPCreditNote,
+                        C_Currency_ID: meta.C_Currency_ID,
+                        page: p, pageSize: CREDITS_PER_PAGE
+                    },
+                    success: function (raw) {
+                        showModalBusy(false);
+                        curCredits = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                        if (!curCredits) curCredits = [];
+                        creditPage = p;
+                        renderCreditRows();
+                    },
+                    error: function (err) { showModalBusy(false); console.log(err); }
+                });
+            }
+
             // Apply on-account & credits
-            if (allRows.length) {
+            if (creditTotal) {
                 var $sec = $('<div class="vas-apinv-m-sec vas-apinv-m-sec-boxed"></div>');
                 $sec.append($('<div class="vas-apinv-m-sec-h"></div>')
                     .append($('<span class="t"></span>').text(lbl("VAS_065_ApplyOnAccountCredits", "Apply on-account & credits")))

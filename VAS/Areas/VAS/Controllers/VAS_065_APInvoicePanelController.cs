@@ -50,6 +50,54 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>Returns a page of payment-schedule rows (server-side paging).</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetSchedulePage(int C_Invoice_ID, int page, int pageSize)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAS_065_APInvoicePanelModel model = new VAS_065_APInvoicePanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetSchedulePage(C_Invoice_ID, page, pageSize));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>Returns a page of posted-journal rows (server-side paging).</summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetPostedJournalPage(int C_Invoice_ID, int page, int pageSize)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_065_APInvoicePanelModel model = new VAS_065_APInvoicePanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetPostedJournalPage(ctx, C_Invoice_ID, page, pageSize));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Returns a page of on-account payment rows (server-side paging). Vendor /
+        /// credit-note flag / invoice currency are passed from the modal meta so the
+        /// header is not re-queried per page.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetOnAccountPaymentsPage(int C_BPartner_ID, bool IsCreditNote, int C_Currency_ID, int page, int pageSize)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_065_APInvoicePanelModel model = new VAS_065_APInvoicePanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetOnAccountPaymentsPage(ctx, C_BPartner_ID, IsCreditNote, C_Currency_ID, page, pageSize));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Converts the invoice open amount into the selected bank account's currency.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]

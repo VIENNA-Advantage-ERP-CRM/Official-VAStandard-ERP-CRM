@@ -51,10 +51,11 @@ namespace VASLogic.Models
 
             data.Lines = LoadLines(C_Invoice_ID);
             data.Taxes = LoadTaxes(C_Invoice_ID);
-            data.PaymentSchedule = LoadSchedule(C_Invoice_ID);
+            data.PaymentSchedule = LoadSchedule(C_Invoice_ID, 0, SCHEDULE_PAGE_SIZE);
+            LoadScheduleAggregate(C_Invoice_ID, data);
             data.GoodsReceipt = LoadGoodsReceipt(C_Invoice_ID);
             data.LandedCost = LoadLandedCost(C_Invoice_ID);
-            data.PostedJournal = LoadPostedJournal(ctx, C_Invoice_ID);
+            data.PostedJournal = LoadPostedJournal(ctx, C_Invoice_ID, 0, JOURNAL_PAGE_SIZE, true);
             LoadWithholding(C_Invoice_ID, data);
 
             return data;
@@ -447,7 +448,27 @@ namespace VASLogic.Models
         }
 
         /// <summary>Loads the invoice pay-schedule rows.</summary>
-        private List<ScheduleRow> LoadSchedule(int C_Invoice_ID)
+        // Server-side page sizes (mirrored by the frontend pagers).
+        private const int SCHEDULE_PAGE_SIZE = 5;
+        private const int JOURNAL_PAGE_SIZE = 10;
+        private const int ONACCOUNT_PAGE_SIZE = 5;
+
+        /// <summary>
+        /// Builds the DB-specific row-limit suffix for server-side paging. Oracle uses
+        /// OFFSET/FETCH; PostgreSQL and MySQL use LIMIT/OFFSET. page/pageSize are integers
+        /// (no injection risk), so they are inlined - some engines reject bound LIMIT params.
+        /// </summary>
+        private string PagingSuffix(int page, int pageSize)
+        {
+            if (page < 0) page = 0;
+            if (pageSize <= 0) pageSize = 10;
+            int offset = page * pageSize;
+            if (DB.IsOracle())
+                return " OFFSET " + offset + " ROWS FETCH NEXT " + pageSize + " ROWS ONLY";
+            return " LIMIT " + pageSize + " OFFSET " + offset;
+        }
+
+        private List<ScheduleRow> LoadSchedule(int C_Invoice_ID, int page, int pageSize)
         {
             List<ScheduleRow> list = new List<ScheduleRow>();
             string sql = @"SELECT
@@ -462,6 +483,7 @@ namespace VASLogic.Models
                            WHERE ips.C_Invoice_ID = @C_Invoice_ID
                              AND ips.IsActive = 'Y'
                            ORDER BY ips.DueDate, ips.C_InvoicePaySchedule_ID";
+            sql += PagingSuffix(page, pageSize);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
@@ -479,6 +501,32 @@ namespace VASLogic.Models
                 list.Add(s);
             }
             return list;
+        }
+
+        /// <summary>Schedule footer aggregate (total count, open amount, hold) over ALL
+        /// schedules - the page rows alone cannot produce these.</summary>
+        private void LoadScheduleAggregate(int C_Invoice_ID, APInvoicePanelData data)
+        {
+            DataSet ds = DB.ExecuteDataset(
+                @"SELECT COUNT(ips.C_InvoicePaySchedule_ID) AS Total,
+                         COALESCE(SUM(CASE WHEN COALESCE(ips.VA009_IsPaid,'N') <> 'Y' THEN ips.DueAmt ELSE 0 END), 0) AS OpenAmt,
+                         MAX(CASE WHEN COALESCE(ips.IsHoldPayment,'N') = 'Y' THEN 1 ELSE 0 END) AS AnyHold
+                    FROM C_InvoicePaySchedule ips
+                   WHERE ips.C_Invoice_ID = @C_Invoice_ID AND ips.IsActive = 'Y'",
+                new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                DataRow r = ds.Tables[0].Rows[0];
+                data.ScheduleTotal = Util.GetValueOfInt(r["Total"]);
+                data.ScheduleOpenAmount = Util.GetValueOfDecimal(r["OpenAmt"]);
+                data.ScheduleAnyHold = Util.GetValueOfInt(r["AnyHold"]) == 1;
+            }
+        }
+
+        /// <summary>Page of schedule rows for the server-side pager.</summary>
+        public List<ScheduleRow> GetSchedulePage(int C_Invoice_ID, int page, int pageSize)
+        {
+            return LoadSchedule(C_Invoice_ID, page, pageSize > 0 ? pageSize : SCHEDULE_PAGE_SIZE);
         }
 
         /// <summary>
@@ -667,7 +715,7 @@ namespace VASLogic.Models
         }
 
         /// <summary>Loads posted accounting facts for the invoice.</summary>
-        private PostedJournalInfo LoadPostedJournal(Ctx ctx, int C_Invoice_ID)
+        private PostedJournalInfo LoadPostedJournal(Ctx ctx, int C_Invoice_ID, int page, int pageSize, bool includeTotals)
         {
             PostedJournalInfo pj = new PostedJournalInfo { Rows = new List<JournalRow>() };
             string sql = @"SELECT
@@ -697,42 +745,71 @@ namespace VASLogic.Models
                            WHERE fa.AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName = 'C_Invoice')
                              AND fa.Record_ID = @C_Invoice_ID
                              AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID
-                           ORDER BY fa.AmtAcctDr DESC";
+                           ORDER BY fa.AmtAcctDr DESC, fa.Fact_Acct_ID";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += PagingSuffix(page, pageSize);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
-            if (ds == null || ds.Tables.Count == 0) return pj;
-
-            decimal totDr = 0m, totCr = 0m;
-            foreach (DataRow r in ds.Tables[0].Rows)
+            if (ds != null && ds.Tables.Count > 0)
             {
-                JournalRow jr = new JournalRow();
-                jr.AccountValue = Util.GetValueOfString(r["AccountValue"]);
-                jr.AccountName = Util.GetValueOfString(r["AccountName"]);
-                jr.Description = Util.GetValueOfString(r["Description"]);
-                jr.OrgName = Util.GetValueOfString(r["OrgName"]);
-                jr.BPName = Util.GetValueOfString(r["BPName"]);
-                jr.ProductName = Util.GetValueOfString(r["ProductName"]);
-                jr.OrgTrxName = Util.GetValueOfString(r["OrgTrxName"]);
-                jr.AmtAcctDr = Util.GetValueOfDecimal(r["AmtAcctDr"]);
-                jr.AmtAcctCr = Util.GetValueOfDecimal(r["AmtAcctCr"]);
-                pj.Rows.Add(jr);
-                totDr += jr.AmtAcctDr;
-                totCr += jr.AmtAcctCr;
-                if (!pj.PostingDate.HasValue) pj.PostingDate = Util.GetValueOfDateTime(r["DateAcct"]);
-                if (string.IsNullOrEmpty(pj.PeriodName)) pj.PeriodName = Util.GetValueOfString(r["PeriodName"]);
-                if (string.IsNullOrEmpty(pj.CurSymbol))
+                foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    pj.CurSymbol = Util.GetValueOfString(r["AcctCurSymbol"]);
-                    pj.StdPrecision = Util.GetValueOfInt(r["AcctStdPrecision"]);
+                    JournalRow jr = new JournalRow();
+                    jr.AccountValue = Util.GetValueOfString(r["AccountValue"]);
+                    jr.AccountName = Util.GetValueOfString(r["AccountName"]);
+                    jr.Description = Util.GetValueOfString(r["Description"]);
+                    jr.OrgName = Util.GetValueOfString(r["OrgName"]);
+                    jr.BPName = Util.GetValueOfString(r["BPName"]);
+                    jr.ProductName = Util.GetValueOfString(r["ProductName"]);
+                    jr.OrgTrxName = Util.GetValueOfString(r["OrgTrxName"]);
+                    jr.AmtAcctDr = Util.GetValueOfDecimal(r["AmtAcctDr"]);
+                    jr.AmtAcctCr = Util.GetValueOfDecimal(r["AmtAcctCr"]);
+                    pj.Rows.Add(jr);
+                    if (!pj.PostingDate.HasValue) pj.PostingDate = Util.GetValueOfDateTime(r["DateAcct"]);
+                    if (string.IsNullOrEmpty(pj.PeriodName)) pj.PeriodName = Util.GetValueOfString(r["PeriodName"]);
+                    if (string.IsNullOrEmpty(pj.CurSymbol))
+                    {
+                        pj.CurSymbol = Util.GetValueOfString(r["AcctCurSymbol"]);
+                        pj.StdPrecision = Util.GetValueOfInt(r["AcctStdPrecision"]);
+                    }
                 }
             }
-            pj.TotalDr = totDr;
-            pj.TotalCr = totCr;
+
+            // Footer totals + count over ALL fact lines (independent of the page). These
+            // do not change between pages, so they are computed ONLY on the initial load
+            // (includeTotals); page fetches skip this aggregate query.
+            if (includeTotals)
+            {
+                string aggSql = @"SELECT COUNT(fa.Fact_Acct_ID) AS Total,
+                                         COALESCE(SUM(fa.AmtAcctDr), 0) AS TotDr,
+                                         COALESCE(SUM(fa.AmtAcctCr), 0) AS TotCr
+                                    FROM Fact_Acct fa
+                                    INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = fa.AD_Client_ID)
+                                   WHERE fa.AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table WHERE TableName = 'C_Invoice')
+                                     AND fa.Record_ID = @C_Invoice_ID
+                                     AND fa.C_AcctSchema_ID = ci.C_AcctSchema1_ID";
+                aggSql = MRole.GetDefault(ctx).AddAccessSQL(aggSql, "fa", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+                DataSet ads = DB.ExecuteDataset(aggSql,
+                    new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
+                if (ads != null && ads.Tables.Count > 0 && ads.Tables[0].Rows.Count > 0)
+                {
+                    DataRow ar = ads.Tables[0].Rows[0];
+                    pj.Total = Util.GetValueOfInt(ar["Total"]);
+                    pj.TotalDr = Util.GetValueOfDecimal(ar["TotDr"]);
+                    pj.TotalCr = Util.GetValueOfDecimal(ar["TotCr"]);
+                }
+            }
             return pj;
+        }
+
+        /// <summary>Page of posted-journal rows for the pager (rows only - totals/count are
+        /// already on the client from the initial load, so the aggregate is not recomputed).</summary>
+        public PostedJournalInfo GetPostedJournalPage(Ctx ctx, int C_Invoice_ID, int page, int pageSize)
+        {
+            return LoadPostedJournal(ctx, C_Invoice_ID, page, pageSize > 0 ? pageSize : JOURNAL_PAGE_SIZE, false);
         }
 
         #endregion
@@ -784,28 +861,19 @@ namespace VASLogic.Models
                 meta.NetOpenAmount = head.OpenAmount;
             }
 
-            meta.OnAccountPayments = LoadOnAccountPayments(ctx, head.AD_Client_ID, head.C_BPartner_ID, head.IsAPCreditNote);
-            // Vendor credit notes are offsetting sources for an invoice; they do not apply
-            // to another credit note, so the list is empty in credit-note mode.
-            //meta.CreditNotes = head.IsAPCreditNote
-            //    ? new List<AvailableCreditRow>()
-            //    : LoadVendorCreditNotes(ctx, head.AD_Client_ID, head.C_BPartner_ID);
-
-            // "Available to apply" is shown in the invoice currency: convert each
-            // on-account payment / credit note to the invoice currency on the current
-            // date and sum the converted amounts.
-            decimal avail = 0;
+            // First page of on-account payments (server-side paged). The page rows are
+            // converted for display; total count + "Available to apply" come from a
+            // full aggregate pass so they are not limited to the page.
+            meta.OnAccountPayments = LoadOnAccountPayments(ctx, head.AD_Client_ID, head.C_BPartner_ID, head.IsAPCreditNote, 0, ONACCOUNT_PAGE_SIZE);
             foreach (AvailableCreditRow c in meta.OnAccountPayments)
             {
                 ConvertRowToInvoiceCurrency(ctx, c, head);
-                avail += c.AvailableAmountInv;
             }
-            //foreach (AvailableCreditRow c in meta.CreditNotes)
-            //{
-            //    ConvertRowToInvoiceCurrency(ctx, c, head);
-            //    avail += c.AvailableAmountInv;
-            //}
-            meta.AvailableToApply = avail;
+            int oaTotal;
+            decimal oaAvail;
+            LoadOnAccountAggregate(ctx, head.AD_Client_ID, head.C_BPartner_ID, head.IsAPCreditNote, head, out oaTotal, out oaAvail);
+            meta.OnAccountPaymentsTotal = oaTotal;
+            meta.AvailableToApply = oaAvail;
             meta.BankAccounts = LoadBankAccounts(role, head.AD_Org_ID);
             meta.PaymentMethods = LoadPaymentMethods(role, head.AD_Org_ID);
             // Currency + conversion-type selectors on the modal.
@@ -908,8 +976,21 @@ namespace VASLogic.Models
             }, null));
         }
 
-        /// <summary>Available (unallocated) on-account vendor payments.</summary>
-        private List<AvailableCreditRow> LoadOnAccountPayments(Ctx ctx, int AD_Client_ID, int C_BPartner_ID, bool IsCreditNote)
+        /// <summary>
+        /// SQL filter that keeps the displayable on-account payments. The sign of the
+        /// available amount selects the set: invoice mode (not a credit note) keeps
+        /// avail &lt;= 0; credit-note mode keeps avail &gt; 0. Pushed into SQL so paging and
+        /// the row count are correct.
+        /// </summary>
+        private string OnAccountSignFilter(bool IsCreditNote)
+        {
+            return IsCreditNote
+                ? " AND ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) > 0"
+                : " AND ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) <= 0";
+        }
+
+        /// <summary>Available (unallocated) on-account vendor payments (one page).</summary>
+        private List<AvailableCreditRow> LoadOnAccountPayments(Ctx ctx, int AD_Client_ID, int C_BPartner_ID, bool IsCreditNote, int page, int pageSize)
         {
             List<AvailableCreditRow> list = new List<AvailableCreditRow>();
             string sql = @"SELECT
@@ -937,9 +1018,11 @@ namespace VASLogic.Models
                              AND COALESCE(p.IsAllocated, 'N') = 'N'
                              AND p.C_Invoice_ID IS NULL
                              AND p.C_Charge_ID IS NULL
-                             AND p.C_Order_ID IS NULL
-                           ORDER BY p.DateAcct, p.DocumentNo";
+                             AND p.C_Order_ID IS NULL";
+            sql += OnAccountSignFilter(IsCreditNote);
+            sql += " ORDER BY p.DateAcct, p.DocumentNo, p.C_Payment_ID";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += PagingSuffix(page, pageSize);
 
             DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[]
             {
@@ -951,16 +1034,6 @@ namespace VASLogic.Models
             foreach (DataRow r in ds.Tables[0].Rows)
             {
                 decimal avail = Util.GetValueOfDecimal(r["AvailableAmount"]);
-                // for AP Payment < 0, AP Credit Note
-                if (avail > 0 && !IsCreditNote)
-                {
-                    continue;
-                }
-                // for AP Payment > 0, AP Invoive
-                else if (avail <= 0 && IsCreditNote)
-                {
-                    continue;
-                }
                 list.Add(new AvailableCreditRow
                 {
                     SourceType = "PAYMENT",
@@ -979,6 +1052,74 @@ namespace VASLogic.Models
                 });
             }
             return list;
+        }
+
+        /// <summary>
+        /// Aggregate over ALL displayable on-account payments (independent of the page):
+        /// total row count and the "available to apply" sum converted into the invoice
+        /// currency. The conversion is per row, so this scans the full set (light columns).
+        /// </summary>
+        private void LoadOnAccountAggregate(Ctx ctx, int AD_Client_ID, int C_BPartner_ID, bool IsCreditNote,
+            APInvoicePanelData head, out int total, out decimal availToApply)
+        {
+            total = 0;
+            availToApply = 0m;
+            string sql = @"SELECT p.AD_Org_ID, p.C_Currency_ID, p.C_ConversionType_ID, p.DateAcct,
+                                  ALLOCPAYMENTAVAILABLE(p.C_Payment_ID) AS AvailableAmount
+                             FROM C_Payment p
+                            WHERE p.AD_Client_ID = @AD_Client_ID
+                              AND p.C_BPartner_ID = @C_BPartner_ID
+                              AND p.IsReceipt = 'N'
+                              AND p.IsActive = 'Y'
+                              AND p.DocStatus IN ('CO','CL')
+                              AND COALESCE(p.IsAllocated, 'N') = 'N'
+                              AND p.C_Invoice_ID IS NULL
+                              AND p.C_Charge_ID IS NULL
+                              AND p.C_Order_ID IS NULL";
+            sql += OnAccountSignFilter(IsCreditNote);
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "p", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[]
+            {
+                new SqlParameter("@AD_Client_ID", AD_Client_ID),
+                new SqlParameter("@C_BPartner_ID", C_BPartner_ID)
+            }, null);
+            if (ds == null || ds.Tables.Count == 0) return;
+
+            foreach (DataRow r in ds.Tables[0].Rows)
+            {
+                total++;
+                AvailableCreditRow tmp = new AvailableCreditRow
+                {
+                    AvailableAmount = Math.Abs(Util.GetValueOfDecimal(r["AvailableAmount"])),
+                    AD_Org_ID = Util.GetValueOfInt(r["AD_Org_ID"]),
+                    C_Currency_ID = Util.GetValueOfInt(r["C_Currency_ID"]),
+                    C_ConversionType_ID = Util.GetValueOfInt(r["C_ConversionType_ID"]),
+                    DateAcct = Util.GetValueOfDateTime(r["DateAcct"])
+                };
+                ConvertRowToInvoiceCurrency(ctx, tmp, head);
+                availToApply += tmp.AvailableAmountInv;
+            }
+        }
+
+        /// <summary>
+        /// Page of on-account payment rows (converted for display) for the pager. The
+        /// vendor, invoice currency and credit-note flag are passed from the frontend
+        /// (already known from the modal meta) so the header is NOT re-queried per page;
+        /// AD_Client_ID is taken from the trusted session ctx, not the client request.
+        /// </summary>
+        public List<AvailableCreditRow> GetOnAccountPaymentsPage(Ctx ctx, int C_BPartner_ID, bool IsCreditNote,
+            int C_Currency_ID, int page, int pageSize)
+        {
+            if (C_BPartner_ID <= 0) return new List<AvailableCreditRow>();
+            APInvoicePanelData head = new APInvoicePanelData
+            {
+                AD_Client_ID = ctx.GetAD_Client_ID(),
+                C_Currency_ID = C_Currency_ID
+            };
+            List<AvailableCreditRow> rows = LoadOnAccountPayments(ctx, head.AD_Client_ID, C_BPartner_ID,
+                IsCreditNote, page, pageSize > 0 ? pageSize : ONACCOUNT_PAGE_SIZE);
+            foreach (AvailableCreditRow c in rows) ConvertRowToInvoiceCurrency(ctx, c, head);
+            return rows;
         }
 
         /// <summary>Open vendor credit notes available to apply on an AP invoice.</summary>
@@ -1753,12 +1894,11 @@ namespace VASLogic.Models
 
                 payment.SetDateTrx(txDate);
                 payment.SetDateAcct(txDate);
-                payment.SetPaymentAmount(inv.IsReturnTrx() ? decimal.Negate(payAmt) : payAmt);
+                payment.SetPayAmt(inv.IsReturnTrx() ? decimal.Negate(payAmt) : payAmt);
                 if (req.DiscountAmt > 0)
                 {
                     payment.SetDiscountAmt(inv.IsReturnTrx() ? decimal.Negate(req.DiscountAmt) : req.DiscountAmt);
                 }
-                payment.SetPayAmt(inv.IsReturnTrx() ? decimal.Negate(payAmt + req.DiscountAmt) : (payAmt + req.DiscountAmt));
 
                 // VA009_PaymentBaseType code 'S' = Check (per the codebase remap in
                 // MPaymentModel.GetBPartnerDetail; it maps to tender type 'K').
@@ -1891,10 +2031,10 @@ namespace VASLogic.Models
                         pa.SetC_InvoicePaySchedule_ID(planSchedId[i]);
                         pa.SetAmount(inv.IsReturnTrx() ? decimal.Negate(alloc) : alloc);
                         pa.SetDiscountAmt(inv.IsReturnTrx() ? decimal.Negate(disc) : disc);
-                        pa.SetInvoiceAmt(due);
                         // Keep Amount + Discount + OverUnderAmt = InvoiceAmt balanced
                         // (OverUnderAmt = the shortfall, 0 when the schedule is fully settled).
                         pa.SetOverUnderAmt(inv.IsReturnTrx() ? decimal.Negate(due - alloc - disc) : (due - alloc - disc));
+                        pa.SetInvoiceAmt(pa.GetAmount() + pa.GetDiscountAmt() + pa.GetWriteOffAmt() + pa.GetOverUnderAmt());
                         if (!pa.Save(trx))
                         {
                             result.Message = RetrieveErr(ctx, "VAS_065_PaymentSaveFailed");
@@ -2238,7 +2378,11 @@ namespace VASLogic.Models
             public List<LineRow> Lines { get; set; }
             public List<TaxRow> Taxes { get; set; }
             public WithholdingInfo Withholding { get; set; }
-            public List<ScheduleRow> PaymentSchedule { get; set; }
+            public List<ScheduleRow> PaymentSchedule { get; set; }   // first page only
+            // Schedule footer aggregates over ALL schedules (server-side paging).
+            public int ScheduleTotal { get; set; }
+            public decimal ScheduleOpenAmount { get; set; }
+            public bool ScheduleAnyHold { get; set; }
             public GoodsReceiptInfo GoodsReceipt { get; set; }
             public LandedCostInfo LandedCost { get; set; }
             public PostedJournalInfo PostedJournal { get; set; }
@@ -2351,7 +2495,8 @@ namespace VASLogic.Models
             // Base/accounting currency (primary accounting schema) the posted amounts are in.
             public string CurSymbol { get; set; }
             public int StdPrecision { get; set; }
-            public List<JournalRow> Rows { get; set; }
+            public List<JournalRow> Rows { get; set; }   // first page only
+            public int Total { get; set; }               // total fact lines (server-side paging)
         }
 
         public class JournalRow
@@ -2387,7 +2532,8 @@ namespace VASLogic.Models
             public decimal AvailableToApply { get; set; }
             public decimal CreditNoteAmount { get; set; }
             public decimal OpenInvoicesAvailable { get; set; }
-            public List<AvailableCreditRow> OnAccountPayments { get; set; }
+            public List<AvailableCreditRow> OnAccountPayments { get; set; }   // first page only
+            public int OnAccountPaymentsTotal { get; set; }                  // total (server-side paging)
             public List<AvailableCreditRow> CreditNotes { get; set; }
             public List<OpenInvoiceRow> OpenInvoices { get; set; }
             public List<BankAccountOption> BankAccounts { get; set; }
