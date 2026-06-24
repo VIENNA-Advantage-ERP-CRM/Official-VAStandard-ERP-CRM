@@ -908,14 +908,7 @@
                         escapeHtml(method) +
                         '</td>' +
 
-                        '<td class="vas-cpa-td-reason" ' +
-                        'title="' +
-                        escapeHtml(reason) +
-                        '">' +
-                        '<span class="vas-cpa-truncate">' +
-                        escapeHtml(reason) +
-                        '</span>' +
-                        '</td>' +
+                       
 
                         '</tr>'
                     );

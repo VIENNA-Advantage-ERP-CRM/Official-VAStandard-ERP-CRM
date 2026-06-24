@@ -2589,24 +2589,17 @@
 
                 '<button type="button" class="' +
                 classPrefix +
-                'apply-high">' +
-
-                '<svg viewBox="0 0 24 24">' +
-                '<polyline points="20 6 9 17 4 12"></polyline>' +
-                "</svg>" +
-
-                "<span>" +
+                'open-form">' +
 
                 escapeHtml(
                     lbl(
-                        "VAS_072_ApplyHighConfidence",
-                        "Apply high-confidence"
+                        "VAS_072_OpenAllocationForm",
+                        "Open Allocation"
                     )
                 ) +
 
-                "</span>" +
+                " →</button>" +
 
-                "</button>" +
                 "</div>" +
 
                 '<div class="' +
@@ -2676,19 +2669,7 @@
                 "</button>" +
                 "</div>" +
 
-                '<button type="button" class="' +
-                classPrefix +
-                'open-form">' +
-
-                escapeHtml(
-                    lbl(
-                        "VAS_072_OpenAllocationForm",
-                        "Open allocation form"
-                    )
-                ) +
-
-                " →</button>" +
-
+              
                 "</div>" +
                 "</div>" +
                 "</div>"

@@ -384,7 +384,7 @@
 .VAS-072-MatchSuggestionAPPayment-open-form {
     flex: 0 1 auto;
     min-width: 0;
-    max-width: 8em;
+    max-width: 12em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

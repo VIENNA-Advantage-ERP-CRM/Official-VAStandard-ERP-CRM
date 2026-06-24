@@ -1,66 +1,18 @@
 ﻿/**
- * Upcoming runs
- * Purpose - Displays upcoming AP payment runs due within the next 7 days,
- * grouped by payment method and due date.
+ * VAS_031 Upcoming AP Runs Widget
  *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Upcoming runs                        | VAS_031_MessageUpcomingRuns
- *  2  | Next 7 days                          | VAS_031_MessageNext7Days
- *  3  | payment                              | VAS_031_MessagePayment
- *  4  | payments                             | VAS_031_MessagePayments
- *  5  | Loading                              | VAS_031_MessageLoading
- *  6  | No Data                              | VAS_031_MessageNoData
- *  7  | Previous                             | VAS_Previous
- *  8  | Next                                 | VAS_Next
- *  9  | Could not load data                  | VAS_ErrorLoading
- * 10  | Of                                   | VAS_Of
- * 11  | Not Specified                        | VAS_031_MessageNotSpecified
- * 12  | Pay                                  | VAS_031_MessagePay
- * 13  | Create Payment                       | VAS_031_MessageCreatePayment
- * 14  | Pre-filled from upcoming             | VAS_031_MessagePrefilledFromUpcoming
- * 15  | Loading payment details              | VAS_031_MessageLoadingDetails
- * 16  | Organization                         | VAS_031_MessageOrganization
- * 17  | Bank Account                         | VAS_031_MessageBankAccount
- * 18  | Transaction Date                     | VAS_031_MessageTransactionDate
- * 19  | Vendor                               | VAS_031_MessageVendor
- * 20  | Currency                             | VAS_PaymentCurrency
- * 21  | Currency Type                        | VAS_031_MessageCurrencyType
- * 22  | Spot                                 | VAS_031_MessageSpot
- * 23  | Document Type                        | VAS_031_MessageDocumentType
- * 24  | Tender Type                          | VAS_031_MessageTenderType
- * 25  | Payment Amount                       | VAS_031_MessagePaymentAmount
- * 26  | Document No.                         | VAS_031_MessageDocumentNo
- * 27  | pre-filled                           | VAS_031_MessagePrefilled
- * 28  | Select                               | VAS_Select
- * 29  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
- * 30  | Review and save.                     | VAS_031_MessageReviewAndSave
- * 31  | Organization is required.            | VAS_031_MessageOrganizationRequired
- * 32  | Bank account is required.            | VAS_031_MessageBankAccountRequired
- * 33  | Vendor is required.                  | VAS_031_MessageVendorRequired
- * 34  | Currency is required.                | VAS_031_MessageCurrencyRequired
- * 35  | Currency type is required.           | VAS_031_MessageConversionTypeRequired
- * 36  | Document type is required.           | VAS_031_MessageDocumentTypeRequired
- * 37  | Tender type is required.             | VAS_031_MessageTenderTypeRequired
- * 38  | Transaction date is required.        | VAS_031_MessageTransactionDateRequired
- * 39  | Payment amount must be greater...    | VAS_031_MessagePaymentAmountRequired
- * 40  | Saving                               | VAS_031_MessageSaving
- * 41  | Save payment                         | VAS_031_MessageSavePayment
- * 42  | Close                                | VAS_Close
- * 43  | Generated from Upcoming · 7 days     | VAS_031_MessageGeneratedFromUpcoming
- * 44  | Cancel                               | VAS_Cancel
- * 45  | Transaction date must be in...       | VAS_031_MessageTransactionDateInvalid
- * 46  | Could not save AP payment            | VAS_031_MessageCouldNotSaveAPPayment
- * 47  | Upcoming AP payment created...       | VAS_031_MessagePaymentCreatedSuccessfully
- * ─────────────────────────────────────────────────────────────────────
+ * Source:
+ *     C_Invoice
+ *
+ * Grouping:
+ *     Due Date + Payment Method + Currency
+ *
+ * Popup:
+ *     Displays individual invoices.
+ *
+ * Create:
+ *     Creates C_Payment linked with C_Invoice_ID.
  */
-
-/**
-* Upcoming runs
-* Purpose - Displays upcoming AP payment runs due within the next 7 days
-* and creates a new AP payment from a selected upcoming payment.
-*/
 
 ; VAS = window.VAS || {};
 
@@ -91,6 +43,7 @@
         var $payDialogTitle = null;
         var $payDialogSub = null;
         var $payDialogNotice = null;
+        var $invoiceList = null;
         var $payDialogGrid = null;
         var $payDialogSave = null;
         var $payDialogSaveLabel = null;
@@ -100,11 +53,11 @@
         var saveInProgress = false;
 
         var runsData = [];
-        var paymentRows = [];
+        var invoiceRows = [];
         var popupLookups = null;
 
         var selectedRun = null;
-        var selectedPaymentRow = null;
+        var selectedInvoiceRow = null;
 
         var pageNo = 1;
         var pageSize = 3;
@@ -205,7 +158,7 @@
         function firstPositiveValue() {
             var i;
             var value;
-            var numericValue;
+            var numberValue;
 
             for (
                 i = 0;
@@ -222,407 +175,17 @@
                     continue;
                 }
 
-                numericValue = Number(value);
+                numberValue = Number(value);
 
                 if (
-                    !isNaN(numericValue) &&
-                    numericValue > 0
+                    !isNaN(numberValue) &&
+                    numberValue > 0
                 ) {
-                    return value;
+                    return numberValue;
                 }
             }
 
-            return '';
-        }
-
-        function getLookup(name) {
-            if (
-                popupLookups &&
-                $.isArray(
-                    popupLookups[name]
-                )
-            ) {
-                return popupLookups[name];
-            }
-
-            return [];
-        }
-
-        function getLookupAny(names) {
-            var i;
-            var items;
-
-            names = $.isArray(names)
-                ? names
-                : [];
-
-            for (
-                i = 0;
-                i < names.length;
-                i++
-            ) {
-                items = getLookup(
-                    names[i]
-                );
-
-                if (items.length > 0) {
-                    return items;
-                }
-            }
-
-            return [];
-        }
-
-        function getLookupItemValue(
-            item,
-            valueProp
-        ) {
-            item = item || {};
-
-            if (
-                valueProp &&
-                item[valueProp] !== undefined &&
-                item[valueProp] !== null
-            ) {
-                return item[valueProp];
-            }
-
-            if (
-                item.id !== undefined &&
-                item.id !== null
-            ) {
-                return item.id;
-            }
-
-            if (
-                item.value !== undefined &&
-                item.value !== null
-            ) {
-                return item.value;
-            }
-
-            if (
-                item.key !== undefined &&
-                item.key !== null
-            ) {
-                return item.key;
-            }
-
-            if (
-                item.code !== undefined &&
-                item.code !== null
-            ) {
-                return item.code;
-            }
-
-            return '';
-        }
-
-        function getLookupItemText(
-            item,
-            textProp,
-            value
-        ) {
-            item = item || {};
-
-            if (
-                textProp &&
-                item[textProp] !== undefined &&
-                item[textProp] !== null
-            ) {
-                return item[textProp];
-            }
-
-            return firstValue(
-                item.name,
-                item.text,
-                item.label,
-                item.description,
-                item.documentNo,
-                item.code,
-                value
-            );
-        }
-
-        /*
-         * ترجع القيمة فقط إذا كانت موجودة فعليًا
-         * داخل اللستة القادمة من الباك.
-         */
-        function getValidLookupValue(
-            items,
-            requestedValue
-        ) {
-            var i;
-            var itemValue;
-
-            items = $.isArray(items)
-                ? items
-                : [];
-
-            if (
-                requestedValue === undefined ||
-                requestedValue === null ||
-                String(requestedValue).trim() === '' ||
-                String(requestedValue).trim() === '0'
-            ) {
-                return '';
-            }
-
-            for (
-                i = 0;
-                i < items.length;
-                i++
-            ) {
-                itemValue =
-                    getLookupItemValue(
-                        items[i]
-                    );
-
-                if (
-                    String(itemValue) ===
-                    String(requestedValue)
-                ) {
-                    return itemValue;
-                }
-            }
-
-            return '';
-        }
-
-        function getFirstLookupValue(items) {
-            var i;
-            var value;
-
-            items = $.isArray(items)
-                ? items
-                : [];
-
-            for (
-                i = 0;
-                i < items.length;
-                i++
-            ) {
-                value =
-                    getLookupItemValue(
-                        items[i]
-                    );
-
-                if (
-                    value !== undefined &&
-                    value !== null &&
-                    String(value).trim() !== ''
-                ) {
-                    return value;
-                }
-            }
-
-            return '';
-        }
-
-        function getFirstPositiveLookupValue(
-            items
-        ) {
-            var i;
-            var value;
-            var numericValue;
-
-            items = $.isArray(items)
-                ? items
-                : [];
-
-            for (
-                i = 0;
-                i < items.length;
-                i++
-            ) {
-                value =
-                    getLookupItemValue(
-                        items[i]
-                    );
-
-                numericValue = Number(value);
-
-                if (
-                    !isNaN(numericValue) &&
-                    numericValue > 0
-                ) {
-                    return value;
-                }
-            }
-
-            return '';
-        }
-
-        /*
-         * لا تتم إضافة fallback option.
-         * جميع الخيارات يجب أن تأتي من الباك.
-         */
-        function selectHtml(
-            fieldName,
-            items,
-            selectedValue,
-            textProp,
-            valueProp
-        ) {
-            var html;
-            var i;
-            var item;
-            var value;
-            var text;
-            var selected;
-
-            items = $.isArray(items)
-                ? items
-                : [];
-
-            html =
-                '<select ' +
-                'class="vas-upcoming-ap-runs-edit-control" ' +
-                'data-pay-field="' +
-                escapeHtml(fieldName) +
-                '">';
-
-            html +=
-                '<option value="">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_Select',
-                        'Select'
-                    )
-                ) +
-                '</option>';
-
-            for (
-                i = 0;
-                i < items.length;
-                i++
-            ) {
-                item = items[i] || {};
-
-                value =
-                    getLookupItemValue(
-                        item,
-                        valueProp
-                    );
-
-                if (
-                    value === undefined ||
-                    value === null ||
-                    String(value).trim() === ''
-                ) {
-                    continue;
-                }
-
-                text =
-                    getLookupItemText(
-                        item,
-                        textProp,
-                        value
-                    );
-
-                selected =
-                    String(value) ===
-                    String(selectedValue);
-
-                html +=
-                    '<option value="' +
-                    escapeHtml(value) +
-                    '"' +
-                    (
-                        selected
-                            ? ' selected'
-                            : ''
-                    ) +
-                    '>' +
-                    escapeHtml(
-                        text || value
-                    ) +
-                    '</option>';
-            }
-
-            html += '</select>';
-
-            return html;
-        }
-
-        function inputHtml(
-            fieldName,
-            type,
-            value,
-            step
-        ) {
-            var html =
-                '<input ' +
-                'class="vas-upcoming-ap-runs-edit-control" ' +
-                'data-pay-field="' +
-                escapeHtml(fieldName) +
-                '" ' +
-                'type="' +
-                escapeHtml(type) +
-                '" ' +
-                'value="' +
-                escapeHtml(
-                    value == null
-                        ? ''
-                        : value
-                ) +
-                '"';
-
-            if (step) {
-                html +=
-                    ' step="' +
-                    escapeHtml(step) +
-                    '"';
-            }
-
-            html += '>';
-
-            return html;
-        }
-
-        function fieldHtml(
-            label,
-            controlHtml,
-            prefilled
-        ) {
-            return (
-                '<div class="vas-upcoming-ap-runs-field' +
-                (
-                    prefilled
-                        ? ' is-prefilled'
-                        : ''
-                ) +
-                '">' +
-
-                '<div class="vas-upcoming-ap-runs-field-label">' +
-
-                escapeHtml(label) +
-
-                (
-                    prefilled
-                        ? '<span>' +
-                        escapeHtml(
-                            lbl(
-                                'VAS_031_MessagePrefilled',
-                                'pre-filled'
-                            )
-                        ) +
-                        '</span>'
-                        : ''
-                ) +
-
-                '</div>' +
-
-                '<div class="vas-upcoming-ap-runs-field-value">' +
-
-                (
-                    controlHtml || ''
-                ) +
-
-                '</div>' +
-
-                '</div>'
-            );
+            return 0;
         }
 
         function parseDateValue(value) {
@@ -646,17 +209,13 @@
                 );
 
                 if (!isNaN(timestamp)) {
-                    return new Date(
-                        timestamp
-                    );
+                    return new Date(timestamp);
                 }
             }
 
             if (
                 typeof value === 'string' &&
-                /^\d{4}-\d{2}-\d{2}$/.test(
-                    value
-                )
+                /^\d{4}-\d{2}-\d{2}$/.test(value)
             ) {
                 parts = value.split('-');
 
@@ -666,25 +225,20 @@
                     Number(parts[2])
                 );
 
-                return isNaN(
-                    date.getTime()
-                )
+                return isNaN(date.getTime())
                     ? null
                     : date;
             }
 
             date = new Date(value);
 
-            return isNaN(
-                date.getTime()
-            )
+            return isNaN(date.getTime())
                 ? null
                 : date;
         }
 
         function formatDate(value) {
-            var date =
-                parseDateValue(value);
+            var date = parseDateValue(value);
 
             if (!date) {
                 return value || '';
@@ -712,15 +266,12 @@
 
             if (
                 typeof value === 'string' &&
-                /^\d{4}-\d{2}-\d{2}$/.test(
-                    value
-                )
+                /^\d{4}-\d{2}-\d{2}$/.test(value)
             ) {
                 return value;
             }
 
-            date =
-                parseDateValue(value);
+            date = parseDateValue(value);
 
             if (!date) {
                 return '';
@@ -757,30 +308,12 @@
             currencyISO,
             stdPrecision
         ) {
-            var numericValue =
-                Number(value || 0);
-
-            var precision =
-                Number(stdPrecision);
+            var numericValue = Number(value || 0);
+            var precision = Number(stdPrecision);
+            var amountText;
 
             if (isNaN(numericValue)) {
                 numericValue = 0;
-            }
-
-            if (
-                isNaN(precision) &&
-                VIS &&
-                VIS.Env &&
-                VIS.Env.getCtx &&
-                VIS.Env.getCtx() &&
-                VIS.Env.getCtx()
-                    .getStdPrecision
-            ) {
-                precision = Number(
-                    VIS.Env
-                        .getCtx()
-                        .getStdPrecision()
-                );
             }
 
             if (
@@ -790,26 +323,36 @@
                 precision = 2;
             }
 
-            return numericValue
-                .toLocaleString(
-                    window.navigator.language,
-                    {
-                        minimumFractionDigits:
-                            precision,
+            amountText = numericValue.toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: precision,
+                    maximumFractionDigits: precision
+                }
+            );
 
-                        maximumFractionDigits:
-                            precision
-                    }
-                );
+            return (
+                (
+                    currencySymbol ||
+                    currencyISO ||
+                    ''
+                ) +
+                (
+                    currencySymbol ||
+                        currencyISO
+                        ? ' '
+                        : ''
+                ) +
+                amountText
+            );
         }
 
         function normalizeNumber(value) {
-            var numericValue =
-                Number(value || 0);
+            var numberValue = Number(value || 0);
 
-            return isNaN(numericValue)
+            return isNaN(numberValue)
                 ? '0'
-                : String(numericValue);
+                : String(numberValue);
         }
 
         function showBusy(show) {
@@ -858,106 +401,395 @@
             );
         }
 
-        function pickRunValue(
-            run,
-            camelName,
-            fallbackName
-        ) {
-            if (!run) {
-                return null;
-            }
-
+        function getLookup(name) {
             if (
-                run[camelName] !== undefined &&
-                run[camelName] !== null &&
-                run[camelName] !== ''
+                popupLookups &&
+                $.isArray(popupLookups[name])
             ) {
-                return run[camelName];
+                return popupLookups[name];
             }
 
-            if (
-                run[fallbackName] !== undefined &&
-                run[fallbackName] !== null &&
-                run[fallbackName] !== ''
-            ) {
-                return run[fallbackName];
-            }
-
-            return null;
+            return [];
         }
 
-        function getPaymentLabel(count) {
-            return Number(count) === 1
-                ? lbl(
-                    'VAS_031_MessagePayment',
-                    'payment'
-                )
-                : lbl(
-                    'VAS_031_MessagePayments',
-                    'payments'
+        function getLookupAny(names) {
+            var i;
+            var list;
+
+            names = $.isArray(names)
+                ? names
+                : [];
+
+            for (
+                i = 0;
+                i < names.length;
+                i++
+            ) {
+                list = getLookup(names[i]);
+
+                if (list.length > 0) {
+                    return list;
+                }
+            }
+
+            return [];
+        }
+
+        function getLookupItemValue(
+            item,
+            valueProp
+        ) {
+            item = item || {};
+
+            if (
+                valueProp &&
+                item[valueProp] !== undefined &&
+                item[valueProp] !== null
+            ) {
+                return item[valueProp];
+            }
+
+            if (
+                item.id !== undefined &&
+                item.id !== null
+            ) {
+                return item.id;
+            }
+
+            if (
+                item.value !== undefined &&
+                item.value !== null
+            ) {
+                return item.value;
+            }
+
+            if (
+                item.code !== undefined &&
+                item.code !== null
+            ) {
+                return item.code;
+            }
+
+            return '';
+        }
+
+        function getLookupItemText(
+            item,
+            textProp,
+            value
+        ) {
+            item = item || {};
+
+            if (
+                textProp &&
+                item[textProp] !== undefined &&
+                item[textProp] !== null
+            ) {
+                return item[textProp];
+            }
+
+            return firstValue(
+                item.name,
+                item.text,
+                item.label,
+                item.description,
+                item.code,
+                value
+            );
+        }
+
+        function getValidLookupValue(
+            items,
+            requestedValue
+        ) {
+            var i;
+            var itemValue;
+
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            if (
+                requestedValue === undefined ||
+                requestedValue === null ||
+                String(requestedValue).trim() === '' ||
+                String(requestedValue).trim() === '0'
+            ) {
+                return '';
+            }
+
+            for (
+                i = 0;
+                i < items.length;
+                i++
+            ) {
+                itemValue = getLookupItemValue(
+                    items[i]
                 );
+
+                if (
+                    String(itemValue) ===
+                    String(requestedValue)
+                ) {
+                    return itemValue;
+                }
+            }
+
+            return '';
+        }
+
+        function getFirstLookupValue(items) {
+            var i;
+            var value;
+
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            for (
+                i = 0;
+                i < items.length;
+                i++
+            ) {
+                value = getLookupItemValue(
+                    items[i]
+                );
+
+                if (
+                    value !== undefined &&
+                    value !== null &&
+                    String(value).trim() !== ''
+                ) {
+                    return value;
+                }
+            }
+
+            return '';
+        }
+
+        function getFirstPositiveLookupValue(items) {
+            var i;
+            var value;
+            var numberValue;
+
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            for (
+                i = 0;
+                i < items.length;
+                i++
+            ) {
+                value = getLookupItemValue(
+                    items[i]
+                );
+
+                numberValue = Number(value);
+
+                if (
+                    !isNaN(numberValue) &&
+                    numberValue > 0
+                ) {
+                    return value;
+                }
+            }
+
+            return '';
+        }
+
+        function selectHtml(
+            fieldName,
+            items,
+            selectedValue,
+            disabled
+        ) {
+            var html;
+            var i;
+            var item;
+            var value;
+            var text;
+            var selected;
+
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            html =
+                '<select ' +
+                'class="vas-upcoming-ap-runs-edit-control" ' +
+                'data-pay-field="' +
+                escapeHtml(fieldName) +
+                '"' +
+                (
+                    disabled
+                        ? ' disabled'
+                        : ''
+                ) +
+                '>';
+
+            html +=
+                '<option value="">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Select',
+                        'Select'
+                    )
+                ) +
+                '</option>';
+
+            for (
+                i = 0;
+                i < items.length;
+                i++
+            ) {
+                item = items[i] || {};
+
+                value = getLookupItemValue(item);
+
+                if (
+                    value === undefined ||
+                    value === null ||
+                    String(value).trim() === ''
+                ) {
+                    continue;
+                }
+
+                text = getLookupItemText(
+                    item,
+                    null,
+                    value
+                );
+
+                selected =
+                    String(value) ===
+                    String(selectedValue);
+
+                html +=
+                    '<option value="' +
+                    escapeHtml(value) +
+                    '"' +
+                    (
+                        selected
+                            ? ' selected'
+                            : ''
+                    ) +
+                    '>' +
+                    escapeHtml(text || value) +
+                    '</option>';
+            }
+
+            html += '</select>';
+
+            return html;
+        }
+
+        function inputHtml(
+            fieldName,
+            type,
+            value,
+            step,
+            readonly
+        ) {
+            var html =
+                '<input ' +
+                'class="vas-upcoming-ap-runs-edit-control" ' +
+                'data-pay-field="' +
+                escapeHtml(fieldName) +
+                '" ' +
+                'type="' +
+                escapeHtml(type) +
+                '" ' +
+                'value="' +
+                escapeHtml(
+                    value == null
+                        ? ''
+                        : value
+                ) +
+                '"';
+
+            if (step) {
+                html +=
+                    ' step="' +
+                    escapeHtml(step) +
+                    '"';
+            }
+
+            if (readonly) {
+                html += ' readonly';
+            }
+
+            html += '>';
+
+            return html;
+        }
+
+        function fieldHtml(
+            label,
+            controlHtml,
+            prefilled
+        ) {
+            return (
+                '<div class="vas-upcoming-ap-runs-field' +
+                (
+                    prefilled
+                        ? ' is-prefilled'
+                        : ''
+                ) +
+                '">' +
+
+                '<div class="vas-upcoming-ap-runs-field-label">' +
+
+                escapeHtml(label) +
+
+                (
+                    prefilled
+                        ? '<span>' +
+                        escapeHtml(
+                            lbl(
+                                'VAS_031_MessagePrefilled',
+                                'pre-filled'
+                            )
+                        ) +
+                        '</span>'
+                        : ''
+                ) +
+
+                '</div>' +
+
+                '<div class="vas-upcoming-ap-runs-field-value">' +
+                controlHtml +
+                '</div>' +
+
+                '</div>'
+            );
         }
 
         function getPaymentMethodClass(name) {
-            var method =
-                String(name || '')
-                    .toLowerCase();
+            var method = String(
+                name || ''
+            ).toLowerCase();
 
-            if (
-                method.indexOf('rtgs') >= 0
-            ) {
-                return (
-                    'vas-upcoming-ap-runs-bar-rtgs'
-                );
+            if (method.indexOf('rtgs') >= 0) {
+                return 'vas-upcoming-ap-runs-bar-rtgs';
             }
 
-            if (
-                method.indexOf('upi') >= 0
-            ) {
-                return (
-                    'vas-upcoming-ap-runs-bar-upi'
-                );
+            if (method.indexOf('upi') >= 0) {
+                return 'vas-upcoming-ap-runs-bar-upi';
             }
 
-            if (
-                method.indexOf('card') >= 0
-            ) {
-                return (
-                    'vas-upcoming-ap-runs-bar-card'
-                );
+            if (method.indexOf('card') >= 0) {
+                return 'vas-upcoming-ap-runs-bar-card';
             }
 
             if (
                 method.indexOf('cheque') >= 0 ||
                 method.indexOf('check') >= 0
             ) {
-                return (
-                    'vas-upcoming-ap-runs-bar-cheque'
-                );
+                return 'vas-upcoming-ap-runs-bar-cheque';
             }
 
-            return (
-                'vas-upcoming-ap-runs-bar-neft'
-            );
-        }
-
-        function getRunTitle(
-            paymentMethodName,
-            vendorName,
-            count
-        ) {
-            if (
-                Number(count) === 1 &&
-                vendorName
-            ) {
-                return (
-                    paymentMethodName +
-                    ' · ' +
-                    vendorName
-                );
-            }
-
-            return paymentMethodName;
+            return 'vas-upcoming-ap-runs-bar-neft';
         }
 
         function createRunRow(run) {
@@ -969,34 +801,28 @@
                 );
 
             var paymentCount =
-                Number(
-                    run.paymentCount || 0
-                );
+                Number(run.paymentCount || 0);
 
             var amount =
                 Number(
-                    pickRunValue(
-                        run,
-                        'totalAmount',
-                        'amount'
-                    ) || 0
-                );
-
-            var dueDateText =
-                pickRunValue(
-                    run,
-                    'dueDateText',
-                    'runDateText'
-                ) ||
-                formatDate(
-                    pickRunValue(
-                        run,
-                        'dueDate',
-                        'runDate'
+                    firstValue(
+                        run.totalAmount,
+                        run.amount,
+                        0
                     )
                 );
 
-            var metaParts = [];
+            var dueDateText =
+                firstValue(
+                    run.dueDateText,
+                    run.runDateText,
+                    formatDate(
+                        firstValue(
+                            run.dueDate,
+                            run.runDate
+                        )
+                    )
+                );
 
             var $row = $(
                 '<div class="vas-upcoming-ap-runs-row">'
@@ -1020,42 +846,25 @@
 
             var $title = $(
                 '<div class="vas-upcoming-ap-runs-run-title">'
-            ).text(
-                getRunTitle(
-                    paymentMethodName,
-                    run.vendorName,
-                    paymentCount
-                )
-            );
+            ).text(paymentMethodName);
 
-            var $meta;
-            var $amount;
-            var $payButton;
-
-            if (dueDateText) {
-                metaParts.push(
-                    dueDateText
-                );
-            }
-
-            metaParts.push(
-                paymentCount
-                    .toLocaleString(
-                        window.navigator.language
-                    ) +
-                ' ' +
-                getPaymentLabel(
-                    paymentCount
-                )
-            );
-
-            $meta = $(
+            var $meta = $(
                 '<div class="vas-upcoming-ap-runs-meta">'
             ).text(
-                metaParts.join(' · ')
+                dueDateText +
+                ' · ' +
+                paymentCount.toLocaleString(
+                    window.navigator.language
+                ) +
+                ' ' +
+                (
+                    paymentCount === 1
+                        ? 'invoice'
+                        : 'invoices'
+                )
             );
 
-            $amount = $(
+            var $amount = $(
                 '<span class="vas-upcoming-ap-runs-amount">'
             ).text(
                 formatCurrencyAmount(
@@ -1066,22 +875,19 @@
                 )
             );
 
-            $payButton = $(
+            var $payButton = $(
                 '<button ' +
                 'type="button" ' +
-                'class="vas-upcoming-ap-runs-pay-btn">'
-            )
-                .text(
+                'class="vas-upcoming-ap-runs-pay-btn">' +
+                escapeHtml(
                     lbl(
                         'VAS_031_MessagePay',
                         'Pay'
                     )
-                )
-                .append(
-                    $(
-                        '<span class="vas-upcoming-ap-runs-pay-arrow">'
-                    ).text('›')
-                );
+                ) +
+                '<span class="vas-upcoming-ap-runs-pay-arrow">›</span>' +
+                '</button>'
+            );
 
             $payButton.on(
                 'click',
@@ -1089,6 +895,16 @@
                     event.preventDefault();
                     event.stopPropagation();
 
+                    openPayDialog(run);
+                }
+            );
+
+            /*
+             * الضغط على السطر أيضًا يفتح التفاصيل.
+             */
+            $row.on(
+                'click',
+                function () {
                     openPayDialog(run);
                 }
             );
@@ -1205,29 +1021,14 @@
                 ? $.grep(
                     data.runs,
                     function (run) {
-                        var amount =
-                            Number(
-                                pickRunValue(
-                                    run,
-                                    'totalAmount',
-                                    'amount'
-                                ) || 0
-                            );
-
-                        var count =
-                            Number(
-                                run.paymentCount || 0
-                            );
-
                         return (
-                            (
-                                !isNaN(amount) &&
-                                amount > 0
-                            ) ||
-                            (
-                                !isNaN(count) &&
-                                count > 0
-                            )
+                            Number(
+                                firstValue(
+                                    run.totalAmount,
+                                    run.amount,
+                                    0
+                                )
+                            ) > 0
                         );
                     }
                 )
@@ -1239,12 +1040,6 @@
             }
 
             pageNo = 1;
-
-            totalPages =
-                Math.ceil(
-                    runsData.length /
-                    pageSize
-                );
 
             renderPage();
         }
@@ -1273,10 +1068,7 @@
                         return;
                     }
 
-                    data =
-                        normalizeResponse(
-                            response
-                        );
+                    data = normalizeResponse(response);
 
                     if (
                         !data ||
@@ -1329,594 +1121,12 @@
             });
         }
 
-        function getBankAccountDisplay(row) {
-            var bankName =
-                row.bankName || '';
-
-            var accountName =
-                row.bankAccountName || '';
-
-            var accountNo =
-                row.bankAccountNo || '';
-
-            var tail = accountNo
-                ? String(accountNo)
-                    .slice(-4)
-                : '';
-
-            if (
-                bankName &&
-                accountName &&
-                tail
-            ) {
-                return (
-                    bankName +
-                    ' · ' +
-                    accountName +
-                    ' · ****' +
-                    tail
-                );
-            }
-
-            if (
-                bankName &&
-                tail
-            ) {
-                return (
-                    bankName +
-                    ' · ****' +
-                    tail
-                );
-            }
-
-            if (
-                accountName &&
-                tail
-            ) {
-                return (
-                    accountName +
-                    ' · ****' +
-                    tail
-                );
-            }
-
-            return (
-                accountName ||
-                bankName ||
-                (
-                    tail
-                        ? '****' + tail
-                        : ''
-                )
-            );
-        }
-
-        function renderPayDialogGrid(row) {
-            var organizations;
-            var bankAccounts;
-            var vendors;
-            var currencies;
-            var conversionTypes;
-            var documentTypes;
-            var tenderTypes;
-
-            var selectedOrganizationId;
-            var selectedBankAccountId;
-            var selectedVendorId;
-            var selectedCurrencyId;
-            var selectedConversionTypeId;
-            var selectedDocTypeId;
-            var selectedTenderType;
-
-            var transactionDate;
-            var paymentAmount;
-            var paymentDocumentNo;
-            var html;
-
-            if (
-                !$payDialogGrid ||
-                !row
-            ) {
-                return;
-            }
-
-            /*
-             * جميع اللستات من Response الباك.
-             */
-            organizations =
-                getLookup(
-                    'organizations'
-                );
-
-            bankAccounts =
-                getLookup(
-                    'bankAccounts'
-                );
-
-            vendors =
-                getLookup(
-                    'vendors'
-                );
-
-            currencies =
-                getLookup(
-                    'currencies'
-                );
-
-            conversionTypes =
-                getLookup(
-                    'conversionTypes'
-                );
-
-            documentTypes =
-                getLookupAny([
-                    'documentTypes',
-                    'docTypes'
-                ]);
-
-            tenderTypes =
-                getLookupAny([
-                    'tenderTypes',
-                    'paymentMethods'
-                ]);
-
-            selectedOrganizationId =
-                getValidLookupValue(
-                    organizations,
-                    firstPositiveValue(
-                        row.organizationId,
-                        row.adOrgId,
-
-                        selectedRun &&
-                        selectedRun.organizationId,
-
-                        selectedRun &&
-                        selectedRun.adOrgId
-                    )
-                );
-
-            selectedBankAccountId =
-                getValidLookupValue(
-                    bankAccounts,
-                    firstPositiveValue(
-                        row.bankAccountId,
-
-                        selectedRun &&
-                        selectedRun.bankAccountId
-                    )
-                );
-
-            /*
-             * مهم:
-             * إذا Business Partner الموجود بالسجل ليس Vendor،
-             * فلن يكون موجودًا داخل vendors،
-             * وبالتالي تبقى اللستة بدون تحديد بدل إرساله للباك.
-             */
-            selectedVendorId =
-                getValidLookupValue(
-                    vendors,
-                    firstPositiveValue(
-                        row.vendorId,
-                        row.cBPartnerId,
-
-                        selectedRun &&
-                        selectedRun.vendorId,
-
-                        selectedRun &&
-                        selectedRun.cBPartnerId
-                    )
-                );
-
-            selectedCurrencyId =
-                getValidLookupValue(
-                    currencies,
-                    firstPositiveValue(
-                        row.cCurrencyId,
-                        row.currencyId,
-
-                        selectedRun &&
-                        selectedRun.cCurrencyId,
-
-                        selectedRun &&
-                        selectedRun.currencyId
-                    )
-                );
-
-            selectedConversionTypeId =
-                getValidLookupValue(
-                    conversionTypes,
-                    firstPositiveValue(
-                        row.conversionTypeId,
-                        row.cConversionTypeId,
-
-                        selectedRun &&
-                        selectedRun.conversionTypeId,
-
-                        selectedRun &&
-                        selectedRun.cConversionTypeId
-                    )
-                );
-
-            selectedDocTypeId =
-                getValidLookupValue(
-                    documentTypes,
-                    firstPositiveValue(
-                        row.docTypeId,
-                        row.cDocTypeId,
-
-                        selectedRun &&
-                        selectedRun.docTypeId,
-
-                        selectedRun &&
-                        selectedRun.cDocTypeId
-                    )
-                );
-
-            /*
-             * إذا الـ Doc Type الأصلي صفر،
-             * اختار أول Doc Type صالح قادم من الباك.
-             */
-            if (!selectedDocTypeId) {
-                selectedDocTypeId =
-                    getFirstPositiveLookupValue(
-                        documentTypes
-                    );
-            }
-
-            selectedTenderType =
-                getValidLookupValue(
-                    tenderTypes,
-                    firstValue(
-                        row.tenderType,
-                        row.paymentMethodValue,
-
-                        selectedRun &&
-                        selectedRun.tenderType,
-
-                        selectedRun &&
-                        selectedRun.paymentMethodValue
-                    )
-                );
-
-            if (!selectedTenderType) {
-                selectedTenderType =
-                    getFirstLookupValue(
-                        tenderTypes
-                    );
-            }
-
-            transactionDate =
-                formatDateForInput(
-                    firstValue(
-                        row.transactionDate,
-                        row.dateTrx,
-
-                        selectedRun &&
-                        selectedRun.transactionDate,
-
-                        selectedRun &&
-                        selectedRun.runDate,
-
-                        selectedRun &&
-                        selectedRun.dueDate
-                    )
-                );
-
-            paymentAmount =
-                firstValue(
-                    row.amount,
-                    row.payAmt,
-
-                    selectedRun &&
-                    selectedRun.amount,
-
-                    selectedRun &&
-                    selectedRun.totalAmount,
-
-                    0
-                );
-
-            paymentDocumentNo =
-                firstValue(
-                    row.paymentDocumentNo,
-                    row.newPaymentDocumentNo,
-                    row.documentNo,
-                    ''
-                );
-
-            html =
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageOrganization',
-                        'Organization'
-                    ),
-
-                    selectHtml(
-                        'adOrgId',
-                        organizations,
-                        selectedOrganizationId
-                    ),
-
-                    false
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageBankAccount',
-                        'Bank Account'
-                    ),
-
-                    selectHtml(
-                        'bankAccountId',
-                        bankAccounts,
-                        selectedBankAccountId
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageTransactionDate',
-                        'Transaction Date'
-                    ),
-
-                    inputHtml(
-                        'transactionDate',
-                        'date',
-                        transactionDate
-                    ),
-
-                    false
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageVendor',
-                        'Vendor'
-                    ),
-
-                    selectHtml(
-                        'vendorId',
-                        vendors,
-                        selectedVendorId
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_PaymentCurrency',
-                        'Currency'
-                    ),
-
-                    selectHtml(
-                        'currencyId',
-                        currencies,
-                        selectedCurrencyId
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageCurrencyType',
-                        'Currency Type'
-                    ),
-
-                    selectHtml(
-                        'conversionTypeId',
-                        conversionTypes,
-                        selectedConversionTypeId
-                    ),
-
-                    false
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageDocumentType',
-                        'Document Type'
-                    ),
-
-                    selectHtml(
-                        'docTypeId',
-                        documentTypes,
-                        selectedDocTypeId
-                    ),
-
-                    false
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageTenderType',
-                        'Tender Type'
-                    ),
-
-                    selectHtml(
-                        'tenderType',
-                        tenderTypes,
-                        selectedTenderType
-                    ),
-
-                    false
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessagePaymentAmount',
-                        'Payment Amount'
-                    ),
-
-                    inputHtml(
-                        'payAmt',
-                        'number',
-                        normalizeNumber(
-                            paymentAmount
-                        ),
-                        '0.01'
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageDocumentNo',
-                        'Document No.'
-                    ),
-
-                    inputHtml(
-                        'documentNo',
-                        'text',
-                        paymentDocumentNo
-                    ),
-
-                    false
-                );
-
-            $payDialogGrid.html(html);
-        }
-
-        function updatePayNotice(row) {
-            var amountText;
-            var sourceDocumentNo;
-            var vendorName;
-
-            if (
-                !$payDialogNotice ||
-                !row
-            ) {
-                return;
-            }
-
-            amountText =
-                formatCurrencyAmount(
-                    firstValue(
-                        row.amount,
-                        row.payAmt,
-
-                        selectedRun &&
-                        selectedRun.totalAmount,
-
-                        0
-                    ),
-
-                    row.currencySymbol ||
-                    (
-                        selectedRun &&
-                        selectedRun.currencySymbol
-                    ),
-
-                    row.currencyISO ||
-                    (
-                        selectedRun &&
-                        selectedRun.currencyISO
-                    ),
-
-                    row.stdPrecision ||
-                    (
-                        selectedRun &&
-                        selectedRun.stdPrecision
-                    )
-                );
-
-            sourceDocumentNo =
-                firstValue(
-                    row.documentNo,
-                    row.invoiceDocumentNo,
-                    row.invoiceNo,
-                    ''
-                );
-
-            vendorName =
-                firstValue(
-                    row.vendorName,
-
-                    selectedRun &&
-                    selectedRun.vendorName,
-
-                    ''
-                );
-
-            $payDialogNotice
-                .removeClass(
-                    'vas-upcoming-ap-runs-pay-error'
-                )
-                .html(
-                    escapeHtml(
-                        lbl(
-                            'VAS_031_MessagePrefilledForInvoice',
-                            'Pre-filled for invoice'
-                        )
-                    ) +
-
-                    (
-                        sourceDocumentNo
-                            ? ' <strong>' +
-                            escapeHtml(
-                                sourceDocumentNo
-                            ) +
-                            '</strong>'
-                            : ''
-                    ) +
-
-                    (
-                        vendorName
-                            ? ' — ' +
-                            escapeHtml(
-                                vendorName
-                            )
-                            : ''
-                    ) +
-
-                    ' · ' +
-
-                    escapeHtml(
-                        amountText
-                    ) +
-
-                    '. ' +
-
-                    escapeHtml(
-                        lbl(
-                            'VAS_031_MessageReviewAndSave',
-                            'Review and save.'
-                        )
-                    )
-                );
-        }
-
-        function showPayError(message) {
-            if (!$payDialogNotice) {
-                return;
-            }
-
-            $payDialogNotice
-                .addClass(
-                    'vas-upcoming-ap-runs-pay-error'
-                )
-                .text(
-                    message ||
-                    lbl(
-                        'VAS_ErrorLoading',
-                        'Could not load data'
-                    )
-                );
-        }
-
         function setPayDialogBusy(
             show,
             isSaving
         ) {
             var busy = !!show;
-
-            var saving =
-                busy &&
-                !!isSaving;
+            var saving = busy && !!isSaving;
 
             if ($payDialogBusy) {
                 $payDialogBusy.toggleClass(
@@ -1929,7 +1139,8 @@
                 $payDialogSave
                     .prop(
                         'disabled',
-                        busy
+                        busy ||
+                        !selectedInvoiceRow
                     )
                     .toggleClass(
                         'is-loading',
@@ -1952,10 +1163,24 @@
             }
         }
 
-        /*
-         * إذا فشل تحميل اللستات،
-         * لا يكمل تحميل البوب ولا ينشئ خيارات fallback.
-         */
+        function showPayError(message) {
+            if (!$payDialogNotice) {
+                return;
+            }
+
+            $payDialogNotice
+                .addClass(
+                    'vas-upcoming-ap-runs-pay-error'
+                )
+                .text(
+                    message ||
+                    lbl(
+                        'VAS_ErrorLoading',
+                        'Could not load data'
+                    )
+                );
+        }
+
         function ensurePopupLookups(callback) {
             if (popupLookups) {
                 callback(true);
@@ -1972,10 +1197,9 @@
                 cache: false,
 
                 success: function (response) {
-                    var data =
-                        normalizeResponse(
-                            response
-                        );
+                    var data = normalizeResponse(
+                        response
+                    );
 
                     if (
                         !data ||
@@ -1992,15 +1216,7 @@
                                     data.error
                                 )
                             ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load lookup data'
-                            )
-                        );
-
-                        setPayDialogBusy(
-                            false,
-                            false
+                            'Could not load lookup data.'
                         );
 
                         callback(false);
@@ -2018,16 +1234,8 @@
                     showPayError(
                         getAjaxErrorMessage(
                             xhr,
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load lookup data'
-                            )
+                            'Could not load lookup data.'
                         )
-                    );
-
-                    setPayDialogBusy(
-                        false,
-                        false
                     );
 
                     callback(false);
@@ -2035,7 +1243,535 @@
             });
         }
 
-        function loadRunPaymentDetails(run) {
+        function renderInvoiceRows(rows) {
+            var html;
+            var i;
+            var row;
+            var amountText;
+
+            rows = $.isArray(rows)
+                ? rows
+                : [];
+
+            html =
+                '<div class="vas-upcoming-ap-runs-invoice-list-title">' +
+                escapeHtml('Invoices') +
+                '</div>' +
+
+                '<div class="vas-upcoming-ap-runs-invoice-list-body">';
+
+            for (
+                i = 0;
+                i < rows.length;
+                i++
+            ) {
+                row = rows[i];
+
+                amountText = formatCurrencyAmount(
+                    row.openAmount ||
+                    row.amount ||
+                    0,
+
+                    row.currencySymbol,
+
+                    row.currencyISO,
+
+                    row.stdPrecision
+                );
+
+                html +=
+                    '<button ' +
+                    'type="button" ' +
+                    'class="vas-upcoming-ap-runs-invoice-row' +
+                    (
+                        selectedInvoiceRow &&
+                            Number(selectedInvoiceRow.invoiceId) ===
+                            Number(row.invoiceId)
+                            ? ' is-selected'
+                            : ''
+                    ) +
+                    '" ' +
+                    'data-invoice-index="' +
+                    i +
+                    '">' +
+
+                    '<span class="vas-upcoming-ap-runs-invoice-main">' +
+
+                    '<strong>' +
+                    escapeHtml(
+                        row.invoiceDocumentNo ||
+                        row.documentNo ||
+                        ''
+                    ) +
+                    '</strong>' +
+
+                    '<small>' +
+                    escapeHtml(
+                        row.vendorName || ''
+                    ) +
+                    '</small>' +
+
+                    '</span>' +
+
+                    '<span class="vas-upcoming-ap-runs-invoice-side">' +
+
+                    '<strong>' +
+                    escapeHtml(amountText) +
+                    '</strong>' +
+
+                    '<small>' +
+                    escapeHtml(
+                        formatDate(
+                            row.dueDate
+                        )
+                    ) +
+                    '</small>' +
+
+                    '</span>' +
+
+                    '</button>';
+            }
+
+            html += '</div>';
+
+            $invoiceList.html(html);
+
+            $invoiceList
+                .find(
+                    '[data-invoice-index]'
+                )
+                .off('click')
+                .on(
+                    'click',
+                    function () {
+                        var index = Number(
+                            $(this).attr(
+                                'data-invoice-index'
+                            )
+                        );
+
+                        if (
+                            isNaN(index) ||
+                            !invoiceRows[index]
+                        ) {
+                            return;
+                        }
+
+                        selectInvoiceRow(
+                            invoiceRows[index]
+                        );
+                    }
+                );
+        }
+
+        function selectInvoiceRow(row) {
+            selectedInvoiceRow = row;
+
+            renderInvoiceRows(
+                invoiceRows
+            );
+
+            renderPayDialogGrid(
+                row
+            );
+
+            updatePayNotice(
+                row
+            );
+
+            setPayDialogBusy(
+                false,
+                false
+            );
+        }
+
+        function renderPayDialogGrid(row) {
+            var organizations;
+            var bankAccounts;
+            var vendors;
+            var currencies;
+            var conversionTypes;
+            var documentTypes;
+            var tenderTypes;
+
+            var organizationId;
+            var vendorId;
+            var currencyId;
+            var bankAccountId;
+            var conversionTypeId;
+            var docTypeId;
+            var tenderType;
+
+            var html;
+
+            if (
+                !$payDialogGrid ||
+                !row
+            ) {
+                return;
+            }
+
+            organizations =
+                getLookup('organizations');
+
+            bankAccounts =
+                getLookup('bankAccounts');
+
+            vendors =
+                getLookup('vendors');
+
+            currencies =
+                getLookup('currencies');
+
+            conversionTypes =
+                getLookup('conversionTypes');
+
+            documentTypes =
+                getLookupAny([
+                    'documentTypes',
+                    'docTypes'
+                ]);
+
+            tenderTypes =
+                getLookupAny([
+                    'tenderTypes',
+                    'paymentMethods'
+                ]);
+
+            organizationId =
+                getValidLookupValue(
+                    organizations,
+                    firstPositiveValue(
+                        row.organizationId,
+                        row.adOrgId
+                    )
+                );
+
+            vendorId =
+                getValidLookupValue(
+                    vendors,
+                    firstPositiveValue(
+                        row.vendorId,
+                        row.cBPartnerId
+                    )
+                );
+
+            currencyId =
+                getValidLookupValue(
+                    currencies,
+                    firstPositiveValue(
+                        row.currencyId,
+                        row.cCurrencyId
+                    )
+                );
+
+            bankAccountId =
+                getValidLookupValue(
+                    bankAccounts,
+                    firstPositiveValue(
+                        row.bankAccountId
+                    )
+                );
+
+            conversionTypeId =
+                getValidLookupValue(
+                    conversionTypes,
+                    firstPositiveValue(
+                        row.conversionTypeId,
+                        row.cConversionTypeId
+                    )
+                );
+
+            if (!conversionTypeId) {
+                conversionTypeId =
+                    getFirstPositiveLookupValue(
+                        conversionTypes
+                    );
+            }
+
+            docTypeId =
+                getValidLookupValue(
+                    documentTypes,
+                    firstPositiveValue(
+                        row.docTypeId,
+                        row.cDocTypeId
+                    )
+                );
+
+            if (!docTypeId) {
+                docTypeId =
+                    getFirstPositiveLookupValue(
+                        documentTypes
+                    );
+            }
+
+            tenderType =
+                getValidLookupValue(
+                    tenderTypes,
+                    firstValue(
+                        row.tenderType
+                    )
+                );
+
+            if (!tenderType) {
+                tenderType =
+                    getFirstLookupValue(
+                        tenderTypes
+                    );
+            }
+
+            html =
+                fieldHtml(
+                    'Invoice',
+                    inputHtml(
+                        'invoiceDocumentNo',
+                        'text',
+                        row.invoiceDocumentNo ||
+                        row.documentNo ||
+                        '',
+                        null,
+                        true
+                    ),
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageOrganization',
+                        'Organization'
+                    ),
+
+                    selectHtml(
+                        'adOrgId',
+                        organizations,
+                        organizationId,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageVendor',
+                        'Vendor'
+                    ),
+
+                    selectHtml(
+                        'vendorId',
+                        vendors,
+                        vendorId,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_PaymentCurrency',
+                        'Currency'
+                    ),
+
+                    selectHtml(
+                        'currencyId',
+                        currencies,
+                        currencyId,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageBankAccount',
+                        'Bank Account'
+                    ),
+
+                    selectHtml(
+                        'bankAccountId',
+                        bankAccounts,
+                        bankAccountId,
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageTransactionDate',
+                        'Transaction Date'
+                    ),
+
+                    inputHtml(
+                        'transactionDate',
+                        'date',
+                        formatDateForInput(
+                            firstValue(
+                                row.transactionDate,
+                                row.dueDate,
+                                row.dateTrx
+                            )
+                        ),
+                        null,
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageCurrencyType',
+                        'Currency Type'
+                    ),
+
+                    selectHtml(
+                        'conversionTypeId',
+                        conversionTypes,
+                        conversionTypeId,
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageDocumentType',
+                        'Document Type'
+                    ),
+
+                    selectHtml(
+                        'docTypeId',
+                        documentTypes,
+                        docTypeId,
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageTenderType',
+                        'Tender Type'
+                    ),
+
+                    selectHtml(
+                        'tenderType',
+                        tenderTypes,
+                        tenderType,
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessagePaymentAmount',
+                        'Payment Amount'
+                    ),
+
+                    inputHtml(
+                        'payAmt',
+                        'number',
+                        normalizeNumber(
+                            firstValue(
+                                row.openAmount,
+                                row.amount,
+                                row.payAmt,
+                                0
+                            )
+                        ),
+                        '0.01',
+                        false
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageDocumentNo',
+                        'Payment Document No.'
+                    ),
+
+                    inputHtml(
+                        'documentNo',
+                        'text',
+                        '',
+                        null,
+                        false
+                    ),
+
+                    false
+                );
+
+            $payDialogGrid.html(html);
+        }
+
+        function updatePayNotice(row) {
+            var amountText;
+
+            amountText = formatCurrencyAmount(
+                firstValue(
+                    row.openAmount,
+                    row.amount,
+                    0
+                ),
+
+                row.currencySymbol,
+
+                row.currencyISO,
+
+                row.stdPrecision
+            );
+
+            $payDialogNotice
+                .removeClass(
+                    'vas-upcoming-ap-runs-pay-error'
+                )
+                .html(
+                    escapeHtml(
+                        'Pre-filled for invoice'
+                    ) +
+
+                    ' <strong>' +
+
+                    escapeHtml(
+                        row.invoiceDocumentNo ||
+                        row.documentNo ||
+                        ''
+                    ) +
+
+                    '</strong>' +
+
+                    (
+                        row.vendorName
+                            ? ' — ' +
+                            escapeHtml(
+                                row.vendorName
+                            )
+                            : ''
+                    ) +
+
+                    ' · ' +
+
+                    escapeHtml(amountText) +
+
+                    '. ' +
+
+                    escapeHtml(
+                        'Review and save.'
+                    )
+                );
+        }
+
+        function loadRunInvoiceDetails(run) {
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
@@ -2047,20 +1783,30 @@
 
                 data: {
                     runDate:
-                        run.runDate ||
-                        run.dueDate ||
-                        '',
+                        firstValue(
+                            run.runDate,
+                            run.dueDate
+                        ),
 
                     paymentMethodId:
-                        run.paymentMethodId ||
-                        0
+                        Number(
+                            run.paymentMethodId ||
+                            0
+                        ),
+
+                    currencyId:
+                        Number(
+                            firstPositiveValue(
+                                run.currencyId,
+                                run.cCurrencyId
+                            )
+                        )
                 },
 
                 success: function (response) {
-                    var data =
-                        normalizeResponse(
-                            response
-                        );
+                    var data = normalizeResponse(
+                        response
+                    );
 
                     if (
                         !data ||
@@ -2075,23 +1821,17 @@
                                     data.error
                                 )
                             ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load data'
-                            )
+                            'Could not load invoice details.'
                         );
 
                         return;
                     }
 
-                    paymentRows =
-                        $.isArray(data.rows)
-                            ? data.rows
-                            : [];
+                    invoiceRows = $.isArray(data.rows)
+                        ? data.rows
+                        : [];
 
-                    if (
-                        paymentRows.length === 0
-                    ) {
+                    if (invoiceRows.length === 0) {
                         showPayError(
                             lbl(
                                 'VAS_031_MessageNoData',
@@ -2102,15 +1842,8 @@
                         return;
                     }
 
-                    selectedPaymentRow =
-                        paymentRows[0];
-
-                    renderPayDialogGrid(
-                        selectedPaymentRow
-                    );
-
-                    updatePayNotice(
-                        selectedPaymentRow
+                    selectInvoiceRow(
+                        invoiceRows[0]
                     );
                 },
 
@@ -2118,10 +1851,7 @@
                     showPayError(
                         getAjaxErrorMessage(
                             xhr,
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load data'
-                            )
+                            'Could not load invoice details.'
                         )
                     );
                 },
@@ -2144,8 +1874,8 @@
             }
 
             selectedRun = run;
-            selectedPaymentRow = null;
-            paymentRows = [];
+            selectedInvoiceRow = null;
+            invoiceRows = [];
 
             $payDialogTitle.text(
                 lbl(
@@ -2173,10 +1903,11 @@
                 .text(
                     lbl(
                         'VAS_031_MessageLoadingDetails',
-                        'Loading payment details'
+                        'Loading invoice details'
                     )
                 );
 
+            $invoiceList.empty();
             $payDialogGrid.empty();
 
             setPayDialogBusy(
@@ -2193,10 +1924,15 @@
             ensurePopupLookups(
                 function (loaded) {
                     if (!loaded) {
+                        setPayDialogBusy(
+                            false,
+                            false
+                        );
+
                         return;
                     }
 
-                    loadRunPaymentDetails(
+                    loadRunInvoiceDetails(
                         run
                     );
                 }
@@ -2212,10 +1948,12 @@
             }
 
             selectedRun = null;
-            selectedPaymentRow = null;
-            paymentRows = [];
+            selectedInvoiceRow = null;
+            invoiceRows = [];
 
             $payDialog.hide();
+
+            $invoiceList.empty();
             $payDialogGrid.empty();
 
             $payDialogNotice
@@ -2229,320 +1967,98 @@
             );
         }
 
-        /*
-         * القيم الخاصة باللستات تؤخذ فقط من الـ select الظاهر.
-         * لا يتم الرجوع إلى Vendor قديم غير صالح.
-         */
-        function savePayDialog() {
-            var payload;
-
-            if (
-                !selectedRun ||
-                !selectedPaymentRow ||
-                saveInProgress
-            ) {
-                return;
-            }
-
-            payload =
-                readPayDialogPayload();
-
-            if (!payload) {
-                return;
-            }
-
-            saveInProgress = true;
-
-            setPayDialogBusy(
-                true,
-                true
+        function getPayField(name) {
+            return $payDialogGrid.find(
+                '[data-pay-field="' +
+                name +
+                '"]'
             );
-
-            $.ajax({
-                url:
-                    VIS.Application.contextUrl +
-                    'VAS_031_UpcomingAPRunsWidget/CreateUpcomingAPPayment',
-
-                type: 'POST',
-
-                dataType: 'json',
-
-                cache: false,
-
-                data: {
-                    /*
-                     * Payment الأصلية التي ظهرت في Upcoming.
-                     * الكونترولر يحدث حالتها إلى R.
-                     */
-                    sourcePaymentId:
-                        payload.sourcePaymentId,
-
-                    adOrgId:
-                        payload.adOrgId,
-
-                    bankAccountId:
-                        payload.bankAccountId,
-
-                    vendorId:
-                        payload.vendorId,
-
-                    currencyId:
-                        payload.currencyId,
-
-                    conversionTypeId:
-                        payload.conversionTypeId,
-
-                    docTypeId:
-                        payload.docTypeId,
-
-                    tenderType:
-                        payload.tenderType,
-
-                    transactionDate:
-                        payload.transactionDate,
-
-                    documentNo:
-                        payload.documentNo,
-
-                    payAmt:
-                        payload.payAmt
-                },
-
-                success: function (response) {
-                    var data =
-                        normalizeResponse(
-                            response
-                        );
-
-                    if (
-                        !data ||
-                        data.success === false ||
-                        data.error
-                    ) {
-                        showPayError(
-                            (
-                                data &&
-                                (
-                                    data.error ||
-                                    data.errorText ||
-                                    data.message
-                                )
-                            ) ||
-                            lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
-                                'Could not save AP payment'
-                            )
-                        );
-
-                        return;
-                    }
-
-                    /*
-                     * نوقف حالة الحفظ قبل إغلاق الـpopup
-                     * لأن closePayDialog لا يغلقه إذا
-                     * saveInProgress = true.
-                     */
-                    saveInProgress = false;
-
-                    setPayDialogBusy(
-                        false,
-                        false
-                    );
-
-                    /*
-                     * إفراغ السجلات القديمة حتى لا يبقى
-                     * القيد السابق مخزوناً داخل الـJS.
-                     */
-                    selectedPaymentRow = null;
-                    selectedRun = null;
-                    paymentRows = [];
-
-                    /*
-                     * إعادة تحميل Lookups في المرة القادمة.
-                     */
-                    popupLookups = null;
-
-                    /*
-                     * إغلاق الـpopup يدوياً.
-                     */
-                    if ($payDialog) {
-                        $payDialog.hide();
-                    }
-
-                    if ($payDialogGrid) {
-                        $payDialogGrid.empty();
-                    }
-
-                    if ($payDialogNotice) {
-                        $payDialogNotice
-                            .removeClass(
-                                'vas-upcoming-ap-runs-pay-error'
-                            )
-                            .text('');
-                    }
-
-                    $('body').removeClass(
-                        'vas-upcoming-ap-runs-body-lock'
-                    );
-
-                    /*
-                     * إعادة الصفحة إلى البداية.
-                     */
-                    pageNo = 1;
-
-                    /*
-                     * إعادة استدعاء GetUpcomingAPRuns.
-                     *
-                     * بما أن الكونترولر حدث:
-                     * VA009_ExecutionStatus = 'R'
-                     *
-                     * والكويري تعرض فقط الحالة I،
-                     * فلن يرجع القيد مرة ثانية.
-                     */
-                    loadData();
-                },
-
-                error: function (xhr) {
-                    showPayError(
-                        getAjaxErrorMessage(
-                            xhr,
-                            lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
-                                'Could not save AP payment'
-                            )
-                        )
-                    );
-                },
-
-                complete: function () {
-                    /*
-                     * إذا حدث خطأ، نعيد تفعيل زر الحفظ.
-                     *
-                     * في حالة النجاح تم تحويل
-                     * saveInProgress إلى false مسبقاً.
-                     */
-                    if (saveInProgress) {
-                        saveInProgress = false;
-
-                        setPayDialogBusy(
-                            false,
-                            false
-                        );
-                    }
-                }
-            });
         }
 
         function readPayDialogPayload() {
-            var payload = {};
-            var sourcePaymentId = 0;
+            var payload;
 
-            var $fields =
-                $payDialogGrid
-                    ? $payDialogGrid.find(
-                        '[data-pay-field]'
-                    )
-                    : $();
-
-            $fields.each(function () {
-                var fieldName =
-                    $(this).attr(
-                        'data-pay-field'
-                    );
-
-                if (!fieldName) {
-                    return;
-                }
-
-                payload[fieldName] =
-                    $(this).val();
-            });
-
-            /*
-             * Payment الأصلية التي ظهرت في Upcoming.
-             */
-            sourcePaymentId = Number(
-                firstPositiveValue(
-                    selectedPaymentRow &&
-                    selectedPaymentRow.paymentId,
-
-                    selectedPaymentRow &&
-                    selectedPaymentRow.cPaymentId,
-
-                    selectedPaymentRow &&
-                    selectedPaymentRow.C_Payment_ID,
-
-                    selectedRun &&
-                    selectedRun.paymentId,
-
-                    selectedRun &&
-                    selectedRun.cPaymentId,
-
-                    0
-                )
-            );
-
-            payload.sourcePaymentId =
-                isNaN(sourcePaymentId)
-                    ? 0
-                    : sourcePaymentId;
-
-            payload.adOrgId =
-                Number(
-                    payload.adOrgId || 0
-                );
-
-            payload.bankAccountId =
-                Number(
-                    payload.bankAccountId || 0
-                );
-
-            payload.vendorId =
-                Number(
-                    payload.vendorId || 0
-                );
-
-            payload.currencyId =
-                Number(
-                    payload.currencyId || 0
-                );
-
-            payload.conversionTypeId =
-                Number(
-                    payload.conversionTypeId || 0
-                );
-
-            payload.docTypeId =
-                Number(
-                    payload.docTypeId || 0
-                );
-
-            payload.tenderType =
-                String(
-                    payload.tenderType || ''
-                ).trim();
-
-            payload.transactionDate =
-                formatDateForInput(
-                    payload.transactionDate || ''
-                );
-
-            payload.documentNo =
-                String(
-                    payload.documentNo || ''
-                ).trim();
-
-            payload.payAmt =
-                Number(
-                    payload.payAmt || 0
-                );
-
-            if (payload.sourcePaymentId <= 0) {
+            if (!selectedInvoiceRow) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageSourcePaymentRequired',
-                        'Source scheduled payment is required.'
+                    'Select an invoice.'
+                );
+
+                return null;
+            }
+
+            payload = {
+                invoiceId: Number(
+                    firstPositiveValue(
+                        selectedInvoiceRow.invoiceId,
+                        selectedInvoiceRow.sourceInvoiceId,
+                        selectedInvoiceRow.cInvoiceId
                     )
+                ),
+
+                adOrgId: Number(
+                    getPayField(
+                        'adOrgId'
+                    ).val() || 0
+                ),
+
+                bankAccountId: Number(
+                    getPayField(
+                        'bankAccountId'
+                    ).val() || 0
+                ),
+
+                vendorId: Number(
+                    getPayField(
+                        'vendorId'
+                    ).val() || 0
+                ),
+
+                currencyId: Number(
+                    getPayField(
+                        'currencyId'
+                    ).val() || 0
+                ),
+
+                conversionTypeId: Number(
+                    getPayField(
+                        'conversionTypeId'
+                    ).val() || 0
+                ),
+
+                docTypeId: Number(
+                    getPayField(
+                        'docTypeId'
+                    ).val() || 0
+                ),
+
+                tenderType: String(
+                    getPayField(
+                        'tenderType'
+                    ).val() || ''
+                ).trim(),
+
+                transactionDate: String(
+                    getPayField(
+                        'transactionDate'
+                    ).val() || ''
+                ).trim(),
+
+                documentNo: String(
+                    getPayField(
+                        'documentNo'
+                    ).val() || ''
+                ).trim(),
+
+                payAmt: Number(
+                    getPayField(
+                        'payAmt'
+                    ).val() || 0
+                )
+            };
+
+            if (payload.invoiceId <= 0) {
+                showPayError(
+                    'Source invoice is required.'
                 );
 
                 return null;
@@ -2550,10 +2066,7 @@
 
             if (payload.adOrgId <= 0) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageOrganizationRequired',
-                        'Organization is required.'
-                    )
+                    'Organization is required.'
                 );
 
                 return null;
@@ -2561,10 +2074,7 @@
 
             if (payload.bankAccountId <= 0) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageBankAccountRequired',
-                        'Bank account is required.'
-                    )
+                    'Bank account is required.'
                 );
 
                 return null;
@@ -2572,10 +2082,7 @@
 
             if (payload.vendorId <= 0) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageVendorRequired',
-                        'Vendor is required.'
-                    )
+                    'Vendor is required.'
                 );
 
                 return null;
@@ -2583,10 +2090,7 @@
 
             if (payload.currencyId <= 0) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageCurrencyRequired',
-                        'Currency is required.'
-                    )
+                    'Currency is required.'
                 );
 
                 return null;
@@ -2594,10 +2098,7 @@
 
             if (payload.conversionTypeId <= 0) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageConversionTypeRequired',
-                        'Currency type is required.'
-                    )
+                    'Currency type is required.'
                 );
 
                 return null;
@@ -2605,10 +2106,7 @@
 
             if (payload.docTypeId <= 0) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageDocumentTypeRequired',
-                        'Document type is required.'
-                    )
+                    'Document type is required.'
                 );
 
                 return null;
@@ -2616,10 +2114,7 @@
 
             if (!payload.tenderType) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageTenderTypeRequired',
-                        'Tender type is required.'
-                    )
+                    'Tender type is required.'
                 );
 
                 return null;
@@ -2627,10 +2122,7 @@
 
             if (!payload.transactionDate) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessageTransactionDateRequired',
-                        'Transaction date is required.'
-                    )
+                    'Transaction date is required.'
                 );
 
                 return null;
@@ -2641,10 +2133,22 @@
                 payload.payAmt <= 0
             ) {
                 showPayError(
-                    lbl(
-                        'VAS_031_MessagePaymentAmountRequired',
-                        'Payment amount must be greater than zero.'
-                    )
+                    'Payment amount must be greater than zero.'
+                );
+
+                return null;
+            }
+
+            if (
+                payload.payAmt >
+                Number(
+                    selectedInvoiceRow.openAmount ||
+                    selectedInvoiceRow.amount ||
+                    0
+                )
+            ) {
+                showPayError(
+                    'Payment amount exceeds invoice open amount.'
                 );
 
                 return null;
@@ -2658,14 +2162,13 @@
 
             if (
                 !selectedRun ||
-                !selectedPaymentRow ||
+                !selectedInvoiceRow ||
                 saveInProgress
             ) {
                 return;
             }
 
-            payload =
-                readPayDialogPayload();
+            payload = readPayDialogPayload();
 
             if (!payload) {
                 return;
@@ -2685,13 +2188,14 @@
 
                 type: 'POST',
                 dataType: 'json',
+                cache: false,
+
                 data: payload,
 
                 success: function (response) {
-                    var data =
-                        normalizeResponse(
-                            response
-                        );
+                    var data = normalizeResponse(
+                        response
+                    );
 
                     if (
                         !data ||
@@ -2707,10 +2211,7 @@
                                     data.message
                                 )
                             ) ||
-                            lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
-                                'Could not save AP payment'
-                            )
+                            'Could not save AP payment.'
                         );
 
                         return;
@@ -2720,28 +2221,34 @@
 
                     setPayDialogBusy(
                         false,
-                        true
+                        false
                     );
 
                     closePayDialog();
 
-                    /*
-                     * إعادة تحميل اللستات والسجلات
-                     * بعد إنشاء الدفع.
-                     */
                     popupLookups = null;
 
                     loadData();
+
+                    if (
+                        VIS &&
+                        VIS.ADialog &&
+                        VIS.ADialog.info
+                    ) {
+                        VIS.ADialog.info(
+                            (
+                                data.message ||
+                                'AP payment created successfully.'
+                            )
+                        );
+                    }
                 },
 
                 error: function (xhr) {
                     showPayError(
                         getAjaxErrorMessage(
                             xhr,
-                            lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
-                                'Could not save AP payment'
-                            )
+                            'Could not save AP payment.'
                         )
                     );
                 },
@@ -2752,7 +2259,7 @@
 
                         setPayDialogBusy(
                             false,
-                            true
+                            false
                         );
                     }
                 }
@@ -2760,8 +2267,6 @@
         }
 
         function createPayDialog() {
-            var closeSelector;
-
             if ($payDialog) {
                 return;
             }
@@ -2778,37 +2283,7 @@
 
                 '<div class="vas-upcoming-ap-runs-pay-header">' +
 
-                '<span class="vas-upcoming-ap-runs-pay-icon">' +
-
-                '<svg ' +
-                'viewBox="0 0 24 24" ' +
-                'fill="none" ' +
-                'stroke="currentColor" ' +
-                'stroke-width="1.8" ' +
-                'stroke-linecap="round" ' +
-                'stroke-linejoin="round" ' +
-                'aria-hidden="true">' +
-
-                '<rect ' +
-                'x="3" ' +
-                'y="5" ' +
-                'width="18" ' +
-                'height="14" ' +
-                'rx="2">' +
-                '</rect>' +
-
-                '<line ' +
-                'x1="3" ' +
-                'y1="10" ' +
-                'x2="21" ' +
-                'y2="10">' +
-                '</line>' +
-
-                '</svg>' +
-
-                '</span>' +
-
-                '<div class="vas-upcoming-ap-runs-pay-title-group">' +
+                '<div>' +
 
                 '<div class="vas-upcoming-ap-runs-pay-title"></div>' +
 
@@ -2818,187 +2293,97 @@
 
                 '<button ' +
                 'type="button" ' +
-                'class="vas-upcoming-ap-runs-pay-close" ' +
-                'aria-label="' +
-                escapeHtml(
-                    lbl(
-                        'VAS_Close',
-                        'Close'
-                    )
-                ) +
-                '">' +
-
-                '<svg ' +
-                'viewBox="0 0 24 24" ' +
-                'fill="none" ' +
-                'stroke="currentColor" ' +
-                'stroke-width="1.8" ' +
-                'stroke-linecap="round" ' +
-                'stroke-linejoin="round">' +
-
-                '<line ' +
-                'x1="18" ' +
-                'y1="6" ' +
-                'x2="6" ' +
-                'y2="18">' +
-                '</line>' +
-
-                '<line ' +
-                'x1="6" ' +
-                'y1="6" ' +
-                'x2="18" ' +
-                'y2="18">' +
-                '</line>' +
-
-                '</svg>' +
-
-                '</button>' +
-
-                '</div>' +
-
-                '<div class="vas-upcoming-ap-runs-pay-body">' +
-
-                '<div class="vas-upcoming-ap-runs-pay-busy">' +
-
-                '<div class="vis-busyindicatorinnerwrap">' +
-
-                '<i class="vis_widgetloader"></i>' +
-
-                '</div>' +
+                'class="vas-upcoming-ap-runs-pay-close">×</button>' +
 
                 '</div>' +
 
                 '<div class="vas-upcoming-ap-runs-pay-notice"></div>' +
 
+                '<div class="vas-upcoming-ap-runs-invoice-list"></div>' +
+
                 '<div class="vas-upcoming-ap-runs-pay-grid"></div>' +
 
-                '</div>' +
-
                 '<div class="vas-upcoming-ap-runs-pay-footer">' +
-
-                '<span>' +
-
-                escapeHtml(
-                    lbl(
-                        'VAS_031_MessageGeneratedFromUpcoming',
-                        'Generated from Upcoming · 7 days'
-                    )
-                ) +
-
-                '</span>' +
-
-                '<div class="vas-upcoming-ap-runs-pay-footer-actions">' +
 
                 '<button ' +
                 'type="button" ' +
                 'class="vas-upcoming-ap-runs-pay-cancel">' +
-
                 escapeHtml(
                     lbl(
                         'VAS_Cancel',
                         'Cancel'
                     )
                 ) +
-
                 '</button>' +
 
                 '<button ' +
                 'type="button" ' +
                 'class="vas-upcoming-ap-runs-pay-save">' +
 
-                '<span ' +
-                'class="vas-upcoming-ap-runs-save-spinner" ' +
-                'aria-hidden="true">' +
-                '</span>' +
-
-                '<span ' +
-                'class="vas-upcoming-ap-runs-save-check" ' +
-                'aria-hidden="true">' +
-                '✓' +
-                '</span>' +
-
-                '<span class="vas-upcoming-ap-runs-save-label">' +
-
+                '<span class="vas-upcoming-ap-runs-pay-save-label">' +
                 escapeHtml(
                     lbl(
                         'VAS_031_MessageSavePayment',
                         'Save payment'
                     )
                 ) +
-
                 '</span>' +
 
                 '</button>' +
 
                 '</div>' +
 
-                '</div>' +
+                '<div class="vas-upcoming-ap-runs-pay-busy"></div>' +
 
                 '</div>' +
 
                 '</div>'
             );
 
-            $payDialog.hide();
+            $('body').append($payDialog);
 
-            $payDialogTitle =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-pay-title'
-                );
+            $payDialogTitle = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-title'
+            );
 
-            $payDialogSub =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-pay-sub'
-                );
+            $payDialogSub = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-sub'
+            );
 
-            $payDialogNotice =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-pay-notice'
-                );
+            $payDialogNotice = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-notice'
+            );
 
-            $payDialogGrid =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-pay-grid'
-                );
+            $invoiceList = $payDialog.find(
+                '.vas-upcoming-ap-runs-invoice-list'
+            );
 
-            $payDialogSave =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-pay-save'
-                );
+            $payDialogGrid = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-grid'
+            );
 
-            $payDialogSaveLabel =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-save-label'
-                );
+            $payDialogSave = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-save'
+            );
 
-            $payDialogBusy =
-                $payDialog.find(
-                    '.vas-upcoming-ap-runs-pay-busy'
-                );
+            $payDialogSaveLabel = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-save-label'
+            );
 
-            closeSelector =
-                '.vas-upcoming-ap-runs-pay-close, ' +
-                '.vas-upcoming-ap-runs-pay-cancel';
+            $payDialogBusy = $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-busy'
+            );
 
-            $payDialog
-                .find(closeSelector)
-                .on(
-                    'click',
-                    function () {
-                        closePayDialog();
-                    }
-                );
-
-            $payDialog
-                .find(
-                    '.vas-upcoming-ap-runs-pay-scrim'
-                )
-                .on(
-                    'click',
-                    function () {
-                        closePayDialog();
-                    }
-                );
+            $payDialog.find(
+                '.vas-upcoming-ap-runs-pay-close,' +
+                '.vas-upcoming-ap-runs-pay-cancel,' +
+                '.vas-upcoming-ap-runs-pay-scrim'
+            ).on(
+                'click',
+                function () {
+                    closePayDialog();
+                }
+            );
 
             $payDialogSave.on(
                 'click',
@@ -3007,83 +2392,23 @@
                 }
             );
 
-            $(document).on(
-                'keydown.vas-upcoming-ap-runs-pay-' +
-                $self.AD_UserHomeWidgetID,
-
-                function (event) {
-                    if (
-                        event.key === 'Escape' &&
-                        $payDialog &&
-                        $payDialog.is(':visible')
-                    ) {
-                        closePayDialog();
-                    }
-                }
-            );
-
-            $('body').append(
-                $payDialog
-            );
+            $payDialog.hide();
         }
 
-        function createWidget() {
-            var $head;
-            var $headLeft;
-            var $titleRow;
-            var $iconBox;
-            var $icon;
-            var $title;
-            var $arrow;
-            var $sub;
-            var $footer;
-
+        function createLayout() {
             $card = $(
                 '<div class="vas-upcoming-ap-runs-card">'
             );
 
-            $head = $(
-                '<div class="vas-upcoming-ap-runs-head">'
+            var $header = $(
+                '<div class="vas-upcoming-ap-runs-header">'
             );
 
-            $headLeft = $(
-                '<div class="vas-upcoming-ap-runs-head-left">'
+            var $headerText = $(
+                '<div class="vas-upcoming-ap-runs-header-text">'
             );
 
-            $titleRow = $(
-                '<div class="vas-upcoming-ap-runs-title-row">'
-            );
-
-            $iconBox = $(
-                '<span class="vas-upcoming-ap-runs-icon-box">'
-            );
-
-            $icon = $(
-                '<svg ' +
-                'class="vas-upcoming-ap-runs-icon" ' +
-                'viewBox="0 0 24 24" ' +
-                'fill="none" ' +
-                'stroke="currentColor" ' +
-                'stroke-width="2" ' +
-                'stroke-linecap="round" ' +
-                'stroke-linejoin="round" ' +
-                'aria-hidden="true" ' +
-                'focusable="false">' +
-
-                '<circle ' +
-                'cx="12" ' +
-                'cy="12" ' +
-                'r="10">' +
-                '</circle>' +
-
-                '<polyline ' +
-                'points="12 6 12 12 16 14">' +
-                '</polyline>' +
-
-                '</svg>'
-            );
-
-            $title = $(
+            var $title = $(
                 '<div class="vas-upcoming-ap-runs-title">'
             ).text(
                 lbl(
@@ -3092,16 +2417,8 @@
                 )
             );
 
-            $arrow = $(
-                '<span class="vas-upcoming-ap-runs-arrow" aria-hidden="true">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M9 18l6-6-6-6"></path>' +
-                '</svg>' +
-                '</span>'
-            );
-
-            $sub = $(
-                '<div class="vas-upcoming-ap-runs-sub">'
+            var $subtitle = $(
+                '<div class="vas-upcoming-ap-runs-subtitle">'
             ).text(
                 lbl(
                     'VAS_031_MessageNext7Days',
@@ -3109,147 +2426,111 @@
                 )
             );
 
-    
+            $headerText
+                .append($title)
+                .append($subtitle);
+
+            $header.append($headerText);
+
+            $body = $(
+                '<div class="vas-upcoming-ap-runs-body">'
+            );
+
+            $state = $(
+                '<div class="vas-upcoming-ap-runs-state">'
+            );
+
+            $busy = $(
+                '<div class="vas-upcoming-ap-runs-busy">'
+            );
+
             $pager = $(
                 '<div class="vas-upcoming-ap-runs-pager">'
             );
 
             $pagerPrev = $(
-                '<button ' +
-                'type="button" ' +
-                'class="vas-upcoming-ap-runs-page-btn" ' +
-                'aria-label="' +
+                '<button type="button">' +
                 escapeHtml(
                     lbl(
                         'VAS_Previous',
                         'Previous'
                     )
                 ) +
-                '">' +
-                '‹' +
                 '</button>'
             );
 
             $pagerText = $(
-                '<span class="vas-upcoming-ap-runs-page-text">'
+                '<span>'
             );
 
             $pagerNext = $(
-                '<button ' +
-                'type="button" ' +
-                'class="vas-upcoming-ap-runs-page-btn" ' +
-                'aria-label="' +
+                '<button type="button">' +
                 escapeHtml(
                     lbl(
                         'VAS_Next',
                         'Next'
                     )
                 ) +
-                '">' +
-                '›' +
                 '</button>'
             );
-
-            $body = $(
-                '<div class="vas-upcoming-ap-runs-body">'
-            );
-
-            $footer = $(
-                '<div class="vas-upcoming-ap-runs-footer">'
-            );
-
-            $busy = $(
-                '<div class="vas-upcoming-ap-runs-busy">' +
-
-                '<div class="vis-busyindicatorinnerwrap">' +
-
-                '<i class="vis_widgetloader"></i>' +
-
-                '</div>' +
-
-                '</div>'
-            );
-
-            $state = $(
-                '<div class="vas-upcoming-ap-runs-state-message">'
-            );
-
-            $iconBox.append($icon);
-
-            $titleRow
-                .append($iconBox)
-                .append($title);
-
-            $headLeft
-                .append($titleRow)
-                .append($sub);
-
-            $head
-                .append($headLeft)
-                .append($arrow);
-
-            $pager
-                .append($pagerPrev)
-                .append($pagerText)
-                .append($pagerNext);
-
-            $footer.append($pager);
-
-            $card
-                .append($head)
-                .append($body)
-                .append($footer)
-                .append($busy)
-                .append($state);
-
-            $root
-                .empty()
-                .append($card);
 
             $pagerPrev.on(
                 'click',
                 function () {
-                    if (pageNo <= 1) {
-                        return;
+                    if (pageNo > 1) {
+                        pageNo--;
+                        renderPage();
                     }
-
-                    pageNo--;
-
-                    renderPage();
                 }
             );
 
             $pagerNext.on(
                 'click',
                 function () {
-                    if (
-                        totalPages <= 1 ||
-                        pageNo >= totalPages
-                    ) {
-                        return;
+                    if (pageNo < totalPages) {
+                        pageNo++;
+                        renderPage();
                     }
-
-                    pageNo++;
-
-                    renderPage();
                 }
             );
+
+            $pager
+                .append($pagerPrev)
+                .append($pagerText)
+                .append($pagerNext);
+
+            $card
+                .append($header)
+                .append($busy)
+                .append($state)
+                .append($body)
+                .append($pager);
+
+            $root.append($card);
 
             createPayDialog();
         }
 
-        this.Initalize = function () {
-            createWidget();
+        this.init = function (windowNo, frame) {
+            $self.windowNo = windowNo || 0;
+            $self.frame = frame || null;
+
+            createLayout();
+
+            if (
+                $self.frame &&
+                $self.frame.getContentGrid
+            ) {
+                $self.frame
+                    .getContentGrid()
+                    .append($root);
+            }
+
             loadData();
         };
 
-        this.refreshWidget = function () {
-            if (isDisposed) {
-                return;
-            }
-
+        this.refresh = function () {
             popupLookups = null;
-
             loadData();
         };
 
@@ -3257,108 +2538,31 @@
             return $root;
         };
 
-        this.disposeComponent = function () {
+        this.dispose = function () {
             isDisposed = true;
 
-            $(document).off(
-                'keydown.vas-upcoming-ap-runs-pay-' +
-                $self.AD_UserHomeWidgetID
-            );
+            selectedRun = null;
+            selectedInvoiceRow = null;
+
+            runsData = [];
+            invoiceRows = [];
+            popupLookups = null;
+
+            if ($payDialog) {
+                $payDialog.remove();
+                $payDialog = null;
+            }
+
+            if ($root) {
+                $root.remove();
+            }
 
             $('body').removeClass(
                 'vas-upcoming-ap-runs-body-lock'
             );
 
-            if ($pagerPrev) {
-                $pagerPrev.off();
-            }
-
-            if ($pagerNext) {
-                $pagerNext.off();
-            }
-
-            if ($payDialog) {
-                $payDialog
-                    .find('*')
-                    .off();
-
-                $payDialog.remove();
-            }
-
-            $root
-                .find('*')
-                .off();
-
-            $root.remove();
-
-            $card = null;
-            $body = null;
-            $pager = null;
-            $pagerPrev = null;
-            $pagerNext = null;
-            $pagerText = null;
-            $busy = null;
-            $state = null;
-
-            $payDialog = null;
-            $payDialogTitle = null;
-            $payDialogSub = null;
-            $payDialogNotice = null;
-            $payDialogGrid = null;
-            $payDialogSave = null;
-            $payDialogSaveLabel = null;
-            $payDialogBusy = null;
-
-            selectedRun = null;
-            selectedPaymentRow = null;
-
-            paymentRows = [];
-            popupLookups = null;
-            runsData = [];
+            $self.frame = null;
         };
     };
-
-    VAS.VAS_031_UpcomingAPRunsWidget
-        .prototype
-        .init = function (
-            windowNo,
-            frame
-        ) {
-            this.frame = frame;
-
-            this.AD_UserHomeWidgetID =
-                frame.widgetInfo
-                    .AD_UserHomeWidgetID;
-
-            this.windowNo = windowNo;
-
-            this.Initalize();
-
-            this.frame
-                .getContentGrid()
-                .append(
-                    this.getRoot()
-                );
-        };
-
-    VAS.VAS_031_UpcomingAPRunsWidget
-        .prototype
-        .widgetSizeChange = function (
-            height,
-            width
-        ) {
-        };
-
-    VAS.VAS_031_UpcomingAPRunsWidget
-        .prototype
-        .dispose = function () {
-            this.disposeComponent();
-
-            if (this.frame) {
-                this.frame.dispose();
-            }
-
-            this.frame = null;
-        };
 
 })(VAS, jQuery);
