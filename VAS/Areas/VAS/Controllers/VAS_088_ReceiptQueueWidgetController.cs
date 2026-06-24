@@ -60,9 +60,9 @@ namespace VIS.Controllers
                 SELECT InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier_Name,
-                       COALESCE(PurchaseOrder.DocumentNo, '-') AS PO_No,
+                       COALESCE(PurchaseOrder.DocumentNo, N'-') AS PO_No,
                        InOut.DocStatus AS Doc_Status,
-                       COALESCE(UserInfo.Name, '-') AS Received_By,
+                       COALESCE(UserInfo.Name, N'-') AS Received_By,
                        COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Received_Time
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -201,7 +201,7 @@ namespace VIS.Controllers
 
             string linesSql = @"
                 SELECT InOutLine.M_InOutLine_ID AS GRN_Line_ID,
-                       COALESCE(Product.Name, '-') AS Item_Name,
+                       COALESCE(Product.Name, N'-') AS Item_Name,
                        COALESCE(OrderLine.QtyOrdered, 0) AS Ordered_Qty,
                        COALESCE(InOutLine.MovementQty, 0) AS Received_Qty
                 FROM M_InOut InOut

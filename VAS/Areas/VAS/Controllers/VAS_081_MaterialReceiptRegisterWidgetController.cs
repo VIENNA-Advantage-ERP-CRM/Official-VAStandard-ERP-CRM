@@ -54,17 +54,16 @@ namespace VIS.Controllers
             if (pageSize > 5) { pageSize = 5; }
             int offset = (pageNo - 1) * pageSize;
 
-            string registerSql = @"
-                SELECT InOut.M_InOut_ID AS Receipt_Id,
-                       InOut.DocumentNo AS Receipt_No,
-                       PurchaseOrder.DocumentNo AS Linked_PO_No,
-                       BPartner.Name AS Supplier,
-                       COALESCE(Project.Name, '-') AS Customer_Project,
-                       InOut.MovementDate AS Received_On,
+            string rawSql = @"
+                SELECT InOut.M_InOut_ID,
+                       InOut.DocumentNo,
+                       PurchaseOrder.DocumentNo AS PO_DocumentNo,
+                       BPartner.Name AS BPartner_Name,
+                       COALESCE(Project.Name, N'-') AS Project_Name,
+                       InOut.MovementDate,
                        ConfirmationData.Put_Away_On,
-                       COUNT(InOutLine.M_InOutLine_ID) AS Item_Count,
-                       SUM(COALESCE(InOutLine.MovementQty, 0)) AS Total_Received_Qty,
-                       COUNT(1) OVER () AS TotalRecords
+                       InOutLine.M_InOutLine_ID,
+                       InOutLine.MovementQty
                 FROM M_InOut InOut
                 INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=InOut.M_InOut_ID AND InOutLine.IsActive='Y')
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -82,17 +81,10 @@ namespace VIS.Controllers
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
                   AND InOut.DocStatus NOT IN ('RE', 'VO')
-                  AND InOut.AD_Client_ID=@AD_Client_ID
-                GROUP BY InOut.M_InOut_ID,
-                         InOut.DocumentNo,
-                         PurchaseOrder.DocumentNo,
-                         BPartner.Name,
-                         COALESCE(Project.Name, '-'),
-                         InOut.MovementDate,
-                         ConfirmationData.Put_Away_On";
+                  AND InOut.AD_Client_ID=@AD_Client_ID";
 
-            registerSql = MRole.GetDefault(ctx).AddAccessSQL(
-                registerSql,
+            rawSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawSql,
                 "InOut",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -108,9 +100,27 @@ namespace VIS.Controllers
                        RegisterData.Put_Away_On,
                        RegisterData.Item_Count,
                        RegisterData.Total_Received_Qty,
-                       RegisterData.TotalRecords
+                       COUNT(1) OVER () AS TotalRecords
                 FROM (
-                    " + registerSql + @"
+                    SELECT RawData.M_InOut_ID AS Receipt_Id,
+                           RawData.DocumentNo AS Receipt_No,
+                           RawData.PO_DocumentNo AS Linked_PO_No,
+                           RawData.BPartner_Name AS Supplier,
+                           RawData.Project_Name AS Customer_Project,
+                           RawData.MovementDate AS Received_On,
+                           RawData.Put_Away_On,
+                           COUNT(RawData.M_InOutLine_ID) AS Item_Count,
+                           SUM(COALESCE(RawData.MovementQty, 0)) AS Total_Received_Qty
+                    FROM (
+                        " + rawSql + @"
+                    ) RawData
+                    GROUP BY RawData.M_InOut_ID,
+                             RawData.DocumentNo,
+                             RawData.PO_DocumentNo,
+                             RawData.BPartner_Name,
+                             RawData.Project_Name,
+                             RawData.MovementDate,
+                             RawData.Put_Away_On
                 ) RegisterData
                 ORDER BY RegisterData.Received_On DESC, RegisterData.Receipt_No DESC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";

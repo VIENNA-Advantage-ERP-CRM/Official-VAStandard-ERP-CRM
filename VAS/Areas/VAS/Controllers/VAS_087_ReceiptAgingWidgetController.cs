@@ -66,7 +66,7 @@ namespace VIS.Controllers
                 SELECT InOut.M_InOut_ID AS Receipt_Id,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier,
-                       COALESCE(PurchaseOrder.DocumentNo, '-') AS Linked_PO_No,
+                       COALESCE(PurchaseOrder.DocumentNo, N'-') AS Linked_PO_No,
                        InOut.MovementDate AS Received_On
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -233,8 +233,8 @@ namespace VIS.Controllers
                 ? "LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=LineConfirm.M_Locator_ID AND Locator.IsActive='Y')"
                 : "";
             string locatorSql = hasLineConfirmTable
-                ? "COALESCE(Locator.Value, '-')"
-                : "'-'";
+                ? "COALESCE(Locator.Value, N'-')"
+                : "N'-'";
             string statusSql = "'Unloading'";
 
             if (hasLineConfirmTable && hasQualityCheckColumn)

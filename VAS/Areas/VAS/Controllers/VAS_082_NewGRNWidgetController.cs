@@ -39,13 +39,13 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
 
-            string baseSql = @"
+            string rawSql = @"
                 SELECT o.C_Order_ID AS PO_ID,
                        o.DocumentNo AS PO_NO,
                        bp.Name AS Supplier,
                        wh.Name AS Warehouse_Name,
-                       MIN(COALESCE(ol.DatePromised, o.DatePromised)) AS Promise_Date,
-                       COUNT(ol.C_OrderLine_ID) AS Open_Line_Count
+                       COALESCE(ol.DatePromised, o.DatePromised) AS Line_Promise_Date,
+                       ol.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON ol.C_Order_ID=o.C_Order_ID
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID AND bp.IsActive='Y')
@@ -55,14 +55,10 @@ namespace VIS.Controllers
                   AND o.IsSOTrx='N'
                   AND o.DocStatus='CO'
                   AND o.AD_Client_ID=@AD_Client_ID
-                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                GROUP BY o.C_Order_ID,
-                         o.DocumentNo,
-                         bp.Name,
-                         wh.Name";
+                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)";
 
-            baseSql = MRole.GetDefault(ctx).AddAccessSQL(
-                baseSql,
+            rawSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawSql,
                 "o",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -77,7 +73,19 @@ namespace VIS.Controllers
                        OpenPO.Open_Line_Count,
                        COUNT(1) OVER () AS TotalRecords
                 FROM (
-                    " + baseSql + @"
+                    SELECT RawData.PO_ID,
+                           RawData.PO_NO,
+                           RawData.Supplier,
+                           RawData.Warehouse_Name,
+                           MIN(RawData.Line_Promise_Date) AS Promise_Date,
+                           COUNT(RawData.PO_Line_ID) AS Open_Line_Count
+                    FROM (
+                        " + rawSql + @"
+                    ) RawData
+                    GROUP BY RawData.PO_ID,
+                             RawData.PO_NO,
+                             RawData.Supplier,
+                             RawData.Warehouse_Name
                 ) OpenPO
                 ORDER BY OpenPO.Promise_Date, OpenPO.PO_NO
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";

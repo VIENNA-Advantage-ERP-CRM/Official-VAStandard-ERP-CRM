@@ -40,18 +40,18 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
             string dockSql = HasColumn("M_Locator", "LocatorCombination")
-                ? "COALESCE(ReceiveLocator.LocatorCombination, ReceiveLocator.Value, '-')"
-                : "COALESCE(ReceiveLocator.Value, '-')";
+                ? "COALESCE(ReceiveLocator.LocatorCombination, ReceiveLocator.Value, N'-')"
+                : "COALESCE(ReceiveLocator.Value, N'-')";
 
-            string baseSql = @"
+            string rawSql = @"
                 SELECT PurchaseOrder.C_Order_ID AS PO_ID,
                        PurchaseOrder.DocumentNo AS PO_No,
                        BPartner.Name AS Supplier_Name,
-                       COALESCE(Warehouse.Name, '-') AS Warehouse_Name,
+                       COALESCE(Warehouse.Name, N'-') AS Warehouse_Name,
                        " + dockSql + @" AS Dock_Name,
-                       COALESCE(PurchaseOrder.POReference, '-') AS Supplier_Reference,
-                       MIN(COALESCE(OrderLine.DatePromised, PurchaseOrder.DatePromised)) AS Promise_Date,
-                       COUNT(OrderLine.C_OrderLine_ID) AS Open_Line_Count
+                       COALESCE(PurchaseOrder.POReference, N'-') AS Supplier_Reference,
+                       COALESCE(OrderLine.DatePromised, PurchaseOrder.DatePromised) AS Line_Promise_Date,
+                       OrderLine.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=PurchaseOrder.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -61,16 +61,10 @@ namespace VIS.Controllers
                   AND PurchaseOrder.IsSOTrx='N'
                   AND PurchaseOrder.DocStatus='CO'
                   AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
-                  AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)
-                GROUP BY PurchaseOrder.C_Order_ID,
-                         PurchaseOrder.DocumentNo,
-                         BPartner.Name,
-                         COALESCE(Warehouse.Name, '-'),
-                         " + dockSql + @",
-                         COALESCE(PurchaseOrder.POReference, '-')";
+                  AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
 
-            baseSql = MRole.GetDefault(ctx).AddAccessSQL(
-                baseSql,
+            rawSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawSql,
                 "PurchaseOrder",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -87,7 +81,23 @@ namespace VIS.Controllers
                        OpenPO.Open_Line_Count,
                        COUNT(1) OVER () AS TotalRecords
                 FROM (
-                    " + baseSql + @"
+                    SELECT RawData.PO_ID,
+                           RawData.PO_No,
+                           RawData.Supplier_Name,
+                           RawData.Warehouse_Name,
+                           RawData.Dock_Name,
+                           RawData.Supplier_Reference,
+                           MIN(RawData.Line_Promise_Date) AS Promise_Date,
+                           COUNT(RawData.PO_Line_ID) AS Open_Line_Count
+                    FROM (
+                        " + rawSql + @"
+                    ) RawData
+                    GROUP BY RawData.PO_ID,
+                             RawData.PO_No,
+                             RawData.Supplier_Name,
+                             RawData.Warehouse_Name,
+                             RawData.Dock_Name,
+                             RawData.Supplier_Reference
                 ) OpenPO
                 ORDER BY OpenPO.Promise_Date, OpenPO.PO_No
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
@@ -160,7 +170,7 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT OrderLine.C_OrderLine_ID AS PO_Line_ID,
                        OrderLine.Line AS Line_No,
-                       COALESCE(Product.Name, '-') AS Item_Name,
+                       COALESCE(Product.Name, N'-') AS Item_Name,
                        COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(OrderLine.QtyDelivered, 0) AS Already_Received_Qty,
                        COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) AS Open_Qty,
@@ -264,14 +274,13 @@ namespace VIS.Controllers
                 ? "COALESCE(DocType.AD_PrintFormat_ID, 0)"
                 : "0";
 
-            string labelSql = @"
+            string rawLabelSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Party_Name,
-                       COALESCE(SUM(COALESCE(InOutLine.MovementQty, 0)), 0) AS Received_Qty,
+                       COALESCE(InOutLine.MovementQty, 0) AS Line_Qty,
                        " + copiesSql + @" AS Copies,
                        " + printFormatSql + @" AS Print_Format_ID,
-                       COUNT(1) OVER () AS TotalRecords,
                        COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Sort_Date
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -279,18 +288,10 @@ namespace VIS.Controllers
                 LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=InOut.C_DocType_ID AND DocType.IsActive='Y')
                 WHERE InOut.IsActive='Y'
                   AND InOut.MovementType='V+'
-                  AND InOut.AD_Client_ID=@AD_Client_ID" + searchWhere + @"
-                GROUP BY InOut.M_InOut_ID,
-                         InOut.DocumentNo,
-                         BPartner.Name,
-                         " + copiesSql + @",
-                         " + printFormatSql + @",
-                         InOut.DateReceived,
-                         InOut.MovementDate,
-                         InOut.Created";
+                  AND InOut.AD_Client_ID=@AD_Client_ID" + searchWhere;
 
-            labelSql = MRole.GetDefault(ctx).AddAccessSQL(
-                labelSql,
+            rawLabelSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawLabelSql,
                 "InOut",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -305,7 +306,20 @@ namespace VIS.Controllers
                        LabelData.Print_Format_ID,
                        LabelData.TotalRecords
                 FROM (
-                    " + labelSql + @"
+                    SELECT RawData.GRN_ID,
+                           RawData.GRN_No,
+                           RawData.Party_Name,
+                           COALESCE(SUM(RawData.Line_Qty), 0) AS Received_Qty,
+                           MAX(RawData.Copies) AS Copies,
+                           MAX(RawData.Print_Format_ID) AS Print_Format_ID,
+                           MAX(RawData.Sort_Date) AS Sort_Date,
+                           COUNT(1) OVER () AS TotalRecords
+                    FROM (
+                        " + rawLabelSql + @"
+                    ) RawData
+                    GROUP BY RawData.GRN_ID,
+                             RawData.GRN_No,
+                             RawData.Party_Name
                 ) LabelData
                 ORDER BY LabelData.Sort_Date DESC, LabelData.GRN_No DESC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
