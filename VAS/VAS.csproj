@@ -235,9 +235,12 @@
     <Compile Include="Areas\VAS\Controllers\OverdueController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_067_APInvoiceSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_068_APPaymentSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_069_CashJournalSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_016_AvgPaymentPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_017_MonthlyPurchaseSpendWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_018_OverduePayablesWidgetController.cs" />
@@ -249,8 +252,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_024_TotalOutstandingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_025_TotalPurchasesWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_026_VendorCreditUtilisationWidgetController.cs" />
-
-
     <Compile Include="Areas\VAS\Controllers\VAS_045_GLJournalPendingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
@@ -288,6 +289,7 @@
     <Compile Include="Areas\VAS\Controllers\VPaySelectController.cs" />
     <Compile Include="Areas\VAS\Controllers\VTrxMaterialController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_032_RecentAPPaymentsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_033_PaymentMethodsWidget.js" />
@@ -333,7 +335,6 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
-
     <Content Include="Areas\VAS\Content\VAS_016_AvgPaymentPeriodWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_017_MonthlyPurchaseSpendWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_018_OverduePayablesWidget.css" />
@@ -346,7 +347,6 @@
     <Content Include="Areas\VAS\Content\VAS_025_TotalPurchasesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_026_VendorCreditUtilisationWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_071_NewPaymentWidget.css" />
-
     <Content Include="Areas\VAS\Content\VAS_010_CashGlCashInWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_003_OnAccountReceipts.css" />
     <Content Include="Areas\VAS\Content\VAS_011_UnreconciledReceipts.css" />
@@ -356,7 +356,6 @@
     <Content Include="Areas\VAS\Content\VAS_015_OutstandingVsReceived.css" />
     <Content Include="Areas\VAS\Content\VAS_035_MatchSuggestions.css" />
     <Content Include="Areas\VAS\Content\VAS_AvgDaysToPayWidget.css" />
-
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateNewReceipt.css" />
@@ -499,7 +498,6 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_035_MatchSuggestions.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
-
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
