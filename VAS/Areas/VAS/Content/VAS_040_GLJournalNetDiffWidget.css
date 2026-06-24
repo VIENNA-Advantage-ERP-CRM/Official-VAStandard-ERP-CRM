@@ -1,0 +1,255 @@
+/* ==========================================================================
+   VAS GL Journal Net Difference KPI Widget
+   File  : VAS_040_GLJournalNetDiffWidget.css
+   Scope : .VAS-gljnd-root
+   ========================================================================== */
+
+/* ── Root wrapper ────────────────────────────────────────────────────────── */
+.VAS-gljnd-root {
+    height: 100%;
+    width: 100%;
+}
+
+/* ── KPI card container ──────────────────────────────────────────────────── */
+.VAS-gljnd-root .kpi {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    padding: 1em;
+    border-radius: 0.875em;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(0, 83, 180, 0.06);
+    position: relative;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Teal/ice variant */
+.VAS-gljnd-root .kpi.kpi-teal {
+    background: linear-gradient(150deg, #FAFCFE 0%, #EEF6FF 100%);
+}
+
+/* ── Header row ──────────────────────────────────────────────────────────── */
+.VAS-gljnd-root .w-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Icon well */
+.VAS-gljnd-root .w-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    flex-shrink: 0;
+    border-radius: 0.375em;
+    background: rgba(0, 131, 218, 0.12);
+    color: #004E9A;
+}
+
+.VAS-gljnd-root .w-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+    stroke: currentColor;
+}
+
+/* Title label */
+.VAS-gljnd-root .w-title {
+    font-size: 0.8125em;
+    font-weight: 400;
+    color: #5F7283;
+    letter-spacing: 0.015em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* DR − CR badge — pushed to the far right */
+.VAS-gljnd-drcr {
+    font-size: 0.7em;
+    font-weight: 600;
+    color: #748494;
+    letter-spacing: 0.04em;
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* ── Period toggle ───────────────────────────────────────────────────────── */
+.VAS-gljnd-period-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex-shrink: 0;
+}
+
+.VAS-gljnd-period {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #748494;
+    cursor: pointer;
+    padding: 0.15em 0.3em;
+    border-radius: 0.3em;
+    transition: color 0.12s, background 0.12s;
+    user-select: none;
+}
+
+.VAS-gljnd-period:hover {
+    color: #0083DA;
+}
+
+.VAS-gljnd-period-active {
+    color: #0083DA;
+    font-weight: 700;
+}
+
+.VAS-gljnd-sep {
+    font-size: 0.75em;
+    color: #C0CBD3;
+    user-select: none;
+}
+
+/* ── KPI value ───────────────────────────────────────────────────────────── */
+.VAS-gljnd-root .kpi-value {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
+    line-height: 1;
+    color: #102C3F;
+}
+
+/* Green when books are in balance */
+.VAS-gljnd-root .kpi-value.VAS-gljnd-balanced {
+    color: #0B6B45;
+}
+
+/* Amber when out of balance */
+.VAS-gljnd-root .kpi-value.VAS-gljnd-unbalanced {
+    color: #8B5200;
+}
+
+/* Currency prefix */
+.VAS-gljnd-prefix {
+    font-size: 0.65em;
+    font-weight: 500;
+    color: inherit;
+    opacity: 0.7;
+    margin-right: 0.1em;
+    align-self: flex-start;
+    padding-top: 0.2em;
+}
+
+/* Main integer part */
+.VAS-gljnd-main {
+    font-size: 2.25em;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* Decimal part */
+.VAS-gljnd-decimal {
+    font-size: 1.125em;
+    font-weight: 400;
+    opacity: 0.6;
+}
+
+/* ── Status / Why section ────────────────────────────────────────────────── */
+.VAS-gljnd-root .kpi-why {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4em;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.5em;
+    padding: 0.45em 0.6em;
+    border: 1px solid rgba(0, 131, 218, 0.12);
+}
+
+.VAS-gljnd-root .kpi-why-label {
+    font-size: 0.6875em;
+    font-weight: 700;
+    color: #0083DA;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.VAS-gljnd-root .kpi-why-text {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.4;
+}
+
+/* Balanced — green status text */
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
+    color: #0B6B45;
+    font-weight: 500;
+}
+
+/* Unbalanced — amber warning text */
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-warn {
+    color: #8B5200;
+    font-weight: 500;
+}
+
+/* ── Responsive scaling ──────────────────────────────────────────────────── */
+@media screen and (max-width: 1920px) {
+    .vis-editModeWidget .VAS-gljnd-root .kpi {
+        font-size: 10px;
+    }
+}
+
+@media screen and (max-width: 1366px) {
+    .VAS-gljnd-root .kpi {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljnd-root .kpi {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .VAS-gljnd-root .kpi {
+        font-size: 9px;
+    }
+
+    .vis-editModeWidget .VAS-gljnd-root .kpi {
+        font-size: 6px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .VAS-gljnd-root .kpi {
+        font-size: 10px;
+    }
+
+    .vis-editModeWidget .VAS-gljnd-root .kpi {
+        font-size: 7px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .VAS-gljnd-root .kpi {
+        font-size: 11px;
+    }
+}
+
+/* RTL support */
+html[dir="rtl"] .VAS-gljnd-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljnd-drcr {
+    margin-left: unset;
+    margin-right: auto;
+}
+
+html[dir="rtl"] .VAS-gljnd-root .kpi-why {
+    flex-direction: row-reverse;
+}

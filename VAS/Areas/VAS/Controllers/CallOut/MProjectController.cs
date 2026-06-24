@@ -45,6 +45,18 @@ namespace VIS.Controllers
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
+        public JsonResult GetVASProjectDetail(string fields)
+        {
+
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MProjectModel objProjectModel = new MProjectModel();
+                retJSON = JsonConvert.SerializeObject(objProjectModel.GetVASProjectDetail(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
 
         // Added by Bharat on 23 May 2017
         public JsonResult GetProjectPriceLimit(string fields)
@@ -55,6 +67,17 @@ namespace VIS.Controllers
                 VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
                 MProjectModel objProjectModel = new MProjectModel();
                 retJSON = JsonConvert.SerializeObject(objProjectModel.GetProjectPriceLimit(ctx, fields));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+        public JsonResult GetVASProjectPriceLimit(string fields)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                VAdvantage.Utility.Ctx ctx = Session["ctx"] as Ctx;
+                MProjectModel objProjectModel = new MProjectModel();
+                retJSON = JsonConvert.SerializeObject(objProjectModel.GetVASProjectPriceLimit(ctx, fields));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

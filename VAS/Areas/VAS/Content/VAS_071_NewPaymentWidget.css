@@ -1,0 +1,99 @@
+/* ==========================================================
+   VAS New Payment quick-action widget - vas-npmt-* namespace
+   ========================================================== */
+
+.vas-npmt-root {
+    position: relative;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.vas-npmt-card,
+.vas-npmt-card:focus,
+.vas-npmt-card:active {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed #9ED1FF;
+    border-radius: 14px;
+    padding: 0.875em;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.07);
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.vas-npmt-card:hover {
+    border-color: #1F83FF;
+    box-shadow: 0 4px 14px rgba(31, 131, 255, 0.13);
+}
+
+.vas-npmt-card:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: -4px;
+}
+
+.vas-npmt-card.vas-npmt-opening,
+.vas-npmt-card:disabled {
+    cursor: wait;
+    opacity: 0.72;
+}
+
+.vas-npmt-icon-wrap {
+    display: flex;
+    justify-content: flex-end;
+    flex-shrink: 0;
+}
+
+.vas-npmt-icon {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 10px;
+    background: #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    box-shadow: 0 8px 20px rgba(31, 131, 255, 0.28);
+}
+
+.vas-npmt-icon svg {
+    width: 1em;
+    height: 1em;
+    stroke-width: 2.2;
+}
+
+.vas-npmt-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125em;
+    min-width: 0;
+}
+
+.vas-npmt-title {
+    font-size: 0.75em;
+    font-weight: 500;
+    line-height: 1.2;
+    color: #102C3F;
+    overflow-wrap: anywhere;
+}
+
+.vas-npmt-sub {
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.25;
+    color: #5F7283;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

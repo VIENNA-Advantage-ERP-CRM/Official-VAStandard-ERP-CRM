@@ -248,6 +248,8 @@
     <Compile Include="Model\MConversionRate.cs" />
     <Compile Include="Model\MConversionType.cs" />
     <Compile Include="Model\MInventoryRevaluation.cs" />
+    <Compile Include="Model\MOppLines.cs" />
+    <Compile Include="Model\MOpportunity.cs" />
     <Compile Include="Model\MProductionPlan.cs" />
     <Compile Include="Model\MRevaluationAcctSchema.cs" />
     <Compile Include="Model\MRevaluationLine.cs" />
@@ -583,6 +585,8 @@
     <Compile Include="Model\Tax.cs" />
     <Compile Include="Model\UserPricingVO.cs" />
     <Compile Include="Model\X_C_Team.cs" />
+    <Compile Include="Model\X_VAS_OppLines.cs" />
+    <Compile Include="Model\X_VAS_Opportunity.cs" />
     <Compile Include="Process\CalculateBudget.cs" />
     <Compile Include="Process\CopyFromProjectLine.cs" />
     <Compile Include="Process\CostClosing.cs" />
@@ -599,6 +603,9 @@
     <Compile Include="Process\AlertTestMailAttachment.cs" />
     <Compile Include="Process\ReCostingCalculationTransaction.cs" />
     <Compile Include="Process\RenewalContract.cs" />
+    <Compile Include="Process\VAS_ArchiveOpportunity.cs" />
+    <Compile Include="Process\VAS_GenerateQuotation.cs" />
+    <Compile Include="Process\VAS_GenerateOrder.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
     <Compile Include="Process\AcctSchemaCopyAcct.cs" />
     <Compile Include="Process\AcctSchemaDefaultCopy.cs" />
@@ -812,6 +819,12 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Process\ViennaAdvantageProcess\LeadToOpportunity.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Process\VAS_LeadToOpportunity.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Process\VAS_ProspectToOpportunity.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="Process\ViennaAdvantageProcess\PaymentOnline.cs">
