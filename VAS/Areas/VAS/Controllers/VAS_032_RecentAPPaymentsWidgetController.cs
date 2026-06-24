@@ -24,6 +24,7 @@ using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
+using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VIS.Filters;
@@ -132,7 +133,8 @@ namespace VAS.Controllers
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPaymentAllocationDetail(int paymentId)
+        public JsonResult GetPaymentAllocationDetail(
+    int paymentId)
         {
             Ctx ctx = GetContext();
 
@@ -141,33 +143,203 @@ namespace VAS.Controllers
                 return GetSessionExpiredResult();
             }
 
+            if (paymentId <= 0)
+            {
+                return Json(
+                    new
+                    {
+                        success = false,
+                        error = GetMsg(
+                            ctx,
+                            "VAS_032_PaymentRequired",
+                            "Payment is required."
+                        ),
+                        errorText = GetMsg(
+                            ctx,
+                            "VAS_032_PaymentRequired",
+                            "Payment is required."
+                        ),
+                        hasData = false,
+                        lines = new List<object>()
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
+            }
+
             IDataReader dr = null;
+            string sql = string.Empty;
 
             try
             {
-                string clientIdSql =
-                    ctx.GetAD_Client_ID().ToString(
-                        CultureInfo.InvariantCulture
+                string queryParametersFrom =
+                    DB.IsOracle()
+                        ? " FROM DUAL"
+                        : string.Empty;
+
+                string emptyText =
+                    DB.IsOracle()
+                        ? "CAST('' AS VARCHAR2(4000))"
+                        : "CAST('' AS VARCHAR(4000))";
+
+                string paymentDocumentNoSql =
+                    GetTextCastSql(
+                        "Payment.DocumentNo"
                     );
 
-                string paymentIdSql =
-                    Math.Max(0, paymentId).ToString(
-                        CultureInfo.InvariantCulture
+                string paymentDocStatusSql =
+                    GetTextCastSql(
+                        "Payment.DocStatus"
                     );
 
-                string sql = @"
+                string paymentIsAllocatedSql =
+                    GetTextCastSql(
+                        "Payment.IsAllocated"
+                    );
+
+                string allocationDocumentNoSql =
+                    GetTextCastSql(
+                        "AllocationHdr.DocumentNo"
+                    );
+
+                string allocationDocStatusSql =
+                    GetTextCastSql(
+                        "AllocationHdr.DocStatus"
+                    );
+
+                string invoiceDocumentNoSql =
+                    GetTextCastSql(
+                        "Invoice.DocumentNo"
+                    );
+
+                string vendorNameSql =
+                    GetTextCastSql(
+                        "BusinessPartner.Name"
+                    );
+
+                string currencyISOSql =
+                    GetTextCastSql(
+                        "Currency.ISO_Code"
+                    );
+
+                string currencySymbolSql =
+                    GetTextCastSql(
+                        "Currency.CurSymbol"
+                    );
+
+                /*
+                 * Apply MRole only on physical C_Payment table.
+                 */
+                string paymentAccessSql = @"
 SELECT
-    COALESCE
-    (
-        Invoice.DocumentNo,
-        ''
-    ) AS InvoiceDocumentNo,
+    Payment.C_Payment_ID,
+    Payment.AD_Client_ID,
+    Payment.AD_Org_ID,
+    Payment.C_BPartner_ID,
+    Payment.C_Currency_ID,
+    Payment.DocumentNo,
+    Payment.DateTrx,
+    Payment.DateAcct,
+    Payment.PayAmt,
+    Payment.DocStatus,
+    Payment.IsAllocated
+
+FROM C_Payment Payment
+
+WHERE Payment.IsActive = 'Y'
+
+AND Payment.AD_Client_ID =
+(
+    SELECT
+        QueryParameters.AD_Client_ID
+
+    FROM QueryParameters QueryParameters
+)
+
+AND Payment.C_Payment_ID =
+(
+    SELECT
+        QueryParameters.C_Payment_ID
+
+    FROM QueryParameters QueryParameters
+)";
+
+                paymentAccessSql =
+                    MRole.GetDefault(ctx).AddAccessSQL(
+                        paymentAccessSql,
+                        "Payment",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
+
+                sql = @"
+WITH QueryParameters AS
+(
+    SELECT
+        @AD_Client_ID AS AD_Client_ID,
+        @C_Payment_ID AS C_Payment_ID"
+                + queryParametersFrom + @"
+),
+AccessiblePayment AS
+(
+" + paymentAccessSql + @"
+)
+SELECT
+    Payment.C_Payment_ID,
+
+    " + paymentDocumentNoSql + @"
+        AS PaymentDocumentNo,
+
+    Payment.DateTrx
+        AS PaymentDate,
+
+    Payment.PayAmt
+        AS PaymentAmount,
+
+    " + paymentDocStatusSql + @"
+        AS PaymentDocStatus,
+
+    " + paymentIsAllocatedSql + @"
+        AS IsAllocated,
+
+    AllocationHdr.C_AllocationHdr_ID,
+
+    " + allocationDocumentNoSql + @"
+        AS AllocationDocumentNo,
+
+    AllocationHdr.DateTrx
+        AS AllocationTransactionDate,
+
+    AllocationHdr.DateAcct
+        AS AllocationDate,
+
+    " + allocationDocStatusSql + @"
+        AS AllocationDocStatus,
+
+    AllocationLine.C_AllocationLine_ID,
+
+    AllocationLine.C_Invoice_ID,
+
+    AllocationLine.C_InvoicePaySchedule_ID,
+
+    CASE
+        WHEN Invoice.DocumentNo IS NULL
+        THEN " + emptyText + @"
+        ELSE " + invoiceDocumentNoSql + @"
+    END AS InvoiceDocumentNo,
 
     Invoice.DateInvoiced,
 
-    AllocationHdr.DocumentNo AS AllocationDocumentNo,
+    COALESCE
+    (
+        InvoicePaySchedule.DueDate,
+        Invoice.DateAcct
+    ) AS DueDate,
 
-    AllocationHdr.DateAcct AS AllocationDate,
+    CASE
+        WHEN BusinessPartner.Name IS NULL
+        THEN " + emptyText + @"
+        ELSE " + vendorNameSql + @"
+    END AS VendorName,
 
     COALESCE
     (
@@ -189,15 +361,43 @@ SELECT
 
     COALESCE
     (
-        Currency.ISO_Code,
-        ''
-    ) AS CurrencyISO,
+        AllocationLine.OverUnderAmt,
+        0
+    ) AS OverUnderAmt,
 
-    COALESCE
     (
-        Currency.CurSymbol,
-        ''
-    ) AS CurrencySymbol,
+        COALESCE
+        (
+            AllocationLine.Amount,
+            0
+        )
+        +
+        COALESCE
+        (
+            AllocationLine.DiscountAmt,
+            0
+        )
+        +
+        COALESCE
+        (
+            AllocationLine.WriteOffAmt,
+            0
+        )
+    ) AS TotalAllocatedAmount,
+
+    AllocationHdr.C_Currency_ID,
+
+    CASE
+        WHEN Currency.ISO_Code IS NULL
+        THEN " + emptyText + @"
+        ELSE " + currencyISOSql + @"
+    END AS CurrencyISO,
+
+    CASE
+        WHEN Currency.CurSymbol IS NULL
+        THEN " + emptyText + @"
+        ELSE " + currencySymbolSql + @"
+    END AS CurrencySymbol,
 
     COALESCE
     (
@@ -205,7 +405,18 @@ SELECT
         2
     ) AS StdPrecision
 
-FROM C_AllocationLine AllocationLine
+FROM AccessiblePayment Payment
+
+INNER JOIN C_AllocationLine AllocationLine ON
+(
+    AllocationLine.C_Payment_ID =
+    Payment.C_Payment_ID
+
+    AND AllocationLine.IsActive = 'Y'
+
+    AND AllocationLine.AD_Client_ID =
+    Payment.AD_Client_ID
+)
 
 INNER JOIN C_AllocationHdr AllocationHdr ON
 (
@@ -214,13 +425,36 @@ INNER JOIN C_AllocationHdr AllocationHdr ON
 
     AND AllocationHdr.IsActive = 'Y'
 
-    AND AllocationHdr.AD_Client_ID = " + clientIdSql + @"
+    AND AllocationHdr.AD_Client_ID =
+    Payment.AD_Client_ID
+
+    AND AllocationHdr.DocStatus IN
+    (
+        'CO',
+        'CL'
+    )
 )
 
 LEFT OUTER JOIN C_Invoice Invoice ON
 (
     Invoice.C_Invoice_ID =
     AllocationLine.C_Invoice_ID
+
+    AND Invoice.IsActive = 'Y'
+)
+
+LEFT OUTER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
+(
+    InvoicePaySchedule.C_InvoicePaySchedule_ID =
+    AllocationLine.C_InvoicePaySchedule_ID
+
+    AND InvoicePaySchedule.IsActive = 'Y'
+)
+
+LEFT OUTER JOIN C_BPartner BusinessPartner ON
+(
+    BusinessPartner.C_BPartner_ID =
+    Invoice.C_BPartner_ID
 )
 
 LEFT OUTER JOIN C_Currency Currency ON
@@ -229,21 +463,38 @@ LEFT OUTER JOIN C_Currency Currency ON
     AllocationHdr.C_Currency_ID
 )
 
-WHERE AllocationLine.IsActive = 'Y'
-
-AND AllocationLine.C_Payment_ID = " + paymentIdSql + @"
-
 ORDER BY
-    AllocationHdr.DateAcct,
-    AllocationLine.C_AllocationLine_ID";
+    AllocationHdr.DateAcct DESC,
+    AllocationHdr.C_AllocationHdr_ID DESC,
+    AllocationLine.C_AllocationLine_ID DESC";
+
+                SqlParameter[] parameters =
+                    new SqlParameter[]
+                    {
+                new SqlParameter(
+                    "@AD_Client_ID",
+                    ctx.GetAD_Client_ID()
+                ),
+
+                new SqlParameter(
+                    "@C_Payment_ID",
+                    paymentId
+                )
+                    };
 
                 dr = DB.ExecuteReader(
                     sql,
-                    null,
+                    parameters,
                     null
                 );
 
-                List<object> lines = new List<object>();
+                List<object> lines =
+                    new List<object>();
+
+                decimal totalAllocatedAmount = 0;
+                decimal totalDiscountAmount = 0;
+                decimal totalWriteOffAmount = 0;
+                decimal grandTotalAmount = 0;
 
                 while (
                     dr != null &&
@@ -251,76 +502,327 @@ ORDER BY
                 )
                 {
                     string currencyISO =
-                        GetString(dr, "CurrencyISO", string.Empty);
+                        GetString(
+                            dr,
+                            "CurrencyISO",
+                            string.Empty
+                        );
 
                     string currencySymbol =
-                        GetString(dr, "CurrencySymbol", string.Empty);
+                        GetString(
+                            dr,
+                            "CurrencySymbol",
+                            string.Empty
+                        );
 
-                    if (string.IsNullOrWhiteSpace(currencySymbol))
+                    if (
+                        string.IsNullOrWhiteSpace(
+                            currencySymbol
+                        )
+                    )
                     {
-                        currencySymbol = currencyISO;
+                        currencySymbol =
+                            currencyISO;
                     }
 
                     int stdPrecision =
                         NormalizePrecision(
-                            GetInt(dr, "StdPrecision", 2)
+                            GetInt(
+                                dr,
+                                "StdPrecision",
+                                2
+                            )
                         );
 
-                    lines.Add(new
-                    {
-                        invoiceDocumentNo =
-                            GetString(dr, "InvoiceDocumentNo", string.Empty),
+                    decimal allocatedAmount =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "AllocatedAmount",
+                                0
+                            ),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        invoiceDate =
-                            FormatDate(GetNullableDate(dr, "DateInvoiced")),
+                    decimal discountAmt =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "DiscountAmt",
+                                0
+                            ),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        allocationDocumentNo =
-                            GetString(dr, "AllocationDocumentNo", string.Empty),
+                    decimal writeOffAmt =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "WriteOffAmt",
+                                0
+                            ),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        allocationDate =
-                            FormatDate(GetNullableDate(dr, "AllocationDate")),
+                    decimal overUnderAmt =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "OverUnderAmt",
+                                0
+                            ),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        allocatedAmount =
-                            GetDecimal(dr, "AllocatedAmount", 0),
+                    decimal totalAllocated =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "TotalAllocatedAmount",
+                                0
+                            ),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        discountAmt =
-                            GetDecimal(dr, "DiscountAmt", 0),
+                    totalAllocatedAmount +=
+                        allocatedAmount;
 
-                        writeOffAmt =
-                            GetDecimal(dr, "WriteOffAmt", 0),
+                    totalDiscountAmount +=
+                        discountAmt;
 
-                        currencyISO =
-                            currencyISO,
+                    totalWriteOffAmount +=
+                        writeOffAmt;
 
-                        currencySymbol =
-                            currencySymbol,
+                    grandTotalAmount +=
+                        totalAllocated;
 
-                        stdPrecision =
-                            stdPrecision
-                    });
+                    lines.Add(
+                        new
+                        {
+                            paymentId =
+                                GetInt(
+                                    dr,
+                                    "C_Payment_ID"
+                                ),
+
+                            paymentDocumentNo =
+                                GetString(
+                                    dr,
+                                    "PaymentDocumentNo",
+                                    string.Empty
+                                ),
+
+                            paymentDate =
+                                FormatDate(
+                                    GetNullableDate(
+                                        dr,
+                                        "PaymentDate"
+                                    )
+                                ),
+
+                            paymentAmount =
+                                GetDecimal(
+                                    dr,
+                                    "PaymentAmount",
+                                    0
+                                ),
+
+                            paymentDocStatus =
+                                GetString(
+                                    dr,
+                                    "PaymentDocStatus",
+                                    string.Empty
+                                ),
+
+                            isAllocated =
+                                GetString(
+                                    dr,
+                                    "IsAllocated",
+                                    "N"
+                                ),
+
+                            allocationHdrId =
+                                GetInt(
+                                    dr,
+                                    "C_AllocationHdr_ID"
+                                ),
+
+                            allocationLineId =
+                                GetInt(
+                                    dr,
+                                    "C_AllocationLine_ID"
+                                ),
+
+                            allocationDocumentNo =
+                                GetString(
+                                    dr,
+                                    "AllocationDocumentNo",
+                                    string.Empty
+                                ),
+
+                            allocationTransactionDate =
+                                FormatDate(
+                                    GetNullableDate(
+                                        dr,
+                                        "AllocationTransactionDate"
+                                    )
+                                ),
+
+                            allocationDate =
+                                FormatDate(
+                                    GetNullableDate(
+                                        dr,
+                                        "AllocationDate"
+                                    )
+                                ),
+
+                            allocationDocStatus =
+                                GetString(
+                                    dr,
+                                    "AllocationDocStatus",
+                                    string.Empty
+                                ),
+
+                            invoiceId =
+                                GetInt(
+                                    dr,
+                                    "C_Invoice_ID"
+                                ),
+
+                            invoicePayScheduleId =
+                                GetInt(
+                                    dr,
+                                    "C_InvoicePaySchedule_ID"
+                                ),
+
+                            invoiceDocumentNo =
+                                GetString(
+                                    dr,
+                                    "InvoiceDocumentNo",
+                                    string.Empty
+                                ),
+
+                            invoiceDate =
+                                FormatDate(
+                                    GetNullableDate(
+                                        dr,
+                                        "DateInvoiced"
+                                    )
+                                ),
+
+                            dueDate =
+                                FormatDate(
+                                    GetNullableDate(
+                                        dr,
+                                        "DueDate"
+                                    )
+                                ),
+
+                            vendorName =
+                                GetString(
+                                    dr,
+                                    "VendorName",
+                                    string.Empty
+                                ),
+
+                            allocatedAmount =
+                                allocatedAmount,
+
+                            discountAmt =
+                                discountAmt,
+
+                            writeOffAmt =
+                                writeOffAmt,
+
+                            overUnderAmt =
+                                overUnderAmt,
+
+                            totalAllocated =
+                                totalAllocated,
+
+                            cCurrencyId =
+                                GetInt(
+                                    dr,
+                                    "C_Currency_ID"
+                                ),
+
+                            currencyISO =
+                                currencyISO,
+
+                            currencySymbol =
+                                currencySymbol,
+
+                            stdPrecision =
+                                stdPrecision
+                        }
+                    );
                 }
 
-                return Json(new
-                {
-                    success = true,
-                    error = string.Empty,
-                    lines = lines
-                }, JsonRequestBehavior.AllowGet);
+                return Json(
+                    new
+                    {
+                        success = true,
+                        error = string.Empty,
+                        hasData = lines.Count > 0,
+
+                        totalAllocatedAmount =
+                            totalAllocatedAmount,
+
+                        totalDiscountAmount =
+                            totalDiscountAmount,
+
+                        totalWriteOffAmount =
+                            totalWriteOffAmount,
+
+                        grandTotalAmount =
+                            grandTotalAmount,
+
+                        lines =
+                            lines
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = ex.Message,
-                    errorText = ex.Message
-                }, JsonRequestBehavior.AllowGet);
+                VLogger.Get().SaveError(
+                    "VAS_032_GetPaymentAllocationDetail",
+                    ex
+                );
+
+                string message =
+                    GetMsg(
+                        ctx,
+                        "VAS_032_AllocationLoadError",
+                        "Could not load allocation details."
+                    );
+
+                return Json(
+                    new
+                    {
+                        success = false,
+                        error = message,
+                        errorText = message,
+                        hasData = false,
+                        lines = new List<object>()
+                    },
+                    JsonRequestBehavior.AllowGet
+                );
             }
             finally
             {
-                CloseReader(dr);
+                CloseReader(
+                    dr
+                );
             }
         }
+
+
 
         private SqlQueryData BuildRecentPaymentsSql(
             Ctx ctx
