@@ -324,115 +324,191 @@
     overflow: hidden !important;
 }
 
-.modal-wrap {
+.MPC-ws-modal {
     position: fixed;
     inset: 0;
-    z-index: 60;
+    z-index: 10050;
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 32px;
-}
-.modal-wrap.open {
-    display: flex;
-}
-.modal-scrim {
-    position: absolute;
-    inset: 0;
-    background: rgba(2, 38, 64, 0.28);
-    backdrop-filter: blur(2px);
-}
-.modal {
-    position: relative;
-    width: min(440px, 100%);
-    max-height: 88vh;
-    display: flex;
-    flex-direction: column;
-    background: #fff;
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+    padding: 1em;
     font-family: Roboto, sans-serif;
 }
-.modal-title {
-    flex: 0 0 auto;
-    height: 56px;
+
+.MPC-ws-modal.MPC-ws-modal-open {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 20px;
-    background: rgba(255, 255, 255, 0.9);
-    border-bottom: 1px solid #1F83FF;
 }
-.modal-title .mt-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
+
+.MPC-ws-modal-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 38, 64, 0.38);
+    backdrop-filter: blur(2px);
 }
-.modal-title h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 400;
-    color: #141414;
-    white-space: nowrap;
+
+.MPC-ws-modal-dialog {
+    position: relative;
+    width: min(36em, calc(100vw - 2em));
+    max-height: calc(100vh - 2em);
     overflow: hidden;
-    text-overflow: ellipsis;
+    background: #fff;
+    border: 1px solid rgba(31, 131, 255, 0.35);
+    border-radius: 14px;
+    box-shadow: 0 24px 70px rgba(0, 38, 64, 0.24);
 }
-.modal-title .mt-badge {
-    font-size: 0.72rem;
-    flex: 0 0 auto;
+
+.MPC-ws-modal-header {
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0 1em;
+    color: #102c3f;
+    font-size: 1rem;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid #1f83ff;
+}
+
+.MPC-ws-modal-badge {
+    margin-inline-start: auto;
     padding: 0.2em 0.65em;
     color: #106ab0;
+    font-size: 0.75em;
+    font-weight: 400;
     background: #dff1ff;
     border-radius: 999px;
 }
-.modal-close {
+
+.MPC-ws-modal-close {
     width: 32px;
     height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #141414;
-    border-radius: 8px;
-    flex: 0 0 auto;
+    padding: 0;
+    color: #5f7283;
+    font-size: 1.5rem;
+    line-height: 1;
     background: transparent;
     border: 0;
-    cursor: pointer;
+    border-radius: 8px;
 }
-.modal-close:hover {
-    background: #EEF6FF;
-    color: #0083DA;
+
+.MPC-ws-modal-close:hover,
+.MPC-ws-modal-close:focus-visible {
+    color: #0083da;
+    background: #eef6ff;
+    outline: none;
 }
-.modal-close svg {
-    width: 20px;
-    height: 20px;
+
+.MPC-ws-modal-body {
+    max-height: calc(100vh - 8em);
+    padding: 1.25em;
+    overflow-y: auto;
 }
-.modal-body {
-    padding: 22px 24px;
-    overflow: auto;
+
+.MPC-ws-age-total {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
 }
-.agm { display: flex; flex-direction: column; gap: 14px; }
-.agm-total { display: flex; align-items: baseline; gap: 8px; }
-.agm-total .v { font-size: 1.6rem; font-weight: 700; color: var(--t-primary, #102c3f); }
-.agm-total .l { font-size: .8rem; color: var(--t-muted, #748494); }
-.agm-stack { display: flex; height: 16px; border-radius: 999px; overflow: hidden; background: #EEF2F6; }
-.agm-stack > span { height: 100%; }
-.agm-rows { display: flex; flex-direction: column; gap: 12px; }
-.agm-row { display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: center; }
-.agm-lab { display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 700; color: var(--t-primary, #102c3f); }
-.agm-dot { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 auto; }
-.agm-track { height: 12px; border-radius: 999px; background: #EEF2F6; overflow: hidden; }
-.agm-fill { height: 100%; border-radius: 999px; }
-.agm-val { text-align: right; font-size: .85rem; font-weight: 700; color: var(--t-primary, #102c3f); white-space: nowrap; }
-.agm-val small { display: block; font-size: .7rem; font-weight: 400; color: var(--t-muted, #748494); }
+
+.MPC-ws-age-total strong {
+    color: #102c3f;
+    font-size: 1.75rem;
+    font-weight: 400;
+    line-height: 1.1;
+}
+
+.MPC-ws-age-total span {
+    color: #748494;
+    font-size: 0.78rem;
+}
+
+.MPC-ws-age-stack {
+    width: 100%;
+    height: 0.75em;
+    display: flex;
+    margin: 1.1em 0;
+    overflow: hidden;
+    background: #e9eef3;
+    border-radius: 999px;
+}
+
+.MPC-ws-age-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+}
+
+.MPC-ws-age-row {
+    display: grid;
+    grid-template-columns: 7em minmax(5em, 1fr) 6.5em;
+    gap: 0.75em;
+    align-items: center;
+}
+
+.MPC-ws-age-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    color: #102c3f;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.MPC-ws-age-label i {
+    width: 0.6em;
+    height: 0.6em;
+    flex: 0 0 auto;
+    border-radius: 50%;
+}
+
+.MPC-ws-age-track {
+    height: 0.45em;
+    overflow: hidden;
+    background: #edf2f6;
+    border-radius: 999px;
+}
+
+.MPC-ws-age-track i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.MPC-ws-age-track svg {
+    border-radius: 999px;
+}
+
+.MPC-ws-age-value {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-ws-age-value strong {
+    color: #102c3f;
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+.MPC-ws-age-value small {
+    color: #748494;
+    font-size: 0.68rem;
+}
+
+[dir="rtl"] .MPC-ws-chevron,
+[dir="rtl"] .MPC-ws-pager svg {
+    transform: scaleX(-1);
+}
 
 @media (max-width: 600px) {
-    .agm-row {
-        grid-template-columns: 100px 1fr;
+    .MPC-ws-age-row {
+        grid-template-columns: 6.5em 1fr;
     }
-    .agm-val {
+
+    .MPC-ws-age-value {
         grid-column: 2;
-        text-align: left;
+        align-items: flex-start;
     }
 }

@@ -238,28 +238,25 @@
 
         function createDialog() {
             $dialog = $(
-                '<div class="modal-wrap" id="modalWrap-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' +
-                    '<div class="modal-scrim" id="modalScrim-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '"></div>' +
-                    '<div class="modal">' +
-                        '<div class="modal-title">' +
-                            '<div class="mt-left">' +
-                                '<h3 id="modalTitle-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">Detail</h3>' +
-                                '<span class="mt-badge" id="modalBadge-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '" style="display:none;"></span>' +
+                '<div class="MPC-product-search-dialog-wrap" role="dialog" aria-modal="true" aria-hidden="true">' +
+                    '<div class="MPC-product-search-dialog-scrim"></div>' +
+                    '<section class="MPC-product-search-dialog">' +
+                        '<header class="MPC-product-search-dialog-titlebar">' +
+                            '<div class="MPC-product-search-dialog-title-left">' +
+                                '<h2></h2>' +
+                                '<span class="MPC-product-search-dialog-badge"></span>' +
                             '</div>' +
-                            '<button class="modal-close" id="modalClose-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' +
-                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>' +
-                            '</button>' +
-                        '</div>' +
-                        '<div class="modal-body" id="modalBody-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '"></div>' +
-                    '</div>' +
+                            '<button type="button" class="MPC-product-search-dialog-close" aria-label="' + escapeHtml(label('Close', 'Close')) + '">' + icon('close') + '</button>' +
+                        '</header>' +
+                        '<div class="MPC-product-search-dialog-body"></div>' +
+                    '</section>' +
                 '</div>'
             );
 
             $('body').append($dialog);
-            $dialogTitle = $dialog.find('h3');
-            $dialogBadge = $dialog.find('.mt-badge');
-            $dialogClose = $dialog.find('.modal-close');
-            $dialogBody = $dialog.find('.modal-body');
+            $dialogTitle = $dialog.find('h2');
+            $dialogBadge = $dialog.find('.MPC-product-search-dialog-badge');
+            $dialogBody = $dialog.find('.MPC-product-search-dialog-body');
         }
 
         function bindEvents() {
@@ -277,7 +274,7 @@
             });
 
             $dialog.on('click', '.MPC-product-search-dialog-close, .MPC-product-search-dialog-scrim', closeDialog);
-            $dialog.on('click', '.seg button', function () {
+            $dialog.on('click', '.MPC-product-search-tab', function () {
                 activeTab = $(this).attr('data-tab');
                 renderTab();
             });
@@ -468,31 +465,24 @@
 
         function openLoadingDialog(productName, productCode) {
             $dialogTitle.text(productName || label('VAS_ProductDetail', 'Product Detail'));
-            if (productCode) {
-                $dialogBadge.html('<span class="pill info">' + escapeHtml(productCode) + '</span>').show();
-            } else {
-                $dialogBadge.hide();
-            }
-            $dialogBody.html('<div style="padding: 24px; text-align: center; color: #748494;">' + escapeHtml(label('Loading', 'Loading\u2026')) + '</div>');
-            $dialog.addClass('open').attr('aria-hidden', 'false');
+            $dialogBadge.text(productCode || '').toggle(!!productCode);
+            $dialogBody.html('<div class="MPC-product-search-dialog-state">' + escapeHtml(label('Loading', 'Loading\u2026')) + '</div>');
+            $dialog.addClass('is-open').attr('aria-hidden', 'false');
             $('body').addClass('MPC-product-search-modal-open');
         }
 
         function renderDialogError(message) {
-            $dialogBody.html('<div style="padding: 24px; text-align: center; color: #A33F3F;">' + escapeHtml(message) + '</div>');
+            $dialogBody.html('<div class="MPC-product-search-dialog-state MPC-product-search-dialog-error">' + escapeHtml(message) + '</div>');
         }
 
         function renderProductDialog() {
             var overview = productDetail.Overview;
-            var statusStr = productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive');
-            var statusCls = productDetail.Status === 'Y' ? 'ok' : 'warn';
+            var status = productDetail.Status === 'Y'
+                ? label('Active', 'Active')
+                : label('Inactive', 'Inactive');
 
             $dialogTitle.text(overview.ProductName);
-            if (overview.ProductCode) {
-                $dialogBadge.html('<span class="pill info">' + escapeHtml(overview.ProductCode) + '</span>').show();
-            } else {
-                $dialogBadge.hide();
-            }
+            $dialogBadge.text(overview.ProductCode || '').toggle(!!overview.ProductCode);
 
             var chips = [
                 overview.ProductCode,
@@ -500,22 +490,22 @@
                 overview.CategoryName,
                 overview.UomName ? label('VAS_UnitOfMeasure', 'UoM') + ' - ' + overview.UomName : ''
             ].filter(function (value) { return value; }).map(function (value) {
-                return '<span class="pchip">' + escapeHtml(value) + '</span>';
+                return '<span class="MPC-product-search-chip">' + escapeHtml(value) + '</span>';
             }).join('');
 
-            var hero = '<div class="phero">' +
-                '<div class="phero-ico">' + icon('box') + '</div>' +
-                '<div class="phero-main">' +
-                    '<div class="phero-name">' + escapeHtml(overview.ProductName) + '</div>' +
-                    '<div class="phero-chips">' + chips + '</div>' +
+            var hero = '<section class="MPC-product-search-hero">' +
+                '<span class="MPC-product-search-hero-icon">' + icon('product') + '</span>' +
+                '<div class="MPC-product-search-hero-main">' +
+                    '<div class="MPC-product-search-hero-name">' + escapeHtml(overview.ProductName) + '</div>' +
+                    '<div class="MPC-product-search-chips">' + chips + '</div>' +
                 '</div>' +
-                '<div class="phero-stats">' +
+                '<div class="MPC-product-search-stats">' +
                     statTile(label('VAS_OnHand', 'On Hand'), formatCompactQty(productDetail.OnHandQty), '') +
                     statTile(label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), '') +
-                    statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'warn') +
-                    statTile(label('Status', 'Status'), statusStr, statusCls) +
+                    statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning') +
+                    statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : '') +
                 '</div>' +
-            '</div>';
+            '</section>';
 
             var tabs = [
                 ['overview', label('VAS_Overview', 'Overview')],
@@ -525,27 +515,27 @@
                 ['movements', label('VAS_Movements', 'Movements')],
                 ['requisitions', label('VAS_Requisitions', 'Requisitions')]
             ].map(function (tab) {
-                return '<button type="button" class="' + (activeTab === tab[0] ? 'active' : '') + '" data-tab="' + tab[0] + '">' + escapeHtml(tab[1]) + '</button>';
+                return '<button type="button" class="MPC-product-search-tab' + (activeTab === tab[0] ? ' is-active' : '') + '" data-tab="' + tab[0] + '">' + escapeHtml(tab[1]) + '</button>';
             }).join('');
 
-            $dialogBody.html(hero + '<div class="seg">' + tabs + '</div><div class="modal-tab-content"></div>');
+            $dialogBody.html(hero + '<nav class="MPC-product-search-tabs">' + tabs + '</nav><div class="MPC-product-search-tab-body"></div>');
             renderTab();
         }
 
         function statTile(title, value, className) {
-            return '<div class="pstat">' +
-                '<div class="l">' + escapeHtml(title) + '</div>' +
-                '<div class="v ' + className + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</div>' +
+            return '<div class="MPC-product-search-stat">' +
+                '<div class="MPC-product-search-stat-label">' + escapeHtml(title) + '</div>' +
+                '<div class="MPC-product-search-stat-value ' + className + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</div>' +
             '</div>';
         }
 
         function renderTab() {
             if (!productDetail) { return; }
 
-            $dialog.find('.seg button').removeClass('active')
-                .filter('[data-tab="' + activeTab + '"]').addClass('active');
+            $dialog.find('.MPC-product-search-tab').removeClass('is-active')
+                .filter('[data-tab="' + activeTab + '"]').addClass('is-active');
 
-            var $tabBody = $dialog.find('.modal-tab-content');
+            var $tabBody = $dialog.find('.MPC-product-search-tab-body');
             if (activeTab === 'overview') {
                 $tabBody.html(renderOverview());
             }
@@ -583,11 +573,11 @@
                 [label('Status', 'Status'), productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive')]
             ];
 
-            return '<div class="form-grid">' + fields.map(function (field) {
+            return '<div class="MPC-product-search-form-grid">' + fields.map(function (field) {
                 var value = field[1] || '-';
-                return '<div class="field">' +
-                    '<div class="field-label">' + escapeHtml(field[0]) + '</div>' +
-                    '<div class="field-value' + (field[2] ? ' strong' : '') + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</div>' +
+                return '<div class="MPC-product-search-field">' +
+                    '<div class="MPC-product-search-field-label">' + escapeHtml(field[0]) + '</div>' +
+                    '<div class="MPC-product-search-field-value' + (field[2] ? ' is-strong' : '') + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</div>' +
                 '</div>';
             }).join('') + '</div>';
         }
@@ -676,33 +666,49 @@
         }
 
         function latestRecordsNote() {
-            return '<div class="note">' + icon('clock') + escapeHtml(label('VAS_ShowingLatest5Records', 'Showing latest 5 records (most recent first).')) + '</div>';
+            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_ShowingLatest5Records', 'Showing latest 5 records.')) + '</span></div>';
         }
 
         function renderTable(headers, rows, rightAlignedColumns, pageKey) {
-            if (!rows || !rows.length) {
-                return '<div style="padding:20px 4px; color: #748494; font-size: 0.875rem;">' + escapeHtml(label('VAS_NoProductRecords', 'No records on file for this item.')) + '</div>';
+            if (!rows.length) {
+                return '<div class="MPC-product-search-empty">' + escapeHtml(label('VAS_NoProductRecords', 'No records found for this product.')) + '</div>';
             }
 
-            var displayRows = rows.slice(0, 5);
+            var totalPages = Math.max(1, Math.ceil(rows.length / tablePageSize));
+            var page = Math.min(Math.max(tabPages[pageKey] || 1, 1), totalPages);
+            tabPages[pageKey] = page;
+            var start = (page - 1) * tablePageSize;
+            var pageRows = rows.slice(start, start + tablePageSize);
 
-            var th = headers.map(function(h, i) {
-                return '<th class="' + (rightAlignedColumns.indexOf(i) > -1 ? 'r' : '') + '">' + escapeHtml(h) + '</th>';
+            var head = headers.map(function (header, index) {
+                return '<th class="' + (rightAlignedColumns.indexOf(index) >= 0 ? 'is-right' : '') + '" title="' + escapeHtml(header) + '">' + escapeHtml(header) + '</th>';
             }).join('');
 
-            var tr = displayRows.map(function(row) {
-                return '<tr>' + row.map(function(c, i) {
-                    var value = c == null || c === '' ? '-' : c;
-                    return '<td class="' + (i === 0 ? 's ' : '') + (rightAlignedColumns.indexOf(i) > -1 ? 'r' : '') + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</td>';
+            var body = pageRows.map(function (row) {
+                return '<tr>' + row.map(function (cell, index) {
+                    var value = cell == null || cell === '' ? '-' : cell;
+                    return '<td class="' + (index === 0 ? 'is-primary ' : '') + (rightAlignedColumns.indexOf(index) >= 0 ? 'is-right' : '') + '" title="' + escapeHtml(value) + '">' + escapeHtml(value) + '</td>';
                 }).join('') + '</tr>';
             }).join('');
 
-            return '<table class="mini-table"><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table>';
+            var pager = '';
+            if (totalPages > 1) {
+                pager = '<div class="MPC-product-search-table-footer">' +
+                    '<span>' + escapeHtml(label('VAS_Showing', 'Showing')) + ' ' + (start + 1) + '\u2013' + (start + pageRows.length) + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + rows.length + '</span>' +
+                    '<span class="MPC-product-search-table-pager">' +
+                        '<button type="button" class="MPC-product-search-table-page" data-direction="previous" aria-label="' + escapeHtml(label('VAS_PreviousPage', 'Previous page')) + '"' + (page === 1 ? ' disabled' : '') + '>&lsaquo;</button>' +
+                        '<span>' + page + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + totalPages + '</span>' +
+                        '<button type="button" class="MPC-product-search-table-page" data-direction="next" aria-label="' + escapeHtml(label('VAS_NextPage', 'Next page')) + '"' + (page === totalPages ? ' disabled' : '') + '>&rsaquo;</button>' +
+                    '</span>' +
+                '</div>';
+            }
+
+            return '<div class="MPC-product-search-table-wrap"><table class="MPC-product-search-table"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>' + pager;
         }
 
         function closeDialog() {
             if (!$dialog) { return; }
-            $dialog.removeClass('open').attr('aria-hidden', 'true');
+            $dialog.removeClass('is-open').attr('aria-hidden', 'true');
             $('body').removeClass('MPC-product-search-modal-open');
             productDetail = null;
         }

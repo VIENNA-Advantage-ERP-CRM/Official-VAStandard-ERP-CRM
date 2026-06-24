@@ -146,7 +146,7 @@ namespace VAS.Controllers
                 INNER JOIN M_CostElement CostElement ON (
                     CostElement.M_CostElement_ID=Cost.M_CostElement_ID
                     AND CostElement.IsActive=N'Y'
-                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method1)
+                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)
                 )
                 WHERE Cost.IsActive=N'Y'
                   AND Cost.C_AcctSchema_ID=@C_AcctSchema_ID
@@ -154,7 +154,7 @@ namespace VAS.Controllers
                   AND Cost.AD_Client_ID=@Cost_Client_ID
                   AND Cost.AD_Org_ID IN (0,COALESCE(NULLIF(@Cost_Org_ID,0),Cost.AD_Org_ID))
                   AND (
-                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method2)<>'C'
+                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)<>'C'
                       OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
                   )";
 
@@ -250,13 +250,12 @@ namespace VAS.Controllers
                 new SqlParameter("@Product_Type", SqlDbType.VarChar) { Value = likeValue },
                 new SqlParameter("@Product_Category", likeValue),
                 new SqlParameter("@Max_Rows", maxRows),
-                new SqlParameter("@Costing_Method1", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
                 new SqlParameter("@M_CostType_ID", currency.CostTypeId),
+                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
+                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@Cost_Client_ID", clientId),
                 new SqlParameter("@Cost_Org_ID", orgId),
-                new SqlParameter("@Costing_Method2", SqlDbType.VarChar) { Value = currency.CostingMethod },
-                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
                 new SqlParameter("@Storage_Client_ID", clientId),
                 new SqlParameter("@Storage_Org_ID", orgId)
             };
@@ -391,7 +390,7 @@ namespace VAS.Controllers
                 INNER JOIN M_CostElement CostElement ON (
                     CostElement.M_CostElement_ID=Cost.M_CostElement_ID
                     AND CostElement.IsActive=N'Y'
-                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method1)
+                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)
                 )
                 WHERE Cost.IsActive=N'Y'
                   AND Cost.M_Product_ID=@Cost_Product_ID
@@ -400,7 +399,7 @@ namespace VAS.Controllers
                   AND Cost.AD_Client_ID=@Cost_Client_ID
                   AND Cost.AD_Org_ID IN (0,COALESCE(NULLIF(@Cost_Org_ID,0),Cost.AD_Org_ID))
                   AND (
-                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method2)<>'C'
+                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)<>'C'
                       OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
                   )";
 
@@ -477,14 +476,13 @@ namespace VAS.Controllers
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@Costing_Method1", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@Cost_Product_ID", productId),
                 new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
                 new SqlParameter("@M_CostType_ID", currency.CostTypeId),
+                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
+                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@Cost_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Cost_Org_ID", ctx.GetAD_Org_ID()),
-                new SqlParameter("@Costing_Method2", SqlDbType.VarChar) { Value = currency.CostingMethod },
-                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
                 new SqlParameter("@Storage_Product_ID", productId),
                 new SqlParameter("@Storage_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Storage_Org_ID", ctx.GetAD_Org_ID())
