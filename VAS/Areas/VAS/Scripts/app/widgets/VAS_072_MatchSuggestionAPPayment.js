@@ -1604,7 +1604,7 @@
                         "VAS_072_PaymentMethod",
                         "Payment method"
                     ),
-                    detail.paymentMethod
+                    detail.paymentMethodName
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -2594,7 +2594,7 @@
                 escapeHtml(
                     lbl(
                         "VAS_072_OpenAllocationForm",
-                        "Open Allocation"
+                        "Open Allocation Form"
                     )
                 ) +
 

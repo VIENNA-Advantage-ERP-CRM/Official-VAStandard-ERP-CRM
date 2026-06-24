@@ -1132,14 +1132,22 @@ ORDER BY NumberedRows.PageRowNo";
         /// Parameters: payment, invoice and pay-schedule IDs.
         /// No pagination and no zero sentinel parameters are used.
         /// </summary>
+
         private MatchDetailRow ReadMatchDetail(
-            Ctx ctx,
-            int paymentId,
-            int invoiceId,
-            int payScheduleId)
+    Ctx ctx,
+    int paymentId,
+    int invoiceId,
+    int payScheduleId)
         {
             IDataReader reader = null;
 
+            string textType = DB.IsOracle()
+                ? "VARCHAR2(4000)"
+                : "VARCHAR(4000)";
+
+            /*
+             * Apply MRole only to the main physical C_Payment table.
+             */
             string paymentAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 @"
 SELECT
@@ -1163,14 +1171,29 @@ AND Payment.IsReceipt='N'
 AND Payment.DocStatus IN ('CO','CL')
 AND COALESCE(Payment.IsAllocated,'N')='N'
 AND Payment.C_CashLine_ID IS NULL
-AND (Payment.TenderType IS NULL OR Payment.TenderType<>'B')
-AND Payment.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
-AND Payment.C_Payment_ID=(SELECT QueryParameters.C_Payment_ID FROM QueryParameters QueryParameters)",
+AND
+(
+    Payment.TenderType IS NULL
+    OR Payment.TenderType<>'B'
+)
+AND Payment.AD_Client_ID=
+(
+    SELECT QueryParameters.AD_Client_ID
+    FROM QueryParameters QueryParameters
+)
+AND Payment.C_Payment_ID=
+(
+    SELECT QueryParameters.C_Payment_ID
+    FROM QueryParameters QueryParameters
+)",
                 "Payment",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
 
+            /*
+             * Apply MRole only to the main physical C_Invoice table.
+             */
             string invoiceAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 @"
 SELECT
@@ -1191,8 +1214,16 @@ AND Invoice.IsSOTrx='N'
 AND COALESCE(Invoice.IsReturnTrx,'N')='N'
 AND Invoice.DocStatus IN ('CO','CL')
 AND COALESCE(Invoice.IsPaid,'N')='N'
-AND Invoice.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
-AND Invoice.C_Invoice_ID=(SELECT QueryParameters.C_Invoice_ID FROM QueryParameters QueryParameters)",
+AND Invoice.AD_Client_ID=
+(
+    SELECT QueryParameters.AD_Client_ID
+    FROM QueryParameters QueryParameters
+)
+AND Invoice.C_Invoice_ID=
+(
+    SELECT QueryParameters.C_Invoice_ID
+    FROM QueryParameters QueryParameters
+)",
                 "Invoice",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
@@ -1207,12 +1238,81 @@ WITH QueryParameters AS
 (
     SELECT
         @AD_Client_ID AS AD_Client_ID,
+        @AD_Language AS AD_Language,
         @C_Payment_ID AS C_Payment_ID,
         @C_Invoice_ID AS C_Invoice_ID,
         @C_InvoicePaySchedule_ID AS C_InvoicePaySchedule_ID,
         @ExactTolerance AS ExactTolerance,
         @HighConfidenceScore AS HighConfidenceScore"
-+ queryParametersFrom + @"
+        + queryParametersFrom + @"
+),
+TenderTypeReference AS
+(
+    SELECT DISTINCT
+        CAST
+        (
+            RefList.Value AS " + textType + @"
+        ) AS ReferenceValue,
+
+        CAST
+        (
+            RefList.Name AS " + textType + @"
+        ) AS BaseName,
+
+        CAST
+        (
+            RefListTrl.Name AS " + textType + @"
+        ) AS TranslatedName
+
+    FROM AD_Table TableInfo
+
+    INNER JOIN AD_Column ColumnInfo ON
+    (
+        ColumnInfo.AD_Table_ID=
+        TableInfo.AD_Table_ID
+    )
+
+    INNER JOIN AD_Reference ReferenceInfo ON
+    (
+        ReferenceInfo.AD_Reference_ID=
+        ColumnInfo.AD_Reference_Value_ID
+    )
+
+    INNER JOIN AD_Ref_List RefList ON
+    (
+        RefList.AD_Reference_ID=
+        ReferenceInfo.AD_Reference_ID
+    )
+
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
+    (
+        RefListTrl.AD_Ref_List_ID=
+        RefList.AD_Ref_List_ID
+
+        AND CAST
+        (
+            RefListTrl.AD_Language AS " + textType + @"
+        )=
+        CAST
+        (
+            (
+                SELECT QueryParameters.AD_Language
+                FROM QueryParameters QueryParameters
+            ) AS " + textType + @"
+        )
+    )
+
+    WHERE TableInfo.TableName='C_Payment'
+
+    AND ColumnInfo.ColumnName='C_Payment Tender Type'
+
+    AND TableInfo.IsActive='Y'
+
+    AND ColumnInfo.IsActive='Y'
+
+    AND ReferenceInfo.IsActive='Y'
+
+    AND RefList.IsActive='Y'
 ),
 AccessiblePayment AS
 (
@@ -1226,197 +1326,691 @@ PaymentAllocated AS
 (
     SELECT
         AllocationLine.C_Payment_ID,
-        SUM(ABS(COALESCE(AllocationLine.Amount,0))) AS AllocatedAmount
+
+        SUM
+        (
+            ABS
+            (
+                COALESCE
+                (
+                    AllocationLine.Amount,
+                    0
+                )
+            )
+        ) AS AllocatedAmount
+
     FROM C_AllocationLine AllocationLine
+
     INNER JOIN C_AllocationHdr AllocationHeader ON
     (
-        AllocationHeader.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID
+        AllocationHeader.C_AllocationHdr_ID=
+        AllocationLine.C_AllocationHdr_ID
     )
+
     WHERE AllocationHeader.IsActive='Y'
+
     AND AllocationHeader.DocStatus IN ('CO','CL')
-    AND AllocationLine.C_Payment_ID=(SELECT QueryParameters.C_Payment_ID FROM QueryParameters QueryParameters)
-    GROUP BY AllocationLine.C_Payment_ID
+
+    AND AllocationLine.C_Payment_ID=
+    (
+        SELECT QueryParameters.C_Payment_ID
+        FROM QueryParameters QueryParameters
+    )
+
+    GROUP BY
+        AllocationLine.C_Payment_ID
 ),
 ScheduleAllocated AS
 (
     SELECT
         AllocationLine.C_InvoicePaySchedule_ID,
-        SUM(ABS(COALESCE(AllocationLine.Amount,0))) AS AllocatedAmount
+
+        SUM
+        (
+            ABS
+            (
+                COALESCE
+                (
+                    AllocationLine.Amount,
+                    0
+                )
+            )
+        ) AS AllocatedAmount
+
     FROM C_AllocationLine AllocationLine
+
     INNER JOIN C_AllocationHdr AllocationHeader ON
     (
-        AllocationHeader.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID
+        AllocationHeader.C_AllocationHdr_ID=
+        AllocationLine.C_AllocationHdr_ID
     )
+
     WHERE AllocationHeader.IsActive='Y'
+
     AND AllocationHeader.DocStatus IN ('CO','CL')
-    AND AllocationLine.C_InvoicePaySchedule_ID=(SELECT QueryParameters.C_InvoicePaySchedule_ID FROM QueryParameters QueryParameters)
-    GROUP BY AllocationLine.C_InvoicePaySchedule_ID
+
+    AND AllocationLine.C_InvoicePaySchedule_ID=
+    (
+        SELECT QueryParameters.C_InvoicePaySchedule_ID
+        FROM QueryParameters QueryParameters
+    )
+
+    GROUP BY
+        AllocationLine.C_InvoicePaySchedule_ID
 ),
 DetailBase AS
 (
     SELECT
         Payment.C_Payment_ID,
+
         Payment.C_BPartner_ID AS PaymentVendorId,
+
         Invoice.C_BPartner_ID AS InvoiceVendorId,
+
         BusinessPartner.Name AS VendorName,
+
         Payment.DocumentNo AS PaymentDocumentNo,
+
         Payment.DateAcct AS PaymentDate,
-        Payment.TenderType AS PaymentMethodCode,
-        COALESCE(Payment.TrxNo,Payment.CheckNo,Payment.DocumentNo) AS ReferenceNo,
+
+        CAST
+        (
+            Payment.TenderType AS " + textType + @"
+        ) AS PaymentMethodCode,
+
+        TenderTypeReference.BaseName AS PaymentMethodBaseName,
+
+        TenderTypeReference.TranslatedName AS PaymentMethodTranslatedName,
+
+        COALESCE
+        (
+            Payment.TrxNo,
+            Payment.CheckNo,
+            Payment.DocumentNo
+        ) AS ReferenceNo,
+
         Bank.Name AS BankName,
+
         BankAccount.AccountNo AS AccountNo,
+
         Payment.C_Currency_ID AS PaymentCurrencyId,
+
         PaymentCurrency.ISO_Code AS PaymentCurrencyISOCode,
+
         CASE
-            WHEN PaymentCurrency.CurSymbol IS NOT NULL THEN PaymentCurrency.CurSymbol
+            WHEN PaymentCurrency.CurSymbol IS NOT NULL
+            THEN PaymentCurrency.CurSymbol
             ELSE PaymentCurrency.ISO_Code
         END AS PaymentCurrencySymbol,
-        COALESCE(PaymentCurrency.StdPrecision,2) AS PaymentPrecision,
-        ABS(COALESCE(Payment.PayAmt,0)) AS PaymentOriginalAmount,
-        COALESCE(PaymentAllocated.AllocatedAmount,0) AS PaymentAllocatedAmount,
+
+        COALESCE
+        (
+            PaymentCurrency.StdPrecision,
+            2
+        ) AS PaymentPrecision,
+
+        ABS
+        (
+            COALESCE
+            (
+                Payment.PayAmt,
+                0
+            )
+        ) AS PaymentOriginalAmount,
+
+        COALESCE
+        (
+            PaymentAllocated.AllocatedAmount,
+            0
+        ) AS PaymentAllocatedAmount,
+
         CASE
-            WHEN ABS(COALESCE(Payment.PayAmt,0))-COALESCE(PaymentAllocated.AllocatedAmount,0)<=0 THEN 0
-            WHEN ABS(COALESCE(Payment.VAS_UnAllocatedAmount,0))>(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-            AND ABS(COALESCE(Payment.VAS_UnAllocatedAmount,0))<ABS(COALESCE(Payment.PayAmt,0))-COALESCE(PaymentAllocated.AllocatedAmount,0)
-                THEN ABS(COALESCE(Payment.VAS_UnAllocatedAmount,0))
-            ELSE ABS(COALESCE(Payment.PayAmt,0))-COALESCE(PaymentAllocated.AllocatedAmount,0)
+            WHEN
+            (
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.PayAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    PaymentAllocated.AllocatedAmount,
+                    0
+                )
+            )<=0
+            THEN 0
+
+            WHEN ABS
+            (
+                COALESCE
+                (
+                    Payment.VAS_UnAllocatedAmount,
+                    0
+                )
+            )>
+            (
+                SELECT QueryParameters.ExactTolerance
+                FROM QueryParameters QueryParameters
+            )
+
+            AND ABS
+            (
+                COALESCE
+                (
+                    Payment.VAS_UnAllocatedAmount,
+                    0
+                )
+            )<
+            (
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.PayAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    PaymentAllocated.AllocatedAmount,
+                    0
+                )
+            )
+            THEN ABS
+            (
+                COALESCE
+                (
+                    Payment.VAS_UnAllocatedAmount,
+                    0
+                )
+            )
+
+            ELSE
+            (
+                ABS
+                (
+                    COALESCE
+                    (
+                        Payment.PayAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    PaymentAllocated.AllocatedAmount,
+                    0
+                )
+            )
         END AS PaymentOpenAmount,
+
         Invoice.C_Invoice_ID,
+
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
+
         Invoice.DocumentNo AS InvoiceDocumentNo,
+
         Invoice.DateInvoiced AS InvoiceDate,
-        COALESCE(InvoicePaySchedule.DueDate,Invoice.DateInvoiced) AS DueDate,
+
+        COALESCE
+        (
+            InvoicePaySchedule.DueDate,
+            Invoice.DateInvoiced
+        ) AS DueDate,
+
         PaymentTerm.Name AS PaymentTerms,
+
         Invoice.C_Currency_ID AS InvoiceCurrencyId,
+
         InvoiceCurrency.ISO_Code AS InvoiceCurrencyISOCode,
+
         CASE
-            WHEN InvoiceCurrency.CurSymbol IS NOT NULL THEN InvoiceCurrency.CurSymbol
+            WHEN InvoiceCurrency.CurSymbol IS NOT NULL
+            THEN InvoiceCurrency.CurSymbol
             ELSE InvoiceCurrency.ISO_Code
         END AS InvoiceCurrencySymbol,
-        COALESCE(InvoiceCurrency.StdPrecision,2) AS InvoicePrecision,
-        ABS(COALESCE(Invoice.GrandTotalAfterWithholding,Invoice.GrandTotal,0)) AS InvoiceOriginalAmount,
-        COALESCE(ScheduleAllocated.AllocatedAmount,0) AS InvoiceAllocatedAmount,
+
+        COALESCE
+        (
+            InvoiceCurrency.StdPrecision,
+            2
+        ) AS InvoicePrecision,
+
+        ABS
+        (
+            COALESCE
+            (
+                Invoice.GrandTotalAfterWithholding,
+                Invoice.GrandTotal,
+                0
+            )
+        ) AS InvoiceOriginalAmount,
+
+        COALESCE
+        (
+            ScheduleAllocated.AllocatedAmount,
+            0
+        ) AS InvoiceAllocatedAmount,
+
         CASE
-            WHEN ABS(COALESCE(InvoicePaySchedule.DueAmt,0))-COALESCE(ScheduleAllocated.AllocatedAmount,0)>0
-                THEN ABS(COALESCE(InvoicePaySchedule.DueAmt,0))-COALESCE(ScheduleAllocated.AllocatedAmount,0)
+            WHEN
+            (
+                ABS
+                (
+                    COALESCE
+                    (
+                        InvoicePaySchedule.DueAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocated.AllocatedAmount,
+                    0
+                )
+            )>0
+            THEN
+            (
+                ABS
+                (
+                    COALESCE
+                    (
+                        InvoicePaySchedule.DueAmt,
+                        0
+                    )
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocated.AllocatedAmount,
+                    0
+                )
+            )
+
             ELSE 0
         END AS InvoiceOpenAmount
+
     FROM AccessiblePayment Payment
+
     INNER JOIN AccessibleInvoice Invoice ON
     (
-        Invoice.C_BPartner_ID=Payment.C_BPartner_ID
-        AND Invoice.C_Currency_ID=Payment.C_Currency_ID
+        Invoice.C_BPartner_ID=
+        Payment.C_BPartner_ID
+
+        AND Invoice.C_Currency_ID=
+        Payment.C_Currency_ID
     )
+
     INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
     (
-        InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID
-        AND InvoicePaySchedule.C_InvoicePaySchedule_ID=(SELECT QueryParameters.C_InvoicePaySchedule_ID FROM QueryParameters QueryParameters)
+        InvoicePaySchedule.C_Invoice_ID=
+        Invoice.C_Invoice_ID
+
+        AND InvoicePaySchedule.C_InvoicePaySchedule_ID=
+        (
+            SELECT QueryParameters.C_InvoicePaySchedule_ID
+            FROM QueryParameters QueryParameters
+        )
     )
+
     INNER JOIN C_BPartner BusinessPartner ON
     (
-        BusinessPartner.C_BPartner_ID=Payment.C_BPartner_ID
+        BusinessPartner.C_BPartner_ID=
+        Payment.C_BPartner_ID
     )
+
     INNER JOIN C_Currency PaymentCurrency ON
     (
-        PaymentCurrency.C_Currency_ID=Payment.C_Currency_ID
+        PaymentCurrency.C_Currency_ID=
+        Payment.C_Currency_ID
     )
+
     INNER JOIN C_Currency InvoiceCurrency ON
     (
-        InvoiceCurrency.C_Currency_ID=Invoice.C_Currency_ID
+        InvoiceCurrency.C_Currency_ID=
+        Invoice.C_Currency_ID
     )
+
     LEFT OUTER JOIN C_BankAccount BankAccount ON
     (
-        BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID
+        BankAccount.C_BankAccount_ID=
+        Payment.C_BankAccount_ID
     )
+
     LEFT OUTER JOIN C_Bank Bank ON
     (
-        Bank.C_Bank_ID=BankAccount.C_Bank_ID
+        Bank.C_Bank_ID=
+        BankAccount.C_Bank_ID
     )
+
     LEFT OUTER JOIN C_PaymentTerm PaymentTerm ON
     (
-        PaymentTerm.C_PaymentTerm_ID=Invoice.C_PaymentTerm_ID
+        PaymentTerm.C_PaymentTerm_ID=
+        Invoice.C_PaymentTerm_ID
     )
+
     LEFT OUTER JOIN PaymentAllocated PaymentAllocated ON
     (
-        PaymentAllocated.C_Payment_ID=Payment.C_Payment_ID
+        PaymentAllocated.C_Payment_ID=
+        Payment.C_Payment_ID
     )
+
     LEFT OUTER JOIN ScheduleAllocated ScheduleAllocated ON
     (
-        ScheduleAllocated.C_InvoicePaySchedule_ID=InvoicePaySchedule.C_InvoicePaySchedule_ID
+        ScheduleAllocated.C_InvoicePaySchedule_ID=
+        InvoicePaySchedule.C_InvoicePaySchedule_ID
     )
+
+    LEFT OUTER JOIN TenderTypeReference TenderTypeReference ON
+    (
+        TenderTypeReference.ReferenceValue=
+        CAST
+        (
+            Payment.TenderType AS " + textType + @"
+        )
+    )
+
     WHERE InvoicePaySchedule.IsActive='Y'
-    AND COALESCE(InvoicePaySchedule.IsHoldPayment,'N')='N'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.IsHoldPayment,
+        'N'
+    )='N'
 ),
 DetailCalculated AS
 (
     SELECT
         DetailBase.*,
+
         CASE
-            WHEN DetailBase.PaymentOpenAmount<=DetailBase.InvoiceOpenAmount THEN DetailBase.PaymentOpenAmount
+            WHEN DetailBase.PaymentOpenAmount<=
+                 DetailBase.InvoiceOpenAmount
+            THEN DetailBase.PaymentOpenAmount
+
             ELSE DetailBase.InvoiceOpenAmount
         END AS ReadyAmount,
-        ABS(DetailBase.PaymentOpenAmount-DetailBase.InvoiceOpenAmount) AS DifferenceAmount,
+
+        ABS
+        (
+            DetailBase.PaymentOpenAmount
+            -
+            DetailBase.InvoiceOpenAmount
+        ) AS DifferenceAmount,
+
         CASE
-            WHEN DetailBase.InvoiceOpenAmount<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters) THEN 100
-            ELSE ABS(DetailBase.PaymentOpenAmount-DetailBase.InvoiceOpenAmount)*100/DetailBase.InvoiceOpenAmount
+            WHEN DetailBase.InvoiceOpenAmount<=
+            (
+                SELECT QueryParameters.ExactTolerance
+                FROM QueryParameters QueryParameters
+            )
+            THEN 100
+
+            ELSE
+            (
+                ABS
+                (
+                    DetailBase.PaymentOpenAmount
+                    -
+                    DetailBase.InvoiceOpenAmount
+                )
+                *
+                100
+                /
+                DetailBase.InvoiceOpenAmount
+            )
         END AS DifferencePercentage,
-        ABS(CAST(DetailBase.PaymentDate AS DATE)-CAST(DetailBase.DueDate AS DATE)) AS DateGapDays,
+
+        ABS
+        (
+            CAST
+            (
+                DetailBase.PaymentDate AS DATE
+            )
+            -
+            CAST
+            (
+                DetailBase.DueDate AS DATE
+            )
+        ) AS DateGapDays,
+
         CASE
             WHEN DetailBase.ReferenceNo IS NOT NULL
+
             AND DetailBase.InvoiceDocumentNo IS NOT NULL
-            AND UPPER(DetailBase.ReferenceNo) LIKE '%' || UPPER(DetailBase.InvoiceDocumentNo) || '%'
-                THEN 1
+
+            AND UPPER
+            (
+                DetailBase.ReferenceNo
+            ) LIKE
+            (
+                '%'
+                ||
+                UPPER
+                (
+                    DetailBase.InvoiceDocumentNo
+                )
+                ||
+                '%'
+            )
+            THEN 1
+
             ELSE 0
         END AS ReferenceMatch
+
     FROM DetailBase DetailBase
-    WHERE DetailBase.PaymentOpenAmount>(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
-    AND DetailBase.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters)
+
+    WHERE DetailBase.PaymentOpenAmount>
+    (
+        SELECT QueryParameters.ExactTolerance
+        FROM QueryParameters QueryParameters
+    )
+
+    AND DetailBase.InvoiceOpenAmount>
+    (
+        SELECT QueryParameters.ExactTolerance
+        FROM QueryParameters QueryParameters
+    )
 ),
 DetailScored AS
 (
     SELECT
         DetailCalculated.*,
+
         50
-        +CASE
-            WHEN DetailCalculated.DifferenceAmount<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters) THEN 30
-            WHEN DetailCalculated.DifferencePercentage<=5 THEN 20
+        +
+        CASE
+            WHEN DetailCalculated.DifferenceAmount<=
+            (
+                SELECT QueryParameters.ExactTolerance
+                FROM QueryParameters QueryParameters
+            )
+            THEN 30
+
+            WHEN DetailCalculated.DifferencePercentage<=5
+            THEN 20
+
             ELSE 10
         END
-        +CASE
-            WHEN DetailCalculated.DateGapDays<=3 THEN 15
-            WHEN DetailCalculated.DateGapDays<=7 THEN 10
+        +
+        CASE
+            WHEN DetailCalculated.DateGapDays<=3
+            THEN 15
+
+            WHEN DetailCalculated.DateGapDays<=7
+            THEN 10
+
             ELSE 5
         END
-        +CASE
-            WHEN DetailCalculated.ReferenceMatch=1 THEN 5
+        +
+        CASE
+            WHEN DetailCalculated.ReferenceMatch=1
+            THEN 5
+
             ELSE 0
         END AS MatchScore
+
     FROM DetailCalculated DetailCalculated
 )
 SELECT
-    DetailScored.*,
+    DetailScored.C_Payment_ID,
+
+    DetailScored.PaymentVendorId,
+
+    DetailScored.InvoiceVendorId,
+
+    DetailScored.VendorName,
+
+    DetailScored.PaymentDocumentNo,
+
+    DetailScored.PaymentDate,
+
+    DetailScored.PaymentMethodCode,
+
+    DetailScored.PaymentMethodBaseName,
+
+    DetailScored.PaymentMethodTranslatedName,
+
+    DetailScored.ReferenceNo,
+
+    DetailScored.BankName,
+
+    DetailScored.AccountNo,
+
+    DetailScored.PaymentCurrencyId,
+
+    DetailScored.PaymentCurrencyISOCode,
+
+    DetailScored.PaymentCurrencySymbol,
+
+    DetailScored.PaymentPrecision,
+
+    DetailScored.PaymentOriginalAmount,
+
+    DetailScored.PaymentAllocatedAmount,
+
+    DetailScored.PaymentOpenAmount,
+
+    DetailScored.C_Invoice_ID,
+
+    DetailScored.C_InvoicePaySchedule_ID,
+
+    DetailScored.InvoiceDocumentNo,
+
+    DetailScored.InvoiceDate,
+
+    DetailScored.DueDate,
+
+    DetailScored.PaymentTerms,
+
+    DetailScored.InvoiceCurrencyId,
+
+    DetailScored.InvoiceCurrencyISOCode,
+
+    DetailScored.InvoiceCurrencySymbol,
+
+    DetailScored.InvoicePrecision,
+
+    DetailScored.InvoiceOriginalAmount,
+
+    DetailScored.InvoiceAllocatedAmount,
+
+    DetailScored.InvoiceOpenAmount,
+
+    DetailScored.ReadyAmount,
+
+    DetailScored.DifferenceAmount,
+
+    DetailScored.DifferencePercentage,
+
+    DetailScored.DateGapDays,
+
+    DetailScored.ReferenceMatch,
+
+    DetailScored.MatchScore,
+
     CASE
-        WHEN DetailScored.MatchScore>=(SELECT QueryParameters.HighConfidenceScore FROM QueryParameters QueryParameters) THEN 'HIGH'
+        WHEN DetailScored.MatchScore>=
+        (
+            SELECT QueryParameters.HighConfidenceScore
+            FROM QueryParameters QueryParameters
+        )
+        THEN 'HIGH'
+
         ELSE 'REVIEW'
     END AS MatchConfidence,
+
     CASE
-        WHEN DetailScored.MatchScore>=(SELECT QueryParameters.HighConfidenceScore FROM QueryParameters QueryParameters)
-        AND DetailScored.DifferenceAmount<=(SELECT QueryParameters.ExactTolerance FROM QueryParameters QueryParameters) THEN 'Y'
+        WHEN DetailScored.MatchScore>=
+        (
+            SELECT QueryParameters.HighConfidenceScore
+            FROM QueryParameters QueryParameters
+        )
+
+        AND DetailScored.DifferenceAmount<=
+        (
+            SELECT QueryParameters.ExactTolerance
+            FROM QueryParameters QueryParameters
+        )
+        THEN 'Y'
+
         ELSE 'N'
     END AS IsAutoApplicable
+
 FROM DetailScored DetailScored";
 
-            sql = sql.Replace("/*PAYMENT_ACCESS_SQL*/", paymentAccessSql);
-            sql = sql.Replace("/*INVOICE_ACCESS_SQL*/", invoiceAccessSql);
+            sql = sql.Replace(
+                "/*PAYMENT_ACCESS_SQL*/",
+                paymentAccessSql
+            );
+
+            sql = sql.Replace(
+                "/*INVOICE_ACCESS_SQL*/",
+                invoiceAccessSql
+            );
 
             SqlParameter[] parameters = new SqlParameter[]
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@C_Payment_ID", paymentId),
-                new SqlParameter("@C_Invoice_ID", invoiceId),
-                new SqlParameter("@C_InvoicePaySchedule_ID", payScheduleId),
-                new SqlParameter("@ExactTolerance", ExactTolerance),
-                new SqlParameter("@HighConfidenceScore", HighConfidenceScore)
+        new SqlParameter(
+            "@AD_Client_ID",
+            ctx.GetAD_Client_ID()
+        ),
+
+        new SqlParameter(
+            "@AD_Language",
+            ctx.GetAD_Language()
+        ),
+
+        new SqlParameter(
+            "@C_Payment_ID",
+            paymentId
+        ),
+
+        new SqlParameter(
+            "@C_Invoice_ID",
+            invoiceId
+        ),
+
+        new SqlParameter(
+            "@C_InvoicePaySchedule_ID",
+            payScheduleId
+        ),
+
+        new SqlParameter(
+            "@ExactTolerance",
+            ExactTolerance
+        ),
+
+        new SqlParameter(
+            "@HighConfidenceScore",
+            HighConfidenceScore
+        )
             };
 
             try
@@ -1466,9 +2060,42 @@ FROM DetailScored DetailScored";
                             "PaymentDate"
                         ),
 
+                        /*
+                         * Original value stored in C_Payment.TenderType.
+                         */
                         PaymentMethodCode = GetSafeString(
                             reader,
                             "PaymentMethodCode"
+                        ),
+
+                        /*
+                         * Display value:
+                         * 1. translated name
+                         * 2. base name
+                         * 3. stored code
+                         * 4. translated Not Specified message
+                         */
+                        PaymentMethodName = FirstNotEmpty(
+                            GetSafeString(
+                                reader,
+                                "PaymentMethodTranslatedName"
+                            ),
+
+                            GetSafeString(
+                                reader,
+                                "PaymentMethodBaseName"
+                            ),
+
+                            GetSafeString(
+                                reader,
+                                "PaymentMethodCode"
+                            ),
+
+                            GetMsg(
+                                ctx,
+                                "VAS_072_NotSpecified",
+                                "Not Specified"
+                            )
                         ),
 
                         ReferenceNo = GetSafeString(
@@ -1655,9 +2282,9 @@ FROM DetailScored DetailScored";
                 CloseReader(reader);
             }
 
-
             return null;
         }
+
 
         #endregion
 
@@ -2839,7 +3466,27 @@ AND InvoiceRow.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM Que
 
         #endregion
 
+
         #region Helpers
+
+        private string FirstNotEmpty(
+    params string[] values)
+        {
+            if (values == null)
+            {
+                return string.Empty;
+            }
+
+            foreach (string value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return string.Empty;
+        }
 
         private string CastNumberSql(string expression)
         {
@@ -2910,28 +3557,7 @@ AND InvoiceRow.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM Que
                 : GetMsg(ctx, "VAS_072_Review", "Review");
         }
 
-        private string GetPaymentMethodName(Ctx ctx, string tenderType)
-        {
-            switch ((tenderType ?? string.Empty).ToUpperInvariant())
-            {
-                case "K":
-                    return GetMsg(ctx, "Cheque", "Cheque");
-                case "S":
-                    return GetMsg(ctx, "Check", "Check");
-                case "T":
-                    return GetMsg(ctx, "BankTransfer", "Bank Transfer");
-                case "P":
-                    return GetMsg(ctx, "OnCredit", "On Credit");
-                case "A":
-                    return GetMsg(ctx, "ACH", "ACH");
-                case "C":
-                    return GetMsg(ctx, "CreditCard", "Credit Card");
-                case "D":
-                    return GetMsg(ctx, "DirectDeposit", "Direct Deposit");
-                default:
-                    return tenderType ?? string.Empty;
-            }
-        }
+   
 
         private int GetAllocationFormId(Ctx ctx)
         {
@@ -3745,6 +4371,7 @@ AND
             public int DateGapDays { get; set; }
             public bool ReferenceMatch { get; set; }
             public int Score { get; set; }
+            public string PaymentMethodName { get; set; }
             public string Confidence { get; set; }
             public bool IsAutoApplicable { get; set; }
         }
