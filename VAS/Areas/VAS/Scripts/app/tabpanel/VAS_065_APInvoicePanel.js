@@ -1476,8 +1476,61 @@
             // This object is mutated in place so closures keep a live reference.
             var payCtx = { curId: meta.C_Currency_ID, sym: cur, prec: p, rate: 1, noRate: false };
 
-            function parseNum(s) { var n = parseFloat(String(s).replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; }
+            // Locale number format: the ERP user's configured decimal separator drives how
+            // amounts are typed, parsed and re-displayed. isDecimalPoint() === true means
+            // '.' is the decimal separator (',' groups thousands, e.g. 1,234.23); false means
+            // ',' is the decimal separator ('.' groups thousands, e.g. 1.234,23 - Slovenian).
+            var dotDecimal = (VIS.Env && typeof VIS.Env.isDecimalPoint === "function") ? VIS.Env.isDecimalPoint() : true;
+            var decSep = dotDecimal ? "." : ",";   // decimal separator
+            var grpSep = dotDecimal ? "," : ".";   // grouping (thousands) separator
+
+            // Parse a user-typed amount in the current locale into a JS number: drop grouping
+            // separators and normalise the locale decimal separator to '.' before parseFloat.
+            function parseNum(s) {
+                s = String(s).split(grpSep).join("");
+                if (decSep !== ".") s = s.split(decSep).join(".");
+                var n = parseFloat(s.replace(/[^0-9.\-]/g, ""));
+                return isNaN(n) ? 0 : n;
+            }
             function roundTo(v, prec) { var f = Math.pow(10, prec >= 0 ? prec : 0); return Math.round((+v || 0) * f) / f; }
+
+            // Format a number for an editable amount field in the current locale (no grouping,
+            // so it stays easy to edit) - canonical toFixed with the decimal separator swapped
+            // to the locale one. Pairs with parseNum for a clean round-trip.
+            function fmtAmtInput(v, prec) {
+                var s = roundTo(v, prec).toFixed(prec >= 0 ? prec : 0);
+                return (decSep !== ".") ? s.replace(".", decSep) : s;
+            }
+
+            // Strip anything that is not a digit or the locale decimal separator (keeping at
+            // most one), so the value is always a clean non-negative amount.
+            function sanitizeAmount(s) {
+                s = String(s);
+                var out = "", seenDec = false;
+                for (var i = 0; i < s.length; i++) {
+                    var c = s.charAt(i);
+                    if (c >= "0" && c <= "9") out += c;
+                    else if (c === decSep && !seenDec) { out += decSep; seenDec = true; }
+                    // grouping separators and any other characters are dropped
+                }
+                return out;
+            }
+            // Turn a text input into a numeric/amount field: block invalid keystrokes and
+            // sanitize pasted/dropped content (locale-aware), then re-run the live recompute.
+            function bindAmountInput($inp) {
+                $inp.attr({ inputmode: "decimal", autocomplete: "off" });
+                $inp.on("keypress", function (e) {
+                    if (e.ctrlKey || e.metaKey || e.which === 0 || e.which === 8) return; // control keys
+                    var ch = String.fromCharCode(e.which);
+                    if (ch === decSep) { if (this.value.indexOf(decSep) !== -1) e.preventDefault(); return; }
+                    if (ch === grpSep) return;                  // allow grouping separators
+                    if (!/[0-9]/.test(ch)) e.preventDefault();
+                });
+                $inp.on("paste drop", function () {
+                    var el = this;
+                    setTimeout(function () { el.value = sanitizeAmount(el.value); $(el).trigger("input"); }, 0);
+                });
+            }
 
             // Open amount still to settle (invoice currency) after any applied credits.
             function invRemaining() { return Math.max(0, invOpen - state.applied); }
@@ -1504,7 +1557,7 @@
             function syncPayUI(resetAmount) {
                 $payAmt.closest(".control").find(".pfx").text(payCtx.sym);
                 $payDisc.closest(".control").find(".pfx").text(payCtx.sym);
-                if (resetAmount) $payAmt.val(payRemaining().toFixed(payCtx.prec));
+                if (resetAmount) $payAmt.val(fmtAmtInput(payRemaining(), payCtx.prec));
             }
 
             // Resolve the payment currency from the selected currency + conversion type and
@@ -1549,7 +1602,7 @@
                             payCtx.rate = 0;
                             payCtx.noRate = true;
                             syncPayUI(false);
-                            $payAmt.val((0).toFixed(payCtx.prec));
+                            $payAmt.val(fmtAmtInput(0, payCtx.prec));
                             recompute();
                             error((resp && resp.Message) || lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency."));
                         }
@@ -1669,12 +1722,16 @@
             $bodyM.data("applySelectedCredits", applySelectedCredits);
             $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum, payCtx: payCtx }; });
 
+            // Payment amount and discount are numeric/amount fields: restrict input to a
+            // non-negative decimal before the live recompute runs.
+            bindAmountInput($payAmt);
+            bindAmountInput($payDisc);
             $payAmt.on("input", recompute);
             $payDisc.on("input", recompute);
             // On blur, round the entered amount / discount to the selected currency's
             // precision and show it with that many decimals.
             function roundFieldToCurrency($inp) {
-                $inp.val(roundTo(parseNum($inp.val()), payCtx.prec).toFixed(payCtx.prec >= 0 ? payCtx.prec : 0));
+                $inp.val(fmtAmtInput(parseNum($inp.val()), payCtx.prec));
                 recompute();
             }
             $payAmt.on("blur", function () { roundFieldToCurrency($payAmt); });
@@ -1692,7 +1749,9 @@
             $bodyM.find(".js-pay-date").on("change", function () { applyPaymentCurrency(false); });
 
             // Initial state: invoice currency (case 5). Set the amount to the open balance.
-            $payAmt.val((invOpen).toFixed(p));
+            // Both amount fields are shown in the user's locale number format.
+            $payAmt.val(fmtAmtInput(invOpen, p));
+            $payDisc.val(fmtAmtInput(parseNum($payDisc.val()), p));
             updateCreditSummary();
             recompute();
 
@@ -2116,4 +2175,3 @@
     };
 
 })(VAS, jQuery);
-
