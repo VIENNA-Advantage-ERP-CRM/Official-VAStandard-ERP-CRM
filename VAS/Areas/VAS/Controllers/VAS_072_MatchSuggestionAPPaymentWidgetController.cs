@@ -1164,7 +1164,8 @@ SELECT
     Payment.TrxNo,
     Payment.CheckNo,
     Payment.TenderType,
-    Payment.C_BankAccount_ID
+    Payment.C_BankAccount_ID,
+    Payment.VA009_PaymentMethod_ID
 FROM C_Payment Payment
 WHERE Payment.IsActive='Y'
 AND Payment.Processed='Y'
@@ -1422,6 +1423,8 @@ DetailBase AS
         TenderTypeReference.BaseName AS PaymentMethodBaseName,
 
         TenderTypeReference.TranslatedName AS PaymentMethodTranslatedName,
+
+        VA009PaymentMethod.VA009_Name AS PaymentMethodVA009Name,
 
         COALESCE
         (
@@ -1717,6 +1720,12 @@ DetailBase AS
         )
     )
 
+    LEFT OUTER JOIN VA009_PaymentMethod VA009PaymentMethod ON
+    (
+        VA009PaymentMethod.VA009_PaymentMethod_ID=
+        Payment.VA009_PaymentMethod_ID
+    )
+
     WHERE InvoicePaySchedule.IsActive='Y'
 
     AND COALESCE
@@ -1877,6 +1886,8 @@ SELECT
     DetailScored.PaymentMethodBaseName,
 
     DetailScored.PaymentMethodTranslatedName,
+
+    DetailScored.PaymentMethodVA009Name,
 
     DetailScored.ReferenceNo,
 
@@ -2077,6 +2088,11 @@ FROM DetailScored DetailScored";
                          * 4. translated Not Specified message
                          */
                         PaymentMethodName = FirstNotEmpty(
+                            GetSafeString(
+                                reader,
+                                "PaymentMethodVA009Name"
+                            ),
+
                             GetSafeString(
                                 reader,
                                 "PaymentMethodTranslatedName"

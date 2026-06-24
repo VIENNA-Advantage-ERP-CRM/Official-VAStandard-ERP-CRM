@@ -680,7 +680,7 @@
 .vas-upcoming-ap-runs-form-panel {
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .vas-upcoming-ap-runs-pay-grid {
@@ -743,6 +743,7 @@
     padding: 0;
     border: none;
     border-radius: 0;
+    box-shadow: none;
     background: transparent;
     color: #111827;
     font-family: inherit;
@@ -753,6 +754,12 @@
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+}
+
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-calendar-picker-indicator,
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-inner-spin-button,
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-clear-button {
+    display: none;
 }
 
 select.vas-upcoming-ap-runs-edit-control:not(:disabled) {
