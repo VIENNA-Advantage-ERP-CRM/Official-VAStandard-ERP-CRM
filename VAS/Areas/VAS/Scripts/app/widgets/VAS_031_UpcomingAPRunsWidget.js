@@ -2112,22 +2112,6 @@
 
                 fieldHtml(
                     lbl(
-                        'VAS_031_MessageTenderType',
-                        'Tender Type'
-                    ),
-
-                    selectHtml(
-                        'tenderType',
-                        tenderTypes,
-                        tenderType,
-                        false
-                    ),
-
-                    false
-                ) +
-
-                fieldHtml(
-                    lbl(
                         'VAS_031_MessagePaymentMethod',
                         'Payment Method'
                     ),
@@ -2202,23 +2186,6 @@
                     ),
 
                     true
-                ) +
-
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageDocumentNo',
-                        'Payment Document No.'
-                    ),
-
-                    inputHtml(
-                        'documentNo',
-                        'text',
-                        '',
-                        null,
-                        false
-                    ),
-
-                    false
                 );
 
             $payDialogGrid.html(html);
@@ -2588,9 +2555,7 @@
                 ),
 
                 tenderType: String(
-                    getPayField(
-                        'tenderType'
-                    ).val() || ''
+                    tenderType || ''
                 ).trim(),
 
                 paymentMethodId: Number(
@@ -2617,11 +2582,7 @@
                     ).val() || ''
                 ).trim(),
 
-                documentNo: String(
-                    getPayField(
-                        'documentNo'
-                    ).val() || ''
-                ).trim(),
+                documentNo: '',
 
                 payAmt: Number(
                     getPayField(
@@ -2701,17 +2662,6 @@
                     lbl(
                         'VAS_031_MessageDocumentTypeRequired',
                         'Document type is required.'
-                    )
-                );
-
-                return null;
-            }
-
-            if (!payload.tenderType) {
-                showPayError(
-                    lbl(
-                        'VAS_031_MessageTenderTypeRequired',
-                        'Tender type is required.'
                     )
                 );
 

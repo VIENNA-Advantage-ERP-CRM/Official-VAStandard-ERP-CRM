@@ -873,6 +873,13 @@
     font-weight: 400;
 }
 
+.vas-recent-ap-payments-alloc-empty {
+    padding: 1em 0;
+    color: #748494;
+    font-size: 0.8125em;
+    font-style: italic;
+}
+
 .vas-recent-ap-payments-alloc-table {
     width: 100%;
     border-collapse: collapse;
@@ -985,4 +992,105 @@
 .vas-recent-ap-payments-dialog,
 .vas-recent-ap-payments-dialog * {
     font-weight: 700;
+}
+
+
+.vas-allocation-popup {
+    padding: 18px;
+    font-family: Arial, sans-serif;
+}
+
+.vas-allocation-popup-header {
+    margin-bottom: 20px;
+}
+
+.vas-allocation-popup-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #12263f;
+    margin-bottom: 6px;
+}
+
+.vas-allocation-popup-subtitle {
+    font-size: 16px;
+    color: #6e7f91;
+}
+
+.vas-allocation-summary-card {
+    border: 1px solid #d9e3ec;
+    border-radius: 16px;
+    padding: 24px;
+    background: #f9fbfd;
+    margin-bottom: 26px;
+}
+
+.vas-allocation-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 26px 30px;
+}
+
+.vas-summary-item {
+    min-width: 0;
+}
+
+.vas-summary-wide {
+    grid-column: span 3;
+}
+
+.vas-summary-label {
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: #6f8397;
+    margin-bottom: 8px;
+}
+
+.vas-summary-value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #12263f;
+}
+
+.vas-allocation-lines-title {
+    margin: 12px 0 16px;
+    font-size: 18px;
+    letter-spacing: 2px;
+    color: #6f8397;
+}
+
+.vas-allocation-lines-table-wrap {
+    overflow-x: auto;
+}
+
+.vas-allocation-lines-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #d9e3ec;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+    .vas-allocation-lines-table thead th {
+        background: #edf3f8;
+        color: #6f8397;
+        font-size: 13px;
+        letter-spacing: 1.5px;
+        text-align: left;
+        padding: 14px 16px;
+    }
+
+    .vas-allocation-lines-table tbody td {
+        padding: 14px 16px;
+        border-top: 1px solid #e7eef5;
+        font-size: 15px;
+        color: #12263f;
+    }
+
+.vas-allocation-empty {
+    padding: 20px;
+    border: 1px solid #d9e3ec;
+    border-radius: 12px;
+    color: #6f8397;
+    background: #fafcfe;
 }
