@@ -455,8 +455,8 @@
     z-index: 1;
     display: flex;
     flex-direction: column;
-    width: min(1080px, calc(100vw - 48px));
-    max-height: calc(100vh - 48px);
+    width: min(1280px, calc(100vw - 48px));
+    max-height: calc(100vh - 32px);
     min-height: 0;
     overflow: hidden;
     border: 1px solid #e4edf4;
@@ -754,6 +754,7 @@
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
+    border: none;
 }
 
 input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-calendar-picker-indicator,
