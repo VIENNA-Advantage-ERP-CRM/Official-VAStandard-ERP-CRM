@@ -1,0 +1,162 @@
+/* Overall Inventory Quick Operations widget. All selectors are MPC-prefixed. */
+
+.MPC-quick-operations-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-quick-operations-root,
+.MPC-quick-operations-root * {
+    box-sizing: border-box;
+}
+
+.MPC-quick-operations-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+}
+
+.MPC-quick-operations-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-bottom: 0.625em;
+}
+
+.MPC-quick-operations-header-icon {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2em;
+    padding: 0.5em;
+    color: #0083da;
+    background: rgba(0, 131, 218, 0.1);
+    border-radius: 10px;
+}
+
+.MPC-quick-operations-header-svg,
+.MPC-quick-operations-action-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.MPC-quick-operations-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #102c3f;
+    font-size: 1em;
+    font-weight: 400;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-quick-operations-actions {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1em;
+    align-content: center;
+    overflow: hidden;
+}
+
+.MPC-quick-operations-action {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6em;
+    padding: 1em 0.5em;
+    overflow: hidden;
+    color: #102c3f;
+    font-family: inherit;
+    text-align: center;
+    background: transparent;
+    border: 1px solid #e4edf4;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.MPC-quick-operations-action:hover:not(:disabled) {
+    border-color: #bfe4ff;
+    box-shadow: 0 10px 22px rgba(31, 131, 255, 0.16);
+    transform: translateY(-2px);
+}
+
+.MPC-quick-operations-action:focus-visible {
+    outline: 3px solid rgba(0, 131, 218, 0.35);
+    outline-offset: 2px;
+}
+
+.MPC-quick-operations-action:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.MPC-quick-operations-action-icon {
+    width: 3.4em;
+    height: 3.4em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 3.4em;
+    padding: 0.9em;
+    color: #fff;
+    background: linear-gradient(135deg, #2ba0ff, #1f83ff);
+    border-radius: 18px;
+    box-shadow: 0 10px 22px rgba(31, 131, 255, 0.3);
+}
+
+.MPC-quick-operations-action-title {
+    max-width: 100%;
+    overflow: hidden;
+    color: #102c3f;
+    font-size: 0.8125em;
+    font-weight: 500;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-quick-operations-action-description {
+    max-width: 100%;
+    overflow: hidden;
+    color: #748494;
+    font-size: 0.625em;
+    font-weight: 400;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .MPC-quick-operations-action {
+        transition: none;
+    }
+
+    .MPC-quick-operations-action:hover:not(:disabled) {
+        transform: none;
+    }
+}

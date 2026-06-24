@@ -18,6 +18,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI154      2026-06-21 Created
     ///   VAI154      2026-06-22 Added schema currency and paging
+    ///   VAI154      2026-06-23 Fixed Oracle parameter binding
     /// </summary>
     public class VAS_079_TopValueItemsWidgetController : Controller
     {
@@ -166,7 +167,7 @@ namespace VAS.Controllers
                 INNER JOIN M_CostElement CostElement ON (
                     CostElement.M_CostElement_ID=Cost.M_CostElement_ID
                     AND CostElement.IsActive=N'Y'
-                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)
+                    AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Element_Costing_Method)
                 )
                 WHERE Cost.IsActive=N'Y'
                   AND Cost.C_AcctSchema_ID=@C_AcctSchema_ID
@@ -174,7 +175,7 @@ namespace VAS.Controllers
                   AND Cost.AD_Client_ID=@Cost_Client_ID
                   AND Cost.AD_Org_ID IN (0,COALESCE(NULLIF(@Cost_Org_ID,0),Cost.AD_Org_ID))
                   AND (
-                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)<>'C'
+                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Filter_Costing_Method)<>'C'
                       OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
                   )";
 
@@ -209,7 +210,7 @@ namespace VAS.Controllers
                 SELECT ProductRows.M_Product_ID,
                        ProductRows.Name AS Product_Name,
                        CASE
-                            WHEN @Warehouse_ID IS NULL THEN NULL
+                            WHEN @Name_Warehouse_ID IS NULL THEN NULL
                             ELSE MAX(WarehouseRows.Name)
                        END AS Warehouse_Name,
                        SUM(StorageRows.QtyOnHand) AS Qty_On_Hand,
@@ -238,7 +239,7 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN CostValues ClientWarehouse ON (ClientWarehouse.AD_Org_ID=0 AND ClientWarehouse.M_Product_ID=StorageRows.M_Product_ID AND ClientWarehouse.M_Warehouse_ID=WarehouseRows.M_Warehouse_ID AND ClientWarehouse.M_AttributeSetInstance_ID=0)
                 LEFT OUTER JOIN CostValues ClientAttribute ON (ClientAttribute.AD_Org_ID=0 AND ClientAttribute.M_Product_ID=StorageRows.M_Product_ID AND ClientAttribute.M_Warehouse_ID=0 AND ClientAttribute.M_AttributeSetInstance_ID=StorageRows.M_AttributeSetInstance_ID)
                 LEFT OUTER JOIN CostValues ClientProduct ON (ClientProduct.AD_Org_ID=0 AND ClientProduct.M_Product_ID=StorageRows.M_Product_ID AND ClientProduct.M_Warehouse_ID=0 AND ClientProduct.M_AttributeSetInstance_ID=0)
-                WHERE (@Warehouse_ID IS NULL OR WarehouseRows.M_Warehouse_ID=@Warehouse_ID)
+                WHERE (@Filter_Warehouse_ID IS NULL OR WarehouseRows.M_Warehouse_ID=@Selected_Warehouse_ID)
                  GROUP BY ProductRows.M_Product_ID,
                           ProductRows.Name
                 )
@@ -252,10 +253,7 @@ namespace VAS.Controllers
                 ORDER BY Carrying_Value DESC
                 OFFSET @Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 
-            SqlParameter warehouseParameter = new SqlParameter("@Warehouse_ID", SqlDbType.Int)
-            {
-                Value = warehouseId.HasValue ? (object)warehouseId.Value : DBNull.Value
-            };
+            object warehouseValue = warehouseId.HasValue ? (object)warehouseId.Value : DBNull.Value;
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@Warehouse_Client_ID", ctx.GetAD_Client_ID()),
@@ -266,15 +264,18 @@ namespace VAS.Controllers
                 new SqlParameter("@Storage_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Product_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Product_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Element_Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
                 new SqlParameter("@M_CostType_ID", currency.CostTypeId),
-                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
-                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@Cost_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Cost_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Filter_Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
+                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
+                new SqlParameter("@Name_Warehouse_ID", SqlDbType.Int) { Value = warehouseValue },
+                new SqlParameter("@Filter_Warehouse_ID", SqlDbType.Int) { Value = warehouseValue },
+                new SqlParameter("@Selected_Warehouse_ID", SqlDbType.Int) { Value = warehouseValue },
                 new SqlParameter("@Offset", (pageNo - 1) * pageSize),
-                new SqlParameter("@Page_Size", pageSize),
-                warehouseParameter
+                new SqlParameter("@Page_Size", pageSize)
             };
 
             IDataReader reader = null;

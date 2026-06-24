@@ -17,6 +17,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI154      2026-06-21 Created
     ///   VAI154      2026-06-22 Updated for schema currency
+    ///   VAI154      2026-06-24 Fixed ORA-00932 cascade: replaced 'Y' with 'Y' in Oracle CHAR comparisons
     /// </summary>
     public class VAS_075_TotalInventoryValueWidgetController : Controller
     {
@@ -68,7 +69,7 @@ namespace VAS.Controllers
                        COALESCE(Storage.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        Storage.QtyOnHand
                 FROM M_Storage Storage
-                WHERE Storage.IsActive=N'Y'
+                WHERE Storage.IsActive='Y'
                   AND Storage.AD_Client_ID=@Storage_Client_ID
                   AND Storage.AD_Org_ID IN (0,COALESCE(NULLIF(@Storage_Org_ID,0),Storage.AD_Org_ID))";
 
@@ -83,7 +84,7 @@ namespace VAS.Controllers
                 SELECT Locator.M_Locator_ID,
                        Locator.M_Warehouse_ID
                 FROM M_Locator Locator
-                WHERE Locator.IsActive=N'Y'
+                WHERE Locator.IsActive='Y'
                   AND Locator.AD_Client_ID=@Locator_Client_ID
                   AND Locator.AD_Org_ID IN (0,COALESCE(NULLIF(@Locator_Org_ID,0),Locator.AD_Org_ID))";
 
@@ -101,20 +102,20 @@ namespace VAS.Controllers
                        COALESCE(Cost.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        SUM(COALESCE(Cost.CurrentCostPrice,0)) AS Unit_Cost
                 FROM M_Cost Cost
-                INNER JOIN M_Product CostProduct ON (CostProduct.M_Product_ID=Cost.M_Product_ID AND CostProduct.IsActive=N'Y')
-                LEFT OUTER JOIN M_Product_Category CostCategory ON (CostCategory.M_Product_Category_ID=CostProduct.M_Product_Category_ID AND CostCategory.IsActive=N'Y')
+                INNER JOIN M_Product CostProduct ON (CostProduct.M_Product_ID=Cost.M_Product_ID AND CostProduct.IsActive='Y')
+                LEFT OUTER JOIN M_Product_Category CostCategory ON (CostCategory.M_Product_Category_ID=CostProduct.M_Product_Category_ID AND CostCategory.IsActive='Y')
                 INNER JOIN M_CostElement CostElement ON (
                     CostElement.M_CostElement_ID=Cost.M_CostElement_ID
-                    AND CostElement.IsActive=N'Y'
+                    AND CostElement.IsActive='Y'
                     AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)
                 )
-                WHERE Cost.IsActive=N'Y'
+                WHERE Cost.IsActive='Y'
                   AND Cost.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND Cost.M_CostType_ID=@M_CostType_ID
                   AND Cost.AD_Client_ID=@Cost_Client_ID
                   AND Cost.AD_Org_ID IN (0,COALESCE(NULLIF(@Cost_Org_ID,0),Cost.AD_Org_ID))
                   AND (
-                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)<>'C'
+                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method2)<>'C'
                       OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
                   )";
 
@@ -183,12 +184,13 @@ namespace VAS.Controllers
                 new SqlParameter("@Storage_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Locator_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Locator_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
                 new SqlParameter("@M_CostType_ID", currency.CostTypeId),
-                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
-                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@Cost_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Cost_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@Cost_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Costing_Method2", SqlDbType.VarChar) { Value = currency.CostingMethod },
+                new SqlParameter("@M_CostElement_ID", currency.CostElementId)
             };
 
             return Util.GetValueOfDecimal(DB.ExecuteScalar(sql, parameters, null));
@@ -212,9 +214,9 @@ namespace VAS.Controllers
                        END AS Currency_Symbol,
                        Currency.ISO_Code AS Currency_ISO
                 FROM AD_ClientInfo ClientInfo
-                INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID AND AcctSchema.IsActive=N'Y')
-                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID AND Currency.IsActive=N'Y')
-                WHERE ClientInfo.IsActive=N'Y'
+                INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID AND AcctSchema.IsActive='Y')
+                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID AND Currency.IsActive='Y')
+                WHERE ClientInfo.IsActive='Y'
                   AND ClientInfo.AD_Client_ID=@AD_Client_ID";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(

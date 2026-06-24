@@ -18,6 +18,7 @@ namespace VAS.Controllers
     /// Chronological development:
     ///   VAI154      2026-06-21 Created
     ///   VAI154      2026-06-22 Updated for schema currency
+    ///   VAI154      2026-06-24 Fixed ORA-12704: replaced 'Y'/'N' with 'Y'/'N' in Oracle CHAR comparisons
     /// </summary>
     public class VAS_080_WarehouseStockWidgetController : Controller
     {
@@ -69,7 +70,7 @@ namespace VAS.Controllers
                        Warehouse.Value AS Warehouse_Code,
                        Warehouse.Name AS Warehouse_Name
                 FROM M_Warehouse Warehouse
-                WHERE Warehouse.IsActive=N'Y'
+                WHERE Warehouse.IsActive='Y'
                   AND Warehouse.AD_Client_ID=@Warehouse_Client_ID
                   AND Warehouse.AD_Org_ID IN (0,COALESCE(NULLIF(@Warehouse_Org_ID,0),Warehouse.AD_Org_ID))";
 
@@ -113,6 +114,12 @@ namespace VAS.Controllers
             if (ctx == null) { return result; }
 
             SchemaCurrency currency = GetSchemaCurrency(ctx);
+            if (string.IsNullOrEmpty(currency.CostingMethod))
+            {
+                // GetSchemaCurrency returned no data; default so CHAR parameters are never null
+                currency.CostingMethod = "S";
+                Log.Log(Level.WARNING, "VAS_080_WarehouseStockWidget.GetStockRowsData: GetSchemaCurrency returned no data for client " + ctx.GetAD_Client_ID());
+            }
             result.currency_symbol = currency.Symbol;
             result.currency_iso = currency.IsoCode;
             result.std_precision = currency.StdPrecision;
@@ -122,7 +129,7 @@ namespace VAS.Controllers
                        Warehouse.Value,
                        Warehouse.Name
                 FROM M_Warehouse Warehouse
-                WHERE Warehouse.IsActive=N'Y'
+                WHERE Warehouse.IsActive='Y'
                   AND Warehouse.AD_Client_ID=@Warehouse_Client_ID
                   AND Warehouse.AD_Org_ID IN (0,COALESCE(NULLIF(@Warehouse_Org_ID,0),Warehouse.AD_Org_ID))";
 
@@ -133,7 +140,7 @@ namespace VAS.Controllers
                        Locator.LocatorCombination,
                        Locator.Bin
                 FROM M_Locator Locator
-                WHERE Locator.IsActive=N'Y'
+                WHERE Locator.IsActive='Y'
                   AND Locator.AD_Client_ID=@Locator_Client_ID
                   AND Locator.AD_Org_ID IN (0,COALESCE(NULLIF(@Locator_Org_ID,0),Locator.AD_Org_ID))";
 
@@ -144,7 +151,7 @@ namespace VAS.Controllers
                        COALESCE(Storage.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        Storage.QtyOnHand
                 FROM M_Storage Storage
-                WHERE Storage.IsActive=N'Y'
+                WHERE Storage.IsActive='Y'
                   AND Storage.AD_Client_ID=@Storage_Client_ID
                   AND Storage.AD_Org_ID IN (0,COALESCE(NULLIF(@Storage_Org_ID,0),Storage.AD_Org_ID))";
 
@@ -155,20 +162,20 @@ namespace VAS.Controllers
                        COALESCE(Cost.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        SUM(COALESCE(Cost.CurrentCostPrice,0)) AS Unit_Cost
                 FROM M_Cost Cost
-                INNER JOIN M_Product CostProduct ON (CostProduct.M_Product_ID=Cost.M_Product_ID AND CostProduct.IsActive=N'Y')
-                LEFT OUTER JOIN M_Product_Category CostCategory ON (CostCategory.M_Product_Category_ID=CostProduct.M_Product_Category_ID AND CostCategory.IsActive=N'Y')
+                INNER JOIN M_Product CostProduct ON (CostProduct.M_Product_ID=Cost.M_Product_ID AND CostProduct.IsActive='Y')
+                LEFT OUTER JOIN M_Product_Category CostCategory ON (CostCategory.M_Product_Category_ID=CostProduct.M_Product_Category_ID AND CostCategory.IsActive='Y')
                 INNER JOIN M_CostElement CostElement ON (
                     CostElement.M_CostElement_ID=Cost.M_CostElement_ID
-                    AND CostElement.IsActive=N'Y'
+                    AND CostElement.IsActive='Y'
                     AND CostElement.CostingMethod=COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)
                 )
-                WHERE Cost.IsActive=N'Y'
+                WHERE Cost.IsActive='Y'
                   AND Cost.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND Cost.M_CostType_ID=@M_CostType_ID
                   AND Cost.AD_Client_ID=@Cost_Client_ID
                   AND Cost.AD_Org_ID IN (0,COALESCE(NULLIF(@Cost_Org_ID,0),Cost.AD_Org_ID))
                   AND (
-                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method)<>'C'
+                      COALESCE(NULLIF(CostCategory.CostingMethod,''),@Costing_Method2)<>'C'
                       OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
                   )";
 
@@ -178,8 +185,8 @@ namespace VAS.Controllers
                        COALESCE(Movement.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        Movement.MovementDate
                 FROM M_Transaction Movement
-                WHERE Movement.IsActive=N'Y'
-                  AND COALESCE(Movement.IsReversed,'N')='N'
+                WHERE Movement.IsActive='Y'
+                  AND COALESCE(CAST(Movement.IsReversed AS VARCHAR(1)),'N')='N'
                   AND Movement.AD_Client_ID=@Movement_Client_ID
                   AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@Movement_Org_ID,0),Movement.AD_Org_ID))";
 
@@ -217,7 +224,7 @@ namespace VAS.Controllers
                            WarehouseRows.Name AS Warehouse_Name,
                            LocatorRows.M_Locator_ID AS Locator_ID,
                            LocatorRows.Value AS Locator_Code,
-                           COALESCE(LocatorRows.LocatorCombination,LocatorRows.Bin,LocatorRows.Value) AS Locator_Name,
+                           COALESCE(CAST(LocatorRows.LocatorCombination AS VARCHAR(255)),CAST(LocatorRows.Bin AS VARCHAR(255)),CAST(LocatorRows.Value AS VARCHAR(255))) AS Locator_Name,
                            StorageRows.M_Product_ID AS Product_ID,
                            StorageRows.M_AttributeSetInstance_ID AS ASI_ID,
                            SUM(COALESCE(StorageRows.QtyOnHand,0)) AS Qty_On_Hand
@@ -230,7 +237,7 @@ namespace VAS.Controllers
                              WarehouseRows.Name,
                              LocatorRows.M_Locator_ID,
                              LocatorRows.Value,
-                             COALESCE(LocatorRows.LocatorCombination,LocatorRows.Bin,LocatorRows.Value),
+                             COALESCE(CAST(LocatorRows.LocatorCombination AS VARCHAR(255)),CAST(LocatorRows.Bin AS VARCHAR(255)),CAST(LocatorRows.Value AS VARCHAR(255))),
                              StorageRows.M_Product_ID,
                              StorageRows.M_AttributeSetInstance_ID
                     HAVING SUM(COALESCE(StorageRows.QtyOnHand,0))<>0
@@ -309,12 +316,13 @@ namespace VAS.Controllers
                 new SqlParameter("@Locator_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Storage_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Storage_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@C_AcctSchema_ID", currency.AcctSchemaId),
                 new SqlParameter("@M_CostType_ID", currency.CostTypeId),
-                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
-                new SqlParameter("@Costing_Method", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@Cost_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Cost_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Costing_Method2", SqlDbType.VarChar) { Value = currency.CostingMethod },
+                new SqlParameter("@M_CostElement_ID", currency.CostElementId),
                 new SqlParameter("@Movement_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Movement_Org_ID", ctx.GetAD_Org_ID())
             };
@@ -368,9 +376,9 @@ namespace VAS.Controllers
                        END AS Currency_Symbol,
                        Currency.ISO_Code AS Currency_ISO
                 FROM AD_ClientInfo ClientInfo
-                INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID AND AcctSchema.IsActive=N'Y')
-                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID AND Currency.IsActive=N'Y')
-                WHERE ClientInfo.IsActive=N'Y'
+                INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID AND AcctSchema.IsActive='Y')
+                INNER JOIN C_Currency Currency ON (Currency.C_Currency_ID=AcctSchema.C_Currency_ID AND Currency.IsActive='Y')
+                WHERE ClientInfo.IsActive='Y'
                   AND ClientInfo.AD_Client_ID=@AD_Client_ID";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -426,7 +434,9 @@ namespace VAS.Controllers
         private JsonResult ErrorResult(Ctx ctx, string action, Exception ex)
         {
             Log.Log(Level.SEVERE, "VAS_080_WarehouseStockWidget." + action, ex);
-            string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+            string label = Msg.GetMsg(ctx, "Error");
+            if (string.IsNullOrEmpty(label)) { label = "Error"; }
+            string json = JsonConvert.SerializeObject(new { error = label, detail = ex.Message });
             return Json(json, JsonRequestBehavior.AllowGet);
         }
 

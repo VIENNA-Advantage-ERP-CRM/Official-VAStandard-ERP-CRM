@@ -296,6 +296,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_078_ProductSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_079_TopValueItemsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_080_WarehouseStockWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_091_HighestSellingProductsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_092_QuickOperationsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_093_StockMovementTodayWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_032_RecentAPPaymentsWidget.js" />
@@ -397,6 +400,9 @@
     <Content Include="Areas\VAS\Content\VAS_078_ProductSearchWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_079_TopValueItemsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_080_WarehouseStockWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_091_HighestSellingProductsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_092_QuickOperationsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_093_StockMovementTodayWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
@@ -519,6 +525,9 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_078_ProductSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_079_TopValueItemsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_080_WarehouseStockWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_091_HighestSellingProductsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_092_QuickOperationsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_093_StockMovementTodayWidget.js" />
 
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />

@@ -218,8 +218,8 @@
 
 .MPC-product-search-dialog {
     position: relative;
-    width: min(980px, 100%);
-    max-height: 88vh;
+    width: min(61.25em, 100%);
+    height: min(52em, 90vh);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -296,9 +296,12 @@
 }
 
 .MPC-product-search-dialog-body {
+    flex: 1 1 auto;
     min-height: 0;
     padding: 22px 24px 24px;
-    overflow: auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .MPC-product-search-dialog-state,
@@ -314,6 +317,7 @@
 }
 
 .MPC-product-search-hero {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 18px;
@@ -416,6 +420,7 @@
 }
 
 .MPC-product-search-tabs {
+    flex: 0 0 auto;
     display: inline-flex;
     gap: 4px;
     max-width: 100%;
@@ -480,31 +485,56 @@
     font-weight: 400;
 }
 
-.MPC-product-search-note {
+.MPC-product-search-tab-body {
+    flex: 1;
+    min-height: 0;
     display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-block-end: 10px;
-    color: #748494;
-    font-size: 0.78rem;
-}
-
-.MPC-product-search-note svg {
-    width: 14px;
-    height: 14px;
-    flex: 0 0 auto;
-    color: #0083DA;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .MPC-product-search-table-wrap {
-    width: 100%;
-    overflow-x: auto;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .MPC-product-search-table {
     width: 100%;
-    border-collapse: collapse;
+    flex: 1;
+    min-height: 0;
     table-layout: fixed;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-product-search-table thead {
+    flex: 0 0 auto;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.MPC-product-search-table tbody {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-product-search-table tbody tr {
+    flex: 1;
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-product-search-table tbody tr:last-child {
+    border-bottom: 0;
 }
 
 .MPC-product-search-table th,
@@ -525,19 +555,14 @@
 }
 
 .MPC-product-search-table td {
-    padding: 9px 8px;
+    padding: 0 8px;
     color: #5F7283;
-    border-bottom: 1px solid #EDF2F6;
     font-size: 0.8125rem;
-}
-
-.MPC-product-search-table tr:last-child td {
-    border-bottom: 0;
+    vertical-align: middle;
 }
 
 .MPC-product-search-table td.is-primary {
     color: #102C3F;
-    font-weight: 400;
 }
 
 .MPC-product-search-table th.is-right,
@@ -546,35 +571,16 @@
     font-variant-numeric: tabular-nums;
 }
 
-.MPC-product-search-table-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-top: 8px;
+.MPC-product-search-table-row-empty td {
+    color: transparent;
+    user-select: none;
+}
+
+.MPC-product-search-table-note {
+    flex: 0 0 auto;
+    padding-block-start: 6px;
     color: #748494;
     font-size: 0.75rem;
-}
-
-.MPC-product-search-table-pager {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.MPC-product-search-table-page {
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    color: #0083DA;
-    font-size: 14px;
-    background: transparent;
-    border: 1px solid #E4EDF4;
-    border-radius: 6px;
-}
-
-.MPC-product-search-table-page:disabled {
-    color: #B8C6D2;
 }
 
 @container (max-width: 50em) {

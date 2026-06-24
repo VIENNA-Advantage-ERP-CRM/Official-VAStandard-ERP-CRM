@@ -289,6 +289,10 @@
             $footer.empty();
         }
 
+        function hasErrorProp(obj) {
+            return obj !== null && typeof obj === 'object' && 'error' in obj;
+        }
+
         function loadData() {
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_080_WarehouseStockWidget/GetWarehouses',
@@ -296,10 +300,13 @@
                 cache: false,
                 success: function (response) {
                     var warehouses = parseResponse(response);
-                    if (warehouses.error) { showError(); return; }
+                    if (hasErrorProp(warehouses)) {
+                        console.error('[VAS_080] GetWarehouses error:', warehouses.error, '|', warehouses.detail || '');
+                        showError(); return;
+                    }
 
-                    warehouseStockState.warehouses = warehouses;
-                    warehouseStockState.warehouseId = warehouses.length ? warehouses[0].warehouse_id : null;
+                    warehouseStockState.warehouses = Array.isArray(warehouses) ? warehouses : [];
+                    warehouseStockState.warehouseId = warehouseStockState.warehouses.length ? warehouseStockState.warehouses[0].warehouse_id : null;
                     renderWarehouseOptions();
 
                     $.ajax({
@@ -308,17 +315,26 @@
                         cache: false,
                         success: function (stockResponse) {
                             var stockResult = parseResponse(stockResponse);
-                            if (stockResult.error) { showError(); return; }
+                            if (hasErrorProp(stockResult)) {
+                                console.error('[VAS_080] GetStockRows error:', stockResult.error, '|', stockResult.detail || '');
+                                showError(); return;
+                            }
                             warehouseStockState.rows = stockResult.rows || [];
                             warehouseStockState.currencySymbol = stockResult.currency_symbol || '';
                             warehouseStockState.currencyIso = stockResult.currency_iso || '';
                             warehouseStockState.stdPrecision = stockResult.std_precision;
                             renderWarehouseStockWidget();
                         },
-                        error: showError
+                        error: function (xhr) {
+                            console.error('[VAS_080] GetStockRows HTTP error:', xhr.status, xhr.responseText);
+                            showError();
+                        }
                     });
                 },
-                error: showError
+                error: function (xhr) {
+                    console.error('[VAS_080] GetWarehouses HTTP error:', xhr.status, xhr.responseText);
+                    showError();
+                }
             });
         }
 

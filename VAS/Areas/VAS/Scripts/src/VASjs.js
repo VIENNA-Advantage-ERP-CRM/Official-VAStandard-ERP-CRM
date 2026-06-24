@@ -196,3 +196,6 @@ import "../app/widgets/VAS_077_NewStockAdjustmentWidget.js";
 import "../app/widgets/VAS_078_ProductSearchWidget.js";
 import "../app/widgets/VAS_079_TopValueItemsWidget.js";
 import "../app/widgets/VAS_080_WarehouseStockWidget.js";
+import "../app/widgets/VAS_091_HighestSellingProductsWidget.js";
+import "../app/widgets/VAS_092_QuickOperationsWidget.js";
+import "../app/widgets/VAS_093_StockMovementTodayWidget.js";
