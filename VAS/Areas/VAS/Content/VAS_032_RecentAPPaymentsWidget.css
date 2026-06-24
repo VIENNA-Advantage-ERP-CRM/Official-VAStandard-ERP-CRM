@@ -304,7 +304,7 @@
 
 .vas-recent-ap-payments-table {
     width: 100%;
-    min-width: 48em;
+    min-width: 60em;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -344,39 +344,39 @@
     }
 
 .vas-recent-ap-payments-date {
-    width: 10%;
+    width: 9%;
     color: #5f7283;
     white-space: nowrap;
 }
 
 .vas-recent-ap-payments-value {
-    width: 16%;
+    width: 14%;
     color: #5f7283;
     font-family: "Roboto Mono", Consolas, monospace;
     font-size: 0.6875em;
 }
 
 .vas-recent-ap-payments-vendor {
-    width: 18%;
+    width: 17%;
     font-weight: 700;
 }
 
 .vas-recent-ap-payments-method-col {
-    width: 12%;
+    width: 11%;
 }
 
 .vas-recent-ap-payments-bank-account {
-    width: 18%;
+    width: 15%;
     color: #5f7283;
 }
 
 .vas-recent-ap-payments-status-col {
-    width: 13%;
+    width: 10%;
 }
 
 .vas-recent-ap-payments-amount {
-    width: 13%;
-    text-align: right;
+    width: 24%;
+    text-align: left;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

@@ -538,6 +538,7 @@
 
 .VAS-056-AutoAllocatedAPPayment-dialog-table {
     width: 100%;
+    min-width: 68em;
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.875em;
@@ -598,13 +599,13 @@
 .VAS-056-AutoAllocatedAPPayment-th-currency,
 .VAS-056-AutoAllocatedAPPayment-td-currency {
     width: 6em;
-    text-align: center;
+    text-align: left;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-amount,
 .VAS-056-AutoAllocatedAPPayment-td-amount {
-    width: 10em;
-    text-align: right !important;
+    width: 14em;
+    text-align: left;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-method,
@@ -859,13 +860,13 @@
 .VAS-056-AutoAllocatedAPPayment-th-currency,
 .VAS-056-AutoAllocatedAPPayment-td-currency {
     width: 7em;
-    text-align: center;
+    text-align: left;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-amount,
 .VAS-056-AutoAllocatedAPPayment-td-amount {
-    width: 10em;
-    text-align: right !important;
+    width: 14em;
+    text-align: left;
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-date,

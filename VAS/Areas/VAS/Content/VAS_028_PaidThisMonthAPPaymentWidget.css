@@ -638,8 +638,8 @@
 
 .vas-ptm-th-amount,
 .vas-ptm-td-amount {
-    width: 9em;
-    text-align: right !important;
+    width: 14em;
+    text-align: left;
 }
 
 .vas-ptm-td-amount {

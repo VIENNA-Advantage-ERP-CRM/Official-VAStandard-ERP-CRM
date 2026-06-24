@@ -743,7 +743,7 @@
                         totalPages = 0;
 
                         renderErrorRow(
-                            'Invalid response from server'
+                            lbl('VAS_ErrorInvalidResponse', 'Invalid response from server')
                         );
 
                         return;

@@ -634,13 +634,13 @@
 .vas-scheduled-ap-payment-th-currency,
 .vas-scheduled-ap-payment-td-currency {
     width: 6em;
-    text-align: center;
+    text-align: left;
 }
 
 .vas-scheduled-ap-payment-th-amount,
 .vas-scheduled-ap-payment-td-amount {
-    width: 9em;
-    text-align: right !important;
+    width: 14em;
+    text-align: left;
 }
 
 .vas-scheduled-ap-payment-th-method,

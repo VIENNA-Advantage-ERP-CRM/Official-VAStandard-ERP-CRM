@@ -19,6 +19,17 @@
  * 11  | Auto-match process is not configured              | VAS_027_messageAutoMatchProcessNotConfigured
  * 12  | Payment reconciliation window is not configured    | VAS_027_messageReconciliationWindowNotConfigured
  * 13  | Could not open action                             | VAS_ErrorLoading
+ * 14  | Unreconciled (summary label)                      | VAS_027_messageUnreconciled
+ * 15  | Amount (summary label)                            | VAS_027_messageAmount
+ * 16  | Oldest (summary label)                            | VAS_027_messageOldest
+ * 17  | Payment No. (table header)                        | VAS_027_messagePaymentNo
+ * 18  | Date (table header)                               | VAS_027_messageDate
+ * 19  | Vendor (table header)                             | VAS_027_messageVendor
+ * 20  | Bank Account (table header)                       | VAS_027_messageBankAccount
+ * 21  | Currency (table header)                           | VAS_027_messageCurrency
+ * 22  | Method (table header)                             | VAS_027_messageMethod
+ * 23  | Auto-match remaining (button)                     | VAS_027_messageAutoMatchRemaining
+ * 24  | Open reconciliation (button)                      | VAS_027_messageOpenReconciliation
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1091,32 +1102,26 @@
                 '<div class="vas-cpa-summary">' +
 
                 '<div>' +
-                '<span>Unreconciled</span>' +
+                '<span>' + lbl('VAS_027_messageUnreconciled', 'Unreconciled') + '</span>' +
                 '<strong class="vas-cpa-summary-count">' +
                 '0' +
                 '</strong>' +
                 '</div>' +
 
                 '<div>' +
-                '<span>Amount</span>' +
+                '<span>' + lbl('VAS_027_messageAmount', 'Amount') + '</span>' +
                 '<strong class="vas-cpa-summary-amount">' +
                 '0' +
                 '</strong>' +
                 '</div>' +
 
                 '<div>' +
-                '<span>Oldest</span>' +
+                '<span>' + lbl('VAS_027_messageOldest', 'Oldest') + '</span>' +
                 '<strong class="vas-cpa-summary-oldest">' +
                 '0' +
                 '</strong>' +
                 '</div>' +
 
-                '<div>' +
-                '<span>Auto-match rate</span>' +
-                '<strong class="vas-cpa-summary-rate">' +
-                '0%' +
-                '</strong>' +
-                '</div>' +
 
                 '</div>' +
 
@@ -1132,14 +1137,13 @@
 
                 '<thead>' +
                 '<tr>' +
-                '<th>Payment No.</th>' +
-                '<th>Date</th>' +
-                '<th>Vendor</th>' +
-                '<th>Bank Account</th>' +
-                '<th>Currency</th>' +
-                '<th>Amount</th>' +
-                '<th>Method</th>' +
-                '<th>Why Unreconciled</th>' +
+                '<th>' + lbl('VAS_027_messagePaymentNo', 'Payment No.') + '</th>' +
+                '<th>' + lbl('VAS_027_messageDate', 'Date') + '</th>' +
+                '<th>' + lbl('VAS_027_messageVendor', 'Vendor') + '</th>' +
+                '<th>' + lbl('VAS_027_messageBankAccount', 'Bank Account') + '</th>' +
+                '<th>' + lbl('VAS_027_messageCurrency', 'Currency') + '</th>' +
+                '<th>' + lbl('VAS_027_messageAmount', 'Amount') + '</th>' +
+                '<th>' + lbl('VAS_027_messageMethod', 'Method') + '</th>' +
                 '</tr>' +
                 '</thead>' +
 
@@ -1159,14 +1163,14 @@
 
                 '<button type="button" ' +
                 'class="vas-cpa-action vas-cpa-auto-match">' +
-                'Auto-match remaining' +
+                lbl('VAS_027_messageAutoMatchRemaining', 'Auto-match remaining') +
                 '</button>' +
 
                 '<button type="button" ' +
                 'class="vas-cpa-action ' +
                 'vas-cpa-action-primary ' +
                 'vas-cpa-open-reconciliation">' +
-                'Open reconciliation' +
+                lbl('VAS_027_messageOpenReconciliation', 'Open reconciliation') +
                 '</button>' +
 
                 '</div>' +

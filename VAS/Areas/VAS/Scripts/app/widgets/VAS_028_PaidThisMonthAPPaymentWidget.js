@@ -913,26 +913,28 @@
                     ? 'cleared'
                     : 'intransit';
 
+                var executionStatusName = row.executionStatusName;
+
                 var statusClass = getStatusClass(
                     statusType
                 );
 
                 var statusText = getStatusText(
-                    statusType
+                    statusType, executionStatusName
                 );
 
                 var supplierName =
                     row.supplier ||
                     lbl(
                         'VAS_028_MessageNotSpecified',
-                        'Not Specified'
+                        ''
                     );
 
                 var paymentMethod =
                     row.paymentMethodName ||
                     lbl(
                         'VAS_028_MessageNotSpecified',
-                        'Not Specified'
+                        ''
                     );
 
                 $dialogTbody.append(
@@ -1184,7 +1186,7 @@
             return 'vas-ptm-dialog-status-intransit';
         }
 
-        function getStatusText(statusType) {
+        function getStatusText(statusType, executionStatusName = "") {
             if (statusType === 'cleared') {
                 return lbl(
                     'VAS_028_MessageCleared',
@@ -1203,10 +1205,7 @@
                 );
             }
 
-            return lbl(
-                'VAS_028_MessageInTransit',
-                'In transit'
-            );
+            return executionStatusName;
         }
 
         function createDialog() {
