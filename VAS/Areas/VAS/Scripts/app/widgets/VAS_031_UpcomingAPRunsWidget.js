@@ -1,17 +1,50 @@
 ﻿/**
  * VAS_031 Upcoming AP Runs Widget
+ * Purpose - Displays upcoming AP invoices due within the next seven days,
+ * groups them by due date, payment method and currency, displays invoice
+ * details, and creates an AP payment linked to the selected invoice.
  *
- * Source:
- *     C_Invoice
- *
- * Grouping:
- *     Due Date + Payment Method + Currency
- *
- * Popup:
- *     Displays individual invoices.
- *
- * Create:
- *     Creates C_Payment linked with C_Invoice_ID.
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Upcoming runs                        | VAS_031_MessageUpcomingRuns
+ *  2  | Next 7 days                          | VAS_031_MessageNext7Days
+ *  3  | invoice                              | VAS_031_MessageInvoice
+ *  4  | invoices                             | VAS_031_MessageInvoices
+ *  5  | Loading                              | VAS_031_MessageLoading
+ *  6  | No Data                              | VAS_031_MessageNoData
+ *  7  | Previous                             | VAS_Previous
+ *  8  | Next                                 | VAS_Next
+ *  9  | Showing                              | VAS_031_MessageShowing
+ * 10  | of                                   | VAS_Of
+ * 11  | Not Specified                        | VAS_031_MessageNotSpecified
+ * 12  | Pay                                  | VAS_031_MessagePay
+ * 13  | Create Payment                       | VAS_031_MessageCreatePayment
+ * 14  | Pre-filled from upcoming             | VAS_031_MessagePrefilledFromUpcoming
+ * 15  | Loading invoice details              | VAS_031_MessageLoadingDetails
+ * 16  | Invoices                             | VAS_031_MessageInvoices
+ * 17  | Invoice                              | VAS_031_MessageInvoice
+ * 18  | Organization                         | VAS_031_MessageOrganization
+ * 19  | Bank Account                         | VAS_031_MessageBankAccount
+ * 20  | Transaction Date                     | VAS_031_MessageTransactionDate
+ * 21  | Vendor                               | VAS_031_MessageVendor
+ * 22  | Currency                             | VAS_PaymentCurrency
+ * 23  | Currency Type                        | VAS_031_MessageCurrencyType
+ * 24  | Document Type                        | VAS_031_MessageDocumentType
+ * 25  | Tender Type                          | VAS_031_MessageTenderType
+ * 26  | Payment Amount                       | VAS_031_MessagePaymentAmount
+ * 27  | Payment Document No.                 | VAS_031_MessageDocumentNo
+ * 28  | pre-filled                           | VAS_031_MessagePrefilled
+ * 29  | Select                               | VAS_Select
+ * 30  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
+ * 31  | Review and save.                     | VAS_031_MessageReviewAndSave
+ * 32  | Saving                               | VAS_031_MessageSaving
+ * 33  | Save payment                         | VAS_031_MessageSavePayment
+ * 34  | Cancel                               | VAS_Cancel
+ * 35  | Close                                | VAS_Close
+ * 36  | Could not load data                  | VAS_ErrorLoading
+ * 37  | Could not save AP payment            | VAS_031_MessageCouldNotSaveAPPayment
+ * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
@@ -32,12 +65,15 @@
 
         var $card = null;
         var $body = null;
+        var $state = null;
+        var $busy = null;
+
+        var $footer = null;
+        var $showingText = null;
         var $pager = null;
         var $pagerPrev = null;
         var $pagerNext = null;
         var $pagerText = null;
-        var $busy = null;
-        var $state = null;
 
         var $payDialog = null;
         var $payDialogTitle = null;
@@ -63,11 +99,23 @@
         var pageSize = 3;
         var totalPages = 0;
 
+        var resizeObserver = null;
+
+        /*
+         * Two-line widget row:
+         * title + metadata + padding + divider.
+         */
+        var widgetRowHeight = 65;
+        var widgetMinimumRows = 3;
+
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
 
-            return text &&
+            return (
+                text &&
+                text !== key &&
                 text !== '[' + key + ']'
+            )
                 ? text
                 : fallback;
         }
@@ -87,10 +135,13 @@
 
         function normalizeResponse(response) {
             var data = response;
-            var i;
+            var index;
 
-            for (i = 0; i < 2; i++) {
-
+            for (
+                index = 0;
+                index < 2;
+                index++
+            ) {
                 if (typeof data !== 'string') {
                     break;
                 }
@@ -133,15 +184,15 @@
         }
 
         function firstValue() {
-            var i;
+            var index;
             var value;
 
             for (
-                i = 0;
-                i < arguments.length;
-                i++
+                index = 0;
+                index < arguments.length;
+                index++
             ) {
-                value = arguments[i];
+                value = arguments[index];
 
                 if (
                     value !== undefined &&
@@ -156,16 +207,16 @@
         }
 
         function firstPositiveValue() {
-            var i;
+            var index;
             var value;
-            var numberValue;
+            var numericValue;
 
             for (
-                i = 0;
-                i < arguments.length;
-                i++
+                index = 0;
+                index < arguments.length;
+                index++
             ) {
-                value = arguments[i];
+                value = arguments[index];
 
                 if (
                     value === undefined ||
@@ -175,13 +226,13 @@
                     continue;
                 }
 
-                numberValue = Number(value);
+                numericValue = Number(value);
 
                 if (
-                    !isNaN(numberValue) &&
-                    numberValue > 0
+                    !isNaN(numericValue) &&
+                    numericValue > 0
                 ) {
-                    return numberValue;
+                    return numericValue;
                 }
             }
 
@@ -311,9 +362,29 @@
             var numericValue = Number(value || 0);
             var precision = Number(stdPrecision);
             var amountText;
+            var currencyText;
 
             if (isNaN(numericValue)) {
                 numericValue = 0;
+            }
+
+            if (
+                isNaN(precision) ||
+                precision < 0
+            ) {
+                if (
+                    VIS &&
+                    VIS.Env &&
+                    VIS.Env.getCtx &&
+                    VIS.Env.getCtx() &&
+                    VIS.Env.getCtx().getStdPrecision
+                ) {
+                    precision = Number(
+                        VIS.Env
+                            .getCtx()
+                            .getStdPrecision()
+                    );
+                }
             }
 
             if (
@@ -331,28 +402,34 @@
                 }
             );
 
-            return (
-                (
-                    currencySymbol ||
-                    currencyISO ||
-                    ''
-                ) +
-                (
-                    currencySymbol ||
-                        currencyISO
-                        ? ' '
-                        : ''
-                ) +
-                amountText
-            );
+            currencyText =
+                currencySymbol ||
+                currencyISO ||
+                '';
+
+            return currencyText
+                ? currencyText + ' ' + amountText
+                : amountText;
         }
 
         function normalizeNumber(value) {
-            var numberValue = Number(value || 0);
+            var numericValue = Number(value || 0);
 
-            return isNaN(numberValue)
+            return isNaN(numericValue)
                 ? '0'
-                : String(numberValue);
+                : String(numericValue);
+        }
+
+        function getInvoiceLabel(count) {
+            return Number(count) === 1
+                ? lbl(
+                    'VAS_031_MessageInvoice',
+                    'invoice'
+                )
+                : lbl(
+                    'VAS_031_MessageInvoices',
+                    'invoices'
+                );
         }
 
         function showBusy(show) {
@@ -379,6 +456,10 @@
 
             if ($body) {
                 $body.toggle(!show);
+            }
+
+            if ($footer) {
+                $footer.toggle(!show);
             }
         }
 
@@ -413,22 +494,22 @@
         }
 
         function getLookupAny(names) {
-            var i;
-            var list;
+            var index;
+            var items;
 
             names = $.isArray(names)
                 ? names
                 : [];
 
             for (
-                i = 0;
-                i < names.length;
-                i++
+                index = 0;
+                index < names.length;
+                index++
             ) {
-                list = getLookup(names[i]);
+                items = getLookup(names[index]);
 
-                if (list.length > 0) {
-                    return list;
+                if (items.length > 0) {
+                    return items;
                 }
             }
 
@@ -464,6 +545,13 @@
             }
 
             if (
+                item.key !== undefined &&
+                item.key !== null
+            ) {
+                return item.key;
+            }
+
+            if (
                 item.code !== undefined &&
                 item.code !== null
             ) {
@@ -493,6 +581,7 @@
                 item.text,
                 item.label,
                 item.description,
+                item.documentNo,
                 item.code,
                 value
             );
@@ -502,7 +591,7 @@
             items,
             requestedValue
         ) {
-            var i;
+            var index;
             var itemValue;
 
             items = $.isArray(items)
@@ -519,12 +608,12 @@
             }
 
             for (
-                i = 0;
-                i < items.length;
-                i++
+                index = 0;
+                index < items.length;
+                index++
             ) {
                 itemValue = getLookupItemValue(
-                    items[i]
+                    items[index]
                 );
 
                 if (
@@ -539,7 +628,7 @@
         }
 
         function getFirstLookupValue(items) {
-            var i;
+            var index;
             var value;
 
             items = $.isArray(items)
@@ -547,12 +636,12 @@
                 : [];
 
             for (
-                i = 0;
-                i < items.length;
-                i++
+                index = 0;
+                index < items.length;
+                index++
             ) {
                 value = getLookupItemValue(
-                    items[i]
+                    items[index]
                 );
 
                 if (
@@ -568,28 +657,28 @@
         }
 
         function getFirstPositiveLookupValue(items) {
-            var i;
+            var index;
             var value;
-            var numberValue;
+            var numericValue;
 
             items = $.isArray(items)
                 ? items
                 : [];
 
             for (
-                i = 0;
-                i < items.length;
-                i++
+                index = 0;
+                index < items.length;
+                index++
             ) {
                 value = getLookupItemValue(
-                    items[i]
+                    items[index]
                 );
 
-                numberValue = Number(value);
+                numericValue = Number(value);
 
                 if (
-                    !isNaN(numberValue) &&
-                    numberValue > 0
+                    !isNaN(numericValue) &&
+                    numericValue > 0
                 ) {
                     return value;
                 }
@@ -605,7 +694,7 @@
             disabled
         ) {
             var html;
-            var i;
+            var index;
             var item;
             var value;
             var text;
@@ -639,11 +728,11 @@
                 '</option>';
 
             for (
-                i = 0;
-                i < items.length;
-                i++
+                index = 0;
+                index < items.length;
+                index++
             ) {
-                item = items[i] || {};
+                item = items[index] || {};
 
                 value = getLookupItemValue(item);
 
@@ -793,42 +882,88 @@
         }
 
         function createRunRow(run) {
-            var paymentMethodName =
+            var paymentMethodName;
+            var paymentCount;
+            var amount;
+            var dueDateText;
+            var titleText;
+            var metaText;
+            var amountText;
+
+            var $row;
+            var $bar;
+            var $info;
+            var $actions;
+            var $title;
+            var $meta;
+            var $amount;
+            var $payButton;
+
+            paymentMethodName =
                 run.paymentMethodName ||
                 lbl(
                     'VAS_031_MessageNotSpecified',
                     'Not Specified'
                 );
 
-            var paymentCount =
-                Number(run.paymentCount || 0);
-
-            var amount =
-                Number(
-                    firstValue(
-                        run.totalAmount,
-                        run.amount,
-                        0
-                    )
-                );
-
-            var dueDateText =
-                firstValue(
-                    run.dueDateText,
-                    run.runDateText,
-                    formatDate(
-                        firstValue(
-                            run.dueDate,
-                            run.runDate
-                        )
-                    )
-                );
-
-            var $row = $(
-                '<div class="vas-upcoming-ap-runs-row">'
+            paymentCount = Number(
+                run.paymentCount || 0
             );
 
-            var $bar = $(
+            amount = Number(
+                firstValue(
+                    run.totalAmount,
+                    run.amount,
+                    0
+                )
+            );
+
+            dueDateText = firstValue(
+                run.dueDateText,
+                run.runDateText,
+                formatDate(
+                    firstValue(
+                        run.dueDate,
+                        run.runDate
+                    )
+                )
+            );
+
+            titleText = paymentMethodName;
+
+            if (
+                paymentCount === 1 &&
+                run.vendorName
+            ) {
+                titleText +=
+                    ' · ' +
+                    run.vendorName;
+            }
+
+            metaText =
+                dueDateText +
+                ' · ' +
+                paymentCount.toLocaleString(
+                    window.navigator.language
+                ) +
+                ' ' +
+                getInvoiceLabel(paymentCount);
+
+            amountText = formatCurrencyAmount(
+                amount,
+                run.currencySymbol,
+                run.currencyISO,
+                run.stdPrecision
+            );
+
+            $row = $(
+                '<div ' +
+                'class="vas-upcoming-ap-runs-row" ' +
+                'role="button" ' +
+                'tabindex="0">'
+            );
+
+            $bar = $(
                 '<span class="vas-upcoming-ap-runs-bar">'
             ).addClass(
                 getPaymentMethodClass(
@@ -836,76 +971,79 @@
                 )
             );
 
-            var $info = $(
+            $info = $(
                 '<div class="vas-upcoming-ap-runs-info">'
             );
 
-            var $actions = $(
+            $actions = $(
                 '<div class="vas-upcoming-ap-runs-actions">'
             );
 
-            var $title = $(
+            $title = $(
                 '<div class="vas-upcoming-ap-runs-run-title">'
-            ).text(paymentMethodName);
+            )
+                .text(titleText)
+                .attr('title', titleText);
 
-            var $meta = $(
+            $meta = $(
                 '<div class="vas-upcoming-ap-runs-meta">'
-            ).text(
-                dueDateText +
-                ' · ' +
-                paymentCount.toLocaleString(
-                    window.navigator.language
-                ) +
-                ' ' +
-                (
-                    paymentCount === 1
-                        ? 'invoice'
-                        : 'invoices'
-                )
-            );
+            )
+                .text(metaText)
+                .attr('title', metaText);
 
-            var $amount = $(
+            $amount = $(
                 '<span class="vas-upcoming-ap-runs-amount">'
-            ).text(
-                formatCurrencyAmount(
-                    amount,
-                    run.currencySymbol,
-                    run.currencyISO,
-                    run.stdPrecision
-                )
-            );
+            )
+                .text(amountText)
+                .attr('title', amountText);
 
-            var $payButton = $(
+            $payButton = $(
                 '<button ' +
                 'type="button" ' +
                 'class="vas-upcoming-ap-runs-pay-btn">' +
+
                 escapeHtml(
                     lbl(
                         'VAS_031_MessagePay',
                         'Pay'
                     )
                 ) +
-                '<span class="vas-upcoming-ap-runs-pay-arrow">›</span>' +
+
+                '<span ' +
+                'class="vas-upcoming-ap-runs-pay-arrow" ' +
+                'aria-hidden="true">›</span>' +
+
                 '</button>'
             );
 
-            $payButton.on(
-                'click',
-                function (event) {
+            function openSelectedRun(event) {
+                if (event) {
                     event.preventDefault();
                     event.stopPropagation();
-
-                    openPayDialog(run);
                 }
+
+                openPayDialog(run);
+            }
+
+            $payButton.on(
+                'click',
+                openSelectedRun
             );
 
-            /*
-             * الضغط على السطر أيضًا يفتح التفاصيل.
-             */
             $row.on(
                 'click',
-                function () {
-                    openPayDialog(run);
+                openSelectedRun
+            );
+
+            $row.on(
+                'keydown',
+                function (event) {
+                    if (
+                        event.key === 'Enter' ||
+                        event.key === ' '
+                    ) {
+                        openSelectedRun(event);
+                    }
                 }
             );
 
@@ -925,9 +1063,169 @@
             return $row;
         }
 
+        function calculatePageSize() {
+            var availableHeight;
+            var calculatedRows;
+            var newPageSize;
+            var newTotalPages;
+
+            if (
+                !$body ||
+                !$body.length
+            ) {
+                return;
+            }
+
+            availableHeight =
+                $body[0].clientHeight;
+
+            if (availableHeight <= 0) {
+                return;
+            }
+
+            calculatedRows = Math.floor(
+                availableHeight /
+                widgetRowHeight
+            );
+
+            newPageSize = Math.max(
+                widgetMinimumRows,
+                calculatedRows
+            );
+
+            if (newPageSize === pageSize) {
+                return;
+            }
+
+            pageSize = newPageSize;
+
+            newTotalPages =
+                runsData.length > 0
+                    ? Math.max(
+                        1,
+                        Math.ceil(
+                            runsData.length /
+                            pageSize
+                        )
+                    )
+                    : 0;
+
+            pageNo = Math.max(
+                1,
+                Math.min(
+                    pageNo,
+                    newTotalPages || 1
+                )
+            );
+
+            renderPage();
+        }
+
+        function startAdaptiveRowObserver() {
+            if (
+                resizeObserver ||
+                !$body ||
+                !$body.length
+            ) {
+                return;
+            }
+
+            if (
+                typeof ResizeObserver ===
+                'undefined'
+            ) {
+                calculatePageSize();
+                return;
+            }
+
+            resizeObserver = new ResizeObserver(
+                function () {
+                    window.requestAnimationFrame(
+                        calculatePageSize
+                    );
+                }
+            );
+
+            resizeObserver.observe(
+                $body[0]
+            );
+
+            calculatePageSize();
+        }
+
+        function stopAdaptiveRowObserver() {
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+        }
+
         function updatePager() {
+            var count;
+            var startIndex;
+            var endIndex;
+
             if (!$pager) {
                 return;
+            }
+
+            count = runsData.length;
+
+            totalPages =
+                count > 0
+                    ? Math.max(
+                        1,
+                        Math.ceil(
+                            count /
+                            pageSize
+                        )
+                    )
+                    : 0;
+
+            pageNo = Math.max(
+                1,
+                Math.min(
+                    pageNo,
+                    totalPages || 1
+                )
+            );
+
+            startIndex =
+                count > 0
+                    ? (
+                        (pageNo - 1) *
+                        pageSize
+                    ) + 1
+                    : 0;
+
+            endIndex =
+                count > 0
+                    ? Math.min(
+                        pageNo * pageSize,
+                        count
+                    )
+                    : 0;
+
+            if ($showingText) {
+                $showingText.text(
+                    count > 0
+                        ? lbl(
+                            'VAS_031_MessageShowing',
+                            'Showing'
+                        ) +
+                        ' ' +
+                        startIndex +
+                        '–' +
+                        endIndex +
+                        ' ' +
+                        lbl(
+                            'VAS_Of',
+                            'of'
+                        ) +
+                        ' ' +
+                        count
+                        : ''
+                );
             }
 
             if (totalPages > 1) {
@@ -957,12 +1255,16 @@
                 totalPages <= 1 ||
                 pageNo >= totalPages
             );
+
+            $pager.toggle(
+                totalPages > 1
+            );
         }
 
         function renderPage() {
             var startIndex;
             var pageItems;
-            var i;
+            var index;
 
             if (
                 !runsData ||
@@ -1002,13 +1304,13 @@
             $body.empty();
 
             for (
-                i = 0;
-                i < pageItems.length;
-                i++
+                index = 0;
+                index < pageItems.length;
+                index++
             ) {
                 $body.append(
                     createRunRow(
-                        pageItems[i]
+                        pageItems[index]
                     )
                 );
             }
@@ -1021,14 +1323,27 @@
                 ? $.grep(
                     data.runs,
                     function (run) {
+                        var amount = Number(
+                            firstValue(
+                                run.totalAmount,
+                                run.amount,
+                                0
+                            )
+                        );
+
+                        var count = Number(
+                            run.paymentCount || 0
+                        );
+
                         return (
-                            Number(
-                                firstValue(
-                                    run.totalAmount,
-                                    run.amount,
-                                    0
-                                )
-                            ) > 0
+                            (
+                                !isNaN(amount) &&
+                                amount > 0
+                            ) ||
+                            (
+                                !isNaN(count) &&
+                                count > 0
+                            )
                         );
                     }
                 )
@@ -1041,6 +1356,7 @@
 
             pageNo = 1;
 
+            calculatePageSize();
             renderPage();
         }
 
@@ -1126,13 +1442,27 @@
             isSaving
         ) {
             var busy = !!show;
-            var saving = busy && !!isSaving;
+            var saving =
+                busy &&
+                !!isSaving;
 
             if ($payDialogBusy) {
-                $payDialogBusy.toggleClass(
-                    'is-visible',
-                    busy
-                );
+                $payDialogBusy
+                    .text(
+                        saving
+                            ? lbl(
+                                'VAS_031_MessageSaving',
+                                'Saving'
+                            )
+                            : lbl(
+                                'VAS_031_MessageLoading',
+                                'Loading'
+                            )
+                    )
+                    .toggleClass(
+                        'is-visible',
+                        busy
+                    );
             }
 
             if ($payDialogSave) {
@@ -1216,7 +1546,10 @@
                                     data.error
                                 )
                             ) ||
-                            'Could not load lookup data.'
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load lookup data.'
+                            )
                         );
 
                         callback(false);
@@ -1234,7 +1567,10 @@
                     showPayError(
                         getAjaxErrorMessage(
                             xhr,
-                            'Could not load lookup data.'
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load lookup data.'
+                            )
                         )
                     );
 
@@ -1244,39 +1580,52 @@
         }
 
         function renderInvoiceRows(rows) {
-            var html;
-            var i;
+            var html = '';
+            var index;
             var row;
             var amountText;
+            var documentText;
+            var vendorText;
+            var dueText;
 
             rows = $.isArray(rows)
                 ? rows
                 : [];
 
-            html =
-                '<div class="vas-upcoming-ap-runs-invoice-list-title">' +
-                escapeHtml('Invoices') +
-                '</div>' +
-
-                '<div class="vas-upcoming-ap-runs-invoice-list-body">';
-
             for (
-                i = 0;
-                i < rows.length;
-                i++
+                index = 0;
+                index < rows.length;
+                index++
             ) {
-                row = rows[i];
+                row = rows[index] || {};
 
                 amountText = formatCurrencyAmount(
-                    row.openAmount ||
-                    row.amount ||
-                    0,
-
+                    firstValue(
+                        row.openAmount,
+                        row.amount,
+                        0
+                    ),
                     row.currencySymbol,
-
                     row.currencyISO,
-
                     row.stdPrecision
+                );
+
+                documentText = firstValue(
+                    row.invoiceDocumentNo,
+                    row.documentNo,
+                    ''
+                );
+
+                vendorText = firstValue(
+                    row.vendorName,
+                    ''
+                );
+
+                dueText = formatDate(
+                    firstValue(
+                        row.dueDate,
+                        row.transactionDate
+                    )
                 );
 
                 html +=
@@ -1285,54 +1634,52 @@
                     'class="vas-upcoming-ap-runs-invoice-row' +
                     (
                         selectedInvoiceRow &&
-                            Number(selectedInvoiceRow.invoiceId) ===
+                            Number(
+                                selectedInvoiceRow.invoiceId
+                            ) ===
                             Number(row.invoiceId)
                             ? ' is-selected'
                             : ''
                     ) +
                     '" ' +
                     'data-invoice-index="' +
-                    i +
+                    index +
                     '">' +
 
                     '<span class="vas-upcoming-ap-runs-invoice-main">' +
 
-                    '<strong>' +
-                    escapeHtml(
-                        row.invoiceDocumentNo ||
-                        row.documentNo ||
-                        ''
-                    ) +
+                    '<strong title="' +
+                    escapeHtml(documentText) +
+                    '">' +
+                    escapeHtml(documentText) +
                     '</strong>' +
 
-                    '<small>' +
-                    escapeHtml(
-                        row.vendorName || ''
-                    ) +
+                    '<small title="' +
+                    escapeHtml(vendorText) +
+                    '">' +
+                    escapeHtml(vendorText) +
                     '</small>' +
 
                     '</span>' +
 
                     '<span class="vas-upcoming-ap-runs-invoice-side">' +
 
-                    '<strong>' +
+                    '<strong title="' +
+                    escapeHtml(amountText) +
+                    '">' +
                     escapeHtml(amountText) +
                     '</strong>' +
 
-                    '<small>' +
-                    escapeHtml(
-                        formatDate(
-                            row.dueDate
-                        )
-                    ) +
+                    '<small title="' +
+                    escapeHtml(dueText) +
+                    '">' +
+                    escapeHtml(dueText) +
                     '</small>' +
 
                     '</span>' +
 
                     '</button>';
             }
-
-            html += '</div>';
 
             $invoiceList.html(html);
 
@@ -1344,21 +1691,21 @@
                 .on(
                     'click',
                     function () {
-                        var index = Number(
+                        var selectedIndex = Number(
                             $(this).attr(
                                 'data-invoice-index'
                             )
                         );
 
                         if (
-                            isNaN(index) ||
-                            !invoiceRows[index]
+                            isNaN(selectedIndex) ||
+                            !invoiceRows[selectedIndex]
                         ) {
                             return;
                         }
 
                         selectInvoiceRow(
-                            invoiceRows[index]
+                            invoiceRows[selectedIndex]
                         );
                     }
                 );
@@ -1367,17 +1714,9 @@
         function selectInvoiceRow(row) {
             selectedInvoiceRow = row;
 
-            renderInvoiceRows(
-                invoiceRows
-            );
-
-            renderPayDialogGrid(
-                row
-            );
-
-            updatePayNotice(
-                row
-            );
+            renderInvoiceRows(invoiceRows);
+            renderPayDialogGrid(row);
+            updatePayNotice(row);
 
             setPayDialogBusy(
                 false,
@@ -1509,7 +1848,8 @@
                 getValidLookupValue(
                     tenderTypes,
                     firstValue(
-                        row.tenderType
+                        row.tenderType,
+                        row.paymentMethodValue
                     )
                 );
 
@@ -1522,16 +1862,23 @@
 
             html =
                 fieldHtml(
-                    'Invoice',
+                    lbl(
+                        'VAS_031_MessageInvoice',
+                        'Invoice'
+                    ),
+
                     inputHtml(
                         'invoiceDocumentNo',
                         'text',
-                        row.invoiceDocumentNo ||
-                        row.documentNo ||
-                        '',
+                        firstValue(
+                            row.invoiceDocumentNo,
+                            row.documentNo,
+                            ''
+                        ),
                         null,
                         true
                     ),
+
                     true
                 ) +
 
@@ -1716,19 +2063,37 @@
 
         function updatePayNotice(row) {
             var amountText;
+            var documentText;
+            var vendorText;
+
+            if (
+                !$payDialogNotice ||
+                !row
+            ) {
+                return;
+            }
 
             amountText = formatCurrencyAmount(
                 firstValue(
                     row.openAmount,
                     row.amount,
+                    row.payAmt,
                     0
                 ),
-
                 row.currencySymbol,
-
                 row.currencyISO,
-
                 row.stdPrecision
+            );
+
+            documentText = firstValue(
+                row.invoiceDocumentNo,
+                row.documentNo,
+                ''
+            );
+
+            vendorText = firstValue(
+                row.vendorName,
+                ''
             );
 
             $payDialogNotice
@@ -1737,25 +2102,24 @@
                 )
                 .html(
                     escapeHtml(
-                        'Pre-filled for invoice'
+                        lbl(
+                            'VAS_031_MessagePrefilledForInvoice',
+                            'Pre-filled for invoice'
+                        )
                     ) +
-
-                    ' <strong>' +
-
-                    escapeHtml(
-                        row.invoiceDocumentNo ||
-                        row.documentNo ||
-                        ''
-                    ) +
-
-                    '</strong>' +
 
                     (
-                        row.vendorName
+                        documentText
+                            ? ' <strong>' +
+                            escapeHtml(documentText) +
+                            '</strong>'
+                            : ''
+                    ) +
+
+                    (
+                        vendorText
                             ? ' — ' +
-                            escapeHtml(
-                                row.vendorName
-                            )
+                            escapeHtml(vendorText)
                             : ''
                     ) +
 
@@ -1766,7 +2130,10 @@
                     '. ' +
 
                     escapeHtml(
-                        'Review and save.'
+                        lbl(
+                            'VAS_031_MessageReviewAndSave',
+                            'Review and save.'
+                        )
                     )
                 );
         }
@@ -1821,7 +2188,10 @@
                                     data.error
                                 )
                             ) ||
-                            'Could not load invoice details.'
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load invoice details.'
+                            )
                         );
 
                         return;
@@ -1851,7 +2221,10 @@
                     showPayError(
                         getAjaxErrorMessage(
                             xhr,
-                            'Could not load invoice details.'
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load invoice details.'
+                            )
                         )
                     );
                 },
@@ -1892,7 +2265,10 @@
                 ' · ' +
                 (
                     run.paymentMethodName ||
-                    ''
+                    lbl(
+                        'VAS_031_MessageNotSpecified',
+                        'Not Specified'
+                    )
                 )
             );
 
@@ -1910,15 +2286,18 @@
             $invoiceList.empty();
             $payDialogGrid.empty();
 
-            setPayDialogBusy(
-                true,
-                false
+            $payDialog.css(
+                'display',
+                'flex'
             );
-
-            $payDialog.show();
 
             $('body').addClass(
                 'vas-upcoming-ap-runs-body-lock'
+            );
+
+            setPayDialogBusy(
+                true,
+                false
             );
 
             ensurePopupLookups(
@@ -1932,9 +2311,7 @@
                         return;
                     }
 
-                    loadRunInvoiceDetails(
-                        run
-                    );
+                    loadRunInvoiceDetails(run);
                 }
             );
         }
@@ -1977,10 +2354,14 @@
 
         function readPayDialogPayload() {
             var payload;
+            var maximumAmount;
 
             if (!selectedInvoiceRow) {
                 showPayError(
-                    'Select an invoice.'
+                    lbl(
+                        'VAS_031_MessageInvoiceRequired',
+                        'Select an invoice.'
+                    )
                 );
 
                 return null;
@@ -2058,7 +2439,10 @@
 
             if (payload.invoiceId <= 0) {
                 showPayError(
-                    'Source invoice is required.'
+                    lbl(
+                        'VAS_031_MessageSourceInvoiceRequired',
+                        'Source invoice is required.'
+                    )
                 );
 
                 return null;
@@ -2066,7 +2450,10 @@
 
             if (payload.adOrgId <= 0) {
                 showPayError(
-                    'Organization is required.'
+                    lbl(
+                        'VAS_031_MessageOrganizationRequired',
+                        'Organization is required.'
+                    )
                 );
 
                 return null;
@@ -2074,7 +2461,10 @@
 
             if (payload.bankAccountId <= 0) {
                 showPayError(
-                    'Bank account is required.'
+                    lbl(
+                        'VAS_031_MessageBankAccountRequired',
+                        'Bank account is required.'
+                    )
                 );
 
                 return null;
@@ -2082,7 +2472,10 @@
 
             if (payload.vendorId <= 0) {
                 showPayError(
-                    'Vendor is required.'
+                    lbl(
+                        'VAS_031_MessageVendorRequired',
+                        'Vendor is required.'
+                    )
                 );
 
                 return null;
@@ -2090,7 +2483,10 @@
 
             if (payload.currencyId <= 0) {
                 showPayError(
-                    'Currency is required.'
+                    lbl(
+                        'VAS_031_MessageCurrencyRequired',
+                        'Currency is required.'
+                    )
                 );
 
                 return null;
@@ -2098,7 +2494,10 @@
 
             if (payload.conversionTypeId <= 0) {
                 showPayError(
-                    'Currency type is required.'
+                    lbl(
+                        'VAS_031_MessageConversionTypeRequired',
+                        'Currency type is required.'
+                    )
                 );
 
                 return null;
@@ -2106,7 +2505,10 @@
 
             if (payload.docTypeId <= 0) {
                 showPayError(
-                    'Document type is required.'
+                    lbl(
+                        'VAS_031_MessageDocumentTypeRequired',
+                        'Document type is required.'
+                    )
                 );
 
                 return null;
@@ -2114,7 +2516,10 @@
 
             if (!payload.tenderType) {
                 showPayError(
-                    'Tender type is required.'
+                    lbl(
+                        'VAS_031_MessageTenderTypeRequired',
+                        'Tender type is required.'
+                    )
                 );
 
                 return null;
@@ -2122,7 +2527,10 @@
 
             if (!payload.transactionDate) {
                 showPayError(
-                    'Transaction date is required.'
+                    lbl(
+                        'VAS_031_MessageTransactionDateRequired',
+                        'Transaction date is required.'
+                    )
                 );
 
                 return null;
@@ -2133,22 +2541,34 @@
                 payload.payAmt <= 0
             ) {
                 showPayError(
-                    'Payment amount must be greater than zero.'
+                    lbl(
+                        'VAS_031_MessagePaymentAmountRequired',
+                        'Payment amount must be greater than zero.'
+                    )
                 );
 
                 return null;
             }
 
-            if (
-                payload.payAmt >
-                Number(
-                    selectedInvoiceRow.openAmount ||
-                    selectedInvoiceRow.amount ||
+            maximumAmount = Number(
+                firstValue(
+                    selectedInvoiceRow.openAmount,
+                    selectedInvoiceRow.amount,
+                    selectedInvoiceRow.payAmt,
                     0
                 )
+            );
+
+            if (
+                !isNaN(maximumAmount) &&
+                maximumAmount > 0 &&
+                payload.payAmt > maximumAmount
             ) {
                 showPayError(
-                    'Payment amount exceeds invoice open amount.'
+                    lbl(
+                        'VAS_031_MessagePaymentExceedsOpenAmount',
+                        'Payment amount exceeds invoice open amount.'
+                    )
                 );
 
                 return null;
@@ -2189,7 +2609,6 @@
                 type: 'POST',
                 dataType: 'json',
                 cache: false,
-
                 data: payload,
 
                 success: function (response) {
@@ -2211,7 +2630,10 @@
                                     data.message
                                 )
                             ) ||
-                            'Could not save AP payment.'
+                            lbl(
+                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'Could not save AP payment.'
+                            )
                         );
 
                         return;
@@ -2236,8 +2658,9 @@
                         VIS.ADialog.info
                     ) {
                         VIS.ADialog.info(
-                            (
-                                data.message ||
+                            data.message ||
+                            lbl(
+                                'VAS_031_MessagePaymentCreatedSuccessfully',
                                 'AP payment created successfully.'
                             )
                         );
@@ -2248,7 +2671,10 @@
                     showPayError(
                         getAjaxErrorMessage(
                             xhr,
-                            'Could not save AP payment.'
+                            lbl(
+                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'Could not save AP payment.'
+                            )
                         )
                     );
                 },
@@ -2283,7 +2709,7 @@
 
                 '<div class="vas-upcoming-ap-runs-pay-header">' +
 
-                '<div>' +
+                '<div class="vas-upcoming-ap-runs-pay-heading">' +
 
                 '<div class="vas-upcoming-ap-runs-pay-title"></div>' +
 
@@ -2293,27 +2719,60 @@
 
                 '<button ' +
                 'type="button" ' +
-                'class="vas-upcoming-ap-runs-pay-close">×</button>' +
+                'class="vas-upcoming-ap-runs-pay-close" ' +
+                'aria-label="' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Close',
+                        'Close'
+                    )
+                ) +
+                '">×</button>' +
 
                 '</div>' +
 
                 '<div class="vas-upcoming-ap-runs-pay-notice"></div>' +
 
+                '<div class="vas-upcoming-ap-runs-pay-content">' +
+
+                '<section class="vas-upcoming-ap-runs-invoice-panel">' +
+
+                '<div class="vas-upcoming-ap-runs-invoice-list-title">' +
+
+                escapeHtml(
+                    lbl(
+                        'VAS_031_MessageInvoices',
+                        'Invoices'
+                    )
+                ) +
+
+                '</div>' +
+
                 '<div class="vas-upcoming-ap-runs-invoice-list"></div>' +
 
+                '</section>' +
+
+                '<section class="vas-upcoming-ap-runs-form-panel">' +
+
                 '<div class="vas-upcoming-ap-runs-pay-grid"></div>' +
+
+                '</section>' +
+
+                '</div>' +
 
                 '<div class="vas-upcoming-ap-runs-pay-footer">' +
 
                 '<button ' +
                 'type="button" ' +
                 'class="vas-upcoming-ap-runs-pay-cancel">' +
+
                 escapeHtml(
                     lbl(
                         'VAS_Cancel',
                         'Cancel'
                     )
                 ) +
+
                 '</button>' +
 
                 '<button ' +
@@ -2321,12 +2780,14 @@
                 'class="vas-upcoming-ap-runs-pay-save">' +
 
                 '<span class="vas-upcoming-ap-runs-pay-save-label">' +
+
                 escapeHtml(
                     lbl(
                         'VAS_031_MessageSavePayment',
                         'Save payment'
                     )
                 ) +
+
                 '</span>' +
 
                 '</button>' +
@@ -2342,48 +2803,58 @@
 
             $('body').append($payDialog);
 
-            $payDialogTitle = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-title'
-            );
+            $payDialogTitle =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-title'
+                );
 
-            $payDialogSub = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-sub'
-            );
+            $payDialogSub =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-sub'
+                );
 
-            $payDialogNotice = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-notice'
-            );
+            $payDialogNotice =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-notice'
+                );
 
-            $invoiceList = $payDialog.find(
-                '.vas-upcoming-ap-runs-invoice-list'
-            );
+            $invoiceList =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-invoice-list'
+                );
 
-            $payDialogGrid = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-grid'
-            );
+            $payDialogGrid =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-grid'
+                );
 
-            $payDialogSave = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-save'
-            );
+            $payDialogSave =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-save'
+                );
 
-            $payDialogSaveLabel = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-save-label'
-            );
+            $payDialogSaveLabel =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-save-label'
+                );
 
-            $payDialogBusy = $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-busy'
-            );
+            $payDialogBusy =
+                $payDialog.find(
+                    '.vas-upcoming-ap-runs-pay-busy'
+                );
 
-            $payDialog.find(
-                '.vas-upcoming-ap-runs-pay-close,' +
-                '.vas-upcoming-ap-runs-pay-cancel,' +
-                '.vas-upcoming-ap-runs-pay-scrim'
-            ).on(
-                'click',
-                function () {
-                    closePayDialog();
-                }
-            );
+            $payDialog
+                .find(
+                    '.vas-upcoming-ap-runs-pay-close,' +
+                    '.vas-upcoming-ap-runs-pay-cancel,' +
+                    '.vas-upcoming-ap-runs-pay-scrim'
+                )
+                .on(
+                    'click',
+                    function () {
+                        closePayDialog();
+                    }
+                );
 
             $payDialogSave.on(
                 'click',
@@ -2392,23 +2863,73 @@
                 }
             );
 
+            $(document).on(
+                'keydown.vas-upcoming-ap-runs-' +
+                $self.AD_UserHomeWidgetID,
+
+                function (event) {
+                    if (
+                        event.key === 'Escape' &&
+                        $payDialog &&
+                        $payDialog.is(':visible')
+                    ) {
+                        closePayDialog();
+                    }
+                }
+            );
+
             $payDialog.hide();
         }
 
         function createLayout() {
+            var $head;
+            var $headLeft;
+            var $titleRow;
+            var $iconBox;
+            var $icon;
+            var $title;
+            var $arrow;
+            var $sub;
+
             $card = $(
                 '<div class="vas-upcoming-ap-runs-card">'
             );
 
-            var $header = $(
-                '<div class="vas-upcoming-ap-runs-header">'
+            $head = $(
+                '<div class="vas-upcoming-ap-runs-head">'
             );
 
-            var $headerText = $(
-                '<div class="vas-upcoming-ap-runs-header-text">'
+            $headLeft = $(
+                '<div class="vas-upcoming-ap-runs-head-left">'
             );
 
-            var $title = $(
+            $titleRow = $(
+                '<div class="vas-upcoming-ap-runs-title-row">'
+            );
+
+            $iconBox = $(
+                '<span class="vas-upcoming-ap-runs-icon-box">'
+            );
+
+            $icon = $(
+                '<svg ' +
+                'class="vas-upcoming-ap-runs-icon" ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'stroke="currentColor" ' +
+                'stroke-width="2" ' +
+                'stroke-linecap="round" ' +
+                'stroke-linejoin="round" ' +
+                'aria-hidden="true">' +
+
+                '<circle cx="12" cy="12" r="9"></circle>' +
+
+                '<path d="M12 7v5l3 2"></path>' +
+
+                '</svg>'
+            );
+
+            $title = $(
                 '<div class="vas-upcoming-ap-runs-title">'
             ).text(
                 lbl(
@@ -2417,8 +2938,28 @@
                 )
             );
 
-            var $subtitle = $(
-                '<div class="vas-upcoming-ap-runs-subtitle">'
+            $arrow = $(
+                '<span ' +
+                'class="vas-upcoming-ap-runs-arrow" ' +
+                'aria-hidden="true">' +
+
+                '<svg ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'stroke="currentColor" ' +
+                'stroke-width="2.4" ' +
+                'stroke-linecap="round" ' +
+                'stroke-linejoin="round">' +
+
+                '<path d="M9 18l6-6-6-6"></path>' +
+
+                '</svg>' +
+
+                '</span>'
+            );
+
+            $sub = $(
+                '<div class="vas-upcoming-ap-runs-sub">'
             ).text(
                 lbl(
                     'VAS_031_MessageNext7Days',
@@ -2426,22 +2967,42 @@
                 )
             );
 
-            $headerText
+            $iconBox.append($icon);
+
+            $titleRow
+                .append($iconBox)
                 .append($title)
-                .append($subtitle);
+                .append($arrow);
 
-            $header.append($headerText);
+            $headLeft
+                .append($titleRow)
+                .append($sub);
 
-            $body = $(
-                '<div class="vas-upcoming-ap-runs-body">'
+            $head.append($headLeft);
+
+            $busy = $(
+                '<div class="vas-upcoming-ap-runs-busy">'
+            ).text(
+                lbl(
+                    'VAS_031_MessageLoading',
+                    'Loading'
+                )
             );
 
             $state = $(
                 '<div class="vas-upcoming-ap-runs-state">'
             );
 
-            $busy = $(
-                '<div class="vas-upcoming-ap-runs-busy">'
+            $body = $(
+                '<div class="vas-upcoming-ap-runs-body">'
+            );
+
+            $footer = $(
+                '<div class="vas-upcoming-ap-runs-footer">'
+            );
+
+            $showingText = $(
+                '<div class="vas-upcoming-ap-runs-showing">'
             );
 
             $pager = $(
@@ -2449,28 +3010,62 @@
             );
 
             $pagerPrev = $(
-                '<button type="button">' +
+                '<button ' +
+                'type="button" ' +
+                'class="vas-upcoming-ap-runs-page-btn" ' +
+                'aria-label="' +
                 escapeHtml(
                     lbl(
                         'VAS_Previous',
                         'Previous'
                     )
                 ) +
+                '">' +
+
+                '<svg ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'stroke="currentColor" ' +
+                'stroke-width="2.4" ' +
+                'stroke-linecap="round" ' +
+                'stroke-linejoin="round">' +
+
+                '<path d="M15 18l-6-6 6-6"></path>' +
+
+                '</svg>' +
+
                 '</button>'
             );
 
             $pagerText = $(
-                '<span>'
+                '<span class="vas-upcoming-ap-runs-page-text">'
             );
 
             $pagerNext = $(
-                '<button type="button">' +
+                '<button ' +
+                'type="button" ' +
+                'class="vas-upcoming-ap-runs-page-btn" ' +
+                'aria-label="' +
                 escapeHtml(
                     lbl(
                         'VAS_Next',
                         'Next'
                     )
                 ) +
+                '">' +
+
+                '<svg ' +
+                'viewBox="0 0 24 24" ' +
+                'fill="none" ' +
+                'stroke="currentColor" ' +
+                'stroke-width="2.4" ' +
+                'stroke-linecap="round" ' +
+                'stroke-linejoin="round">' +
+
+                '<path d="M9 18l6-6-6-6"></path>' +
+
+                '</svg>' +
+
                 '</button>'
             );
 
@@ -2499,22 +3094,31 @@
                 .append($pagerText)
                 .append($pagerNext);
 
+            $footer
+                .append($showingText)
+                .append($pager);
+
             $card
-                .append($header)
+                .append($head)
                 .append($busy)
                 .append($state)
                 .append($body)
-                .append($pager);
+                .append($footer);
 
             $root.append($card);
 
             createPayDialog();
         }
 
+        this.init = function (
+            windowNo,
+            frame
+        ) {
+            $self.windowNo =
+                windowNo || 0;
 
-        this.init = function (windowNo, frame) {
-            $self.windowNo = windowNo || 0;
-            $self.frame = frame || null;
+            $self.frame =
+                frame || null;
 
             createLayout();
 
@@ -2527,10 +3131,28 @@
                     .append($root);
             }
 
+            startAdaptiveRowObserver();
+            loadData();
+        };
+
+        /*
+         * VIS widget lifecycle compatibility.
+         */
+        this.initialize = function () {
+            if (!$root.parent().length) {
+                createLayout();
+            }
+
+            startAdaptiveRowObserver();
             loadData();
         };
 
         this.refresh = function () {
+            popupLookups = null;
+            loadData();
+        };
+
+        this.refreshWidget = function () {
             popupLookups = null;
             loadData();
         };
@@ -2540,7 +3162,26 @@
         };
 
         this.dispose = function () {
+            disposeWidget();
+        };
+
+        this.disposeComponent = function () {
+            disposeWidget();
+        };
+
+        function disposeWidget() {
+            if (isDisposed) {
+                return;
+            }
+
             isDisposed = true;
+
+            stopAdaptiveRowObserver();
+
+            $(document).off(
+                'keydown.vas-upcoming-ap-runs-' +
+                $self.AD_UserHomeWidgetID
+            );
 
             selectedRun = null;
             selectedInvoiceRow = null;
@@ -2562,8 +3203,28 @@
                 'vas-upcoming-ap-runs-body-lock'
             );
 
+            $card = null;
+            $body = null;
+            $state = null;
+            $busy = null;
+            $footer = null;
+            $showingText = null;
+            $pager = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
+
+            $payDialogTitle = null;
+            $payDialogSub = null;
+            $payDialogNotice = null;
+            $invoiceList = null;
+            $payDialogGrid = null;
+            $payDialogSave = null;
+            $payDialogSaveLabel = null;
+            $payDialogBusy = null;
+
             $self.frame = null;
-        };
+        }
     };
 
 })(VAS, jQuery);
