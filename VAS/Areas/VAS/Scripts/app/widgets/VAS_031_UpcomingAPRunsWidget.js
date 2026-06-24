@@ -816,7 +816,8 @@
         function fieldHtml(
             label,
             controlHtml,
-            prefilled
+            prefilled,
+            extraAttributes
         ) {
             return (
                 '<div class="vas-upcoming-ap-runs-field' +
@@ -825,7 +826,13 @@
                         ? ' is-prefilled'
                         : ''
                 ) +
-                '">' +
+                '"' +
+                (
+                    extraAttributes
+                        ? ' ' + extraAttributes
+                        : ''
+                ) +
+                '>' +
 
                 '<div class="vas-upcoming-ap-runs-field-label">' +
 
@@ -1724,6 +1731,88 @@
             );
         }
 
+        function getSelectedLookupItem(
+            items,
+            selectedValue
+        ) {
+            var index;
+            var item;
+
+            items = $.isArray(items)
+                ? items
+                : [];
+
+            for (index = 0; index < items.length; index++) {
+                item = items[index] || {};
+
+                if (
+                    String(getLookupItemValue(item)) ===
+                    String(selectedValue)
+                ) {
+                    return item;
+                }
+            }
+
+            return null;
+        }
+
+        function isCheckPaymentMethodItem(item) {
+            var text;
+
+            item = item || {};
+
+            if (
+                item.isCheck === true ||
+                String(item.isCheck).toLowerCase() === 'true'
+            ) {
+                return true;
+            }
+
+            text = String(
+                firstValue(
+                    item.name,
+                    item.text,
+                    item.label,
+                    ''
+                )
+            ).toLowerCase();
+
+            return (
+                text.indexOf('cheque') >= 0 ||
+                text.indexOf('check') >= 0 ||
+                text.indexOf('chq') >= 0 ||
+                text.indexOf('صك') >= 0
+            );
+        }
+
+        function updateCheckFieldsVisibility() {
+            var paymentMethodId;
+            var selectedMethod;
+            var showFields;
+
+            paymentMethodId = Number(
+                getPayField('paymentMethodId').val() || 0
+            );
+
+            selectedMethod = getSelectedLookupItem(
+                getLookup('paymentMethods'),
+                paymentMethodId
+            );
+
+            showFields = isCheckPaymentMethodItem(
+                selectedMethod
+            );
+
+            $payDialogGrid
+                .find('[data-check-field="true"]')
+                .toggle(showFields);
+
+            if (!showFields) {
+                getPayField('checkNo').val('');
+                getPayField('checkDate').val('');
+            }
+        }
+
         function renderPayDialogGrid(row) {
             var organizations;
             var bankAccounts;
@@ -1732,6 +1821,7 @@
             var conversionTypes;
             var documentTypes;
             var tenderTypes;
+            var paymentMethods;
 
             var organizationId;
             var vendorId;
@@ -1740,6 +1830,7 @@
             var conversionTypeId;
             var docTypeId;
             var tenderType;
+            var paymentMethodId;
 
             var html;
 
@@ -1772,10 +1863,10 @@
                 ]);
 
             tenderTypes =
-                getLookupAny([
-                    'tenderTypes',
-                    'paymentMethods'
-                ]);
+                getLookup('tenderTypes');
+
+            paymentMethods =
+                getLookup('paymentMethods');
 
             organizationId =
                 getValidLookupValue(
@@ -1857,6 +1948,24 @@
                 tenderType =
                     getFirstLookupValue(
                         tenderTypes
+                    );
+            }
+
+            paymentMethodId =
+                getValidLookupValue(
+                    paymentMethods,
+                    firstPositiveValue(
+                        row.paymentMethodId,
+                        row.va009PaymentMethodId,
+                        selectedRun &&
+                        selectedRun.paymentMethodId
+                    )
+                );
+
+            if (!paymentMethodId) {
+                paymentMethodId =
+                    getFirstPositiveLookupValue(
+                        paymentMethods
                     );
             }
 
@@ -2019,6 +2128,60 @@
 
                 fieldHtml(
                     lbl(
+                        'VAS_031_MessagePaymentMethod',
+                        'Payment Method'
+                    ),
+
+                    selectHtml(
+                        'paymentMethodId',
+                        paymentMethods,
+                        paymentMethodId,
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageCheckNo',
+                        'Check No.'
+                    ),
+
+                    inputHtml(
+                        'checkNo',
+                        'text',
+                        firstValue(row.checkNo, ''),
+                        null,
+                        false
+                    ),
+
+                    false,
+                    'data-check-field="true" style="display:none;"'
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageCheckDate',
+                        'Check Date'
+                    ),
+
+                    inputHtml(
+                        'checkDate',
+                        'date',
+                        formatDateForInput(
+                            firstValue(row.checkDate, '')
+                        ),
+                        null,
+                        false
+                    ),
+
+                    false,
+                    'data-check-field="true" style="display:none;"'
+                ) +
+
+                fieldHtml(
+                    lbl(
                         'VAS_031_MessagePaymentAmount',
                         'Payment Amount'
                     ),
@@ -2059,6 +2222,17 @@
                 );
 
             $payDialogGrid.html(html);
+
+            getPayField('paymentMethodId')
+                .off('change.vasPaymentMethod')
+                .on(
+                    'change.vasPaymentMethod',
+                    function () {
+                        updateCheckFieldsVisibility();
+                    }
+                );
+
+            updateCheckFieldsVisibility();
         }
 
         function updatePayNotice(row) {
@@ -2355,6 +2529,7 @@
         function readPayDialogPayload() {
             var payload;
             var maximumAmount;
+            var selectedPaymentMethod;
 
             if (!selectedInvoiceRow) {
                 showPayError(
@@ -2415,6 +2590,24 @@
                 tenderType: String(
                     getPayField(
                         'tenderType'
+                    ).val() || ''
+                ).trim(),
+
+                paymentMethodId: Number(
+                    getPayField(
+                        'paymentMethodId'
+                    ).val() || 0
+                ),
+
+                checkNo: String(
+                    getPayField(
+                        'checkNo'
+                    ).val() || ''
+                ).trim(),
+
+                checkDate: String(
+                    getPayField(
+                        'checkDate'
                     ).val() || ''
                 ).trim(),
 
@@ -2523,6 +2716,51 @@
                 );
 
                 return null;
+            }
+
+            if (payload.paymentMethodId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessagePaymentMethodRequired',
+                        'Payment method is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            selectedPaymentMethod =
+                getSelectedLookupItem(
+                    getLookup('paymentMethods'),
+                    payload.paymentMethodId
+                );
+
+            if (isCheckPaymentMethodItem(selectedPaymentMethod)) {
+                if (!payload.checkNo) {
+                    showPayError(
+                        lbl(
+                            'VAS_031_MessageCheckNoRequired',
+                            'Check number is required.'
+                        )
+                    );
+
+                    return null;
+                }
+
+                if (!payload.checkDate) {
+                    showPayError(
+                        lbl(
+                            'VAS_031_MessageCheckDateRequired',
+                            'Check date is required.'
+                        )
+                    );
+
+                    return null;
+                }
+            }
+            else {
+                payload.checkNo = '';
+                payload.checkDate = '';
             }
 
             if (!payload.transactionDate) {

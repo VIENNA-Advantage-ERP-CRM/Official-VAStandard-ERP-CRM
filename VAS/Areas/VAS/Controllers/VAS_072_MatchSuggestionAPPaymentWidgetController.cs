@@ -229,6 +229,7 @@ namespace VAS.Controllers
                     vendorId = row.VendorId,
                     vendorName = row.VendorName,
                     paymentMethod = row.PaymentMethodCode,
+                    paymentMethodName = row.PaymentMethodName,
                     reference = row.ReferenceNo,
                     bankName = row.BankName,
                     accountNo = row.AccountNo,

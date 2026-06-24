@@ -59,6 +59,8 @@
         var $dialogTitle;
         var $dialogSub;
         var $dialogGrid;
+        var $dialogAllocSection;
+        var $dialogAllocWrap;
 
         var isDisposed = false;
         var paymentsData = [];
@@ -292,8 +294,8 @@
             var statusClass = getStatusClass(payment.statusType, statusText);
             var documentNo = getDocumentNo(payment);
             var bankAccountText = getBankAccountText(payment);
-            var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
-            var paymentMethodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
+            var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', '-');
+            var paymentMethodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', '-');
             var amountText = formatCurrencyAmount(
                 payment.amount,
                 payment.currencySymbol,
@@ -396,8 +398,8 @@
             }
 
             var documentNo = getDocumentNo(payment);
-            var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
-            var methodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', 'Not Specified');
+            var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', '-');
+            var methodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', '-');
             var bankAccountText = getBankAccountText(payment);
             var statusText = payment.statusName || getStatusText(payment.statusType);
             var statusClass = getStatusClass(payment.statusType, statusText);
@@ -434,8 +436,20 @@
                 $dialogGrid.html(gridHtml);
             }
 
+            if ($dialogAllocSection) {
+                $dialogAllocSection.hide();
+            }
+
+            if ($dialogAllocWrap) {
+                $dialogAllocWrap.empty();
+            }
+
             $dialog.show();
             $('body').addClass('vas-recent-ap-payments-body-lock');
+
+            if (payment.paymentId) {
+                loadAllocationDetail(payment);
+            }
         }
 
         function closeDialog() {
@@ -448,6 +462,14 @@
 
             if ($dialogGrid) {
                 $dialogGrid.empty();
+            }
+
+            if ($dialogAllocSection) {
+                $dialogAllocSection.hide();
+            }
+
+            if ($dialogAllocWrap) {
+                $dialogAllocWrap.empty();
             }
         }
 
@@ -480,6 +502,10 @@
                 '<div class="vas-recent-ap-payments-dialog-body">' +
                 '<div class="vas-recent-ap-payments-dialog-section-label">' + escapeHtml(lbl('VAS_032_MessagePaymentSummary', 'Payment summary')) + '</div>' +
                 '<div class="vas-recent-ap-payments-dialog-grid"></div>' +
+                '<div class="vas-recent-ap-payments-dialog-alloc-section" style="display:none;">' +
+                '<div class="vas-recent-ap-payments-dialog-alloc-label">' + escapeHtml(lbl('VAS_032_AllocDetail', 'Allocation Detail')) + '</div>' +
+                '<div class="vas-recent-ap-payments-dialog-alloc-wrap"></div>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
                 '</div>'
@@ -488,6 +514,8 @@
             $dialogTitle = $dialog.find('.vas-recent-ap-payments-dialog-title');
             $dialogSub = $dialog.find('.vas-recent-ap-payments-dialog-sub');
             $dialogGrid = $dialog.find('.vas-recent-ap-payments-dialog-grid');
+            $dialogAllocSection = $dialog.find('.vas-recent-ap-payments-dialog-alloc-section');
+            $dialogAllocWrap = $dialog.find('.vas-recent-ap-payments-dialog-alloc-wrap');
 
             $dialog.find('.vas-recent-ap-payments-dialog-close').on('click', function (e) {
                 e.stopPropagation();
@@ -505,6 +533,181 @@
             });
 
             $('body').append($dialog);
+        }
+
+        function loadAllocationDetail(payment) {
+            if (
+                !$dialogAllocSection ||
+                !$dialogAllocWrap
+            ) {
+                return;
+            }
+
+            $dialogAllocWrap.html(
+                '<div class="vas-recent-ap-payments-alloc-loading">' +
+                escapeHtml(lbl('VAS_032_MessageLoading', 'Loading')) +
+                '&hellip;</div>'
+            );
+
+            $dialogAllocSection.show();
+
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_032_RecentAPPaymentsWidget/GetPaymentAllocationDetail',
+
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+
+                data: {
+                    paymentId: payment.paymentId
+                },
+
+                success: function (response) {
+                    renderAllocationDetail(
+                        response,
+                        payment
+                    );
+                },
+
+                error: function () {
+                    if ($dialogAllocSection) {
+                        $dialogAllocSection.hide();
+                    }
+                }
+            });
+        }
+
+        function renderAllocationDetail(response, payment) {
+            if (
+                !$dialogAllocSection ||
+                !$dialogAllocWrap
+            ) {
+                return;
+            }
+
+            var data = response;
+
+            if (typeof data === 'string') {
+                try {
+                    data = JSON.parse(data);
+                }
+                catch (e) {
+                    $dialogAllocSection.hide();
+                    return;
+                }
+            }
+
+            if (
+                !data ||
+                !data.success ||
+                !$.isArray(data.lines) ||
+                data.lines.length === 0
+            ) {
+                $dialogAllocSection.hide();
+                return;
+            }
+
+            var lines = data.lines;
+            var firstLine = lines[0];
+            var currencySymbol =
+                firstLine.currencySymbol ||
+                firstLine.currencyISO ||
+                payment.currencySymbol ||
+                '';
+            var stdPrecision =
+                Number(firstLine.stdPrecision) ||
+                Number(payment.stdPrecision) ||
+                2;
+
+            var totalAllocated = 0;
+            var totalDiscount = 0;
+            var totalWriteOff = 0;
+
+            var html =
+                '<table class="vas-recent-ap-payments-alloc-table">' +
+                '<thead><tr>' +
+                '<th>' + escapeHtml(lbl('VAS_032_AllocInvoiceNo', 'Invoice No.')) + '</th>' +
+                '<th>' + escapeHtml(lbl('VAS_032_AllocDate', 'Date')) + '</th>' +
+                '<th class="vas-recent-ap-payments-alloc-num">' + escapeHtml(lbl('VAS_032_AllocAmount', 'Allocated')) + '</th>' +
+                '<th class="vas-recent-ap-payments-alloc-num">' + escapeHtml(lbl('VAS_032_AllocDiscount', 'Discount')) + '</th>' +
+                '<th class="vas-recent-ap-payments-alloc-num">' + escapeHtml(lbl('VAS_032_AllocWriteOff', 'Write-Off')) + '</th>' +
+                '<th class="vas-recent-ap-payments-alloc-num">' + escapeHtml(lbl('VAS_032_AllocTotal', 'Total')) + '</th>' +
+                '</tr></thead><tbody>';
+
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                var allocated = Number(line.allocatedAmount) || 0;
+                var discount = Number(line.discountAmt) || 0;
+                var writeOff = Number(line.writeOffAmt) || 0;
+                var lineTotal = allocated + discount + writeOff;
+
+                totalAllocated += allocated;
+                totalDiscount += discount;
+                totalWriteOff += writeOff;
+
+                html +=
+                    '<tr>' +
+                    '<td>' + escapeHtml(line.invoiceDocumentNo || '—') + '</td>' +
+                    '<td>' + escapeHtml(formatDate(line.invoiceDate) || '—') + '</td>' +
+                    '<td class="vas-recent-ap-payments-alloc-num">' + formatAllocAmount(allocated, currencySymbol, stdPrecision) + '</td>' +
+                    '<td class="vas-recent-ap-payments-alloc-num">' +
+                    (discount !== 0
+                        ? formatAllocAmount(discount, currencySymbol, stdPrecision)
+                        : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
+                    '</td>' +
+                    '<td class="vas-recent-ap-payments-alloc-num">' +
+                    (writeOff !== 0
+                        ? formatAllocAmount(writeOff, currencySymbol, stdPrecision)
+                        : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
+                    '</td>' +
+                    '<td class="vas-recent-ap-payments-alloc-num vas-recent-ap-payments-alloc-total-cell">' +
+                    formatAllocAmount(lineTotal, currencySymbol, stdPrecision) +
+                    '</td>' +
+                    '</tr>';
+            }
+
+            var grandTotal = totalAllocated + totalDiscount + totalWriteOff;
+
+            html +=
+                '</tbody>' +
+                '<tfoot><tr class="vas-recent-ap-payments-alloc-foot">' +
+                '<td colspan="2"><strong>' + escapeHtml(lbl('VAS_Total', 'Total')) + '</strong></td>' +
+                '<td class="vas-recent-ap-payments-alloc-num"><strong>' + formatAllocAmount(totalAllocated, currencySymbol, stdPrecision) + '</strong></td>' +
+                '<td class="vas-recent-ap-payments-alloc-num"><strong>' +
+                (totalDiscount !== 0
+                    ? formatAllocAmount(totalDiscount, currencySymbol, stdPrecision)
+                    : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
+                '</strong></td>' +
+                '<td class="vas-recent-ap-payments-alloc-num"><strong>' +
+                (totalWriteOff !== 0
+                    ? formatAllocAmount(totalWriteOff, currencySymbol, stdPrecision)
+                    : '<span class="vas-recent-ap-payments-alloc-dash">—</span>') +
+                '</strong></td>' +
+                '<td class="vas-recent-ap-payments-alloc-num vas-recent-ap-payments-alloc-total-cell"><strong>' +
+                formatAllocAmount(grandTotal, currencySymbol, stdPrecision) +
+                '</strong></td>' +
+                '</tr></tfoot>' +
+                '</table>';
+
+            $dialogAllocWrap.html(html);
+        }
+
+        function formatAllocAmount(value, currencySymbol, stdPrecision) {
+            var amount = Number(value || 0).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: stdPrecision,
+                    maximumFractionDigits: stdPrecision
+                }
+            );
+
+            return escapeHtml(
+                currencySymbol
+                    ? currencySymbol + amount
+                    : amount
+            );
         }
 
         function getStatusClass(statusType, statusText) {
@@ -679,6 +882,8 @@
             $dialogTitle = null;
             $dialogSub = null;
             $dialogGrid = null;
+            $dialogAllocSection = null;
+            $dialogAllocWrap = null;
         };
     };
 

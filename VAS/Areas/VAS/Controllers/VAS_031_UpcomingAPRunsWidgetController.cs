@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
@@ -1136,6 +1136,13 @@ ORDER BY
                         ctx
                     );
 
+                currentLookup = "paymentMethods";
+
+                List<object> paymentMethods =
+                    ReadPaymentMethodLookupRows(
+                        ctx
+                    );
+
                 return Json(new
                 {
                     success = true,
@@ -1149,7 +1156,7 @@ ORDER BY
                     documentTypes = documentTypes,
                     docTypes = documentTypes,
                     tenderTypes = tenderTypes,
-                    paymentMethods = tenderTypes
+                    paymentMethods = paymentMethods
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -1305,7 +1312,7 @@ ORDER BY
                     {
                         displayName =
                             displayName +
-                            " � " +
+                            " · " +
                             accountNo;
                     }
 
@@ -1494,6 +1501,79 @@ ORDER BY
             return rows;
         }
 
+        private List<object> ReadPaymentMethodLookupRows(
+            Ctx ctx)
+        {
+            List<object> rows = new List<object>();
+            IDataReader reader = null;
+
+            string clientIdSql = ctx.GetAD_Client_ID().ToString(
+                CultureInfo.InvariantCulture
+            );
+
+            string sql = @"
+SELECT
+    PaymentMethod.VA009_PaymentMethod_ID AS ID,
+    PaymentMethod.VA009_Name AS Name
+FROM VA009_PaymentMethod PaymentMethod
+WHERE PaymentMethod.IsActive = 'Y'
+AND PaymentMethod.AD_Client_ID IN
+(
+    0,
+    " + clientIdSql + @"
+)
+ORDER BY
+    PaymentMethod.VA009_Name";
+
+            try
+            {
+                reader = DB.ExecuteReader(
+                    sql,
+                    null,
+                    null
+                );
+
+                while (
+                    reader != null &&
+                    reader.Read()
+                )
+                {
+                    int id = GetInt(reader, "ID");
+                    string name = GetString(reader, "Name");
+
+                    rows.Add(new
+                    {
+                        id = id,
+                        value = id,
+                        name = name,
+                        text = name,
+                        label = name,
+                        isCheck = IsCheckPaymentMethod(name)
+                    });
+                }
+            }
+            finally
+            {
+                CloseReader(reader);
+            }
+
+            return rows;
+        }
+
+        private bool IsCheckPaymentMethod(
+            string paymentMethodName)
+        {
+            string value = (paymentMethodName ?? string.Empty)
+                .Trim()
+                .ToLowerInvariant();
+
+            return
+                value.Contains("cheque") ||
+                value.Contains("check") ||
+                value.Contains("chq") ||
+                value.Contains("صك");
+        }
+
         #endregion
 
         #region Create AP Payment From Invoice
@@ -1510,6 +1590,9 @@ ORDER BY
             int conversionTypeId,
             int docTypeId,
             string tenderType,
+            int paymentMethodId,
+            string checkNo,
+            string checkDate,
             string transactionDate,
             string documentNo,
             decimal payAmt)
@@ -1532,6 +1615,15 @@ ORDER BY
                     ctx,
                     "VAS_031_MessageSourceInvoiceRequired",
                     "Source invoice is required."
+                );
+            }
+
+            if (paymentMethodId <= 0)
+            {
+                return GetValidationError(
+                    ctx,
+                    "VAS_031_MessagePaymentMethodRequired",
+                    "Payment method is required."
                 );
             }
 
@@ -1818,6 +1910,76 @@ ORDER BY
                     );
                 }
 
+                string paymentMethodName = Util.GetValueOfString(
+                    DB.ExecuteScalar(
+                        @"SELECT VA009_Name
+                          FROM VA009_PaymentMethod
+                          WHERE IsActive = 'Y'
+                          AND VA009_PaymentMethod_ID = " +
+                        paymentMethodId.ToString(
+                            CultureInfo.InvariantCulture
+                        ) +
+                        " AND AD_Client_ID IN (0, " +
+                        ctx.GetAD_Client_ID().ToString(
+                            CultureInfo.InvariantCulture
+                        ) + ")" ,
+                        null,
+                        trx
+                    )
+                );
+
+                if (string.IsNullOrWhiteSpace(paymentMethodName))
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidPaymentMethod",
+                            "The selected payment method is invalid or inactive."
+                        )
+                    );
+                }
+
+                bool isCheckPayment =
+                    IsCheckPaymentMethod(
+                        paymentMethodName
+                    );
+
+                DateTime parsedCheckDate = DateTime.MinValue;
+
+                if (isCheckPayment)
+                {
+                    if (string.IsNullOrWhiteSpace(checkNo))
+                    {
+                        throw new InvalidOperationException(
+                            GetMsg(
+                                ctx,
+                                "VAS_031_MessageCheckNoRequired",
+                                "Check number is required."
+                            )
+                        );
+                    }
+
+                    if (
+                        string.IsNullOrWhiteSpace(checkDate) ||
+                        !DateTime.TryParseExact(
+                            checkDate,
+                            "yyyy-MM-dd",
+                            CultureInfo.InvariantCulture,
+                            DateTimeStyles.None,
+                            out parsedCheckDate
+                        )
+                    )
+                    {
+                        throw new InvalidOperationException(
+                            GetMsg(
+                                ctx,
+                                "VAS_031_MessageCheckDateInvalid",
+                                "Check date is required and must be in yyyy-MM-dd format."
+                            )
+                        );
+                    }
+                }
+
                 MPayment payment = new MPayment(
                     ctx,
                     0,
@@ -1867,6 +2029,24 @@ ORDER BY
                 payment.SetTenderType(
                     tenderType.Trim()
                 );
+
+                payment.Set_Value(
+                    "VA009_PaymentMethod_ID",
+                    paymentMethodId
+                );
+
+                if (isCheckPayment)
+                {
+                    payment.Set_Value(
+                        "CheckNo",
+                        checkNo.Trim()
+                    );
+
+                    payment.Set_Value(
+                        "CheckDate",
+                        parsedCheckDate
+                    );
+                }
 
                 payment.SetPayAmt(
                     payAmt

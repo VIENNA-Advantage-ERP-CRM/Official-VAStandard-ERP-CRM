@@ -130,6 +130,198 @@ namespace VAS.Controllers
             }
         }
 
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetPaymentAllocationDetail(int paymentId)
+        {
+            Ctx ctx = GetContext();
+
+            if (ctx == null)
+            {
+                return GetSessionExpiredResult();
+            }
+
+            IDataReader dr = null;
+
+            try
+            {
+                string clientIdSql =
+                    ctx.GetAD_Client_ID().ToString(
+                        CultureInfo.InvariantCulture
+                    );
+
+                string paymentIdSql =
+                    Math.Max(0, paymentId).ToString(
+                        CultureInfo.InvariantCulture
+                    );
+
+                string sql = @"
+SELECT
+    COALESCE
+    (
+        Invoice.DocumentNo,
+        ''
+    ) AS InvoiceDocumentNo,
+
+    Invoice.DateInvoiced,
+
+    AllocationHdr.DocumentNo AS AllocationDocumentNo,
+
+    AllocationHdr.DateAcct AS AllocationDate,
+
+    COALESCE
+    (
+        AllocationLine.Amount,
+        0
+    ) AS AllocatedAmount,
+
+    COALESCE
+    (
+        AllocationLine.DiscountAmt,
+        0
+    ) AS DiscountAmt,
+
+    COALESCE
+    (
+        AllocationLine.WriteOffAmt,
+        0
+    ) AS WriteOffAmt,
+
+    COALESCE
+    (
+        Currency.ISO_Code,
+        ''
+    ) AS CurrencyISO,
+
+    COALESCE
+    (
+        Currency.CurSymbol,
+        ''
+    ) AS CurrencySymbol,
+
+    COALESCE
+    (
+        Currency.StdPrecision,
+        2
+    ) AS StdPrecision
+
+FROM C_AllocationLine AllocationLine
+
+INNER JOIN C_AllocationHdr AllocationHdr ON
+(
+    AllocationHdr.C_AllocationHdr_ID =
+    AllocationLine.C_AllocationHdr_ID
+
+    AND AllocationHdr.IsActive = 'Y'
+
+    AND AllocationHdr.AD_Client_ID = " + clientIdSql + @"
+)
+
+LEFT OUTER JOIN C_Invoice Invoice ON
+(
+    Invoice.C_Invoice_ID =
+    AllocationLine.C_Invoice_ID
+)
+
+LEFT OUTER JOIN C_Currency Currency ON
+(
+    Currency.C_Currency_ID =
+    AllocationHdr.C_Currency_ID
+)
+
+WHERE AllocationLine.IsActive = 'Y'
+
+AND AllocationLine.C_Payment_ID = " + paymentIdSql + @"
+
+ORDER BY
+    AllocationHdr.DateAcct,
+    AllocationLine.C_AllocationLine_ID";
+
+                dr = DB.ExecuteReader(
+                    sql,
+                    null,
+                    null
+                );
+
+                List<object> lines = new List<object>();
+
+                while (
+                    dr != null &&
+                    dr.Read()
+                )
+                {
+                    string currencyISO =
+                        GetString(dr, "CurrencyISO", string.Empty);
+
+                    string currencySymbol =
+                        GetString(dr, "CurrencySymbol", string.Empty);
+
+                    if (string.IsNullOrWhiteSpace(currencySymbol))
+                    {
+                        currencySymbol = currencyISO;
+                    }
+
+                    int stdPrecision =
+                        NormalizePrecision(
+                            GetInt(dr, "StdPrecision", 2)
+                        );
+
+                    lines.Add(new
+                    {
+                        invoiceDocumentNo =
+                            GetString(dr, "InvoiceDocumentNo", string.Empty),
+
+                        invoiceDate =
+                            FormatDate(GetNullableDate(dr, "DateInvoiced")),
+
+                        allocationDocumentNo =
+                            GetString(dr, "AllocationDocumentNo", string.Empty),
+
+                        allocationDate =
+                            FormatDate(GetNullableDate(dr, "AllocationDate")),
+
+                        allocatedAmount =
+                            GetDecimal(dr, "AllocatedAmount", 0),
+
+                        discountAmt =
+                            GetDecimal(dr, "DiscountAmt", 0),
+
+                        writeOffAmt =
+                            GetDecimal(dr, "WriteOffAmt", 0),
+
+                        currencyISO =
+                            currencyISO,
+
+                        currencySymbol =
+                            currencySymbol,
+
+                        stdPrecision =
+                            stdPrecision
+                    });
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    error = string.Empty,
+                    lines = lines
+                }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new
+                {
+                    success = false,
+                    error = ex.Message,
+                    errorText = ex.Message
+                }, JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                CloseReader(dr);
+            }
+        }
+
         private SqlQueryData BuildRecentPaymentsSql(
             Ctx ctx
         )
