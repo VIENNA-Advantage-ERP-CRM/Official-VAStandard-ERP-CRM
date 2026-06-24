@@ -2085,29 +2085,6 @@ ORDER BY
              
                
 
-                if (
-                    !string.Equals(
-                        payment.GetDocStatus(),
-                        "CO",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                    &&
-                    !string.Equals(
-                        payment.GetDocStatus(),
-                        "CL",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessagePaymentNotCompleted",
-                            "The AP payment was created but was not completed."
-                        )
-                    );
-                }
-
                 trx.Commit();
 
                 return Json(new
