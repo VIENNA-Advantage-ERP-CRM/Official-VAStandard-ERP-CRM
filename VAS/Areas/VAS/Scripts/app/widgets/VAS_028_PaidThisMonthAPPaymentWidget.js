@@ -970,12 +970,6 @@
                     escapeHtml(row.paymentCurrency || '') +
                     '</td>' +
 
-                    '<td class="vas-ptm-td-amount" title="' +
-                    escapeHtml(amountText) +
-                    '">' +
-                    escapeHtml(amountText) +
-                    '</td>' +
-
                     '<td class="vas-ptm-td-method" title="' +
                     escapeHtml(paymentMethod) +
                     '">' +
@@ -989,6 +983,14 @@
                     escapeHtml(statusText) +
                     '</span>' +
                     '</td>' +
+
+
+                    '<td class="vas-ptm-td-amount" title="' +
+                    escapeHtml(amountText) +
+                    '">' +
+                    escapeHtml(amountText) +
+                    '</td>' +
+
 
                     '</tr>'
                 );
@@ -1360,15 +1362,6 @@
                 ) +
                 '</th>' +
 
-                '<th class="vas-ptm-th-amount">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_028_MessageAmount',
-                        'Amount'
-                    )
-                ) +
-                '</th>' +
-
                 '<th>' +
                 escapeHtml(
                     lbl(
@@ -1386,6 +1379,17 @@
                     )
                 ) +
                 '</th>' +
+
+
+                '<th class="vas-ptm-th-amount">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_028_MessageAmount',
+                        'Amount'
+                    )
+                ) +
+                '</th>' +
+
 
                 '</tr>' +
                 '</thead>' +

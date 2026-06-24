@@ -391,10 +391,10 @@
                     '</td>' +
                     '<td class="vas-scheduled-ap-payment-td-duedate" title="' + escapeHtml(dueDateText) + '">' + escapeHtml(dueDateText) + '</td>' +
                     '<td class="vas-scheduled-ap-payment-td-currency" title="' + escapeHtml(invoiceCurrency) + '">' + escapeHtml(invoiceCurrency) + '</td>' +
-                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
                     '<td class="vas-scheduled-ap-payment-td-method" title="' + escapeHtml(paymentMethodName) + '">' +
                     '<span class="vas-scheduled-ap-payment-truncate">' + escapeHtml(paymentMethodName) + '</span>' +
                     '</td>' +
+                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
                     '</tr>'
                 );
             }
@@ -603,8 +603,8 @@
                 '<th class="vas-scheduled-ap-payment-th-vendor">' + escapeHtml(lbl('VAS_029_MessageVendor', 'Vendor')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-duedate">' + escapeHtml(lbl('VIS_DueDate', 'Due date')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-currency">' + escapeHtml(lbl('VAS_PaymentCurrency', 'Currency')) + '</th>' +
-                '<th class="vas-scheduled-ap-payment-th-amount">' + escapeHtml(lbl('VAS_029_MessageAmount', 'Amount')) + '</th>' +
                 '<th class="vas-scheduled-ap-payment-th-method">' + escapeHtml(lbl('VAS_029_MessageMethod', 'Method')) + '</th>' +
+                '<th class="vas-scheduled-ap-payment-th-amount">' + escapeHtml(lbl('VAS_029_MessageAmount', 'Amount')) + '</th>' +
                 '</tr>' +
                 '</thead>' +
                 '<tbody class="vas-scheduled-ap-payment-dialog-tbody"></tbody>' +

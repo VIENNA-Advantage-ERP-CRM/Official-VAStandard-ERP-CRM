@@ -1260,6 +1260,21 @@
                     escapeHtml(currency) +
                     '</td>' +
 
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-method" ' +
+                    'title="' +
+                    escapeHtml(method) +
+                    '">' +
+                    escapeHtml(method) +
+                    '</td>' +
+
+                    '<td ' +
+                    'class="vas-bounced-ap-payment-td-status">' +
+                    statusHtml +
+                    '</td>' +
+
+
                     '<td ' +
                     'class="vas-bounced-ap-payment-td-amount" ' +
                     'title="' +
@@ -1273,19 +1288,6 @@
                     ) +
                     '">' +
                     amountHtml +
-                    '</td>' +
-
-                    '<td ' +
-                    'class="vas-bounced-ap-payment-td-method" ' +
-                    'title="' +
-                    escapeHtml(method) +
-                    '">' +
-                    escapeHtml(method) +
-                    '</td>' +
-
-                    '<td ' +
-                    'class="vas-bounced-ap-payment-td-status">' +
-                    statusHtml +
                     '</td>' +
 
                     '</tr>'
@@ -1547,15 +1549,6 @@
                 ) +
                 '</th>' +
 
-                '<th class="' +
-                'vas-bounced-ap-payment-th-amount">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_Amount',
-                        'Amount'
-                    )
-                ) +
-                '</th>' +
 
                 '<th>' +
                 escapeHtml(
@@ -1571,6 +1564,17 @@
                     lbl(
                         'VAS_Status',
                         'Status'
+                    )
+                ) +
+                '</th>' +
+
+
+                '<th class="' +
+                'vas-bounced-ap-payment-th-amount">' +
+                escapeHtml(
+                    lbl(
+                        'VAS_Amount',
+                        'Amount'
                     )
                 ) +
                 '</th>' +

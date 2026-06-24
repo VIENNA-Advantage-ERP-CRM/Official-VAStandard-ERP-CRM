@@ -594,6 +594,7 @@
     padding: 18px 24px;
     text-align: left;
     vertical-align: middle;
+    
 }
 
 .vas-cpa-dialog-table th {
@@ -606,7 +607,7 @@
     font-weight: 800;
     letter-spacing: 0.04em;
     line-height: 1.2;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .vas-cpa-dialog-table td {

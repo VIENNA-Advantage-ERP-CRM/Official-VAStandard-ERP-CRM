@@ -2511,6 +2511,7 @@
             createPayDialog();
         }
 
+
         this.init = function (windowNo, frame) {
             $self.windowNo = windowNo || 0;
             $self.frame = frame || null;

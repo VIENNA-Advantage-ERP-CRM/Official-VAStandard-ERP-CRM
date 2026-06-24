@@ -900,15 +900,15 @@
                         escapeHtml(currencyIso) +
                         '</td>' +
 
-                        '<td class="vas-cpa-td-amount">' +
-                        escapeHtml(amountText) +
-                        '</td>' +
 
                         '<td class="vas-cpa-td-method">' +
                         escapeHtml(method) +
                         '</td>' +
 
-                       
+
+                        '<td class="vas-cpa-td-amount">' +
+                        escapeHtml(amountText) +
+                        '</td>' +
 
                         '</tr>'
                     );
@@ -1135,8 +1135,8 @@
                 '<th>' + lbl('VAS_027_messageVendor', 'Vendor') + '</th>' +
                 '<th>' + lbl('VAS_027_messageBankAccount', 'Bank Account') + '</th>' +
                 '<th>' + lbl('VAS_027_messageCurrency', 'Currency') + '</th>' +
-                '<th>' + lbl('VAS_027_messageAmount', 'Amount') + '</th>' +
                 '<th>' + lbl('VAS_027_messageMethod', 'Method') + '</th>' +
+                '<th>' + lbl('VAS_027_messageAmount', 'Amount') + '</th>' +
                 '</tr>' +
                 '</thead>' +
 
