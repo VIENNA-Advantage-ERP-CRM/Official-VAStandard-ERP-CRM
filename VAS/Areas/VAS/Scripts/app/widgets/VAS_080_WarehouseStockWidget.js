@@ -134,18 +134,15 @@
         }
 
         function renderStackedBar(shares, className) {
-            var offset = 0;
-            var rects = ageBands.map(function (band, index) {
+            var spans = ageBands.map(function (band, index) {
                 var width = Math.max(0, shares[index]);
-                var rect = '<rect class="' + band.className + '" x="' + offset.toFixed(2) + '" y="0" width="' + width.toFixed(2) + '" height="1"></rect>';
-                offset += width;
-                return rect;
+                return '<span class="' + band.className + '" style="width:' + width.toFixed(2) + '%"></span>';
             }).join('');
-            return '<svg class="' + className + '" viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true">' + rects + '</svg>';
+            return '<div class="agm-stack">' + spans + '</div>';
         }
 
         function renderBandBar(share, band) {
-            return '<svg viewBox="0 0 100 1" preserveAspectRatio="none" aria-hidden="true"><rect class="' + band.className + '" x="0" y="0" width="' + Math.max(0, share).toFixed(2) + '" height="1"></rect></svg>';
+            return '<div class="agm-fill ' + band.className + '" style="width:' + Math.max(0, share).toFixed(2) + '%"></div>';
         }
 
         function warehouseIcon() {
@@ -258,29 +255,31 @@
             var rows = ageBands.map(function (band, index) {
                 var value = Number(row[band.key] || 0);
                 var amount = formatAmount(value);
-                return '<div class="MPC-ws-age-row">' +
-                    '<span class="MPC-ws-age-label"><i class="' + band.className + '"></i>' + escapeHtml(label(band.messageKey, band.fallback)) + '</span>' +
-                    '<span class="MPC-ws-age-track">' + renderBandBar(shares[index], band) + '</span>' +
-                    '<span class="MPC-ws-age-value"><strong title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</strong><small>' + Math.round(shares[index]) + '% ' + escapeHtml(label('VAS_OfValue', 'of value')) + '</small></span>' +
+                return '<div class="agm-row">' +
+                    '<div class="agm-lab"><div class="agm-dot ' + band.className + '"></div>' + escapeHtml(label(band.messageKey, band.fallback)) + '</div>' +
+                    '<div class="agm-track">' + renderBandBar(shares[index], band) + '</div>' +
+                    '<div class="agm-val"><span title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</span><small>' + Math.round(shares[index]) + '% ' + escapeHtml(label('VAS_OfValue', 'of value')) + '</small></div>' +
                 '</div>';
             }).join('');
 
             $modalBadge.text(formatQty(row.total_qty) + ' ' + label('VAS_Units', 'units'));
             $modalBody.html(
-                '<div class="MPC-ws-age-total"><strong title="' + escapeHtml(formatAmount(totalValue)) + '">' + escapeHtml(formatAmount(totalValue)) + '</strong><span>' + escapeHtml(label('VAS_TotalCarryingValueLocator', 'total carrying value in this locator')) + '</span></div>' +
-                '<div class="MPC-ws-age-stack">' + stack + '</div>' +
-                '<div class="MPC-ws-age-rows">' + rows + '</div>'
+                '<div class="agm">' +
+                    '<div class="agm-total"><div class="v" title="' + escapeHtml(formatAmount(totalValue)) + '">' + escapeHtml(formatAmount(totalValue)) + '</div><div class="l">' + escapeHtml(label('VAS_TotalCarryingValueLocator', 'total carrying value in this locator')) + '</div></div>' +
+                    '<div class="agm-stack">' + stack + '</div>' +
+                    '<div class="agm-rows">' + rows + '</div>' +
+                '</div>'
             );
 
-            $modal.addClass('MPC-ws-modal-open').attr('aria-hidden', 'false');
-            $('body').addClass('MPC-ws-body-lock');
-            $modal.find('.MPC-ws-modal-close').trigger('focus');
+            $modal.addClass('open').attr('aria-hidden', 'false');
+            $('body').addClass('MPC-product-search-modal-open');
+            $modal.find('.modal-close').trigger('focus');
         }
 
         function closeAgeModal() {
             if (!$modal) { return; }
-            $modal.removeClass('MPC-ws-modal-open').attr('aria-hidden', 'true');
-            $('body').removeClass('MPC-ws-body-lock');
+            $modal.removeClass('open').attr('aria-hidden', 'true');
+            $('body').removeClass('MPC-product-search-modal-open');
         }
 
         function showError() {
@@ -360,21 +359,25 @@
             $root.append($card);
 
             $modal = $(
-                '<div class="MPC-ws-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="MPC-ws-modal-title-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' +
-                    '<div class="MPC-ws-modal-scrim"></div>' +
-                    '<div class="MPC-ws-modal-dialog">' +
-                        '<div class="MPC-ws-modal-header">' +
-                            '<span id="MPC-ws-modal-title-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' + escapeHtml(label('VAS_InventoryValueByAge', 'Inventory Value by Age')) + '</span>' +
-                            '<span class="MPC-ws-modal-badge"></span>' +
-                            '<button type="button" class="MPC-ws-modal-close" aria-label="' + escapeHtml(label('Close', 'Close')) + '">\u00d7</button>' +
+                '<div class="modal-wrap" id="wsModalWrap-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' +
+                    '<div class="modal-scrim"></div>' +
+                    '<div class="modal">' +
+                        '<div class="modal-title">' +
+                            '<div class="mt-left">' +
+                                '<h3 id="wsModalTitle-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget') + '">' + escapeHtml(label('VAS_InventoryValueByAge', 'Inventory Value by Age')) + '</h3>' +
+                                '<span class="mt-badge"></span>' +
+                            '</div>' +
+                            '<button type="button" class="modal-close" aria-label="' + escapeHtml(label('Close', 'Close')) + '">' +
+                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>' +
+                            '</button>' +
                         '</div>' +
-                        '<div class="MPC-ws-modal-body"></div>' +
+                        '<div class="modal-body"></div>' +
                     '</div>' +
                 '</div>'
             );
 
-            $modalBadge = $modal.find('.MPC-ws-modal-badge');
-            $modalBody = $modal.find('.MPC-ws-modal-body');
+            $modalBadge = $modal.find('.mt-badge');
+            $modalBody = $modal.find('.modal-body');
             $('body').append($modal);
 
             $warehouseSelect.on('change', function () {
@@ -397,7 +400,7 @@
                 if (row) { openAgeModal(row); }
             });
 
-            $modal.on('click', '.MPC-ws-modal-close, .MPC-ws-modal-scrim', closeAgeModal);
+            $modal.on('click', '.modal-close, .modal-scrim', closeAgeModal);
             $(document).on('keydown.MPCWarehouseStock-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget'), function (event) {
                 if (event.key === 'Escape') { closeAgeModal(); }
             });
