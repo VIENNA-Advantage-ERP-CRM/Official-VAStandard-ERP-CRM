@@ -1922,7 +1922,7 @@ ORDER BY
                         " AND AD_Client_ID IN (0, " +
                         ctx.GetAD_Client_ID().ToString(
                             CultureInfo.InvariantCulture
-                        ) + ")" ,
+                        ) + ")",
                         null,
                         trx
                     )
@@ -2082,35 +2082,28 @@ ORDER BY
                     );
                 }
 
-                if (!payment.ProcessIt(
-                    VAdvantage.Process
-                        .DocActionVariables
-                        .ACTION_COMPLETE
-                ))
-                {
-                    string processMessage =
-                        payment.GetProcessMsg();
+             
+               
 
-                    if (string.IsNullOrWhiteSpace(
-                        processMessage
-                    ))
-                    {
-                        processMessage =
-                            "Could not complete AP payment.";
-                    }
-
-                    throw new InvalidOperationException(
-                        processMessage
-                    );
-                }
-
-                if (!payment.Save())
+                if (
+                    !string.Equals(
+                        payment.GetDocStatus(),
+                        "CO",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    &&
+                    !string.Equals(
+                        payment.GetDocStatus(),
+                        "CL",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     throw new InvalidOperationException(
-                        GetLastModelError(
+                        GetMsg(
                             ctx,
-                            "VAS_031_MessageCouldNotCompleteAPPayment",
-                            "Could not complete AP payment."
+                            "VAS_031_MessagePaymentNotCompleted",
+                            "The AP payment was created but was not completed."
                         )
                     );
                 }

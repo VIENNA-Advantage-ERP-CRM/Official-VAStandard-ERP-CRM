@@ -94,6 +94,7 @@
 
         var selectedRun = null;
         var selectedInvoiceRow = null;
+        var currentTenderType = null;
 
         var pageNo = 1;
         var pageSize = 3;
@@ -1829,7 +1830,6 @@
             var bankAccountId;
             var conversionTypeId;
             var docTypeId;
-            var tenderType;
             var paymentMethodId;
 
             var html;
@@ -1935,7 +1935,7 @@
                     );
             }
 
-            tenderType =
+            currentTenderType =
                 getValidLookupValue(
                     tenderTypes,
                     firstValue(
@@ -1944,8 +1944,8 @@
                     )
                 );
 
-            if (!tenderType) {
-                tenderType =
+            if (!currentTenderType) {
+                currentTenderType =
                     getFirstLookupValue(
                         tenderTypes
                     );
@@ -2555,7 +2555,7 @@
                 ),
 
                 tenderType: String(
-                    tenderType || ''
+                    currentTenderType || ''
                 ).trim(),
 
                 paymentMethodId: Number(

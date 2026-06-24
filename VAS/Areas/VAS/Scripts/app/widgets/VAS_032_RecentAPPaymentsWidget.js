@@ -436,10 +436,6 @@
                 $dialogGrid.html(gridHtml);
             }
 
-            if ($dialogAllocSection) {
-                $dialogAllocSection.hide();
-            }
-
             if ($dialogAllocWrap) {
                 $dialogAllocWrap.empty();
             }
@@ -447,9 +443,7 @@
             $dialog.show();
             $('body').addClass('vas-recent-ap-payments-body-lock');
 
-            if (payment.paymentId) {
-                loadAllocationDetail(payment);
-            }
+            loadAllocationDetail(payment);
         }
 
         function closeDialog() {
@@ -543,13 +537,20 @@
                 return;
             }
 
+            $dialogAllocSection.show();
+
+            var paymentId = payment && Number(payment.paymentId);
+
+            if (!paymentId || paymentId <= 0) {
+                renderAllocationDetail(null, payment);
+                return;
+            }
+
             $dialogAllocWrap.html(
                 '<div class="vas-recent-ap-payments-alloc-loading">' +
                 escapeHtml(lbl('VAS_032_MessageLoading', 'Loading')) +
                 '&hellip;</div>'
             );
-
-            $dialogAllocSection.show();
 
             $.ajax({
                 url:
@@ -561,7 +562,7 @@
                 cache: false,
 
                 data: {
-                    paymentId: payment.paymentId
+                    paymentId: paymentId
                 },
 
                 success: function (response) {
@@ -572,9 +573,7 @@
                 },
 
                 error: function () {
-                    if ($dialogAllocSection) {
-                        $dialogAllocSection.hide();
-                    }
+                    renderAllocationDetail(null, payment);
                 }
             });
         }
@@ -605,7 +604,11 @@
                 !$.isArray(data.lines) ||
                 data.lines.length === 0
             ) {
-                $dialogAllocSection.hide();
+                $dialogAllocWrap.html(
+                    '<div class="vas-recent-ap-payments-alloc-empty">' +
+                    escapeHtml(lbl('VAS_032_AllocNoData', 'No data')) +
+                    '</div>'
+                );
                 return;
             }
 
@@ -815,6 +818,356 @@
             }
 
             return currencyISO ? amount + ' ' + currencyISO : amount;
+        }
+        function renderAllocationLinesTable(
+            lines,
+            header
+        ) {
+            var html = '';
+            var index;
+            var line;
+            var amountText;
+            var discountText;
+            var writeOffText;
+            var totalText;
+
+            if (!lines || lines.length === 0) {
+                return (
+                    '<div class="vas-allocation-empty">' +
+                    'No allocation lines found.' +
+                    '</div>'
+                );
+            }
+
+            html +=
+                '<div class="vas-allocation-lines-table-wrap">' +
+                '<table class="vas-allocation-lines-table">' +
+                '<thead>' +
+                '<tr>' +
+                '<th>INVOICE NO.</th>' +
+                '<th>VENDOR</th>' +
+                '<th>INVOICE DATE</th>' +
+                '<th>DUE DATE</th>' +
+                '<th>AMOUNT</th>' +
+                '<th>DISCOUNT</th>' +
+                '<th>WRITEOFF</th>' +
+                '<th>TOTAL ALLOCATED</th>' +
+                '</tr>' +
+                '</thead>' +
+                '<tbody>';
+
+            for (index = 0; index < lines.length; index++) {
+                line = lines[index] || {};
+
+                amountText = formatCurrencyAmount(
+                    line.amount || 0,
+                    header.currencySymbol,
+                    header.currencyISO,
+                    header.stdPrecision
+                );
+
+                discountText = formatCurrencyAmount(
+                    line.discountAmt || 0,
+                    header.currencySymbol,
+                    header.currencyISO,
+                    header.stdPrecision
+                );
+
+                writeOffText = formatCurrencyAmount(
+                    line.writeOffAmt || 0,
+                    header.currencySymbol,
+                    header.currencyISO,
+                    header.stdPrecision
+                );
+
+                totalText = formatCurrencyAmount(
+                    line.allocatedTotal || 0,
+                    header.currencySymbol,
+                    header.currencyISO,
+                    header.stdPrecision
+                );
+
+                html +=
+                    '<tr>' +
+                    '<td>' +
+                    escapeHtml(
+                        firstValue(
+                            line.invoiceDocumentNo,
+                            ''
+                        )
+                    ) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(
+                        firstValue(
+                            line.vendorName,
+                            ''
+                        )
+                    ) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(
+                        firstValue(
+                            line.invoiceDate,
+                            ''
+                        )
+                    ) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(
+                        firstValue(
+                            line.dueDate,
+                            ''
+                        )
+                    ) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(amountText) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(discountText) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(writeOffText) +
+                    '</td>' +
+
+                    '<td>' +
+                    escapeHtml(totalText) +
+                    '</td>' +
+                    '</tr>';
+            }
+
+            html +=
+                '</tbody>' +
+                '</table>' +
+                '</div>';
+
+            return html;
+        }
+
+
+        function openAllocationPopup(paymentRow) {
+            var paymentId;
+
+            paymentId = Number(
+                paymentRow &&
+                (
+                    paymentRow.paymentId ||
+                    paymentRow.cPaymentId ||
+                    paymentRow.C_Payment_ID
+                )
+            );
+
+            if (!paymentId || paymentId <= 0) {
+                VIS.ADialog.error(
+                    'Payment ID is required.'
+                );
+                return;
+            }
+
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_031_UpcomingAPRunsWidget/GetPaymentAllocationDetails',
+
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+
+                data: {
+                    paymentId: paymentId
+                },
+
+                success: function (response) {
+                    var data = normalizeResponse(response);
+
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
+                        VIS.ADialog.error(
+                            (
+                                data &&
+                                (
+                                    data.error ||
+                                    data.errorText
+                                )
+                            ) ||
+                            'Could not load allocation details.'
+                        );
+                        return;
+                    }
+
+                    renderAllocationPopup(data);
+                },
+
+                error: function () {
+                    VIS.ADialog.error(
+                        'Could not load allocation details.'
+                    );
+                }
+            });
+        }
+
+        function renderAllocationPopup(data) {
+            var header = data.header || {};
+            var lines = $.isArray(data.lines)
+                ? data.lines
+                : [];
+
+            var payAmtText = formatCurrencyAmount(
+                header.payAmt || 0,
+                header.currencySymbol,
+                header.currencyISO,
+                header.stdPrecision
+            );
+
+            var allocatedAmtText = formatCurrencyAmount(
+                header.allocatedAmt || 0,
+                header.currencySymbol,
+                header.currencyISO,
+                header.stdPrecision
+            );
+
+            var html =
+                '<div class="vas-allocation-popup">' +
+
+                '<div class="vas-allocation-popup-header">' +
+                '<div class="vas-allocation-popup-title">' +
+                escapeHtml(
+                    firstValue(
+                        header.documentNo,
+                        'Payment'
+                    )
+                ) +
+                ' · ' +
+                escapeHtml(
+                    firstValue(
+                        header.description,
+                        header.vendorName,
+                        ''
+                    )
+                ) +
+                '</div>' +
+
+                '<div class="vas-allocation-popup-subtitle">' +
+                'Posted · ' +
+                escapeHtml(
+                    firstValue(
+                        header.postedDate,
+                        header.dateTrx,
+                        ''
+                    )
+                ) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-allocation-summary-card">' +
+
+                '<div class="vas-allocation-summary-grid">' +
+
+                '<div class="vas-summary-item">' +
+                '<div class="vas-summary-label">PAYMENT NO.</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(
+                    firstValue(
+                        header.documentNo,
+                        ''
+                    )
+                ) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-summary-item">' +
+                '<div class="vas-summary-label">DATE</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(
+                    firstValue(
+                        header.dateTrx,
+                        ''
+                    )
+                ) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-summary-item">' +
+                '<div class="vas-summary-label">STATUS</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(
+                    firstValue(
+                        header.statusText,
+                        header.docStatus,
+                        ''
+                    )
+                ) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-summary-item">' +
+                '<div class="vas-summary-label">ORGANIZATION</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(
+                    firstValue(
+                        header.organizationName,
+                        ''
+                    )
+                ) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-summary-item">' +
+                '<div class="vas-summary-label">PAYMENT AMOUNT</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(payAmtText) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-summary-item">' +
+                '<div class="vas-summary-label">ALLOCATED</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(allocatedAmtText) +
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-summary-item vas-summary-wide">' +
+                '<div class="vas-summary-label">DESCRIPTION</div>' +
+                '<div class="vas-summary-value">' +
+                escapeHtml(
+                    firstValue(
+                        header.description,
+                        header.vendorName,
+                        ''
+                    )
+                ) +
+                '</div>' +
+                '</div>' +
+
+                '</div>' +
+                '</div>' +
+
+                '<div class="vas-allocation-lines-title">' +
+                'ALLOCATION LINES' +
+                '</div>' +
+
+                renderAllocationLinesTable(
+                    lines,
+                    header
+                ) +
+
+                '</div>';
+
+            VIS.ADialog.info(
+                html,
+                true,
+                'Allocation Details'
+            );
         }
 
         function showBusy(show) {
