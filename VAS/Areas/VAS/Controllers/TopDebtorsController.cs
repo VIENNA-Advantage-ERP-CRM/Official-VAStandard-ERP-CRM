@@ -35,14 +35,16 @@ namespace VIS.Controllers
             /* Base (accounting-schema) currency for the client. CurSymbol falls back to the
                ISO code when no display symbol is configured; every outstanding amount below is
                converted into this currency, so the symbol applies to all figures shown. */
-            string schemaCurrencySql = @"
+            string schemaCurrencySql = $@"
                 SELECT ci.AD_Client_ID,
                        acc.C_Currency_ID AS Acct_Currency_ID,
                        cur.StdPrecision,
+                       cur.ISO_Code AS ISO_Code,
                        CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema acc ON (ci.C_AcctSchema1_ID=acc.C_AcctSchema_ID)
-                INNER JOIN C_Currency cur ON (acc.C_Currency_ID=cur.C_Currency_ID)";
+                INNER JOIN C_Currency cur ON (acc.C_Currency_ID=cur.C_Currency_ID)
+                WHERE ci.AD_Client_ID = {ctx.GetAD_Client_ID()}";
 
             /* Days overdue = today − DueDate, built per database dialect.
                PostgreSQL: a plain DATE − DATE resolves to an INTERVAL, which cannot be compared
@@ -134,7 +136,8 @@ namespace VIS.Controllers
                and base-currency symbol. */
             string precisionDataSql = @"
                 SELECT MAX(StdPrecision) AS Prec,
-                       MAX(Cur_Symbol) AS Cur_Symbol
+                       MAX(Cur_Symbol) AS Cur_Symbol,
+                       MAX(ISO_Code) AS ISO_Code
                 FROM schema_currency";
 
             string sql = @"
@@ -151,13 +154,17 @@ namespace VIS.Controllers
                        co.Customer_Name,
                        ROUND(co.Total_Outstanding_Amount, p.Prec) AS Total_Outstanding_Amount,
                        co.Max_Days_Overdue,
-                       p.Cur_Symbol AS Currency_Symbol
+                       p.Cur_Symbol AS Currency_Symbol,
+                       p.ISO_Code AS ISO_Code,
+                       p.Prec AS Std_Precision
                 FROM customer_outstanding co
                 CROSS JOIN precision_data p
                 ORDER BY Total_Outstanding_Amount DESC
                 FETCH FIRST 5 ROWS ONLY";
 
             string currencySymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
             var rows = new List<object>();
 
             IDataReader dr = null;
@@ -166,10 +173,15 @@ namespace VIS.Controllers
                 dr = DB.ExecuteReader(sql);
                 while (dr != null && dr.Read())
                 {
-                    /* Symbol is identical on every row (CROSS JOIN); capture it once. */
+                    /* Symbol/ISO/precision are identical on every row (CROSS JOIN); capture once. */
                     if (string.IsNullOrEmpty(currencySymbol))
                     {
                         currencySymbol = Util.GetValueOfString(dr["Currency_Symbol"]);
+                        isoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                        if (dr["Std_Precision"] != null && dr["Std_Precision"] != System.DBNull.Value)
+                        {
+                            stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]);
+                        }
                     }
 
                     int maxDaysOverdue = Util.GetValueOfInt(dr["Max_Days_Overdue"]);
@@ -194,7 +206,7 @@ namespace VIS.Controllers
 
             /* Return the base-currency symbol alongside the rows so the widget can render it
                before each amount regardless of the user's browser locale. */
-            return Json(JsonConvert.SerializeObject(new { symbol = currencySymbol, rows = rows }), JsonRequestBehavior.AllowGet);
+            return Json(JsonConvert.SerializeObject(new { symbol = currencySymbol, isoCode = isoCode, stdPrecision = stdPrecision, rows = rows }), JsonRequestBehavior.AllowGet);
         }
     }
 }

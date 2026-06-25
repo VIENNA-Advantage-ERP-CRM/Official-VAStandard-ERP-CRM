@@ -257,6 +257,10 @@
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_042_GLJournalVolumeWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_067_APInvoiceSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_068_APPaymentSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_069_CashJournalSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
@@ -291,6 +295,10 @@
     <Compile Include="Areas\VAS\Controllers\VTrxMaterialController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
+    <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
+    <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_032_RecentAPPaymentsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_033_PaymentMethodsWidget.js" />
@@ -454,6 +462,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\CurrencyFormat.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />

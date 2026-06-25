@@ -66,6 +66,9 @@
         var $contentArea;
         /* Base-currency symbol from the backend; prefixed before every amount. */
         var currencySymbol = '';
+        /* Base-currency ISO code (drives Indian vs international abbreviation) and precision. */
+        var currencyIso = '';
+        var currencyPrecision = null;
         /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
         var $busy;
 
@@ -103,28 +106,14 @@
             });
         }
 
-        /* ── Format the numeric part of an amount (k / M abbreviations) ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-
-            var sign = value < 0 ? '-' : '';
-            var absVal = Math.abs(value);
-
-            if (absVal >= 1000000) {
-                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return sign + Math.round(absVal / 1000) + 'k';
-            }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
-        }
-
         /* Build amount markup with the base-currency symbol placed *before* the amount;
-           the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
+           the minus sign (if any) precedes the symbol (e.g. -$1.2M). The compact
+           magnitude (Indian vs international numbering by base currency, kept to the
+           currency precision) comes from VIS.Util.formatCompactAmount. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var absStr = formatCurrency(Math.abs(value));
+            var absStr = VIS.Util.formatCompactAmount(value, currencyIso, currencyPrecision);
             var symHtml = symbol ? '<span class="vas-ar-cur">' + symbol + '</span>' : '';
             return sign + symHtml + absStr;
         }
@@ -159,6 +148,8 @@
             var r = Array.isArray(data) ? data[0] : data; // Handle both arrays and single objects safely
 
             currencySymbol = r.symbol || '';
+            currencyIso = r.isoCode || '';
+            currencyPrecision = (r.stdPrecision === undefined || r.stdPrecision === null) ? null : r.stdPrecision;
 
             var notDue = r.notDueAmount || 0;
             var days1_30 = r.days1To30Amount || 0;
