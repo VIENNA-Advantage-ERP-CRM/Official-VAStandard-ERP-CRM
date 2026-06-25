@@ -81,7 +81,7 @@
     line-height: 1.2;
     font-weight: 400;
     letter-spacing: 0;
-    color: rgba(255, 255, 255, 0.68);
+    color: #102C3F;
 }
 
 .VAS_current-cash-cash-journal-filter {
@@ -466,7 +466,7 @@
 }
 
 .VAS_current-cash-cash-journal-label {
-    color: #60748A;
+    color: #102C3F;
 }
 
 .VAS_current-cash-cash-journal-filter {
