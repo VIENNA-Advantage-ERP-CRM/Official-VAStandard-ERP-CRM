@@ -557,7 +557,7 @@
 .vas-recent-ap-payments-dialog-card {
     position: relative;
     width: 100%;
-    max-width: 45em;
+    max-width: 76em;
     max-height: 86vh;
     overflow: hidden;
     display: flex;
@@ -828,9 +828,7 @@
  * ========================================================= */
 
 .vas-recent-ap-payments-dialog-alloc-section {
-    border-top: 1px solid #edf2f6;
     margin: 0 1.375em;
-    padding-bottom: 1.25em;
 }
 
 .vas-recent-ap-payments-dialog-alloc-label {
@@ -839,7 +837,7 @@
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: 0.05em;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .vas-recent-ap-payments-alloc-loading {
@@ -859,27 +857,39 @@
 .vas-recent-ap-payments-alloc-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8125em;
+    table-layout: fixed;
 }
 
     .vas-recent-ap-payments-alloc-table thead th {
-        padding: 0 0.625em 0.5em;
-        border-bottom: 1px solid #d0dae3;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 1em 0.75em;
+        border-bottom: 1px solid #edf2f6;
+        background: #ffffff;
         color: #748494;
-        font-size: 0.875em;
-        font-weight: 500;
-        letter-spacing: 0.04em;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1.2;
         text-align: left;
-        text-transform: uppercase;
+        text-transform: capitalize;
         white-space: nowrap;
     }
 
     .vas-recent-ap-payments-alloc-table tbody td {
-        padding: 0.625em;
+        padding: 0.875em 0.75em;
         border-bottom: 1px solid #edf2f6;
         color: #102c3f;
-        line-height: 1.3;
+        font-size: 0.875em;
+        line-height: 1.2;
         vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas-recent-ap-payments-alloc-table tbody tr:hover td {
+        background: #f8fbfe;
     }
 
     .vas-recent-ap-payments-alloc-table tbody tr:last-child td {
@@ -887,10 +897,12 @@
     }
 
     .vas-recent-ap-payments-alloc-table tfoot td {
-        padding: 0.625em;
-        border-top: 2px solid #d0dae3;
+        padding: 0.875em 0.75em;
+        border-top: 2px solid #edf2f6;
         color: #102c3f;
-        line-height: 1.3;
+        font-size: 0.875em;
+        font-weight: 700;
+        line-height: 1.2;
         vertical-align: middle;
     }
 
@@ -1042,29 +1054,40 @@
 .vas-allocation-lines-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
     background: #ffffff;
-    border: 1px solid #edf2f6;
-    border-radius: 0.875em;
-    overflow: hidden;
 }
 
     .vas-allocation-lines-table thead th {
-        background: #fbfdff;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 1em 0.75em;
+        border-bottom: 1px solid #edf2f6;
+        background: #ffffff;
         color: #748494;
         font-size: 0.75em;
         font-weight: 700;
-        letter-spacing: 0.04em;
+        line-height: 1.2;
         text-align: left;
-        padding: 0.875em 1em;
-        border-bottom: 1px solid #edf2f6;
         text-transform: capitalize;
+        white-space: nowrap;
     }
 
     .vas-allocation-lines-table tbody td {
-        padding: 0.875em 1em;
-        border-top: 1px solid #edf2f6;
+        padding: 0.875em 0.75em;
+        border-bottom: 1px solid #edf2f6;
         font-size: 0.875em;
         color: #102c3f;
+        line-height: 1.2;
+        vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas-allocation-lines-table tbody tr:hover td {
+        background: #f8fbfe;
     }
 
 .vas-allocation-empty {
