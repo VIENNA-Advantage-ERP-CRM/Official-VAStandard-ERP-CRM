@@ -312,3 +312,19 @@
     background: #FBFDFF;
     border: 1px solid #E4EDF4;
 }
+
+/* ── Hover expand ─────────────────────────────────────────────────────── */
+.VAS_net-cash-cash-journal-label { cursor: default; }
+.VAS_net-cash-cash-journal-label:hover {
+    overflow: visible; white-space: normal; word-break: break-word;
+    position: relative; z-index: 30;
+    background: rgba(255,255,255,0.98);
+    box-shadow: 0 4px 16px rgba(15,61,97,0.14);
+    border-radius: 6px; padding: 0.25em 0.5em; margin: -0.25em -0.5em;
+}
+
+@container (max-width: 16em) {
+    .VAS_net-cash-cash-journal-value {
+        font-size: 1em;
+    }
+}

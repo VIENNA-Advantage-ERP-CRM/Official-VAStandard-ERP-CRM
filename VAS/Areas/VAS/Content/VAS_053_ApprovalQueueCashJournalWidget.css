@@ -284,8 +284,8 @@
 }
 
 .VAS_053_approval-side {
-    min-width: 11em;
-    flex: 0 0 11em;
+    min-width: 13em;
+    flex: 0 0 13em;
     align-self: stretch;
     display: flex;
     flex-direction: column;
@@ -538,4 +538,24 @@
     font-weight: 700;
     color: #141414;
     font-variant-numeric: tabular-nums;
+}
+
+/* ── Hover expand: show full text on pointer-over ─────────────────────── */
+.VAS_053_approval-row-title,
+.VAS_053_approval-row-sub {
+    cursor: default;
+}
+
+.VAS_053_approval-row-title:hover,
+.VAS_053_approval-row-sub:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    position: relative;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
+    border-radius: 6px;
+    padding: 0.25em 0.5em;
+    margin: -0.25em -0.5em;
 }

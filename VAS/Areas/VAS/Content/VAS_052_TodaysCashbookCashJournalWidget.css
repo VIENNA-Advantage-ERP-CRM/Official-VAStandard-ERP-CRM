@@ -131,12 +131,29 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
+}
+
+.VAS_052_cashbook-body::-webkit-scrollbar {
+    height: 4px;
+}
+
+.VAS_052_cashbook-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.VAS_052_cashbook-body::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(16, 44, 63, 0.18);
 }
 
 /* Table */
 .VAS_052_cashbook-table {
     width: 100%;
+    min-width: 48em;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0;
@@ -201,7 +218,7 @@
 }
 
 .VAS_052_cashbook-col-amount {
-    width: 7em;
+    width: 12em;
     text-align: right !important;
     font-weight: 800 !important;
     font-variant-numeric: tabular-nums;
@@ -517,4 +534,20 @@
     font-size: 1em;
     font-weight: 700;
     color: #141414;
+}
+
+/* ── Hover expand: show full cell text on pointer-over ─────────────────── */
+.VAS_052_cashbook-table td {
+    cursor: default;
+}
+
+.VAS_052_cashbook-table td:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    position: relative;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
+    border-radius: 6px;
 }

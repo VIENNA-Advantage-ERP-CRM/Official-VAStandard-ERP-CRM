@@ -111,6 +111,55 @@
     cursor: pointer;
 }
 
+/* Scroll body — wraps col-headers + rows so both scroll together */
+.VAS_054_counterparties-body {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
+}
+
+.VAS_054_counterparties-body::-webkit-scrollbar {
+    height: 4px;
+}
+
+.VAS_054_counterparties-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.VAS_054_counterparties-body::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(16, 44, 63, 0.18);
+}
+
+/* Column headers */
+.VAS_054_counterparties-col-headers {
+    flex: 0 0 auto;
+    min-width: 36em;
+    display: grid;
+    grid-template-columns: 2em minmax(8em, 1fr) 6em 2.5em 6em auto;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0 0.5em 0.5em;
+    border-bottom: 1px solid rgba(212, 225, 234, 0.72);
+    color: #748494;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.col-h-txns,
+.col-h-volume {
+    justify-self: end;
+    text-align: right;
+}
+
 .VAS_054_counterparties-list {
     min-width: 0;
     min-height: 0;
@@ -122,10 +171,10 @@
 
 .VAS_054_counterparties-row {
     width: 100%;
-    min-width: 0;
+    min-width: 36em;
     flex: 1 1 0;
     display: grid;
-    grid-template-columns: 2em minmax(0, 1fr) 6em 2.5em 6em auto;
+    grid-template-columns: 2em minmax(8em, 1fr) 6em 2.5em 6em auto;
     align-items: center;
     gap: 0.75em;
     padding: 0.5em 0.5em;
@@ -187,28 +236,33 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 0.25em 0.625em;
+    padding: 0.3em 0.75em;
     border-radius: 7px;
+    border: 1px solid transparent;
     font-size: 0.625em;
     line-height: 1.1;
     font-weight: 800;
     letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .VAS_054_counterparties-chip-vendor {
-    background: rgba(164, 67, 67, 0.11);
+    background: rgba(164, 67, 67, 0.08);
+    border-color: rgba(164, 67, 67, 0.35);
     color: #9F4545;
 }
 
 .VAS_054_counterparties-chip-customer {
-    background: rgba(12, 116, 87, 0.09);
+    background: rgba(12, 116, 87, 0.07);
+    border-color: rgba(12, 116, 87, 0.35);
     color: #2D7555;
 }
 
 .VAS_054_counterparties-chip-bank,
 .VAS_054_counterparties-chip-cashbook,
 .VAS_054_counterparties-chip-other {
-    background: rgba(0, 120, 212, 0.10);
+    background: rgba(0, 120, 212, 0.07);
+    border-color: rgba(0, 120, 212, 0.30);
     color: #2C6EAA;
 }
 
@@ -427,6 +481,7 @@
 }
 
 @container (max-width: 38em) {
+    .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
         grid-template-columns: 2em minmax(0, 1fr) 5.5em 2em 4.5em auto;
         gap: 0.5em;
@@ -445,10 +500,12 @@
     }
 
     .VAS_054_counterparties-action,
-    .VAS_054_counterparties-spark-wrap {
+    .VAS_054_counterparties-spark-wrap,
+    .col-h-trend {
         display: none;
     }
 
+    .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
         grid-template-columns: 2em minmax(0, 1fr) 5em 2em auto;
     }
@@ -506,4 +563,22 @@
     font-size: 1em;
     font-weight: 700;
     color: #141414;
+}
+
+/* ── Hover expand: show full counterparty name on pointer-over ─────────── */
+.VAS_054_counterparties-name {
+    cursor: default;
+}
+
+.VAS_054_counterparties-name:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    position: relative;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
+    border-radius: 6px;
+    padding: 0.25em 0.5em;
+    margin: -0.25em -0.5em;
 }

@@ -45,7 +45,7 @@
         var $pageText = null;
 
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 4;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -228,10 +228,27 @@
                 'text': lbl('VAS_054_Last30Days', 'Last 30 Days')
             });
 
+            var $body = $('<div>', {
+                'class': 'VAS_054_counterparties-body'
+            });
+
+            var $colHeaders = $('<div>', {
+                'class': 'VAS_054_counterparties-col-headers'
+            });
+
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-avatar' }).appendTo($colHeaders);
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-party',  'text': lbl('VAS_054_ColParty',  'Party')    }).appendTo($colHeaders);
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-type',   'text': lbl('VAS_054_ColType',   'Type')     }).appendTo($colHeaders);
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-txns',   'text': lbl('VAS_054_ColTxns',   'Txns')     }).appendTo($colHeaders);
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-trend',  'text': lbl('VAS_054_ColTrend',  '30D Trend') }).appendTo($colHeaders);
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-volume', 'text': lbl('VAS_054_ColVolume', 'Volume')   }).appendTo($colHeaders);
+
             var $list = $('<div>', {
                 'class': 'VAS_054_counterparties-list',
                 'id': 'VAS_054_counterparties-list-' + widgetId
             });
+
+            $body.append($colHeaders).append($list);
 
             var $state = $('<div>', {
                 'class': 'VAS_054_counterparties-state',
@@ -296,7 +313,7 @@
             $card
                 .append($busy)
                 .append($header)
-                .append($list)
+                .append($body)
                 .append($footer)
                 .append($state);
 
