@@ -100,22 +100,18 @@
 }
 
 .VAS_current-cash-cash-journal-select {
-    min-width: 0;
-    max-width: 9em;
-    border: 0;
-    outline: 0;
+
+    appearance: none;
     background: transparent;
+    border: 0;
     color: inherit;
+    cursor: pointer;
     font: inherit;
     font-size: 0.6875em;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    appearance: none;
-    cursor: pointer;
+    padding: 0px;
+    width: 100%;
+    min-width: 0;
+    outline: 0;
 }
 
     .VAS_current-cash-cash-journal-select option {
