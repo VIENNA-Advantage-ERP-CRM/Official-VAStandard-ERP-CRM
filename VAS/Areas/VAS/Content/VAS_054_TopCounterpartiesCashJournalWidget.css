@@ -142,7 +142,7 @@
     flex: 0 0 auto;
     min-width: 36em;
     display: grid;
-    grid-template-columns: 2em minmax(8em, 1fr) 6em 2.5em 6em auto;
+    grid-template-columns: 2em minmax(0, 1fr) 6em 2.5em 6em minmax(9em, auto);
     align-items: center;
     gap: 0.75em;
     padding: 0 0.5em 0.5em;
@@ -174,7 +174,7 @@
     min-width: 36em;
     flex: 1 1 0;
     display: grid;
-    grid-template-columns: 2em minmax(8em, 1fr) 6em 2.5em 6em auto;
+    grid-template-columns: 2em minmax(0, 1fr) 6em 2.5em 6em minmax(9em, auto);
     align-items: center;
     gap: 0.75em;
     padding: 0.5em 0.5em;
@@ -507,7 +507,7 @@
 
     .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
-        grid-template-columns: 2em minmax(0, 1fr) 5em 2em auto;
+        grid-template-columns: 2em minmax(0, 1fr) 5em 2em minmax(7em, auto);
     }
 
     .VAS_054_counterparties-icon {
