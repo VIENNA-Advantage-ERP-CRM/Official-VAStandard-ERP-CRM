@@ -37,7 +37,7 @@
         var isDisposed = false;
         var ajaxRequest = null;
         var pageNo = 1;
-        var pageSize = 2;
+        var pageSize = 3;
         var totalPages = 0;
 
         function lbl(key, fallback) {
