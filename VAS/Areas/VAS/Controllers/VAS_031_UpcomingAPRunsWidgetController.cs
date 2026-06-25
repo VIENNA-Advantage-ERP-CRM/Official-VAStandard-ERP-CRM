@@ -229,7 +229,7 @@ namespace VAS.Controllers
                 : "CURRENT_DATE + 7";
 
             /*
-             * MRole is applied only to the physical C_Invoice table.
+             * Apply role security only to physical C_Invoice table.
              */
             string invoiceAccessSql = @"
 SELECT
@@ -247,18 +247,34 @@ SELECT
     Invoice.DateAcct,
     Invoice.GrandTotal,
     Invoice.VA009_PaymentMethod_ID
+
 FROM C_Invoice Invoice
+
 WHERE Invoice.IsActive = 'Y'
+
 AND Invoice.AD_Client_ID = " + clientIdSql + @"
+
 AND Invoice.IsSOTrx = 'N'
-AND Invoice.DocStatus IN ('CO', 'CL')
+
+AND Invoice.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+
 AND EXISTS
 (
     SELECT 1
+
     FROM C_DocType InvoiceDocumentType
-    WHERE InvoiceDocumentType.C_DocType_ID = Invoice.C_DocType_ID
+
+    WHERE InvoiceDocumentType.C_DocType_ID =
+          Invoice.C_DocType_ID
+
     AND InvoiceDocumentType.IsActive = 'Y'
+
     AND InvoiceDocumentType.DocBaseType = 'API'
+
     AND InvoiceDocumentType.IsSOTrx = 'N'
 )";
 
@@ -274,10 +290,15 @@ WITH SecuredInvoice AS
 (
 " + invoiceAccessSql + @"
 ),
-InvoiceAllocation AS
+
+/*
+ * Allocation amount calculated separately
+ * for each invoice payment schedule.
+ */
+ScheduleAllocation AS
 (
     SELECT
-        AllocationLine.C_Invoice_ID,
+        AllocationLine.C_InvoicePaySchedule_ID,
 
         SUM
         (
@@ -304,11 +325,112 @@ InvoiceAllocation AS
 
     WHERE AllocationLine.IsActive = 'Y'
 
-    AND AllocationLine.C_Invoice_ID IS NOT NULL
+    AND AllocationLine.C_InvoicePaySchedule_ID
+        IS NOT NULL
 
     GROUP BY
-        AllocationLine.C_Invoice_ID
+        AllocationLine.C_InvoicePaySchedule_ID
 ),
+
+/*
+ * Contains only unpaid schedules.
+ */
+UnpaidSchedule AS
+(
+    SELECT
+        InvoicePaySchedule.C_InvoicePaySchedule_ID,
+
+        InvoicePaySchedule.C_Invoice_ID,
+
+        InvoicePaySchedule.DueDate,
+
+        COALESCE
+        (
+            InvoicePaySchedule.DueAmt,
+            0
+        ) AS DueAmt,
+
+        COALESCE
+        (
+            ScheduleAllocation.AllocatedAmt,
+            0
+        ) AS AllocatedAmt,
+
+        CASE
+            WHEN
+            (
+                COALESCE
+                (
+                    InvoicePaySchedule.DueAmt,
+                    0
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocation.AllocatedAmt,
+                    0
+                )
+            ) > 0
+            THEN
+            (
+                COALESCE
+                (
+                    InvoicePaySchedule.DueAmt,
+                    0
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocation.AllocatedAmt,
+                    0
+                )
+            )
+
+            ELSE 0
+        END AS OpenAmount
+
+    FROM C_InvoicePaySchedule InvoicePaySchedule
+
+    LEFT OUTER JOIN ScheduleAllocation ScheduleAllocation ON
+    (
+        ScheduleAllocation.C_InvoicePaySchedule_ID =
+            InvoicePaySchedule.C_InvoicePaySchedule_ID
+    )
+
+    WHERE InvoicePaySchedule.IsActive = 'Y'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.DueAmt,
+        0
+    ) > 0
+
+    /*
+     * Exclude any schedule already linked to an active
+     * non-voided/non-reversed payment.
+     */
+    AND NOT EXISTS
+    (
+        SELECT 1
+
+        FROM C_Payment ExistingPayment
+
+        WHERE ExistingPayment.IsActive = 'Y'
+
+        AND ExistingPayment.C_Invoice_ID =
+            InvoicePaySchedule.C_Invoice_ID
+
+        AND ExistingPayment.C_InvoicePaySchedule_ID =
+            InvoicePaySchedule.C_InvoicePaySchedule_ID
+
+        AND ExistingPayment.DocStatus NOT IN
+        (
+            'VO',
+            'RE'
+        )
+    )
+),
+
 UpcomingInvoices AS
 (
     SELECT
@@ -318,13 +440,13 @@ UpcomingInvoices AS
 
         Invoice.C_BPartner_Location_ID,
 
-        InvoicePaySchedule.C_InvoicePaySchedule_ID,
+        UnpaidSchedule.C_InvoicePaySchedule_ID,
 
         BusinessPartner.Name AS VendorName,
 
         COALESCE
         (
-            InvoicePaySchedule.DueDate,
+            UnpaidSchedule.DueDate,
             Invoice.DateAcct
         ) AS DueDate,
 
@@ -340,108 +462,42 @@ UpcomingInvoices AS
 
         PaymentMethod.VA009_Name AS PaymentMethodName,
 
-        CASE
-            WHEN
-            (
-                Invoice.GrandTotal -
-                COALESCE
-                (
-                    InvoiceAllocation.AllocatedAmt,
-                    0
-                )
-            ) <= 0
-            THEN 0
+        UnpaidSchedule.DueAmt AS ScheduleDueAmount,
 
-            WHEN InvoicePaySchedule.C_InvoicePaySchedule_ID
-                 IS NOT NULL
+        UnpaidSchedule.AllocatedAmt AS ScheduleAllocatedAmount,
 
-            AND COALESCE
-            (
-                InvoicePaySchedule.DueAmt,
-                0
-            ) > 0
-
-            AND InvoicePaySchedule.DueAmt <
-            (
-                Invoice.GrandTotal -
-                COALESCE
-                (
-                    InvoiceAllocation.AllocatedAmt,
-                    0
-                )
-            )
-            THEN InvoicePaySchedule.DueAmt
-
-            ELSE
-            (
-                Invoice.GrandTotal -
-                COALESCE
-                (
-                    InvoiceAllocation.AllocatedAmt,
-                    0
-                )
-            )
-        END AS OpenAmount
+        UnpaidSchedule.OpenAmount AS OpenAmount
 
     FROM SecuredInvoice Invoice
 
     INNER JOIN C_BPartner BusinessPartner ON
     (
         BusinessPartner.C_BPartner_ID =
-        Invoice.C_BPartner_ID
+            Invoice.C_BPartner_ID
     )
 
-    INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
+    /*
+     * Inner join means the invoice appears only when
+     * it has at least one unpaid schedule.
+     */
+    INNER JOIN UnpaidSchedule UnpaidSchedule ON
     (
-        InvoicePaySchedule.C_Invoice_ID =
-        Invoice.C_Invoice_ID
-
-        AND InvoicePaySchedule.IsActive = 'Y'
-
-        AND COALESCE
-        (
-            InvoicePaySchedule.DueAmt,
-            0
-        ) > 0
-
-        AND NOT EXISTS
-        (
-            SELECT 1
-
-            FROM C_Payment ExistingPayment
-
-            WHERE ExistingPayment.IsActive = 'Y'
-
-            AND ExistingPayment.C_Invoice_ID =
+        UnpaidSchedule.C_Invoice_ID =
             Invoice.C_Invoice_ID
 
-            AND ExistingPayment.C_InvoicePaySchedule_ID =
-            InvoicePaySchedule.C_InvoicePaySchedule_ID
-
-            AND ExistingPayment.DocStatus NOT IN
-            (
-                'VO',
-                'RE'
-            )
-        )
-    )
-
-    LEFT OUTER JOIN InvoiceAllocation InvoiceAllocation ON
-    (
-        InvoiceAllocation.C_Invoice_ID =
-        Invoice.C_Invoice_ID
+        AND UnpaidSchedule.OpenAmount > 0
     )
 
     LEFT OUTER JOIN C_Currency Currency ON
     (
         Currency.C_Currency_ID =
-        Invoice.C_Currency_ID
+            Invoice.C_Currency_ID
     )
 
     LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
     (
         PaymentMethod.VA009_PaymentMethod_ID =
-        Invoice.VA009_PaymentMethod_ID
+            Invoice.VA009_PaymentMethod_ID
     )
 
     WHERE BusinessPartner.IsActive = 'Y'
@@ -450,16 +506,17 @@ UpcomingInvoices AS
 
     AND COALESCE
     (
-        InvoicePaySchedule.DueDate,
+        UnpaidSchedule.DueDate,
         Invoice.DateAcct
     ) >= " + currentDateSql + @"
 
     AND COALESCE
     (
-        InvoicePaySchedule.DueDate,
+        UnpaidSchedule.DueDate,
         Invoice.DateAcct
     ) < " + dateToSql + @"
 )
+
 SELECT
     DueDate AS RunDate,
 
@@ -494,6 +551,10 @@ SELECT
 
 FROM UpcomingInvoices
 
+/*
+ * Final protection:
+ * paid schedules never participate in widget totals.
+ */
 WHERE OpenAmount > 0
 
 GROUP BY
@@ -520,7 +581,6 @@ ORDER BY
 
             return sql;
         }
-
         #endregion
 
 
