@@ -544,14 +544,13 @@
     min-width: 68em;
     border-collapse: collapse;
     table-layout: fixed;
-    font-size: 0.875em;
 }
 
     .VAS-056-AutoAllocatedAPPayment-dialog-table thead th {
         position: sticky;
         top: 0;
         z-index: 1;
-        padding: 0.875em 0.75em;
+        padding: 1em 0.75em;
         border-bottom: 1px solid #edf2f6;
         background: #ffffff;
         color: #748494;

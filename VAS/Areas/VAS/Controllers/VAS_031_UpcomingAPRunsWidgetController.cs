@@ -237,6 +237,9 @@ SELECT
     Invoice.AD_Client_ID,
     Invoice.AD_Org_ID,
     Invoice.C_BPartner_ID,
+    Invoice.C_BPartner_Location_ID,
+    Invoice.C_DocType_ID,
+    Invoice.C_DocTypeTarget_ID,
     Invoice.C_Currency_ID,
     Invoice.C_ConversionType_ID,
     Invoice.DocumentNo,
@@ -248,7 +251,16 @@ FROM C_Invoice Invoice
 WHERE Invoice.IsActive = 'Y'
 AND Invoice.AD_Client_ID = " + clientIdSql + @"
 AND Invoice.IsSOTrx = 'N'
-AND Invoice.DocStatus IN ('CO', 'CL')";
+AND Invoice.DocStatus IN ('CO', 'CL')
+AND EXISTS
+(
+    SELECT 1
+    FROM C_DocType InvoiceDocumentType
+    WHERE InvoiceDocumentType.C_DocType_ID = Invoice.C_DocType_ID
+    AND InvoiceDocumentType.IsActive = 'Y'
+    AND InvoiceDocumentType.DocBaseType = 'API'
+    AND InvoiceDocumentType.IsSOTrx = 'N'
+)";
 
             invoiceAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
                 invoiceAccessSql,
@@ -303,6 +315,10 @@ UpcomingInvoices AS
         Invoice.C_Invoice_ID,
 
         Invoice.C_BPartner_ID,
+
+        Invoice.C_BPartner_Location_ID,
+
+        InvoicePaySchedule.C_InvoicePaySchedule_ID,
 
         BusinessPartner.Name AS VendorName,
 
@@ -566,6 +582,9 @@ SELECT
     Invoice.AD_Client_ID,
     Invoice.AD_Org_ID,
     Invoice.C_BPartner_ID,
+    Invoice.C_BPartner_Location_ID,
+    Invoice.C_DocType_ID,
+    Invoice.C_DocTypeTarget_ID,
     Invoice.C_Currency_ID,
     Invoice.C_ConversionType_ID,
     Invoice.DocumentNo,
@@ -578,6 +597,15 @@ WHERE Invoice.IsActive = 'Y'
 AND Invoice.AD_Client_ID = " + clientIdSql + @"
 AND Invoice.IsSOTrx = 'N'
 AND Invoice.DocStatus IN ('CO', 'CL')
+AND EXISTS
+(
+    SELECT 1
+    FROM C_DocType InvoiceDocumentType
+    WHERE InvoiceDocumentType.C_DocType_ID = Invoice.C_DocType_ID
+    AND InvoiceDocumentType.IsActive = 'Y'
+    AND InvoiceDocumentType.DocBaseType = 'API'
+    AND InvoiceDocumentType.IsSOTrx = 'N'
+)
 AND Invoice.C_Currency_ID = " + currencyIdSql + @"
 AND COALESCE
 (
@@ -642,6 +670,10 @@ SELECT
     Organization.Name AS OrganizationName,
 
     Invoice.C_BPartner_ID,
+
+    Invoice.C_BPartner_Location_ID,
+
+    InvoicePaySchedule.C_InvoicePaySchedule_ID,
 
     BusinessPartner.Name AS VendorName,
 
@@ -882,6 +914,26 @@ ORDER BY
                         vendorId = vendorId,
 
                         cBPartnerId = vendorId,
+
+                        bPartnerLocationId = GetInt(
+                            reader,
+                            "C_BPartner_Location_ID"
+                        ),
+
+                        cBPartnerLocationId = GetInt(
+                            reader,
+                            "C_BPartner_Location_ID"
+                        ),
+
+                        invoicePayScheduleId = GetInt(
+                            reader,
+                            "C_InvoicePaySchedule_ID"
+                        ),
+
+                        cInvoicePayScheduleId = GetInt(
+                            reader,
+                            "C_InvoicePaySchedule_ID"
+                        ),
 
                         vendorName = GetString(
                             reader,
@@ -1583,6 +1635,7 @@ ORDER BY
         [AjaxSessionFilterAttribute]
         public JsonResult CreateUpcomingAPPayment(
             int invoiceId,
+            int invoicePayScheduleId,
             int adOrgId,
             int bankAccountId,
             int vendorId,
@@ -1618,6 +1671,15 @@ ORDER BY
                 );
             }
 
+            if (invoicePayScheduleId <= 0)
+            {
+                return GetValidationError(
+                    ctx,
+                    "VAS_031_MessageInvoicePayScheduleRequired",
+                    "Invoice payment schedule is required."
+                );
+            }
+
             if (paymentMethodId <= 0)
             {
                 return GetValidationError(
@@ -1627,19 +1689,18 @@ ORDER BY
                 );
             }
 
-            JsonResult validationResult =
-                ValidateCreateRequest(
-                    ctx,
-                    adOrgId,
-                    bankAccountId,
-                    vendorId,
-                    currencyId,
-                    conversionTypeId,
-                    docTypeId,
-                    tenderType,
-                    transactionDate,
-                    payAmt
-                );
+            JsonResult validationResult = ValidateCreateRequest(
+                ctx,
+                adOrgId,
+                bankAccountId,
+                vendorId,
+                currencyId,
+                conversionTypeId,
+                docTypeId,
+                tenderType,
+                transactionDate,
+                payAmt
+            );
 
             if (validationResult != null)
             {
@@ -1668,12 +1729,13 @@ ORDER BY
                 "_" +
                 DateTime.Now.Ticks;
 
-            Trx trx = Trx.GetTrx(
-                trxName
-            );
+            Trx trx = Trx.GetTrx(trxName);
 
             try
             {
+                /*
+                 * Read and validate source invoice.
+                 */
                 MInvoice invoice = new MInvoice(
                     ctx,
                     invoiceId,
@@ -1691,10 +1753,7 @@ ORDER BY
                     );
                 }
 
-                if (
-                    invoice.GetAD_Client_ID() !=
-                    ctx.GetAD_Client_ID()
-                )
+                if (invoice.GetAD_Client_ID() != ctx.GetAD_Client_ID())
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -1716,19 +1775,18 @@ ORDER BY
                     );
                 }
 
-                if (
-                    !string.Equals(
-                        invoice.GetDocStatus(),
+                string invoiceDocStatus = invoice.GetDocStatus();
+
+                if (!string.Equals(
+                        invoiceDocStatus,
                         "CO",
                         StringComparison.OrdinalIgnoreCase
-                    )
-                    &&
+                    ) &&
                     !string.Equals(
-                        invoice.GetDocStatus(),
+                        invoiceDocStatus,
                         "CL",
                         StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                    ))
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -1739,28 +1797,80 @@ ORDER BY
                     );
                 }
 
-                if (
-                    invoice.GetAD_Org_ID() != adOrgId ||
-                    invoice.GetC_BPartner_ID() != vendorId ||
-                    invoice.GetC_Currency_ID() != currencyId
-                )
+                int invoiceDocTypeId = invoice.GetC_DocType_ID();
+
+                if (invoiceDocTypeId <= 0)
+                {
+                    invoiceDocTypeId = invoice.GetC_DocTypeTarget_ID();
+                }
+
+                string invoiceDocBaseType = GetInvoiceDocBaseType(
+                    invoiceDocTypeId,
+                    trx
+                );
+
+                if (!string.Equals(
+                    invoiceDocBaseType,
+                    "API",
+                    StringComparison.OrdinalIgnoreCase
+                ))
                 {
                     throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageInvoiceDataMismatch",
-                            "Organization, vendor or currency does not match the invoice."
-                        )
+                        "The selected document is not a normal AP Invoice. " +
+                        "Invoice DocBaseType must be API, but it is " +
+                        invoiceDocBaseType + "."
                     );
                 }
 
-                decimal currentOpenAmount =
-                    GetInvoiceOpenAmount(
+                /*
+                 * Prevent changing invoice-related information
+                 * from the UI.
+                 */
+                if (invoice.GetAD_Org_ID() != adOrgId)
+                {
+                    throw new InvalidOperationException(
+                        "Selected organization does not match the invoice."
+                    );
+                }
+
+                if (invoice.GetC_BPartner_ID() != vendorId)
+                {
+                    throw new InvalidOperationException(
+                        "Selected vendor does not match the invoice."
+                    );
+                }
+
+                if (invoice.GetC_Currency_ID() != currencyId)
+                {
+                    throw new InvalidOperationException(
+                        "Selected currency does not match the invoice."
+                    );
+                }
+
+                int validatedInvoicePayScheduleId =
+                    ValidateInvoicePaySchedule(
                         invoiceId,
+                        invoicePayScheduleId,
                         trx
                     );
 
-                if (currentOpenAmount <= 0)
+                if (validatedInvoicePayScheduleId <= 0)
+                {
+                    throw new InvalidOperationException(
+                        "The selected invoice payment schedule is invalid, inactive, " +
+                        "or does not belong to the selected invoice."
+                    );
+                }
+
+                /*
+                 * Read the current invoice open amount before creating payment.
+                 */
+                decimal openAmountBeforePayment = GetInvoiceOpenAmount(
+                    invoiceId,
+                    trx
+                );
+
+                if (openAmountBeforePayment <= 0)
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -1771,7 +1881,7 @@ ORDER BY
                     );
                 }
 
-                if (payAmt > currentOpenAmount)
+                if (payAmt > openAmountBeforePayment)
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -1782,95 +1892,121 @@ ORDER BY
                     );
                 }
 
+                /*
+                 * Validate organization.
+                 */
                 MOrg organization = new MOrg(
                     ctx,
                     adOrgId,
                     trx
                 );
 
-                if (
-                    organization.GetAD_Org_ID() <= 0 ||
-                    !organization.IsActive()
-                )
+                if (organization.GetAD_Org_ID() <= 0 ||
+                    !organization.IsActive())
                 {
                     throw new InvalidOperationException(
                         "Organization was not found or is inactive."
                     );
                 }
 
+                /*
+                 * Validate bank account.
+                 */
                 MBankAccount bankAccount = new MBankAccount(
                     ctx,
                     bankAccountId,
                     trx
                 );
 
-                if (
-                    bankAccount.GetC_BankAccount_ID() <= 0 ||
-                    !bankAccount.IsActive()
-                )
+                if (bankAccount.GetC_BankAccount_ID() <= 0 ||
+                    !bankAccount.IsActive())
                 {
                     throw new InvalidOperationException(
                         "Bank account was not found or is inactive."
                     );
                 }
 
+                if (bankAccount.GetAD_Client_ID() != ctx.GetAD_Client_ID())
+                {
+                    throw new InvalidOperationException(
+                        "Bank account does not belong to the current client."
+                    );
+                }
+
+                /*
+                 * Validate vendor.
+                 */
                 MBPartner vendor = new MBPartner(
                     ctx,
                     vendorId,
                     trx
                 );
 
-                if (
-                    vendor.GetC_BPartner_ID() <= 0 ||
+                if (vendor.GetC_BPartner_ID() <= 0 ||
                     !vendor.IsActive() ||
-                    !vendor.IsVendor()
-                )
+                    !vendor.IsVendor())
                 {
                     throw new InvalidOperationException(
                         "Selected business partner is not an active vendor."
                     );
                 }
 
+                int bPartnerLocationId = ResolveBPartnerLocationId(
+                    invoice,
+                    vendorId,
+                    trx
+                );
+
+                if (bPartnerLocationId <= 0)
+                {
+                    throw new InvalidOperationException(
+                        "No active business partner location was found for the selected vendor."
+                    );
+                }
+
+                /*
+                 * Validate currency.
+                 */
                 MCurrency currency = new MCurrency(
                     ctx,
                     currencyId,
                     trx
                 );
 
-                if (
-                    currency.GetC_Currency_ID() <= 0 ||
-                    !currency.IsActive()
-                )
+                if (currency.GetC_Currency_ID() <= 0 ||
+                    !currency.IsActive())
                 {
                     throw new InvalidOperationException(
                         "Currency was not found or is inactive."
                     );
                 }
 
-                MConversionType conversionType =
-                    new MConversionType(
-                        ctx,
-                        conversionTypeId,
-                        trx
-                    );
+                /*
+                 * Validate conversion type.
+                 */
+                MConversionType conversionType = new MConversionType(
+                    ctx,
+                    conversionTypeId,
+                    trx
+                );
 
-                if (
-                    conversionType.GetC_ConversionType_ID() <= 0 ||
-                    !conversionType.IsActive()
-                )
+                if (conversionType.GetC_ConversionType_ID() <= 0 ||
+                    !conversionType.IsActive())
                 {
                     throw new InvalidOperationException(
                         "Conversion type was not found or is inactive."
                     );
                 }
 
-                int resolvedDocTypeId =
-                    ResolveAPPaymentDocTypeId(
-                        ctx,
-                        docTypeId,
-                        adOrgId,
-                        trx
-                    );
+                /*
+                 * Resolve AP Payment document type.
+                 */
+                int resolvedDocTypeId = ResolveAPPaymentDocTypeId(
+                    ctx,
+                    docTypeId,
+                    adOrgId,
+                    trx
+                );
 
                 if (resolvedDocTypeId <= 0)
                 {
@@ -1885,24 +2021,28 @@ ORDER BY
                     trx
                 );
 
-                if (
-                    documentType.GetC_DocType_ID() <= 0 ||
+                if (documentType.GetC_DocType_ID() <= 0 ||
                     !documentType.IsActive() ||
                     !string.Equals(
                         documentType.GetDocBaseType(),
                         "APP",
                         StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                    ))
                 {
                     throw new InvalidOperationException(
                         "The selected document type is not an AP Payment document type."
                     );
                 }
 
+                /*
+                 * Validate tender type.
+                 */
+                string normalizedTenderType =
+                    (tenderType ?? string.Empty).Trim();
+
                 if (!IsValidTenderType(
                     ctx,
-                    tenderType
+                    normalizedTenderType
                 ))
                 {
                     throw new InvalidOperationException(
@@ -1910,19 +2050,33 @@ ORDER BY
                     );
                 }
 
+                /*
+                 * Validate payment method.
+                 */
                 string paymentMethodName = Util.GetValueOfString(
                     DB.ExecuteScalar(
-                        @"SELECT VA009_Name
-                          FROM VA009_PaymentMethod
-                          WHERE IsActive = 'Y'
-                          AND VA009_PaymentMethod_ID = " +
+                        @"
+SELECT
+    PaymentMethod.VA009_Name
+
+FROM VA009_PaymentMethod PaymentMethod
+
+WHERE PaymentMethod.IsActive = 'Y'
+
+AND PaymentMethod.VA009_PaymentMethod_ID = " +
                         paymentMethodId.ToString(
                             CultureInfo.InvariantCulture
-                        ) +
-                        " AND AD_Client_ID IN (0, " +
+                        ) + @"
+
+AND PaymentMethod.AD_Client_ID IN
+(
+    0,
+    " +
                         ctx.GetAD_Client_ID().ToString(
                             CultureInfo.InvariantCulture
-                        ) + ")",
+                        ) +
+                        @"
+)",
                         null,
                         trx
                     )
@@ -1939,10 +2093,9 @@ ORDER BY
                     );
                 }
 
-                bool isCheckPayment =
-                    IsCheckPaymentMethod(
-                        paymentMethodName
-                    );
+                bool isCheckPayment = IsCheckPaymentMethod(
+                    paymentMethodName
+                );
 
                 DateTime parsedCheckDate = DateTime.MinValue;
 
@@ -1959,16 +2112,14 @@ ORDER BY
                         );
                     }
 
-                    if (
-                        string.IsNullOrWhiteSpace(checkDate) ||
+                    if (string.IsNullOrWhiteSpace(checkDate) ||
                         !DateTime.TryParseExact(
                             checkDate,
                             "yyyy-MM-dd",
                             CultureInfo.InvariantCulture,
                             DateTimeStyles.None,
                             out parsedCheckDate
-                        )
-                    )
+                        ))
                     {
                         throw new InvalidOperationException(
                             GetMsg(
@@ -1980,6 +2131,9 @@ ORDER BY
                     }
                 }
 
+                /*
+                 * Create AP payment.
+                 */
                 MPayment payment = new MPayment(
                     ctx,
                     0,
@@ -1990,9 +2144,7 @@ ORDER BY
                     invoice.GetAD_Org_ID()
                 );
 
-                payment.SetIsReceipt(
-                    false
-                );
+                payment.SetIsReceipt(false);
 
                 payment.SetC_DocType_ID(
                     resolvedDocTypeId
@@ -2006,6 +2158,10 @@ ORDER BY
                     invoice.GetC_BPartner_ID()
                 );
 
+                payment.SetC_BPartner_Location_ID(
+                    bPartnerLocationId
+                );
+
                 payment.SetC_Currency_ID(
                     invoice.GetC_Currency_ID()
                 );
@@ -2014,20 +2170,24 @@ ORDER BY
                     conversionTypeId
                 );
 
+                /*
+                 * Linking C_Invoice_ID is necessary so the completion
+                 * process can allocate the payment against this invoice.
+                 */
                 payment.SetC_Invoice_ID(
                     invoice.GetC_Invoice_ID()
                 );
 
-                payment.SetDateTrx(
-                    dateTrx
+                payment.Set_Value(
+                    "C_InvoicePaySchedule_ID",
+                    validatedInvoicePayScheduleId
                 );
 
-                payment.SetDateAcct(
-                    dateTrx
-                );
+                payment.SetDateTrx(dateTrx);
+                payment.SetDateAcct(dateTrx);
 
                 payment.SetTenderType(
-                    tenderType.Trim()
+                    normalizedTenderType
                 );
 
                 payment.Set_Value(
@@ -2048,21 +2208,14 @@ ORDER BY
                     );
                 }
 
-                payment.SetPayAmt(
-                    payAmt
-                );
+                payment.SetPayAmt(payAmt);
 
-                payment.SetDocStatus(
-                    "DR"
-                );
-
-                payment.SetDocAction(
-                    "CO"
-                );
-
-                payment.SetProcessed(
-                    false
-                );
+                /*
+                 * Initially save as Draft.
+                 */
+                payment.SetDocStatus("DR");
+                payment.SetDocAction("CO");
+                payment.SetProcessed(false);
 
                 if (!string.IsNullOrWhiteSpace(documentNo))
                 {
@@ -2082,9 +2235,101 @@ ORDER BY
                     );
                 }
 
-             
-               
+                /*
+                 * Important:
+                 * Complete the payment so Vienna Advantage creates
+                 * the accounting/allocation records.
+                 */
+                bool completed = payment.ProcessIt("CO");
 
+                if (!completed)
+                {
+                    string processMessage = payment.GetProcessMsg();
+
+                    if (string.IsNullOrWhiteSpace(processMessage))
+                    {
+                        processMessage = GetMsg(
+                            ctx,
+                            "VAS_031_MessageCouldNotCompleteAPPayment",
+                            "Could not complete AP payment."
+                        );
+                    }
+
+                    throw new InvalidOperationException(
+                        processMessage
+                    );
+                }
+
+                /*
+                 * Save changes made by ProcessIt.
+                 */
+                if (!payment.Save())
+                {
+                    throw new InvalidOperationException(
+                        GetLastModelError(
+                            ctx,
+                            "VAS_031_MessageCouldNotCompleteAPPayment",
+                            "Could not save the completed AP payment."
+                        )
+                    );
+                }
+
+                /*
+                 * Confirm that payment is really completed.
+                 */
+                string completedDocStatus = payment.GetDocStatus();
+
+                bool isCompleted =
+                    string.Equals(
+                        completedDocStatus,
+                        "CO",
+                        StringComparison.OrdinalIgnoreCase
+                    ) ||
+                    string.Equals(
+                        completedDocStatus,
+                        "CL",
+                        StringComparison.OrdinalIgnoreCase
+                    );
+
+                if (!isCompleted)
+                {
+                    string processMessage = payment.GetProcessMsg();
+
+                    if (string.IsNullOrWhiteSpace(processMessage))
+                    {
+                        processMessage =
+                            "Payment was saved but was not completed. " +
+                            "Current status: " +
+                            completedDocStatus;
+                    }
+
+                    throw new InvalidOperationException(
+                        processMessage
+                    );
+                }
+
+                /*
+                 * Recalculate invoice open amount in the same transaction.
+                 *
+                 * Full payment:
+                 * remainingOpenAmount = 0
+                 * invoice must disappear from widget.
+                 *
+                 * Partial payment:
+                 * remainingOpenAmount > 0
+                 * invoice remains with the remaining value.
+                 */
+                decimal remainingOpenAmount = GetInvoiceOpenAmount(
+                    invoiceId,
+                    trx
+                );
+
+                bool invoiceFullyPaid =
+                    remainingOpenAmount <= 0;
+
+                /*
+                 * Commit payment and allocation together.
+                 */
                 trx.Commit();
 
                 return Json(new
@@ -2092,10 +2337,16 @@ ORDER BY
                     success = true,
                     error = string.Empty,
 
-                    invoiceId = invoiceId,
+                    invoiceId = invoice.GetC_Invoice_ID(),
 
                     invoiceDocumentNo =
                         invoice.GetDocumentNo(),
+
+                    invoicePayScheduleId =
+                        validatedInvoicePayScheduleId,
+
+                    bPartnerLocationId =
+                        bPartnerLocationId,
 
                     paymentId =
                         payment.GetC_Payment_ID(),
@@ -2106,11 +2357,35 @@ ORDER BY
                     docStatus =
                         payment.GetDocStatus(),
 
+                    docAction =
+                        payment.GetDocAction(),
+
+                    processed =
+                        payment.IsProcessed(),
+
                     docTypeId =
                         resolvedDocTypeId,
 
                     docTypeName =
                         documentType.GetName(),
+
+                    paidAmount =
+                        payAmt,
+
+                    openAmountBeforePayment =
+                        openAmountBeforePayment,
+
+                    remainingOpenAmount =
+                        remainingOpenAmount,
+
+                    invoiceFullyPaid =
+                        invoiceFullyPaid,
+
+                    removeInvoiceFromWidget =
+                        invoiceFullyPaid,
+
+                    refreshUpcomingAPRuns =
+                        true,
 
                     message = GetMsg(
                         ctx,
@@ -2121,9 +2396,7 @@ ORDER BY
             }
             catch (InvalidOperationException ex)
             {
-                RollbackTransaction(
-                    trx
-                );
+                RollbackTransaction(trx);
 
                 return Json(new
                 {
@@ -2134,9 +2407,7 @@ ORDER BY
             }
             catch (Exception ex)
             {
-                RollbackTransaction(
-                    trx
-                );
+                RollbackTransaction(trx);
 
                 VLogger.Get().SaveError(
                     "VAS_031_CreateUpcomingAPPayment",
@@ -2146,7 +2417,7 @@ ORDER BY
                 string message = GetMsg(
                     ctx,
                     "VAS_031_MessageCouldNotSaveAPPayment",
-                    "Could not save AP payment."
+                    "Could not save or complete AP payment."
                 );
 
                 return Json(new
@@ -2163,6 +2434,132 @@ ORDER BY
                     trx.Close();
                 }
             }
+        }
+
+        #endregion
+
+
+        #region Create AP Payment From Invoice
+
+
+
+        private string GetInvoiceDocBaseType(
+            int invoiceDocTypeId,
+            Trx trx)
+        {
+            if (invoiceDocTypeId <= 0)
+            {
+                return string.Empty;
+            }
+
+            string sql = @"
+SELECT
+    DocumentType.DocBaseType
+FROM C_DocType DocumentType
+WHERE DocumentType.C_DocType_ID = " +
+                invoiceDocTypeId.ToString(CultureInfo.InvariantCulture);
+
+            return Util.GetValueOfString(
+                DB.ExecuteScalar(sql, null, trx)
+            );
+        }
+
+        private int ValidateInvoicePaySchedule(
+            int invoiceId,
+            int invoicePayScheduleId,
+            Trx trx)
+        {
+            if (invoiceId <= 0 || invoicePayScheduleId <= 0)
+            {
+                return 0;
+            }
+
+            string sql = @"
+SELECT
+    InvoicePaySchedule.C_InvoicePaySchedule_ID
+FROM C_InvoicePaySchedule InvoicePaySchedule
+WHERE InvoicePaySchedule.IsActive = 'Y'
+AND InvoicePaySchedule.C_Invoice_ID = " +
+                invoiceId.ToString(CultureInfo.InvariantCulture) + @"
+AND InvoicePaySchedule.C_InvoicePaySchedule_ID = " +
+                invoicePayScheduleId.ToString(CultureInfo.InvariantCulture);
+
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(sql, null, trx)
+            );
+        }
+
+        private int ResolveBPartnerLocationId(
+            MInvoice invoice,
+            int vendorId,
+            Trx trx)
+        {
+            if (invoice == null || vendorId <= 0)
+            {
+                return 0;
+            }
+
+            int invoiceLocationId =
+                invoice.GetC_BPartner_Location_ID();
+
+            if (invoiceLocationId > 0)
+            {
+                string validationSql = @"
+SELECT
+    BPartnerLocation.C_BPartner_Location_ID
+FROM C_BPartner_Location BPartnerLocation
+WHERE BPartnerLocation.IsActive = 'Y'
+AND BPartnerLocation.C_BPartner_Location_ID = " +
+                    invoiceLocationId.ToString(CultureInfo.InvariantCulture) + @"
+AND BPartnerLocation.C_BPartner_ID = " +
+                    vendorId.ToString(CultureInfo.InvariantCulture);
+
+                int validLocationId = Util.GetValueOfInt(
+                    DB.ExecuteScalar(validationSql, null, trx)
+                );
+
+                if (validLocationId > 0)
+                {
+                    return validLocationId;
+                }
+            }
+
+            string fallbackSql;
+
+            if (DB.IsOracle())
+            {
+                fallbackSql = @"
+SELECT LocationResult.C_BPartner_Location_ID
+FROM
+(
+    SELECT BPartnerLocation.C_BPartner_Location_ID
+    FROM C_BPartner_Location BPartnerLocation
+    WHERE BPartnerLocation.IsActive = 'Y'
+    AND BPartnerLocation.C_BPartner_ID = " +
+                    vendorId.ToString(CultureInfo.InvariantCulture) + @"
+    ORDER BY
+        CASE WHEN BPartnerLocation.IsBillTo = 'Y' THEN 0 ELSE 1 END,
+        BPartnerLocation.C_BPartner_Location_ID
+) LocationResult
+WHERE ROWNUM = 1";
+            }
+            else
+            {
+                fallbackSql = @"
+SELECT BPartnerLocation.C_BPartner_Location_ID
+FROM C_BPartner_Location BPartnerLocation
+WHERE BPartnerLocation.IsActive = 'Y'
+AND BPartnerLocation.C_BPartner_ID = " +
+                    vendorId.ToString(CultureInfo.InvariantCulture) + @"
+ORDER BY
+    CASE WHEN BPartnerLocation.IsBillTo = 'Y' THEN 0 ELSE 1 END,
+    BPartnerLocation.C_BPartner_Location_ID
+LIMIT 1";
+            }
+
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(fallbackSql, null, trx)
+            );
         }
 
         private decimal GetInvoiceOpenAmount(
@@ -2410,99 +2807,36 @@ WHERE Invoice.C_Invoice_ID =
             int adOrgId,
             Trx trx)
         {
-            int clientId = ctx.GetAD_Client_ID();
-
-            string clientIdSql =
-                clientId.ToString(
-                    CultureInfo.InvariantCulture
-                );
-
-            string orgIdSql =
-                Math.Max(
-                    0,
-                    adOrgId
-                ).ToString(
-                    CultureInfo.InvariantCulture
-                );
-
-            string requestedIdSql =
-                Math.Max(
-                    0,
-                    requestedDocTypeId
-                ).ToString(
-                    CultureInfo.InvariantCulture
-                );
+            if (ctx == null ||
+                requestedDocTypeId <= 0 ||
+                adOrgId <= 0)
+            {
+                return 0;
+            }
 
             string sql = @"
 SELECT
     DocumentType.C_DocType_ID
-
 FROM C_DocType DocumentType
-
-WHERE DocumentType.IsActive = 'Y'
-
+WHERE DocumentType.C_DocType_ID = " +
+                requestedDocTypeId.ToString(CultureInfo.InvariantCulture) + @"
+AND DocumentType.IsActive = 'Y'
 AND DocumentType.DocBaseType = 'APP'
-
 AND DocumentType.IsSOTrx = 'N'
-
 AND DocumentType.AD_Client_ID IN
 (
     0,
-    " + clientIdSql + @"
+    " + ctx.GetAD_Client_ID().ToString(CultureInfo.InvariantCulture) + @"
 )
-
 AND DocumentType.AD_Org_ID IN
 (
     0,
-    " + orgIdSql + @"
-)
+    " + adOrgId.ToString(CultureInfo.InvariantCulture) + @"
+)";
 
-ORDER BY
-    CASE
-        WHEN DocumentType.C_DocType_ID =
-             " + requestedIdSql + @"
-        THEN 0
-        ELSE 1
-    END,
-
-    CASE
-        WHEN DocumentType.AD_Org_ID =
-             " + orgIdSql + @"
-        THEN 0
-        ELSE 1
-    END,
-
-    DocumentType.Name,
-
-    DocumentType.C_DocType_ID";
-
-            IDataReader reader = null;
-
-            try
-            {
-                reader = DB.ExecuteReader(
-                    sql,
-                    null,
-                    trx
-                );
-
-                if (
-                    reader != null &&
-                    reader.Read()
-                )
-                {
-                    return GetInt(
-                        reader,
-                        "C_DocType_ID"
-                    );
-                }
-            }
-            finally
-            {
-                CloseReader(reader);
-            }
-
-            return 0;
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(sql, null, trx)
+            );
         }
 
         private bool IsValidTenderType(

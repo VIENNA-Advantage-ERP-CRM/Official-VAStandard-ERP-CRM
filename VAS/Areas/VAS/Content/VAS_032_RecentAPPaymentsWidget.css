@@ -660,6 +660,7 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
+    padding: 0px 0px 20px;
 }
 
 .vas-recent-ap-payments-dialog-section-label {
@@ -1080,6 +1081,7 @@
         font-size: 0.875em;
         color: #102c3f;
         line-height: 1.2;
+        text-align: left;
         vertical-align: middle;
         overflow: hidden;
         text-overflow: ellipsis;

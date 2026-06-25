@@ -513,7 +513,7 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 0.875em 0.625em;
+    padding: 1em 0.75em;
     border-bottom: 1px solid #edf2f6;
     background: #ffffff;
     color: #748494;
@@ -521,14 +521,15 @@
     line-height: 1.2;
     font-weight: 700;
     text-align: left;
+    text-transform: capitalize;
     white-space: nowrap;
 }
 
 .vas-bounced-ap-payment-dialog-table td {
-    padding: 0.8125em 0.625em;
+    padding: 0.875em 0.75em;
     border-bottom: 1px solid #edf2f6;
     color: #102c3f;
-    font-size: 0.8125em;
+    font-size: 0.875em;
     line-height: 1.2;
     vertical-align: middle;
     overflow: hidden;

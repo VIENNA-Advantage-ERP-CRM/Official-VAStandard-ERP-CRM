@@ -319,15 +319,9 @@
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 1em;
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.68);
     backdrop-filter: blur(0.125em);
-    color: #5f7283;
-    font-size: 0.75em;
-    font-weight: 500;
-    line-height: 1.35;
-    text-align: center;
 }
 
     .vas-upcoming-ap-runs-busy.is-visible {
@@ -867,9 +861,6 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
     justify-content: center;
     background: rgba(255, 255, 255, 0.70);
     backdrop-filter: blur(0.125em);
-    color: #5f7283;
-    font-size: 0.875em;
-    font-weight: 500;
 }
 
     .vas-upcoming-ap-runs-pay-busy.is-visible {

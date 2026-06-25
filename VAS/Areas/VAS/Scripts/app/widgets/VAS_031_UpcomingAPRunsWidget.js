@@ -1456,17 +1456,6 @@
 
             if ($payDialogBusy) {
                 $payDialogBusy
-                    .text(
-                        saving
-                            ? lbl(
-                                'VAS_031_MessageSaving',
-                                'Saving'
-                            )
-                            : lbl(
-                                'VAS_031_MessageLoading',
-                                'Loading'
-                            )
-                    )
                     .toggleClass(
                         'is-visible',
                         busy
@@ -2518,6 +2507,13 @@
                     )
                 ),
 
+                invoicePayScheduleId: Number(
+                    firstPositiveValue(
+                        selectedInvoiceRow.invoicePayScheduleId,
+                        selectedInvoiceRow.cInvoicePayScheduleId
+                    )
+                ),
+
                 adOrgId: Number(
                     getPayField(
                         'adOrgId'
@@ -2596,6 +2592,17 @@
                     lbl(
                         'VAS_031_MessageSourceInvoiceRequired',
                         'Source invoice is required.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (payload.invoicePayScheduleId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageInvoicePayScheduleRequired',
+                        'Invoice payment schedule is required.'
                     )
                 );
 
@@ -2982,7 +2989,11 @@
 
                 '</div>' +
 
-                '<div class="vas-upcoming-ap-runs-pay-busy"></div>' +
+                '<div class="vas-upcoming-ap-runs-pay-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>' +
 
                 '</div>' +
 
@@ -3169,12 +3180,11 @@
             $head.append($headLeft);
 
             $busy = $(
-                '<div class="vas-upcoming-ap-runs-busy">'
-            ).text(
-                lbl(
-                    'VAS_031_MessageLoading',
-                    'Loading'
-                )
+                '<div class="vas-upcoming-ap-runs-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
             );
 
             $state = $(

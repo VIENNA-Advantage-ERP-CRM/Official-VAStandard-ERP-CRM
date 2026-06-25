@@ -536,6 +536,7 @@
     font-weight: 700;
     line-height: 1.2;
     text-align: left;
+    text-transform: capitalize;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
