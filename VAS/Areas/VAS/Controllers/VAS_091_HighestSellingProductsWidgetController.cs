@@ -92,8 +92,8 @@ namespace VAS.Controllers
                   AND Invoice.DocStatus=N'CO'
                   AND Invoice.AD_Client_ID=@Invoice_Client_ID
                   AND Invoice.AD_Org_ID IN (0,COALESCE(NULLIF(@Invoice_Org_ID,0),Invoice.AD_Org_ID))
-                  AND Invoice.DateInvoiced>=@Previous_Year_Start
-                  AND Invoice.DateInvoiced<@Current_Year_End";
+                  AND Invoice.DateInvoiced>=@Previous_Year_Start1
+                  AND Invoice.DateInvoiced<@Current_Year_End1";
 
             string orderLineSql = @"
                 SELECT OrderLine.C_OrderLine_ID,
@@ -146,28 +146,28 @@ namespace VAS.Controllers
                            Products.Name AS Product_Name,
                            SUM(
                                CASE
-                                   WHEN Invoices.DateInvoiced>=@Current_Year_Start AND Invoices.DateInvoiced<@Current_Year_End
-                                   THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
+                                   WHEN Invoices.DateInvoiced>=@Current_Year_Start1 AND Invoices.DateInvoiced<@Current_Year_End2
+                                   THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID1,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
                                    ELSE 0
                                END
                            ) AS Current_Year_Value,
                            SUM(
                                CASE
-                                   WHEN Invoices.DateInvoiced>=@Current_Year_Start AND Invoices.DateInvoiced<@Current_Year_End
+                                   WHEN Invoices.DateInvoiced>=@Current_Year_Start2 AND Invoices.DateInvoiced<@Current_Year_End3
                                    THEN COALESCE(InvoiceLines.QtyInvoiced,InvoiceLines.QtyEntered,0)
                                    ELSE 0
                                END
                            ) AS Current_Year_Units,
                            SUM(
                                CASE
-                                   WHEN Invoices.DateInvoiced>=@Previous_Year_Start AND Invoices.DateInvoiced<@Previous_Year_End
-                                   THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
+                                   WHEN Invoices.DateInvoiced>=@Previous_Year_Start2 AND Invoices.DateInvoiced<@Previous_Year_End1
+                                   THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID2,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
                                    ELSE 0
                                END
                            ) AS Previous_Year_Value,
                            SUM(
                                CASE
-                                   WHEN Invoices.DateInvoiced>=@Previous_Year_Start AND Invoices.DateInvoiced<@Previous_Year_End
+                                   WHEN Invoices.DateInvoiced>=@Previous_Year_Start3 AND Invoices.DateInvoiced<@Previous_Year_End2
                                    THEN COALESCE(InvoiceLines.QtyInvoiced,InvoiceLines.QtyEntered,0)
                                    ELSE 0
                                END
@@ -203,17 +203,24 @@ namespace VAS.Controllers
                 new SqlParameter("@InvoiceLine_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Invoice_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Invoice_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Previous_Year_Start1", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
+                new SqlParameter("@Current_Year_End1", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
                 new SqlParameter("@OrderLine_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@OrderLine_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Order_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Order_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Product_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Product_Org_ID", ctx.GetAD_Org_ID()),
-                new SqlParameter("@Schema_Currency_ID", currency.CurrencyId),
-                new SqlParameter("@Current_Year_Start", SqlDbType.DateTime) { Value = financialYears.CurrentStart },
-                new SqlParameter("@Current_Year_End", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
-                new SqlParameter("@Previous_Year_Start", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
-                new SqlParameter("@Previous_Year_End", SqlDbType.DateTime) { Value = financialYears.PreviousEndExclusive }
+                new SqlParameter("@Current_Year_Start1", SqlDbType.DateTime) { Value = financialYears.CurrentStart },
+                new SqlParameter("@Current_Year_End2", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
+                new SqlParameter("@Schema_Currency_ID1", currency.CurrencyId),
+                new SqlParameter("@Current_Year_Start2", SqlDbType.DateTime) { Value = financialYears.CurrentStart },
+                new SqlParameter("@Current_Year_End3", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
+                new SqlParameter("@Previous_Year_Start2", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
+                new SqlParameter("@Previous_Year_End1", SqlDbType.DateTime) { Value = financialYears.PreviousEndExclusive },
+                new SqlParameter("@Schema_Currency_ID2", currency.CurrencyId),
+                new SqlParameter("@Previous_Year_Start3", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
+                new SqlParameter("@Previous_Year_End2", SqlDbType.DateTime) { Value = financialYears.PreviousEndExclusive }
             };
 
             IDataReader reader = null;

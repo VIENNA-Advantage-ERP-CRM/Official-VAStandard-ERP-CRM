@@ -65,8 +65,8 @@ namespace VAS.Controllers
                   AND COALESCE(Movement.IsReversed,'N')='N'
                   AND Movement.AD_Client_ID=@Movement_Client_ID
                   AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@Movement_Org_ID,0),Movement.AD_Org_ID))
-                  AND Movement.MovementDate>=CURRENT_DATE
-                  AND Movement.MovementDate<CURRENT_DATE+1";
+                  AND Movement.MovementDate>=@Today
+                  AND Movement.MovementDate<@Tomorrow";
 
             string productSql = @"
                 SELECT Product.M_Product_ID,
@@ -110,6 +110,15 @@ namespace VAS.Controllers
                 ),
                 WarehouseRows AS (
                     {3}
+                ),
+                StorageRows AS (
+                    SELECT M_Product_ID,
+                           M_Locator_ID,
+                           SUM(QtyOnHand) AS QtyOnHand
+                    FROM M_Storage
+                    WHERE IsActive='Y'
+                      AND AD_Client_ID=@Storage_Client_ID
+                    GROUP BY M_Product_ID, M_Locator_ID
                 )
                 SELECT MovementRows.M_Transaction_ID,
                        ProductRows.Name AS Item_Name,
@@ -118,11 +127,16 @@ namespace VAS.Controllers
                        WarehouseRows.Name AS Warehouse_Name,
                        LocatorRows.Value AS Locator_Value,
                        MovementRows.MovementDate,
+                       COALESCE(StorageRows.QtyOnHand, 0) AS QtyOnHand,
                        COUNT(*) OVER() AS Total_Rows
                 FROM MovementRows
                 INNER JOIN ProductRows ON (ProductRows.M_Product_ID=MovementRows.M_Product_ID)
                 INNER JOIN LocatorRows ON (LocatorRows.M_Locator_ID=MovementRows.M_Locator_ID)
                 INNER JOIN WarehouseRows ON (WarehouseRows.M_Warehouse_ID=LocatorRows.M_Warehouse_ID)
+                LEFT JOIN StorageRows ON (
+                    StorageRows.M_Product_ID=MovementRows.M_Product_ID
+                    AND StorageRows.M_Locator_ID=MovementRows.M_Locator_ID
+                )
                 ORDER BY MovementRows.MovementDate DESC,
                          MovementRows.Created DESC,
                          MovementRows.M_Transaction_ID DESC
@@ -133,16 +147,20 @@ namespace VAS.Controllers
                 warehouseSql
             );
 
+            DateTime today = DateTime.Now.Date;
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@Movement_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Movement_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Today", SqlDbType.DateTime) { Value = today },
+                new SqlParameter("@Tomorrow", SqlDbType.DateTime) { Value = today.AddDays(1) },
                 new SqlParameter("@Product_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Product_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Locator_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@Locator_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Warehouse_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Warehouse_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@Warehouse_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Storage_Client_ID", ctx.GetAD_Client_ID())
             };
 
             IDataReader reader = null;
@@ -160,7 +178,8 @@ namespace VAS.Controllers
                         movement_qty = Util.GetValueOfDecimal(reader["MovementQty"]),
                         warehouse_name = Util.GetValueOfString(reader["Warehouse_Name"]),
                         locator_value = Util.GetValueOfString(reader["Locator_Value"]),
-                        movement_date = FormatDateTime(Util.GetValueOfDateTime(reader["MovementDate"]))
+                        movement_date = FormatDateTime(Util.GetValueOfDateTime(reader["MovementDate"])),
+                        qty_on_hand = Util.GetValueOfDecimal(reader["QtyOnHand"])
                     });
                 }
             }
@@ -211,6 +230,7 @@ namespace VAS.Controllers
             public string warehouse_name { get; set; }
             public string locator_value { get; set; }
             public string movement_date { get; set; }
+            public decimal qty_on_hand { get; set; }
         }
     }
 }

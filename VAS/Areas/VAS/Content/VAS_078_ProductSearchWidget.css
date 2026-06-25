@@ -306,6 +306,10 @@
 
 .MPC-product-search-dialog-state,
 .MPC-product-search-empty {
+    flex: 1 1 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 32px 12px;
     color: #748494;
     font-size: 0.875rem;
@@ -452,7 +456,7 @@
     color: #0083DA;
     background: #FFFFFF;
     box-shadow: 0 2px 6px rgba(15, 61, 97, 0.10);
-    font-weight: 400;
+    font-weight: 700;
 }
 
 .MPC-product-search-form-grid {
@@ -482,54 +486,66 @@
 }
 
 .MPC-product-search-field-value.is-strong {
-    font-weight: 400;
+    font-weight: 700;
 }
 
 .MPC-product-search-tab-body {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .MPC-product-search-table-wrap {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    width: 100%;
+    overflow: auto;
+    margin-top: 6px;
 }
 
 .MPC-product-search-table {
     width: 100%;
-    flex: 1;
-    min-height: 0;
-    table-layout: fixed;
+    height: 100%;
     display: flex;
     flex-direction: column;
 }
 
 .MPC-product-search-table thead {
     flex: 0 0 auto;
-    display: table;
-    width: 100%;
-    table-layout: fixed;
+}
+
+.MPC-product-search-table thead tr {
+    display: flex;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-product-search-table th {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 8px;
+    color: #748494;
+    font-size: 0.75rem;
+    font-weight: 400;
+    text-align: start;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .MPC-product-search-table tbody {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
 }
 
 .MPC-product-search-table tbody tr {
-    flex: 1;
-    display: table;
-    width: 100%;
-    table-layout: fixed;
+    flex: 0 0 20%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
     border-bottom: 1px solid #EDF2F6;
 }
 
@@ -537,31 +553,20 @@
     border-bottom: 0;
 }
 
-.MPC-product-search-table th,
 .MPC-product-search-table td {
-    overflow: hidden;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 4px 8px;
+    color: #5F7283;
+    font-size: 0.875rem;
     text-align: start;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.MPC-product-search-table th {
-    padding: 6px 8px;
-    color: #748494;
-    border-bottom: 1px solid #EDF2F6;
-    font-size: 0.75rem;
-    font-weight: 400;
-    text-transform: capitalize;
-}
-
-.MPC-product-search-table td {
-    padding: 0 8px;
-    color: #5F7283;
-    font-size: 0.8125rem;
-    vertical-align: middle;
-}
-
 .MPC-product-search-table td.is-primary {
+    font-weight: 700;
     color: #102C3F;
 }
 
@@ -571,16 +576,62 @@
     font-variant-numeric: tabular-nums;
 }
 
-.MPC-product-search-table-row-empty td {
-    color: transparent;
-    user-select: none;
+.MPC-product-search-note {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 10px;
+    color: #748494;
+    font-size: 0.78rem;
 }
 
-.MPC-product-search-table-note {
+.MPC-product-search-note svg {
+    width: 14px;
+    height: 14px;
     flex: 0 0 auto;
-    padding-block-start: 6px;
+    color: #0083DA;
+}
+
+.MPC-product-search-table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 10px;
     color: #748494;
     font-size: 0.75rem;
+}
+
+.MPC-product-search-table-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.MPC-product-search-table-page {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #E4EDF4;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.MPC-product-search-table-page:hover {
+    background: #E7F4FF;
+}
+
+.MPC-product-search-table-page:disabled {
+    color: #B8C6D2;
+    cursor: default;
 }
 
 @container (max-width: 50em) {

@@ -5,6 +5,7 @@
  * Type                             Type
  * Qty                              Qty
  * Location                         Location
+ * VAS_093_Location                 Location
  * VAS_093_Receipt                  Receipt
  * VAS_093_VendorReturn             Vendor Return
  * VAS_093_CustomerReturn           Customer Return
@@ -30,6 +31,27 @@
 ; (function (VAS, $) {
     "use strict";
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's pixel
+       width so the widget's em sizing resolves against the dashboard content
+       area (matching the reference's container query), not the viewport. One
+       document-level observer serves every widget; without a marked container
+       or ResizeObserver the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_093_StockMovementTodayWidget = function () {
         var $self = this;
         var $root = $('<div class="MPC-stock-movement-root"></div>');
@@ -44,7 +66,7 @@
 
         function label(key, fallback) {
             var value = VIS.Msg.getMsg(key);
-            return value && value !== key ? value : fallback;
+            return value && value.charAt(0) !== '[' ? value : fallback;
         }
 
         function getPrecision() {
@@ -80,22 +102,25 @@
         }
 
         function typeInfo(code) {
+            // tone maps to the reference pill palette by movement class:
+            // Receipt/Transfer -> info, outbound issues/returns -> bad,
+            // builds/customer returns (inbound) -> ok, adjustments -> warn.
             var types = {
-                'V+': ['VAS_093_Receipt', 'Receipt', 'in'],
-                'V-': ['VAS_093_VendorReturn', 'Vendor Return', 'out'],
-                'C+': ['VAS_093_CustomerReturn', 'Customer Return', 'in'],
-                'C-': ['VAS_093_ShipmentIssue', 'Shipment / Issue', 'out'],
-                'M+': ['VAS_093_MovementIn', 'Movement In', 'move'],
-                'M-': ['VAS_093_MovementOut', 'Movement Out', 'move'],
-                'I+': ['VAS_093_InventoryIncrease', 'Inventory Increase', 'in'],
-                'I-': ['VAS_093_InventoryDecrease', 'Inventory Decrease', 'out'],
-                'P+': ['VAS_093_ProductionIn', 'Production In', 'in'],
-                'P-': ['VAS_093_ProductionOut', 'Production Out', 'out']
+                'V+': ['VAS_093_Receipt', 'Receipt', 'info'],
+                'V-': ['VAS_093_VendorReturn', 'Vendor Return', 'bad'],
+                'C+': ['VAS_093_CustomerReturn', 'Customer Return', 'ok'],
+                'C-': ['VAS_093_ShipmentIssue', 'Shipment / Issue', 'bad'],
+                'M+': ['VAS_093_MovementIn', 'Movement In', 'info'],
+                'M-': ['VAS_093_MovementOut', 'Movement Out', 'info'],
+                'I+': ['VAS_093_InventoryIncrease', 'Inventory Increase', 'warn'],
+                'I-': ['VAS_093_InventoryDecrease', 'Inventory Decrease', 'warn'],
+                'P+': ['VAS_093_ProductionIn', 'Production In', 'ok'],
+                'P-': ['VAS_093_ProductionOut', 'Production Out', 'ok']
             };
             var type = types[code];
             return type
                 ? { text: label(type[0], type[1]), tone: type[2] }
-                : { text: code || '', tone: 'move' };
+                : { text: code || '', tone: 'neutral' };
         }
 
         function locationText(row) {
@@ -105,10 +130,14 @@
             return parts.join(' \u00b7 ');
         }
 
-        function addDetail($container, detailLabel, value) {
+        function addDetail($container, detailLabel, value, isStrong) {
             var $detail = $('<div class="MPC-smt-detail"></div>');
             $detail.append($('<span class="MPC-smt-detail-label"></span>').text(detailLabel));
-            $detail.append($('<span class="MPC-smt-detail-value"></span>').text(value || ''));
+            $detail.append(
+                $('<span class="MPC-smt-detail-value"></span>')
+                    .toggleClass('is-strong', !!isStrong)
+                    .text(value || '')
+            );
             $container.append($detail);
         }
 
@@ -121,18 +150,52 @@
         function openModal(row) {
             if (!$modal || !row) { return; }
 
-            var movementType = typeInfo(row.movement_type).text;
+            var movementType = typeInfo(row.movement_type);
+            $modal.find('.MPC-smt-modal-title').text(row.item_name || '');
+            $modal.find('.MPC-smt-modal-badge')
+                .attr('class', 'MPC-smt-modal-badge MPC-smt-type MPC-smt-type-' + movementType.tone)
+                .text(movementType.text);
             var $details = $modal.find('.MPC-smt-modal-details').empty();
-            addDetail($details, label('Item', 'Item'), row.item_name);
-            addDetail($details, label('MovementType', 'Movement Type'), movementType);
+            addDetail($details, label('Item', 'Item'), row.item_name, true);
+            addDetail($details, label('MovementType', 'Movement'), movementType.text);
             addDetail($details, label('Quantity', 'Quantity'), formatQuantity(row.movement_qty));
-            addDetail($details, label('Warehouse', 'Warehouse'), row.warehouse_name);
-            addDetail($details, label('Locator', 'Locator'), row.locator_value);
-            addDetail($details, label('MovementDate', 'Movement Date'), formatDate(row.movement_date));
+            addDetail($details, label('Locator', 'Location'), row.locator_value || '');
+            addDetail($details, label('MovementDate', 'Posted'), formatDate(row.movement_date));
+            addDetail($details, label('Warehouse', 'Warehouse'), row.warehouse_name || '');
+
+            var $effect = $modal.find('.MPC-smt-stock-effect').empty().addClass('MPC-smt-hidden');
+            if (row.qty_on_hand != null) {
+                var prec = getPrecision();
+                var fmtQ = function (n) {
+                    return Number(n).toLocaleString(window.navigator.language, {
+                        minimumFractionDigits: prec,
+                        maximumFractionDigits: prec
+                    });
+                };
+                var qtyAfter = Number(row.qty_on_hand || 0);
+                var qtyChange = Number(row.movement_qty || 0);
+                var qtyBefore = qtyAfter - qtyChange;
+                $effect.append($('<div class="MPC-smt-effect-head"></div>').text(label('VAS_StockEffect', 'Stock Effect')));
+                $effect.append(
+                    '<table class="MPC-smt-effect-table">' +
+                        '<thead><tr>' +
+                            '<th>' + label('VAS_Before', 'Before') + '</th>' +
+                            '<th class="is-center">' + label('VAS_Change', 'Change') + '</th>' +
+                            '<th class="is-right">' + label('VAS_After', 'After') + '</th>' +
+                        '</tr></thead>' +
+                        '<tbody><tr>' +
+                            '<td class="is-strong">' + fmtQ(qtyBefore) + '</td>' +
+                            '<td class="is-center">' + formatQuantity(qtyChange) + '</td>' +
+                            '<td class="is-right">' + fmtQ(qtyAfter) + '</td>' +
+                        '</tr></tbody>' +
+                    '</table>'
+                );
+                $effect.removeClass('MPC-smt-hidden');
+            }
 
             $modal.addClass('MPC-smt-modal-open').attr('aria-hidden', 'false');
             $('body').addClass('MPC-smt-body-lock');
-            $modal.find('.MPC-smt-modal-close').trigger('focus');
+            $modal.find('.MPC-smt-modal-dialog').trigger('focus');
         }
 
         function renderRows(totalRecords) {
@@ -220,18 +283,26 @@
             $modal = $(
                 '<div class="MPC-smt-modal" aria-hidden="true">' +
                     '<div class="MPC-smt-modal-scrim"></div>' +
-                    '<div class="MPC-smt-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="' + modalTitleId + '">' +
+                    '<div class="MPC-smt-modal-dialog" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="' + modalTitleId + '">' +
                         '<div class="MPC-smt-modal-header">' +
                             '<span class="MPC-smt-modal-title" id="' + modalTitleId + '"></span>' +
-                            '<button type="button" class="MPC-smt-modal-close">\u00d7</button>' +
+                            '<span class="MPC-smt-modal-badge"></span>' +
+                            '<button type="button" class="MPC-smt-modal-close">' +
+                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                                    '<line x1="6" y1="6" x2="18" y2="18"/>' +
+                                    '<line x1="18" y1="6" x2="6" y2="18"/>' +
+                                '</svg>' +
+                            '</button>' +
                         '</div>' +
-                        '<div class="MPC-smt-modal-details"></div>' +
+                        '<div class="MPC-smt-modal-body">' +
+                            '<div class="MPC-smt-modal-details"></div>' +
+                            '<div class="MPC-smt-stock-effect MPC-smt-hidden"></div>' +
+                        '</div>' +
                     '</div>' +
                 '</div>'
             );
 
             var closeText = label('Close', 'Close');
-            $modal.find('.MPC-smt-modal-title').text(label('VAS_093_MovementDetail', 'Stock Movement Detail'));
             $modal.find('.MPC-smt-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
@@ -248,9 +319,7 @@
                     '<div class="MPC-smt-header">' +
                         '<span class="MPC-smt-icon" aria-hidden="true">' +
                             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                                '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4z"></path>' +
-                                '<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>' +
-                                '<line x1="12" y1="22.08" x2="12" y2="12"></line>' +
+                                '<polyline points="2 12 7 12 10 4 14 20 17 12 22 12"></polyline>' +
                             '</svg>' +
                         '</span>' +
                         '<span class="MPC-smt-title"></span>' +
@@ -272,7 +341,7 @@
             $card.find('.MPC-smt-head-item').text(label('Item', 'Item'));
             $card.find('.MPC-smt-head-type').text(label('Type', 'Type'));
             $card.find('.MPC-smt-head-quantity').text(label('Qty', 'Qty'));
-            $card.find('.MPC-smt-head-location').text(label('Location', 'Location'));
+            $card.find('.MPC-smt-head-location').text(label('VAS_093_Location', 'Location'));
             $list = $card.find('.MPC-smt-list');
             $empty = $card.find('.MPC-smt-empty');
             $footer = $card.find('.MPC-smt-footer');
@@ -284,6 +353,7 @@
             });
 
             $root.append($card);
+            ensureDashInlineSizeVar($root);
             createModal();
             loadMovements();
         };
