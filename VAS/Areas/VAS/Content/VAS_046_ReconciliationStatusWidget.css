@@ -323,8 +323,7 @@
     color: #748494;
 }
 
-.vas-reconciliation-status-busy,
-.vas-reconciliation-status-state {
+.vas-reconciliation-status-busy {
     position: absolute;
     inset: 0;
     z-index: 2;
@@ -341,8 +340,7 @@
     line-height: 1.35;
 }
 
-.vas-reconciliation-status-busy.is-visible,
-.vas-reconciliation-status-state.is-visible {
+.vas-reconciliation-status-busy.is-visible {
     display: flex;
 }
 

@@ -37,11 +37,15 @@
 .VAS-056-AutoAllocatedAPPayment-dialog-busy {
     align-items: center;
     background: rgba(255, 255, 255, 0.62);
-    display: flex;
+    display: none;
     inset: 0;
     justify-content: center;
     position: absolute;
     z-index: 5;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-busy.is-visible {
+    display: flex;
 }
 
 .VAS-056-AutoAllocatedAPPayment-pager {
@@ -49,6 +53,11 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-pager-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
     background: #fbfdff;
     border: 1px solid #e4edf4;
     border-radius: 8px;
@@ -78,7 +87,7 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-pager-text {
-    font-size: 0.85rem;
+    font-size: 0.85em;
     font-weight: 500;
     min-width: 3.75em;
 }
@@ -395,7 +404,7 @@
     align-items: flex-start;
     gap: 0.75em;
     padding: 1em 1.25em;
-    border-bottom: 0.0625em solid #edf2f6;
+    border-bottom: 1px solid #edf2f6;
 }
 
 .VAS-056-AutoAllocatedAPPayment-dialog-icon {
@@ -475,7 +484,7 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1em;
     padding: 1em 1.25em;
-    border-bottom: 0.0625em solid #edf2f6;
+    border-bottom: 1px solid #edf2f6;
     background: #fbfdff;
 }
 
@@ -520,10 +529,14 @@
     position: absolute;
     inset: 0;
     z-index: 5;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.62);
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-busy.is-visible {
+    display: flex;
 }
 
 .VAS-056-AutoAllocatedAPPayment-dialog-table {
@@ -539,20 +552,21 @@
         top: 0;
         z-index: 1;
         padding: 0.875em 0.75em;
-        border-bottom: 0.0625em solid #edf2f6;
+        border-bottom: 1px solid #edf2f6;
         background: #ffffff;
         color: #748494;
-        font-size: 0.8125em;
+        font-size: 0.75em;
         font-weight: 700;
         text-align: left;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        text-transform: capitalize;
     }
 
     .VAS-056-AutoAllocatedAPPayment-dialog-table tbody td {
         padding: 0.875em 0.75em;
-        border-bottom: 0.0625em solid #edf2f6;
+        border-bottom: 1px solid #edf2f6;
         color: #102c3f;
         font-size: 0.875em;
         line-height: 1.2;
@@ -583,12 +597,12 @@
 
 .VAS-056-AutoAllocatedAPPayment-th-bank,
 .VAS-056-AutoAllocatedAPPayment-td-bank {
-    width: 8em;
+    width: 13em;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-currency,
 .VAS-056-AutoAllocatedAPPayment-td-currency {
-    width: 6em;
+    width: 7em;
     text-align: left;
 }
 
@@ -596,6 +610,16 @@
 .VAS-056-AutoAllocatedAPPayment-td-amount {
     width: 14em;
     text-align: left;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-date,
+.VAS-056-AutoAllocatedAPPayment-td-bank,
+.VAS-056-AutoAllocatedAPPayment-td-currency {
+    color: #5f7283;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-customer {
+    font-weight: 700;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-method,
@@ -777,7 +801,7 @@
     align-items: center;
     gap: 0.5em;
     padding: 0.75em 1.25em 0;
-    border-bottom: 0.0625em solid #edf2f6;
+    border-bottom: 1px solid #edf2f6;
     background: #ffffff;
 }
 
@@ -824,49 +848,6 @@
 .VAS-056-AutoAllocatedAPPayment-tab.VAS-056-AutoAllocatedAPPayment-tab-active .VAS-056-AutoAllocatedAPPayment-tab-count {
     background: #fff4dd;
     color: #9a6500;
-}
-
-/* Column sizes used by the Auto Allocated AP Payment dialog. */
-.VAS-056-AutoAllocatedAPPayment-th-date,
-.VAS-056-AutoAllocatedAPPayment-td-date {
-    width: 8em;
-}
-
-.VAS-056-AutoAllocatedAPPayment-th-doc,
-.VAS-056-AutoAllocatedAPPayment-td-doc {
-    width: 9em;
-}
-
-.VAS-056-AutoAllocatedAPPayment-th-customer,
-.VAS-056-AutoAllocatedAPPayment-td-customer {
-    width: 13em;
-}
-
-.VAS-056-AutoAllocatedAPPayment-th-bank,
-.VAS-056-AutoAllocatedAPPayment-td-bank {
-    width: 13em;
-}
-
-.VAS-056-AutoAllocatedAPPayment-th-currency,
-.VAS-056-AutoAllocatedAPPayment-td-currency {
-    width: 7em;
-    text-align: left;
-}
-
-.VAS-056-AutoAllocatedAPPayment-th-amount,
-.VAS-056-AutoAllocatedAPPayment-td-amount {
-    width: 14em;
-    text-align: left;
-}
-
-.VAS-056-AutoAllocatedAPPayment-td-date,
-.VAS-056-AutoAllocatedAPPayment-td-bank,
-.VAS-056-AutoAllocatedAPPayment-td-currency {
-    color: #5f7283;
-}
-
-.VAS-056-AutoAllocatedAPPayment-td-customer {
-    font-weight: 700;
 }
 
 @media (max-width: 48em) {

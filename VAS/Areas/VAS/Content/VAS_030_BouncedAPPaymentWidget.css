@@ -87,6 +87,11 @@
 }
 
 .vas-bounced-ap-payment-pager-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
     background: #fbfdff;
     border: 1px solid #e4edf4;
     border-radius: 8px;
@@ -111,7 +116,7 @@
 }
 
 .vas-bounced-ap-payment-pager-text {
-    font-size: 0.85rem;
+    font-size: 0.85em;
     font-weight: 500;
     min-width: 3.75em;
 }

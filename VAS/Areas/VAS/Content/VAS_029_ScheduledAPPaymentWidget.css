@@ -17,6 +17,11 @@
 }
 
 .vas-scheduled-ap-payment-pager-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
     background: #fbfdff;
     border: 1px solid #e4edf4;
     border-radius: 8px;
@@ -46,7 +51,7 @@
 }
 
 .vas-scheduled-ap-payment-pager-text {
-    font-size: 0.85rem;
+    font-size: 0.85em;
     font-weight: 500;
     min-width: 3.75em;
 }
@@ -339,65 +344,6 @@
     padding: 1.25em;
     font-family: Roboto, Arial, sans-serif;
     font-size: 1em;
-}
-
-.vas-scheduled-ap-payment-busy {
-    align-items: center;
-    border-radius: 14px;
-    color: #5f7283;
-    display: none;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.8125em;
-    font-weight: 600;
-    inset: 0;
-    justify-content: center;
-    line-height: 1.35;
-    padding: 0.875em;
-    position: absolute;
-    text-align: center;
-    z-index: 2;
-}
-
-.vas-scheduled-ap-payment-busy.is-visible {
-    display: flex;
-}
-
-.vas-scheduled-ap-payment-dialog-busy {
-    align-items: center;
-    background: rgba(255, 255, 255, 0.62);
-    display: none;
-    inset: 0;
-    justify-content: center;
-    position: absolute;
-    z-index: 5;
-}
-
-.vas-scheduled-ap-payment-dialog-busy.is-visible {
-    display: flex;
-}
-
-.vas-scheduled-ap-payment-dialog,
-.vas-scheduled-ap-payment-dialog * {
-    font-weight: 700;
-}
-
-.vas-scheduled-ap-payment-dialog-busy {
-    display: flex;
-    visibility: hidden;
-}
-
-.vas-scheduled-ap-payment-dialog-busy.is-visible {
-    visibility: visible;
-}
-
-.vas-scheduled-ap-payment-dialog,
-.vas-scheduled-ap-payment-dialog * {
-    font-weight: 700;
-}
-
-.vas-scheduled-ap-payment-dialog,
-.vas-scheduled-ap-payment-dialog * {
-    font-weight: 700;
 }
 
 .vas-scheduled-ap-payment-dialog-scrim {
@@ -823,42 +769,3 @@
     }
 }
 
-.vas-scheduled-ap-payment-busy {
-    align-items: center;
-    border-radius: 14px;
-    color: #5f7283;
-    display: none;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.8125em;
-    font-weight: 600;
-    inset: 0;
-    justify-content: center;
-    line-height: 1.35;
-    padding: 0.875em;
-    position: absolute;
-    text-align: center;
-    z-index: 2;
-}
-
-.vas-scheduled-ap-payment-busy.is-visible {
-    display: flex;
-}
-
-.vas-scheduled-ap-payment-dialog-busy {
-    align-items: center;
-    background: rgba(255, 255, 255, 0.62);
-    display: none;
-    inset: 0;
-    justify-content: center;
-    position: absolute;
-    z-index: 5;
-}
-
-.vas-scheduled-ap-payment-dialog-busy.is-visible {
-    display: flex;
-}
-
-.vas-scheduled-ap-payment-dialog,
-.vas-scheduled-ap-payment-dialog * {
-    font-weight: 700;
-}

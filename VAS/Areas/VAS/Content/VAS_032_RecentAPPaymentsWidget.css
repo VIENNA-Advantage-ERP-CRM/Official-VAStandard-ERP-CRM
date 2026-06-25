@@ -238,7 +238,7 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
     margin: 0 -0.25em;
     padding: 0 0.25em;
 }
@@ -265,16 +265,6 @@
     display: flex;
 }
 
-.vas-recent-ap-payments-dialog,
-.vas-recent-ap-payments-dialog * {
-    font-weight: 700;
-}
-
-.vas-recent-ap-payments-dialog,
-.vas-recent-ap-payments-dialog * {
-    font-weight: 700;
-}
-
 .vas-recent-ap-payments-footer {
     flex: 0 0 auto;
     min-width: 0;
@@ -287,20 +277,6 @@
     border-top: 1px solid #edf2f6;
     overflow: hidden;
 }
-
-    .vas-recent-ap-payments-table-wrap::-webkit-scrollbar {
-        width: 0.5em;
-        height: 0.5em;
-    }
-
-    .vas-recent-ap-payments-table-wrap::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .vas-recent-ap-payments-table-wrap::-webkit-scrollbar-thumb {
-        background: rgba(16, 44, 63, 0.15);
-        border-radius: 0.25em;
-    }
 
 .vas-recent-ap-payments-table {
     width: 100%;
@@ -989,45 +965,41 @@
     display: flex;
 }
 
-.vas-recent-ap-payments-dialog,
-.vas-recent-ap-payments-dialog * {
-    font-weight: 700;
-}
-
-
 .vas-allocation-popup {
-    padding: 18px;
-    font-family: Arial, sans-serif;
+    padding: 1.125em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+    color: #102c3f;
 }
 
 .vas-allocation-popup-header {
-    margin-bottom: 20px;
+    margin-bottom: 1.25em;
 }
 
 .vas-allocation-popup-title {
-    font-size: 28px;
+    font-size: 1.375em;
     font-weight: 700;
-    color: #12263f;
-    margin-bottom: 6px;
+    color: #102c3f;
+    margin-bottom: 0.375em;
 }
 
 .vas-allocation-popup-subtitle {
-    font-size: 16px;
-    color: #6e7f91;
+    font-size: 0.8125em;
+    color: #5f7283;
 }
 
 .vas-allocation-summary-card {
-    border: 1px solid #d9e3ec;
-    border-radius: 16px;
-    padding: 24px;
-    background: #f9fbfd;
-    margin-bottom: 26px;
+    border: 1px solid #edf2f6;
+    border-radius: 0.875em;
+    padding: 1.125em;
+    background: #fbfdff;
+    margin-bottom: 1.375em;
 }
 
 .vas-allocation-summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 26px 30px;
+    gap: 1.25em 1.375em;
 }
 
 .vas-summary-item {
@@ -1039,58 +1011,68 @@
 }
 
 .vas-summary-label {
-    font-size: 13px;
-    letter-spacing: 2px;
-    color: #6f8397;
-    margin-bottom: 8px;
+    font-size: 0.75em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #748494;
+    margin-bottom: 0.375em;
+    text-transform: capitalize;
 }
 
 .vas-summary-value {
-    font-size: 18px;
+    font-size: 1em;
     font-weight: 600;
-    color: #12263f;
+    color: #102c3f;
+    font-variant-numeric: tabular-nums;
 }
 
 .vas-allocation-lines-title {
-    margin: 12px 0 16px;
-    font-size: 18px;
-    letter-spacing: 2px;
-    color: #6f8397;
+    margin: 0.75em 0 1em;
+    font-size: 0.875em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #748494;
+    text-transform: capitalize;
 }
 
 .vas-allocation-lines-table-wrap {
-    overflow-x: auto;
+    overflow: hidden;
 }
 
 .vas-allocation-lines-table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
-    border: 1px solid #d9e3ec;
-    border-radius: 14px;
+    background: #ffffff;
+    border: 1px solid #edf2f6;
+    border-radius: 0.875em;
     overflow: hidden;
 }
 
     .vas-allocation-lines-table thead th {
-        background: #edf3f8;
-        color: #6f8397;
-        font-size: 13px;
-        letter-spacing: 1.5px;
+        background: #fbfdff;
+        color: #748494;
+        font-size: 0.75em;
+        font-weight: 700;
+        letter-spacing: 0.04em;
         text-align: left;
-        padding: 14px 16px;
+        padding: 0.875em 1em;
+        border-bottom: 1px solid #edf2f6;
+        text-transform: capitalize;
     }
 
     .vas-allocation-lines-table tbody td {
-        padding: 14px 16px;
-        border-top: 1px solid #e7eef5;
-        font-size: 15px;
-        color: #12263f;
+        padding: 0.875em 1em;
+        border-top: 1px solid #edf2f6;
+        font-size: 0.875em;
+        color: #102c3f;
     }
 
 .vas-allocation-empty {
-    padding: 20px;
-    border: 1px solid #d9e3ec;
-    border-radius: 12px;
-    color: #6f8397;
-    background: #fafcfe;
+    padding: 1.25em;
+    border: 1px solid #edf2f6;
+    border-radius: 0.75em;
+    color: #748494;
+    background: #fbfdff;
+    font-size: 0.8125em;
+    text-align: center;
 }
