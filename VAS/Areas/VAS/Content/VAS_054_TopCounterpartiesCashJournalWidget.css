@@ -116,15 +116,16 @@
     min-width: 0;
     min-height: 0;
     flex: 1 1 auto;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: auto;
     display: flex;
     flex-direction: column;
+    direction: ltr;
     scrollbar-width: thin;
     scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
 }
 
 .VAS_054_counterparties-body::-webkit-scrollbar {
+    width: 4px;
     height: 4px;
 }
 
@@ -140,18 +141,19 @@
 /* Column headers */
 .VAS_054_counterparties-col-headers {
     flex: 0 0 auto;
-    min-width: 36em;
+    width: 100%;
+    min-width: 0;
     display: grid;
-    grid-template-columns: 2em minmax(0, 1fr) 6em 2.5em 6em minmax(9em, auto);
+    grid-template-columns: 1.75em minmax(5em, 1fr) minmax(4.75em, 0.72fr) 2.25em minmax(4.25em, 0.6fr) minmax(5.75em, 0.8fr);
     align-items: center;
-    gap: 0.75em;
+    gap: 0.375em;
     padding: 0 0.5em 0.5em;
     border-bottom: 1px solid rgba(212, 225, 234, 0.72);
     color: #748494;
     font-size: 0.6875em;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: capitalize;
 }
 
 .col-h-txns,
@@ -161,22 +163,23 @@
 }
 
 .VAS_054_counterparties-list {
+    width: 100%;
     min-width: 0;
     min-height: 0;
-    flex: 1 1 auto;
-    overflow: hidden;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
 }
 
 .VAS_054_counterparties-row {
     width: 100%;
-    min-width: 36em;
-    flex: 1 1 0;
+    min-width: 0;
+    min-height: 3.875em;
+    flex: 0 0 auto;
     display: grid;
-    grid-template-columns: 2em minmax(0, 1fr) 6em 2.5em 6em minmax(9em, auto);
+    grid-template-columns: 1.75em minmax(5em, 1fr) minmax(4.75em, 0.72fr) 2.25em minmax(4.25em, 0.6fr) minmax(5.75em, 0.8fr);
     align-items: center;
-    gap: 0.75em;
+    gap: 0.375em;
     padding: 0.5em 0.5em;
     border-top: 1px solid rgba(212, 225, 234, 0.66);
 }
@@ -224,6 +227,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    unicode-bidi: plaintext;
     font-size: 0.8125em;
     line-height: 1.2;
     font-weight: 700;
@@ -242,8 +246,8 @@
     font-size: 0.625em;
     line-height: 1.1;
     font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: 0;
+    text-transform: capitalize;
 }
 
 .VAS_054_counterparties-chip-vendor {
@@ -483,8 +487,8 @@
 @container (max-width: 38em) {
     .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
-        grid-template-columns: 2em minmax(0, 1fr) 5.5em 2em 4.5em auto;
-        gap: 0.5em;
+        grid-template-columns: 1.75em minmax(4.75em, 1fr) minmax(4.25em, 0.72fr) 2em minmax(4em, 0.6fr) minmax(5.25em, 0.8fr);
+        gap: 0.3em;
     }
 
     .VAS_054_counterparties-meta {
@@ -499,15 +503,14 @@
         border-radius: 12px;
     }
 
-    .VAS_054_counterparties-action,
-    .VAS_054_counterparties-spark-wrap,
-    .col-h-trend {
+    .VAS_054_counterparties-action {
         display: none;
     }
 
     .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
-        grid-template-columns: 2em minmax(0, 1fr) 5em 2em minmax(7em, auto);
+        grid-template-columns: 1.5em minmax(4.25em, 1fr) minmax(3.9em, 0.75fr) 1.75em minmax(3.75em, 0.65fr) minmax(4.75em, 0.85fr);
+        gap: 0.25em;
     }
 
     .VAS_054_counterparties-icon {

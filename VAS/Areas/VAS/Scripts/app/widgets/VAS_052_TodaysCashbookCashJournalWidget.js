@@ -50,7 +50,7 @@
         var $pageText = null;
 
         var pageNo = 1;
-        var pageSize = 2;
+        var pageSize = 3;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -453,13 +453,13 @@
                         'Posted by'
                     ) +
                     '</th>' +
-                    '<th>' +
+                    '<th class="VAS_052_cashbook-col-amount">' +
                     lbl(
                         'VAS_052_In',
                         'In'
                     ) +
                     '</th>' +
-                    '<th>' +
+                    '<th class="VAS_052_cashbook-col-amount">' +
                     lbl(
                         'VAS_052_Out',
                         'Out'

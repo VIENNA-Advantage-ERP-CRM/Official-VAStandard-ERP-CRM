@@ -240,7 +240,7 @@
             $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-party',  'text': lbl('VAS_054_ColParty',  'Party')    }).appendTo($colHeaders);
             $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-type',   'text': lbl('VAS_054_ColType',   'Type')     }).appendTo($colHeaders);
             $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-txns',   'text': lbl('VAS_054_ColTxns',   'Txns')     }).appendTo($colHeaders);
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-trend',  'text': lbl('VAS_054_ColTrend',  '30D Trend') }).appendTo($colHeaders);
+            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-trend',  'text': lbl('VAS_054_ColTrend',  '30d Trend') }).appendTo($colHeaders);
             $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-volume', 'text': lbl('VAS_054_ColVolume', 'Volume')   }).appendTo($colHeaders);
 
             var $list = $('<div>', {
