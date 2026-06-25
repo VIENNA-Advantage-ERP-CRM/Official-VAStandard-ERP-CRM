@@ -365,10 +365,13 @@ UnpaidSchedule AS
                     0
                 )
                 -
-                COALESCE
+                ABS
                 (
-                    ScheduleAllocation.AllocatedAmt,
-                    0
+                    COALESCE
+                    (
+                        ScheduleAllocation.AllocatedAmt,
+                        0
+                    )
                 )
             ) > 0
             THEN
@@ -379,10 +382,13 @@ UnpaidSchedule AS
                     0
                 )
                 -
-                COALESCE
+                ABS
                 (
-                    ScheduleAllocation.AllocatedAmt,
-                    0
+                    COALESCE
+                    (
+                        ScheduleAllocation.AllocatedAmt,
+                        0
+                    )
                 )
             )
 
@@ -398,6 +404,12 @@ UnpaidSchedule AS
     )
 
     WHERE InvoicePaySchedule.IsActive = 'Y'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.IsPaid,
+        'N'
+    ) = 'N'
 
     AND COALESCE
     (
@@ -799,10 +811,13 @@ UnpaidSchedule AS
                     0
                 )
                 -
-                COALESCE
+                ABS
                 (
-                    ScheduleAllocation.AllocatedAmt,
-                    0
+                    COALESCE
+                    (
+                        ScheduleAllocation.AllocatedAmt,
+                        0
+                    )
                 )
             ) > 0
             THEN
@@ -813,10 +828,13 @@ UnpaidSchedule AS
                     0
                 )
                 -
-                COALESCE
+                ABS
                 (
-                    ScheduleAllocation.AllocatedAmt,
-                    0
+                    COALESCE
+                    (
+                        ScheduleAllocation.AllocatedAmt,
+                        0
+                    )
                 )
             )
 
@@ -832,6 +850,12 @@ UnpaidSchedule AS
     )
 
     WHERE InvoicePaySchedule.IsActive = 'Y'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.IsPaid,
+        'N'
+    ) = 'N'
 
     AND COALESCE
     (
@@ -857,10 +881,10 @@ UnpaidSchedule AS
         AND ExistingPayment.C_InvoicePaySchedule_ID =
             InvoicePaySchedule.C_InvoicePaySchedule_ID
 
-        AND ExistingPayment.DocStatus IN
+        AND ExistingPayment.DocStatus NOT IN
         (
-            'CO',
-            'CL'
+            'VO',
+            'RE'
         )
     )
 )
@@ -2044,6 +2068,17 @@ ORDER BY
                     );
                 }
 
+                if (IsInvoicePaySchedulePaid(
+                    invoiceId,
+                    invoicePayScheduleId,
+                    trx
+                ))
+                {
+                    throw new InvalidOperationException(
+                        "Invoice schedule already paid."
+                    );
+                }
+
                 int validatedInvoicePayScheduleId =
                     ValidateInvoicePaySchedule(
                         invoiceId,
@@ -2054,7 +2089,7 @@ ORDER BY
                 if (validatedInvoicePayScheduleId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "The selected invoice payment schedule is invalid, inactive, " +
+                        "The selected invoice payment schedule is invalid, inactive, paid, " +
                         "or does not belong to the selected invoice."
                     );
                 }
@@ -2540,11 +2575,14 @@ AND PaymentMethod.AD_Client_ID IN
                  */
                 trx.Commit();
 
+                string createdPaymentDocumentNo =
+                    payment.GetDocumentNo();
+
                 string msg = GetMsg(
-                         ctx,
-                         "VAS_031_MessagePaymentCreatedSuccessfully",
-                         "AP payment created and completed successfully : " 
-                     ) + " " + documentNo;
+                    ctx,
+                    "VAS_031_MessagePaymentCreatedSuccessfully",
+                    "AP payment created and completed successfully:"
+                ) + " " + createdPaymentDocumentNo;
 
 
                 return Json(new
@@ -2567,7 +2605,13 @@ AND PaymentMethod.AD_Client_ID IN
                         payment.GetC_Payment_ID(),
 
                     documentNo =
-                        payment.GetDocumentNo(),
+                        createdPaymentDocumentNo,
+
+                    paymentDocumentNo =
+                        createdPaymentDocumentNo,
+
+                    paymentNo =
+                        createdPaymentDocumentNo,
 
                     docStatus =
                         payment.GetDocStatus(),
@@ -2680,7 +2724,8 @@ WHERE DocumentType.C_DocType_ID = " +
             int invoicePayScheduleId,
             Trx trx)
         {
-            if (invoiceId <= 0 || invoicePayScheduleId <= 0)
+            if (invoiceId <= 0 ||
+                invoicePayScheduleId <= 0)
             {
                 return 0;
             }
@@ -2688,15 +2733,81 @@ WHERE DocumentType.C_DocType_ID = " +
             string sql = @"
 SELECT
     InvoicePaySchedule.C_InvoicePaySchedule_ID
+
 FROM C_InvoicePaySchedule InvoicePaySchedule
+
 WHERE InvoicePaySchedule.IsActive = 'Y'
+
+AND COALESCE
+(
+    InvoicePaySchedule.IsPaid,
+    'N'
+) = 'N'
+
 AND InvoicePaySchedule.C_Invoice_ID = " +
-                invoiceId.ToString(CultureInfo.InvariantCulture) + @"
+                invoiceId.ToString(
+                    CultureInfo.InvariantCulture
+                ) + @"
+
 AND InvoicePaySchedule.C_InvoicePaySchedule_ID = " +
-                invoicePayScheduleId.ToString(CultureInfo.InvariantCulture);
+                invoicePayScheduleId.ToString(
+                    CultureInfo.InvariantCulture
+                );
 
             return Util.GetValueOfInt(
-                DB.ExecuteScalar(sql, null, trx)
+                DB.ExecuteScalar(
+                    sql,
+                    null,
+                    trx
+                )
+            );
+        }
+
+        private bool IsInvoicePaySchedulePaid(
+            int invoiceId,
+            int invoicePayScheduleId,
+            Trx trx)
+        {
+            if (invoiceId <= 0 ||
+                invoicePayScheduleId <= 0)
+            {
+                return true;
+            }
+
+            string sql = @"
+SELECT
+    COALESCE
+    (
+        InvoicePaySchedule.IsPaid,
+        'N'
+    )
+
+FROM C_InvoicePaySchedule InvoicePaySchedule
+
+WHERE InvoicePaySchedule.IsActive = 'Y'
+
+AND InvoicePaySchedule.C_Invoice_ID = " +
+                invoiceId.ToString(
+                    CultureInfo.InvariantCulture
+                ) + @"
+
+AND InvoicePaySchedule.C_InvoicePaySchedule_ID = " +
+                invoicePayScheduleId.ToString(
+                    CultureInfo.InvariantCulture
+                );
+
+            string isPaid = Util.GetValueOfString(
+                DB.ExecuteScalar(
+                    sql,
+                    null,
+                    trx
+                )
+            );
+
+            return string.Equals(
+                isPaid,
+                "Y",
+                StringComparison.OrdinalIgnoreCase
             );
         }
 
