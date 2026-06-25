@@ -117,8 +117,6 @@
     min-height: 0;
     flex: 1 1 auto;
     overflow: auto;
-    display: flex;
-    flex-direction: column;
     direction: ltr;
     scrollbar-width: thin;
     scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
@@ -138,59 +136,85 @@
     background: rgba(16, 44, 63, 0.18);
 }
 
-/* Column headers */
-.VAS_054_counterparties-col-headers {
-    flex: 0 0 auto;
+.VAS_054_counterparties-table {
     width: 100%;
-    min-width: 50em;
-    display: grid;
-    grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
-    align-items: center;
-    gap: 0.375em;
-    padding: 0 0.5em 0.5em;
-    border-bottom: 1px solid rgba(212, 225, 234, 0.72);
+    min-width: 58em;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.VAS_054_counterparties-table th,
+.VAS_054_counterparties-table td {
+    min-width: 0;
+    padding: 0.375em 0.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(212, 225, 234, 0.66);
+}
+
+.VAS_054_counterparties-table th {
+    padding-top: 0;
+    padding-bottom: 0.5em;
     color: #748494;
     font-size: 0.6875em;
+    line-height: 1.2;
     font-weight: 700;
     letter-spacing: 0;
+    text-align: left;
     text-transform: capitalize;
+    border-bottom-color: rgba(212, 225, 234, 0.72);
 }
 
-.col-h-txns,
-.col-h-volume {
-    justify-self: end;
-    text-align: right;
+.VAS_054_counterparties-table td {
+    text-align: left !important;
 }
 
-.VAS_054_counterparties-list {
-    width: 100%;
-    min-width: 50em;
-    min-height: 0;
-    flex: 0 0 auto;
-    display: flex;
-    flex-direction: column;
+.VAS_054_counterparties-table tbody tr {
+    height: 3em;
 }
 
-.VAS_054_counterparties-row {
-    width: 100%;
-    min-width: 50em;
-    min-height: 3.875em;
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
-    align-items: center;
-    gap: 0.375em;
-    padding: 0.5em 0.5em;
-    border-top: 1px solid rgba(212, 225, 234, 0.66);
+.VAS_054_counterparties-table tbody tr:last-child td {
+    border-bottom: 0;
 }
 
-    .VAS_054_counterparties-row:first-child {
-        border-top: 0;
-    }
+.VAS_054_counterparties-col-avatar,
+.VAS_054_counterparties-cell-avatar {
+    width: 2em;
+}
+
+.VAS_054_counterparties-col-party,
+.VAS_054_counterparties-cell-party {
+    width: 12em;
+}
+
+.VAS_054_counterparties-col-type,
+.VAS_054_counterparties-cell-type {
+    width: 7em;
+}
+
+.VAS_054_counterparties-col-txns,
+.VAS_054_counterparties-count {
+    width: 3em;
+    text-align: left !important;
+}
+
+.VAS_054_counterparties-col-trend,
+.VAS_054_counterparties-spark-wrap {
+    width: 9em;
+}
+
+.VAS_054_counterparties-col-volume,
+.VAS_054_counterparties-cell-volume {
+    width: 20em;
+    text-align: left !important;
+}
 
 .VAS_054_counterparties-avatar {
-    width: 1.75em;
-    height: 1.75em;
+    width: 1.5em;
+    height: 1.5em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -235,7 +259,6 @@
 }
 
 .VAS_054_counterparties-chip {
-    justify-self: start;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -271,16 +294,13 @@
 }
 
 .VAS_054_counterparties-count {
-    justify-self: end;
     color: #748494;
     font-size: 0.8125em;
     font-weight: 600;
 }
 
 .VAS_054_counterparties-spark-wrap {
-    min-width: 0;
-    width: 100%;
-    height: 1.125em;
+    height: 2.25em;
 }
 
 .VAS_054_counterparties-sparkline {
@@ -311,19 +331,19 @@
 }
 
 .VAS_054_counterparties-amount {
-    justify-self: end;
-    min-width: 16em;
+    min-width: 0;
+    max-width: 100%;
     overflow: visible;
     text-overflow: clip;
     white-space: nowrap;
-    text-align: right;
+    text-align: left;
     display: inline-flex;
     align-items: baseline;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 0;
     font-size: 0.8125em;
     line-height: 1;
-    font-weight: 800;
+    font-weight: 700;
     color: #102C3F;
 }
 
@@ -349,6 +369,7 @@
     text-overflow: clip;
     font-size: 1em;
     line-height: 1;
+    font-weight: 700;
     color: currentColor;
 }
 
@@ -368,7 +389,7 @@
     margin-top: 0;
     color: currentColor;
     font-size: 1em;
-    font-weight: 800;
+    font-weight: 700;
     opacity: 1;
 }
 
@@ -485,12 +506,6 @@
 }
 
 @container (max-width: 38em) {
-    .VAS_054_counterparties-col-headers,
-    .VAS_054_counterparties-row {
-        grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
-        gap: 0.375em;
-    }
-
     .VAS_054_counterparties-meta {
         display: none;
     }
@@ -505,12 +520,6 @@
 
     .VAS_054_counterparties-action {
         display: none;
-    }
-
-    .VAS_054_counterparties-col-headers,
-    .VAS_054_counterparties-row {
-        grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
-        gap: 0.375em;
     }
 
     .VAS_054_counterparties-icon {

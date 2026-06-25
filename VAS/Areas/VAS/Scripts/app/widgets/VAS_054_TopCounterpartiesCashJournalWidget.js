@@ -45,7 +45,7 @@
         var $pageText = null;
 
         var pageNo = 1;
-        var pageSize = 4;
+        var pageSize = 2;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -232,23 +232,26 @@
                 'class': 'VAS_054_counterparties-body'
             });
 
-            var $colHeaders = $('<div>', {
-                'class': 'VAS_054_counterparties-col-headers'
+            var $table = $('<table>', {
+                'class': 'VAS_054_counterparties-table'
             });
 
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-avatar' }).appendTo($colHeaders);
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-party',  'text': lbl('VAS_054_ColParty',  'Party')    }).appendTo($colHeaders);
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-type',   'text': lbl('VAS_054_ColType',   'Type')     }).appendTo($colHeaders);
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-txns',   'text': lbl('VAS_054_ColTxns',   'Txns')     }).appendTo($colHeaders);
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-trend',  'text': lbl('VAS_054_ColTrend',  '30d Trend') }).appendTo($colHeaders);
-            $('<span>', { 'class': 'VAS_054_counterparties-col-h col-h-volume', 'text': lbl('VAS_054_ColVolume', 'Volume')   }).appendTo($colHeaders);
+            var $thead = $('<thead>').appendTo($table);
+            var $headerRow = $('<tr>').appendTo($thead);
 
-            var $list = $('<div>', {
-                'class': 'VAS_054_counterparties-list',
+            $('<th>', { 'class': 'VAS_054_counterparties-col-avatar' }).appendTo($headerRow);
+            $('<th>', { 'class': 'VAS_054_counterparties-col-party',  'text': lbl('VAS_054_ColParty',  'Party')     }).appendTo($headerRow);
+            $('<th>', { 'class': 'VAS_054_counterparties-col-type',   'text': lbl('VAS_054_ColType',   'Type')      }).appendTo($headerRow);
+            $('<th>', { 'class': 'VAS_054_counterparties-col-txns',   'text': lbl('VAS_054_ColTxns',   'Txns')      }).appendTo($headerRow);
+            $('<th>', { 'class': 'VAS_054_counterparties-col-trend',  'text': lbl('VAS_054_ColTrend',  '30d Trend') }).appendTo($headerRow);
+            $('<th>', { 'class': 'VAS_054_counterparties-col-volume', 'text': lbl('VAS_054_ColVolume', 'Volume')    }).appendTo($headerRow);
+
+            var $list = $('<tbody>', {
                 'id': 'VAS_054_counterparties-list-' + widgetId
             });
 
-            $body.append($colHeaders).append($list);
+            $table.append($list);
+            $body.append($table);
 
             var $state = $('<div>', {
                 'class': 'VAS_054_counterparties-state',
@@ -391,6 +394,14 @@
             }
         }
 
+        function resetHorizontalScroll() {
+            if (!$root) {
+                return;
+            }
+
+            $root.find('.VAS_054_counterparties-body').scrollLeft(0);
+        }
+
         function buildSparkline(trend) {
             var points = trend === 'down'
                 ? '2,8 12,11 22,7 32,12 42,8 52,13 62,15'
@@ -438,35 +449,51 @@
             }
 
             $.each(items, function (index, item) {
-                var $row = $('<div>', {
+                var $row = $('<tr>', {
                     'class': 'VAS_054_counterparties-row'
                 });
 
-                var $avatar = $('<span>', {
-                    'class': 'VAS_054_counterparties-avatar VAS_054_counterparties-avatar-' + (item.typeClass || 'other'),
-                    'text': item.initials || '--'
-                });
+                var $avatarCell = $('<td>', {
+                    'class': 'VAS_054_counterparties-cell-avatar'
+                }).append(
+                    $('<span>', {
+                        'class': 'VAS_054_counterparties-avatar VAS_054_counterparties-avatar-' + (item.typeClass || 'other'),
+                        'text': item.initials || '--'
+                    })
+                );
 
-                var $name = $('<div>', {
-                    'class': 'VAS_054_counterparties-name',
-                    'text': item.name || '-',
-                    'title': item.name || '-'
-                });
+                var $nameCell = $('<td>', {
+                    'class': 'VAS_054_counterparties-cell-party'
+                }).append(
+                    $('<div>', {
+                        'class': 'VAS_054_counterparties-name',
+                        'text': item.name || '-',
+                        'title': item.name || '-'
+                    })
+                );
 
-                var $chip = $('<span>', {
-                    'class': 'VAS_054_counterparties-chip VAS_054_counterparties-chip-' + (item.typeClass || 'other'),
-                    'text': item.typeText || '',
-                    'title': item.typeText || ''
-                });
+                var $typeCell = $('<td>', {
+                    'class': 'VAS_054_counterparties-cell-type'
+                }).append(
+                    $('<span>', {
+                        'class': 'VAS_054_counterparties-chip VAS_054_counterparties-chip-' + (item.typeClass || 'other'),
+                        'text': item.typeText || '',
+                        'title': item.typeText || ''
+                    })
+                );
 
-                var $count = $('<span>', {
+                var $count = $('<td>', {
                     'class': 'VAS_054_counterparties-count',
                     'text': safeNumber(item.entryCount).toLocaleString(window.navigator.language)
                 });
 
-                var $spark = $('<span>', {
+                var $spark = $('<td>', {
                     'class': 'VAS_054_counterparties-spark-wrap',
                     'html': buildSparkline(item.trend)
+                });
+
+                var $amountCell = $('<td>', {
+                    'class': 'VAS_054_counterparties-cell-volume'
                 });
 
                 var $amount = $('<span>', {
@@ -475,19 +502,21 @@
                 });
 
                 renderAmount($amount, item);
+                $amountCell.append($amount);
 
                 $row
-                    .append($avatar)
-                    .append($name)
-                    .append($chip)
+                    .append($avatarCell)
+                    .append($nameCell)
+                    .append($typeCell)
                     .append($count)
                     .append($spark)
-                    .append($amount);
+                    .append($amountCell);
 
                 $list.append($row);
             });
 
             updatePager();
+            resetHorizontalScroll();
         }
 
         function loadData() {
