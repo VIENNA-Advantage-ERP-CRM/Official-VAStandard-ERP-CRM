@@ -422,13 +422,7 @@
                 $(
                     '<table class="VAS_052_cashbook-table">' +
                     '<thead>' +
-                    '<tr>' +
-                    '<th class="VAS_052_cashbook-col-time">' +
-                    lbl(
-                        'VAS_052_Time',
-                        'Time'
-                    ) +
-                    '</th>' +
+                
                     '<th class="VAS_052_cashbook-col-doc-no">' +
                     lbl(
                         'VAS_052_DocumentNo',
@@ -760,18 +754,7 @@
             var $row =
                 $('<tr>');
 
-            $('<td>', {
-                'class':
-                    'VAS_052_cashbook-col-time',
-
-                'text':
-                    entry.timeText ||
-                    '',
-
-                'title':
-                    entry.timeText ||
-                    ''
-            }).appendTo($row);
+          
 
             $('<td>', {
                 'class':

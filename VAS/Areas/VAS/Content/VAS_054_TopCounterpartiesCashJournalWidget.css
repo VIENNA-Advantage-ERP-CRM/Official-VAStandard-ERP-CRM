@@ -142,9 +142,9 @@
 .VAS_054_counterparties-col-headers {
     flex: 0 0 auto;
     width: 100%;
-    min-width: 0;
+    min-width: 50em;
     display: grid;
-    grid-template-columns: 1.75em minmax(5em, 1fr) minmax(4.75em, 0.72fr) 2.25em minmax(4.25em, 0.6fr) minmax(5.75em, 0.8fr);
+    grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
     align-items: center;
     gap: 0.375em;
     padding: 0 0.5em 0.5em;
@@ -164,7 +164,7 @@
 
 .VAS_054_counterparties-list {
     width: 100%;
-    min-width: 0;
+    min-width: 50em;
     min-height: 0;
     flex: 0 0 auto;
     display: flex;
@@ -173,11 +173,11 @@
 
 .VAS_054_counterparties-row {
     width: 100%;
-    min-width: 0;
+    min-width: 50em;
     min-height: 3.875em;
     flex: 0 0 auto;
     display: grid;
-    grid-template-columns: 1.75em minmax(5em, 1fr) minmax(4.75em, 0.72fr) 2.25em minmax(4.25em, 0.6fr) minmax(5.75em, 0.8fr);
+    grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
     align-items: center;
     gap: 0.375em;
     padding: 0.5em 0.5em;
@@ -312,9 +312,9 @@
 
 .VAS_054_counterparties-amount {
     justify-self: end;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-width: 16em;
+    overflow: visible;
+    text-overflow: clip;
     white-space: nowrap;
     text-align: right;
     display: inline-flex;
@@ -345,8 +345,8 @@
 
 .VAS_054_counterparties-amount .VAS-cash-amount-main {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible;
+    text-overflow: clip;
     font-size: 1em;
     line-height: 1;
     color: currentColor;
@@ -487,8 +487,8 @@
 @container (max-width: 38em) {
     .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
-        grid-template-columns: 1.75em minmax(4.75em, 1fr) minmax(4.25em, 0.72fr) 2em minmax(4em, 0.6fr) minmax(5.25em, 0.8fr);
-        gap: 0.3em;
+        grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
+        gap: 0.375em;
     }
 
     .VAS_054_counterparties-meta {
@@ -509,8 +509,8 @@
 
     .VAS_054_counterparties-col-headers,
     .VAS_054_counterparties-row {
-        grid-template-columns: 1.5em minmax(4.25em, 1fr) minmax(3.9em, 0.75fr) 1.75em minmax(3.75em, 0.65fr) minmax(4.75em, 0.85fr);
-        gap: 0.25em;
+        grid-template-columns: 2em minmax(12em, 1fr) 7em 3em 8em minmax(16em, auto);
+        gap: 0.375em;
     }
 
     .VAS_054_counterparties-icon {
