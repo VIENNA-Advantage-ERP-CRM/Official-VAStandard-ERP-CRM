@@ -44,16 +44,6 @@
     z-index: 5;
 }
 
-.VAS-056-AutoAllocatedAPPayment-dialog,
-.VAS-056-AutoAllocatedAPPayment-dialog * {
-    font-weight: 700;
-}
-
-.VAS-056-AutoAllocatedAPPayment-dialog,
-.VAS-056-AutoAllocatedAPPayment-dialog * {
-    font-weight: 700;
-}
-
 .VAS-056-AutoAllocatedAPPayment-pager {
     gap: 0.5em;
 }
@@ -904,38 +894,3 @@
     }
 }
 
-.VAS-056-AutoAllocatedAPPayment-busy {
-    align-items: center;
-    border-radius: 14px;
-    color: #5f7283;
-    display: none;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.8125em;
-    font-weight: 600;
-    inset: 0;
-    justify-content: center;
-    line-height: 1.35;
-    padding: 0.875em;
-    position: absolute;
-    text-align: center;
-    z-index: 2;
-}
-
-.VAS-056-AutoAllocatedAPPayment-busy.is-visible {
-    display: flex;
-}
-
-.VAS-056-AutoAllocatedAPPayment-dialog-busy {
-    align-items: center;
-    background: rgba(255, 255, 255, 0.62);
-    display: flex;
-    inset: 0;
-    justify-content: center;
-    position: absolute;
-    z-index: 5;
-}
-
-.VAS-056-AutoAllocatedAPPayment-dialog,
-.VAS-056-AutoAllocatedAPPayment-dialog * {
-    font-weight: 700;
-}
