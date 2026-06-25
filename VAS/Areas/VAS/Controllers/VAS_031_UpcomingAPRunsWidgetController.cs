@@ -523,6 +523,7 @@ ORDER BY
 
         #endregion
 
+
         #region Upcoming Invoice Details
 
         [AjaxAuthorizeAttribute]
@@ -619,21 +620,39 @@ SELECT
     Invoice.DateAcct,
     Invoice.GrandTotal,
     Invoice.VA009_PaymentMethod_ID
+
 FROM C_Invoice Invoice
+
 WHERE Invoice.IsActive = 'Y'
+
 AND Invoice.AD_Client_ID = " + clientIdSql + @"
+
 AND Invoice.IsSOTrx = 'N'
-AND Invoice.DocStatus IN ('CO', 'CL')
+
+AND Invoice.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+
 AND EXISTS
 (
     SELECT 1
+
     FROM C_DocType InvoiceDocumentType
-    WHERE InvoiceDocumentType.C_DocType_ID = Invoice.C_DocType_ID
+
+    WHERE InvoiceDocumentType.C_DocType_ID =
+          Invoice.C_DocType_ID
+
     AND InvoiceDocumentType.IsActive = 'Y'
+
     AND InvoiceDocumentType.DocBaseType = 'API'
+
     AND InvoiceDocumentType.IsSOTrx = 'N'
 )
+
 AND Invoice.C_Currency_ID = " + currencyIdSql + @"
+
 AND COALESCE
 (
     Invoice.VA009_PaymentMethod_ID,
@@ -652,10 +671,11 @@ WITH SecuredInvoice AS
 (
 " + invoiceAccessSql + @"
 ),
-InvoiceAllocation AS
+
+ScheduleAllocation AS
 (
     SELECT
-        AllocationLine.C_Invoice_ID,
+        AllocationLine.C_InvoicePaySchedule_ID,
 
         SUM
         (
@@ -682,11 +702,109 @@ InvoiceAllocation AS
 
     WHERE AllocationLine.IsActive = 'Y'
 
-    AND AllocationLine.C_Invoice_ID IS NOT NULL
+    AND AllocationLine.C_InvoicePaySchedule_ID
+        IS NOT NULL
 
     GROUP BY
-        AllocationLine.C_Invoice_ID
+        AllocationLine.C_InvoicePaySchedule_ID
+),
+
+UnpaidSchedule AS
+(
+    SELECT
+        InvoicePaySchedule.C_InvoicePaySchedule_ID,
+
+        InvoicePaySchedule.C_Invoice_ID,
+
+        InvoicePaySchedule.DueDate,
+
+        COALESCE
+        (
+            InvoicePaySchedule.DueAmt,
+            0
+        ) AS DueAmt,
+
+        COALESCE
+        (
+            ScheduleAllocation.AllocatedAmt,
+            0
+        ) AS AllocatedAmt,
+
+        CASE
+            WHEN
+            (
+                COALESCE
+                (
+                    InvoicePaySchedule.DueAmt,
+                    0
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocation.AllocatedAmt,
+                    0
+                )
+            ) > 0
+            THEN
+            (
+                COALESCE
+                (
+                    InvoicePaySchedule.DueAmt,
+                    0
+                )
+                -
+                COALESCE
+                (
+                    ScheduleAllocation.AllocatedAmt,
+                    0
+                )
+            )
+
+            ELSE 0
+        END AS OpenAmount
+
+    FROM C_InvoicePaySchedule InvoicePaySchedule
+
+    LEFT OUTER JOIN ScheduleAllocation ScheduleAllocation ON
+    (
+        ScheduleAllocation.C_InvoicePaySchedule_ID =
+            InvoicePaySchedule.C_InvoicePaySchedule_ID
+    )
+
+    WHERE InvoicePaySchedule.IsActive = 'Y'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.DueAmt,
+        0
+    ) > 0
+
+    /*
+     * Hide schedule when a completed/closed payment
+     * already exists for the same schedule.
+     */
+    AND NOT EXISTS
+    (
+        SELECT 1
+
+        FROM C_Payment ExistingPayment
+
+        WHERE ExistingPayment.IsActive = 'Y'
+
+        AND ExistingPayment.C_Invoice_ID =
+            InvoicePaySchedule.C_Invoice_ID
+
+        AND ExistingPayment.C_InvoicePaySchedule_ID =
+            InvoicePaySchedule.C_InvoicePaySchedule_ID
+
+        AND ExistingPayment.DocStatus IN
+        (
+            'CO',
+            'CL'
+        )
+    )
 )
+
 SELECT
     Invoice.C_Invoice_ID,
 
@@ -700,7 +818,13 @@ SELECT
 
     Invoice.C_BPartner_Location_ID,
 
-    InvoicePaySchedule.C_InvoicePaySchedule_ID,
+    UnpaidSchedule.C_InvoicePaySchedule_ID,
+
+    UnpaidSchedule.DueAmt AS ScheduleDueAmount,
+
+    UnpaidSchedule.AllocatedAmt AS ScheduleAllocatedAmount,
+
+    UnpaidSchedule.OpenAmount AS ScheduleOpenAmount,
 
     BusinessPartner.Name AS VendorName,
 
@@ -728,155 +852,75 @@ SELECT
 
     COALESCE
     (
-        InvoicePaySchedule.DueDate,
+        UnpaidSchedule.DueDate,
         Invoice.DateAcct
     ) AS DueDate,
 
     Invoice.GrandTotal,
 
-    CASE
-        WHEN
-        (
-            Invoice.GrandTotal -
-            COALESCE
-            (
-                InvoiceAllocation.AllocatedAmt,
-                0
-            )
-        ) <= 0
-        THEN 0
-
-        WHEN InvoicePaySchedule.C_InvoicePaySchedule_ID
-             IS NOT NULL
-
-        AND COALESCE
-        (
-            InvoicePaySchedule.DueAmt,
-            0
-        ) > 0
-
-        AND InvoicePaySchedule.DueAmt <
-        (
-            Invoice.GrandTotal -
-            COALESCE
-            (
-                InvoiceAllocation.AllocatedAmt,
-                0
-            )
-        )
-        THEN InvoicePaySchedule.DueAmt
-
-        ELSE
-        (
-            Invoice.GrandTotal -
-            COALESCE
-            (
-                InvoiceAllocation.AllocatedAmt,
-                0
-            )
-        )
-    END AS OpenAmount
+    UnpaidSchedule.OpenAmount AS OpenAmount
 
 FROM SecuredInvoice Invoice
 
 INNER JOIN C_BPartner BusinessPartner ON
 (
     BusinessPartner.C_BPartner_ID =
-    Invoice.C_BPartner_ID
+        Invoice.C_BPartner_ID
+)
+
+INNER JOIN UnpaidSchedule UnpaidSchedule ON
+(
+    UnpaidSchedule.C_Invoice_ID =
+        Invoice.C_Invoice_ID
+
+    /*
+     * Only unpaid schedules appear in popup.
+     */
+    AND UnpaidSchedule.OpenAmount > 0
 )
 
 LEFT OUTER JOIN AD_Org Organization ON
 (
     Organization.AD_Org_ID =
-    Invoice.AD_Org_ID
-)
-
-INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
-(
-    InvoicePaySchedule.C_Invoice_ID =
-    Invoice.C_Invoice_ID
-
-    AND InvoicePaySchedule.IsActive = 'Y'
-
-    AND COALESCE
-    (
-        InvoicePaySchedule.DueAmt,
-        0
-    ) > 0
-
-    AND NOT EXISTS
-    (
-        SELECT 1
-
-        FROM C_Payment ExistingPayment
-
-        WHERE ExistingPayment.IsActive = 'Y'
-
-        AND ExistingPayment.C_Invoice_ID =
-        Invoice.C_Invoice_ID
-
-        AND ExistingPayment.C_InvoicePaySchedule_ID =
-        InvoicePaySchedule.C_InvoicePaySchedule_ID
-
-        AND ExistingPayment.DocStatus NOT IN
-        (
-            'VO',
-            'RE'
-        )
-    )
-)
-
-LEFT OUTER JOIN InvoiceAllocation InvoiceAllocation ON
-(
-    InvoiceAllocation.C_Invoice_ID =
-    Invoice.C_Invoice_ID
+        Invoice.AD_Org_ID
 )
 
 LEFT OUTER JOIN C_Currency Currency ON
 (
     Currency.C_Currency_ID =
-    Invoice.C_Currency_ID
+        Invoice.C_Currency_ID
 )
 
 LEFT OUTER JOIN C_ConversionType ConversionType ON
 (
     ConversionType.C_ConversionType_ID =
-    Invoice.C_ConversionType_ID
+        Invoice.C_ConversionType_ID
 )
 
 LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 (
     PaymentMethod.VA009_PaymentMethod_ID =
-    Invoice.VA009_PaymentMethod_ID
+        Invoice.VA009_PaymentMethod_ID
 )
 
 WHERE BusinessPartner.IsActive = 'Y'
 
 AND BusinessPartner.IsVendor = 'Y'
 "
-+ GetDateFilter(
+        + GetDateFilter(
                     @"COALESCE
 (
-    InvoicePaySchedule.DueDate,
+    UnpaidSchedule.DueDate,
     Invoice.DateAcct
 )",
                     dateFrom,
                     dateTo
                 ) + @"
 
-AND
-(
-    Invoice.GrandTotal -
-    COALESCE
-    (
-        InvoiceAllocation.AllocatedAmt,
-        0
-    )
-) > 0
-
 ORDER BY
     DueDate,
     Invoice.DocumentNo,
+    UnpaidSchedule.C_InvoicePaySchedule_ID,
     Invoice.C_Invoice_ID";
 
                 reader = DB.ExecuteReader(
@@ -912,7 +956,9 @@ ORDER BY
                         "CurrencySymbol"
                     );
 
-                    if (string.IsNullOrWhiteSpace(currencySymbol))
+                    if (string.IsNullOrWhiteSpace(
+                        currencySymbol
+                    ))
                     {
                         currencySymbol = currencyISO;
                     }
@@ -927,10 +973,35 @@ ORDER BY
                         "C_BPartner_ID"
                     );
 
-                    decimal openAmount = GetDecimal(
+                    int invoicePayScheduleId = GetInt(
                         reader,
-                        "OpenAmount"
+                        "C_InvoicePaySchedule_ID"
                     );
+
+                    decimal scheduleDueAmount = GetDecimal(
+                        reader,
+                        "ScheduleDueAmount"
+                    );
+
+                    decimal scheduleAllocatedAmount = GetDecimal(
+                        reader,
+                        "ScheduleAllocatedAmount"
+                    );
+
+                    decimal scheduleOpenAmount = GetDecimal(
+                        reader,
+                        "ScheduleOpenAmount"
+                    );
+
+                    /*
+                     * Final C# protection:
+                     * never add a paid schedule to popup rows.
+                     */
+                    if (invoicePayScheduleId <= 0 ||
+                        scheduleOpenAmount <= 0)
+                    {
+                        continue;
+                    }
 
                     rows.Add(new
                     {
@@ -939,6 +1010,12 @@ ORDER BY
                         sourceInvoiceId = invoiceId,
 
                         cInvoiceId = invoiceId,
+
+                        invoicePayScheduleId =
+                            invoicePayScheduleId,
+
+                        cInvoicePayScheduleId =
+                            invoicePayScheduleId,
 
                         invoiceDocumentNo = GetString(
                             reader,
@@ -977,16 +1054,6 @@ ORDER BY
                         cBPartnerLocationId = GetInt(
                             reader,
                             "C_BPartner_Location_ID"
-                        ),
-
-                        invoicePayScheduleId = GetInt(
-                            reader,
-                            "C_InvoicePaySchedule_ID"
-                        ),
-
-                        cInvoicePayScheduleId = GetInt(
-                            reader,
-                            "C_InvoicePaySchedule_ID"
                         ),
 
                         vendorName = GetString(
@@ -1061,11 +1128,23 @@ ORDER BY
                             "GrandTotal"
                         ),
 
-                        openAmount = openAmount,
+                        scheduleDueAmount =
+                            scheduleDueAmount,
 
-                        amount = openAmount,
+                        scheduleAllocatedAmount =
+                            scheduleAllocatedAmount,
 
-                        payAmt = openAmount,
+                        scheduleOpenAmount =
+                            scheduleOpenAmount,
+
+                        openAmount =
+                            scheduleOpenAmount,
+
+                        amount =
+                            scheduleOpenAmount,
+
+                        payAmt =
+                            scheduleOpenAmount,
 
                         paymentMethodId = GetInt(
                             reader,
@@ -1080,13 +1159,14 @@ ORDER BY
                             )
                         ),
 
-                        /*
-                         * These values are selected from popup lookups.
-                         */
                         bankAccountId = 0,
+
                         docTypeId = 0,
+
                         cDocTypeId = 0,
+
                         tenderType = string.Empty,
+
                         paymentDocumentNo = string.Empty
                     });
                 }
@@ -1095,6 +1175,7 @@ ORDER BY
                 {
                     success = true,
                     error = string.Empty,
+                    hasData = rows.Count > 0,
                     rows = rows
                 }, JsonRequestBehavior.AllowGet);
             }
@@ -1115,7 +1196,9 @@ ORDER BY
                 {
                     success = false,
                     error = message,
-                    errorText = message
+                    errorText = message,
+                    hasData = false,
+                    rows = new List<object>()
                 }, JsonRequestBehavior.AllowGet);
             }
             finally
@@ -2397,6 +2480,13 @@ AND PaymentMethod.AD_Client_ID IN
                  */
                 trx.Commit();
 
+                string msg = GetMsg(
+                         ctx,
+                         "VAS_031_MessagePaymentCreatedSuccessfully",
+                         "AP payment created and completed successfully : " 
+                     ) + " " + documentNo;
+
+
                 return Json(new
                 {
                     success = true,
@@ -2452,11 +2542,7 @@ AND PaymentMethod.AD_Client_ID IN
                     refreshUpcomingAPRuns =
                         true,
 
-                    message = GetMsg(
-                        ctx,
-                        "VAS_031_MessagePaymentCreatedSuccessfully",
-                        "AP payment created and completed successfully."
-                    )
+                    message = msg
                 });
             }
             catch (InvalidOperationException ex)
