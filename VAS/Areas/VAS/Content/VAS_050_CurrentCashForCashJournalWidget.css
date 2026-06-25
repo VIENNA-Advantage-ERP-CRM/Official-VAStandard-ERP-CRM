@@ -444,7 +444,10 @@
 }
 
 /* Align card surface with the dashboard widget standard */
-.VAS_current-cash-cash-journal-root,
+.VAS_current-cash-cash-journal-root {
+    color: #102C3F;
+}
+
 .VAS_current-cash-cash-journal-card {
     color: #60748A;
 }

@@ -129,9 +129,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 1em;
+    font-size: 0.75em;
     line-height: 1.2;
-    font-weight: 800;
+    font-weight: 700;
     color: #102C3F;
 }
 
@@ -150,7 +150,7 @@
     display: block;
     max-width: 100%;
     text-align: right;
-    font-size: 0.875em;
+    font-size: 0.75em;
 }
 
 .VAS_055_cash-category-amount {
@@ -303,8 +303,8 @@
 }
 
 .VAS_055_cash-category-page-btn {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.5em;
+    height: 1.5em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -340,7 +340,7 @@
 }
 
 .VAS_055_cash-category-page-text {
-    min-width: 4.25em;
+    min-width: 3em;
     text-align: center;
     font-size: 1em;
     line-height: 1.2;
@@ -483,8 +483,8 @@
 }
 
 .VAS_055_cash-category-page-btn {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.5em;
+    height: 1.5em;
     border: 1px solid #cfe9ff;
     border-radius: 0.5em;
     background: rgba(255, 255, 255, 0.86);
@@ -503,7 +503,7 @@
 
 .VAS_055_cash-category-page-text {
     display: inline-block;
-    min-width: 4.25em;
+    min-width: 3em;
     font-size: 1em;
     font-weight: 700;
     color: #141414;

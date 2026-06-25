@@ -27,8 +27,8 @@
     min-height: 0;
     overflow: hidden;
     font-family: Roboto, Arial, sans-serif;
-    /* Single lever: change this and everything inside rescales. */
     font-size: clamp(16px, 1.4cqi, 24px);
+    container-type: inline-size;
     color: #102C3F;
 }
 
@@ -87,7 +87,7 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
 }
 
 /* Icon box — semi-transparent pill */
@@ -120,7 +120,7 @@
     font-size: 0.875em; /* md token */
     line-height: 1.2;
     font-weight: 400;
-    color: #5F7283;
+    color: #102C3F;
 }
 
 /* Date period pill — xs token (0.6875em) */
@@ -328,11 +328,7 @@
 }
 
 /* ── Compact / small breakpoint ──────────────────────────────────────── */
-@media (max-width: 32.5em) {
-    .VAS-047-today-cash-in-cash-journal-root {
-        font-size: clamp(16px, 1.4cqi, 24px);
-    }
-
+@container (max-width: 32.5em) {
     .VAS-047-today-cash-in-cash-journal-card {
         padding: 0.75em;
         gap: 0.375em;
@@ -345,7 +341,6 @@
         border-radius: 0.375em;
     }
 
-    /* Value shrinks proportionally at narrow sizes */
     .VAS-047-today-cash-in-cash-journal-value {
         font-size: 1.375em;
     }

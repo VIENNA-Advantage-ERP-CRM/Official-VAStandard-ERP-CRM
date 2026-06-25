@@ -95,7 +95,7 @@
     white-space: nowrap;
     font-size: 0.875em;
     line-height: 1.2;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0;
     color: #102C3F;
 }
@@ -131,29 +131,12 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow: auto;
-    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
-    scrollbar-width: thin;
+    overflow: hidden;
 }
-
-    .VAS_052_cashbook-body::-webkit-scrollbar {
-        width: 0.375em;
-        height: 0.375em;
-    }
-
-    .VAS_052_cashbook-body::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .VAS_052_cashbook-body::-webkit-scrollbar-thumb {
-        border-radius: 999px;
-        background: rgba(16, 44, 63, 0.18);
-    }
 
 /* Table */
 .VAS_052_cashbook-table {
     width: 100%;
-    min-width: 54em;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0;
@@ -175,14 +158,14 @@
         font-family: Roboto, Arial, sans-serif;
         font-size: 0.75em;
         line-height: 1.2;
-        font-weight: 700;
-        letter-spacing: 0.12em;
+        font-weight: 400;
+        text-transform: capitalize;
     }
 
     .VAS_052_cashbook-table td {
         padding: 0.625em 0.75em;
         color: #60748A;
-        font-size: 0.8125em;
+        font-size: 0.75em;
         line-height: 1.2;
         font-weight: 400;
     }
@@ -200,7 +183,8 @@
 
 .VAS_052_cashbook-desc {
     color: #102C3F !important;
-    font-size: 0.8125em !important;
+    font-size: 0.75em !important;
+    font-weight: 700 !important;
 }
 
 .VAS_052_cashbook-col-category,
@@ -341,8 +325,8 @@
 }
 
 .VAS_052_cashbook-page-btn {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.5em;
+    height: 1.5em;
     border: 1px solid #cfe9ff;
     border-radius: 0.5em;
     background: rgba(255, 255, 255, 0.86);
@@ -356,15 +340,15 @@
 
 .VAS_052_cashbook-page-text {
     display: inline-block;
-    min-width: 4.25em;
+    min-width: 3em;
     font-size: 1em;
     font-weight: 700;
     color: #141414;
 }
 
 .VAS_052_cashbook-page-btn {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.5em;
+    height: 1.5em;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -400,7 +384,7 @@
     }
 
 .VAS_052_cashbook-page-text {
-    min-width: 4.25em;
+    min-width: 3em;
     text-align: center;
     font-size: 1em;
     line-height: 1.2;
@@ -464,10 +448,6 @@
     .VAS_052_cashbook-meta {
         display: none;
     }
-
-    .VAS_052_cashbook-table {
-        min-width: 50em;
-    }
 }
 
 @container (max-width: 26em) {
@@ -495,10 +475,6 @@
         display: none;
     }
 
-    .VAS_052_cashbook-table {
-        min-width: 46em;
-    }
-
     .VAS_052_cashbook-footer {
         justify-content: flex-end;
         gap: 0.5em;
@@ -506,13 +482,8 @@
         padding-top: 0.45em;
     }
 
-    .VAS_052_cashbook-page-btn {
-        width: 1.6em;
-        height: 1.6em;
-    }
-
     .VAS_052_cashbook-page-text {
-        min-width: 2.25em;
+        min-width: 2em;
         font-size: 0.7em;
     }
 }
@@ -522,8 +493,8 @@
 }
 
 .VAS_052_cashbook-page-btn {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.5em;
+    height: 1.5em;
     border: 1px solid #cfe9ff;
     border-radius: 0.5em;
     background: rgba(255, 255, 255, 0.86);
@@ -542,7 +513,7 @@
 
 .VAS_052_cashbook-page-text {
     display: inline-block;
-    min-width: 4.25em;
+    min-width: 3em;
     font-size: 1em;
     font-weight: 700;
     color: #141414;
