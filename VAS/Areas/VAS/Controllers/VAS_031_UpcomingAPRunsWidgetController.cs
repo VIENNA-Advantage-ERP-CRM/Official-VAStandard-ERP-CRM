@@ -391,12 +391,39 @@ UpcomingInvoices AS
         Invoice.C_BPartner_ID
     )
 
-    LEFT OUTER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
+    INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
     (
         InvoicePaySchedule.C_Invoice_ID =
         Invoice.C_Invoice_ID
 
         AND InvoicePaySchedule.IsActive = 'Y'
+
+        AND COALESCE
+        (
+            InvoicePaySchedule.DueAmt,
+            0
+        ) > 0
+
+        AND NOT EXISTS
+        (
+            SELECT 1
+
+            FROM C_Payment ExistingPayment
+
+            WHERE ExistingPayment.IsActive = 'Y'
+
+            AND ExistingPayment.C_Invoice_ID =
+            Invoice.C_Invoice_ID
+
+            AND ExistingPayment.C_InvoicePaySchedule_ID =
+            InvoicePaySchedule.C_InvoicePaySchedule_ID
+
+            AND ExistingPayment.DocStatus NOT IN
+            (
+                'VO',
+                'RE'
+            )
+        )
     )
 
     LEFT OUTER JOIN InvoiceAllocation InvoiceAllocation ON
@@ -764,12 +791,39 @@ LEFT OUTER JOIN AD_Org Organization ON
     Invoice.AD_Org_ID
 )
 
-LEFT OUTER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
+INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
 (
     InvoicePaySchedule.C_Invoice_ID =
     Invoice.C_Invoice_ID
 
     AND InvoicePaySchedule.IsActive = 'Y'
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.DueAmt,
+        0
+    ) > 0
+
+    AND NOT EXISTS
+    (
+        SELECT 1
+
+        FROM C_Payment ExistingPayment
+
+        WHERE ExistingPayment.IsActive = 'Y'
+
+        AND ExistingPayment.C_Invoice_ID =
+        Invoice.C_Invoice_ID
+
+        AND ExistingPayment.C_InvoicePaySchedule_ID =
+        InvoicePaySchedule.C_InvoicePaySchedule_ID
+
+        AND ExistingPayment.DocStatus NOT IN
+        (
+            'VO',
+            'RE'
+        )
+    )
 )
 
 LEFT OUTER JOIN InvoiceAllocation InvoiceAllocation ON
@@ -1862,6 +1916,17 @@ ORDER BY
                     );
                 }
 
+                if (HasExistingPaymentForSchedule(
+                    invoiceId,
+                    validatedInvoicePayScheduleId,
+                    trx
+                ))
+                {
+                    throw new InvalidOperationException(
+                        "Invoice schedule already has an active payment."
+                    );
+                }
+
                 /*
                  * Read the current invoice open amount before creating payment.
                  */
@@ -2487,6 +2552,52 @@ AND InvoicePaySchedule.C_InvoicePaySchedule_ID = " +
             return Util.GetValueOfInt(
                 DB.ExecuteScalar(sql, null, trx)
             );
+        }
+
+        private bool HasExistingPaymentForSchedule(
+            int invoiceId,
+            int invoicePayScheduleId,
+            Trx trx)
+        {
+            if (invoiceId <= 0 ||
+                invoicePayScheduleId <= 0)
+            {
+                return true;
+            }
+
+            string sql = @"
+SELECT
+    COUNT(1)
+
+FROM C_Payment ExistingPayment
+
+WHERE ExistingPayment.IsActive = 'Y'
+
+AND ExistingPayment.C_Invoice_ID = " +
+                invoiceId.ToString(
+                    CultureInfo.InvariantCulture
+                ) + @"
+
+AND ExistingPayment.C_InvoicePaySchedule_ID = " +
+                invoicePayScheduleId.ToString(
+                    CultureInfo.InvariantCulture
+                ) + @"
+
+AND ExistingPayment.DocStatus NOT IN
+(
+    'VO',
+    'RE'
+)";
+
+            int paymentCount = Util.GetValueOfInt(
+                DB.ExecuteScalar(
+                    sql,
+                    null,
+                    trx
+                )
+            );
+
+            return paymentCount > 0;
         }
 
         private int ResolveBPartnerLocationId(
