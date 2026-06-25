@@ -359,7 +359,7 @@
                 '<div class="VAS-047-cash-in-dialog-footer"><span class="VAS-047-cash-in-pager-helper"></span><div class="VAS-047-cash-in-dialog-actions">' +
                 '<div class="VAS-047-cash-in-pager"><button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-prev" aria-label="' + escapeHtml(lbl('VAS_050_Previous', 'Previous')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>' +
                 '<span class="VAS-047-cash-in-pager-text"></span><button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-next" aria-label="' + escapeHtml(lbl('VAS_050_Next', 'Next')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button></div>' +
-                '<button type="button" class="VAS-047-cash-in-dialog-close-action">' + escapeHtml(lbl('VAS_050_Close', 'Close')) + '</button></div></div></div></div>'
+                '</div></div></div></div>'
             );
 
             $dialogTbody = $dialog.find('.VAS-047-cash-in-dialog-tbody');
@@ -369,7 +369,7 @@
             $pagerNext = $dialog.find('.VAS-047-cash-in-pager-next');
             $pagerText = $dialog.find('.VAS-047-cash-in-pager-text');
             showDialogBusy(false);
-            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-close-action, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
+            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
             $pagerPrev.on('click', function () { if (!rowsLoading && pageNo > 1) { pageNo--; loadDialogRows(); } });
             $pagerNext.on('click', function () { if (!rowsLoading && pageNo < totalPages) { pageNo++; loadDialogRows(); } });
             eventNamespace = '.VAS050CurrentCash' + String(uid).replace(/[^A-Za-z0-9]/g, '');
@@ -427,10 +427,6 @@
                 'text': '·'
             });
 
-            var $live = $('<span>', {
-                'class': 'VAS_current-cash-cash-journal-live',
-                'text': lbl('VAS_050_Live', 'Live')
-            });
 
             var $zoom = $('<span>', {
                 'class': 'VAS-glje-zoom',
@@ -476,7 +472,7 @@
 
             $delta.html(getTrendIcon(0)).append($deltaText);
             $footer.append($delta).append($description);
-            $filter.append($select).append($separator).append($live);
+            $filter.append($select);
             $headerTools.append($filter).append($zoom);
             $header.append($title).append($headerTools);
             $card.append($action).append($busy).append($header).append($value).append($footer).append($state);

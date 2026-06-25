@@ -454,7 +454,6 @@
                 '<span class="VAS-047-cash-in-pager-text"></span>' +
                 '<button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-next" aria-label="' + escapeHtml(lbl('VAS_047_Next', 'Next')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>' +
                 '</div>' +
-                '<button type="button" class="VAS-047-cash-in-dialog-close-action">' + escapeHtml(lbl('VAS_047_Close', 'Close')) + '</button>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +
@@ -469,7 +468,7 @@
             $pagerText = $dialog.find('.VAS-047-cash-in-pager-text');
             $dialogBusy[0].style.visibility = 'hidden';
 
-            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-close-action').on('click', closeDialog);
+            $dialog.find('.VAS-047-cash-in-dialog-close').on('click', closeDialog);
             $dialog.find('.VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
 
             $pagerPrev.on('click', function () {

@@ -325,7 +325,7 @@
                 '<button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-prev" aria-label="' + escapeHtml(lbl('VAS_048_Previous', 'Previous')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>' +
                 '<span class="VAS-047-cash-in-pager-text"></span>' +
                 '<button type="button" class="VAS-047-cash-in-pager-btn VAS-047-cash-in-pager-next" aria-label="' + escapeHtml(lbl('VAS_048_Next', 'Next')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>' +
-                '</div><button type="button" class="VAS-047-cash-in-dialog-close-action">' + escapeHtml(lbl('VAS_048_Close', 'Close')) + '</button></div></div>' +
+                '</div></div></div>' +
                 '</div></div>'
             );
 
@@ -337,7 +337,7 @@
             $pagerText = $dialog.find('.VAS-047-cash-in-pager-text');
             showDialogBusy(false);
 
-            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-close-action, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
+            $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
             $pagerPrev.on('click', function () { if (!rowsLoading && pageNo > 1) { pageNo--; loadDialogRows(); } });
             $pagerNext.on('click', function () { if (!rowsLoading && pageNo < totalPages) { pageNo++; loadDialogRows(); } });
 
