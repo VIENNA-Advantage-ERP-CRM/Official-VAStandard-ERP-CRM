@@ -149,6 +149,13 @@
     color: #FFFFFF;
 }
 
+.VAS_current-cash-cash-journal-value,
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix,
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-main,
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-decimal {
+    font-weight: 700;
+}
+
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix {
     flex: 0 0 auto;
     margin-top: 0.18em;
@@ -490,6 +497,22 @@
 
 .VAS_current-cash-cash-journal-delta-negative {
     color: #A94747;
+}
+
+.VAS_current-cash-cash-journal-value {
+    font-size: 1.375em;
+    font-weight: 700;
+}
+
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-main {
+    font-size: 1em;
+    font-weight: 700;
+}
+
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix,
+.VAS_current-cash-cash-journal-value .VAS-cash-amount-decimal {
+    font-size: 1em;
+    font-weight: 700;
 }
 
 .VAS_current-cash-cash-journal-busy {
