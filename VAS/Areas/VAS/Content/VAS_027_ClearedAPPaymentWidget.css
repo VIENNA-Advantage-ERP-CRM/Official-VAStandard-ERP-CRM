@@ -534,7 +534,7 @@
 .vas-cpa-dialog-table th:nth-child(6),
 .vas-cpa-td-amount {
     width: 14em;
-    text-align: right;
+    text-align: left;
 }
 
 .vas-cpa-td-amount {

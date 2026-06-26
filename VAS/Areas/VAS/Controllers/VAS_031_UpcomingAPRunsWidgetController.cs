@@ -359,6 +359,8 @@ UnpaidSchedule AS
     )
     WHERE InvoicePaySchedule.IsActive = 'Y'
     AND COALESCE(InvoicePaySchedule.VA009_IsPaid, 'N') = 'N'
+    AND COALESCE(InvoicePaySchedule.C_Payment_ID, 0) = 0
+    AND COALESCE(InvoicePaySchedule.C_CashLine_ID, 0) = 0
     AND COALESCE(InvoicePaySchedule.DueAmt, 0) > 0
     AND NOT EXISTS
     (
@@ -771,9 +773,21 @@ UnpaidSchedule AS
     ) > 0
 
     /*
-     * Hide schedule when a completed/closed payment
-     * already exists for the same schedule.
+     * Hide schedule when the payment engine would reject it as already
+     * assigned/paid.
      */
+    AND COALESCE
+    (
+        InvoicePaySchedule.C_Payment_ID,
+        0
+    ) = 0
+
+    AND COALESCE
+    (
+        InvoicePaySchedule.C_CashLine_ID,
+        0
+    ) = 0
+
     AND NOT EXISTS
     (
         SELECT 1
@@ -2658,6 +2672,18 @@ AND COALESCE
     'N'
 ) = 'N'
 
+AND COALESCE
+(
+    InvoicePaySchedule.C_Payment_ID,
+    0
+) = 0
+
+AND COALESCE
+(
+    InvoicePaySchedule.C_CashLine_ID,
+    0
+) = 0
+
 AND InvoicePaySchedule.C_Invoice_ID = " +
                 invoiceId.ToString(
                     CultureInfo.InvariantCulture
@@ -2908,6 +2934,8 @@ FROM
     )
     WHERE InvoicePaySchedule.IsActive = 'Y'
     AND COALESCE(InvoicePaySchedule.VA009_IsPaid, 'N') = 'N'
+    AND COALESCE(InvoicePaySchedule.C_Payment_ID, 0) = 0
+    AND COALESCE(InvoicePaySchedule.C_CashLine_ID, 0) = 0
     AND InvoicePaySchedule.C_Invoice_ID = " + invoiceIdSql + @"
     AND InvoicePaySchedule.C_InvoicePaySchedule_ID = " + scheduleIdSql + @"
 ) ScheduleBalance

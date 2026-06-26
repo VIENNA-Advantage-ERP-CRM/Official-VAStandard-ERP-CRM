@@ -227,7 +227,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: right;
+    text-align: left;
     font-size: 0.6875em;
     font-weight: 500;
     line-height: 1.2;

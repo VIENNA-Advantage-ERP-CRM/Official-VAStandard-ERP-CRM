@@ -247,7 +247,7 @@
 .vas-reconciliation-status-tooltip-row strong {
     color: #ffffff;
     font-weight: 700;
-    text-align: end;
+    text-align: start;
     white-space: nowrap;
 }
 

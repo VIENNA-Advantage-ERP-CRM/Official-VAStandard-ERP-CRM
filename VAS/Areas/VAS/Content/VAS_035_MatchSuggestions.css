@@ -569,7 +569,7 @@
     color: #102C3F;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    text-align: left;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
