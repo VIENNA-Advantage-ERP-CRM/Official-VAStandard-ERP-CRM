@@ -1006,12 +1006,7 @@
                 data.hasData === false ||
                 entries.length === 0
             ) {
-                setState(
-                    lbl(
-                        'VAS_052_NoData',
-                        'No data'
-                    )
-                );
+                setState('No data');
 
                 return;
             }

@@ -72,7 +72,8 @@
         }
 
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            return currencySymbol || currencyISO || '';
+            var label = String(currencyISO || currencySymbol || '').trim();
+            return label.toUpperCase() === 'ID' ? 'IQD' : label;
         }
 
         function getAmountParts(value, currencySymbol, currencyISO, precision) {
@@ -135,6 +136,11 @@
             });
         }
 
+        function formatDialogAmountWithCurrency(value, precision, currencyLabel) {
+            var amount = formatDialogAmount(value, precision);
+            return currencyLabel ? amount + ' ' + currencyLabel : amount;
+        }
+
         function formatDialogDate(value) {
             var match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
 
@@ -171,9 +177,7 @@
             $dialogTbody.empty();
 
             if (!rows || rows.length === 0) {
-                renderDialogMessage(
-                    lbl('VAS_048_NoDisbursements', 'No cash disbursements found today')
-                );
+                renderDialogMessage('No data');
                 return;
             }
 
@@ -184,10 +188,7 @@
                 var charge = row.chargeName || '-';
                 var cashBook = row.cashBookName || '-';
                 var description = row.description || '-';
-                var amountText = formatDialogAmount(row.amount, row.stdPrecision);
-                var amountWithCurrency = dialogCurrencyLabel
-                    ? dialogCurrencyLabel + ' ' + amountText
-                    : amountText;
+                var amountWithCurrency = formatDialogAmountWithCurrency(row.amount, row.stdPrecision, dialogCurrencyLabel);
 
                 $dialogTbody.append(
                     '<tr>' +
@@ -213,8 +214,7 @@
                         lbl('VAS_048_Of', 'of') + ' ' + totalRecords + ' ' +
                         lbl(totalRecords === 1 ? 'VAS_048_Disbursement' : 'VAS_048_Disbursements', totalRecords === 1 ? 'disbursement' : 'disbursements') +
                         ' \u00B7 ' + lbl('VAS_048_Total', 'total') + ' ' +
-                        (dialogCurrencyLabel ? dialogCurrencyLabel + ' ' : '') +
-                        formatDialogAmount(totalAmount, dialogPrecision)
+                        formatDialogAmountWithCurrency(totalAmount, dialogPrecision, dialogCurrencyLabel)
                     : '');
             }
 
@@ -482,7 +482,7 @@
             var amount = safeNumber(data.mainMetric);
             var deltaPercent = safeNumber(data.deltaPercent);
             var disbursementCount = safeNumber(data.disbursementCount);
-            dialogCurrencyLabel = data.currencySymbol || data.currencyISO || '';
+            dialogCurrencyLabel = getCurrencyLabel(data.currencySymbol, data.currencyISO);
             var footerText = lbl('VAS_048_VsSevenDayAvg', 'vs 7-day avg') + ' · ' + disbursementCount.toLocaleString(window.navigator.language) + ' ' + lbl('VAS_048_Disbursements', 'disbursements');
 
             $root.find('#VAS_048_today-cash-out-state-' + widgetId).removeClass('is-visible').text('');
@@ -541,7 +541,7 @@
                     }
 
                     if (response.hasData === false) {
-                        setState(lbl('VAS_048_NoData', 'No data'));
+                        setState('No data');
                         return;
                     }
 

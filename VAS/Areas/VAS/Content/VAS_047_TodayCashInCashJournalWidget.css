@@ -439,6 +439,7 @@
 .VAS-047-cash-in-dialog-title-group {
     flex: 1 1 auto;
     min-width: 0;
+    text-align: left;
 }
 
 .VAS-047-cash-in-dialog-title {
@@ -541,6 +542,7 @@
     line-height: 1.3;
     font-weight: 400;
     vertical-align: middle;
+    text-align: left !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -587,7 +589,7 @@
 .VAS-047-cash-in-th-amount,
 .VAS-047-cash-in-td-amount {
     width: 10rem;
-    text-align: right !important;
+    text-align: left !important;
 }
 
 .VAS-047-cash-in-td-document {
@@ -631,7 +633,7 @@
 
 .VAS-047-cash-in-dialog-empty {
     padding: 36px 16px !important;
-    text-align: center;
+    text-align: left !important;
     color: #748494 !important;
 }
 
@@ -655,6 +657,7 @@
     color: #748494;
     font-size: 0.8125rem;
     font-variant-numeric: tabular-nums;
+    text-align: left;
 }
 
 .VAS-047-cash-in-dialog-actions,

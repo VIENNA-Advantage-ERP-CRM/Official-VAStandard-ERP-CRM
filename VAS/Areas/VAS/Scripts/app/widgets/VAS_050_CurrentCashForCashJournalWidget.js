@@ -78,6 +78,7 @@
         function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
+            var currencyLabel = getCurrencyLabel(currencySymbol, currencyISO);
 
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
@@ -85,15 +86,12 @@
             });
             var sign = numericValue < 0 ? '-' : '';
 
-            if (currencySymbol) {
-                return sign + currencySymbol + amount;
-            }
-
-            return currencyISO ? sign + currencyISO + amount : sign + amount;
+            return currencyLabel ? sign + amount + ' ' + currencyLabel : sign + amount;
         }
 
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            return currencySymbol || currencyISO || '';
+            var label = String(currencyISO || currencySymbol || '').trim();
+            return label.toUpperCase() === 'ID' ? 'IQD' : label;
         }
 
         function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {
@@ -226,7 +224,7 @@
             $dialogTbody.empty();
 
             if (!rows || !rows.length) {
-                renderDialogMessage(lbl('VAS_050_NoJournals', 'No cash journals found'));
+                renderDialogMessage('No data');
                 return;
             }
 
@@ -235,9 +233,9 @@
                 var cashDate = row.statementDate || '-';
                 var cashType = row.cashTypeName || row.cashTypeValue || '-';
                 var charge = row.chargeName || '-';
-                var currencyLabel = row.currencyISO || row.currencySymbol || '';
                 var amountText = formatAmount(row.amount, row.stdPrecision);
-                var amountWithCurrency = currencyLabel ? currencyLabel + ' ' + amountText : amountText;
+                var currencyLabel = getCurrencyLabel(row.currencySymbol, row.currencyISO);
+                var amountWithCurrency = currencyLabel ? amountText + ' ' + currencyLabel : amountText;
                 var status = row.docStatusName || row.docStatusValue || '-';
                 var description = row.description || '-';
 
@@ -274,7 +272,7 @@
 
         function loadDialogRows() {
             if (!$dialogTbody || rowsLoading || selectedCashBookId <= 0) {
-                if (selectedCashBookId <= 0) { renderDialogMessage(lbl('VAS_050_NoJournals', 'No cash journals found')); }
+                if (selectedCashBookId <= 0) { renderDialogMessage('No data'); }
                 return;
             }
 
@@ -632,7 +630,7 @@
 
                     if (response.hasData === false) {
                         renderCashBookOptions(response.cashBooks || []);
-                        setState(lbl('VAS_050_NoData', 'No data'));
+                        setState('No data');
                         return;
                     }
 

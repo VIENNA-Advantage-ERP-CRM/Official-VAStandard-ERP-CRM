@@ -300,7 +300,7 @@
                     }
 
                     if (response.hasData === false) {
-                        setState(lbl('VAS_049_NoData', 'No data'));
+                        setState('No data');
                         return;
                     }
 

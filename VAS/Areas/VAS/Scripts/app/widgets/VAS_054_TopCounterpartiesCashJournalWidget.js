@@ -444,7 +444,7 @@
             $list.empty();
 
             if (!items.length) {
-                setState(data.noDataText || lbl('VAS_054_NoData', 'No counterparties found'));
+                setState('No data');
                 return;
             }
 

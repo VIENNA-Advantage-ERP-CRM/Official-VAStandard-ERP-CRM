@@ -120,7 +120,13 @@
 
         /* ── Amount formatter ───────────────────────────────────────── */
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            return currencySymbol || currencyISO || '';
+            var label = String(currencyISO || currencySymbol || '').trim();
+            return label.toUpperCase() === 'ID' ? 'IQD' : label;
+        }
+
+        function formatAmountWithCurrency(value, precision, currencyLabel) {
+            var amount = formatAmount(value, precision);
+            return currencyLabel ? amount + ' ' + currencyLabel : amount;
         }
 
         function getAmountParts(value, precision) {
@@ -210,12 +216,7 @@
             $dialogTbody.empty();
 
             if (!rows || rows.length === 0) {
-                renderDialogMessage(
-                    lbl(
-                        'VAS_047_NoReceipts',
-                        'No cash receipts found today'
-                    )
-                );
+                renderDialogMessage('No data');
                 return;
             }
 
@@ -226,13 +227,11 @@
                 var cashType = row.cashTypeName || row.cashTypeValue || '-';
                 var charge = row.chargeName || '-';
                 var cashBook = row.cashBookName || '-';
-                var amountText = formatAmount(
+                var amountWithCurrency = formatAmountWithCurrency(
                     row.amount,
-                    row.stdPrecision
+                    row.stdPrecision,
+                    dialogCurrencyLabel
                 );
-                var amountWithCurrency = dialogCurrencyLabel
-                    ? dialogCurrencyLabel + ' ' + amountText
-                    : amountText;
 
                 $dialogTbody.append(
                     '<tr>' +
@@ -271,8 +270,7 @@
                         ) +
                         ' \u00B7 ' +
                         lbl('VAS_047_Total', 'total') + ' ' +
-                        (dialogCurrencyLabel ? dialogCurrencyLabel + ' ' : '') +
-                        formatAmount(totalAmount, dialogPrecision)
+                        formatAmountWithCurrency(totalAmount, dialogPrecision, dialogCurrencyLabel)
                     );
                 }
                 else {
@@ -586,7 +584,7 @@
             var avgDailyAmount = Number(data.avgDailyAmount || 0);
             var deltaRaw = Number(data.deltaPercent || 0);
             var receiptCount = data.receiptCount || data.recordCount || 0;
-            dialogCurrencyLabel = data.currencySymbol || data.currencyISO || '';
+            dialogCurrencyLabel = getCurrencyLabel(data.currencySymbol, data.currencyISO);
 
             if (!data.deltaPercent && avgDailyAmount > 0) {
                 deltaRaw = Math.round(((mainMetric - avgDailyAmount) / avgDailyAmount) * 100);
@@ -653,7 +651,7 @@
                     }
 
                     if (!response.hasData) {
-                        showState(true, lbl('VAS_047_NoData', 'No data available'));
+                        showState(true, 'No data');
                         return;
                     }
 

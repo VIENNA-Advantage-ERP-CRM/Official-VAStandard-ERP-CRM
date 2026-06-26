@@ -234,7 +234,7 @@
             $body.empty();
 
             if (data.hasData === false || items.length === 0) {
-                setState(lbl('VAS_051_NoData', 'No data'));
+                setState('No data');
                 return;
             }
 

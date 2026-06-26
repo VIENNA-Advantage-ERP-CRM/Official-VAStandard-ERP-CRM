@@ -336,7 +336,7 @@
             $list.empty();
 
             if (!items.length) {
-                setState(data.noDataText || lbl('VAS_053_NoData', 'No in-progress cash journals'));
+                setState('No data');
                 return;
             }
 

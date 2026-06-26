@@ -425,7 +425,7 @@
             $body.empty();
 
             if (data.hasData === false || items.length === 0) {
-                setState(data.noDataText || lbl('VAS_055_NoData', 'No cash out today'));
+                setState('No data');
                 return;
             }
 
