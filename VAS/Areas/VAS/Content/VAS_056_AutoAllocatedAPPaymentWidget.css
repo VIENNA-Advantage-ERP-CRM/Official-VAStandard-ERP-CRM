@@ -608,7 +608,7 @@
 .VAS-056-AutoAllocatedAPPayment-th-amount,
 .VAS-056-AutoAllocatedAPPayment-td-amount {
     width: 14em;
-    text-align: left;
+    text-align: right;
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-date,

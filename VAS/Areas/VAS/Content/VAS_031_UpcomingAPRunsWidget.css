@@ -760,7 +760,20 @@
 input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-calendar-picker-indicator,
 input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-inner-spin-button,
 input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-clear-button {
-    display: none;
+    display: block;
+}
+
+input[type="date"].vas-upcoming-ap-runs-edit-control {
+    padding-right: 1.5em;
+    cursor: pointer;
+    -webkit-appearance: auto;
+    -moz-appearance: auto;
+    appearance: auto;
+}
+
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.72;
 }
 
 select.vas-upcoming-ap-runs-edit-control:not(:disabled) {
