@@ -197,7 +197,7 @@
                     '<td class="VAS-047-cash-in-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-book" style="text-align:left" title="' + escapeHtml(cashBook) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashBook) + '</span></td>' +
-                    '<td class="VAS-047-cash-in-td-amount" style="text-align:left" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
+                    '<td class="VAS-047-cash-in-td-amount" style="text-align:right" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
                     '<td class="VAS-047-cash-in-td-description" style="text-align:left" title="' + escapeHtml(description) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(description) + '</span></td>' +
                     '</tr>'
                 );
@@ -318,7 +318,7 @@
                 '<th class="VAS-047-cash-in-th-type" style="text-align:left">' + escapeHtml(lbl('VAS_048_CashType', 'Cash Type')) + '</th>' +
                 '<th class="VAS-047-cash-in-th-charge" style="text-align:left">' + escapeHtml(lbl('VAS_048_Charge', 'Charge')) + '</th>' +
                 '<th class="VAS-047-cash-in-th-book" style="text-align:left">' + escapeHtml(lbl('VAS_048_CashBook', 'Cash Book')) + '</th>' +
-                '<th class="VAS-047-cash-in-th-amount" style="text-align:left">' + escapeHtml(lbl('VAS_048_Amount', 'Amount')) + '</th>' +
+                '<th class="VAS-047-cash-in-th-amount" style="text-align:right">' + escapeHtml(lbl('VAS_048_Amount', 'Amount')) + '</th>' +
                 '<th class="VAS-047-cash-in-th-description" style="text-align:left">' + escapeHtml(lbl('VAS_048_DialogDescription', 'Description')) + '</th>' +
                 '</tr></thead><tbody class="VAS-047-cash-in-dialog-tbody"></tbody></table></div>' +
                 '<div class="VAS-047-cash-in-dialog-footer"><span class="VAS-047-cash-in-pager-helper"></span><div class="VAS-047-cash-in-dialog-actions"><div class="VAS-047-cash-in-pager">' +

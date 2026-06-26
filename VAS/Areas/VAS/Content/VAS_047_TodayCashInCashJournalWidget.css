@@ -589,7 +589,7 @@
 .VAS-047-cash-in-th-amount,
 .VAS-047-cash-in-td-amount {
     width: 10rem;
-    text-align: left !important;
+    text-align: right !important;
 }
 
 .VAS-047-cash-in-td-document {

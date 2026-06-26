@@ -245,7 +245,7 @@
                     '<td class="VAS-050-current-cash-td-date" style="text-align:left" title="' + escapeHtml(cashDate) + '">' + escapeHtml(cashDate) + '</td>' +
                     '<td class="VAS-050-current-cash-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
-                    '<td class="VAS-050-current-cash-td-amount" style="text-align:left" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
+                    '<td class="VAS-050-current-cash-td-amount" style="text-align:right" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
                     '<td class="VAS-050-current-cash-td-status" style="text-align:left" title="' + escapeHtml(status) + '"><span class="VAS-050-current-cash-status' + getStatusTone(row.docStatusValue) + '">' + escapeHtml(status) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-description" style="text-align:left" title="' + escapeHtml(description) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(description) + '</span></td>' +
                     '</tr>'
@@ -333,7 +333,8 @@
             var titleId = 'VAS-050-current-cash-dialog-title-' + uid;
             var heading = function (key, fallback, cssClass) {
                 var text = escapeHtml(lbl(key, fallback));
-                return '<th class="' + cssClass + '" title="' + text + '" style="text-align:left">' + text + '</th>';
+                var align = cssClass.indexOf('-amount') >= 0 ? 'right' : 'left';
+                return '<th class="' + cssClass + '" title="' + text + '" style="text-align:' + align + '">' + text + '</th>';
             };
 
             $dialog = $(
