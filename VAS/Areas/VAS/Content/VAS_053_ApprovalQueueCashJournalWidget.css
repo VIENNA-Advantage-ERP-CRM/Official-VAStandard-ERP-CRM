@@ -545,7 +545,7 @@
 .VAS_053_approval-row-sub {
     cursor: default;
 }
-
+/*
 .VAS_053_approval-row-title:hover,
 .VAS_053_approval-row-sub:hover {
     overflow: visible;
@@ -558,4 +558,4 @@
     border-radius: 6px;
     padding: 0.25em 0.5em;
     margin: -0.25em -0.5em;
-}
+}*/
