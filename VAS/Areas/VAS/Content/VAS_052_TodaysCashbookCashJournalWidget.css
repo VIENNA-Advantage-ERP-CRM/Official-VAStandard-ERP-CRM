@@ -222,7 +222,7 @@
     overflow: visible !important;
     text-overflow: clip !important;
     white-space: nowrap !important;
-    text-align: right !important;
+    text-align: left !important;
     font-weight: 800 !important;
     font-variant-numeric: tabular-nums;
 }

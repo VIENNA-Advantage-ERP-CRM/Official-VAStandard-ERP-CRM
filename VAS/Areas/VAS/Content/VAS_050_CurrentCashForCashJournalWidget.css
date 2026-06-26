@@ -364,7 +364,7 @@
 .VAS-050-current-cash-th-amount,
 .VAS-050-current-cash-td-amount {
     width: 17%;
-    text-align: right !important;
+    text-align: left !important;
 }
 
 .VAS-050-current-cash-th-status,
@@ -375,7 +375,7 @@
 .VAS-050-current-cash-th-currency,
 .VAS-050-current-cash-td-currency {
     width: 15%;
-    text-align: right !important;
+    text-align: left !important;
 }
 
 .VAS-050-current-cash-td-amount {
