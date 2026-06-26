@@ -2178,6 +2178,7 @@
                 );
 
             $payDialogGrid.html(html);
+            bindDatePickers();
 
             getPayField('paymentMethodId')
                 .off('change.vasPaymentMethod')
@@ -2480,6 +2481,29 @@
                 name +
                 '"]'
             );
+        }
+
+        function bindDatePickers() {
+            $payDialogGrid
+                .find('input[type="date"].vas-upcoming-ap-runs-edit-control')
+                .off('click.vasDatePicker focus.vasDatePicker')
+                .on(
+                    'click.vasDatePicker focus.vasDatePicker',
+                    function () {
+                        if (
+                            this.showPicker &&
+                            !this.readOnly &&
+                            !this.disabled
+                        ) {
+                            try {
+                                this.showPicker();
+                            }
+                            catch (ignore) {
+                                // Native date picker behavior is browser-controlled.
+                            }
+                        }
+                    }
+                );
         }
 
         function readPayDialogPayload() {

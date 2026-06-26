@@ -587,7 +587,7 @@
 .vas-scheduled-ap-payment-th-amount,
 .vas-scheduled-ap-payment-td-amount {
     width: 14em;
-    text-align: left;
+    text-align: right;
 }
 
 .vas-scheduled-ap-payment-th-method,
