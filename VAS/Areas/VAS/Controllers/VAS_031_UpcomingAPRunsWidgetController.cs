@@ -407,7 +407,7 @@ UnpaidSchedule AS
 
     AND COALESCE
     (
-        InvoicePaySchedule.IsPaid,
+        InvoicePaySchedule.VA009_IsPaid,
         'N'
     ) = 'N'
 
@@ -853,7 +853,7 @@ UnpaidSchedule AS
 
     AND COALESCE
     (
-        InvoicePaySchedule.IsPaid,
+        InvoicePaySchedule.VA009_IsPaid,
         'N'
     ) = 'N'
 
@@ -2740,7 +2740,7 @@ WHERE InvoicePaySchedule.IsActive = 'Y'
 
 AND COALESCE
 (
-    InvoicePaySchedule.IsPaid,
+    InvoicePaySchedule.VA009_IsPaid,
     'N'
 ) = 'N'
 
@@ -2778,7 +2778,7 @@ AND InvoicePaySchedule.C_InvoicePaySchedule_ID = " +
 SELECT
     COALESCE
     (
-        InvoicePaySchedule.IsPaid,
+        InvoicePaySchedule.VA009_IsPaid,
         'N'
     )
 
