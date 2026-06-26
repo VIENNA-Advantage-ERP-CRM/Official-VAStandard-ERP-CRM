@@ -2459,6 +2459,9 @@
             selectedInvoiceRow = null;
             invoiceRows = [];
 
+            getPayField('checkNo').val('');
+            getPayField('checkDate').val('');
+
             $payDialog.hide();
 
             $invoiceList.empty();
@@ -2864,6 +2867,9 @@
                         false,
                         false
                     );
+
+                    getPayField('checkNo').val('');
+                    getPayField('checkDate').val('');
 
                     closePayDialog();
 
