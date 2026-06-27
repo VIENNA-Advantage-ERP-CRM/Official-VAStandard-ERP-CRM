@@ -114,10 +114,10 @@
 
 /* ── KPI value ───────────────────────────────────────────────────────────── */
 .VAS-gljnd-root .kpi-value {
-    display: flex;
-    align-items: baseline;
-    gap: 0;
     line-height: 1;
+    font-size: 1.375em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
     color: #102C3F;
 }
 
@@ -140,20 +140,6 @@
     margin-right: 0.1em;
     align-self: flex-start;
     padding-top: 0.2em;
-}
-
-/* Main integer part */
-.VAS-gljnd-main {
-    font-size: 2.25em;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-}
-
-/* Decimal part */
-.VAS-gljnd-decimal {
-    font-size: 1.125em;
-    font-weight: 400;
-    opacity: 0.6;
 }
 
 /* ── Status / Why section ────────────────────────────────────────────────── */
@@ -265,12 +251,6 @@ html[dir="rtl"] .VAS-gljnd-root .kpi-why {
     color: #102C3F;
 }
 
-.VAS-gljnd-main {
-    font-size: 1.375em;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-}
-
 .VAS-gljnd-root .kpi-why-text {
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 400;
@@ -310,7 +290,6 @@ html[dir="rtl"] .VAS-gljnd-root .kpi-why {
 }
 
 .VAS-gljnd-prefix,
-.VAS-gljnd-decimal,
 .VAS-gljnd-root .kpi-why-text {
     color: #748494;
 }

@@ -862,3 +862,19 @@ html[dir="rtl"] .VAS-gljpq-item {
     cursor: default;
     box-shadow: none;
 }
+
+/* Dialog close alignment */
+.VAS-gljpq-dialog-close-x {
+    margin-left: auto;
+    color: #5F7283;
+    background: transparent;
+}
+
+.VAS-gljpq-dialog-close-x:hover {
+    color: #102C3F;
+    background: #F3F7FB;
+}
+
+.VAS-gljpq-dialog-actions {
+    margin-left: auto;
+}

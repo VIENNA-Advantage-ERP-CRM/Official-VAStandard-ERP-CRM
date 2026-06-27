@@ -799,3 +799,19 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     cursor: default;
     box-shadow: none;
 }
+
+/* Dialog close alignment */
+.VAS-glju-dialog-close {
+    margin-left: auto;
+    color: #5F7283;
+    background: transparent;
+}
+
+.VAS-glju-dialog-close:hover {
+    color: #102C3F;
+    background: #F3F7FB;
+}
+
+.VAS-glju-dialog-actions {
+    margin-left: auto;
+}

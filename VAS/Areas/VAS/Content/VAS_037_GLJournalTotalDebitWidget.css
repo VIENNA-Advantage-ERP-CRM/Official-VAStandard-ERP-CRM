@@ -105,11 +105,11 @@
 
 /* ── KPI value ───────────────────────────────────────────────────────────── */
 .VAS-gljtd-root .kpi-value {
-    display: flex;
-    align-items: baseline;
-    gap: 0;
     line-height: 1;
-    color: #102C3F;
+    font-size: 1.375em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #019D89;
 }
 
 /* Currency prefix — small, muted */
@@ -120,20 +120,6 @@
     margin-right: 0.1em;
     align-self: flex-start;
     padding-top: 0.2em;
-}
-
-/* Main integer part — large and bold */
-.VAS-gljtd-main {
-    font-size: 2.25em;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-}
-
-/* Decimal part — smaller and muted */
-.VAS-gljtd-decimal {
-    font-size: 1.125em;
-    font-weight: 400;
-    color: #748494;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */
@@ -233,12 +219,6 @@ html[dir="rtl"] .VAS-gljtd-root .kpi-why {
     color: #102C3F;
 }
 
-.VAS-gljtd-main {
-    font-size: 1.375em;
-    font-weight: 700;
-    letter-spacing: -0.025em;
-}
-
 .VAS-gljtd-root .kpi-why-text {
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     font-weight: 400;
@@ -252,8 +232,7 @@ html[dir="rtl"] .VAS-gljtd-root .kpi-why {
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
 
-.VAS-gljtd-root .w-title,
-.VAS-gljtd-root .kpi-value {
+.VAS-gljtd-root .w-title {
     color: #102C3F;
 }
 
@@ -263,7 +242,6 @@ html[dir="rtl"] .VAS-gljtd-root .kpi-why {
     color: #019D89;
 }
 
-.VAS-gljtd-main,
 .VAS-gljtd-root .kpi-why-label,
 .VAS-gljtd-period-active,
 .VAS-gljtd-period:hover {
@@ -271,7 +249,6 @@ html[dir="rtl"] .VAS-gljtd-root .kpi-why {
 }
 
 .VAS-gljtd-prefix,
-.VAS-gljtd-decimal,
 .VAS-gljtd-root .kpi-why-text,
 .VAS-gljtd-period {
     color: #748494;

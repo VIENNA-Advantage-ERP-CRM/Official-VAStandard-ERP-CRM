@@ -678,6 +678,17 @@
                         ) +
                         "</button>" +
 
+                        '<button type="button" ' +
+                        'class="VAS-glju-close-primary ' +
+                        'VAS-glju-detail-close">' +
+                        esc(
+                            lbl(
+                                "VAS_Close",
+                                "Close"
+                            )
+                        ) +
+                        "</button>" +
+
                         "</div>" +
                         "</div>" +
                         "</div>" +

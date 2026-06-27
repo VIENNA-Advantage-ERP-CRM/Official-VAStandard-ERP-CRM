@@ -93,27 +93,11 @@
     line-height: 1;
     letter-spacing: -0.01em;
     color: #102C3F;
-    display: flex;
-    align-items: baseline;
-    gap: 0.05em;
 }
 
 /* Success/green color for the value */
 .VAS-gljp-root .kpi-value.success {
     color: #019D89;
-}
-
-/* Large percentage number */
-.VAS-gljp-root .VAS-gljp-num {
-    font-size: 1em;
-    font-weight: 700;
-}
-
-/* Smaller % symbol */
-.VAS-gljp-root .VAS-gljp-pct {
-    font-size: 0.5625em;
-    font-weight: 700;
-    color: #0B6B45;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */
@@ -239,7 +223,6 @@ html[dir="rtl"] .VAS-gljp-root .kpi-why {
 }
 
 .VAS-gljp-root .kpi-value.success,
-.VAS-gljp-root .VAS-gljp-num,
 .VAS-gljp-root .kpi-why-label {
     color: #019D89;
 }

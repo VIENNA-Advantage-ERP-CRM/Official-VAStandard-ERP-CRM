@@ -27,8 +27,7 @@
 
         var $self = this;
         var $root = $('<div class="VAS-gljtc-root">');
-        var $mainNum = null;
-        var $decimalNum = null;
+        var $kpiValue = null;
         var $whyText = null;
         var refreshTimer = null;
         var activePeriod = 'month';
@@ -65,23 +64,6 @@
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-        }
-
-        function splitAmount(amountText) {
-            var separator = (1.1).toLocaleString(window.navigator.language).substring(1, 2);
-            var index = amountText.lastIndexOf(separator);
-
-            if (index >= 0) {
-                return {
-                    main: amountText.substring(0, index),
-                    decimal: amountText.substring(index + 1)
-                };
-            }
-
-            return {
-                main: amountText,
-                decimal: ''
-            };
         }
 
         function createBusyIndicator() {
@@ -123,10 +105,7 @@
                 '</div>' +
                 '</div>' +
 
-                '<div class="kpi-value" id="VAS-gljtc-val-' + id + '">' +
-                '<span class="VAS-gljtc-main" id="VAS-gljtc-main-' + id + '">—</span>' +
-                '<span class="VAS-gljtc-decimal" id="VAS-gljtc-dec-' + id + '"></span>' +
-                '</div>' +
+                '<div class="kpi-value" id="VAS-gljtc-val-' + id + '">&mdash;</div>' +
 
                 '<div class="kpi-why">' +
                 '<span class="kpi-why-text" id="VAS-gljtc-why-' + id + '">&mdash;</span>' +
@@ -135,8 +114,7 @@
 
             $root.append(html);
 
-            $mainNum = $root.find('#VAS-gljtc-main-' + id);
-            $decimalNum = $root.find('#VAS-gljtc-dec-' + id);
+            $kpiValue = $root.find('#VAS-gljtc-val-' + id);
             $whyText = $root.find('#VAS-gljtc-why-' + id);
 
             $root.find('#VAS-gljtc-toggle-' + id).on('click', '.VAS-gljtc-period', function () {
@@ -174,8 +152,7 @@
         }
 
         function renderEmpty(message) {
-            $mainNum.text('—');
-            $decimalNum.text('');
+            $kpiValue.text('—');
             $whyText.text(message || lbl('VIS_NoData', 'No data available.'));
         }
 
@@ -195,10 +172,7 @@
                 data.currencyISO || data.ISOCode
             );
 
-            var amountParts = splitAmount(amountText);
-
-            $mainNum.text(amountParts.main);
-            $decimalNum.text(amountParts.decimal ? '.' + amountParts.decimal : '');
+            $kpiValue.text(amountText);
 
             $whyText.text(
                 lbl('VAS_038_SumCreditLines', 'Sum of credit lines across') +
@@ -250,12 +224,8 @@
         }
 
         this.refreshWidget = function () {
-            if ($mainNum) {
-                $mainNum.text('—');
-            }
-
-            if ($decimalNum) {
-                $decimalNum.text('');
+            if ($kpiValue) {
+                $kpiValue.text('—');
             }
 
             loadData();
@@ -276,8 +246,7 @@
                 $root.remove();
             }
 
-            $mainNum = null;
-            $decimalNum = null;
+            $kpiValue = null;
             $whyText = null;
             $root = null;
             $self = null;

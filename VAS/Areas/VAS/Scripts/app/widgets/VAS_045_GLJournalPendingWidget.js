@@ -1293,19 +1293,6 @@
 
                     '<div class="VAS-gljpq-dialog-footer">' +
 
-                    '<button type="button" ' +
-
-                    'class="VAS-gljpq-dialog-secondary VAS-gljpq-detail-close">' +
-
-                    esc(
-                        lbl(
-                            "VAS_Close",
-                            "Close"
-                        )
-                    ) +
-
-                    "</button>" +
-
                     '<div class="VAS-gljpq-dialog-actions">' +
 
                     '<button type="button" ' +
@@ -1329,6 +1316,19 @@
                         lbl(
                             "VAS_045_PostJournal",
                             "Post Journal"
+                        )
+                    ) +
+
+                    "</button>" +
+
+                    '<button type="button" ' +
+
+                    'class="VAS-gljpq-dialog-primary VAS-gljpq-detail-close">' +
+
+                    esc(
+                        lbl(
+                            "VAS_Close",
+                            "Close"
                         )
                     ) +
 

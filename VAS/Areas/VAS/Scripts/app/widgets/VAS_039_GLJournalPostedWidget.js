@@ -69,10 +69,7 @@
                 +   '<div class="w-icon">' + svgIcon + '</div>'
                 +   '<div class="w-title">' + lbl('VAS_039_GLJPosted', 'Posted') + '</div>'
                 + '</div>'
-                + '<div class="kpi-value success" id="VAS-gljp-val-' + id + '">'
-                +   '<span class="VAS-gljp-num">—</span>'
-                +   '<span class="VAS-gljp-pct">%</span>'
-                + '</div>'
+                + '<div class="kpi-value success" id="VAS-gljp-val-' + id + '">—</div>'
                 + '<div class="kpi-why">'
                 +   '<span class="kpi-why-text">' + lbl('VAS_039_PostedDocuments', 'Posted documents.') + '</span>'
                 + '</div>'
@@ -94,23 +91,23 @@
                     try {
                         var data = JSON.parse(result);
                         if (data) {
-                            $kpiValue.find('.VAS-gljp-num').text(typeof data.Percentage === 'number' ? data.Percentage : 0);
+                            $kpiValue.text(typeof data.Percentage === 'number' ? data.Percentage + '%' : '—');
                         } else {
-                            $kpiValue.find('.VAS-gljp-num').text(0);
+                            $kpiValue.text('—');
                         }
                     } catch (e) {
-                        $kpiValue.find('.VAS-gljp-num').text('—');
+                        $kpiValue.text('—');
                     }
                     showBusy(false);
                 },
                 error: function () {
-                    $kpiValue.find('.VAS-gljp-num').text('—');
+                    $kpiValue.text('—');
                     showBusy(false);
                 }
             });
         }
 
-        this.refreshWidget    = function () { $kpiValue.find('.VAS-gljp-num').text('—'); loadData(); };
+        this.refreshWidget    = function () { $kpiValue.text('—'); loadData(); };
         this.getRoot          = function () { return $root; };
         this.disposeComponent = function () { $root.remove(); };
     };

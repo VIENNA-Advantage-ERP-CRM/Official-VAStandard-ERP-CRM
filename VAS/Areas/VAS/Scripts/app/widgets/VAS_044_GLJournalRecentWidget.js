@@ -1390,6 +1390,19 @@
 
                         "</button>" +
 
+                        '<button type="button" ' +
+
+                        'class="VAS-gljr-detail-primary VAS-gljr-detail-close">' +
+
+                        esc(
+                            lbl(
+                                "VAS_Close",
+                                "Close"
+                            )
+                        ) +
+
+                        "</button>" +
+
                         "</div>" +
 
                         "</div>" +
@@ -1458,6 +1471,7 @@
 
                 $detailDialog.find(
                     ".VAS-gljr-detail-close-x, " +
+                    ".VAS-gljr-detail-close, " +
                     ".VAS-gljr-detail-scrim"
                 ).on(
                     "click.VAS044Close",

@@ -919,3 +919,30 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     cursor: default;
     box-shadow: none;
 }
+
+/* Dialog close alignment */
+.VAS-gljr-detail-close-x {
+    margin-left: auto;
+    color: #5F7283;
+    background: transparent;
+}
+
+.VAS-gljr-detail-close-x:hover {
+    color: #102C3F;
+    background: #F3F7FB;
+}
+
+.VAS-gljr-detail-actions {
+    margin-left: auto;
+}
+
+.VAS-gljr-detail-close {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-gljr-detail-close:hover {
+    background: #0069AE;
+    border-color: #0069AE;
+}

@@ -29,8 +29,7 @@
 
         var $self = this;
         var $root = $('<div class="VAS-gljnd-root">');
-        var $mainNum = null;
-        var $decimalNum = null;
+        var $kpiValue = null;
         var $statusText = null;
         var $valueWrap = null;
         var refreshTimer = null;
@@ -68,23 +67,6 @@
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-        }
-
-        function splitAmount(amountText) {
-            var separator = (1.1).toLocaleString(window.navigator.language).substring(1, 2);
-            var index = amountText.lastIndexOf(separator);
-
-            if (index >= 0) {
-                return {
-                    main: amountText.substring(0, index),
-                    decimal: amountText.substring(index + 1)
-                };
-            }
-
-            return {
-                main: amountText,
-                decimal: ''
-            };
         }
 
         function createBusyIndicator() {
@@ -126,10 +108,7 @@
                 '<span class="VAS-gljnd-drcr">' + lbl('VAS_040_DrMinusCr', 'DR − CR') + '</span>' +
                 '</div>' +
 
-                '<div class="kpi-value" id="VAS-gljnd-val-' + id + '">' +
-                '<span class="VAS-gljnd-main" id="VAS-gljnd-main-' + id + '">—</span>' +
-                '<span class="VAS-gljnd-decimal" id="VAS-gljnd-dec-' + id + '"></span>' +
-                '</div>' +
+                '<div class="kpi-value" id="VAS-gljnd-val-' + id + '">&mdash;</div>' +
 
                 '<div class="kpi-why">' +
                 '<span class="kpi-why-text VAS-gljnd-status" id="VAS-gljnd-status-' + id + '">&mdash;</span>' +
@@ -138,8 +117,7 @@
 
             $root.append(html);
 
-            $mainNum = $root.find('#VAS-gljnd-main-' + id);
-            $decimalNum = $root.find('#VAS-gljnd-dec-' + id);
+            $kpiValue = $root.find('#VAS-gljnd-val-' + id);
             $statusText = $root.find('#VAS-gljnd-status-' + id);
             $valueWrap = $root.find('#VAS-gljnd-val-' + id);
 
@@ -178,8 +156,7 @@
         }
 
         function renderEmpty(message) {
-            $mainNum.text('—');
-            $decimalNum.text('');
+            $kpiValue.text('—');
 
             if ($valueWrap) {
                 $valueWrap.removeClass('VAS-gljnd-balanced VAS-gljnd-unbalanced');
@@ -208,10 +185,7 @@
                 data.currencyISO || data.ISOCode
             );
 
-            var amountParts = splitAmount(amountText);
-
-            $mainNum.text(amountParts.main);
-            $decimalNum.text(amountParts.decimal ? '.' + amountParts.decimal : '');
+            $kpiValue.text(amountText);
 
             $valueWrap.removeClass('VAS-gljnd-balanced VAS-gljnd-unbalanced');
             $statusText.removeClass('VAS-gljnd-status-ok VAS-gljnd-status-warn');
@@ -272,12 +246,8 @@
         }
 
         this.refreshWidget = function () {
-            if ($mainNum) {
-                $mainNum.text('—');
-            }
-
-            if ($decimalNum) {
-                $decimalNum.text('');
+            if ($kpiValue) {
+                $kpiValue.text('—');
             }
 
             loadData();
@@ -298,8 +268,7 @@
                 $root.remove();
             }
 
-            $mainNum = null;
-            $decimalNum = null;
+            $kpiValue = null;
             $statusText = null;
             $valueWrap = null;
             $root = null;

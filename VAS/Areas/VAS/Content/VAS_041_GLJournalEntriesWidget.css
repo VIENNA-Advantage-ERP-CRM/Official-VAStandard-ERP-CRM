@@ -1249,3 +1249,30 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     cursor: default;
     box-shadow: none;
 }
+
+/* Dialog close alignment */
+.VAS-glje-dialog-close {
+    margin-left: auto;
+    color: #5F7283;
+    background: transparent;
+}
+
+.VAS-glje-dialog-close:hover {
+    color: #102C3F;
+    background: #F3F7FB;
+}
+
+.VAS-glje-dialog-actions {
+    margin-left: auto;
+}
+
+.VAS-glje-close-primary {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-glje-close-primary:hover {
+    background: #0069AE;
+    border-color: #0069AE;
+}

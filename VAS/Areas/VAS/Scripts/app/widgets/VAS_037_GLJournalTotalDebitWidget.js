@@ -27,8 +27,7 @@
 
         var $self = this;
         var $root = $('<div class="VAS-gljtd-root">');
-        var $mainNum = null;
-        var $decimalNum = null;
+        var $kpiValue = null;
         var $whyText = null;
         var refreshTimer = null;
         var activePeriod = 'month';
@@ -65,23 +64,6 @@
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
-        }
-
-        function splitAmount(amountText) {
-            var separator = (1.1).toLocaleString(window.navigator.language).substring(1, 2);
-            var index = amountText.lastIndexOf(separator);
-
-            if (index >= 0) {
-                return {
-                    main: amountText.substring(0, index),
-                    decimal: amountText.substring(index + 1)
-                };
-            }
-
-            return {
-                main: amountText,
-                decimal: ''
-            };
         }
 
         function createBusyIndicator() {
@@ -122,10 +104,7 @@
                 '<span class="VAS-gljtd-period" data-period="ytd">' + lbl('VAS_037_YTD', 'YTD') + '</span>' +
                 '</div>' +
                 '</div>' +
-                '<div class="kpi-value" id="VAS-gljtd-val-' + id + '">' +
-                '<span class="VAS-gljtd-main" id="VAS-gljtd-main-' + id + '">—</span>' +
-                '<span class="VAS-gljtd-decimal" id="VAS-gljtd-dec-' + id + '"></span>' +
-                '</div>' +
+                '<div class="kpi-value" id="VAS-gljtd-val-' + id + '">&mdash;</div>' +
                 '<div class="kpi-why">' +
                 '<span class="kpi-why-text" id="VAS-gljtd-why-' + id + '">&mdash;</span>' +
                 '</div>' +
@@ -133,8 +112,7 @@
 
             $root.append(html);
 
-            $mainNum = $root.find('#VAS-gljtd-main-' + id);
-            $decimalNum = $root.find('#VAS-gljtd-dec-' + id);
+            $kpiValue = $root.find('#VAS-gljtd-val-' + id);
             $whyText = $root.find('#VAS-gljtd-why-' + id);
 
             $root.find('#VAS-gljtd-toggle-' + id).on('click', '.VAS-gljtd-period', function () {
@@ -172,8 +150,7 @@
         }
 
         function renderEmpty(message) {
-            $mainNum.text('—');
-            $decimalNum.text('');
+            $kpiValue.text('—');
             $whyText.text(message || lbl('VIS_NoData', 'No data available.'));
         }
 
@@ -188,10 +165,8 @@
             $root.find('#VAS-gljtd-mon-' + $self.AD_UserHomeWidgetID).text(monthText);
 
             var amountText = formatCurrencyAmount(amountValue, data.currencySymbol || data.CurSymbol, data.currencyISO || data.ISOCode);
-            var amountParts = splitAmount(amountText);
 
-            $mainNum.text(amountParts.main);
-            $decimalNum.text(amountParts.decimal ? '.' + amountParts.decimal : '');
+            $kpiValue.text(amountText);
 
             $whyText.text(
                 lbl('VAS_037_SumDebitLines', 'Sum of debit lines across') +
@@ -243,12 +218,8 @@
         }
 
         this.refreshWidget = function () {
-            if ($mainNum) {
-                $mainNum.text('—');
-            }
-
-            if ($decimalNum) {
-                $decimalNum.text('');
+            if ($kpiValue) {
+                $kpiValue.text('—');
             }
 
             loadData();
@@ -269,8 +240,7 @@
                 $root.remove();
             }
 
-            $mainNum = null;
-            $decimalNum = null;
+            $kpiValue = null;
             $whyText = null;
             $root = null;
             $self = null;
