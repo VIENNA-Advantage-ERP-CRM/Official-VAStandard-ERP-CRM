@@ -14,8 +14,8 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text          | Message Key
  * ----+-----------------------+----------------------------------------
- *  1  | Pending Inspection    | VAS_PendingInspection
- *  2  | On QA hold            | VAS_OnQAHold
+ *  1  | Pending Inspection    | VAS_084_PendingInspection
+ *  2  | On QA hold            | VAS_084_OnQAHold
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -109,7 +109,7 @@
                 $valueEl.text(formatCount(count));
                 $valueEl.attr('title', formatCount(count));
             }
-            if ($metaEl) { $metaEl.text(lbl("VAS_OnQAHold", "On QA hold")); }
+            if ($metaEl) { $metaEl.text(lbl("VAS_084_OnQAHold", "On QA hold")); }
         }
 
         /* Error state — keep the tile + label, show a dash; never break the
@@ -125,7 +125,7 @@
         function createWidget() {
             var $card = $(
                 '<div class="vas-pinsp-card vas-widget-bg">' +
-                '<div class="vas-pinsp-label">' + escapeHtml(lbl("VAS_PendingInspection", "Pending Inspection")) + '</div>' +
+                '<div class="vas-pinsp-label">' + escapeHtml(lbl("VAS_084_PendingInspection", "Pending Inspection")) + '</div>' +
                 '<div class="vas-pinsp-value">—</div>' +
                 '<div class="vas-pinsp-meta"></div>' +
                 '</div>'

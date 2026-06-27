@@ -128,6 +128,7 @@ import "../app/widgets/VAS_067_APInvoiceSearchWidget.js";
 import "../app/widgets/VAS_068_APPaymentSearchWidget.js";
 import "../app/widgets/VAS_069_CashJournalSearchWidget.js";
 import "../app/widgets/VAS_070_GLJournalSearchWidget.js";
+import "../app/widgets/VAS_091_MaterialReceiptSearchWidget.js";
 import "../app/widgets/VAS_071_NewPaymentWidget.js";
 
 import "../app/widgets/RequestWidget.js";

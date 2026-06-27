@@ -10,16 +10,16 @@
  * Labels / Message Keys
  *  #  | Current Text            | Message Key
  * ----+-------------------------+---------------------------
- *  1  | QA Holds                | VAS_QAHolds
- *  2  | Tap a receipt...        | VAS_QAHoldsSubtitle
- *  3  | Quality Control         | VAS_QualityControl
- *  4  | Quality check           | VAS_QualityCheck
- *  5  | Actual Value            | VAS_ActualValue
- *  6  | Working Fine            | VAS_WorkingFine
- *  7  | Not Satisfactory        | VAS_NotSatisfactory
- *  8  | QA/QC Date              | VAS_QAQCDate
- *  9  | Description             | VAS_Description
- * 10  | Save QA Result          | VAS_SaveQAResult
+ *  1  | QA Holds                | VAS_086_QAHolds
+ *  2  | Tap a receipt...        | VAS_086_QAHoldsSubtitle
+ *  3  | Quality Control         | VAS_086_QualityControl
+ *  4  | Quality check           | VAS_086_QualityCheck
+ *  5  | Actual Value            | VAS_086_ActualValue
+ *  6  | Working Fine            | VAS_086_WorkingFine
+ *  7  | Not Satisfactory        | VAS_086_NotSatisfactory
+ *  8  | QA/QC Date              | VAS_086_QAQCDate
+ *  9  | Description             | VAS_086_Description
+ * 10  | Save QA Result          | VAS_086_SaveQAResult
  */
 ; VAS = window.VAS || {};
 
@@ -170,8 +170,8 @@
                 '<div class="vas-qah-head">' +
                 '<span class="vas-qah-ico">' + icon("shield") + '</span>' +
                 '<div class="vas-qah-titles">' +
-                '<div class="vas-qah-title">' + escapeHtml(lbl("VAS_QAHolds", "QA Holds")) + '</div>' +
-                '<div class="vas-qah-sub">' + escapeHtml(lbl("VAS_QAHoldsSubtitle", "Tap a receipt to verify quality")) + '</div>' +
+                '<div class="vas-qah-title">' + escapeHtml(lbl("VAS_086_QAHolds", "QA Holds")) + '</div>' +
+                '<div class="vas-qah-sub">' + escapeHtml(lbl("VAS_086_QAHoldsSubtitle", "Tap a receipt to verify quality")) + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -181,9 +181,9 @@
                 '<div class="vas-qah-foot vas-qah-hidden">' +
                 '<span class="vas-qah-foot-info"></span>' +
                 '<div class="vas-qah-pager">' +
-                '<button type="button" class="vas-qah-pgbtn vas-qah-prev" aria-label="' + escapeHtml(lbl("VAS_Previous", "Previous")) + '">' + icon("chevL") + '</button>' +
+                '<button type="button" class="vas-qah-pgbtn vas-qah-prev" aria-label="' + escapeHtml(lbl("VAS_086_Previous", "Previous")) + '">' + icon("chevL") + '</button>' +
                 '<span class="vas-qah-pgtext"></span>' +
-                '<button type="button" class="vas-qah-pgbtn vas-qah-next" aria-label="' + escapeHtml(lbl("VAS_Next", "Next")) + '">' + icon("chevR") + '</button>' +
+                '<button type="button" class="vas-qah-pgbtn vas-qah-next" aria-label="' + escapeHtml(lbl("VAS_086_Next", "Next")) + '">' + icon("chevR") + '</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -260,14 +260,14 @@
             $listBody.empty();
 
             if (!rows || rows.length === 0) {
-                $listBody.append('<div class="vas-qah-empty">' + escapeHtml(message || lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $listBody.append('<div class="vas-qah-empty">' + escapeHtml(message || lbl("VAS_086_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
 
             for (var i = 0; i < rows.length; i++) {
                 var r = rows[i];
                 var label = escapeHtml(r.grnNo) + ' &middot; ' + escapeHtml(r.supplier);
-                var meta = escapeHtml(r.itemName) + ' &middot; ' + escapeHtml(lbl("VAS_Held", "held")) + ' ' + escapeHtml(holdAge(r.holdStartedOn));
+                var meta = escapeHtml(r.itemName) + ' &middot; ' + escapeHtml(lbl("VAS_086_Held", "held")) + ' ' + escapeHtml(holdAge(r.holdStartedOn));
                 $listBody.append(
                     '<button type="button" class="vas-qah-row" data-holdid="' + escapeHtml(r.grnConfirmationLineId) + '">' +
                     '<div class="vas-qah-row-main">' +
@@ -282,13 +282,13 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_086_Of", "of") + ' ' + totalPages) : '');
             }
             if ($pageInfo) {
                 if (totalRecords > 0 && totalPages > 1) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VAS_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_086_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_086_Of", "of") + ' ' + totalRecords);
                 } else {
                     $pageInfo.text('');
                 }
@@ -308,7 +308,7 @@
                 '<h3 class="vas-qah-modal-title"></h3>' +
                 '<span class="vas-qah-modal-status"></span>' +
                 '</div>' +
-                '<button type="button" class="vas-qah-modal-close" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-qah-modal-close" aria-label="' + escapeHtml(lbl("VAS_086_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
@@ -350,8 +350,8 @@
             if (!record || !$dialog) { return; }
 
             activeRecord = record;
-            $dialogTitle.text((record.itemName || lbl("VAS_QualityControl", "Quality Control")) + ' - QA');
-            $dialogStatus.html('<span class="vas-qah-pill-warn">' + escapeHtml(lbl("VAS_QualityCheck", "Quality check")) + '</span>');
+            $dialogTitle.text((record.itemName || lbl("VAS_086_QualityControl", "Quality Control")) + ' - QA');
+            $dialogStatus.html('<span class="vas-qah-pill-warn">' + escapeHtml(lbl("VAS_086_QualityCheck", "Quality check")) + '</span>');
             renderQADetail(record);
             $dialog.removeClass('vas-qah-hidden');
             $('body').addClass('vas-qah-body-lock');
@@ -361,22 +361,22 @@
             var actual = record.actualValue || "";
             var qaDate = record.qaQcDate || todayYmd();
             var saveDisabled = record.qaRecordId > 0 ? "" : " disabled";
-            var saveTitle = record.qaRecordId > 0 ? "" : ' title="' + escapeHtml(lbl("VAS_QARecordMissing", "QA inspection record is missing.")) + '"';
+            var saveTitle = record.qaRecordId > 0 ? "" : ' title="' + escapeHtml(lbl("VAS_086_QARecordMissing", "QA inspection record is missing.")) + '"';
 
             var left =
-                disabledField("file", lbl("VAS_GRNConfirmationLine", "GRN Confirmation Line"), lineReference(record)) +
-                disabledField("scale", lbl("VAS_QuantityToVerify", "Quantity To Verify"), formatQty(record.quantityToVerify || record.heldQty), true) +
-                disabledField("clipboard", lbl("VAS_TestParameter", "Test Parameter"), record.testParameter || record.testParameterId || "-") +
-                disabledField("edit", lbl("VAS_AcceptableValue", "Acceptable Value"), record.acceptableValue || record.acceptableValueId || "-") +
+                disabledField("file", lbl("VAS_086_GRNConfirmationLine", "GRN Confirmation Line"), lineReference(record)) +
+                disabledField("scale", lbl("VAS_086_QuantityToVerify", "Quantity To Verify"), formatQty(record.quantityToVerify || record.heldQty), true) +
+                disabledField("clipboard", lbl("VAS_086_TestParameter", "Test Parameter"), record.testParameter || record.testParameterId || "-") +
+                disabledField("edit", lbl("VAS_086_AcceptableValue", "Acceptable Value"), record.acceptableValue || record.acceptableValueId || "-") +
                 '<div class="vas-qah-qc-field active">' +
                 '<div class="vas-qah-qc-ico">' + icon("edit") + '</div>' +
                 '<div class="vas-qah-qc-main">' +
-                '<div class="vas-qah-qc-label req">' + escapeHtml(lbl("VAS_ActualValue", "Actual Value")) + '</div>' +
+                '<div class="vas-qah-qc-label req">' + escapeHtml(lbl("VAS_086_ActualValue", "Actual Value")) + '</div>' +
                 '<div class="vas-qah-select-wrap">' +
                 '<select class="vas-qah-actual">' +
-                '<option value="">' + escapeHtml(lbl("VAS_SelectResult", "Select result...")) + '</option>' +
-                '<option value="Working Fine"' + (actual === "Working Fine" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_WorkingFine", "Working Fine")) + '</option>' +
-                '<option value="Not Satisfactory"' + (actual === "Not Satisfactory" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_NotSatisfactory", "Not Satisfactory")) + '</option>' +
+                '<option value="">' + escapeHtml(lbl("VAS_086_SelectResult", "Select result...")) + '</option>' +
+                '<option value="Working Fine"' + (actual === "Working Fine" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_086_WorkingFine", "Working Fine")) + '</option>' +
+                '<option value="Not Satisfactory"' + (actual === "Not Satisfactory" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_086_NotSatisfactory", "Not Satisfactory")) + '</option>' +
                 '</select>' +
                 '<span class="vas-qah-select-arr">' + icon("chevD") + '</span>' +
                 '</div>' +
@@ -385,29 +385,29 @@
                 '</div>';
 
             var right =
-                disabledField("package", lbl("VAS_Product", "Product"), record.productName || record.itemName) +
+                disabledField("package", lbl("VAS_086_Product", "Product"), record.productName || record.itemName) +
                 '<div class="vas-qah-qc-field active">' +
                 '<div class="vas-qah-qc-ico">' + icon("calendar") + '</div>' +
                 '<div class="vas-qah-qc-main">' +
-                '<div class="vas-qah-qc-label">' + escapeHtml(lbl("VAS_QAQCDate", "QA/QC Date")) + '</div>' +
+                '<div class="vas-qah-qc-label">' + escapeHtml(lbl("VAS_086_QAQCDate", "QA/QC Date")) + '</div>' +
                 '<input class="vas-qah-date" type="date" value="' + escapeHtml(qaDate) + '"/>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-qah-qc-field active note">' +
                 '<div class="vas-qah-qc-main">' +
-                '<div class="vas-qah-qc-label">' + escapeHtml(lbl("VAS_Description", "Description")) + '</div>' +
-                '<textarea class="vas-qah-desc" rows="2" placeholder="' + escapeHtml(lbl("VAS_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(record.description || "") + '</textarea>' +
+                '<div class="vas-qah-qc-label">' + escapeHtml(lbl("VAS_086_Description", "Description")) + '</div>' +
+                '<textarea class="vas-qah-desc" rows="2" placeholder="' + escapeHtml(lbl("VAS_086_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(record.description || "") + '</textarea>' +
                 '</div>' +
                 '</div>';
 
             $dialogBody.html(
-                '<div class="vas-qah-qc-headline">' + escapeHtml(lbl("VAS_QualityControl", "Quality Control")) + '</div>' +
+                '<div class="vas-qah-qc-headline">' + escapeHtml(lbl("VAS_086_QualityControl", "Quality Control")) + '</div>' +
                 '<div class="vas-qah-qc-grid">' +
                 '<div class="vas-qah-qc-col">' + left + '</div>' +
                 '<div class="vas-qah-qc-col">' + right + '</div>' +
                 '</div>' +
                 '<div class="vas-qah-action">' +
-                '<button type="button" class="vas-qah-save"' + saveDisabled + saveTitle + '>' + icon("check") + escapeHtml(lbl("VAS_SaveQAResult", "Save QA Result")) + '</button>' +
+                '<button type="button" class="vas-qah-save"' + saveDisabled + saveTitle + '>' + icon("check") + escapeHtml(lbl("VAS_086_SaveQAResult", "Save QA Result")) + '</button>' +
                 '</div>'
             );
 
@@ -427,7 +427,7 @@
 
             var actualValue = $dialogBody.find('.vas-qah-actual').val();
             if (!actualValue) {
-                VIS.ADialog.info("", true, lbl("VAS_SelectQAActualValue", "Select an actual value before saving."), null);
+                VIS.ADialog.info("", true, lbl("VAS_086_SelectQAActualValue", "Select an actual value before saving."), null);
                 return;
             }
 
@@ -447,7 +447,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (!data || data.error) {
-                        VIS.ADialog.info("", true, data && data.error ? data.error : lbl("VAS_SaveFailed", "Save failed."), null);
+                        VIS.ADialog.info("", true, data && data.error ? data.error : lbl("VAS_086_SaveFailed", "Save failed."), null);
                         return;
                     }
 
@@ -456,7 +456,7 @@
                     $(document).trigger('vas-qaholds-updated');
                 },
                 error: function () {
-                    VIS.ADialog.info("", true, lbl("VAS_SaveFailed", "Save failed."), null);
+                    VIS.ADialog.info("", true, lbl("VAS_086_SaveFailed", "Save failed."), null);
                 },
                 complete: function () {
                     showDialogBusy(false);

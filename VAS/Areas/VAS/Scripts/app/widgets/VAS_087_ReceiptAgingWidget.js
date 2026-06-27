@@ -10,18 +10,18 @@
  * Labels / Message Keys
  *  #  | Current Text                       | Message Key
  * ----+------------------------------------+---------------------------
- *  1  | Receipt Aging                     | VAS_ReceiptAging
- *  2  | Time on dock awaiting put-away    | VAS_ReceiptAgingSubtitle
- *  3  | receipt awaiting                   | VAS_ReceiptAwaiting
- *  4  | receipts awaiting                  | VAS_ReceiptsAwaiting
- *  5  | oldest                             | VAS_Oldest
- *  6  | Aging                              | VAS_Aging
- *  7  | Quality check                      | VAS_QualityCheck
- *  8  | Count mismatch                     | VAS_CountMismatch
- *  9  | Unloading                          | VAS_Unloading
- * 10  | Receipt Lines                      | VAS_ReceiptLines
- * 11  | Received                           | VAS_Received
- * 12  | Location                           | VAS_Location
+ *  1  | Receipt Aging                     | VAS_087_ReceiptAging
+ *  2  | Time on dock awaiting put-away    | VAS_087_ReceiptAgingSubtitle
+ *  3  | receipt awaiting                   | VAS_087_ReceiptAwaiting
+ *  4  | receipts awaiting                  | VAS_087_ReceiptsAwaiting
+ *  5  | oldest                             | VAS_087_Oldest
+ *  6  | Aging                              | VAS_087_Aging
+ *  7  | Quality check                      | VAS_087_QualityCheck
+ *  8  | Count mismatch                     | VAS_087_CountMismatch
+ *  9  | Unloading                          | VAS_087_Unloading
+ * 10  | Receipt Lines                      | VAS_087_ReceiptLines
+ * 11  | Received                           | VAS_087_Received
+ * 12  | Location                           | VAS_087_Location
  */
 ; VAS = window.VAS || {};
 
@@ -145,11 +145,11 @@
         function ageLongLabel(hours) {
             if (hours < 24) {
                 var h = Math.floor(hours);
-                return h + " " + (h === 1 ? lbl("VAS_Hour", "hour") : lbl("VAS_Hours", "hours"));
+                return h + " " + (h === 1 ? lbl("VAS_087_Hour", "hour") : lbl("VAS_087_Hours", "hours"));
             }
 
             var days = Math.max(1, Math.round(hours / 24));
-            return days + " " + (days === 1 ? lbl("VAS_Day", "day") : lbl("VAS_Days", "days"));
+            return days + " " + (days === 1 ? lbl("VAS_087_Day", "day") : lbl("VAS_087_Days", "days"));
         }
 
         function ageSeverity(hours) {
@@ -162,7 +162,7 @@
             var first = record.firstItemName || "-";
             var lineCount = Number(record.lineCount || 0);
             if (lineCount > 1) {
-                return first + " + " + (lineCount - 1) + " " + lbl("VAS_More", "more");
+                return first + " + " + (lineCount - 1) + " " + lbl("VAS_087_More", "more");
             }
             return first;
         }
@@ -176,9 +176,9 @@
 
         function getStatusText(status) {
             switch (normalizeStatus(status)) {
-                case "quality": return lbl("VAS_QualityCheck", "Quality check");
-                case "mismatch": return lbl("VAS_CountMismatch", "Count mismatch");
-                default: return lbl("VAS_Unloading", "Unloading");
+                case "quality": return lbl("VAS_087_QualityCheck", "Quality check");
+                case "mismatch": return lbl("VAS_087_CountMismatch", "Count mismatch");
+                default: return lbl("VAS_087_Unloading", "Unloading");
             }
         }
 
@@ -202,8 +202,8 @@
                 '<div class="vas-rag-head">' +
                 '<span class="vas-rag-ico">' + icon("clock") + '</span>' +
                 '<div class="vas-rag-titles">' +
-                '<div class="vas-rag-title">' + escapeHtml(lbl("VAS_ReceiptAging", "Receipt Aging")) + '</div>' +
-                '<div class="vas-rag-sub">' + escapeHtml(lbl("VAS_ReceiptAgingSubtitle", "Time on dock awaiting put-away")) + '</div>' +
+                '<div class="vas-rag-title">' + escapeHtml(lbl("VAS_087_ReceiptAging", "Receipt Aging")) + '</div>' +
+                '<div class="vas-rag-sub">' + escapeHtml(lbl("VAS_087_ReceiptAgingSubtitle", "Time on dock awaiting put-away")) + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -214,9 +214,9 @@
                 '<div class="vas-rag-foot vas-rag-hidden">' +
                 '<span class="vas-rag-foot-info"></span>' +
                 '<div class="vas-rag-pager">' +
-                '<button type="button" class="vas-rag-pgbtn vas-rag-prev" aria-label="' + escapeHtml(lbl("VAS_Previous", "Previous")) + '">' + icon("chevL") + '</button>' +
+                '<button type="button" class="vas-rag-pgbtn vas-rag-prev" aria-label="' + escapeHtml(lbl("VAS_087_Previous", "Previous")) + '">' + icon("chevL") + '</button>' +
                 '<span class="vas-rag-pgtext"></span>' +
-                '<button type="button" class="vas-rag-pgbtn vas-rag-next" aria-label="' + escapeHtml(lbl("VAS_Next", "Next")) + '">' + icon("chevR") + '</button>' +
+                '<button type="button" class="vas-rag-pgbtn vas-rag-next" aria-label="' + escapeHtml(lbl("VAS_087_Next", "Next")) + '">' + icon("chevR") + '</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -295,7 +295,7 @@
             $listBody.empty();
 
             var summaryText = totalRecords + " " +
-                (totalRecords === 1 ? lbl("VAS_ReceiptAwaiting", "receipt awaiting") : lbl("VAS_ReceiptsAwaiting", "receipts awaiting"));
+                (totalRecords === 1 ? lbl("VAS_087_ReceiptAwaiting", "receipt awaiting") : lbl("VAS_087_ReceiptsAwaiting", "receipts awaiting"));
 
             if (totalRecords > 0) {
                 var oldestHours = ageHours(oldestReceivedOn);
@@ -304,13 +304,13 @@
                         oldestHours = Math.max(oldestHours, ageHours(rows[s].receivedOn));
                     }
                 }
-                summaryText += " - " + lbl("VAS_Oldest", "oldest") + " " + ageLongLabel(oldestHours);
+                summaryText += " - " + lbl("VAS_087_Oldest", "oldest") + " " + ageLongLabel(oldestHours);
             }
 
             $summary.find('span').text(summaryText);
 
             if (!rows || rows.length === 0) {
-                $listBody.append('<div class="vas-rag-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $listBody.append('<div class="vas-rag-empty">' + escapeHtml(lbl("VAS_087_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
 
@@ -342,13 +342,13 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_087_Of", "of") + ' ' + totalPages) : '');
             }
             if ($pageInfo) {
                 if (totalRecords > 0 && totalPages > 1) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VAS_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_087_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_087_Of", "of") + ' ' + totalRecords);
                 } else {
                     $pageInfo.text('');
                 }
@@ -368,7 +368,7 @@
                 '<h3 class="vas-rag-modal-title"></h3>' +
                 '<span class="vas-rag-modal-status"></span>' +
                 '</div>' +
-                '<button type="button" class="vas-rag-modal-close" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-rag-modal-close" aria-label="' + escapeHtml(lbl("VAS_087_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
@@ -408,7 +408,7 @@
             var severity = ageSeverity(hours);
 
             $dialogTitle.text((header.grnNo || "") + " - " + (header.supplier || ""));
-            $dialogStatus.html('<span class="vas-rag-pill ' + severity + '">' + escapeHtml(lbl("VAS_Aging", "Aging") + " " + ageLabel(hours)) + '</span>');
+            $dialogStatus.html('<span class="vas-rag-pill ' + severity + '">' + escapeHtml(lbl("VAS_087_Aging", "Aging") + " " + ageLabel(hours)) + '</span>');
             renderReceiptDetail(header, null);
 
             $dialog.removeClass('vas-rag-hidden');
@@ -435,14 +435,14 @@
         function renderReceiptDetail(header, lines) {
             var html =
                 '<div class="vas-rag-form">' +
-                field(lbl("VAS_GRN", "GRN"), header.grnNo, true) +
-                field(lbl("VAS_LinkedPO", "Linked PO"), header.linkedPoNo) +
-                field(lbl("VAS_Supplier", "Supplier"), header.supplier) +
-                field(lbl("VAS_QtyReceived", "Qty received"), formatQtyWithUom(header.totalQty, header.uom)) +
-                field(lbl("VAS_ReceivedOn", "Received on"), formatDateTime(header.receivedOn)) +
-                field(lbl("VAS_Status", "Status"), getStatusText(header.statusCode)) +
+                field(lbl("VAS_087_GRN", "GRN"), header.grnNo, true) +
+                field(lbl("VAS_087_LinkedPO", "Linked PO"), header.linkedPoNo) +
+                field(lbl("VAS_087_Supplier", "Supplier"), header.supplier) +
+                field(lbl("VAS_087_QtyReceived", "Qty received"), formatQtyWithUom(header.totalQty, header.uom)) +
+                field(lbl("VAS_087_ReceivedOn", "Received on"), formatDateTime(header.receivedOn)) +
+                field(lbl("VAS_087_Status", "Status"), getStatusText(header.statusCode)) +
                 '</div>' +
-                '<div class="vas-rag-lines-title">' + escapeHtml(lbl("VAS_ReceiptLines", "Receipt Lines")) + '</div>' +
+                '<div class="vas-rag-lines-title">' + escapeHtml(lbl("VAS_087_ReceiptLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-rag-lines-wrap">';
 
             if (lines === null) {
@@ -452,7 +452,7 @@
             }
 
             if (!lines || lines.length === 0) {
-                html += '<div class="vas-rag-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div></div>';
+                html += '<div class="vas-rag-empty">' + escapeHtml(lbl("VAS_087_NoDataAvailable", "No data available")) + '</div></div>';
                 $dialogBody.html(html);
                 return;
             }
@@ -472,10 +472,10 @@
             html +=
                 '<table class="vas-rag-lines-table">' +
                 '<thead><tr>' +
-                '<th class="vas-rag-l-item">' + escapeHtml(lbl("VAS_Item", "Item")) + '</th>' +
-                '<th class="vas-rag-l-num">' + escapeHtml(lbl("VAS_Received", "Received")) + '</th>' +
-                '<th class="vas-rag-l-location">' + escapeHtml(lbl("VAS_Location", "Location")) + '</th>' +
-                '<th class="vas-rag-l-status">' + escapeHtml(lbl("VAS_Status", "Status")) + '</th>' +
+                '<th class="vas-rag-l-item">' + escapeHtml(lbl("VAS_087_Item", "Item")) + '</th>' +
+                '<th class="vas-rag-l-num">' + escapeHtml(lbl("VAS_087_Received", "Received")) + '</th>' +
+                '<th class="vas-rag-l-location">' + escapeHtml(lbl("VAS_087_Location", "Location")) + '</th>' +
+                '<th class="vas-rag-l-status">' + escapeHtml(lbl("VAS_087_Status", "Status")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table></div>';
 
             $dialogBody.html(html);

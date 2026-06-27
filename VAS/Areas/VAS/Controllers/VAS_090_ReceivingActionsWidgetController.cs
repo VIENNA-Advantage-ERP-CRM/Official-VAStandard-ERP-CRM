@@ -23,6 +23,25 @@ namespace VIS.Controllers
     /// </summary>
     public class VAS_090_ReceivingActionsWidgetController : Controller
     {
+        /// <summary>
+        /// Renders a string literal compatible with the active database: Oracle uses
+        /// the national-character N'...' prefix, PostgreSQL a plain quoted literal
+        /// (PostgreSQL does not support the N'...' syntax).
+        /// </summary>
+        /// <param name="text">Literal text (no quotes).</param>
+        /// <returns>A DB-appropriate quoted literal.</returns>
+        private static string NLiteral(string text)
+        {
+            return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
+        }
+
+        /// <summary>
+        /// One page of completed vendor purchase orders that still have open
+        /// quantity, with supplier, warehouse, receiving dock and promised date.
+        /// </summary>
+        /// <param name="pageNo">1-based page number.</param>
+        /// <param name="pageSize">Rows per page (max 20).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 8)
@@ -40,16 +59,16 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
             string dockSql = HasColumn("M_Locator", "LocatorCombination")
-                ? "COALESCE(ReceiveLocator.LocatorCombination, ReceiveLocator.Value, N'-')"
-                : "COALESCE(ReceiveLocator.Value, N'-')";
+                ? "COALESCE(ReceiveLocator.LocatorCombination, ReceiveLocator.Value, " + NLiteral("-") + ")"
+                : "COALESCE(ReceiveLocator.Value, " + NLiteral("-") + ")";
 
             string rawSql = @"
                 SELECT PurchaseOrder.C_Order_ID AS PO_ID,
                        PurchaseOrder.DocumentNo AS PO_No,
                        BPartner.Name AS Supplier_Name,
-                       COALESCE(Warehouse.Name, N'-') AS Warehouse_Name,
+                       COALESCE(Warehouse.Name, " + NLiteral("-") + @") AS Warehouse_Name,
                        " + dockSql + @" AS Dock_Name,
-                       COALESCE(PurchaseOrder.POReference, N'-') AS Supplier_Reference,
+                       COALESCE(PurchaseOrder.POReference, " + NLiteral("-") + @") AS Supplier_Reference,
                        COALESCE(OrderLine.DatePromised, PurchaseOrder.DatePromised) AS Line_Promise_Date,
                        OrderLine.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order PurchaseOrder
@@ -156,6 +175,12 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// Open (un-received) order lines for one purchase order, with the default
+        /// received quantity pre-set to the remaining open quantity.
+        /// </summary>
+        /// <param name="poId">C_Order_ID of the selected purchase order.</param>
+        /// <returns>JSON { rows[] }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetPurchaseOrderLines(int poId = 0)
@@ -170,7 +195,7 @@ namespace VIS.Controllers
             string sql = @"
                 SELECT OrderLine.C_OrderLine_ID AS PO_Line_ID,
                        OrderLine.Line AS Line_No,
-                       COALESCE(Product.Name, N'-') AS Item_Name,
+                       COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
                        COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(OrderLine.QtyDelivered, 0) AS Already_Received_Qty,
                        COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) AS Open_Qty,
@@ -240,6 +265,14 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// One page of vendor GRNs for label printing, filtered by an optional
+        /// document-number / supplier-name search, with copy count and print format.
+        /// </summary>
+        /// <param name="searchText">Optional GRN number or supplier name fragment.</param>
+        /// <param name="pageNo">1-based page number.</param>
+        /// <param name="pageSize">Rows per page (max 10).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult SearchGRNLabels(string searchText = "", int pageNo = 1, int pageSize = 5)
@@ -383,6 +416,12 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// Resolves the print metadata (copies, print format) for one GRN and returns
+        /// a queued-label confirmation payload.
+        /// </summary>
+        /// <param name="grnId">M_InOut_ID of the GRN to print.</param>
+        /// <returns>JSON { success, grnId, grnNo, copies, printFormat, ... } or { error }.</returns>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -471,6 +510,9 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>Display text for a print format id (or the default put-away label).</summary>
+        /// <param name="printFormatId">AD_PrintFormat_ID, or 0 when none.</param>
+        /// <returns>Human-readable print-format label.</returns>
         private string GetPrintFormatText(int printFormatId)
         {
             return printFormatId > 0
@@ -478,6 +520,13 @@ namespace VIS.Controllers
                 : "Put-away label 4x6";
         }
 
+        /// <summary>
+        /// Whether a column exists on a table in the active database (PostgreSQL or
+        /// Oracle), so optional columns can be referenced safely.
+        /// </summary>
+        /// <param name="tableName">Physical table name.</param>
+        /// <param name="columnName">Column name to test.</param>
+        /// <returns>True when the column exists.</returns>
         private bool HasColumn(string tableName, string columnName)
         {
             string sql;
@@ -514,11 +563,17 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>Wraps a success payload as a serialized JSON result.</summary>
+        /// <param name="result">Anonymous payload object to serialize.</param>
+        /// <returns>JSON result.</returns>
         private JsonResult Ok(object result)
         {
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>Wraps a failure message as a serialized JSON result.</summary>
+        /// <param name="message">User-facing error/message text.</param>
+        /// <returns>JSON result with success:false.</returns>
         private JsonResult Fail(string message)
         {
             return Json(JsonConvert.SerializeObject(new

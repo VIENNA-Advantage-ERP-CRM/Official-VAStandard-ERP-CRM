@@ -16,12 +16,25 @@ using VIS.Filters;
 namespace VIS.Controllers
 {
     /// <summary>
-    /// New GRN quick-action widget.
-    /// Opens purchase orders, loads open PO lines, and creates a Material Receipt
-    /// through the server-side M_InOut/M_InOutLine flow.
+    /// Module Name : New GRN (Material Receipt / GRN dashboard quick action)
+    /// Purpose     : Quick-action widget to raise a Material Receipt (GRN) from an
+    ///               open purchase order. Lists completed vendor POs that still have
+    ///               open quantity, loads their open lines, and creates + completes
+    ///               the receipt through the server-side M_InOut / M_InOutLine model
+    ///               flow inside a single transaction. MRole is applied to the
+    ///               primary fetched table (C_Order) on every read query.
+    /// Chronological development:
+    ///   &lt;EmpCode&gt;   2026-06-18 Created
     /// </summary>
     public class VAS_082_NewGRNWidgetController : Controller
     {
+        /// <summary>
+        /// One page of completed vendor purchase orders that still have open
+        /// (un-received) quantity, newest promised first.
+        /// </summary>
+        /// <param name="pageNo">1-based page number.</param>
+        /// <param name="pageSize">Rows per page (max 50).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 20)
@@ -47,7 +60,7 @@ namespace VIS.Controllers
                        COALESCE(ol.DatePromised, o.DatePromised) AS Line_Promise_Date,
                        ol.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order o
-                INNER JOIN C_OrderLine ol ON ol.C_Order_ID=o.C_Order_ID
+                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID AND bp.IsActive='Y')
                 LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AND wh.IsActive='Y')
                 WHERE o.IsActive='Y'
@@ -142,6 +155,12 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// Open (un-received) order lines for one purchase order, with the default
+        /// received quantity pre-set to the remaining open quantity.
+        /// </summary>
+        /// <param name="poId">C_Order_ID of the selected purchase order.</param>
+        /// <returns>JSON { rows[] }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetPurchaseOrderLines(int poId = 0)
@@ -161,7 +180,7 @@ namespace VIS.Controllers
                        COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Default_Received_Qty,
                        COALESCE(u.UOMSymbol, u.Name) AS UOM
                 FROM C_Order o
-                INNER JOIN C_OrderLine ol ON ol.C_Order_ID=o.C_Order_ID
+                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')
                 LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID=ol.C_UOM_ID AND u.IsActive='Y')
                 WHERE o.IsActive='Y'
@@ -227,6 +246,16 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// Creates and completes a Material Receipt (GRN) for the given purchase
+        /// order and received quantities. Re-validates each line against the live
+        /// open quantity, then saves the receipt and its lines through the M_InOut /
+        /// M_InOutLine model classes inside a single transaction (rolled back on any
+        /// failure).
+        /// </summary>
+        /// <param name="poId">C_Order_ID of the purchase order being received.</param>
+        /// <param name="linesJson">JSON array of { poLineId, receivedQty } inputs.</param>
+        /// <returns>JSON { success, grnId, grnNo, message } or { success:false, error }.</returns>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -415,6 +444,14 @@ namespace VIS.Controllers
             }
         }
 
+        /// <summary>
+        /// Re-reads the live open quantity and warehouse for the selected PO lines,
+        /// keyed by C_OrderLine_ID, so CreateGRN can validate against current data.
+        /// </summary>
+        /// <param name="ctx">Session context.</param>
+        /// <param name="poId">C_Order_ID of the purchase order.</param>
+        /// <param name="lineIds">Selected C_OrderLine_ID values.</param>
+        /// <returns>Map of C_OrderLine_ID to its open-line info.</returns>
         private Dictionary<int, NewGRNLineInfo> GetOpenLineInfo(Ctx ctx, int poId, IEnumerable<int> lineIds)
         {
             Dictionary<int, NewGRNLineInfo> lines = new Dictionary<int, NewGRNLineInfo>();
@@ -444,7 +481,7 @@ namespace VIS.Controllers
                        COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AS Warehouse_ID,
                        COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Open_Qty
                 FROM C_Order o
-                INNER JOIN C_OrderLine ol ON ol.C_Order_ID=o.C_Order_ID
+                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')
                 WHERE o.IsActive='Y'
                   AND ol.IsActive='Y'
@@ -489,18 +526,25 @@ namespace VIS.Controllers
             return lines;
         }
 
+        /// <summary>
+        /// Resolves the Material Receipt (DocBaseType 'MMR') document type for the
+        /// given organization, preferring an org-specific type over the shared one.
+        /// </summary>
+        /// <param name="orgId">AD_Org_ID of the receipt.</param>
+        /// <param name="clientId">AD_Client_ID context.</param>
+        /// <returns>C_DocType_ID, or 0 when none is configured.</returns>
         private int GetDocTypeId(int orgId, int clientId)
         {
             string sql = @"
-                SELECT C_DocType_ID
-                FROM C_DocType
-                WHERE DocBaseType='MMR'
-                  AND AD_Client_ID=@AD_Client_ID
-                  AND IsActive='Y'
-                  AND AD_Org_ID IN (0, @AD_Org_ID)
-                  AND IsSOTrx='N'
-                  AND IsReturnTrx='N'
-                ORDER BY AD_Org_ID DESC";
+                SELECT DocType.C_DocType_ID
+                FROM C_DocType DocType
+                WHERE DocType.DocBaseType='MMR'
+                  AND DocType.AD_Client_ID=@AD_Client_ID
+                  AND DocType.IsActive='Y'
+                  AND DocType.AD_Org_ID IN (0, @AD_Org_ID)
+                  AND DocType.IsSOTrx='N'
+                  AND DocType.IsReturnTrx='N'
+                ORDER BY DocType.AD_Org_ID DESC";
 
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", clientId));
@@ -509,21 +553,36 @@ namespace VIS.Controllers
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters.ToArray(), null));
         }
 
+        /// <summary>
+        /// Returns the default locator for a warehouse (falling back to any active
+        /// locator), used as the receipt-line locator.
+        /// </summary>
+        /// <param name="warehouseId">M_Warehouse_ID of the receipt.</param>
+        /// <param name="trx">Active transaction.</param>
+        /// <returns>M_Locator_ID, or 0 when none is found.</returns>
         private int GetDefaultLocatorId(int warehouseId, Trx trx)
         {
             if (warehouseId <= 0) { return 0; }
 
             string sql = @"
-                SELECT M_Locator_ID
-                FROM M_Locator
-                WHERE IsActive='Y'
-                  AND M_Warehouse_ID=@M_Warehouse_ID
-                ORDER BY IsDefault DESC";
+                SELECT Locator.M_Locator_ID
+                FROM M_Locator Locator
+                WHERE Locator.IsActive='Y'
+                  AND Locator.M_Warehouse_ID=@M_Warehouse_ID
+                ORDER BY Locator.IsDefault DESC";
 
             SqlParameter[] parameters = { new SqlParameter("@M_Warehouse_ID", warehouseId) };
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, trx));
         }
 
+        /// <summary>
+        /// Builds a user-facing save error: the logged model error if present, else
+        /// the resolved fallback message key, else the literal fallback text.
+        /// </summary>
+        /// <param name="ctx">Session context.</param>
+        /// <param name="fallbackKey">AD_Message key used when no model error exists.</param>
+        /// <param name="fallback">Literal text used when the key does not resolve.</param>
+        /// <returns>The resolved error message.</returns>
         private string GetSaveError(Ctx ctx, string fallbackKey, string fallback)
         {
             ValueNamePair pp = VLogger.RetrieveError();
@@ -542,11 +601,17 @@ namespace VIS.Controllers
             return string.IsNullOrEmpty(error) ? fallback : error;
         }
 
+        /// <summary>Wraps a success payload as a serialized JSON result.</summary>
+        /// <param name="result">Anonymous payload object to serialize.</param>
+        /// <returns>JSON result.</returns>
         private JsonResult Ok(object result)
         {
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>Wraps a failure message as a serialized JSON result.</summary>
+        /// <param name="message">User-facing error/message text.</param>
+        /// <returns>JSON result with success:false.</returns>
         private JsonResult Fail(string message)
         {
             return Json(JsonConvert.SerializeObject(new

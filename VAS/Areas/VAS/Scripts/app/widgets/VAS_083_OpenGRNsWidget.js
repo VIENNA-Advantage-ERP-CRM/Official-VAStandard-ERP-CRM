@@ -16,10 +16,10 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                    | Message Key
  * ----+---------------------------------+--------------------------------
- *  1  | Open GRNs till Today            | VAS_OpenGRNsTillToday
- *  2  | Pending goods receipt posting   | VAS_PendingGRNPosting
- *  3  | No open GRNs                    | VAS_NoOpenGRNs
- *  4  | Couldn't load                   | VAS_CouldntLoad
+ *  1  | Open GRNs till Today            | VAS_083_OpenGRNsTillToday
+ *  2  | Pending goods receipt posting   | VAS_083_PendingGRNPosting
+ *  3  | No open GRNs                    | VAS_083_NoOpenGRNs
+ *  4  | Couldn't load                   | VAS_083_CouldntLoad
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -120,8 +120,8 @@
             }
             if ($metaEl) {
                 $metaEl.text(lastCount === 0
-                    ? lbl("VAS_NoOpenGRNs", "No open GRNs")
-                    : lbl("VAS_PendingGRNPosting", "Pending goods receipt posting"));
+                    ? lbl("VAS_083_NoOpenGRNs", "No open GRNs")
+                    : lbl("VAS_083_PendingGRNPosting", "Pending goods receipt posting"));
             }
             if ($card) { $card.prop('disabled', false); }
         }
@@ -135,7 +135,7 @@
                 $valueEl.text('—');
                 $valueEl.removeAttr('title');
             }
-            if ($metaEl) { $metaEl.text(lbl("VAS_CouldntLoad", "Couldn't load")); }
+            if ($metaEl) { $metaEl.text(lbl("VAS_083_CouldntLoad", "Couldn't load")); }
             /* No data to drill into. */
             if ($card) { $card.prop('disabled', true); }
         }
@@ -169,7 +169,7 @@
         function createWidget() {
             $card = $(
                 '<button type="button" class="vas-ogrn-card vas-widget-bg">' +
-                '<div class="vas-ogrn-label">' + escapeHtml(lbl("VAS_OpenGRNsTillToday", "Open GRNs till Today")) + '</div>' +
+                '<div class="vas-ogrn-label">' + escapeHtml(lbl("VAS_083_OpenGRNsTillToday", "Open GRNs till Today")) + '</div>' +
                 '<div class="vas-ogrn-value">—</div>' +
                 '<div class="vas-ogrn-meta"></div>' +
                 '</button>'

@@ -14,8 +14,8 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text          | Message Key
  * ----+-----------------------+----------------------------------------
- *  1  | PO Fulfilment %       | VAS_POFulfilmentPct
- *  2  | vs last month         | VAS_VsLastMonthShort
+ *  1  | PO Fulfilment %       | VAS_085_POFulfilmentPct
+ *  2  | vs last month         | VAS_085_VsLastMonthShort
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -67,7 +67,7 @@
            change is a percentage-point difference (current − last month). */
         function metaText(change) {
             var c = Number(change || 0);
-            var suffix = lbl("VAS_VsLastMonthShort", "vs last month");
+            var suffix = lbl("VAS_085_VsLastMonthShort", "vs last month");
             if (c > 0) { return "▲ " + c + "% " + suffix; }
             if (c < 0) { return "▼ " + Math.abs(c) + "% " + suffix; }
             return "0% " + suffix;
@@ -131,7 +131,7 @@
         function createWidget() {
             var $card = $(
                 '<div class="vas-pof-card vas-widget-bg">' +
-                '<div class="vas-pof-label">' + escapeHtml(lbl("VAS_POFulfilmentPct", "PO Fulfilment %")) + '</div>' +
+                '<div class="vas-pof-label">' + escapeHtml(lbl("VAS_085_POFulfilmentPct", "PO Fulfilment %")) + '</div>' +
                 '<div class="vas-pof-value">—</div>' +
                 '<div class="vas-pof-meta"></div>' +
                 '</div>'

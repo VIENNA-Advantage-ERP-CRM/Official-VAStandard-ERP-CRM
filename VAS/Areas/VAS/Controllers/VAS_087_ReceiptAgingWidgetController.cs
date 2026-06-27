@@ -25,6 +25,18 @@ namespace VIS.Controllers
     public class VAS_087_ReceiptAgingWidgetController : Controller
     {
         /// <summary>
+        /// Renders a string literal compatible with the active database: Oracle uses
+        /// the national-character N'...' prefix, PostgreSQL a plain quoted literal
+        /// (PostgreSQL does not support the N'...' syntax).
+        /// </summary>
+        /// <param name="text">Literal text (no quotes).</param>
+        /// <returns>A DB-appropriate quoted literal.</returns>
+        private static string NLiteral(string text)
+        {
+            return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
+        }
+
+        /// <summary>
         /// One page of not-yet-stored vendor receipts, oldest first.
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
@@ -50,13 +62,13 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
             bool hasLineConfirmTable = HasTable("M_InOutLineConfirm");
-            bool hasQualityCheckColumn = hasLineConfirmTable && HasColumn("M_InOutLineConfirm", "VA010_QualCheckMark");
+            bool hasQualityCheckColumn = hasLineConfirmTable && HasColumn("M_InOutLineConfirm", "VA010_QualCheckMArk");
 
             string lineConfirmJoin = hasLineConfirmTable
                 ? "LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID AND LineConfirm.IsActive='Y')"
                 : "";
             string qualityCheckSql = hasQualityCheckColumn
-                ? "MAX(CASE WHEN COALESCE(LineConfirm.VA010_QualCheckMark, 'N')='Y' THEN 1 ELSE 0 END)"
+                ? "MAX(CASE WHEN COALESCE(LineConfirm.VA010_QualCheckMArk, 'N')='Y' THEN 1 ELSE 0 END)"
                 : "0";
             string differenceSql = hasLineConfirmTable
                 ? "SUM(COALESCE(LineConfirm.DifferenceQty, 0))"
@@ -66,7 +78,7 @@ namespace VIS.Controllers
                 SELECT InOut.M_InOut_ID AS Receipt_Id,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier,
-                       COALESCE(PurchaseOrder.DocumentNo, N'-') AS Linked_PO_No,
+                       COALESCE(PurchaseOrder.DocumentNo, " + NLiteral("-") + @") AS Linked_PO_No,
                        InOut.MovementDate AS Received_On
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -224,7 +236,7 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
             bool hasLineConfirmTable = HasTable("M_InOutLineConfirm");
-            bool hasQualityCheckColumn = hasLineConfirmTable && HasColumn("M_InOutLineConfirm", "VA010_QualCheckMark");
+            bool hasQualityCheckColumn = hasLineConfirmTable && HasColumn("M_InOutLineConfirm", "VA010_QualCheckMArk");
 
             string lineConfirmJoin = hasLineConfirmTable
                 ? "LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID AND LineConfirm.IsActive='Y')"
@@ -233,15 +245,15 @@ namespace VIS.Controllers
                 ? "LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=LineConfirm.M_Locator_ID AND Locator.IsActive='Y')"
                 : "";
             string locatorSql = hasLineConfirmTable
-                ? "COALESCE(Locator.Value, N'-')"
-                : "N'-'";
+                ? "COALESCE(Locator.Value, " + NLiteral("-") + ")"
+                : NLiteral("-");
             string statusSql = "'Unloading'";
 
             if (hasLineConfirmTable && hasQualityCheckColumn)
             {
                 statusSql = @"
                     CASE
-                        WHEN COALESCE(LineConfirm.VA010_QualCheckMark, 'N')='Y' THEN 'Quality check'
+                        WHEN COALESCE(LineConfirm.VA010_QualCheckMArk, 'N')='Y' THEN 'Quality check'
                         WHEN COALESCE(LineConfirm.DifferenceQty, 0) <> 0 THEN 'Count mismatch'
                         ELSE 'Unloading'
                     END";

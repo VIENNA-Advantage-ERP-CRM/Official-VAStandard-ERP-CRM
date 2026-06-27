@@ -30,6 +30,18 @@ namespace VIS.Controllers
     public class VAS_081_MaterialReceiptRegisterWidgetController : Controller
     {
         /// <summary>
+        /// Renders a string literal compatible with the active database: Oracle uses
+        /// the national-character N'...' prefix, PostgreSQL a plain quoted literal
+        /// (PostgreSQL does not support the N'...' syntax).
+        /// </summary>
+        /// <param name="text">Literal text (no quotes).</param>
+        /// <returns>A DB-appropriate quoted literal.</returns>
+        private static string NLiteral(string text)
+        {
+            return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
+        }
+
+        /// <summary>
         /// One page of the receipt register (header-level), newest first.
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
@@ -59,7 +71,7 @@ namespace VIS.Controllers
                        InOut.DocumentNo,
                        PurchaseOrder.DocumentNo AS PO_DocumentNo,
                        BPartner.Name AS BPartner_Name,
-                       COALESCE(Project.Name, N'-') AS Project_Name,
+                       COALESCE(Project.Name, " + NLiteral("-") + @") AS Project_Name,
                        InOut.MovementDate,
                        ConfirmationData.Put_Away_On,
                        InOutLine.M_InOutLine_ID,

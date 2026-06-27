@@ -27,6 +27,18 @@ namespace VIS.Controllers
     public class VAS_088_ReceiptQueueWidgetController : Controller
     {
         /// <summary>
+        /// Renders a string literal compatible with the active database: Oracle uses
+        /// the national-character N'...' prefix, PostgreSQL a plain quoted literal
+        /// (PostgreSQL does not support the N'...' syntax).
+        /// </summary>
+        /// <param name="text">Literal text (no quotes).</param>
+        /// <returns>A DB-appropriate quoted literal.</returns>
+        private static string NLiteral(string text)
+        {
+            return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
+        }
+
+        /// <summary>
         /// One page of the live receipt queue, newest first.
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
@@ -53,16 +65,16 @@ namespace VIS.Controllers
             int offset = (pageNo - 1) * pageSize;
             bool hasQualityCheckColumn = HasQualityCheckColumn();
             string qualityCheckSql = hasQualityCheckColumn
-                ? "MAX(CASE WHEN COALESCE(LineConfirm.VA010_QualCheckMark, 'N')='Y' THEN 1 ELSE 0 END)"
+                ? "MAX(CASE WHEN COALESCE(LineConfirm.VA010_QualCheckMArk, 'N')='Y' THEN 1 ELSE 0 END)"
                 : "0";
 
             string headerSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier_Name,
-                       COALESCE(PurchaseOrder.DocumentNo, N'-') AS PO_No,
+                       COALESCE(PurchaseOrder.DocumentNo, " + NLiteral("-") + @") AS PO_No,
                        InOut.DocStatus AS Doc_Status,
-                       COALESCE(UserInfo.Name, N'-') AS Received_By,
+                       COALESCE(UserInfo.Name, " + NLiteral("-") + @") AS Received_By,
                        COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Received_Time
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -201,7 +213,7 @@ namespace VIS.Controllers
 
             string linesSql = @"
                 SELECT InOutLine.M_InOutLine_ID AS GRN_Line_ID,
-                       COALESCE(Product.Name, N'-') AS Item_Name,
+                       COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
                        COALESCE(OrderLine.QtyOrdered, 0) AS Ordered_Qty,
                        COALESCE(InOutLine.MovementQty, 0) AS Received_Qty
                 FROM M_InOut InOut
@@ -279,7 +291,7 @@ namespace VIS.Controllers
                     SELECT COUNT(1)
                     FROM information_schema.columns
                     WHERE UPPER(table_name)=UPPER('M_InOutLineConfirm')
-                      AND UPPER(column_name)=UPPER('VA010_QualCheckMark')";
+                      AND UPPER(column_name)=UPPER('VA010_QualCheckMArk')";
             }
             else
             {
@@ -287,7 +299,7 @@ namespace VIS.Controllers
                     SELECT COUNT(1)
                     FROM USER_TAB_COLUMNS
                     WHERE TABLE_NAME=UPPER('M_InOutLineConfirm')
-                      AND COLUMN_NAME=UPPER('VA010_QualCheckMark')";
+                      AND COLUMN_NAME=UPPER('VA010_QualCheckMArk')";
             }
 
             try

@@ -14,8 +14,8 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text          | Message Key
  * ----+-----------------------+----------------------------------------
- *  1  | Receipts MTD          | VAS_ReceiptsMTD
- *  2  | vs {0} last month     | VAS_VsLastMonth
+ *  1  | Receipts MTD          | VAS_089_ReceiptsMTD
+ *  2  | vs {0} last month     | VAS_089_VsLastMonth
  * ─────────────────────────────────────────────────────────────────────
  */
 ; VAS = window.VAS || {};
@@ -71,7 +71,7 @@
            present, else fall back to a plain composed string. */
         function metaText(prevCount) {
             var n = formatCount(prevCount);
-            var tmpl = lbl("VAS_VsLastMonth", "vs {0} last month");
+            var tmpl = lbl("VAS_089_VsLastMonth", "vs {0} last month");
             return tmpl.indexOf("{0}") >= 0 ? tmpl.replace("{0}", n) : ("vs " + n + " last month");
         }
 
@@ -133,7 +133,7 @@
         function createWidget() {
             var $card = $(
                 '<div class="vas-rmtd-card vas-widget-bg">' +
-                '<div class="vas-rmtd-label">' + escapeHtml(lbl("VAS_ReceiptsMTD", "Receipts MTD")) + '</div>' +
+                '<div class="vas-rmtd-label">' + escapeHtml(lbl("VAS_089_ReceiptsMTD", "Receipts MTD")) + '</div>' +
                 '<div class="vas-rmtd-value">—</div>' +
                 '<div class="vas-rmtd-meta"></div>' +
                 '</div>'

@@ -7,23 +7,29 @@
  * Summary Message Table: see Labels / Message Keys below.
  *
  * Labels / Message Keys
- *  #  | Current Text                                      | Message Key
- * ----+---------------------------------------------------+-------------------------------
- *  1  | New GRN                                           | VAS_NewGRN
- *  2  | Receive against a PO                              | VAS_ReceiveAgainstPO
- *  3  | Select a purchase order                           | VAS_SelectPurchaseOrder
- *  4  | No data available                                 | VAS_NoDataAvailable
- *  5  | Purchase Order                                    | VAS_PurchaseOrder
- *  6  | Supplier                                          | VAS_Supplier
- *  7  | Warehouse                                         | VAS_Warehouse
- *  8  | Lines                                             | VAS_Lines
- *  9  | Enter received quantity against each PO line...    | VAS_EnterReceivedQtyAgainstLine
- * 10  | Item                                              | VAS_Item
- * 11  | PO Qty                                            | VAS_POQty
- * 12  | Already Received                                  | VAS_AlreadyReceived
- * 13  | Received                                          | VAS_Received
- * 14  | UOM                                               | VAS_UOM
- * 15  | Make GRN                                          | VAS_MakeGRN
+ *  #  | Current Text                                     | Message Key
+ * ----+--------------------------------------------------+-----------------------------------
+ *  1  | New GRN                                          | VAS_082_NewGRN
+ *  2  | Receive against a PO                             | VAS_082_ReceiveAgainstPO
+ *  3  | Back                                             | VAS_082_Back
+ *  4  | Close                                            | VAS_082_Close
+ *  5  | No data available                                | VAS_082_NoDataAvailable
+ *  6  | Select a purchase order                          | VAS_082_SelectPurchaseOrder
+ *  7  | Purchase Order                                   | VAS_082_PurchaseOrder
+ *  8  | Supplier                                         | VAS_082_Supplier
+ *  9  | Warehouse                                        | VAS_082_Warehouse
+ * 10  | Lines                                            | VAS_082_Lines
+ * 11  | Enter received quantity against each PO line...  | VAS_082_EnterReceivedQtyAgainstLine
+ * 12  | Item                                             | VAS_082_Item
+ * 13  | PO Qty                                           | VAS_082_POQty
+ * 14  | Already Received                                 | VAS_082_AlreadyReceived
+ * 15  | Received                                         | VAS_082_Received
+ * 16  | UOM                                              | VAS_082_UOM
+ * 17  | Make GRN                                         | VAS_082_MakeGRN
+ * 18  | Received quantity cannot be negative.            | VAS_082_NegativeReceivedQty
+ * 19  | Enter received quantity for at least one line.   | VAS_082_ReceivedQtyRequired
+ * 20  | Received quantity cannot be greater than open... | VAS_082_ReceivedQtyTooHigh
+ * 21  | GRN could not be created.                        | VAS_082_GRNCouldNotBeCreated
  */
 ; VAS = window.VAS || {};
 
@@ -121,15 +127,15 @@
 
         function createWidget() {
             var $card = $(
-                '<button type="button" class="vas-ngrn-card vas-widget-bg" aria-label="' + escapeHtml(lbl("VAS_NewGRN", "New GRN")) + '">' +
+                '<button type="button" class="vas-ngrn-card vas-widget-bg" aria-label="' + escapeHtml(lbl("VAS_082_NewGRN", "New GRN")) + '">' +
                 '<div class="vas-ngrn-iconrow">' +
                 '<span class="vas-ngrn-ico">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
                 '</span>' +
                 '</div>' +
                 '<div class="vas-ngrn-text">' +
-                '<div class="vas-ngrn-title">' + escapeHtml(lbl("VAS_NewGRN", "New GRN")) + '</div>' +
-                '<div class="vas-ngrn-sub">' + escapeHtml(lbl("VAS_ReceiveAgainstPO", "Receive against a PO")) + '</div>' +
+                '<div class="vas-ngrn-title">' + escapeHtml(lbl("VAS_082_NewGRN", "New GRN")) + '</div>' +
+                '<div class="vas-ngrn-sub">' + escapeHtml(lbl("VAS_082_ReceiveAgainstPO", "Receive against a PO")) + '</div>' +
                 '</div>' +
                 '</button>'
             );
@@ -145,13 +151,13 @@
                 '<div class="vas-ngrn-card-modal">' +
                 '<div class="vas-ngrn-header">' +
                 '<div class="vas-ngrn-title-left">' +
-                '<button type="button" class="vas-ngrn-back vas-ngrn-hidden" aria-label="' + escapeHtml(lbl("VAS_Back", "Back")) + '">' +
+                '<button type="button" class="vas-ngrn-back vas-ngrn-hidden" aria-label="' + escapeHtml(lbl("VAS_082_Back", "Back")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>' +
                 '</button>' +
                 '<h3 class="vas-ngrn-modal-title"></h3>' +
                 '<span class="vas-ngrn-modal-badge vas-ngrn-hidden"></span>' +
                 '</div>' +
-                '<button type="button" class="vas-ngrn-close" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-ngrn-close" aria-label="' + escapeHtml(lbl("VAS_082_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
@@ -209,7 +215,7 @@
             currentPO = null;
             currentLines = [];
             $dialog.find('.vas-ngrn-back').addClass('vas-ngrn-hidden');
-            $dialogTitle.text(lbl("VAS_NewGRN", "New GRN"));
+            $dialogTitle.text(lbl("VAS_082_NewGRN", "New GRN"));
             setBadge("", "");
             renderPOList();
         }
@@ -241,7 +247,7 @@
                     renderPOList();
                 },
                 error: function () {
-                    VIS.ADialog.error("", false, lbl("VAS_NoDataAvailable", "No data available"), "");
+                    VIS.ADialog.error("", false, lbl("VAS_082_NoDataAvailable", "No data available"), "");
                 },
                 complete: function () {
                     loading = false;
@@ -259,7 +265,7 @@
             }
 
             if (purchaseOrders.length === 0) {
-                $dialogBody.html('<div class="vas-ngrn-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $dialogBody.html('<div class="vas-ngrn-empty">' + escapeHtml(lbl("VAS_082_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
 
@@ -290,7 +296,7 @@
             }
 
             $dialogBody.html(
-                '<div class="vas-ngrn-step-hint">' + escapeHtml(lbl("VAS_SelectPurchaseOrder", "Select a purchase order")) + '</div>' +
+                '<div class="vas-ngrn-step-hint">' + escapeHtml(lbl("VAS_082_SelectPurchaseOrder", "Select a purchase order")) + '</div>' +
                 '<div class="vas-ngrn-po-list">' + rows + '</div>' +
                 paging
             );
@@ -303,7 +309,7 @@
             currentPO = po;
             currentLines = [];
             $dialog.find('.vas-ngrn-back').removeClass('vas-ngrn-hidden');
-            $dialogTitle.text(lbl("VAS_ReceiveAgainstPO", "Receive Against PO"));
+            $dialogTitle.text(lbl("VAS_082_ReceiveAgainstPO", "Receive Against PO"));
             setBadge(po.poNo, "info");
             showDialogBusy(true);
 
@@ -322,7 +328,7 @@
                     renderLineEntry();
                 },
                 error: function () {
-                    VIS.ADialog.error("", false, lbl("VAS_NoDataAvailable", "No data available"), "");
+                    VIS.ADialog.error("", false, lbl("VAS_082_NoDataAvailable", "No data available"), "");
                 },
                 complete: function () {
                     showDialogBusy(false);
@@ -334,16 +340,16 @@
             if (!currentPO) { return; }
 
             if (currentLines.length === 0) {
-                $dialogBody.html('<div class="vas-ngrn-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $dialogBody.html('<div class="vas-ngrn-empty">' + escapeHtml(lbl("VAS_082_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
 
             var fields =
                 '<div class="vas-ngrn-form-grid">' +
-                fieldHtml(lbl("VAS_PurchaseOrder", "Purchase Order"), currentPO.poNo, true) +
-                fieldHtml(lbl("VAS_Supplier", "Supplier"), currentPO.supplier) +
-                fieldHtml(lbl("VAS_Warehouse", "Warehouse"), currentPO.warehouseName || "-") +
-                fieldHtml(lbl("VAS_Lines", "Lines"), String(currentLines.length)) +
+                fieldHtml(lbl("VAS_082_PurchaseOrder", "Purchase Order"), currentPO.poNo, true) +
+                fieldHtml(lbl("VAS_082_Supplier", "Supplier"), currentPO.supplier) +
+                fieldHtml(lbl("VAS_082_Warehouse", "Warehouse"), currentPO.warehouseName || "-") +
+                fieldHtml(lbl("VAS_082_Lines", "Lines"), String(currentLines.length)) +
                 '</div>';
 
             var rows = '';
@@ -361,17 +367,17 @@
 
             $dialogBody.html(
                 fields +
-                '<div class="vas-ngrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
+                '<div class="vas-ngrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_082_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
                 '<div class="vas-ngrn-rcv-line vas-ngrn-rcv-head">' +
-                '<div>' + escapeHtml(lbl("VAS_Item", "Item")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_POQty", "PO Qty")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_AlreadyReceived", "Already Received")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_Received", "Received")) + '</div>' +
-                '<div>' + escapeHtml(lbl("VAS_UOM", "UOM")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_082_Item", "Item")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_082_POQty", "PO Qty")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_082_AlreadyReceived", "Already Received")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_082_Received", "Received")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_082_UOM", "UOM")) + '</div>' +
                 '</div>' +
                 '<div class="vas-ngrn-lines">' + rows + '</div>' +
                 '<div class="vas-ngrn-error vas-ngrn-hidden"></div>' +
-                '<div class="vas-ngrn-action"><button type="button" class="vas-ngrn-create-btn">' + checkIcon() + '<span>' + escapeHtml(lbl("VAS_MakeGRN", "Make GRN")) + '</span></button></div>'
+                '<div class="vas-ngrn-action"><button type="button" class="vas-ngrn-create-btn">' + checkIcon() + '<span>' + escapeHtml(lbl("VAS_082_MakeGRN", "Make GRN")) + '</span></button></div>'
             );
 
             validateLines();
@@ -399,14 +405,14 @@
 
                 if (!isFinite(qty) || qty < 0) {
                     invalid = true;
-                    message = lbl("VAS_NegativeReceivedQty", "Received quantity cannot be negative.");
+                    message = lbl("VAS_082_NegativeReceivedQty", "Received quantity cannot be negative.");
                     $row.addClass('invalid');
                     return;
                 }
 
                 if (qty > openQty) {
                     invalid = true;
-                    message = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
+                    message = lbl("VAS_082_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
                     $row.addClass('invalid');
                     return;
                 }
@@ -431,7 +437,7 @@
             }
 
             if (result.lines.length === 0) {
-                $error.text(lbl("VAS_ReceivedQtyRequired", "Enter received quantity for at least one line.")).removeClass('vas-ngrn-hidden');
+                $error.text(lbl("VAS_082_ReceivedQtyRequired", "Enter received quantity for at least one line.")).removeClass('vas-ngrn-hidden');
                 $button.prop('disabled', true);
                 return false;
             }
@@ -460,7 +466,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data.error || data.success === false) {
-                        VIS.ADialog.error("", false, data.message || data.error || lbl("VAS_GRNCouldNotBeCreated", "GRN could not be created."), "");
+                        VIS.ADialog.error("", false, data.message || data.error || lbl("VAS_082_GRNCouldNotBeCreated", "GRN could not be created."), "");
                         $button.prop('disabled', false);
                         return;
                     }
@@ -470,7 +476,7 @@
                     $(document).trigger('VAS_GRNCreated', [data]);
                 },
                 error: function () {
-                    VIS.ADialog.error("", false, lbl("VAS_GRNCouldNotBeCreated", "GRN could not be created."), "");
+                    VIS.ADialog.error("", false, lbl("VAS_082_GRNCouldNotBeCreated", "GRN could not be created."), "");
                     $button.prop('disabled', false);
                 },
                 complete: function () {

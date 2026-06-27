@@ -13,18 +13,31 @@
  *           VAS_081_MaterialReceiptRegisterWidget/GetReceiptLines  (detail lines)
  * Summary Message Table: see Labels / Message Keys below.
  *
- * ── Labels / Message Keys (new* / reused) ─────────────────────────────
- *  Material Receipt Register | VAS_MaterialReceiptRegister*
- *  Received into stores...   | VAS_MRRSubtitle*
- *  items                     | VAS_Items*        Today | VAS_Today*
- *  Yesterday | VAS_Yesterday*   Receipt No. | VAS_ReceiptNo
- *  Linked PO | VAS_LinkedPO*     Supplier | VAS_Supplier*
- *  Customer / Project | VAS_CustomerProject*   Received on | VAS_ReceivedOn*
- *  Put-away on | VAS_PutAwayOn*  Receipt Lines | VAS_ReceiptLines*
- *  Product | VAS_Product   PO Qty | VAS_POQty*   Received | VAS_Received*
- *  UOM | VAS_Uom   Close | VAS_Close   No data | VAS_NoDataAvailable
- *  Showing | VAS_Showing   of | VAS_Of   Previous | VAS_Previous   Next | VAS_Next
- * ─────────────────────────────────────────────────────────────────────
+ * Labels / Message Keys
+ *  #  | Current Text                          | Message Key
+ * ----+---------------------------------------+-----------------------------------
+ *  1  | Material Receipt Register             | VAS_081_MaterialReceiptRegister
+ *  2  | Received into stores - tap for detail | VAS_081_MRRSubtitle
+ *  3  | items                                 | VAS_081_Items
+ *  4  | Today                                 | VAS_081_Today
+ *  5  | Yesterday                             | VAS_081_Yesterday
+ *  6  | Receipt                               | VAS_081_Receipt
+ *  7  | Linked PO                             | VAS_081_LinkedPO
+ *  8  | Supplier                              | VAS_081_Supplier
+ *  9  | Customer / Project                    | VAS_081_CustomerProject
+ * 10  | Received on                           | VAS_081_ReceivedOn
+ * 11  | Put-away on                           | VAS_081_PutAwayOn
+ * 12  | Receipt Lines                         | VAS_081_ReceiptLines
+ * 13  | Item                                  | VAS_081_Product
+ * 14  | PO Qty                                | VAS_081_POQty
+ * 15  | Received                              | VAS_081_Received
+ * 16  | UOM                                   | VAS_081_Uom
+ * 17  | Close                                 | VAS_081_Close
+ * 18  | No data available                     | VAS_081_NoDataAvailable
+ * 19  | Showing                               | VAS_081_Showing
+ * 20  | of                                    | VAS_081_Of
+ * 21  | Previous                              | VAS_081_Previous
+ * 22  | Next                                  | VAS_081_Next
  */
 ; VAS = window.VAS || {};
 
@@ -104,8 +117,8 @@
             var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             var dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
             var diffDays = Math.round((t - dd) / 86400000);
-            if (diffDays === 0) { return lbl("VAS_Today", "Today"); }
-            if (diffDays === 1) { return lbl("VAS_Yesterday", "Yesterday"); }
+            if (diffDays === 0) { return lbl("VAS_081_Today", "Today"); }
+            if (diffDays === 1) { return lbl("VAS_081_Yesterday", "Yesterday"); }
             return d.toLocaleDateString(window.navigator.language, { day: "2-digit", month: "short", year: "numeric" });
         }
 
@@ -170,8 +183,8 @@
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>' +
                 '</span>' +
                 '<div class="vas-mrr-titles">' +
-                '<div class="vas-mrr-title">' + escapeHtml(lbl("VAS_MaterialReceiptRegister", "Material Receipt Register")) + '</div>' +
-                '<div class="vas-mrr-sub">' + escapeHtml(lbl("VAS_MRRSubtitle", "Received into stores - tap for detail")) + '</div>' +
+                '<div class="vas-mrr-title">' + escapeHtml(lbl("VAS_081_MaterialReceiptRegister", "Material Receipt Register")) + '</div>' +
+                '<div class="vas-mrr-sub">' + escapeHtml(lbl("VAS_081_MRRSubtitle", "Received into stores - tap for detail")) + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -184,9 +197,9 @@
                 '<div class="vas-mrr-foot vas-mrr-hidden">' +
                 '<span class="vas-mrr-foot-info"></span>' +
                 '<div class="vas-mrr-pager">' +
-                '<button type="button" class="vas-mrr-pgbtn vas-mrr-prev" aria-label="' + escapeHtml(lbl("VAS_Previous", "Previous")) + '">' + chevL + '</button>' +
+                '<button type="button" class="vas-mrr-pgbtn vas-mrr-prev" aria-label="' + escapeHtml(lbl("VAS_081_Previous", "Previous")) + '">' + chevL + '</button>' +
                 '<span class="vas-mrr-pgtext"></span>' +
-                '<button type="button" class="vas-mrr-pgbtn vas-mrr-next" aria-label="' + escapeHtml(lbl("VAS_Next", "Next")) + '">' + chevR + '</button>' +
+                '<button type="button" class="vas-mrr-pgbtn vas-mrr-next" aria-label="' + escapeHtml(lbl("VAS_081_Next", "Next")) + '">' + chevR + '</button>' +
                 '</div>' +
                 '</div>'
             );
@@ -211,13 +224,13 @@
         function renderRows() {
             $listBody.empty();
             if (!ROWS || ROWS.length === 0) {
-                $listBody.append('<div class="vas-mrr-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $listBody.append('<div class="vas-mrr-empty">' + escapeHtml(lbl("VAS_081_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
             for (var i = 0; i < ROWS.length; i++) {
                 var r = ROWS[i];
                 var label = escapeHtml(r.receiptNo) + ' · ' + escapeHtml(r.supplier);
-                var meta = escapeHtml(r.itemCount) + ' ' + escapeHtml(lbl("VAS_Items", "items")) + ' · ' + escapeHtml(formatRelDate(r.receivedOn));
+                var meta = escapeHtml(r.itemCount) + ' ' + escapeHtml(lbl("VAS_081_Items", "items")) + ' · ' + escapeHtml(formatRelDate(r.receivedOn));
                 var $row = $(
                     '<button type="button" class="vas-mrr-row" data-receiptid="' + escapeHtml(r.receiptId) + '">' +
                     '<div class="vas-mrr-row-main">' +
@@ -233,13 +246,13 @@
 
         function updatePager() {
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_Of", "of") + ' ' + totalPages) : '');
+                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl("VAS_081_Of", "of") + ' ' + totalPages) : '');
             }
             if ($pageInfo) {
                 if (totalRecords > 0) {
                     var from = (pageNo - 1) * pageSize + 1;
                     var to = Math.min(pageNo * pageSize, totalRecords);
-                    $pageInfo.text(lbl("VAS_Showing", "Showing") + ' ' + from + '–' + to + ' ' + lbl("VAS_Of", "of") + ' ' + totalRecords);
+                    $pageInfo.text(lbl("VAS_081_Showing", "Showing") + ' ' + from + '–' + to + ' ' + lbl("VAS_081_Of", "of") + ' ' + totalRecords);
                 } else { $pageInfo.text(''); }
             }
             if ($prevBtn) { $prevBtn.prop('disabled', loading || pageNo <= 1); }
@@ -256,9 +269,9 @@
                 '<div class="vas-mrr-modal-head">' +
                 '<div class="vas-mrr-modal-title-wrap">' +
                 '<h3 class="vas-mrr-modal-title"></h3>' +
-                '<span class="vas-mrr-modal-badge"><span class="vas-mrr-pill-ok">' + escapeHtml(lbl("VAS_Received", "Received")) + '</span></span>' +
+                '<span class="vas-mrr-modal-badge"><span class="vas-mrr-pill-ok">' + escapeHtml(lbl("VAS_081_Received", "Received")) + '</span></span>' +
                 '</div>' +
-                '<button type="button" class="vas-mrr-modal-close" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-mrr-modal-close" aria-label="' + escapeHtml(lbl("VAS_081_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
@@ -294,14 +307,14 @@
 
             var header =
                 '<div class="vas-mrr-form">' +
-                field("VAS_Receipt", "Receipt", r.receiptNo, true) +
-                field("VAS_LinkedPO", "Linked PO", r.linkedPoNo || "—") +
-                field("VAS_Supplier", "Supplier", r.supplier) +
-                field("VAS_CustomerProject", "Customer / Project", r.customerProject || "—") +
-                field("VAS_ReceivedOn", "Received on", formatFullDate(r.receivedOn)) +
-                field("VAS_PutAwayOn", "Put-away on", formatFullDate(r.putAwayOn)) +
+                field("VAS_081_Receipt", "Receipt", r.receiptNo, true) +
+                field("VAS_081_LinkedPO", "Linked PO", r.linkedPoNo || "—") +
+                field("VAS_081_Supplier", "Supplier", r.supplier) +
+                field("VAS_081_CustomerProject", "Customer / Project", r.customerProject || "—") +
+                field("VAS_081_ReceivedOn", "Received on", formatFullDate(r.receivedOn)) +
+                field("VAS_081_PutAwayOn", "Put-away on", formatFullDate(r.putAwayOn)) +
                 '</div>' +
-                '<div class="vas-mrr-lines-title">' + escapeHtml(lbl("VAS_ReceiptLines", "Receipt Lines")) + '</div>' +
+                '<div class="vas-mrr-lines-title">' + escapeHtml(lbl("VAS_081_ReceiptLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-mrr-lines-wrap"></div>';
 
             $dialogBody.html(header);
@@ -330,7 +343,7 @@
         function renderLines(lines) {
             var $wrap = $dialog.find('.vas-mrr-lines-wrap');
             if (!lines || lines.length === 0) {
-                $wrap.html('<div class="vas-mrr-empty">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                $wrap.html('<div class="vas-mrr-empty">' + escapeHtml(lbl("VAS_081_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
             var body = '';
@@ -347,10 +360,10 @@
             $wrap.html(
                 '<table class="vas-mrr-lines-table">' +
                 '<thead><tr>' +
-                '<th class="vas-mrr-l-item">' + escapeHtml(lbl("VAS_Product", "Item")) + '</th>' +
-                '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_POQty", "PO Qty")) + '</th>' +
-                '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_Received", "Received")) + '</th>' +
-                '<th class="vas-mrr-l-uom">' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</th>' +
+                '<th class="vas-mrr-l-item">' + escapeHtml(lbl("VAS_081_Product", "Item")) + '</th>' +
+                '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_081_POQty", "PO Qty")) + '</th>' +
+                '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_081_Received", "Received")) + '</th>' +
+                '<th class="vas-mrr-l-uom">' + escapeHtml(lbl("VAS_081_Uom", "UOM")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table>'
             );
         }

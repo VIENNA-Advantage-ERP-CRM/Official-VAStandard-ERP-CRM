@@ -14,18 +14,18 @@
  * Labels / Message Keys
  *  #  | Current Text              | Message Key
  * ----+---------------------------+------------------------------
- *  1  | Receiving Actions         | VAS_ReceivingActions
- *  2  | Receive Against PO        | VAS_ReceiveAgainstPO
- *  3  | Enter received quantities | VAS_EnterReceivedQuantities
- *  4  | Pass QA Inspection        | VAS_PassQAInspection
- *  5  | Verify a held receipt     | VAS_VerifyHeldReceipt
- *  6  | Print GRN Label           | VAS_PrintGRNLabel
- *  7  | Search a GRN to print     | VAS_SearchGRNToPrint
- *  8  | Make GRN                  | VAS_MakeGRN
- *  9  | Quality Control           | VAS_QualityControl
- * 10  | Save QA Result            | VAS_SaveQAResult
- * 11  | Print Label               | VAS_PrintLabel
- * 12  | GRN number or supplier... | VAS_GRNSearchPlaceholder
+ *  1  | Receiving Actions         | VAS_090_ReceivingActions
+ *  2  | Receive Against PO        | VAS_090_ReceiveAgainstPO
+ *  3  | Enter received quantities | VAS_090_EnterReceivedQuantities
+ *  4  | Pass QA Inspection        | VAS_090_PassQAInspection
+ *  5  | Verify a held receipt     | VAS_090_VerifyHeldReceipt
+ *  6  | Print GRN Label           | VAS_090_PrintGRNLabel
+ *  7  | Search a GRN to print     | VAS_090_SearchGRNToPrint
+ *  8  | Make GRN                  | VAS_090_MakeGRN
+ *  9  | Quality Control           | VAS_090_QualityControl
+ * 10  | Save QA Result            | VAS_090_SaveQAResult
+ * 11  | Print Label               | VAS_090_PrintLabel
+ * 12  | GRN number or supplier... | VAS_090_GRNSearchPlaceholder
  */
 ; VAS = window.VAS || {};
 
@@ -238,7 +238,7 @@
                 '<div class="vas-ra-head">' +
                 '<span class="vas-ra-ico">' + icon("clipboard") + '</span>' +
                 '<div class="vas-ra-titles">' +
-                '<div class="vas-ra-title">' + escapeHtml(lbl("VAS_ReceivingActions", "Receiving Actions")) + '</div>' +
+                '<div class="vas-ra-title">' + escapeHtml(lbl("VAS_090_ReceivingActions", "Receiving Actions")) + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -247,15 +247,15 @@
                 '<div class="vas-ra-actions">' +
                 '<button type="button" class="vas-ra-action-btn" data-action="receive">' +
                 '<span class="vas-ra-action-ico">' + icon("receive") + '</span>' +
-                '<span class="vas-ra-action-main"><span class="vas-ra-action-title">' + escapeHtml(lbl("VAS_ReceiveAgainstPO", "Receive Against PO")) + '</span><span class="vas-ra-action-sub">' + escapeHtml(lbl("VAS_EnterReceivedQuantities", "Enter received quantities")) + '</span></span>' +
+                '<span class="vas-ra-action-main"><span class="vas-ra-action-title">' + escapeHtml(lbl("VAS_090_ReceiveAgainstPO", "Receive Against PO")) + '</span><span class="vas-ra-action-sub">' + escapeHtml(lbl("VAS_090_EnterReceivedQuantities", "Enter received quantities")) + '</span></span>' +
                 '</button>' +
                 '<button type="button" class="vas-ra-action-btn" data-action="qa">' +
                 '<span class="vas-ra-action-ico">' + icon("shield") + '</span>' +
-                '<span class="vas-ra-action-main"><span class="vas-ra-action-title">' + escapeHtml(lbl("VAS_PassQAInspection", "Pass QA Inspection")) + '</span><span class="vas-ra-action-sub">' + escapeHtml(lbl("VAS_VerifyHeldReceipt", "Verify a held receipt")) + '</span></span>' +
+                '<span class="vas-ra-action-main"><span class="vas-ra-action-title">' + escapeHtml(lbl("VAS_090_PassQAInspection", "Pass QA Inspection")) + '</span><span class="vas-ra-action-sub">' + escapeHtml(lbl("VAS_090_VerifyHeldReceipt", "Verify a held receipt")) + '</span></span>' +
                 '</button>' +
                 '<button type="button" class="vas-ra-action-btn" data-action="print">' +
                 '<span class="vas-ra-action-ico">' + icon("printer") + '</span>' +
-                '<span class="vas-ra-action-main"><span class="vas-ra-action-title">' + escapeHtml(lbl("VAS_PrintGRNLabel", "Print GRN Label")) + '</span><span class="vas-ra-action-sub">' + escapeHtml(lbl("VAS_SearchGRNToPrint", "Search a GRN to print")) + '</span></span>' +
+                '<span class="vas-ra-action-main"><span class="vas-ra-action-title">' + escapeHtml(lbl("VAS_090_PrintGRNLabel", "Print GRN Label")) + '</span><span class="vas-ra-action-sub">' + escapeHtml(lbl("VAS_090_SearchGRNToPrint", "Search a GRN to print")) + '</span></span>' +
                 '</button>' +
                 '</div>'
             );
@@ -284,7 +284,7 @@
                 '<h3 class="vas-ra-modal-title"></h3>' +
                 '<span class="vas-ra-modal-status"></span>' +
                 '</div>' +
-                '<button type="button" class="vas-ra-modal-close" aria-label="' + escapeHtml(lbl("VAS_Close", "Close")) + '">' +
+                '<button type="button" class="vas-ra-modal-close" aria-label="' + escapeHtml(lbl("VAS_090_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
                 '</button>' +
                 '</div>' +
@@ -330,8 +330,8 @@
         function openReceiveAgainstPOModal() {
             currentPO = null;
             currentLines = [];
-            setModal(lbl("VAS_ReceiveAgainstPO", "Receive Against PO"), "", "");
-            $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_Loading", "Loading...")) + '</div>');
+            setModal(lbl("VAS_090_ReceiveAgainstPO", "Receive Against PO"), "", "");
+            $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_Loading", "Loading...")) + '</div>');
             openDialog();
             loadOpenPOLines(1);
         }
@@ -347,7 +347,7 @@
                     var data = parseResponse(res);
                     showDialogBusy(false);
                     if (!data || data.error) {
-                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                         return;
                     }
 
@@ -363,7 +363,7 @@
                 },
                 error: function () {
                     showDialogBusy(false);
-                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                 }
             });
         }
@@ -376,15 +376,15 @@
 
             var rows = data && data.rows ? data.rows : purchaseOrders;
             var html =
-                '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_SelectPOThenReceive", "Select an open purchase order, enter received quantities, then create the GRN.")) + '</span></div>' +
+                '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_090_SelectPOThenReceive", "Select an open purchase order, enter received quantities, then create the GRN.")) + '</span></div>' +
                 '<div class="vas-ra-po-list">';
 
             if (!rows || rows.length === 0) {
-                html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_NoOpenPOs", "No open purchase orders available.")) + '</div>';
+                html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_NoOpenPOs", "No open purchase orders available.")) + '</div>';
             } else {
                 for (var i = 0; i < rows.length; i++) {
                     var po = rows[i];
-                    var meta = (po.dockName || "-") + " - " + (po.openLineCount || 0) + " " + lbl("VAS_OpenLines", "open lines");
+                    var meta = (po.dockName || "-") + " - " + (po.openLineCount || 0) + " " + lbl("VAS_090_OpenLines", "open lines");
                     html +=
                         '<button type="button" class="vas-ra-po-row" data-poid="' + escapeHtml(po.poId) + '">' +
                         '<span class="vas-ra-po-main">' +
@@ -405,9 +405,9 @@
             var from = (poPageNo - 1) * 8 + 1;
             var to = Math.min(poPageNo * 8, poTotalRecords);
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_Of", "of") + ' ' + poTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + poTotalRecords) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-po-prev"' + (poPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
-                '<span class="vas-ra-pgtext">' + escapeHtml(poPageNo + ' ' + lbl("VAS_Of", "of") + ' ' + poTotalPages) + '</span>' +
+                '<span class="vas-ra-pgtext">' + escapeHtml(poPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + poTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-po-next"' + (poPageNo >= poTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
                 '</div>';
         }
@@ -428,7 +428,7 @@
                     var data = parseResponse(res);
                     showDialogBusy(false);
                     if (!data || data.error) {
-                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                         return;
                     }
                     currentLines = data.rows || [];
@@ -436,7 +436,7 @@
                 },
                 error: function () {
                     showDialogBusy(false);
-                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                 }
             });
         }
@@ -444,18 +444,18 @@
         function renderReceiveLines() {
             var html =
                 '<div class="vas-ra-form">' +
-                fieldHtml(lbl("VAS_PO", "PO"), currentPO.poNo, true) +
-                fieldHtml(lbl("VAS_Supplier", "Supplier"), currentPO.supplier) +
-                fieldHtml(lbl("VAS_Dock", "Dock"), currentPO.dockName || currentPO.warehouseName) +
-                fieldHtml(lbl("VAS_SupplierReference", "Supplier Reference"), currentPO.supplierReference) +
+                fieldHtml(lbl("VAS_090_PO", "PO"), currentPO.poNo, true) +
+                fieldHtml(lbl("VAS_090_Supplier", "Supplier"), currentPO.supplier) +
+                fieldHtml(lbl("VAS_090_Dock", "Dock"), currentPO.dockName || currentPO.warehouseName) +
+                fieldHtml(lbl("VAS_090_SupplierReference", "Supplier Reference"), currentPO.supplierReference) +
                 '</div>' +
-                '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_ReceiveQtyNote", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
-                '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_ReceivedLines", "Received Lines")) + '</div>' +
+                '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_090_ReceiveQtyNote", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
+                '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ReceivedLines", "Received Lines")) + '</div>' +
                 '<div class="vas-ra-receive-table">' +
-                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_AlreadyReceived", "Already Received")) + '</span><span>' + escapeHtml(lbl("VAS_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_Received", "Received")) + '</span></div>';
+                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_AlreadyReceived", "Already Received")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
 
             if (!currentLines || currentLines.length === 0) {
-                html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_NoOpenPOLines", "No open PO lines available.")) + '</div>';
+                html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_NoOpenPOLines", "No open PO lines available.")) + '</div>';
             } else {
                 for (var i = 0; i < currentLines.length; i++) {
                     var line = currentLines[i];
@@ -473,8 +473,8 @@
             html +=
                 '</div>' +
                 '<div class="vas-ra-action-footer">' +
-                '<button type="button" class="vas-ra-secondary vas-ra-back-po">' + icon("chevL") + escapeHtml(lbl("VAS_Back", "Back")) + '</button>' +
-                '<button type="button" class="vas-ra-primary vas-ra-make-grn">' + icon("check") + escapeHtml(lbl("VAS_MakeGRN", "Make GRN")) + '</button>' +
+                '<button type="button" class="vas-ra-secondary vas-ra-back-po">' + icon("chevL") + escapeHtml(lbl("VAS_090_Back", "Back")) + '</button>' +
+                '<button type="button" class="vas-ra-primary vas-ra-make-grn">' + icon("check") + escapeHtml(lbl("VAS_090_MakeGRN", "Make GRN")) + '</button>' +
                 '</div>';
 
             $dialogBody.html(html);
@@ -493,12 +493,12 @@
                 var openQty = Number($input.data('openqty') || 0);
 
                 if (!isFinite(qty) || qty < 0) {
-                    invalidMessage = lbl("VAS_ReceivedQtyInvalid", "Received quantity cannot be negative.");
+                    invalidMessage = lbl("VAS_090_ReceivedQtyInvalid", "Received quantity cannot be negative.");
                     return false;
                 }
 
                 if (qty > openQty + 0.000001) {
-                    invalidMessage = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
+                    invalidMessage = lbl("VAS_090_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
                     return false;
                 }
 
@@ -513,7 +513,7 @@
             }
 
             if (lines.length === 0) {
-                notify(lbl("VAS_EnterReceivedQuantity", "Enter received quantity for at least one line."));
+                notify(lbl("VAS_090_EnterReceivedQuantity", "Enter received quantity for at least one line."));
                 return;
             }
 
@@ -528,26 +528,26 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (!data || data.error) {
-                        notify(data && data.error ? data.error : lbl("VAS_SaveFailed", "Save failed."));
+                        notify(data && data.error ? data.error : lbl("VAS_090_SaveFailed", "Save failed."));
                         return;
                     }
 
-                    setModal(lbl("VAS_GRNCreatedFrom", "GRN created from") + " " + currentPO.poNo, lbl("VAS_Unloading", "Unloading"), "info");
+                    setModal(lbl("VAS_090_GRNCreatedFrom", "GRN created from") + " " + currentPO.poNo, lbl("VAS_090_Unloading", "Unloading"), "info");
                     $dialogBody.html(
                         '<div class="vas-ra-form">' +
-                        fieldHtml(lbl("VAS_FromPO", "From PO"), currentPO.poNo, true) +
-                        fieldHtml(lbl("VAS_Supplier", "Supplier"), currentPO.supplier) +
-                        fieldHtml(lbl("VAS_Lines", "Lines"), String(lines.length)) +
-                        fieldHtml(lbl("VAS_NewGRNNo", "New GRN #"), data.grnNo || data.shipmentId || "-") +
-                        fieldHtml(lbl("VAS_Dock", "Dock"), currentPO.dockName || currentPO.warehouseName) +
-                        fieldHtml(lbl("VAS_Status", "Status"), lbl("VAS_Unloading", "Unloading")) +
+                        fieldHtml(lbl("VAS_090_FromPO", "From PO"), currentPO.poNo, true) +
+                        fieldHtml(lbl("VAS_090_Supplier", "Supplier"), currentPO.supplier) +
+                        fieldHtml(lbl("VAS_090_Lines", "Lines"), String(lines.length)) +
+                        fieldHtml(lbl("VAS_090_NewGRNNo", "New GRN #"), data.grnNo || data.shipmentId || "-") +
+                        fieldHtml(lbl("VAS_090_Dock", "Dock"), currentPO.dockName || currentPO.warehouseName) +
+                        fieldHtml(lbl("VAS_090_Status", "Status"), lbl("VAS_090_Unloading", "Unloading")) +
                         '</div>'
                     );
                     $(document).trigger('VAS_GRNCreated');
                     $(document).trigger('vas-receiving-actions-updated');
                 },
                 error: function () {
-                    notify(lbl("VAS_SaveFailed", "Save failed."));
+                    notify(lbl("VAS_090_SaveFailed", "Save failed."));
                 },
                 complete: function () {
                     showDialogBusy(false);
@@ -558,8 +558,8 @@
 
         function openPassQAModal() {
             qaRecord = null;
-            setModal(lbl("VAS_QualityControl", "Quality Control"), lbl("VAS_QualityCheck", "Quality check"), "warn");
-            $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_Loading", "Loading...")) + '</div>');
+            setModal(lbl("VAS_090_QualityControl", "Quality Control"), lbl("VAS_090_QualityCheck", "Quality check"), "warn");
+            $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_Loading", "Loading...")) + '</div>');
             openDialog();
             loadQAHolds(1);
         }
@@ -575,7 +575,7 @@
                     var data = parseResponse(res);
                     showDialogBusy(false);
                     if (!data || data.error) {
-                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                         return;
                     }
 
@@ -587,7 +587,7 @@
                 },
                 error: function () {
                     showDialogBusy(false);
-                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                 }
             });
         }
@@ -600,29 +600,29 @@
 
         function renderQAModal(record, message) {
             if (!record) {
-                $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(message || lbl("VAS_NoQAHolds", "No QA holds available.")) + '</div>');
+                $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(message || lbl("VAS_090_NoQAHolds", "No QA holds available.")) + '</div>');
                 return;
             }
 
             var actual = record.actualValue || "";
             var qaDate = record.qaQcDate || todayYmd();
             var saveDisabled = record.qaRecordId > 0 ? "" : " disabled";
-            var saveTitle = record.qaRecordId > 0 ? "" : ' title="' + escapeHtml(lbl("VAS_QARecordMissing", "QA inspection record is missing.")) + '"';
+            var saveTitle = record.qaRecordId > 0 ? "" : ' title="' + escapeHtml(lbl("VAS_090_QARecordMissing", "QA inspection record is missing.")) + '"';
 
             var left =
-                disabledQAField("file", lbl("VAS_GRNConfirmationLine", "GRN Confirmation Line"), lineReference(record)) +
-                disabledQAField("scale", lbl("VAS_QuantityToVerify", "Quantity To Verify"), formatQty(record.quantityToVerify || record.heldQty), true) +
-                disabledQAField("clipboard", lbl("VAS_TestParameter", "Test Parameter"), record.testParameter || record.testParameterId || "-") +
-                disabledQAField("edit", lbl("VAS_AcceptableValue", "Acceptable Value"), record.acceptableValue || record.acceptableValueId || "-") +
+                disabledQAField("file", lbl("VAS_090_GRNConfirmationLine", "GRN Confirmation Line"), lineReference(record)) +
+                disabledQAField("scale", lbl("VAS_090_QuantityToVerify", "Quantity To Verify"), formatQty(record.quantityToVerify || record.heldQty), true) +
+                disabledQAField("clipboard", lbl("VAS_090_TestParameter", "Test Parameter"), record.testParameter || record.testParameterId || "-") +
+                disabledQAField("edit", lbl("VAS_090_AcceptableValue", "Acceptable Value"), record.acceptableValue || record.acceptableValueId || "-") +
                 '<div class="vas-ra-qc-field active">' +
                 '<div class="vas-ra-qc-ico">' + icon("edit") + '</div>' +
                 '<div class="vas-ra-qc-main">' +
-                '<div class="vas-ra-qc-label req">' + escapeHtml(lbl("VAS_ActualValue", "Actual Value")) + '</div>' +
+                '<div class="vas-ra-qc-label req">' + escapeHtml(lbl("VAS_090_ActualValue", "Actual Value")) + '</div>' +
                 '<div class="vas-ra-select-wrap">' +
                 '<select class="vas-ra-actual">' +
-                '<option value="">' + escapeHtml(lbl("VAS_SelectResult", "Select result...")) + '</option>' +
-                '<option value="Working Fine"' + (actual === "Working Fine" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_WorkingFine", "Working Fine")) + '</option>' +
-                '<option value="Not Satisfactory"' + (actual === "Not Satisfactory" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_NotSatisfactory", "Not Satisfactory")) + '</option>' +
+                '<option value="">' + escapeHtml(lbl("VAS_090_SelectResult", "Select result...")) + '</option>' +
+                '<option value="Working Fine"' + (actual === "Working Fine" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_090_WorkingFine", "Working Fine")) + '</option>' +
+                '<option value="Not Satisfactory"' + (actual === "Not Satisfactory" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_090_NotSatisfactory", "Not Satisfactory")) + '</option>' +
                 '</select>' +
                 '<span class="vas-ra-select-arr">' + icon("chevD") + '</span>' +
                 '</div>' +
@@ -631,30 +631,30 @@
                 '</div>';
 
             var right =
-                disabledQAField("package", lbl("VAS_Product", "Product"), record.productName || record.itemName) +
+                disabledQAField("package", lbl("VAS_090_Product", "Product"), record.productName || record.itemName) +
                 '<div class="vas-ra-qc-field active">' +
                 '<div class="vas-ra-qc-ico">' + icon("calendar") + '</div>' +
                 '<div class="vas-ra-qc-main">' +
-                '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_QAQCDate", "QA/QC Date")) + '</div>' +
+                '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_090_QAQCDate", "QA/QC Date")) + '</div>' +
                 '<input class="vas-ra-date" type="date" value="' + escapeHtml(qaDate) + '"/>' +
                 '</div>' +
                 '</div>' +
                 '<div class="vas-ra-qc-field active note">' +
                 '<div class="vas-ra-qc-main">' +
-                '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_Description", "Description")) + '</div>' +
-                '<textarea class="vas-ra-desc" rows="2" placeholder="' + escapeHtml(lbl("VAS_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(record.description || "") + '</textarea>' +
+                '<div class="vas-ra-qc-label">' + escapeHtml(lbl("VAS_090_Description", "Description")) + '</div>' +
+                '<textarea class="vas-ra-desc" rows="2" placeholder="' + escapeHtml(lbl("VAS_090_AddNoteOptional", "Add a note (optional)")) + '">' + escapeHtml(record.description || "") + '</textarea>' +
                 '</div>' +
                 '</div>';
 
             $dialogBody.html(
                 qaPagerHtml() +
-                '<div class="vas-ra-qc-headline">' + escapeHtml(lbl("VAS_QualityControl", "Quality Control")) + '</div>' +
+                '<div class="vas-ra-qc-headline">' + escapeHtml(lbl("VAS_090_QualityControl", "Quality Control")) + '</div>' +
                 '<div class="vas-ra-qc-grid">' +
                 '<div class="vas-ra-qc-col">' + left + '</div>' +
                 '<div class="vas-ra-qc-col">' + right + '</div>' +
                 '</div>' +
                 '<div class="vas-ra-action-footer right">' +
-                '<button type="button" class="vas-ra-primary vas-ra-save-qa"' + saveDisabled + saveTitle + '>' + icon("check") + escapeHtml(lbl("VAS_SaveQAResult", "Save QA Result")) + '</button>' +
+                '<button type="button" class="vas-ra-primary vas-ra-save-qa"' + saveDisabled + saveTitle + '>' + icon("check") + escapeHtml(lbl("VAS_090_SaveQAResult", "Save QA Result")) + '</button>' +
                 '</div>'
             );
 
@@ -664,7 +664,7 @@
         function qaPagerHtml() {
             if (qaTotalPages <= 1) { return ""; }
             return '<div class="vas-ra-modal-pager top">' +
-                '<span>' + escapeHtml(lbl("VAS_QAHold", "QA hold") + ' ' + qaPageNo + ' ' + lbl("VAS_Of", "of") + ' ' + qaTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_QAHold", "QA hold") + ' ' + qaPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + qaTotalRecords) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-qa-prev"' + (qaPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-qa-next"' + (qaPageNo >= qaTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
                 '</div>';
@@ -683,7 +683,7 @@
 
             var actualValue = $dialogBody.find('.vas-ra-actual').val();
             if (!actualValue) {
-                notify(lbl("VAS_SelectQAActualValue", "Select an actual value before saving."));
+                notify(lbl("VAS_090_SelectQAActualValue", "Select an actual value before saving."));
                 return;
             }
 
@@ -703,7 +703,7 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (!data || data.error) {
-                        notify(data && data.error ? data.error : lbl("VAS_SaveFailed", "Save failed."));
+                        notify(data && data.error ? data.error : lbl("VAS_090_SaveFailed", "Save failed."));
                         return;
                     }
 
@@ -712,7 +712,7 @@
                     $(document).trigger('vas-receiving-actions-updated');
                 },
                 error: function () {
-                    notify(lbl("VAS_SaveFailed", "Save failed."));
+                    notify(lbl("VAS_090_SaveFailed", "Save failed."));
                 },
                 complete: function () {
                     showDialogBusy(false);
@@ -728,7 +728,7 @@
             labelPageNo = 1;
             labelTotalPages = 0;
             labelTotalRecords = 0;
-            setModal(lbl("VAS_PrintGRNLabel", "Print GRN Label"), "", "");
+            setModal(lbl("VAS_090_PrintGRNLabel", "Print GRN Label"), "", "");
             openDialog();
             renderGRNLabelResults([]);
             searchGRNLabels("", 1);
@@ -747,7 +747,7 @@
                     var data = parseResponse(res);
                     showDialogBusy(false);
                     if (!data || data.error) {
-                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                        $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(data && data.error ? data.error : lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                         return;
                     }
 
@@ -763,7 +763,7 @@
                 },
                 error: function () {
                     showDialogBusy(false);
-                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_NoDataAvailable", "No data available")) + '</div>');
+                    $dialogBody.html('<div class="vas-ra-error">' + escapeHtml(lbl("VAS_090_NoDataAvailable", "No data available")) + '</div>');
                 }
             });
         }
@@ -772,10 +772,10 @@
             if ($dialogBody.find('.vas-ra-label-shell').length === 0) {
                 $dialogBody.html(
                     '<div class="vas-ra-label-shell">' +
-                    '<div class="vas-ra-note">' + icon("search") + '<span>' + escapeHtml(lbl("VAS_LabelSearchNote", "Search by GRN number or customer/supplier, then pick a GRN to print its label.")) + '</span></div>' +
-                    '<div class="vas-ra-search"><input class="vas-ra-label-search" type="text" placeholder="' + escapeHtml(lbl("VAS_GRNSearchPlaceholder", "GRN number or supplier name...")) + '"/></div>' +
+                    '<div class="vas-ra-note">' + icon("search") + '<span>' + escapeHtml(lbl("VAS_090_LabelSearchNote", "Search by GRN number or customer/supplier, then pick a GRN to print its label.")) + '</span></div>' +
+                    '<div class="vas-ra-search"><input class="vas-ra-label-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_GRNSearchPlaceholder", "GRN number or supplier name...")) + '"/></div>' +
                     '<table class="vas-ra-label-table">' +
-                    '<thead><tr><th>' + escapeHtml(lbl("VAS_GRNNo", "GRN #")) + '</th><th>' + escapeHtml(lbl("VAS_CustomerSupplier", "Customer / Supplier")) + '</th><th class="r">' + escapeHtml(lbl("VAS_Qty", "Qty")) + '</th><th class="r">' + escapeHtml(lbl("VAS_Label", "Label")) + '</th></tr></thead>' +
+                    '<thead><tr><th>' + escapeHtml(lbl("VAS_090_GRNNo", "GRN #")) + '</th><th>' + escapeHtml(lbl("VAS_090_CustomerSupplier", "Customer / Supplier")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Qty", "Qty")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Label", "Label")) + '</th></tr></thead>' +
                     '<tbody class="vas-ra-label-rows"></tbody>' +
                     '</table>' +
                     '<div class="vas-ra-label-pager"></div>' +
@@ -788,7 +788,7 @@
 
             var body = "";
             if (!rows || rows.length === 0) {
-                body = '<tr><td colspan="4" class="vas-ra-label-empty">' + escapeHtml(lbl("VAS_NoGRNsMatch", "No GRN matches that search.")) + '</td></tr>';
+                body = '<tr><td colspan="4" class="vas-ra-label-empty">' + escapeHtml(lbl("VAS_090_NoGRNsMatch", "No GRN matches that search.")) + '</td></tr>';
             } else {
                 for (var i = 0; i < rows.length; i++) {
                     var r = rows[i];
@@ -797,7 +797,7 @@
                         '<td class="s" title="' + escapeHtml(r.grnNo || "-") + '">' + escapeHtml(r.grnNo || "-") + '</td>' +
                         '<td title="' + escapeHtml(r.partyName || "-") + '">' + escapeHtml(r.partyName || "-") + '</td>' +
                         '<td class="r">' + escapeHtml(formatQty(r.receivedQty)) + '</td>' +
-                        '<td class="r"><span class="vas-ra-pill info">' + escapeHtml(lbl("VAS_Print", "Print")) + '</span></td>' +
+                        '<td class="r"><span class="vas-ra-pill info">' + escapeHtml(lbl("VAS_090_Print", "Print")) + '</span></td>' +
                         '</tr>';
                 }
             }
@@ -810,9 +810,9 @@
             var from = (labelPageNo - 1) * 5 + 1;
             var to = Math.min(labelPageNo * 5, labelTotalRecords);
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_Of", "of") + ' ' + labelTotalRecords) + '</span>' +
+                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + labelTotalRecords) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-label-prev"' + (labelPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
-                '<span class="vas-ra-pgtext">' + escapeHtml(labelPageNo + ' ' + lbl("VAS_Of", "of") + ' ' + labelTotalPages) + '</span>' +
+                '<span class="vas-ra-pgtext">' + escapeHtml(labelPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + labelTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-label-next"' + (labelPageNo >= labelTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
                 '</div>';
         }
@@ -830,26 +830,26 @@
                     var data = parseResponse(res);
                     showDialogBusy(false);
                     if (!data || data.error) {
-                        notify(data && data.error ? data.error : lbl("VAS_PrintFailed", "Print failed."));
+                        notify(data && data.error ? data.error : lbl("VAS_090_PrintFailed", "Print failed."));
                         return;
                     }
 
-                    setModal(lbl("VAS_PrintLabel", "Print Label") + " - " + (data.grnNo || (row ? row.grnNo : "")), data.status || lbl("VAS_Queued", "Queued"), "ok");
+                    setModal(lbl("VAS_090_PrintLabel", "Print Label") + " - " + (data.grnNo || (row ? row.grnNo : "")), data.status || lbl("VAS_090_Queued", "Queued"), "ok");
                     $dialogBody.html(
                         '<div class="vas-ra-form">' +
-                        fieldHtml(lbl("VAS_GRN", "GRN"), data.grnNo || "-", true) +
-                        fieldHtml(lbl("VAS_Copies", "Copies"), data.copies || 1) +
-                        fieldHtml(lbl("VAS_Format", "Format"), data.printFormat || "Put-away label 4x6") +
-                        fieldHtml(lbl("VAS_Printer", "Printer"), data.printer || "Default printer") +
-                        fieldHtml(lbl("VAS_Includes", "Includes"), data.includes || "Barcode + locator") +
-                        fieldHtml(lbl("VAS_Status", "Status"), data.status || "Queued") +
+                        fieldHtml(lbl("VAS_090_GRN", "GRN"), data.grnNo || "-", true) +
+                        fieldHtml(lbl("VAS_090_Copies", "Copies"), data.copies || 1) +
+                        fieldHtml(lbl("VAS_090_Format", "Format"), data.printFormat || "Put-away label 4x6") +
+                        fieldHtml(lbl("VAS_090_Printer", "Printer"), data.printer || "Default printer") +
+                        fieldHtml(lbl("VAS_090_Includes", "Includes"), data.includes || "Barcode + locator") +
+                        fieldHtml(lbl("VAS_090_Status", "Status"), data.status || "Queued") +
                         '</div>'
                     );
                     $(document).trigger('vas-receiving-actions-updated');
                 },
                 error: function () {
                     showDialogBusy(false);
-                    notify(lbl("VAS_PrintFailed", "Print failed."));
+                    notify(lbl("VAS_090_PrintFailed", "Print failed."));
                 }
             });
         }

@@ -238,6 +238,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_088_ReceiptQueueWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_089_ReceiptsMTDWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_090_ReceivingActionsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_091_MaterialReceiptSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_031_UpcomingAPRunsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\ReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\TotalAmountReceivedThisMonthController.cs" />
@@ -512,6 +513,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_088_ReceiptQueueWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_089_ReceiptsMTDWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_090_ReceivingActionsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_091_MaterialReceiptSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TopDebtorsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_010_CashGlCashInWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
