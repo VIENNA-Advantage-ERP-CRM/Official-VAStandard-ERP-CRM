@@ -208,8 +208,7 @@ html[dir="rtl"] .VAS-gljp-root .kpi-why {
     color: #102C3F;
 }
 
-.VAS-gljp-root .kpi-value,
-.VAS-gljp-root .VAS-gljp-num {
+.VAS-gljp-root .kpi-value {
     font-size: 1.375em;
     font-weight: 700;
     letter-spacing: -0.025em;

@@ -2377,11 +2377,29 @@ AND AD_Ref_List.IsActive = 'Y'";
 SELECT
     AD_Tab.AD_Process_ID
 FROM AD_Tab AD_Tab
+INNER JOIN AD_Process AD_Process ON
+(
+    AD_Tab.AD_Process_ID =
+    AD_Process.AD_Process_ID
+)
 WHERE AD_Tab.AD_Table_ID = @AD_Table_ID
 AND AD_Tab.AD_Window_ID = @AD_Window_ID
 AND AD_Tab.AD_Process_ID IS NOT NULL
 AND AD_Tab.AD_Process_ID > 0
 AND AD_Tab.IsActive = 'Y'
+AND AD_Process.IsActive = 'Y'
+AND AD_Process.IsReport = 'Y'
+AND AD_Process.AD_ReportView_ID IS NOT NULL
+AND EXISTS
+(
+    SELECT
+        1
+    FROM AD_PrintFormat AD_PrintFormat
+    WHERE AD_PrintFormat.AD_ReportView_ID =
+        AD_Process.AD_ReportView_ID
+    AND AD_PrintFormat.AD_Table_ID = @AD_Table_ID
+    AND AD_PrintFormat.IsActive = 'Y'
+)
 ORDER BY
     AD_Tab.SeqNo",
                             windowParameters,
@@ -2415,11 +2433,29 @@ INNER JOIN AD_Window AD_Window ON
     AD_Tab.AD_Window_ID =
     AD_Window.AD_Window_ID
 )
+INNER JOIN AD_Process AD_Process ON
+(
+    AD_Tab.AD_Process_ID =
+    AD_Process.AD_Process_ID
+)
 WHERE AD_Tab.AD_Table_ID = @AD_Table_ID
 AND AD_Tab.AD_Process_ID IS NOT NULL
 AND AD_Tab.AD_Process_ID > 0
 AND AD_Tab.IsActive = 'Y'
 AND AD_Window.IsActive = 'Y'
+AND AD_Process.IsActive = 'Y'
+AND AD_Process.IsReport = 'Y'
+AND AD_Process.AD_ReportView_ID IS NOT NULL
+AND EXISTS
+(
+    SELECT
+        1
+    FROM AD_PrintFormat AD_PrintFormat
+    WHERE AD_PrintFormat.AD_ReportView_ID =
+        AD_Process.AD_ReportView_ID
+    AND AD_PrintFormat.AD_Table_ID = @AD_Table_ID
+    AND AD_PrintFormat.IsActive = 'Y'
+)
 ORDER BY
     CASE
         WHEN AD_Window.Name = 'VAS_GLJournal' THEN 0
