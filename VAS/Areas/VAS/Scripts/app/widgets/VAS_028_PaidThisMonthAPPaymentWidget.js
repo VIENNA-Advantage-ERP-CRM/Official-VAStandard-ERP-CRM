@@ -924,18 +924,10 @@
                 );
 
                 var supplierName =
-                    row.supplier ||
-                    lbl(
-                        'VAS_028_MessageNotSpecified',
-                        ''
-                    );
+                    row.supplier || '';
 
                 var paymentMethod =
-                    row.paymentMethodName ||
-                    lbl(
-                        'VAS_028_MessageNotSpecified',
-                        ''
-                    );
+                    row.paymentMethodName || '';
 
                 $dialogTbody.append(
                     '<tr>' +
