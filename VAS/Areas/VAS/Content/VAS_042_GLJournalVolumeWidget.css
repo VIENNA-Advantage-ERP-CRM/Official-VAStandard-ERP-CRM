@@ -225,7 +225,7 @@ html[dir="rtl"] .VAS-gljv-legend {
 }
 
 .VAS-gljv-card {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, 1.4cqi, 24px);
 }
 
 .VAS-gljv-root .w-title {

@@ -329,7 +329,7 @@ html[dir="rtl"] .VAS-gljr-btn-new {
 }
 
 .VAS-gljr-card {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, 1.4cqi, 24px);
 }
 
 .VAS-gljr-root .w-title {

@@ -187,7 +187,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 }
 
 .VAS-glju-root .kpi {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, 1.4cqi, 24px);
 }
 
 .VAS-glju-root .w-title {
@@ -198,7 +198,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 }
 
 .VAS-glju-root .kpi-value {
-    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-size: 1.375em;
     font-weight: 700;
     letter-spacing: -0.025em;
 }

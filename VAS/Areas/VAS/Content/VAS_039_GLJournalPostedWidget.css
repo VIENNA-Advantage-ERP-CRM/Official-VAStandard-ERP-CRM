@@ -198,7 +198,7 @@ html[dir="rtl"] .VAS-gljp-root .kpi-why {
 }
 
 .VAS-gljp-root .kpi {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, 1.4cqi, 24px);
 }
 
 .VAS-gljp-root .w-title {
@@ -210,7 +210,7 @@ html[dir="rtl"] .VAS-gljp-root .kpi-why {
 
 .VAS-gljp-root .kpi-value,
 .VAS-gljp-root .VAS-gljp-num {
-    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
+    font-size: 1.375em;
     font-weight: 700;
     letter-spacing: -0.025em;
 }

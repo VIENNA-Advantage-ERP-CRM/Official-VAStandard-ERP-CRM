@@ -243,7 +243,7 @@ html[dir="rtl"] .VAS-gljtm-root .w-head {
 }
 
 .VAS-gljtm-card {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, 1.4cqi, 24px);
 }
 
 .VAS-gljtm-root .w-title {
