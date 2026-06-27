@@ -127,13 +127,13 @@
             $root.on('click', '.VAS-gljtm-page-prev', function () {
                 if (pageNo <= 1) { return; }
                 pageNo -= 1;
-                renderBars(currentData || {});
+                loadData();
             });
 
             $root.on('click', '.VAS-gljtm-page-next', function () {
                 if (totalPages <= 1 || pageNo >= totalPages) { return; }
                 pageNo += 1;
-                renderBars(currentData || {});
+                loadData();
             });
         }
 
@@ -173,13 +173,12 @@
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
-                data     : { period: activePeriod },
+                data     : { period: activePeriod, pageNo: pageNo },
                 success  : function (result) {
                     var data = normalizeResponse(result);
 
                     if (data && data.Accounts) {
                         currentData = data;
-                        pageNo = 1;
                         renderBars(data);
                     } else {
                         showError();
@@ -225,18 +224,19 @@
 
             $body.removeClass('is-empty');
 
-            totalPages = Math.ceil(accounts.length / pageSize);
+            totalPages = parseInt(data.TotalPages || data.totalPages || 1, 10);
 
-            if (pageNo > totalPages) {
-                pageNo = totalPages;
+            if (isNaN(totalPages) || totalPages < 1) {
+                totalPages = 1;
             }
 
-            if (pageNo < 1) {
+            pageNo = parseInt(data.PageNo || data.pageNo || pageNo || 1, 10);
+
+            if (isNaN(pageNo) || pageNo < 1) {
                 pageNo = 1;
             }
 
-            var start = (pageNo - 1) * pageSize;
-            var pageAccounts = accounts.slice(start, start + pageSize);
+            var pageAccounts = accounts;
             var html = '<div class="VAS-gljtm-list">';
             for (var i = 0; i < pageAccounts.length; i++) {
                 var a       = pageAccounts[i];

@@ -1276,3 +1276,99 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     background: #0069AE;
     border-color: #0069AE;
 }
+
+.VAS-glje-line-pager {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    width: 100%;
+    margin: 0.75rem 0 1rem;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid #BFE4FF;
+    background: #E5F3FB;
+    color: #0083DA;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn:hover {
+    background: #CCE6F8;
+    color: #0069AE;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn.is-active {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-text {
+    min-width: 4rem;
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+/* Popup pagination aligned with VAS_043 */
+.VAS-glje-line-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625em;
+    width: 100%;
+    flex-shrink: 0;
+    margin: 0.75em 0 1em;
+    padding-top: 0.625em;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn {
+    width: 2.25em;
+    height: 2.25em;
+    padding: 0;
+    border: 1px solid #CFE9FF;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+    font-size: 1em;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #9ED1FF;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #C7D3DF;
+    cursor: default;
+    opacity: 1;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-text {
+    display: inline-block;
+    min-width: 4.25em;
+    text-align: center;
+    font-size: 1em;
+    font-weight: 700;
+    color: #141414;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}

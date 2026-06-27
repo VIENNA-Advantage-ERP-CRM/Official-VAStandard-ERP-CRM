@@ -18,19 +18,34 @@ namespace VAS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetMonthlyEntries()
+        public JsonResult GetMonthlyEntries(
+            int pageNo = 1,
+            int pageSize = 10)
         {
-            return GetJournalEntries(false);
+            return GetJournalEntries(
+                false,
+                pageNo,
+                pageSize
+            );
         }
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetUnpostedEntries()
+        public JsonResult GetUnpostedEntries(
+            int pageNo = 1,
+            int pageSize = 10)
         {
-            return GetJournalEntries(true);
+            return GetJournalEntries(
+                true,
+                pageNo,
+                pageSize
+            );
         }
 
-        private JsonResult GetJournalEntries(bool onlyUnposted)
+        private JsonResult GetJournalEntries(
+            bool onlyUnposted,
+            int pageNo,
+            int pageSize)
         {
             Ctx ctx = GetContext();
 
@@ -41,6 +56,27 @@ namespace VAS.Controllers
 
             try
             {
+                pageNo =
+                    Math.Max(
+                        1,
+                        pageNo
+                    );
+
+                pageSize =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            pageSize,
+                            25
+                        )
+                    );
+
+                int rowStart =
+                    ((pageNo - 1) * pageSize) + 1;
+
+                int rowEnd =
+                    pageNo * pageSize;
+
                 string language = GetLanguage(ctx);
 
                 string schemaParameter =
@@ -233,7 +269,19 @@ OrderedJournals AS
             ORDER BY
                 JournalTotals.DateAcct DESC,
                 JournalTotals.GL_Journal_ID DESC
-        ) AS RowNumber
+        ) AS RowNumber,
+
+        COUNT(1) OVER
+        (
+        ) AS TotalCount,
+
+        SUM(JournalTotals.TotalDebit) OVER
+        (
+        ) AS GrandTotalDebit,
+
+        SUM(JournalTotals.TotalCredit) OVER
+        (
+        ) AS GrandTotalCredit
 
     FROM JournalTotals JournalTotals
 )
@@ -251,11 +299,17 @@ SELECT
     OrderedJournals.TotalCredit,
     OrderedJournals.CurSymbol,
     OrderedJournals.ISOCode,
-    OrderedJournals.StdPrecision
+    OrderedJournals.StdPrecision,
+    OrderedJournals.TotalCount,
+    OrderedJournals.GrandTotalDebit,
+    OrderedJournals.GrandTotalCredit
 
 FROM OrderedJournals OrderedJournals
 
-WHERE OrderedJournals.RowNumber <= 100
+WHERE OrderedJournals.RowNumber BETWEEN
+    @PageRowStart
+    AND
+    @PageRowEnd
 
 ORDER BY
     OrderedJournals.RowNumber";
@@ -294,6 +348,20 @@ ORDER BY
                     )
                 );
 
+                parameterList.Add(
+                    new SqlParameter(
+                        "@PageRowStart",
+                        rowStart
+                    )
+                );
+
+                parameterList.Add(
+                    new SqlParameter(
+                        "@PageRowEnd",
+                        rowEnd
+                    )
+                );
+
                 DataSet dataSet =
                     DB.ExecuteDataset(
                         sql,
@@ -311,6 +379,11 @@ ORDER BY
                 string isoCode = string.Empty;
 
                 int stdPrecision = 2;
+
+                int totalCount = 0;
+
+                decimal grandTotalDebit = 0m;
+                decimal grandTotalCredit = 0m;
 
                 DateTime? displayPeriodDate =
                     null;
@@ -349,6 +422,30 @@ ORDER BY
                                 stdPrecision,
                                 MidpointRounding.AwayFromZero
                             );
+
+                        if (totalCount <= 0)
+                        {
+                            totalCount =
+                                Util.GetValueOfInt(
+                                    row["TotalCount"]
+                                );
+                        }
+
+                        if (
+                            grandTotalDebit == 0m &&
+                            grandTotalCredit == 0m
+                        )
+                        {
+                            grandTotalDebit =
+                                Util.GetValueOfDecimal(
+                                    row["GrandTotalDebit"]
+                                );
+
+                            grandTotalCredit =
+                                Util.GetValueOfDecimal(
+                                    row["GrandTotalCredit"]
+                                );
+                        }
 
                         totalDebit += debit;
                         totalCredit += credit;
@@ -480,16 +577,44 @@ ORDER BY
                             entries,
 
                         TotalCount =
-                            entries.Count,
+                            totalCount,
+
+                        PageNo =
+                            pageNo,
+
+                        PageSize =
+                            pageSize,
+
+                        TotalPages =
+                            pageSize <= 0
+                                ? 0
+                                : (int)Math.Ceiling(
+                                    totalCount /
+                                    (decimal)pageSize
+                                ),
 
                         TotalDebit =
+                            Decimal.Round(
+                                grandTotalDebit,
+                                stdPrecision,
+                                MidpointRounding.AwayFromZero
+                            ),
+
+                        TotalCredit =
+                            Decimal.Round(
+                                grandTotalCredit,
+                                stdPrecision,
+                                MidpointRounding.AwayFromZero
+                            ),
+
+                        PageTotalDebit =
                             Decimal.Round(
                                 totalDebit,
                                 stdPrecision,
                                 MidpointRounding.AwayFromZero
                             ),
 
-                        TotalCredit =
+                        PageTotalCredit =
                             Decimal.Round(
                                 totalCredit,
                                 stdPrecision,
@@ -878,7 +1003,9 @@ FROM ProtectedJournal ProtectedJournal";
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetJournalEntryDetail(
-            int journalId)
+            int journalId,
+            int pageNo = 1,
+            int pageSize = 3)
         {
             Ctx ctx = GetContext();
 
@@ -902,6 +1029,27 @@ FROM ProtectedJournal ProtectedJournal";
 
             try
             {
+                pageNo =
+                    Math.Max(
+                        pageNo,
+                        1
+                    );
+
+                pageSize =
+                    Math.Max(
+                        Math.Min(
+                            pageSize,
+                            25
+                        ),
+                        1
+                    );
+
+                int startRow =
+                    ((pageNo - 1) * pageSize) + 1;
+
+                int endRow =
+                    pageNo * pageSize;
+
                 string language =
                     GetLanguage(ctx);
 
@@ -1097,79 +1245,112 @@ WITH ProtectedJournal AS
 GL_Journal.GL_Journal_ID =
 @DetailLineJournalID"
                 ) + @"
+),
+LineRows AS
+(
+    SELECT
+        GL_JournalLine.GL_JournalLine_ID,
+        GL_JournalLine.Line,
+        GL_JournalLine.C_ValidCombination_ID,
+
+        ValidCombination.Account_ID,
+
+        AccountValue.Value AS AccountCode,
+        AccountValue.Name AS AccountName,
+
+        GL_JournalLine.AmtAcctDr,
+        GL_JournalLine.AmtAcctCr,
+
+        CostCenterValue.Value AS CostCenterCode,
+        CostCenterValue.Name AS CostCenterName,
+
+        BPartner.Name AS BPartnerName,
+        Product.Name AS ProductName,
+        Project.Name AS ProjectName,
+
+        COUNT(1) OVER
+        (
+        ) AS TotalLineCount,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                GL_JournalLine.Line,
+                GL_JournalLine.GL_JournalLine_ID
+        ) AS LineRowNumber
+
+    FROM ProtectedJournal ProtectedJournal
+
+    INNER JOIN GL_JournalLine GL_JournalLine ON
+    (
+        ProtectedJournal.GL_Journal_ID =
+        GL_JournalLine.GL_Journal_ID
+    )
+
+    LEFT OUTER JOIN C_ValidCombination
+        ValidCombination ON
+    (
+        GL_JournalLine.C_ValidCombination_ID =
+        ValidCombination.C_ValidCombination_ID
+    )
+
+    LEFT OUTER JOIN C_ElementValue
+        AccountValue ON
+    (
+        ValidCombination.Account_ID =
+        AccountValue.C_ElementValue_ID
+    )
+
+    LEFT OUTER JOIN C_ElementValue
+        CostCenterValue ON
+    (
+        ValidCombination.User1_ID =
+        CostCenterValue.C_ElementValue_ID
+    )
+
+    LEFT OUTER JOIN C_BPartner BPartner ON
+    (
+        ValidCombination.C_BPartner_ID =
+        BPartner.C_BPartner_ID
+    )
+
+    LEFT OUTER JOIN M_Product Product ON
+    (
+        ValidCombination.M_Product_ID =
+        Product.M_Product_ID
+    )
+
+    LEFT OUTER JOIN C_Project Project ON
+    (
+        ValidCombination.C_Project_ID =
+        Project.C_Project_ID
+    )
+
+    WHERE GL_JournalLine.IsActive = 'Y'
 )
 SELECT
-    GL_JournalLine.GL_JournalLine_ID,
-    GL_JournalLine.Line,
-    GL_JournalLine.C_ValidCombination_ID,
+    LineRows.GL_JournalLine_ID,
+    LineRows.Line,
+    LineRows.C_ValidCombination_ID,
+    LineRows.Account_ID,
+    LineRows.AccountCode,
+    LineRows.AccountName,
+    LineRows.AmtAcctDr,
+    LineRows.AmtAcctCr,
+    LineRows.CostCenterCode,
+    LineRows.CostCenterName,
+    LineRows.BPartnerName,
+    LineRows.ProductName,
+    LineRows.ProjectName,
+    LineRows.TotalLineCount
 
-    ValidCombination.Account_ID,
+FROM LineRows LineRows
 
-    AccountValue.Value AS AccountCode,
-    AccountValue.Name AS AccountName,
-
-    GL_JournalLine.AmtAcctDr,
-    GL_JournalLine.AmtAcctCr,
-
-    CostCenterValue.Value AS CostCenterCode,
-    CostCenterValue.Name AS CostCenterName,
-
-    BPartner.Name AS BPartnerName,
-    Product.Name AS ProductName,
-    Project.Name AS ProjectName
-
-FROM ProtectedJournal ProtectedJournal
-
-INNER JOIN GL_JournalLine GL_JournalLine ON
-(
-    ProtectedJournal.GL_Journal_ID =
-    GL_JournalLine.GL_Journal_ID
-)
-
-LEFT OUTER JOIN C_ValidCombination
-    ValidCombination ON
-(
-    GL_JournalLine.C_ValidCombination_ID =
-    ValidCombination.C_ValidCombination_ID
-)
-
-LEFT OUTER JOIN C_ElementValue
-    AccountValue ON
-(
-    ValidCombination.Account_ID =
-    AccountValue.C_ElementValue_ID
-)
-
-LEFT OUTER JOIN C_ElementValue
-    CostCenterValue ON
-(
-    ValidCombination.User1_ID =
-    CostCenterValue.C_ElementValue_ID
-)
-
-LEFT OUTER JOIN C_BPartner BPartner ON
-(
-    ValidCombination.C_BPartner_ID =
-    BPartner.C_BPartner_ID
-)
-
-LEFT OUTER JOIN M_Product Product ON
-(
-    ValidCombination.M_Product_ID =
-    Product.M_Product_ID
-)
-
-LEFT OUTER JOIN C_Project Project ON
-(
-    ValidCombination.C_Project_ID =
-    Project.C_Project_ID
-)
-
-WHERE GL_JournalLine.IsActive = 'Y'
+WHERE LineRows.LineRowNumber >= @DetailLineStartRow
+AND LineRows.LineRowNumber <= @DetailLineEndRow
 
 ORDER BY
-    GL_JournalLine.Line,
-    GL_JournalLine.GL_JournalLine_ID";
+    LineRows.LineRowNumber";
 
                 SqlParameter[] lineParameters =
                 {
@@ -1181,6 +1362,16 @@ ORDER BY
                     new SqlParameter(
                         "@DetailLineJournalID",
                         journalId
+                    ),
+
+                    new SqlParameter(
+                        "@DetailLineStartRow",
+                        startRow
+                    ),
+
+                    new SqlParameter(
+                        "@DetailLineEndRow",
+                        endRow
                     )
                 };
 
@@ -1194,6 +1385,9 @@ ORDER BY
                 List<object> lines =
                     new List<object>();
 
+                int totalLineCount =
+                    0;
+
                 if (
                     lineDataSet != null &&
                     lineDataSet.Tables.Count > 0
@@ -1204,6 +1398,14 @@ ORDER BY
                         lineDataSet.Tables[0].Rows
                     )
                     {
+                        if (totalLineCount <= 0)
+                        {
+                            totalLineCount =
+                                Util.GetValueOfInt(
+                                    row["TotalLineCount"]
+                                );
+                        }
+
                         string accountCode =
                             Util.GetValueOfString(
                                 row["AccountCode"]
@@ -1451,7 +1653,23 @@ ORDER BY
                             lines,
 
                         LineCount =
-                            lines.Count,
+                            totalLineCount,
+
+                        LinePageNo =
+                            pageNo,
+
+                        LinePageSize =
+                            pageSize,
+
+                        LineTotalPages =
+                            pageSize <= 0
+                                ? 0
+                                : Convert.ToInt32(
+                                    Math.Ceiling(
+                                        totalLineCount /
+                                        (decimal)pageSize
+                                    )
+                                ),
 
                         CurSymbol =
                             Util.GetValueOfString(

@@ -60,7 +60,9 @@ namespace VAS.Controllers
         ///// Returns pending GL journals (DocStatus IN DR, IP, AP, NA) ordered oldest-first,
         ///// capped at 15 display rows. TotalCount reflects all pending records.
         ///// </summary>
-        //public JsonResult GetPendingQueue()
+        //public JsonResult GetPendingQueue(
+            //int pageNo = 1,
+            //int pageSize = 3)
         //{
         //    if (Session["ctx"] == null) { return Json("", JsonRequestBehavior.AllowGet); }
         //    Ctx ctx = Session["ctx"] as Ctx;
@@ -231,7 +233,9 @@ namespace VAS.Controllers
         /// Returns pending GL journals with translated document status.
         /// Status is returned as Value and Name.
         /// </summary>
-        public JsonResult GetPendingQueue()
+        public JsonResult GetPendingQueue(
+            int pageNo = 1,
+            int pageSize = 3)
         {
             if (Session["ctx"] == null)
             {
@@ -275,6 +279,27 @@ namespace VAS.Controllers
 
             try
             {
+                pageNo =
+                    Math.Max(
+                        1,
+                        pageNo
+                    );
+
+                pageSize =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            pageSize,
+                            25
+                        )
+                    );
+
+                int rowStart =
+                    ((pageNo - 1) * pageSize) + 1;
+
+                int rowEnd =
+                    pageNo * pageSize;
+
                 string language =
                     ctx.GetAD_Language();
 
@@ -577,7 +602,10 @@ SELECT
 
 FROM PendingRows PendingRows
 
-WHERE PendingRows.RowNumber <= 25
+WHERE PendingRows.RowNumber BETWEEN
+    @PageRowStart
+    AND
+    @PageRowEnd
 
 ORDER BY
     PendingRows.RowNumber";
@@ -605,6 +633,16 @@ ORDER BY
             new SqlParameter(
                 "@StatusLanguage",
                 language
+            ),
+
+            new SqlParameter(
+                "@PageRowStart",
+                rowStart
+            ),
+
+            new SqlParameter(
+                "@PageRowEnd",
+                rowEnd
             )
         };
 
@@ -955,6 +993,20 @@ ORDER BY
 
                             TotalCount =
                                 totalCount,
+
+                            PageNo =
+                                pageNo,
+
+                            PageSize =
+                                pageSize,
+
+                            TotalPages =
+                                pageSize <= 0
+                                    ? 0
+                                    : (int)Math.Ceiling(
+                                        totalCount /
+                                        (decimal)pageSize
+                                    ),
 
                             CurSymbol =
                                 curSymbol,

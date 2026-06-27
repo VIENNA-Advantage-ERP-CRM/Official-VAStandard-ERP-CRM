@@ -418,6 +418,15 @@
             var detailLoaded =
                 false;
 
+            var detailLinePageNo =
+                1;
+
+            var detailLinePageSize =
+                3;
+
+            var detailLineTotalPages =
+                1;
+
             var journalActionInProgress =
                 false;
 
@@ -772,10 +781,7 @@
 
                         pageNo--;
 
-                        renderRows(
-                            currentData || {},
-                            id
-                        );
+                        loadData();
                     }
                 );
 
@@ -792,10 +798,7 @@
 
                         pageNo++;
 
-                        renderRows(
-                            currentData || {},
-                            id
-                        );
+                        loadData();
                     }
                 );
 
@@ -826,6 +829,15 @@
 
                         type:
                             "GET",
+
+                        data:
+                            {
+                                pageNo:
+                                    pageNo,
+
+                                pageSize:
+                                    pageSize
+                            },
 
                         dataType:
                             "json",
@@ -862,9 +874,6 @@
 
                                 currentData =
                                     data;
-
-                                pageNo =
-                                    1;
 
                                 renderRows(
                                     data,
@@ -974,28 +983,31 @@
                 );
 
                 totalPages =
-                    Math.ceil(
-                        entries.length /
-                        pageSize
+                    Number(
+                        data.TotalPages ||
+                        Math.ceil(
+                            Number(
+                                data.TotalCount ||
+                                entries.length ||
+                                0
+                            ) /
+                            pageSize
+                        ) ||
+                        1
+                    );
+
+                pageSize =
+                    Number(
+                        data.PageSize ||
+                        pageSize ||
+                        5
                     );
 
                 pageNo =
-                    Math.max(
-                        1,
-                        Math.min(
-                            pageNo,
-                            totalPages
-                        )
-                    );
-
-                var start =
-                    (pageNo - 1) *
-                    pageSize;
-
-                var pageEntries =
-                    entries.slice(
-                        start,
-                        start + pageSize
+                    Number(
+                        data.PageNo ||
+                        pageNo ||
+                        1
                     );
 
                 var html =
@@ -1003,11 +1015,11 @@
 
                 for (
                     var index = 0;
-                    index < pageEntries.length;
+                    index < entries.length;
                     index++
                 ) {
                     var entry =
-                        pageEntries[index] || {};
+                        entries[index] || {};
 
                     var journalId =
                         parseInt(
@@ -1588,6 +1600,12 @@
                 detailLoaded =
                     false;
 
+                detailLinePageNo =
+                    1;
+
+                detailLineTotalPages =
+                    1;
+
                 updateActionButtons();
 
                 $detailDialog.hide();
@@ -1638,11 +1656,49 @@
 
                 $detailBody.empty();
 
+                $detailBody
+                    .off(
+                        ".VAS044LinePager"
+                    )
+                    .on(
+                        "click.VAS044LinePager",
+                        ".VAS-gljr-line-prev, .VAS-gljr-line-next",
+                        function () {
+                            if (
+                                journalActionInProgress ||
+                                selectedJournalId <= 0
+                            ) {
+                                return;
+                            }
+
+                            var nextPage =
+                                $(this).hasClass(
+                                    "VAS-gljr-line-prev"
+                                )
+                                    ? detailLinePageNo - 1
+                                    : detailLinePageNo + 1;
+
+                            if (
+                                nextPage < 1 ||
+                                nextPage > detailLineTotalPages
+                            ) {
+                                return;
+                            }
+
+                            detailLinePageNo =
+                                nextPage;
+
+                            loadJournalDetail(
+                                selectedJournalId
+                            );
+                        }
+                    );
+
                 detailRequest =
                     $.ajax({
                         url:
                             baseUrl +
-                            "VAS/VAS_044_GLJournalRecentWidget/GetJournalEntryDetail",
+                            "VAS/VAS_041_GLJournalEntriesWidget/GetJournalEntryDetail",
 
                         type:
                             "GET",
@@ -1655,7 +1711,13 @@
 
                         data: {
                             journalId:
-                                journalId
+                                journalId,
+
+                            pageNo:
+                                detailLinePageNo,
+
+                            pageSize:
+                                detailLinePageSize
                         },
 
                         success:
@@ -1780,6 +1842,36 @@
                     )
                         ? data.Lines
                         : [];
+
+                detailLinePageNo =
+                    Number(
+                        data.LinePageNo ||
+                        detailLinePageNo ||
+                        1
+                    );
+
+                detailLinePageSize =
+                    Number(
+                        data.LinePageSize ||
+                        detailLinePageSize ||
+                        3
+                    );
+
+                detailLineTotalPages =
+                    Math.max(
+                        Number(
+                            data.LineTotalPages ||
+                            1
+                        ),
+                        1
+                    );
+
+                var detailLineCount =
+                    Number(
+                        data.LineCount ||
+                        lines.length ||
+                        0
+                    );
 
                 var symbol =
                     data.CurSymbol ||
@@ -2319,6 +2411,42 @@
                     "</tfoot>" +
 
                     "</table>" +
+
+                    "</div>" +
+
+                    '<div class="VAS-gljr-line-pager">' +
+
+                    '<button type="button" ' +
+                    'class="VAS-gljr-page-btn VAS-gljr-line-prev" ' +
+                    (
+                        detailLinePageNo <= 1 ||
+                        detailLineTotalPages <= 1
+                            ? "disabled "
+                            : ""
+                    ) +
+                    'aria-label="Previous">&#8249;</button>' +
+
+                    '<span class="VAS-gljr-page-text">' +
+                    esc(
+                        detailLineCount
+                            ? (
+                                detailLinePageNo +
+                                " of " +
+                                detailLineTotalPages
+                            )
+                            : ""
+                    ) +
+                    "</span>" +
+
+                    '<button type="button" ' +
+                    'class="VAS-gljr-page-btn VAS-gljr-line-next" ' +
+                    (
+                        detailLinePageNo >= detailLineTotalPages ||
+                        detailLineTotalPages <= 1
+                            ? "disabled "
+                            : ""
+                    ) +
+                    'aria-label="Next">&#8250;</button>' +
 
                     "</div>" +
 

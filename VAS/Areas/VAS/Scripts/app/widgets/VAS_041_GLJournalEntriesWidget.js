@@ -338,6 +338,24 @@
             var detailLoaded =
                 false;
 
+            var dialogPageNo =
+                1;
+
+            var dialogPageSize =
+                10;
+
+            var dialogTotalPages =
+                1;
+
+            var detailLinePageNo =
+                1;
+
+            var detailLinePageSize =
+                3;
+
+            var detailLineTotalPages =
+                1;
+
             var selectedJournalId =
                 0;
 
@@ -1026,6 +1044,43 @@
                         }
                     );
 
+                $dialogBody
+                    .off(
+                        "click.VAS041DialogPager",
+                        ".VAS-glje-dialog-page"
+                    )
+                    .on(
+                        "click.VAS041DialogPager",
+                        ".VAS-glje-dialog-page",
+                        function (event) {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            var nextPage =
+                                $(this).hasClass(
+                                    "VAS-glje-dialog-prev"
+                                )
+                                    ? dialogPageNo - 1
+                                    : dialogPageNo + 1;
+
+                            if (
+                                nextPage < 1 ||
+                                nextPage === dialogPageNo ||
+                                nextPage > dialogTotalPages
+                            ) {
+                                return;
+                            }
+
+                            dialogPageNo =
+                                nextPage;
+
+                            dialogLoaded =
+                                false;
+
+                            loadDialogRows();
+                        }
+                    );
+
                 $(document).on(
                     "keydown.VAS-glje-" +
                     id,
@@ -1445,6 +1500,15 @@
                         type:
                             "GET",
 
+                        data:
+                            {
+                                pageNo:
+                                    dialogPageNo,
+
+                                pageSize:
+                                    dialogPageSize
+                            },
+
                         dataType:
                             "json",
 
@@ -1546,6 +1610,37 @@
                 var year =
                     data.Year ||
                     "";
+
+                dialogPageNo =
+                    Number(
+                        data.PageNo ||
+                        dialogPageNo ||
+                        1
+                    );
+
+                dialogPageSize =
+                    Number(
+                        data.PageSize ||
+                        dialogPageSize ||
+                        10
+                    );
+
+                dialogTotalPages =
+                    Math.max(
+                        1,
+                        Number(
+                            data.TotalPages ||
+                            Math.ceil(
+                                Number(
+                                    data.TotalCount ||
+                                    rows.length ||
+                                    0
+                                ) /
+                                dialogPageSize
+                            ) ||
+                            1
+                        )
+                    );
 
                 $dialog.find(
                     "#VAS-glje-dialog-sub-" +
@@ -1770,7 +1865,8 @@
 
                 html +=
                     "</tbody>" +
-                    "</table>";
+                    "</table>" +
+                    renderDialogPager();
 
                 /*
                  * Event is delegated in createDialog.
@@ -1792,6 +1888,51 @@
                         precision
                     )
                 );
+            }
+
+            function renderDialogPager() {
+                var html =
+                    '<div class="VAS-glje-line-pager VAS-glje-dialog-pager">';
+
+                html +=
+                    '<button type="button" ' +
+                    'class="VAS-glje-page-btn VAS-glje-dialog-page VAS-glje-dialog-prev" ' +
+                    (
+                        dialogPageNo <= 1 ||
+                        dialogTotalPages <= 1
+                            ? "disabled "
+                            : ""
+                    ) +
+                    'aria-label="' +
+                    esc(lbl("VIS_Previous", "Previous")) +
+                    '">&#8249;</button>' +
+
+                    '<span class="VAS-glje-page-text">' +
+                    esc(
+                        dialogPageNo +
+                        " " +
+                        lbl("VIS_Of", "of") +
+                        " " +
+                        dialogTotalPages
+                    ) +
+                    "</span>" +
+
+                    '<button type="button" ' +
+                    'class="VAS-glje-page-btn VAS-glje-dialog-page VAS-glje-dialog-next" ' +
+                    (
+                        dialogPageNo >= dialogTotalPages ||
+                        dialogTotalPages <= 1
+                            ? "disabled "
+                            : ""
+                    ) +
+                    'aria-label="' +
+                    esc(lbl("VIS_Next", "Next")) +
+                    '">&#8250;</button>';
+
+                html +=
+                    "</div>";
+
+                return html;
             }
 
             function loadJournalDetail(
@@ -1834,6 +1975,44 @@
 
                 $detailBody.empty();
 
+                $detailBody
+                    .off(
+                        ".VAS041LinePager"
+                    )
+                    .on(
+                        "click.VAS041LinePager",
+                        ".VAS-glje-line-prev, .VAS-glje-line-next",
+                        function () {
+                            if (
+                                journalActionInProgress ||
+                                selectedJournalId <= 0
+                            ) {
+                                return;
+                            }
+
+                            var nextPage =
+                                $(this).hasClass(
+                                    "VAS-glje-line-prev"
+                                )
+                                    ? detailLinePageNo - 1
+                                    : detailLinePageNo + 1;
+
+                            if (
+                                nextPage < 1 ||
+                                nextPage > detailLineTotalPages
+                            ) {
+                                return;
+                            }
+
+                            detailLinePageNo =
+                                nextPage;
+
+                            loadJournalDetail(
+                                selectedJournalId
+                            );
+                        }
+                    );
+
                 detailRequest =
                     $.ajax({
                         url:
@@ -1851,7 +2030,13 @@
 
                         data: {
                             journalId:
-                                journalId
+                                journalId,
+
+                            pageNo:
+                                detailLinePageNo,
+
+                            pageSize:
+                                detailLinePageSize
                         },
 
                         success:
@@ -1976,6 +2161,36 @@
                     )
                         ? data.Lines
                         : [];
+
+                detailLinePageNo =
+                    Number(
+                        data.LinePageNo ||
+                        detailLinePageNo ||
+                        1
+                    );
+
+                detailLinePageSize =
+                    Number(
+                        data.LinePageSize ||
+                        detailLinePageSize ||
+                        3
+                    );
+
+                detailLineTotalPages =
+                    Math.max(
+                        Number(
+                            data.LineTotalPages ||
+                            1
+                        ),
+                        1
+                    );
+
+                var detailLineCount =
+                    Number(
+                        data.LineCount ||
+                        lines.length ||
+                        0
+                    );
 
                 var symbol =
                     data.CurSymbol ||
@@ -2349,6 +2564,42 @@
                     "</tfoot>" +
 
                     "</table>" +
+                    "</div>" +
+
+                    '<div class="VAS-glje-line-pager">' +
+
+                    '<button type="button" ' +
+                    'class="VAS-glje-page-btn VAS-glje-line-prev" ' +
+                    (
+                        detailLinePageNo <= 1 ||
+                        detailLineTotalPages <= 1
+                            ? "disabled "
+                            : ""
+                    ) +
+                    'aria-label="Previous">&#8249;</button>' +
+
+                    '<span class="VAS-glje-page-text">' +
+                    esc(
+                        detailLineCount
+                            ? (
+                                detailLinePageNo +
+                                " of " +
+                                detailLineTotalPages
+                            )
+                            : ""
+                    ) +
+                    "</span>" +
+
+                    '<button type="button" ' +
+                    'class="VAS-glje-page-btn VAS-glje-line-next" ' +
+                    (
+                        detailLinePageNo >= detailLineTotalPages ||
+                        detailLineTotalPages <= 1
+                            ? "disabled "
+                            : ""
+                    ) +
+                    'aria-label="Next">&#8250;</button>' +
+
                     "</div>" +
 
                     '<div class="VAS-glje-created-strip">' +
@@ -3033,6 +3284,12 @@
             ) {
                 detailLoaded =
                     false;
+
+                detailLinePageNo =
+                    1;
+
+                detailLineTotalPages =
+                    1;
 
                 selectedJournalStatus =
                     "";

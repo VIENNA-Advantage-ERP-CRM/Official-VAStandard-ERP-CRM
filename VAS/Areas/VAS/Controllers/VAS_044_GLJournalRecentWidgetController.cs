@@ -66,7 +66,9 @@ namespace VAS.Controllers
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetRecentEntries()
+        public JsonResult GetRecentEntries(
+            int pageNo = 1,
+            int pageSize = 5)
         {
             Ctx ctx = GetContext();
 
@@ -77,6 +79,27 @@ namespace VAS.Controllers
 
             try
             {
+                pageNo =
+                    Math.Max(
+                        1,
+                        pageNo
+                    );
+
+                pageSize =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            pageSize,
+                            25
+                        )
+                    );
+
+                int rowStart =
+                    ((pageNo - 1) * pageSize) + 1;
+
+                int rowEnd =
+                    pageNo * pageSize;
+
                 string language =
                     GetLanguage(ctx);
 
@@ -298,7 +321,11 @@ OrderedJournals AS
             ORDER BY
                 JournalTotals.DateAcct DESC,
                 JournalTotals.GL_Journal_ID DESC
-        ) AS RowNumber
+        ) AS RowNumber,
+
+        COUNT(1) OVER
+        (
+        ) AS TotalCount
 
     FROM JournalTotals JournalTotals
 )
@@ -316,11 +343,15 @@ SELECT
     OrderedJournals.TotalCredit,
     OrderedJournals.CurSymbol,
     OrderedJournals.ISOCode,
-    OrderedJournals.StdPrecision
+    OrderedJournals.StdPrecision,
+    OrderedJournals.TotalCount
 
 FROM OrderedJournals OrderedJournals
 
-WHERE OrderedJournals.RowNumber <= 6
+WHERE OrderedJournals.RowNumber BETWEEN
+    @PageRowStart
+    AND
+    @PageRowEnd
 
 ORDER BY
     OrderedJournals.RowNumber";
@@ -349,6 +380,16 @@ ORDER BY
                     new SqlParameter(
                         "@RecentStatusReferenceName",
                         DocumentStatusReferenceName
+                    ),
+
+                    new SqlParameter(
+                        "@PageRowStart",
+                        rowStart
+                    ),
+
+                    new SqlParameter(
+                        "@PageRowEnd",
+                        rowEnd
                     )
                 };
 
@@ -371,6 +412,9 @@ ORDER BY
                 int stdPrecision =
                     2;
 
+                int totalCount =
+                    0;
+
                 if (
                     dataSet != null &&
                     dataSet.Tables.Count > 0
@@ -385,6 +429,14 @@ ORDER BY
                             Util.GetValueOfString(
                                 row["DocStatus"]
                             );
+
+                        if (totalCount <= 0)
+                        {
+                            totalCount =
+                                Util.GetValueOfInt(
+                                    row["TotalCount"]
+                                );
+                        }
 
                         string statusName =
                             GetReferenceDisplayName(
@@ -532,7 +584,21 @@ ORDER BY
                             entries,
 
                         TotalCount =
-                            entries.Count,
+                            totalCount,
+
+                        PageNo =
+                            pageNo,
+
+                        PageSize =
+                            pageSize,
+
+                        TotalPages =
+                            pageSize <= 0
+                                ? 0
+                                : (int)Math.Ceiling(
+                                    totalCount /
+                                    (decimal)pageSize
+                                ),
 
                         CurSymbol =
                             curSymbol,
@@ -580,7 +646,9 @@ ORDER BY
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetJournalEntryDetail(
-            int journalId)
+            int journalId,
+            int pageNo = 1,
+            int pageSize = 3)
         {
             Ctx ctx =
                 GetContext();
@@ -610,6 +678,27 @@ ORDER BY
 
             try
             {
+                pageNo =
+                    Math.Max(
+                        1,
+                        pageNo
+                    );
+
+                pageSize =
+                    Math.Max(
+                        1,
+                        Math.Min(
+                            pageSize,
+                            25
+                        )
+                    );
+
+                int rowStart =
+                    ((pageNo - 1) * pageSize) + 1;
+
+                int rowEnd =
+                    pageNo * pageSize;
+
                 string language =
                     GetLanguage(ctx);
 

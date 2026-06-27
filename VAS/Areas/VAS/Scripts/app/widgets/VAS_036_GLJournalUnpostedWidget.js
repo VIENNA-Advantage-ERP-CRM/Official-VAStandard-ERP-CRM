@@ -184,6 +184,14 @@
             var dialogLoaded = false;
             var detailLoaded = false;
 
+            var dialogPageNo = 1;
+            var dialogPageSize = 10;
+            var dialogTotalPages = 1;
+
+            var detailLinePageNo = 1;
+            var detailLinePageSize = 3;
+            var detailLineTotalPages = 1;
+
             var selectedJournalId = 0;
             var selectedJournalStatus = "";
             var selectedJournalPosted = false;
@@ -559,6 +567,39 @@
                         }
                     );
 
+                $dialogBody
+                    .off(
+                        "click.VAS036DialogPager",
+                        ".VAS-glju-dialog-page"
+                    )
+                    .on(
+                        "click.VAS036DialogPager",
+                        ".VAS-glju-dialog-page",
+                        function (event) {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            var nextPage =
+                                $(this).hasClass(
+                                    "VAS-glju-dialog-prev"
+                                )
+                                    ? dialogPageNo - 1
+                                    : dialogPageNo + 1;
+
+                            if (
+                                nextPage < 1 ||
+                                nextPage === dialogPageNo ||
+                                nextPage > dialogTotalPages
+                            ) {
+                                return;
+                            }
+
+                            dialogPageNo = nextPage;
+                            dialogLoaded = false;
+                            loadDialogRows();
+                        }
+                    );
+
                 $(document).on(
                     "keydown.VAS-glju-" +
                     id,
@@ -897,6 +938,8 @@
                 selectedJournalPosted = false;
 
                 detailLoaded = false;
+                detailLinePageNo = 1;
+                detailLineTotalPages = 1;
 
                 $detailBody.empty();
 
@@ -934,6 +977,8 @@
                 selectedJournalPosted = false;
 
                 detailLoaded = false;
+                detailLinePageNo = 1;
+                detailLineTotalPages = 1;
 
                 updateActionButtons();
 
@@ -960,6 +1005,10 @@
                         "VAS/VAS_041_GLJournalEntriesWidget/GetUnpostedEntries",
 
                     type: "GET",
+                    data: {
+                        pageNo: dialogPageNo,
+                        pageSize: dialogPageSize
+                    },
                     dataType: "json",
                     cache: false,
 
@@ -1022,6 +1071,28 @@
 
                 var precision =
                     Number(data.StdPrecision);
+
+                dialogPageNo =
+                    Number(data.PageNo || dialogPageNo || 1);
+
+                dialogPageSize =
+                    Number(data.PageSize || dialogPageSize || 10);
+
+                dialogTotalPages =
+                    Math.max(
+                        1,
+                        Number(
+                            data.TotalPages ||
+                            Math.ceil(
+                                Number(
+                                    data.TotalCount ||
+                                    rows.length ||
+                                    0
+                                ) / dialogPageSize
+                            ) ||
+                            1
+                        )
+                    );
 
                 if (!rows.length) {
                     $dialogBody.html(
@@ -1120,7 +1191,8 @@
                 }
 
                 html +=
-                    "</tbody></table>";
+                    "</tbody></table>" +
+                    renderDialogPager();
 
                 $dialogBody.html(html);
 
@@ -1135,6 +1207,19 @@
                 );
             }
 
+            function renderDialogPager() {
+                return '<div class="VAS-glju-line-pager VAS-glju-dialog-pager">' +
+                    '<button type="button" class="VAS-glju-page-btn VAS-glju-dialog-page VAS-glju-dialog-prev" ' +
+                    (dialogPageNo <= 1 || dialogTotalPages <= 1 ? "disabled " : "") +
+                    'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
+                    '<span class="VAS-glju-page-text">' +
+                    esc(dialogPageNo + " " + lbl("VIS_Of", "of") + " " + dialogTotalPages) +
+                    '</span>' +
+                    '<button type="button" class="VAS-glju-page-btn VAS-glju-dialog-page VAS-glju-dialog-next" ' +
+                    (dialogPageNo >= dialogTotalPages || dialogTotalPages <= 1 ? "disabled " : "") +
+                    'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
+                    '</div>';
+            }
             function loadJournalDetail(
                 journalId
             ) {
@@ -1150,6 +1235,29 @@
                 showDetailBusy(true);
                 updateActionButtons();
 
+                $detailBody
+                    .off(".VAS036LinePager")
+                    .on(
+                        "click.VAS036LinePager",
+                        ".VAS-glju-line-prev, .VAS-glju-line-next",
+                        function () {
+                            if (actionInProgress || selectedJournalId <= 0) {
+                                return;
+                            }
+
+                            var nextPage = $(this).hasClass("VAS-glju-line-prev")
+                                ? detailLinePageNo - 1
+                                : detailLinePageNo + 1;
+
+                            if (nextPage < 1 || nextPage > detailLineTotalPages) {
+                                return;
+                            }
+
+                            detailLinePageNo = nextPage;
+                            loadJournalDetail(selectedJournalId);
+                        }
+                    );
+
                 detailRequest = $.ajax({
                     url:
                         baseUrl +
@@ -1161,7 +1269,13 @@
 
                     data: {
                         journalId:
-                            journalId
+                            journalId,
+
+                        pageNo:
+                            detailLinePageNo,
+
+                        pageSize:
+                            detailLinePageSize
                     },
 
                     success: function (result) {
@@ -1217,6 +1331,18 @@
                     Array.isArray(data.Lines)
                         ? data.Lines
                         : [];
+
+                detailLinePageNo =
+                    Number(data.LinePageNo || detailLinePageNo || 1);
+
+                detailLinePageSize =
+                    Number(data.LinePageSize || detailLinePageSize || 3);
+
+                detailLineTotalPages =
+                    Math.max(Number(data.LineTotalPages || 1), 1);
+
+                var detailLineCount =
+                    Number(data.LineCount || lines.length || 0);
 
                 var symbol =
                     data.CurSymbol ||
@@ -1477,6 +1603,18 @@
                     "</tr></tfoot>" +
 
                     "</table>" +
+                    "</div>" +
+
+                    '<div class="VAS-glju-line-pager">' +
+                    '<button type="button" class="VAS-glju-page-btn VAS-glju-line-prev" ' +
+                    (detailLinePageNo <= 1 || detailLineTotalPages <= 1 ? "disabled " : "") +
+                    'aria-label="Previous">&#8249;</button>' +
+                    '<span class="VAS-glju-page-text">' +
+                    esc(detailLineCount ? (detailLinePageNo + " of " + detailLineTotalPages) : "") +
+                    "</span>" +
+                    '<button type="button" class="VAS-glju-page-btn VAS-glju-line-next" ' +
+                    (detailLinePageNo >= detailLineTotalPages || detailLineTotalPages <= 1 ? "disabled " : "") +
+                    'aria-label="Next">&#8250;</button>' +
                     "</div>" +
 
                     '<div class="VAS-glju-created-strip">' +
