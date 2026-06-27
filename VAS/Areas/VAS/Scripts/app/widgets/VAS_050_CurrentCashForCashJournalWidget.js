@@ -152,10 +152,7 @@
 
             var parts = getAmountParts(Math.abs(numberValue), currencySymbol, currencyISO, precision, sign);
 
-            $target.empty()
-                .append($('<span>', { 'class': 'VAS-cash-amount-prefix', 'text': parts.prefix }))
-                .append($('<span>', { 'class': 'VAS-cash-amount-main', 'text': parts.main }))
-                .append($('<span>', { 'class': 'VAS-cash-amount-decimal', 'text': parts.decimal }));
+            $target.text(parts.prefix + parts.main + parts.decimal);
         }
 
         function getStatusText(balance) {

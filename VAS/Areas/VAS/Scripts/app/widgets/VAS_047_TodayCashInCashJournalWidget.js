@@ -149,19 +149,7 @@
             var parts = getAmountParts(value, precision);
             var prefix = parts.sign + getCurrencyLabel(currencySymbol, currencyISO);
 
-            $target.empty()
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-prefix',
-                    'text': prefix
-                }))
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-main',
-                    'text': parts.main
-                }))
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-decimal',
-                    'text': parts.decimal
-                }));
+            $target.text(prefix + parts.main + parts.decimal);
         }
 
         /* ── Loading overlay ────────────────────────────────────────── */
