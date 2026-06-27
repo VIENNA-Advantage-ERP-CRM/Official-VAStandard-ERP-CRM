@@ -20,8 +20,8 @@ namespace VAS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_092_QuickOperationsWidgetController).FullName);
 
-        private const string StockManagementFormName = "Stock Management Form";
-        private const string MaterialIssueFormName = "Material Issue Form";
+        private const string StockManagementFormName = "VA011_WarehouseForm";
+        private const string MaterialIssueFormName = "DTD001_MaterialIssueForm";
 
         /// <summary>
         /// Returns the active form IDs after resolving each form through its Export_ID.
