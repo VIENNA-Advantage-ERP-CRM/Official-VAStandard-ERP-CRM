@@ -830,7 +830,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 
 /* Compact bottom pager and centered empty state */
 .VAS-gljr-pager {
-    justify-content: center;
+    justify-content: flex-end;
     gap: 0.45em;
     margin-top: auto;
     margin-left: 0;

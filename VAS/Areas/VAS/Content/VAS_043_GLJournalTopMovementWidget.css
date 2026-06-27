@@ -331,7 +331,7 @@ html[dir="rtl"] .VAS-gljtm-row-head {
 .VAS-gljtm-pager {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     gap: 0.625em;
     flex-shrink: 0;
     margin-top: 0.75em;

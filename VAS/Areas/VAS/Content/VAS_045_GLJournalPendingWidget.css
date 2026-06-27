@@ -774,7 +774,7 @@ html[dir="rtl"] .VAS-gljpq-item {
 
 /* Compact bottom pager and centered empty state */
 .VAS-gljpq-pager {
-    justify-content: center;
+    justify-content: flex-end;
     gap: 0.45em;
     margin-top: auto;
     padding-top: 0.45em;
