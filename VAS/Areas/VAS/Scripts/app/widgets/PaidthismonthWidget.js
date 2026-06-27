@@ -80,7 +80,7 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol);
+                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol, data.isoCode, data.stdPrecision);
                     }
                 },
                 error: function () {
@@ -90,36 +90,22 @@
             });
         }
 
-        /* ── Format currency ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-
-            var sign = value < 0 ? '-' : '';
-            var absVal = Math.abs(value);
-
-            if (absVal >= 1000000) {
-                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return sign + Math.round(absVal / 1000) + 'k';
-            }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
-        }
-
         /* Build metric markup with the base-currency symbol placed *before* the
-           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
-        function formatMetric(value, symbol) {
+           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). The
+           compact magnitude (Indian vs international numbering by base currency,
+           kept to the currency precision) comes from VIS.Util.formatCompactAmount. */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var absStr = formatCurrency(Math.abs(value));
+            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
             var symHtml = symbol ? '<span class="vas-ptm-cur">' + symbol + '</span>' : '';
             return sign + symHtml + absStr;
         }
 
         /* ── Render metric values ── */
-        function renderMetric(total, count, symbol) {
+        function renderMetric(total, count, symbol, isoCode, precision) {
             if ($metricEl) {
-                $metricEl.html(formatMetric(total, symbol));
+                $metricEl.html(formatMetric(total, symbol, isoCode, precision));
             }
             if ($whyText) {
                 var customerLabel = count !== 1

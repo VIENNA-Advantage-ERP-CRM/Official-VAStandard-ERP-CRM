@@ -88,14 +88,14 @@ namespace ModelLibrary.Process
             MOpportunity fromOpportunity = new MOpportunity(GetCtx(), _VAS_Opportunity_ID, Get_TrxName());
 
 
-            if (fromOpportunity.GetGenerate_Quotation() == null)
-            {
-                throw new ArgumentException("No Generate Quotation found on Opportunity.");
-            }
-            if (fromOpportunity.GetGenerate_Quotation().Trim() == "Y")
-            {
-                throw new ArgumentException("Sales Quotation already generated");
-            }
+            //if (fromOpportunity.GetGenerate_Quotation() == null)
+            //{
+            //    throw new ArgumentException("No Generate Quotation found on Opportunity.");
+            //}
+            //if (fromOpportunity.GetGenerate_Quotation().Trim() == "Y")
+            //{
+            //    throw new ArgumentException("Sales Quotation already generated");
+            //}
 
             // if Business Partner or Prospect is not selected then gives error
             if (fromOpportunity.GetC_BPartner_ID() == 0 && fromOpportunity.GetC_BPartnerSR_ID() == 0)
