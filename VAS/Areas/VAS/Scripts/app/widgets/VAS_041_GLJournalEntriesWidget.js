@@ -2699,466 +2699,210 @@
                     return;
                 }
 
-                var $popupCopy =
-                    $detailDialog
-                        .find(
-                            ".VAS-glje-detail-card"
-                        )
-                        .first()
-                        .clone();
+                journalActionInProgress =
+                    true;
 
-                if (
-                    !$popupCopy ||
-                    !$popupCopy.length
-                ) {
-                    showProcessError(
-                        lbl(
-                            "VAS_041_DetailsNotAvailable",
-                            "Journal details are not available."
-                        )
-                    );
-
-                    return;
-                }
-
-                $popupCopy.find(
-                    ".VAS-glje-dialog-footer"
-                ).remove();
-
-                $popupCopy.find(
-                    ".VAS-glje-dialog-close"
-                ).remove();
-
-                $popupCopy.find(
-                    ".VAS-glje-dialog-busy"
-                ).remove();
-
-                $popupCopy.css({
-                    "position":
-                        "static",
-
-                    "display":
-                        "block",
-
-                    "transform":
-                        "none",
-
-                    "width":
-                        "100%",
-
-                    "max-width":
-                        "none",
-
-                    "height":
-                        "auto",
-
-                    "max-height":
-                        "none",
-
-                    "margin":
-                        "0",
-
-                    "overflow":
-                        "visible"
-                });
-
-                $popupCopy.find(
-                    ".VAS-glje-detail-body, " +
-                    ".VAS-glje-detail-content, " +
-                    ".VAS-glje-detail-lines-wrap"
-                ).css({
-                    "display":
-                        "block",
-
-                    "height":
-                        "auto",
-
-                    "max-height":
-                        "none",
-
-                    "overflow":
-                        "visible"
-                });
-
-                var printFrame =
-                    document.createElement(
-                        "iframe"
-                    );
-
-                printFrame.setAttribute(
-                    "title",
-                    "GL Journal Print"
+                showDetailBusy(
+                    true
                 );
 
-                printFrame.style.position =
-                    "fixed";
+                updateActionButtons();
+
+                $.ajax({
+                    url:
+                        baseUrl +
+                        "VAS/VAS_041_GLJournalEntriesWidget/" +
+                        "GetJournalPrintInfo",
+
+                    type:
+                        "GET",
+
+                    dataType:
+                        "json",
+
+                    cache:
+                        false,
+
+                    data: {
+                        journalId:
+                            selectedJournalId
+                    },
+
+                    success:
+                        function (rawInfo) {
+                            var info =
+                                normalizeResponse(
+                                    rawInfo
+                                );
+
+                            var processId =
+                                Number(
+                                    info &&
+                                    (
+                                        info.AD_Process_ID ||
+                                        info.ad_Process_ID ||
+                                        info.adProcessId
+                                    )
+                                ) || 0;
+
+                            var tableId =
+                                Number(
+                                    info &&
+                                    (
+                                        info.AD_Table_ID ||
+                                        info.ad_Table_ID ||
+                                        info.adTableId
+                                    )
+                                ) || 0;
 
-                printFrame.style.left =
-                    "-10000px";
-
-                printFrame.style.top =
-                    "0";
-
-                printFrame.style.width =
-                    "1px";
-
-                printFrame.style.height =
-                    "1px";
-
-                printFrame.style.border =
-                    "0";
-
-                printFrame.style.opacity =
-                    "0";
-
-                printFrame.style.pointerEvents =
-                    "none";
-
-                document.body.appendChild(
-                    printFrame
-                );
-
-                var printWindow =
-                    printFrame.contentWindow;
-
-                var printDocument =
-                    printWindow.document;
-
-                var stylesHtml =
-                    "";
-
-                $(
-                    "link[rel='stylesheet'], style"
-                ).each(
-                    function () {
-                        stylesHtml +=
-                            this.outerHTML;
-                    }
-                );
-
-                var baseHref =
-                    document.baseURI ||
-                    window.location.href;
-
-                var printTitle =
-                    $detailDialog.find(
-                        ".VAS-glje-dialog-title"
-                    ).text() ||
-                    "GL Journal";
-
-                printDocument.open();
-
-                printDocument.write(
-                    "<!DOCTYPE html>" +
-
-                    "<html>" +
-
-                    "<head>" +
-
-                    "<meta charset='utf-8'>" +
-
-                    "<base href='" +
-                    esc(
-                        baseHref
-                    ) +
-                    "'>" +
-
-                    "<title>" +
-                    esc(
-                        printTitle
-                    ) +
-                    "</title>" +
-
-                    stylesHtml +
-
-                    "<style>" +
-
-                    "@page {" +
-                    "size: A4 landscape;" +
-                    "margin: 10mm;" +
-                    "}" +
-
-                    "html," +
-                    "body {" +
-                    "width: 100% !important;" +
-                    "height: auto !important;" +
-                    "margin: 0 !important;" +
-                    "padding: 0 !important;" +
-                    "overflow: visible !important;" +
-                    "background: #ffffff !important;" +
-                    "}" +
-
-                    ".VAS-glje-print-dialog {" +
-                    "position: static !important;" +
-                    "display: block !important;" +
-                    "width: 100% !important;" +
-                    "height: auto !important;" +
-                    "padding: 0 !important;" +
-                    "margin: 0 !important;" +
-                    "overflow: visible !important;" +
-                    "background: #ffffff !important;" +
-                    "}" +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-detail-card {" +
-                    "position: static !important;" +
-                    "display: block !important;" +
-                    "transform: none !important;" +
-                    "inset: auto !important;" +
-                    "width: 100% !important;" +
-                    "max-width: none !important;" +
-                    "height: auto !important;" +
-                    "max-height: none !important;" +
-                    "margin: 0 !important;" +
-                    "overflow: visible !important;" +
-                    "box-shadow: none !important;" +
-                    "border-radius: 0 !important;" +
-                    "}" +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-detail-body," +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-detail-content," +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-detail-lines-wrap {" +
-
-                    "display: block !important;" +
-                    "height: auto !important;" +
-                    "max-height: none !important;" +
-                    "overflow: visible !important;" +
-
-                    "}" +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-detail-lines {" +
-
-                    "width: 100% !important;" +
-                    "table-layout: auto !important;" +
-
-                    "}" +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-dialog-footer," +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-dialog-close," +
-
-                    ".VAS-glje-print-dialog " +
-                    ".VAS-glje-dialog-busy {" +
-
-                    "display: none !important;" +
-
-                    "}" +
-
-                    "thead {" +
-                    "display: table-header-group !important;" +
-                    "}" +
-
-                    "tfoot {" +
-                    "display: table-footer-group !important;" +
-                    "}" +
-
-                    "tr," +
-                    ".VAS-glje-detail-summary > div," +
-                    ".VAS-glje-created-strip {" +
-
-                    "break-inside: avoid !important;" +
-                    "page-break-inside: avoid !important;" +
-
-                    "}" +
-
-                    "@media print {" +
-
-                    "html," +
-                    "body {" +
-
-                    "-webkit-print-color-adjust: exact !important;" +
-                    "print-color-adjust: exact !important;" +
-
-                    "}" +
-
-                    "}" +
-
-                    "</style>" +
-
-                    "</head>" +
-
-                    "<body>" +
-
-                    '<div class="VAS-glje-dialog ' +
-                    'VAS-glje-detail-dialog ' +
-                    'VAS-glje-print-dialog">' +
-
-                    $popupCopy[0]
-                        .outerHTML +
-
-                    "</div>" +
-
-                    "</body>" +
-                    "</html>"
-                );
-
-                printDocument.close();
-
-                var cleaned =
-                    false;
-
-                var printStarted =
-                    false;
-
-                var printRenderDelay =
-                    1000;
-
-                var maximumLoadWait =
-                    10000;
-
-                function cleanupPrintFrame() {
-                    if (cleaned) {
-                        return;
-                    }
-
-                    cleaned =
-                        true;
-
-                    window.setTimeout(
-                        function () {
                             if (
-                                printFrame &&
-                                printFrame.parentNode
+                                processId <= 0 ||
+                                tableId <= 0
                             ) {
-                                printFrame
-                                    .parentNode
-                                    .removeChild(
-                                        printFrame
-                                    );
-                            }
-                        },
-                        500
-                    );
-                }
-
-                function arePrintImagesLoaded() {
-                    var images =
-                        printDocument.images ||
-                        [];
-
-                    for (
-                        var index = 0;
-                        index < images.length;
-                        index++
-                    ) {
-                        if (
-                            !images[index]
-                                .complete
-                        ) {
-                            return false;
-                        }
-                    }
-
-                    return true;
-                }
-
-                function startBrowserPrint() {
-                    if (printStarted) {
-                        return;
-                    }
-
-                    printStarted =
-                        true;
-
-                    window.setTimeout(
-                        function () {
-                            try {
-                                printWindow.focus();
-
-                                printWindow.print();
-                            }
-                            catch (error) {
-                                cleanupPrintFrame();
+                                finishPdfDownload();
 
                                 showProcessError(
                                     lbl(
-                                        "VAS_041_PrintWindowFailed",
-                                        "Could not open the print window."
+                                        "VAS_041_PrintProcessNotFound",
+                                        "Print process is not configured for GL Journal."
                                     )
                                 );
+
+                                return;
                             }
 
-                            window.setTimeout(
-                                cleanupPrintFrame,
-                                60000
+                            generateJournalPDF(
+                                processId,
+                                tableId
                             );
                         },
-                        printRenderDelay
-                    );
-                }
 
-                function waitForPrintContent() {
-                    var waitStartedAt =
-                        new Date()
-                            .getTime();
+                    error:
+                        function (xhr) {
+                            finishPdfDownload();
 
-                    function checkContent() {
-                        var currentTime =
-                            new Date()
-                                .getTime();
-
-                        var reachedMaximumWait =
-                            currentTime -
-                            waitStartedAt >=
-                            maximumLoadWait;
-
-                        var htmlReady =
-                            printDocument
-                                .readyState ===
-                            "complete";
-
-                        var imagesReady =
-                            arePrintImagesLoaded();
-
-                        if (
-                            (
-                                htmlReady &&
-                                imagesReady
-                            ) ||
-                            reachedMaximumWait
-                        ) {
-                            if (
-                                printDocument.fonts &&
-                                printDocument.fonts.ready
-                            ) {
-                                printDocument
-                                    .fonts
-                                    .ready
-                                    .then(
-                                        startBrowserPrint
+                            showProcessError(
+                                getAjaxErrorMessage(
+                                    xhr,
+                                    lbl(
+                                        "VAS_041_PrintProcessNotFound",
+                                        "Print process is not configured for GL Journal."
                                     )
-                                    .catch(
-                                        startBrowserPrint
-                                    );
-                            }
-                            else {
-                                startBrowserPrint();
-                            }
-
-                            return;
+                                )
+                            );
                         }
+                });
+            }
 
-                        window.setTimeout(
-                            checkContent,
-                            100
-                        );
-                    }
+            function generateJournalPDF(
+                processId,
+                tableId
+            ) {
+                $.ajax({
+                    url:
+                        VIS.Application.contextUrl +
+                        "JsonData/GeneratePrint/",
 
-                    checkContent();
-                }
+                    dataType:
+                        "json",
 
-                printWindow.onafterprint =
-                    cleanupPrintFrame;
+                    data: {
+                        AD_Process_ID:
+                            processId,
 
-                waitForPrintContent();
+                        Name:
+                            "Print",
+
+                        AD_Table_ID:
+                            tableId,
+
+                        Record_ID:
+                            selectedJournalId,
+
+                        WindowNo:
+                            $self.windowNo || 0,
+
+                        filetype:
+                            "P",
+
+                        actionOrigin:
+                            "W",
+
+                        originName:
+                            "GL Journal"
+                    },
+
+                    success:
+                        function (raw) {
+                            var res =
+                                normalizeResponse(
+                                    raw
+                                );
+
+                            var file =
+                                res &&
+                                (
+                                    res.ReportFilePath ||
+                                    res.FilePath ||
+                                    res.FileName ||
+                                    res.fileName ||
+                                    res.path
+                                );
+
+                            if (!file) {
+                                showProcessError(
+                                    (
+                                        res &&
+                                        res.ReportProcessInfo &&
+                                        res.ReportProcessInfo.Summary
+                                    ) ||
+                                    (
+                                        res &&
+                                        res.ErrorText
+                                    ) ||
+                                    lbl(
+                                        "VAS_041_PrintFailed",
+                                        "Could not generate the PDF."
+                                    )
+                                );
+
+                                return;
+                            }
+
+                            window.open(
+                                VIS.Application.contextUrl +
+                                file,
+                                "_blank"
+                            );
+                        },
+
+                    error:
+                        function (xhr) {
+                            showProcessError(
+                                getAjaxErrorMessage(
+                                    xhr,
+                                    lbl(
+                                        "VAS_041_PrintFailed",
+                                        "Could not generate the PDF."
+                                    )
+                                )
+                            );
+                        },
+
+                    complete:
+                        finishPdfDownload
+                });
+            }
+
+            function finishPdfDownload() {
+                journalActionInProgress =
+                    false;
+
+                showDetailBusy(
+                    false
+                );
+
+                updateActionButtons();
             }
 
             function exportDialogRows() {

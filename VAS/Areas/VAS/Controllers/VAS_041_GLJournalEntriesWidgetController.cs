@@ -1713,6 +1713,50 @@ ORDER BY
             }
         }
 
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetJournalPrintInfo(
+            int journalId)
+        {
+            Ctx ctx = GetContext();
+
+            if (ctx == null)
+            {
+                return GetSessionExpiredResult();
+            }
+
+            JsonResult validationResult =
+                ValidateActionRequest(
+                    ctx,
+                    journalId
+                );
+
+            if (validationResult != null)
+            {
+                return validationResult;
+            }
+
+            int tableId =
+                MTable.Get_Table_ID(
+                    "GL_Journal"
+                );
+
+            return JsonString(
+                new
+                {
+                    success = true,
+                    AD_Process_ID =
+                        GetJournalPrintProcessId(
+                            tableId
+                        ),
+                    AD_Table_ID =
+                        tableId,
+                    Record_ID =
+                        journalId
+                }
+            );
+        }
+
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -2305,6 +2349,166 @@ AND AD_Ref_List.IsActive = 'Y'";
             return null;
         }
 
+        private int GetJournalPrintProcessId(
+            int tableId)
+        {
+            int windowId =
+                GetJournalWindowId();
+
+            if (windowId > 0)
+            {
+                SqlParameter[] windowParameters =
+                    new SqlParameter[]
+                    {
+                        new SqlParameter(
+                            "@AD_Table_ID",
+                            tableId
+                        ),
+                        new SqlParameter(
+                            "@AD_Window_ID",
+                            windowId
+                        )
+                    };
+
+                int processId =
+                    Util.GetValueOfInt(
+                        DB.ExecuteScalar(
+                            @"
+SELECT
+    AD_Tab.AD_Process_ID
+FROM AD_Tab AD_Tab
+WHERE AD_Tab.AD_Table_ID = @AD_Table_ID
+AND AD_Tab.AD_Window_ID = @AD_Window_ID
+AND AD_Tab.AD_Process_ID IS NOT NULL
+AND AD_Tab.AD_Process_ID > 0
+AND AD_Tab.IsActive = 'Y'
+ORDER BY
+    AD_Tab.SeqNo",
+                            windowParameters,
+                            null
+                        )
+                    );
+
+                if (processId > 0)
+                {
+                    return processId;
+                }
+            }
+
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@AD_Table_ID",
+                        tableId
+                    )
+                };
+
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(
+                    @"
+SELECT
+    AD_Tab.AD_Process_ID
+FROM AD_Tab AD_Tab
+INNER JOIN AD_Window AD_Window ON
+(
+    AD_Tab.AD_Window_ID =
+    AD_Window.AD_Window_ID
+)
+WHERE AD_Tab.AD_Table_ID = @AD_Table_ID
+AND AD_Tab.AD_Process_ID IS NOT NULL
+AND AD_Tab.AD_Process_ID > 0
+AND AD_Tab.IsActive = 'Y'
+AND AD_Window.IsActive = 'Y'
+ORDER BY
+    CASE
+        WHEN AD_Window.Name = 'VAS_GLJournal' THEN 0
+        WHEN AD_Window.Name = 'GL Journal' THEN 1
+        ELSE 2
+    END,
+    AD_Tab.SeqNo",
+                    parameters,
+                    null
+                )
+            );
+        }
+
+        private int GetJournalWindowId()
+        {
+            int windowId =
+                GetWindowIdByName(
+                    "VAS_GLJournal"
+                );
+
+            if (windowId > 0)
+            {
+                return windowId;
+            }
+
+            windowId =
+                GetWindowIdByName(
+                    "GL Journal"
+                );
+
+            if (windowId > 0)
+            {
+                return windowId;
+            }
+
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@Name",
+                        "VAS_GLJournal"
+                    )
+                };
+
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(
+                    @"
+SELECT
+    AD_Window.AD_Window_ID
+FROM VAS_ZoomScreenConfig VAS_ZoomScreenConfig
+INNER JOIN AD_Window AD_Window ON
+(
+    VAS_ZoomScreenConfig.Value =
+    AD_Window.Name
+)
+WHERE VAS_ZoomScreenConfig.Name = @Name
+AND VAS_ZoomScreenConfig.IsActive = 'Y'
+AND AD_Window.IsActive = 'Y'",
+                    parameters,
+                    null
+                )
+            );
+        }
+
+        private int GetWindowIdByName(
+            string windowName)
+        {
+            SqlParameter[] parameters =
+                new SqlParameter[]
+                {
+                    new SqlParameter(
+                        "@Name",
+                        windowName
+                    )
+                };
+
+            return Util.GetValueOfInt(
+                DB.ExecuteScalar(
+                    @"
+SELECT
+    MIN(AD_Window_ID)
+FROM AD_Window
+WHERE Name = @Name
+AND IsActive = 'Y'",
+                    parameters,
+                    null
+                )
+            );
+        }
         private void ValidateJournal(
             Ctx ctx,
             MJournal journal,
