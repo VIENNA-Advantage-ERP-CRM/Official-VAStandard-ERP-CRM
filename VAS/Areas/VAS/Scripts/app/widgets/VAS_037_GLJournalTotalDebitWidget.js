@@ -48,6 +48,15 @@
             return text && text !== '[' + key + ']' ? text : fallback;
         }
 
+        function esc(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         function formatCurrencyAmount(value, currencySymbol, currencyISO) {
             var numericValue = Number(value || 0);
             var stdPrecision = 2;
@@ -64,6 +73,14 @@
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+        }
+
+        function getCurrencyText(data) {
+            return data.currencySymbol ||
+                data.CurSymbol ||
+                data.currencyISO ||
+                data.ISOCode ||
+                "";
         }
 
         function createBusyIndicator() {
@@ -166,7 +183,20 @@
 
             var amountText = formatCurrencyAmount(amountValue, data.currencySymbol || data.CurSymbol, data.currencyISO || data.ISOCode);
 
-            $kpiValue.text(amountText);
+            var currencyText = getCurrencyText(data);
+
+            $kpiValue.html(
+                (
+                    currencyText
+                        ? '<span class="VAS-gljtd-prefix">' +
+                        esc(currencyText) +
+                        '</span>'
+                        : ''
+                ) +
+                '<span>' +
+                esc(amountText) +
+                '</span>'
+            );
 
             $whyText.text(
                 lbl('VAS_037_SumDebitLines', 'Sum of debit lines across') +

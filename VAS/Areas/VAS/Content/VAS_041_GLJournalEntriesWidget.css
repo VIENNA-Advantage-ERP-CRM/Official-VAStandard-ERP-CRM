@@ -190,27 +190,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     overflow: hidden;
 }
 
-.VAS-glj-overflow-tooltip {
-    position: fixed;
-    z-index: 25000;
-    max-width: min(24em, calc(100vw - 1.5em));
-    max-height: min(18em, calc(100vh - 1.5em));
-    overflow: auto;
-    padding: 0.75em 0.875em;
-    color: #001D32;
-    background: #FFFFFF;
-    border: 0.0625em solid #D8E8F5;
-    border-radius: 0.65em;
-    box-shadow: 0 1em 2.2em rgba(3, 31, 49, 0.22);
-    font-size: 0.875em;
-    font-weight: 500;
-    line-height: 1.45;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    word-break: normal;
-    pointer-events: none;
-}
-
 .VAS-glje-dialog {
     position: fixed;
     inset: 0;
@@ -1021,7 +1000,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.875em;
-    min-width: 64em;
+    min-width: 58em;
 }
 
 .VAS-glje-detail-lines th {
@@ -1059,21 +1038,16 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 }
 
 .VAS-glje-detail-lines th:nth-child(4),
-.VAS-glje-detail-lines td:nth-child(4) {
-    width: 6em;
-}
-
+.VAS-glje-detail-lines td:nth-child(4),
 .VAS-glje-detail-lines th:nth-child(5),
-.VAS-glje-detail-lines td:nth-child(5),
-.VAS-glje-detail-lines th:nth-child(6),
-.VAS-glje-detail-lines td:nth-child(6) {
+.VAS-glje-detail-lines td:nth-child(5) {
     width: 12em;
 }
 
+.VAS-glje-detail-lines th:nth-child(6),
+.VAS-glje-detail-lines td:nth-child(6),
 .VAS-glje-detail-lines th:nth-child(7),
-.VAS-glje-detail-lines td:nth-child(7),
-.VAS-glje-detail-lines th:nth-child(8),
-.VAS-glje-detail-lines td:nth-child(8) {
+.VAS-glje-detail-lines td:nth-child(7) {
     width: 7em;
 }
 
@@ -1475,6 +1449,42 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(5),
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6) {
     text-align: right;
+}
+
+.VAS-glje-pill-draft,
+.VAS-glje-pill-posted,
+.VAS-glje-pill-submit,
+.VAS-glje-pill-pending,
+.VAS-glje-pill-returned,
+.VAS-glje-pill-voided,
+.VAS-glju-pill-draft,
+.VAS-glju-pill-posted,
+.VAS-glju-pill-submit,
+.VAS-glju-pill-pending,
+.VAS-glju-pill-returned,
+.VAS-gljr-pill-draft,
+.VAS-gljr-pill-posted,
+.VAS-gljr-pill-submit,
+.VAS-gljr-pill-pending,
+.VAS-gljr-pill-voided,
+.VAS-gljr-pill-closed,
+.VAS-gljr-pill-reverse,
+.VAS-gljpq-pill-draft,
+.VAS-gljpq-pill-posted,
+.VAS-gljpq-pill-approved,
+.VAS-gljpq-pill-submit,
+.VAS-gljpq-pill-pending,
+.VAS-gljpq-pill-voided,
+.VAS-gljpq-pill-returned {
+    background: #EAF6FF !important;
+    color: #0083DA !important;
+}
+
+.VAS-glje-detail-description,
+.VAS-glju-detail-description,
+.VAS-gljr-detail-description,
+.VAS-gljpq-detail-description {
+    grid-column: auto !important;
 }
 
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-pager-slot {

@@ -1096,6 +1096,11 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     text-align: right;
 }
 
+.VAS-gljr-table th,
+.VAS-gljr-table td {
+    font-size: 0.875em;
+}
+
 .VAS-gljr-row:hover {
     background: #F8FBFE;
 }
@@ -1103,6 +1108,5 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 .VAS-gljr-pager {
     justify-content: flex-end;
     margin-top: auto;
-    padding: 1.35em 0.625em 1em;
     border-top: 1px solid #EDF2F6;
 }

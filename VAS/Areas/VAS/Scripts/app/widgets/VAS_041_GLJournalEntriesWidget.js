@@ -62,7 +62,7 @@
             .replace(/'/g, "&#039;");
     }
 
-    function bindGLJournalOverflowTooltip() {
+    function bindGLJournalOverflowTitle() {
         if (window.VASGLJournalOverflowTooltipBound) {
             return;
         }
@@ -79,15 +79,6 @@
             '[class*="VAS-glj"] [class*="-meta"],' +
             '[class*="VAS-glj"] [class*="-sub"],' +
             '[class*="VAS-glj"] [class*="-name"]';
-
-        var $tooltip = null;
-
-        function hideTooltip() {
-            if ($tooltip) {
-                $tooltip.remove();
-                $tooltip = null;
-            }
-        }
 
         function isClipped(element) {
             return (
@@ -106,54 +97,6 @@
             );
         }
 
-        function placeTooltip(element) {
-            var rect =
-                element.getBoundingClientRect();
-
-            var width =
-                Math.min(
-                    380,
-                    Math.max(
-                        220,
-                        rect.width
-                    )
-                );
-
-            $tooltip.css({
-                width: width + "px",
-                left: Math.max(
-                    12,
-                    Math.min(
-                        rect.left,
-                        window.innerWidth -
-                            width -
-                            12
-                    )
-                ) + "px",
-                top: rect.bottom + 8 + "px"
-            });
-
-            var tooltipHeight =
-                $tooltip.outerHeight();
-
-            if (
-                rect.bottom +
-                    tooltipHeight +
-                    16 >
-                window.innerHeight
-            ) {
-                $tooltip.css(
-                    "top",
-                    Math.max(
-                        12,
-                        rect.top -
-                            tooltipHeight -
-                            8
-                    ) + "px"
-                );
-            }
-        }
-
         $(document)
             .on(
                 "mouseenter",
@@ -169,36 +112,60 @@
                         text.length < 2 ||
                         !isClipped(this)
                     ) {
+                        $(this).removeAttr(
+                            "title"
+                        );
                         return;
                     }
 
-                    hideTooltip();
-
-                    $tooltip =
-                        $("<div/>", {
-                            "class":
-                                "VAS-glj-overflow-tooltip",
-                            text: text
-                        }).appendTo(
-                            document.body
-                        );
-
-                    placeTooltip(this);
+                    $(this).attr(
+                        "title",
+                        text
+                    );
                 }
             )
             .on(
-                "mouseleave mousedown",
+                "mouseleave",
                 selector,
-                hideTooltip
-            );
+                function () {
+                    $(this).removeAttr(
+                        "title"
+                    );
+                }
+            )
+            .on(
+                "focusin",
+                selector,
+                function () {
+                    var text =
+                        cleanText(
+                            $(this).text()
+                        );
 
-        $(window).on(
-            "scroll resize",
-            hideTooltip
-        );
+                    if (
+                        text &&
+                        text.length > 1 &&
+                        isClipped(this)
+                    ) {
+                        $(this).attr(
+                            "title",
+                            text
+                        );
+                    }
+                }
+            )
+            .on(
+                "focusout",
+                selector,
+                function () {
+                    $(this).removeAttr(
+                        "title"
+                    );
+                }
+            );
     }
 
-    bindGLJournalOverflowTooltip();
+    bindGLJournalOverflowTitle();
 
     /**
      * Supports:
@@ -2545,7 +2512,6 @@
                     "<th>Account</th>" +
                     "<th>Debit</th>" +
                     "<th>Credit</th>" +
-                    "<th>Currency</th>" +
                     "<th>Cost Center</th>" +
                     "<th>Business Partner</th>" +
                     "<th>Product</th>" +
@@ -2560,7 +2526,7 @@
                     html +=
                         "<tr>" +
 
-                        '<td colspan="8">' +
+                        '<td colspan="7">' +
 
                         esc(
                             lbl(
@@ -2653,13 +2619,6 @@
 
                             "<td>" +
                             esc(
-                                currencyText ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
                                 line.CostCenter ||
                                 "-"
                             ) +
@@ -2710,7 +2669,7 @@
                     ) +
                     "</td>" +
 
-                    '<td colspan="5"></td>' +
+                    '<td colspan="4"></td>' +
 
                     "</tr>" +
                     "</tfoot>" +
@@ -3201,6 +3160,10 @@
                 processId,
                 tableId
             ) {
+
+                console.log("tableId => " + tableId + " - processId =>    " + processId
+                    + "  - selectedJournalId => " + selectedJournalId);
+
                 $.ajax({
                     url:
                         VIS.Application.contextUrl +

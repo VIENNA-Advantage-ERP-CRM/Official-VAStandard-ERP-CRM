@@ -1971,19 +1971,20 @@
                     );
 
                 var accountingBook =
-                    (
-                        journal.AccountingBook ||
-                        "Primary"
-                    ) +
+                    journal.AccountingBook ||
+                    "Primary";
 
-                    (
-                        data.ISOCode
-                            ? (
-                                " \u00B7 " +
-                                data.ISOCode
-                            )
-                            : ""
-                    );
+                var currencyText =
+                    symbol;
+
+                if (
+                    data.ISOCode &&
+                    data.ISOCode !== symbol
+                ) {
+                    currencyText +=
+                        " \u00B7 " +
+                        data.ISOCode;
+                }
 
                 var html =
                     '<div class="VAS-gljr-detail-summary">' +
@@ -2100,6 +2101,29 @@
 
                     esc(
                         lbl(
+                            "VAS_044_Currency",
+                            "Currency"
+                        )
+                    ) +
+
+                    "</span>" +
+
+                    "<strong>" +
+
+                    esc(
+                        currencyText
+                    ) +
+
+                    "</strong>" +
+
+                    "</div>" +
+
+                    "<div>" +
+
+                    "<span>" +
+
+                    esc(
+                        lbl(
                             "VAS_044_TotalDebit",
                             "Total Debit"
                         )
@@ -2140,7 +2164,7 @@
 
                     "</div>" +
 
-                    '<div class="VAS-gljr-detail-description">' +
+                    "<div>" +
 
                     "<span>" +
 

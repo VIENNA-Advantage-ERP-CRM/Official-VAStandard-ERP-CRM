@@ -105,6 +105,10 @@
 
 /* ── KPI value ───────────────────────────────────────────────────────────── */
 .VAS-gljtc-root .kpi-value {
+    display: flex;
+    align-items: baseline;
+    gap: 0.18em;
+    min-width: 0;
     line-height: 1;
     font-size: 1.375em;
     font-weight: 700;
@@ -115,11 +119,9 @@
 /* Currency prefix — small, muted */
 .VAS-gljtc-prefix {
     font-size: 0.65em;
-    font-weight: 500;
-    color: #5F7283;
-    margin-right: 0.1em;
-    align-self: flex-start;
-    padding-top: 0.2em;
+    font-weight: 700;
+    color: currentColor;
+    flex: 0 0 auto;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */

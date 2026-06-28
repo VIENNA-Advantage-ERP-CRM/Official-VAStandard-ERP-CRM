@@ -174,7 +174,7 @@
 
 /* Unbalanced — amber warning text */
 .VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-warn {
-    color: #8B5200;
+    color: #748494; 
     font-weight: 500;
 }
 
@@ -281,7 +281,7 @@ html[dir="rtl"] .VAS-gljnd-root .kpi-why {
 }
 
 .VAS-gljnd-root .kpi-value.VAS-gljnd-unbalanced,
-.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-warn {
+.VAS-gljnd-root {
     color: #D78B10;
 }
 

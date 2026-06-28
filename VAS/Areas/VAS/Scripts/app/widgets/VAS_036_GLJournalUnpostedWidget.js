@@ -1402,6 +1402,18 @@
                         precision
                     );
 
+                var currencyText =
+                    symbol;
+
+                if (
+                    data.ISOCode &&
+                    data.ISOCode !== symbol
+                ) {
+                    currencyText +=
+                        " \u00B7 " +
+                        data.ISOCode;
+                }
+
                 var id =
                     $self.AD_UserHomeWidgetID;
 
@@ -1457,6 +1469,10 @@
                     ) +
                     "</strong></div>" +
 
+                    "<div><span>Currency</span><strong>" +
+                    esc(currencyText) +
+                    "</strong></div>" +
+
                     "<div><span>Total Debit</span><strong>" +
                     esc(totalDebit) +
                     "</strong></div>" +
@@ -1465,7 +1481,7 @@
                     esc(totalCredit) +
                     "</strong></div>" +
 
-                    '<div class="VAS-glju-detail-description">' +
+                    "<div>" +
                     "<span>Description</span><strong>" +
                     esc(journal.Description) +
                     "</strong></div>" +
