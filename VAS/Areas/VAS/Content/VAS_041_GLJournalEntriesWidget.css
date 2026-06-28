@@ -677,8 +677,8 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 .VAS-glje-table-wrap {
     height: 100%;
     overflow: auto;
-    border: 0;
-    border-radius: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.75em;
 }
 
 /* Entries list dialog: flex column so pager lives below the table */
@@ -1414,8 +1414,8 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     min-height: 0;
     height: auto;
     overflow: auto;
-    border: 0;
-    border-radius: 0;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.75em;
 }
 
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table {

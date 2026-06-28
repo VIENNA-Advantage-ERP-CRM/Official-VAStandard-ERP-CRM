@@ -27,22 +27,22 @@
  * VAS_044_AccountingBook               Accounting Book                      الدفتر المحاسبي
  * VAS_044_TotalDebit                   Total Debit                          إجمالي المدين
  * VAS_044_TotalCredit                  Total Credit                         إجمالي الدائن
- * VAS_044_JournalLines                 Journal Lines                        س�\u00B7ور القيد
+ * VAS_044_JournalLines                 Journal Lines                        س�\u00B7ور القيد
  * VAS_044_Account                      Account                              الحساب
  * VAS_044_CostCenter                   Cost Center                          مركز التكلفة
  * VAS_044_BusinessPartner              Business Partner                     شريك العمل
  * VAS_044_Product                      Product                              المنتج
  * VAS_044_Project                      Project                              المشروع
  * VAS_044_Total                        Total                                الإجمالي
- * VAS_044_CreatedBy                    Created By                           تم الإنشاء بواس�\u00B7ة
+ * VAS_044_CreatedBy                    Created By                           تم الإنشاء بواس�\u00B7ة
  * VAS_044_Drafted                      Drafted                              تم إنشاء المسودة
- * VAS_044_NoJournalLines               No journal lines.                    لا توجد س�\u00B7ور للقيد
+ * VAS_044_NoJournalLines               No journal lines.                    لا توجد س�\u00B7ور للقيد
  * VAS_044_Approving                    Approving...                         جارٍ تنفيذ الموافقة...
  * VAS_044_Posting                      Posting...                           جارٍ ترحيل القيد...
  * VAS_044_JournalProcessFailed         Journal process failed.              فشلت معالجة القيد
  * VAS_044_DetailsNotLoaded             Journal details are not loaded.      لم يتم تحميل تفاصيل القيد
  * VAS_044_DetailsNotAvailable          Journal details are not available.   تفاصيل القيد غير متوفرة
- * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة ال�\u00B7باعة
+ * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة ال�\u00B7باعة
  * VAS_044_LoadFailed                   Could Not Load Recent Entries        
  * VAS_044_InvalidJournalID             Invalid Journal ID                   
  * VAS_044_DetailsLoadFailed            Could Not Load Journal Details       
@@ -1956,12 +1956,19 @@
                     )
                 );
 
-                var totalDebit =
-                    symbol +
+                var totalDebitAmt =
                     formatAmount(
                         journal.TotalDebit,
                         precision
                     );
+
+                var totalCreditAmt =
+                    formatAmount(
+                        journal.TotalCredit,
+                        precision
+                    );
+
+                var totalDebit = symbol + totalDebitAmt;
 
                 var totalCredit =
                     symbol +
@@ -2320,47 +2327,16 @@
                         html +=
                             "<tr>" +
 
-                            "<td>" +
-                            esc(
-                                accountText
-                            ) +
+                            '<td title="' + esc(accountText) + '">' +
+                            esc(accountText) +
                             "</td>" +
 
-                            '<td class="VAS-gljr-num">' +
-
-                            esc(
-                                Number(
-                                    line.Debit || 0
-                                ) > 0
-                                    ? (
-                                        symbol +
-                                        formatAmount(
-                                            line.Debit,
-                                            precision
-                                        )
-                                    )
-                                    : "-"
-                            ) +
-
-                            "</td>" +
-
-                            '<td class="VAS-gljr-num">' +
-
-                            esc(
-                                Number(
-                                    line.Credit || 0
-                                ) > 0
-                                    ? (
-                                        symbol +
-                                        formatAmount(
-                                            line.Credit,
-                                            precision
-                                        )
-                                    )
-                                    : "-"
-                            ) +
-
-                            "</td>" +
+                            (function () {
+                                var ld = Number(line.Debit || 0) > 0 ? formatAmount(line.Debit, precision) : "-";
+                                var lc = Number(line.Credit || 0) > 0 ? formatAmount(line.Credit, precision) : "-";
+                                return '<td class="VAS-gljr-num" title="' + esc(ld) + '">' + esc(ld) + "</td>" +
+                                       '<td class="VAS-gljr-num" title="' + esc(lc) + '">' + esc(lc) + "</td>";
+                            }()) +
 
                             "<td>" +
                             esc(
@@ -2412,18 +2388,18 @@
 
                     "</td>" +
 
-                    '<td class="VAS-gljr-num">' +
+                    '<td class="VAS-gljr-num" title="' + esc(totalDebitAmt) + '">' +
 
                     esc(
-                        totalDebit
+                        totalDebitAmt
                     ) +
 
                     "</td>" +
 
-                    '<td class="VAS-gljr-num">' +
+                    '<td class="VAS-gljr-num" title="' + esc(totalCreditAmt) + '">' +
 
                     esc(
-                        totalCredit
+                        totalCreditAmt
                     ) +
 
                     "</td>" +

@@ -861,6 +861,13 @@
                     data.StdPrecision
                 );
 
+            var symbol =
+                data.CurSymbol ||
+                data.currencySymbol ||
+                data.ISOCode ||
+                data.currencyISO ||
+                "";
+
             $root.find(
                 "#VAS-gljpq-count-" +
                 id
@@ -1024,6 +1031,7 @@
                 }
 
                 var amountText =
+                    symbol +
                     fmtAmt(
                         item.TotalDebit,
                         precision
