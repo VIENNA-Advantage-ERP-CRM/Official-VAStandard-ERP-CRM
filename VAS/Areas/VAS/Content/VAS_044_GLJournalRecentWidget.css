@@ -1045,3 +1045,64 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     padding: 0.3em 0.625em;
     margin-bottom: 0;
 }
+
+/* Unified GL Journal list table design */
+.VAS-gljr-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+}
+
+.VAS-gljr-table {
+    width: 100%;
+    border: 0;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.VAS-gljr-table thead tr {
+    border-bottom: 0;
+}
+
+.VAS-gljr-table th {
+    background: #F5F8FB;
+    border-bottom: 0.0625em solid #EDF2F6;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0;
+    padding: 1em 0.75em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.VAS-gljr-table tbody tr {
+    border-bottom: 0;
+}
+
+.VAS-gljr-table td {
+    border-bottom: 0.0625em solid #EDF2F6;
+    color: #102C3F;
+    font-size: 0.75em;
+    padding: 1em 0.75em;
+}
+
+.VAS-gljr-table th.VAS-gljr-num,
+.VAS-gljr-table td.VAS-gljr-col-num {
+    text-align: right;
+}
+
+.VAS-gljr-row:hover {
+    background: #F8FBFE;
+}
+
+.VAS-gljr-pager {
+    justify-content: flex-end;
+    margin-top: auto;
+    padding: 1.35em 0.625em 1em;
+    border-top: 1px solid #EDF2F6;
+}

@@ -406,3 +406,33 @@ html[dir="rtl"] .VAS-gljtm-row-head {
     min-width: 3.5em;
     font-size: 0.8125em;
 }
+
+/* Unified GL Journal list placement */
+.VAS-gljtm-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+}
+
+.VAS-gljtm-list {
+    gap: 0;
+}
+
+.VAS-gljtm-row {
+    border-radius: 0;
+    border-bottom: 0.0625em solid #EDF2F6;
+    padding: 0.85em 0.75em;
+}
+
+.VAS-gljtm-row:hover {
+    background: #F8FBFE;
+}
+
+.VAS-gljtm-pager {
+    justify-content: flex-end;
+    margin-top: auto;
+    padding: 1.35em 0.625em 1em;
+    border-top: 1px solid #EDF2F6;
+}

@@ -1400,3 +1400,69 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     padding: 0.3em 0.625em;
     margin-bottom: 0;
 }
+
+/* Unified GL Journal list table design */
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 1.125em;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table {
+    width: 100%;
+    border: 0;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table thead th {
+    background: #F5F8FB;
+    border-bottom: 0.0625em solid #EDF2F6;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0;
+    padding: 1em 0.75em;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table tbody td {
+    border-bottom: 0.0625em solid #EDF2F6;
+    color: #102C3F;
+    font-size: 0.75em;
+    padding: 1em 0.75em;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(6),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(5),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6) {
+    text-align: right;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-pager-slot {
+    flex: 0 0 auto;
+    margin-top: auto;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-pager {
+    margin: 0;
+    padding: 1.35em 0.625em 1em;
+    border-top: 1px solid #EDF2F6;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: transparent;
+}

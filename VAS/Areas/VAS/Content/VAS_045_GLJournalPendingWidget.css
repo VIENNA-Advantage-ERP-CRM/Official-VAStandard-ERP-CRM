@@ -977,3 +977,35 @@ html[dir="rtl"] .VAS-gljpq-item {
     padding: 0.3em 0.625em;
     margin-bottom: 0;
 }
+
+/* Unified GL Journal list placement */
+.VAS-gljpq-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+}
+
+.VAS-gljpq-list {
+    gap: 0;
+}
+
+.VAS-gljpq-item {
+    border: 0;
+    border-bottom: 0.0625em solid #EDF2F6;
+    border-radius: 0;
+    background: #FFFFFF;
+    padding: 1em 0.75em;
+}
+
+.VAS-gljpq-item:hover {
+    background: #F8FBFE;
+}
+
+.VAS-gljpq-pager {
+    justify-content: flex-end;
+    margin-top: auto;
+    padding: 1.35em 0.625em 1em;
+    border-top: 1px solid #EDF2F6;
+}
