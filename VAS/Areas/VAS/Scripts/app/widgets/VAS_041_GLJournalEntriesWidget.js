@@ -62,6 +62,144 @@
             .replace(/'/g, "&#039;");
     }
 
+    function bindGLJournalOverflowTooltip() {
+        if (window.VASGLJournalOverflowTooltipBound) {
+            return;
+        }
+
+        window.VASGLJournalOverflowTooltipBound = true;
+
+        var selector =
+            '[class*="VAS-glj"] td,' +
+            '[class*="VAS-glj"] th,' +
+            '[class*="VAS-glj"] strong,' +
+            '[class*="VAS-glj"] .w-title,' +
+            '[class*="VAS-glj"] [class*="-title"],' +
+            '[class*="VAS-glj"] [class*="-desc"],' +
+            '[class*="VAS-glj"] [class*="-meta"],' +
+            '[class*="VAS-glj"] [class*="-sub"],' +
+            '[class*="VAS-glj"] [class*="-name"]';
+
+        var $tooltip = null;
+
+        function hideTooltip() {
+            if ($tooltip) {
+                $tooltip.remove();
+                $tooltip = null;
+            }
+        }
+
+        function isClipped(element) {
+            return (
+                element.scrollWidth >
+                    element.clientWidth + 1 ||
+                element.scrollHeight >
+                    element.clientHeight + 1
+            );
+        }
+
+        function cleanText(text) {
+            return $.trim(
+                String(
+                    text || ""
+                ).replace(/\s+/g, " ")
+            );
+        }
+
+        function placeTooltip(element) {
+            var rect =
+                element.getBoundingClientRect();
+
+            var width =
+                Math.min(
+                    380,
+                    Math.max(
+                        220,
+                        rect.width
+                    )
+                );
+
+            $tooltip.css({
+                width: width + "px",
+                left: Math.max(
+                    12,
+                    Math.min(
+                        rect.left,
+                        window.innerWidth -
+                            width -
+                            12
+                    )
+                ) + "px",
+                top: rect.bottom + 8 + "px"
+            });
+
+            var tooltipHeight =
+                $tooltip.outerHeight();
+
+            if (
+                rect.bottom +
+                    tooltipHeight +
+                    16 >
+                window.innerHeight
+            ) {
+                $tooltip.css(
+                    "top",
+                    Math.max(
+                        12,
+                        rect.top -
+                            tooltipHeight -
+                            8
+                    ) + "px"
+                );
+            }
+        }
+
+        $(document)
+            .on(
+                "mouseenter",
+                selector,
+                function () {
+                    var text =
+                        cleanText(
+                            $(this).text()
+                        );
+
+                    if (
+                        !text ||
+                        text.length < 2 ||
+                        !isClipped(this)
+                    ) {
+                        return;
+                    }
+
+                    hideTooltip();
+
+                    $tooltip =
+                        $("<div/>", {
+                            "class":
+                                "VAS-glj-overflow-tooltip",
+                            text: text
+                        }).appendTo(
+                            document.body
+                        );
+
+                    placeTooltip(this);
+                }
+            )
+            .on(
+                "mouseleave mousedown",
+                selector,
+                hideTooltip
+            );
+
+        $(window).on(
+            "scroll resize",
+            hideTooltip
+        );
+    }
+
+    bindGLJournalOverflowTooltip();
+
     /**
      * Supports:
      * 1. Normal JSON object
@@ -1889,7 +2027,7 @@
                 $dialogFooterText.text(
                     rows.length +
 
-                    " journals · total " +
+                    " journals \u00B7 total " +
 
                     symbol +
 
@@ -2263,7 +2401,7 @@
                         ""
                     ) +
 
-                    " · " +
+                    " \u00B7 " +
 
                     (
                         journal.Description ||
@@ -2277,7 +2415,7 @@
                 ).text(
                     statusText +
 
-                    " · " +
+                    " \u00B7 " +
 
                     (
                         journal.DateAcct ||
@@ -2300,19 +2438,24 @@
                     );
 
                 var accountingBook =
-                    (
-                        journal.AccountingBook ||
-                        "Primary"
-                    ) +
+                    journal.AccountingBook ||
+                    "Primary";
 
-                    (
-                        data.ISOCode
-                            ? (
-                                " · " +
-                                data.ISOCode
-                            )
-                            : ""
-                    );
+                var currencyText =
+                    symbol;
+
+                if (
+                    data.ISOCode &&
+                    data.ISOCode !== symbol
+                ) {
+                    currencyText +=
+                        (
+                            currencyText
+                                ? " \u00B7 "
+                                : ""
+                        ) +
+                        data.ISOCode;
+                }
 
                 var html =
                     '<div class="VAS-glje-detail-summary">' +
@@ -2364,24 +2507,15 @@
                     "</div>" +
 
                     "<div>" +
-                    "<span>Total Debit</span>" +
+                    "<span>Currency</span>" +
                     "<strong>" +
                     esc(
-                        totalDebit
+                        currencyText
                     ) +
                     "</strong>" +
                     "</div>" +
 
                     "<div>" +
-                    "<span>Total Credit</span>" +
-                    "<strong>" +
-                    esc(
-                        totalCredit
-                    ) +
-                    "</strong>" +
-                    "</div>" +
-
-                    '<div class="VAS-glje-detail-description">' +
 
                     "<span>Description</span>" +
 
@@ -2411,6 +2545,7 @@
                     "<th>Account</th>" +
                     "<th>Debit</th>" +
                     "<th>Credit</th>" +
+                    "<th>Currency</th>" +
                     "<th>Cost Center</th>" +
                     "<th>Business Partner</th>" +
                     "<th>Product</th>" +
@@ -2425,7 +2560,7 @@
                     html +=
                         "<tr>" +
 
-                        '<td colspan="7">' +
+                        '<td colspan="8">' +
 
                         esc(
                             lbl(
@@ -2458,7 +2593,7 @@
                             accountText =
                                 line.AccountCode +
 
-                                " · " +
+                                " \u00B7 " +
 
                                 line.AccountName;
                         }
@@ -2518,6 +2653,13 @@
 
                             "<td>" +
                             esc(
+                                currencyText ||
+                                "-"
+                            ) +
+                            "</td>" +
+
+                            "<td>" +
+                            esc(
                                 line.CostCenter ||
                                 "-"
                             ) +
@@ -2568,7 +2710,7 @@
                     ) +
                     "</td>" +
 
-                    '<td colspan="4"></td>' +
+                    '<td colspan="5"></td>' +
 
                     "</tr>" +
                     "</tfoot>" +
@@ -2638,7 +2780,7 @@
                     (
                         journal.CreatedDate
                             ? (
-                                " · drafted " +
+                                " \u00B7 drafted " +
 
                                 esc(
                                     journal.CreatedDate
