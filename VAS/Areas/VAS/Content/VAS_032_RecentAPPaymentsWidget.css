@@ -293,11 +293,12 @@
         background: rgba(255, 255, 255, 0.92);
         backdrop-filter: blur(0.375em);
         color: #748494;
-        font-size: 0.6875em;
-        font-weight: 500;
+        font-size: 0.75em;
+        font-weight: 400;
         line-height: 1.2;
-        letter-spacing: 0.0625em;
+        letter-spacing: 0;
         text-align: left;
+        text-transform: capitalize;
     }
 
     .vas-recent-ap-payments-table td {
