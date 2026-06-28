@@ -79,7 +79,7 @@
         var currentData = null;
 
         var pageNo = 1;
-        var pageSize = 3;
+        var pageSize = 2;
         var totalPages = 0;
 
         var selectedJournalId = 0;
