@@ -1539,3 +1539,32 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     border-radius: 0;
     background: transparent;
 }
+
+/* ── Cell hover tooltip ──────────────────────────────────────────────────── */
+.VAS-glje-detail-lines td[title],
+.VAS-glje-dialog-table td[title] {
+    position: relative;
+    cursor: default;
+}
+
+.VAS-glje-detail-lines td[title]:hover::after,
+.VAS-glje-dialog-table td[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.25em);
+    z-index: 9999;
+    background: rgba(15, 44, 63, 0.96);
+    color: #FFFFFF;
+    font-size: 0.8125em;
+    font-weight: 400;
+    padding: 0.4em 0.65em;
+    border-radius: 0.4em;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 8em;
+    max-width: 22em;
+    line-height: 1.5;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+}

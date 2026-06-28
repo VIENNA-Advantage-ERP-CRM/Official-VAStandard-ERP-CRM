@@ -1879,14 +1879,12 @@
                         "VAS-glje-pill-draft";
 
                     var debit =
-                        symbol +
                         formatAmount(
                             row.TotalDebit,
                             precision
                         );
 
                     var credit =
-                        symbol +
                         formatAmount(
                             row.TotalCredit,
                             precision
@@ -1954,16 +1952,12 @@
 
                         "</td>" +
 
-                        '<td class="VAS-glje-amt">' +
-                        esc(
-                            debit
-                        ) +
+                        '<td class="VAS-glje-amt" title="' + esc(debit) + '">' +
+                        esc(debit) +
                         "</td>" +
 
-                        '<td class="VAS-glje-amt">' +
-                        esc(
-                            credit
-                        ) +
+                        '<td class="VAS-glje-amt" title="' + esc(credit) + '">' +
+                        esc(credit) +
                         "</td>" +
 
                         "</tr>";
@@ -2390,19 +2384,20 @@
                     )
                 );
 
-                var totalDebit =
-                    symbol +
+                var totalDebitAmt =
                     formatAmount(
                         journal.TotalDebit,
                         precision
                     );
 
-                var totalCredit =
-                    symbol +
+                var totalCreditAmt =
                     formatAmount(
                         journal.TotalCredit,
                         precision
                     );
+
+                var totalDebit = symbol + totalDebitAmt;
+                var totalCredit = symbol + totalCreditAmt;
 
                 var accountingBook =
                     journal.AccountingBook ||
@@ -2579,43 +2574,12 @@
                             ) +
                             "</td>" +
 
-                            '<td class="VAS-glje-amt">' +
-
-                            esc(
-                                Number(
-                                    line.Debit || 0
-                                ) > 0
-                                    ? (
-                                        symbol +
-
-                                        formatAmount(
-                                            line.Debit,
-                                            precision
-                                        )
-                                    )
-                                    : "-"
-                            ) +
-
-                            "</td>" +
-
-                            '<td class="VAS-glje-amt">' +
-
-                            esc(
-                                Number(
-                                    line.Credit || 0
-                                ) > 0
-                                    ? (
-                                        symbol +
-
-                                        formatAmount(
-                                            line.Credit,
-                                            precision
-                                        )
-                                    )
-                                    : "-"
-                            ) +
-
-                            "</td>" +
+                            (function () {
+                                var ld = Number(line.Debit || 0) > 0 ? formatAmount(line.Debit, precision) : "-";
+                                var lc = Number(line.Credit || 0) > 0 ? formatAmount(line.Credit, precision) : "-";
+                                return '<td class="VAS-glje-amt" title="' + esc(ld) + '">' + esc(ld) + "</td>" +
+                                       '<td class="VAS-glje-amt" title="' + esc(lc) + '">' + esc(lc) + "</td>";
+                            }()) +
 
                             "<td>" +
                             esc(
@@ -2657,16 +2621,12 @@
 
                     "<td>Total</td>" +
 
-                    '<td class="VAS-glje-amt">' +
-                    esc(
-                        totalDebit
-                    ) +
+                    '<td class="VAS-glje-amt" title="' + esc(totalDebitAmt) + '">' +
+                    esc(totalDebitAmt) +
                     "</td>" +
 
-                    '<td class="VAS-glje-amt">' +
-                    esc(
-                        totalCredit
-                    ) +
+                    '<td class="VAS-glje-amt" title="' + esc(totalCreditAmt) + '">' +
+                    esc(totalCreditAmt) +
                     "</td>" +
 
                     '<td colspan="4"></td>' +

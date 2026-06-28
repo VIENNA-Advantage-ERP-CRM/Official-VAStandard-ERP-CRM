@@ -441,7 +441,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 .VAS-glju-dialog-table th:nth-child(6),
 .VAS-glju-dialog-table td:nth-child(5),
 .VAS-glju-dialog-table td:nth-child(6) {
-    width: 13em;
+    width: 10em;
     text-align: right;
 }
 
@@ -628,7 +628,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.875em;
-    min-width: 70em;
+    min-width: 55em;
 }
 
 .VAS-glju-detail-lines th {
@@ -672,7 +672,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 .VAS-glju-detail-lines th:nth-child(3),
 .VAS-glju-detail-lines td:nth-child(2),
 .VAS-glju-detail-lines td:nth-child(3) {
-    width: 13em;
+    width: 10em;
     text-align: right;
 }
 
@@ -985,4 +985,33 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     border-left: 0;
     border-radius: 0;
     background: transparent;
+}
+
+/* ── Cell hover tooltip ──────────────────────────────────────────────────── */
+.VAS-glju-detail-lines td[title],
+.VAS-glju-dialog-table td[title] {
+    position: relative;
+    cursor: default;
+}
+
+.VAS-glju-detail-lines td[title]:hover::after,
+.VAS-glju-dialog-table td[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.25em);
+    z-index: 9999;
+    background: rgba(15, 44, 63, 0.96);
+    color: #FFFFFF;
+    font-size: 0.8125em;
+    font-weight: 400;
+    padding: 0.4em 0.65em;
+    border-radius: 0.4em;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 8em;
+    max-width: 22em;
+    line-height: 1.5;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
 }
