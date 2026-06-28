@@ -1466,11 +1466,11 @@
                     "</strong></div>" +
 
                     "<div><span>Total Debit</span><strong>" +
-                    esc(totalDebit) +
+                    esc(totalDebitAmt) +
                     "</strong></div>" +
 
                     "<div><span>Total Credit</span><strong>" +
-                    esc(totalCredit) +
+                    esc(totalCreditAmt) +
                     "</strong></div>" +
 
                     "<div>" +

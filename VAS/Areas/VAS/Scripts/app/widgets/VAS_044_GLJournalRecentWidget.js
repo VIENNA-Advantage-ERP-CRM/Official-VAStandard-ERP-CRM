@@ -2141,7 +2141,7 @@
                     "<strong>" +
 
                     esc(
-                        totalDebit
+                        totalDebitAmt
                     ) +
 
                     "</strong>" +
@@ -2164,7 +2164,7 @@
                     "<strong>" +
 
                     esc(
-                        totalCredit
+                        totalCreditAmt
                     ) +
 
                     "</strong>" +

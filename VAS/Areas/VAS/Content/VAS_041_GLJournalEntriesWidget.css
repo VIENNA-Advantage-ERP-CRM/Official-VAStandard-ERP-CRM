@@ -1532,7 +1532,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-pager {
     margin: 0;
     padding: 1.35em 0.625em 1em;
-    border-top: 1px solid #EDF2F6;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
