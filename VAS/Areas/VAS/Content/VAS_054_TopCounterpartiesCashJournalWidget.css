@@ -156,12 +156,16 @@
 }
 
 .VAS_054_counterparties-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
     padding-top: 0;
     padding-bottom: 0.5em;
     color: #748494;
-    font-size: 0.6875em;
+    font-size: 0.75em;
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 400;
     letter-spacing: 0;
     text-align: left;
     text-transform: capitalize;

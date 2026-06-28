@@ -510,24 +510,23 @@
 
 .VAS-047-cash-in-dialog-table {
     width: 100%;
-    border: 1px solid #E4EDF4;
-    border-radius: 12px;
-    border-collapse: separate;
-    border-spacing: 0;
+    border-collapse: collapse;
     table-layout: fixed;
-    overflow: hidden;
 }
 
 .VAS-047-cash-in-dialog-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     padding: 12px 12px;
     border-bottom: 1px solid #E4EDF4;
-    background: #F3F7FB;
+    background: #FFFFFF;
     color: #748494;
     font-size: 0.75rem;
     width: 100px;
     line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 400;
+    letter-spacing: 0;
     text-align: left;
     text-transform: capitalize;
     white-space: nowrap;
