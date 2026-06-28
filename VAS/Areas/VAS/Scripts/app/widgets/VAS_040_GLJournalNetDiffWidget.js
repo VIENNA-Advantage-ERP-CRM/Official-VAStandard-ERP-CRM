@@ -193,7 +193,7 @@
             if (data.IsBalanced === true || netDiff === 0) {
                 $valueWrap.addClass('VAS-gljnd-balanced');
                 $statusText.addClass('VAS-gljnd-status-ok');
-                $statusText.text(lbl('VAS_040_BooksInBalance', 'Books are in balance · ledger ready for posting.'));
+                $statusText.text(lbl('VAS_040_BooksInBalance', 'Books are in balance \u00B7 ledger ready for posting.'));
             } else if (netDiff > 0) {
                 $valueWrap.addClass('VAS-gljnd-unbalanced');
                 $statusText.addClass('VAS-gljnd-status-warn');

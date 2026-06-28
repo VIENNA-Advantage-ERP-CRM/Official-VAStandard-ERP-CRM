@@ -27,22 +27,22 @@
  * VAS_044_AccountingBook               Accounting Book                      الدفتر المحاسبي
  * VAS_044_TotalDebit                   Total Debit                          إجمالي المدين
  * VAS_044_TotalCredit                  Total Credit                         إجمالي الدائن
- * VAS_044_JournalLines                 Journal Lines                        سطور القيد
+ * VAS_044_JournalLines                 Journal Lines                        س�\u00B7ور القيد
  * VAS_044_Account                      Account                              الحساب
  * VAS_044_CostCenter                   Cost Center                          مركز التكلفة
  * VAS_044_BusinessPartner              Business Partner                     شريك العمل
  * VAS_044_Product                      Product                              المنتج
  * VAS_044_Project                      Project                              المشروع
  * VAS_044_Total                        Total                                الإجمالي
- * VAS_044_CreatedBy                    Created By                           تم الإنشاء بواسطة
+ * VAS_044_CreatedBy                    Created By                           تم الإنشاء بواس�\u00B7ة
  * VAS_044_Drafted                      Drafted                              تم إنشاء المسودة
- * VAS_044_NoJournalLines               No journal lines.                    لا توجد سطور للقيد
+ * VAS_044_NoJournalLines               No journal lines.                    لا توجد س�\u00B7ور للقيد
  * VAS_044_Approving                    Approving...                         جارٍ تنفيذ الموافقة...
  * VAS_044_Posting                      Posting...                           جارٍ ترحيل القيد...
  * VAS_044_JournalProcessFailed         Journal process failed.              فشلت معالجة القيد
  * VAS_044_DetailsNotLoaded             Journal details are not loaded.      لم يتم تحميل تفاصيل القيد
  * VAS_044_DetailsNotAvailable          Journal details are not available.   تفاصيل القيد غير متوفرة
- * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة الطباعة
+ * VAS_044_PrintWindowFailed            Could not open the print window.     تعذر فتح نافذة ال�\u00B7باعة
  * VAS_044_LoadFailed                   Could Not Load Recent Entries        
  * VAS_044_InvalidJournalID             Invalid Journal ID                   
  * VAS_044_DetailsLoadFailed            Could Not Load Journal Details       
@@ -1934,7 +1934,7 @@
                         ""
                     ) +
 
-                    " · " +
+                    " \u00B7 " +
 
                     (
                         journal.Description ||
@@ -1948,7 +1948,7 @@
                 ).text(
                     statusName +
 
-                    " · " +
+                    " \u00B7 " +
 
                     (
                         journal.DateAcct ||
@@ -1979,7 +1979,7 @@
                     (
                         data.ISOCode
                             ? (
-                                " · " +
+                                " \u00B7 " +
                                 data.ISOCode
                             )
                             : ""
@@ -2284,7 +2284,7 @@
                                 line.AccountName
                                 ? (
                                     line.AccountCode +
-                                    " · " +
+                                    " \u00B7 " +
                                     line.AccountName
                                 )
                                 : (
@@ -2487,7 +2487,7 @@
                     (
                         journal.CreatedDate
                             ? (
-                                " · " +
+                                " \u00B7 " +
 
                                 esc(
                                     lbl(

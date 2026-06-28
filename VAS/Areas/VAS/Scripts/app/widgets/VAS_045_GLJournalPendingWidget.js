@@ -976,7 +976,7 @@
 
                 if (item.Description) {
                     titleText +=
-                        " · " +
+                        " \u00B7 " +
                         item.Description;
                 }
 
@@ -1112,10 +1112,10 @@
                     (
                         metaParts.length
                             ? (
-                                " · " +
+                                " \u00B7 " +
                                 metaParts
                                     .slice(1)
-                                    .join(" · ")
+                                    .join(" \u00B7 ")
                             )
                             : ""
                     ) +
@@ -1942,7 +1942,7 @@
 
             if (data.ISOCode) {
                 accountingBook +=
-                    " · " +
+                    " \u00B7 " +
                     data.ISOCode;
             }
 
@@ -1958,7 +1958,7 @@
                 (
                     journal.Description
                         ? (
-                            " · " +
+                            " \u00B7 " +
                             journal.Description
                         )
                         : ""
@@ -1974,7 +1974,7 @@
                 (
                     journal.DateAcct
                         ? (
-                            " · " +
+                            " \u00B7 " +
                             journal.DateAcct
                         )
                         : ""
@@ -2277,7 +2277,7 @@
                     ) {
                         accountText =
                             line.AccountCode +
-                            " · " +
+                            " \u00B7 " +
                             line.AccountName;
                     }
                     else {
@@ -2479,7 +2479,7 @@
                 (
                     journal.CreatedDate
                         ? (
-                            " · " +
+                            " \u00B7 " +
 
                             esc(
                                 lbl(

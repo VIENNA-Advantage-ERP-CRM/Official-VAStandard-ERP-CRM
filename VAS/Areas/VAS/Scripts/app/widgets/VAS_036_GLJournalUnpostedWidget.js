@@ -1208,7 +1208,7 @@
 
                 $dialogFooterText.text(
                     rows.length +
-                    " journals � total " +
+                    " journals \u00B7 total " +
                     symbol +
                     formatAmount(
                         data.TotalDebit,
@@ -1413,7 +1413,7 @@
                         journal.DocumentNo ||
                         ""
                     ) +
-                    " � " +
+                    " \u00B7 " +
                     (
                         journal.Description ||
                         ""
@@ -1425,7 +1425,7 @@
                     id
                 ).text(
                     statusText +
-                    " � " +
+                    " \u00B7 " +
                     (
                         journal.DateAcct ||
                         ""
@@ -1513,7 +1513,7 @@
                                 line.AccountName
                                 ? (
                                     line.AccountCode +
-                                    " � " +
+                                    " \u00B7 " +
                                     line.AccountName
                                 )
                                 : (
@@ -1649,7 +1649,7 @@
                     (
                         journal.CreatedDate
                             ? (
-                                " � drafted " +
+                                " \u00B7 drafted " +
                                 esc(
                                     journal.CreatedDate
                                 )

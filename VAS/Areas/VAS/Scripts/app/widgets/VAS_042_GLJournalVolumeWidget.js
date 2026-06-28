@@ -290,10 +290,10 @@
                         var data = JSON.parse(result);
                         if (data && data.Days) {
                             var id = $self.AD_UserHomeWidgetID;
-                            // Update sub-label: "APR 1 – 18 · Count vs Value"
+                            // Update sub-label: "APR 1 – 18 \u00B7 Count vs Value"
                             $root.find('#VAS-gljv-sub-' + id).text(
                                 (data.PeriodLabel || '')
-                                + ' · '
+                                + ' \u00B7 '
                                 + lbl('VAS_042_CountVsValue', 'Count vs Value')
                             );
                             // Inject SVG
