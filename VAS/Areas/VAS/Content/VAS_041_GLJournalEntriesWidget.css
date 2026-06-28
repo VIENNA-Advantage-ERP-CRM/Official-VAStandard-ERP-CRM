@@ -681,6 +681,25 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     border-radius: 0;
 }
 
+/* Entries list dialog: flex column so pager lives below the table */
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-table-wrap {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+}
+
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-pager {
+    flex-shrink: 0;
+    padding: 0.375em 0.625em;
+    margin: 0;
+}
+
 .VAS-glje-dialog-table {
     width: 100%;
     border-collapse: collapse;
@@ -1322,27 +1341,27 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     font-weight: 700;
 }
 
-/* Popup pagination aligned with VAS_043 */
+/* Popup pagination — compact */
 .VAS-glje-line-pager {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.625em;
+    gap: 0.4em;
     width: 100%;
     flex-shrink: 0;
-    margin: 0.75em 0 1em;
-    padding-top: 0.625em;
+    margin: 0.25em 0 0;
+    padding: 0.25em 0.5em;
 }
 
 .VAS-glje-line-pager .VAS-glje-page-btn {
-    width: 2.25em;
-    height: 2.25em;
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 1px solid #CFE9FF;
     border-radius: 0.5em;
     background: rgba(255, 255, 255, 0.86);
     color: #0083DA;
-    font-size: 1em;
+    font-size: 0.8125em;
     font-weight: 700;
     cursor: pointer;
     display: inline-flex;
@@ -1364,11 +1383,20 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-line-pager .VAS-glje-page-text {
     display: inline-block;
-    min-width: 4.25em;
+    min-width: 3em;
     text-align: center;
-    font-size: 1em;
+    font-size: 0.8125em;
     font-weight: 700;
     color: #141414;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+/* Detail popup: pager compact, close to table */
+.VAS-glje-detail-content .VAS-glje-line-pager {
+    margin-top: calc(-1.25em);
+    position: relative;
+    z-index: 1;
+    padding: 0.3em 0.625em;
+    margin-bottom: 0;
 }

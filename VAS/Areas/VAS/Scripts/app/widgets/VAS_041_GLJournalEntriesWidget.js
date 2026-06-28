@@ -1045,6 +1045,7 @@
                     );
 
                 $dialogBody
+                    .parent()
                     .off(
                         "click.VAS041DialogPager",
                         ".VAS-glje-dialog-page"
@@ -1715,23 +1716,7 @@
                     ) +
                     "</th>" +
 
-                    '<th class="VAS-glje-num">' +
-                    esc(
-                        lbl(
-                            "VAS_041_TotalDebit",
-                            "Total Debit"
-                        )
-                    ) +
-                    "</th>" +
-
-                    '<th class="VAS-glje-num">' +
-                    esc(
-                        lbl(
-                            "VAS_041_TotalCredit",
-                            "Total Credit"
-                        )
-                    ) +
-                    "</th>" +
+                   
 
                     "</tr>" +
                     "</thead>" +
@@ -1848,25 +1833,14 @@
 
                         "</td>" +
 
-                        '<td class="VAS-glje-amt">' +
-                        esc(
-                            debit
-                        ) +
-                        "</td>" +
-
-                        '<td class="VAS-glje-amt">' +
-                        esc(
-                            credit
-                        ) +
-                        "</td>" +
+                     
 
                         "</tr>";
                 }
 
                 html +=
                     "</tbody>" +
-                    "</table>" +
-                    renderDialogPager();
+                    "</table>";
 
                 /*
                  * Event is delegated in createDialog.
@@ -1874,6 +1848,16 @@
                  */
                 $dialogBody.html(
                     html
+                );
+
+                $dialogBody
+                    .siblings(
+                        ".VAS-glje-dialog-pager"
+                    )
+                    .remove();
+
+                $dialogBody.after(
+                    renderDialogPager()
                 );
 
                 $dialogFooterText.text(
@@ -3085,6 +3069,8 @@
 
                     success:
                         function (raw) {
+
+                            console.log("raw => " + JSON.stringify(raw));
                             var res =
                                 normalizeResponse(
                                     raw
@@ -3129,6 +3115,9 @@
 
                     error:
                         function (xhr) {
+
+                            console.log("raw xhr => " + JSON.stringify(xhr));
+
                             showProcessError(
                                 getAjaxErrorMessage(
                                     xhr,

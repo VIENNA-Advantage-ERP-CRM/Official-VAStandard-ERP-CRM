@@ -568,6 +568,7 @@
                     );
 
                 $dialogBody
+                    .parent()
                     .off(
                         "click.VAS036DialogPager",
                         ".VAS-glju-dialog-page"
@@ -1191,14 +1192,23 @@
                 }
 
                 html +=
-                    "</tbody></table>" +
-                    renderDialogPager();
+                    "</tbody></table>";
 
                 $dialogBody.html(html);
 
+                $dialogBody
+                    .siblings(
+                        ".VAS-glju-dialog-pager"
+                    )
+                    .remove();
+
+                $dialogBody.after(
+                    renderDialogPager()
+                );
+
                 $dialogFooterText.text(
                     rows.length +
-                    " journals · total " +
+                    " journals ï¿½ total " +
                     symbol +
                     formatAmount(
                         data.TotalDebit,
@@ -1403,7 +1413,7 @@
                         journal.DocumentNo ||
                         ""
                     ) +
-                    " · " +
+                    " ï¿½ " +
                     (
                         journal.Description ||
                         ""
@@ -1415,7 +1425,7 @@
                     id
                 ).text(
                     statusText +
-                    " · " +
+                    " ï¿½ " +
                     (
                         journal.DateAcct ||
                         ""
@@ -1503,7 +1513,7 @@
                                 line.AccountName
                                 ? (
                                     line.AccountCode +
-                                    " · " +
+                                    " ï¿½ " +
                                     line.AccountName
                                 )
                                 : (
@@ -1639,7 +1649,7 @@
                     (
                         journal.CreatedDate
                             ? (
-                                " · drafted " +
+                                " ï¿½ drafted " +
                                 esc(
                                     journal.CreatedDate
                                 )
