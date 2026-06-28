@@ -353,6 +353,14 @@ html[dir="rtl"] .VAS-gljr-btn-new {
     letter-spacing: 0;
 }
 
+.VAS-gljr-col-id {
+    font-weight: 700;
+}
+
+.VAS-gljr-col-num {
+    font-weight: 700;
+}
+
 /* Design-system color alignment */
 .VAS-gljr-card {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
@@ -654,17 +662,21 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 }
 
 .VAS-gljr-detail-lines th {
-    background: #F5F8FB;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
     color: #748494;
     font-size: 0.75em;
     font-weight: 400;
-    letter-spacing: 0.1em;
+    letter-spacing: 0;
     text-align: left;
     padding: 0.875em 0.75em;
     border-bottom: 0.0625em solid #E4EDF4;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-transform: capitalize;
 }
 
 .VAS-gljr-detail-lines td {
@@ -683,7 +695,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 
 .VAS-gljr-detail-lines tfoot td {
     background: #F5F8FB;
-    font-weight: 600;
+    font-weight: 700;
     border-bottom: 0;
 }
 
@@ -1082,7 +1094,10 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 }
 
 .VAS-gljr-table th {
-    background: #F5F8FB;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
     border-bottom: 0.0625em solid #EDF2F6;
     color: #748494;
     font-size: 0.75em;
@@ -1091,6 +1106,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     padding: 1em 0.75em;
     text-align: left;
     white-space: nowrap;
+    text-transform: capitalize;
 }
 
 .VAS-gljr-table tbody tr {
@@ -1111,7 +1127,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 
 .VAS-gljr-table th,
 .VAS-gljr-table td {
-    font-size: 0.875em;
+    font-size: 0.75em;
 }
 
 .VAS-gljr-row:hover {

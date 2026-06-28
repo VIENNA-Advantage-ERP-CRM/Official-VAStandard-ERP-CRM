@@ -540,17 +540,21 @@ html[dir="rtl"] .VAS-gljpq-item {
 }
 
 .VAS-gljpq-detail-lines th {
-    background: #F5F8FB;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
     color: #748494;
     font-size: 0.75em;
     font-weight: 400;
-    letter-spacing: 0.1em;
+    letter-spacing: 0;
     text-align: left;
     padding: 0.875em 0.75em;
     border-bottom: 0.0625em solid #E4EDF4;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-transform: capitalize;
 }
 
 .VAS-gljpq-detail-lines td {
@@ -569,7 +573,7 @@ html[dir="rtl"] .VAS-gljpq-item {
 
 .VAS-gljpq-detail-lines tfoot td {
     background: #F5F8FB;
-    font-weight: 600;
+    font-weight: 700;
     border-bottom: 0;
 }
 

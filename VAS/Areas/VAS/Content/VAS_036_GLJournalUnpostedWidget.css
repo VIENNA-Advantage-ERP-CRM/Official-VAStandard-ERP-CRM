@@ -633,15 +633,19 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 }
 
 .VAS-glju-detail-lines th {
-    background: #F5F8FB;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
     color: #748494;
     font-size: 0.75em;
     font-weight: 400;
-    letter-spacing: 0.1em;
+    letter-spacing: 0;
     text-align: left;
     padding: 0.875em 0.75em;
     border-bottom: 0.0625em solid #E4EDF4;
     white-space: nowrap;
+    text-transform: capitalize;
 }
 
 .VAS-glju-detail-lines td {
@@ -660,7 +664,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 
 .VAS-glju-detail-lines tfoot td {
     background: #F5F8FB;
-    font-weight: 600;
+    font-weight: 700;
     border-bottom: 0;
 }
 
@@ -947,7 +951,10 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 }
 
 .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table thead th {
-    background: #F5F8FB;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
     border-bottom: 0.0625em solid #EDF2F6;
     color: #748494;
     font-size: 0.75em;
@@ -956,6 +963,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     padding: 1em 0.75em;
     text-align: left;
     white-space: nowrap;
+    text-transform: capitalize;
 }
 
 .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table tbody td {
