@@ -232,6 +232,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     padding: 2em 2.25em 1.75em;
     border-bottom: 1px solid #E6EEF5;
     flex-shrink: 0;
+    margin-bottom: 12px;
 }
 
 .VAS-glje-dialog-icon {

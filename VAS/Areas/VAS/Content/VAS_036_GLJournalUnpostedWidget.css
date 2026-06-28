@@ -292,6 +292,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     padding: 1em 1em 1em 1.125em;
     border-bottom: 0.0625em solid #EDF2F6;
     flex-shrink: 0;
+    margin-bottom: 12px;
 }
 
 .VAS-glju-dialog-icon {
