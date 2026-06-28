@@ -20,7 +20,7 @@ namespace VAS.Controllers
         [AjaxSessionFilterAttribute]
         public JsonResult GetMonthlyEntries(
             int pageNo = 1,
-            int pageSize = 10)
+            int pageSize = 8)
         {
             return GetJournalEntries(
                 false,
@@ -33,7 +33,7 @@ namespace VAS.Controllers
         [AjaxSessionFilterAttribute]
         public JsonResult GetUnpostedEntries(
             int pageNo = 1,
-            int pageSize = 10)
+            int pageSize = 8)
         {
             return GetJournalEntries(
                 true,
@@ -67,7 +67,7 @@ namespace VAS.Controllers
                         1,
                         Math.Min(
                             pageSize,
-                            25
+                            8
                         )
                     );
 
@@ -1039,7 +1039,7 @@ FROM ProtectedJournal ProtectedJournal";
                     Math.Max(
                         Math.Min(
                             pageSize,
-                            25
+                            8
                         ),
                         1
                     );
