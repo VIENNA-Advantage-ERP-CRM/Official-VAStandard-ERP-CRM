@@ -378,8 +378,6 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 .VAS-glju-table-wrap {
     height: 100%;
     overflow: auto;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
 }
 
 .VAS-glju-dialog-table {
@@ -619,8 +617,6 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 
 .VAS-glju-detail-lines-wrap {
     overflow: auto;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
     background: #FFFFFF;
 }
 
@@ -939,8 +935,6 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     min-height: 0;
     height: auto;
     overflow: auto;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
 }
 
 .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table {

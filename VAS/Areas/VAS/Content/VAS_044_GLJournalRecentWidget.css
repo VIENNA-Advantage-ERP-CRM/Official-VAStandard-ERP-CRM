@@ -648,8 +648,6 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 
 .VAS-gljr-detail-lines-wrap {
     overflow: auto;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
     background: #FFFFFF;
 }
 
@@ -1078,8 +1076,6 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     margin: 0;
     padding: 0;
     overflow: auto;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
 }
 
 .VAS-gljr-table {
