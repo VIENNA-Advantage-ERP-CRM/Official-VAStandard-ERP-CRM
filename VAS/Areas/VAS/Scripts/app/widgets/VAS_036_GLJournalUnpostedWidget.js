@@ -1168,12 +1168,12 @@
                         "</span>" +
                         "</td>" +
 
-                        '<td class="VAS-glju-amt" title="' + esc(formatAmount(row.TotalDebit, precision)) + '">' +
-                        esc(formatAmount(row.TotalDebit, precision)) +
+                        '<td class="VAS-glju-amt" title="' + esc(symbol + formatAmount(row.TotalDebit, precision)) + '">' +
+                        esc(symbol + formatAmount(row.TotalDebit, precision)) +
                         "</td>" +
 
-                        '<td class="VAS-glju-amt" title="' + esc(formatAmount(row.TotalCredit, precision)) + '">' +
-                        esc(formatAmount(row.TotalCredit, precision)) +
+                        '<td class="VAS-glju-amt" title="' + esc(symbol + formatAmount(row.TotalCredit, precision)) + '">' +
+                        esc(symbol + formatAmount(row.TotalCredit, precision)) +
                         "</td>" +
 
                         "</tr>";

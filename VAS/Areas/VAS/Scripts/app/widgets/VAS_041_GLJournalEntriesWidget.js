@@ -1879,12 +1879,14 @@
                         "VAS-glje-pill-draft";
 
                     var debit =
+                        symbol +
                         formatAmount(
                             row.TotalDebit,
                             precision
                         );
 
                     var credit =
+                        symbol +
                         formatAmount(
                             row.TotalCredit,
                             precision
