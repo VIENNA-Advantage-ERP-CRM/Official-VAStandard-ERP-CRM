@@ -441,7 +441,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 .VAS-glju-dialog-table th:nth-child(6),
 .VAS-glju-dialog-table td:nth-child(5),
 .VAS-glju-dialog-table td:nth-child(6) {
-    width: 9.5em;
+    width: 13em;
     text-align: right;
 }
 
@@ -628,7 +628,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     border-collapse: collapse;
     table-layout: fixed;
     font-size: 0.875em;
-    min-width: 58em;
+    min-width: 70em;
 }
 
 .VAS-glju-detail-lines th {
@@ -672,7 +672,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 .VAS-glju-detail-lines th:nth-child(3),
 .VAS-glju-detail-lines td:nth-child(2),
 .VAS-glju-detail-lines td:nth-child(3) {
-    width: 7em;
+    width: 13em;
     text-align: right;
 }
 

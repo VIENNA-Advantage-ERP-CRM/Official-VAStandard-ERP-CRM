@@ -625,29 +625,38 @@ html[dir="rtl"] .VAS-gljpq-item {
 }
 
 .VAS-gljpq-pill-draft {
-    background: #EAF8FF;
-    color: #0083DA;
-}
-
-.VAS-gljpq-pill-posted {
-    background: rgba(1, 157, 137, 0.12);
-    color: #0B6B45;
-}
-
-.VAS-gljpq-pill-approved {
-    background: rgba(0, 131, 218, 0.12);
-    color: #0069AE;
+    background: #F1F5F9;
+    color: #64748B;
 }
 
 .VAS-gljpq-pill-submit {
-    background: #EAF8FF;
-    color: #0083DA;
+    background: #DBEAFE;
+    color: #1D4ED8;
 }
 
-.VAS-gljpq-pill-pending,
+.VAS-gljpq-pill-approved {
+    background: #CCFBF1;
+    color: #0F766E;
+}
+
+.VAS-gljpq-pill-posted {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.VAS-gljpq-pill-pending {
+    background: #FEF3C7;
+    color: #92400E;
+}
+
+.VAS-gljpq-pill-voided {
+    background: #FEE2E2;
+    color: #B91C1C;
+}
+
 .VAS-gljpq-pill-returned {
-    background: rgba(215, 139, 16, 0.12);
-    color: #9A6500;
+    background: #F3E8FF;
+    color: #7E22CE;
 }
 
 .VAS-gljpq-created-strip {

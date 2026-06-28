@@ -151,7 +151,7 @@
         "IP": "VAS-glju-pill-submit",
         "AP": "VAS-glju-pill-posted",
         "NA": "VAS-glju-pill-pending",
-        "VO": "VAS-glju-pill-returned",
+        "VO": "VAS-glju-pill-voided",
         "RE": "VAS-glju-pill-returned"
     };
 

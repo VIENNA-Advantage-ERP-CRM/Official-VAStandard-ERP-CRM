@@ -114,6 +114,9 @@
 
 /* ── KPI value ───────────────────────────────────────────────────────────── */
 .VAS-gljnd-root .kpi-value {
+    display: flex;
+    align-items: baseline;
+    gap: 0;
     line-height: 1;
     font-size: 1.375em;
     font-weight: 700;
@@ -131,15 +134,12 @@
     color: #8B5200;
 }
 
-/* Currency prefix */
+/* Currency prefix — same style as amount */
 .VAS-gljnd-prefix {
-    font-size: 0.65em;
-    font-weight: 500;
+    font-size: inherit;
+    font-weight: inherit;
     color: inherit;
-    opacity: 0.7;
-    margin-right: 0.1em;
-    align-self: flex-start;
-    padding-top: 0.2em;
+    flex: 0 0 auto;
 }
 
 /* ── Status / Why section ────────────────────────────────────────────────── */
@@ -289,7 +289,6 @@ html[dir="rtl"] .VAS-gljnd-root .kpi-why {
     color: #0083DA;
 }
 
-.VAS-gljnd-prefix,
 .VAS-gljnd-root .kpi-why-text {
     color: #748494;
 }

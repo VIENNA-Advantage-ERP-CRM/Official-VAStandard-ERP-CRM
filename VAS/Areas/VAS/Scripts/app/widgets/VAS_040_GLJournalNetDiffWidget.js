@@ -51,6 +51,23 @@
             return text && text !== '[' + key + ']' ? text : fallback;
         }
 
+        function esc(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function getCurrencyText(data) {
+            return data.currencySymbol ||
+                data.CurSymbol ||
+                data.currencyISO ||
+                data.ISOCode ||
+                "";
+        }
+
         function formatCurrencyAmount(value, currencySymbol, currencyISO) {
             var numericValue = Math.abs(Number(value || 0));
             var stdPrecision = 2;
@@ -185,7 +202,16 @@
                 data.currencyISO || data.ISOCode
             );
 
-            $kpiValue.text(amountText);
+            var currencyText = getCurrencyText(data);
+
+            $kpiValue.html(
+                (
+                    currencyText
+                        ? '<span class="VAS-gljnd-prefix">' + esc(currencyText) + '</span>'
+                        : ''
+                ) +
+                '<span>' + esc(amountText) + '</span>'
+            );
 
             $valueWrap.removeClass('VAS-gljnd-balanced VAS-gljnd-unbalanced');
             $statusText.removeClass('VAS-gljnd-status-ok VAS-gljnd-status-warn');

@@ -107,7 +107,7 @@
 .VAS-gljtc-root .kpi-value {
     display: flex;
     align-items: baseline;
-    gap: 0.18em;
+    gap: 0;
     min-width: 0;
     line-height: 1;
     font-size: 1.375em;
@@ -116,11 +116,11 @@
     color: #0083DA;
 }
 
-/* Currency prefix — small, muted */
+/* Currency prefix — same style as amount */
 .VAS-gljtc-prefix {
-    font-size: 0.65em;
-    font-weight: 700;
-    color: currentColor;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
     flex: 0 0 auto;
 }
 
@@ -250,7 +250,6 @@ html[dir="rtl"] .VAS-gljtc-root .kpi-why {
     color: #0083DA;
 }
 
-.VAS-gljtc-prefix,
 .VAS-gljtc-root .kpi-why-text,
 .VAS-gljtc-period {
     color: #748494;

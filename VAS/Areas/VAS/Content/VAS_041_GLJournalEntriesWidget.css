@@ -1451,33 +1451,70 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     text-align: right;
 }
 
+/* Drafted — neutral gray */
 .VAS-glje-pill-draft,
-.VAS-glje-pill-posted,
-.VAS-glje-pill-submit,
-.VAS-glje-pill-pending,
-.VAS-glje-pill-returned,
-.VAS-glje-pill-voided,
 .VAS-glju-pill-draft,
-.VAS-glju-pill-posted,
-.VAS-glju-pill-submit,
-.VAS-glju-pill-pending,
-.VAS-glju-pill-returned,
 .VAS-gljr-pill-draft,
+.VAS-gljpq-pill-draft {
+    background: #F1F5F9 !important;
+    color: #64748B !important;
+}
+
+/* Completed / Posted — green */
+.VAS-glje-pill-posted,
+.VAS-glju-pill-posted,
 .VAS-gljr-pill-posted,
+.VAS-gljpq-pill-posted {
+    background: #DCFCE7 !important;
+    color: #15803D !important;
+}
+
+/* Approved (where distinct from posted) — teal */
+.VAS-gljpq-pill-approved {
+    background: #CCFBF1 !important;
+    color: #0F766E !important;
+}
+
+/* In Progress / Submitted — blue */
+.VAS-glje-pill-submit,
+.VAS-glju-pill-submit,
 .VAS-gljr-pill-submit,
+.VAS-gljpq-pill-submit {
+    background: #DBEAFE !important;
+    color: #1D4ED8 !important;
+}
+
+/* Closed — indigo */
+.VAS-gljr-pill-closed {
+    background: #E0E7FF !important;
+    color: #3730A3 !important;
+}
+
+/* Not Approved — amber */
+.VAS-glje-pill-pending,
+.VAS-glju-pill-pending,
 .VAS-gljr-pill-pending,
+.VAS-gljpq-pill-pending {
+    background: #FEF3C7 !important;
+    color: #92400E !important;
+}
+
+/* Voided — red */
+.VAS-glje-pill-voided,
+.VAS-glju-pill-voided,
 .VAS-gljr-pill-voided,
-.VAS-gljr-pill-closed,
-.VAS-gljr-pill-reverse,
-.VAS-gljpq-pill-draft,
-.VAS-gljpq-pill-posted,
-.VAS-gljpq-pill-approved,
-.VAS-gljpq-pill-submit,
-.VAS-gljpq-pill-pending,
-.VAS-gljpq-pill-voided,
-.VAS-gljpq-pill-returned {
-    background: #EAF6FF !important;
-    color: #0083DA !important;
+.VAS-gljpq-pill-voided {
+    background: #FEE2E2 !important;
+    color: #B91C1C !important;
+}
+
+/* Returned / Reversed — purple */
+.VAS-glje-pill-returned,
+.VAS-glju-pill-returned,
+.VAS-gljpq-pill-returned,
+.VAS-gljr-pill-reverse {
+    background: #F3E8FF !important;
+    color: #7E22CE !important;
 }
 
 .VAS-glje-detail-description,
