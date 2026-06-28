@@ -1716,7 +1716,23 @@
                     ) +
                     "</th>" +
 
-                   
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_041_TotalDebit",
+                            "Total Debit"
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_041_TotalCredit",
+                            "Total Credit"
+                        )
+                    ) +
+                    "</th>" +
 
                     "</tr>" +
                     "</thead>" +
@@ -1833,7 +1849,17 @@
 
                         "</td>" +
 
-                     
+                        '<td class="VAS-glje-amt">' +
+                        esc(
+                            debit
+                        ) +
+                        "</td>" +
+
+                        '<td class="VAS-glje-amt">' +
+                        esc(
+                            credit
+                        ) +
+                        "</td>" +
 
                         "</tr>";
                 }
