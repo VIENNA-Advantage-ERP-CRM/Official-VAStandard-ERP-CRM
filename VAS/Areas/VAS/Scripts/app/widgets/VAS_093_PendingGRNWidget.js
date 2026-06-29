@@ -1,6 +1,6 @@
 ﻿/************************************************************
  * Module Name    : VAS
- * Purpose        : Get the details of PO and Create GRN
+ * Purpose        :Get the details of PO and Create GRN
  * chronological  : Development
  * Created Date   : 20 Sep 2024
  * Created by     : VAI050
@@ -8,7 +8,7 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
-    VAS.VAS_ExpectedGRNWidget = function () {
+    VAS.VAS_093_PendingGRNWidget = function () {
         this.frame;
         this.windowNo;
         this.widgetInfo;
@@ -26,10 +26,10 @@
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             const orderContainer =
-                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-grn-container">' +
+                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-grn-container-pending">' +
                 '    <div class="VAS-deliveries-heading">' +
-                '        <div>' + VIS.Msg.getMsg("VAS_ExpectedGRN") + '</div>' +
-                ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span>' +
+                '        <div>' + VIS.Msg.getMsg("VAS_PendingGRN") + '</div>' +
+                ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span> '+
                 '    </div>' +
                 //'    <div class="VAS-delivery-count">' +
                 //'        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_GRNCount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
@@ -62,7 +62,7 @@
             $root.find('#VAS_DeliveryContainer_' + widgetID).show();
             $.ajax({
                 url: VIS.Application.contextUrl + "Product/GetExpectedDelivery",
-                data: { pageNo: pageNo, pageSize: pageSize, Type: "EG" },
+                data: { pageNo: pageNo, pageSize: pageSize, Type: "PG" },
                 dataType: 'json',
                 success: function (response) {
                     var response = JSON.parse(response);
@@ -146,7 +146,7 @@
             selectedOrderLineIDs = [];
 
             var productContainer =
-                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-grn-container">' +
+                '<div id="VAS_ProductContainer_' + widgetID + '" class="VAS-grn-container-pending">' +
                 '<span class="VAS-info-span" style="display:none;" id="VAS_spnErrorMessage_' + widgetID + '"></span>' +
                 '    <div class="VAS-deliveries-heading">' +
                 '        <h6>' +
@@ -154,7 +154,7 @@
                 '            ' + VIS.Msg.getMsg("VAS_BackToGRN") +
                 '        </h6>' +
                 '<span id="VAS_GenerateGRN_' + widgetID + '" class="VAS-generate-delivery-btn" data-orderid="' + orderid + '" title="' + VIS.Msg.getMsg("VAS_GenerateGRN") + '">' +
-                '<i class="vis vis-action"></i></span> ' +
+                '<i class="vis vis-action" ></i ></span> ' +
                 '    </div>' +
                 '    <div class="VAS-delivery-count">' +
                 '    </div>' +
@@ -412,16 +412,16 @@
         };
     };
 
-    VAS.VAS_ExpectedGRNWidget.prototype.widgetFirevalueChanged = function (value) {
+    VAS.VAS_093_PendingGRNWidget.prototype.widgetFirevalueChanged = function (value) {
         if (this.listener)
             this.listener.widgetFirevalueChanged(value);
     };
 
-    VAS.VAS_ExpectedGRNWidget.prototype.addChangeListener = function (listener) {
+    VAS.VAS_093_PendingGRNWidget.prototype.addChangeListener = function (listener) {
         this.listener = listener;
     };
 
-    VAS.VAS_ExpectedGRNWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_093_PendingGRNWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.windowNo = windowNo;
@@ -433,15 +433,15 @@
         }, 50);
     };
 
-    VAS.VAS_ExpectedGRNWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_093_PendingGRNWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_ExpectedGRNWidget.prototype.refreshWidget = function () {
+    VAS.VAS_093_PendingGRNWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_ExpectedGRNWidget.prototype.dispose = function () {
+    VAS.VAS_093_PendingGRNWidget.prototype.dispose = function () {
         this.frame = null;
         this.windowNo = null;
         $bsyDiv = null;

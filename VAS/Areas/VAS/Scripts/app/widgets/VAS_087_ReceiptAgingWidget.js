@@ -5,6 +5,11 @@
  *           a detail modal with received lines.
  * Backend - VAS_087_ReceiptAgingWidget/GetReceiptAging
  *           VAS_087_ReceiptAgingWidget/GetReceiptAgingLines
+ * Status  - The modal Status field and the line Status column show the receipt's
+ *           real document status (M_InOut.DocStatus), resolved to its system name
+ *           via the DocStatus reference list (AD_Reference 131). The earlier
+ *           design-only labels (Stored / Quality check / Unloading / Count
+ *           mismatch) are not real system statuses and are no longer used.
  * Summary Message Table: see Labels / Message Keys below.
  *
  * Labels / Message Keys
@@ -16,12 +21,9 @@
  *  4  | receipts awaiting                  | VAS_087_ReceiptsAwaiting
  *  5  | oldest                             | VAS_087_Oldest
  *  6  | Aging                              | VAS_087_Aging
- *  7  | Quality check                      | VAS_087_QualityCheck
- *  8  | Count mismatch                     | VAS_087_CountMismatch
- *  9  | Unloading                          | VAS_087_Unloading
- * 10  | Receipt Lines                      | VAS_087_ReceiptLines
- * 11  | Received                           | VAS_087_Received
- * 12  | Location                           | VAS_087_Location
+ *  7  | Receipt Lines                      | VAS_087_ReceiptLines
+ *  8  | Received                           | VAS_087_Received
+ *  9  | Location                           | VAS_087_Location
  */
 ; VAS = window.VAS || {};
 
@@ -167,27 +169,10 @@
             return first;
         }
 
-        function normalizeStatus(status) {
-            var s = String(status || "").toLowerCase();
-            if (s === "quality" || s === "quality check") { return "quality"; }
-            if (s === "mismatch" || s === "count mismatch") { return "mismatch"; }
-            return "unloading";
-        }
-
-        function getStatusText(status) {
-            switch (normalizeStatus(status)) {
-                case "quality": return lbl("VAS_087_QualityCheck", "Quality check");
-                case "mismatch": return lbl("VAS_087_CountMismatch", "Count mismatch");
-                default: return lbl("VAS_087_Unloading", "Unloading");
-            }
-        }
-
-        function getStatusClass(status) {
-            switch (normalizeStatus(status)) {
-                case "quality": return "warn";
-                case "mismatch": return "bad";
-                default: return "info";
-            }
+        /* Display text comes straight from the system DocStatus name (controller-resolved). */
+        function getStatusText(row) {
+            if (row && row.statusText) { return row.statusText; }
+            return row && row.statusCode ? row.statusCode : "-";
         }
 
         this.Initalize = function () {
@@ -440,7 +425,7 @@
                 field(lbl("VAS_087_Supplier", "Supplier"), header.supplier) +
                 field(lbl("VAS_087_QtyReceived", "Qty received"), formatQtyWithUom(header.totalQty, header.uom)) +
                 field(lbl("VAS_087_ReceivedOn", "Received on"), formatDateTime(header.receivedOn)) +
-                field(lbl("VAS_087_Status", "Status"), getStatusText(header.statusCode)) +
+                field(lbl("VAS_087_Status", "Status"), getStatusText(header)) +
                 '</div>' +
                 '<div class="vas-rag-lines-title">' + escapeHtml(lbl("VAS_087_ReceiptLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-rag-lines-wrap">';

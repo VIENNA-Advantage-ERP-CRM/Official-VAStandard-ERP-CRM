@@ -16,8 +16,9 @@ namespace VIS.Controllers
     /// <summary>
     /// Module Name : Receiving Actions (Material Receipt / GRN dashboard)
     /// Purpose     : Data endpoints for the 3x2 receiving action widget. The
-    ///               widget reuses VAS_NewGRNWidget/CreateGRN for receipt
-    ///               creation and VAS_QAHoldsWidget/SaveQAResult for QA saves.
+    ///               widget reuses VAS_082_NewGRNWidget/CreateGRN for receipt
+    ///               creation and VAS_086_QAHoldsWidget/GetQAHolds + SaveQAResult
+    ///               for the QA inspection load/save.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-20 Created
     /// </summary>
@@ -482,18 +483,36 @@ namespace VIS.Controllers
                 }
 
                 int printFormatId = Util.GetValueOfInt(dr["Print_Format_ID"]);
+                int resolvedGrnId = Util.GetValueOfInt(dr["GRN_ID"]);
+                string grnNo = Util.GetValueOfString(dr["GRN_No"]);
+                int copies = Math.Max(1, Util.GetValueOfInt(dr["Copies"]));
+
+                // Close the reader before issuing further scalar lookups on the connection.
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                // Resolve the GRN print/report process so the client can launch it via
+                // VIS.APrint against this M_InOut record. The process (Value/Name
+                // "DTD001_GRNReport") may not exist yet - in that case processId stays 0
+                // and the client simply shows the queued confirmation without printing.
+                int printProcessId = GetGRNPrintProcessId(ctx);
+                int inOutTableId = GetTableId("M_InOut");
 
                 return Ok(new
                 {
                     success = true,
-                    grnId = Util.GetValueOfInt(dr["GRN_ID"]),
-                    grnNo = Util.GetValueOfString(dr["GRN_No"]),
-                    copies = Math.Max(1, Util.GetValueOfInt(dr["Copies"])),
+                    grnId = resolvedGrnId,
+                    grnNo = grnNo,
+                    copies = copies,
                     printFormatId = printFormatId,
                     printFormat = GetPrintFormatText(printFormatId),
                     printer = "Default printer",
                     includes = "Barcode + locator",
-                    status = "Queued"
+                    status = "Queued",
+                    AD_Process_ID = printProcessId,
+                    AD_Table_ID = inOutTableId,
+                    Record_ID = resolvedGrnId
                 });
             }
             catch (Exception ex)
@@ -507,6 +526,59 @@ namespace VIS.Controllers
                     dr.Close();
                     dr.Dispose();
                 }
+            }
+        }
+
+        /// <summary>
+        /// Resolves the AD_Process_ID of the GRN label/report process, matched by
+        /// either Value or Name "DTD001_GRNReport". Prefers a client-specific record,
+        /// falls back to system (AD_Client_ID = 0). Returns 0 when the process has not
+        /// been created yet, so the print confirmation can still be shown.
+        /// </summary>
+        /// <param name="ctx">Session context (for the active client).</param>
+        /// <returns>AD_Process_ID, or 0 when not found.</returns>
+        private int GetGRNPrintProcessId(Ctx ctx)
+        {
+            const string grnProcessKey = "DTD001_GRNReport";
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@Key", grnProcessKey),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Process_ID
+                      FROM AD_Process
+                      WHERE (Value=@Key OR Name=@Key)
+                        AND IsActive='Y'
+                        AND AD_Client_ID IN (0, @AD_Client_ID)
+                      ORDER BY AD_Client_ID DESC
+                      FETCH FIRST 1 ROW ONLY",
+                    parameters, null));
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>Resolves the AD_Table_ID for a physical table name (0 when missing).</summary>
+        /// <param name="tableName">Physical table name, e.g. "M_InOut".</param>
+        /// <returns>AD_Table_ID, or 0 when not found.</returns>
+        private int GetTableId(string tableName)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Table_ID FROM AD_Table WHERE TableName=@TableName AND IsActive='Y'",
+                    new SqlParameter[] { new SqlParameter("@TableName", tableName) }, null));
+            }
+            catch
+            {
+                return 0;
             }
         }
 

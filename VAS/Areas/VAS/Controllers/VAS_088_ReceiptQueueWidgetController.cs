@@ -63,10 +63,6 @@ namespace VIS.Controllers
             if (pageSize > 5) { pageSize = 5; }
 
             int offset = (pageNo - 1) * pageSize;
-            bool hasQualityCheckColumn = HasQualityCheckColumn();
-            string qualityCheckSql = hasQualityCheckColumn
-                ? "MAX(CASE WHEN COALESCE(LineConfirm.VA010_QualCheckMArk, 'N')='Y' THEN 1 ELSE 0 END)"
-                : "0";
 
             string headerSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
@@ -100,8 +96,6 @@ namespace VIS.Controllers
                        QueueData.Doc_Status,
                        QueueData.Received_By,
                        QueueData.Received_Time,
-                       QueueData.Has_Mismatch,
-                       QueueData.Has_Quality_Check,
                        QueueData.TotalRecords
                 FROM (
                     SELECT HeaderData.GRN_ID,
@@ -112,14 +106,11 @@ namespace VIS.Controllers
                            HeaderData.Doc_Status,
                            HeaderData.Received_By,
                            HeaderData.Received_Time,
-                           MAX(CASE WHEN COALESCE(LineConfirm.DifferenceQty, 0) <> 0 THEN 1 ELSE 0 END) AS Has_Mismatch,
-                           " + qualityCheckSql + @" AS Has_Quality_Check,
                            COUNT(1) OVER () AS TotalRecords
                     FROM (
                         " + headerSql + @"
                     ) HeaderData
                     LEFT OUTER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=HeaderData.GRN_ID AND InOutLine.IsActive='Y' AND InOutLine.AD_Client_ID=@Line_AD_Client_ID)
-                    LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID AND LineConfirm.IsActive='Y')
                     GROUP BY HeaderData.GRN_ID,
                              HeaderData.GRN_No,
                              HeaderData.Supplier_Name,
@@ -149,6 +140,7 @@ namespace VIS.Controllers
                 {
                     totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
                     DateTime? receivedTime = Util.GetValueOfDateTime(dr["Received_Time"]);
+                    string docStatus = Util.GetValueOfString(dr["Doc_Status"]);
 
                     rows.Add(new
                     {
@@ -157,11 +149,8 @@ namespace VIS.Controllers
                         supplier = Util.GetValueOfString(dr["Supplier_Name"]),
                         poNo = Util.GetValueOfString(dr["PO_No"]),
                         receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
-                        statusCode = GetStatusCode(
-                            Util.GetValueOfInt(dr["Has_Mismatch"]),
-                            Util.GetValueOfInt(dr["Has_Quality_Check"]),
-                            Util.GetValueOfString(dr["Doc_Status"])
-                        ),
+                        statusCode = docStatus,
+                        statusText = GetDocStatusName(ctx, docStatus),
                         receivedBy = Util.GetValueOfString(dr["Received_By"]),
                         receivedTime = receivedTime.HasValue ? receivedTime.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : ""
                     });
@@ -273,43 +262,27 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetStatusCode(int hasMismatch, int hasQualityCheck, string docStatus)
+        /// <summary>
+        /// Resolves a receipt's document-status code (M_InOut.DocStatus) to its
+        /// human-readable name from the system's own DocStatus reference list
+        /// (AD_Reference_ID 131) - the same source MInOut.GetDocStatusName uses.
+        /// Falls back to the raw code if the list name cannot be resolved.
+        /// </summary>
+        /// <param name="ctx">Session context.</param>
+        /// <param name="docStatus">Raw DocStatus code (e.g. CO, DR, IP).</param>
+        /// <returns>The system status name, or the raw code as a fallback.</returns>
+        private string GetDocStatusName(Ctx ctx, string docStatus)
         {
-            if (hasMismatch == 1) { return "mismatch"; }
-            if (hasQualityCheck == 1) { return "quality"; }
-            if (docStatus == "DR" || docStatus == "IP" || docStatus == "IN") { return "unloading"; }
-            return "stored";
-        }
-
-        private bool HasQualityCheckColumn()
-        {
-            string sql;
-
-            if (DB.IsPostgreSQL())
-            {
-                sql = @"
-                    SELECT COUNT(1)
-                    FROM information_schema.columns
-                    WHERE UPPER(table_name)=UPPER('M_InOutLineConfirm')
-                      AND UPPER(column_name)=UPPER('VA010_QualCheckMArk')";
-            }
-            else
-            {
-                sql = @"
-                    SELECT COUNT(1)
-                    FROM USER_TAB_COLUMNS
-                    WHERE TABLE_NAME=UPPER('M_InOutLineConfirm')
-                      AND COLUMN_NAME=UPPER('VA010_QualCheckMArk')";
-            }
+            if (string.IsNullOrEmpty(docStatus)) { return ""; }
 
             try
             {
-                return Util.GetValueOfInt(DB.ExecuteScalar(sql)) > 0;
+                string name = MRefList.GetListName(ctx, 131, docStatus);
+                return string.IsNullOrEmpty(name) ? docStatus : name;
             }
             catch
             {
-                // VA010 is optional; if metadata is unavailable, keep the queue usable without that status.
-                return false;
+                return docStatus;
             }
         }
     }

@@ -1,11 +1,15 @@
 /**
  * Receipt Queue Widget (Material Receipt / GRN dashboard)
  * Purpose - 6x2 glass queue of in-progress and recent vendor GRNs:
- *           GRN #, supplier, linked PO, received quantity and plain-language
- *           receipt status. Server-paged at five rows. Row click opens a GRN
- *           detail modal with header fields and received lines.
+ *           GRN #, supplier, linked PO, received quantity and the receipt's real
+ *           document status (M_InOut.DocStatus, resolved to its system name via
+ *           the DocStatus reference list, AD_Reference 131). Server-paged at five
+ *           rows. Row click opens a GRN detail modal with header fields and lines.
  * Backend - VAS_088_ReceiptQueueWidget/GetReceiptQueue
  *           VAS_088_ReceiptQueueWidget/GetReceiptQueueLines
+ * Status  - The pill text is the system DocStatus name (Drafted, In Progress,
+ *           Completed, Closed, Reversed, Voided, ...); the pill colour is mapped
+ *           from the raw DocStatus code in getStatusClass().
  * Summary Message Table: see Labels / Message Keys below.
  *
  * Labels / Message Keys
@@ -17,11 +21,7 @@
  *  4  | PO                 | VAS_088_PO
  *  5  | Qty                | VAS_088_Qty
  *  6  | Status             | VAS_088_Status
- *  7  | Stored             | VAS_088_Stored
- *  8  | Quality check      | VAS_088_QualityCheck
- *  9  | Unloading          | VAS_088_Unloading
- * 10  | Count mismatch     | VAS_088_CountMismatch
- * 11  | Received Lines     | VAS_088_ReceivedLines
+ *  7  | Received Lines     | VAS_088_ReceivedLines
  */
 ; VAS = window.VAS || {};
 
@@ -108,31 +108,33 @@
             });
         }
 
-        function normalizeStatus(status) {
-            var s = String(status || "").toLowerCase();
-            if (s === "stored") { return "stored"; }
-            if (s === "quality" || s === "quality check") { return "quality"; }
-            if (s === "unloading") { return "unloading"; }
-            if (s === "mismatch" || s === "count mismatch") { return "mismatch"; }
-            return "stored";
-        }
-
-        function getStatusText(status) {
-            switch (normalizeStatus(status)) {
-                case "quality": return lbl("VAS_088_QualityCheck", "Quality check");
-                case "unloading": return lbl("VAS_088_Unloading", "Unloading");
-                case "mismatch": return lbl("VAS_088_CountMismatch", "Count mismatch");
-                default: return lbl("VAS_088_Stored", "Stored");
+        /* Pill colour for a row, chosen from the document's real DocStatus code. */
+        function getStatusClass(statusCode) {
+            switch (String(statusCode || "").toUpperCase()) {
+                case "CO":   // Completed
+                case "AP":   // Approved
+                    return "ok";
+                case "DR":   // Drafted
+                case "IP":   // In Progress
+                case "IN":   // In Progress
+                case "WC":   // Waiting Confirmation
+                case "WP":   // Waiting Payment
+                    return "warn";
+                case "VO":   // Voided
+                case "RE":   // Reversed
+                case "NA":   // Not Approved
+                    return "bad";
+                case "CL":   // Closed
+                    return "neutral";
+                default:
+                    return "info";
             }
         }
 
-        function getStatusClass(status) {
-            switch (normalizeStatus(status)) {
-                case "quality": return "warn";
-                case "unloading": return "info";
-                case "mismatch": return "bad";
-                default: return "ok";
-            }
+        /* Display text comes straight from the system status name (controller-resolved). */
+        function getStatusText(row) {
+            if (row && row.statusText) { return row.statusText; }
+            return row && row.statusCode ? row.statusCode : "";
         }
 
         function getLineStatus(orderedQty, receivedQty) {
@@ -268,7 +270,7 @@
                 var r = ROWS[i];
                 rowsById[r.grnId] = r;
 
-                var statusText = getStatusText(r.statusCode);
+                var statusText = getStatusText(r);
                 var statusClass = getStatusClass(r.statusCode);
 
                 $rows.append(
@@ -349,7 +351,7 @@
             var header = rowsById[grnId];
             if (!header || !$dialog) { return; }
 
-            var statusText = getStatusText(header.statusCode);
+            var statusText = getStatusText(header);
             var statusClass = getStatusClass(header.statusCode);
 
             $dialogTitle.text((header.grnNo || "") + " - " + (header.supplier || ""));

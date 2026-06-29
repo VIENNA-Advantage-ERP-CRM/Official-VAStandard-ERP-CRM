@@ -188,6 +188,11 @@
         color: #106AB0;
     }
 
+    .vas-rq-pill.neutral {
+        background: #EEF1F4;
+        color: #5F7283;
+    }
+
 .vas-rq-empty {
     padding: 1.5em 0.5em;
     text-align: center;

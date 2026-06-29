@@ -4,9 +4,9 @@
  *           and GRN label print/search flows.
  * Backend - VAS_090_ReceivingActionsWidget/GetOpenPurchaseOrders
  *           VAS_090_ReceivingActionsWidget/GetPurchaseOrderLines
- *           VAS_NewGRNWidget/CreateGRN
- *           VAS_QAHoldsWidget/GetQAHolds
- *           VAS_QAHoldsWidget/SaveQAResult
+ *           VAS_082_NewGRNWidget/CreateGRN
+ *           VAS_086_QAHoldsWidget/GetQAHolds
+ *           VAS_086_QAHoldsWidget/SaveQAResult
  *           VAS_090_ReceivingActionsWidget/SearchGRNLabels
  *           VAS_090_ReceivingActionsWidget/QueueGRNLabelPrint
  * Summary Message Table: see Labels / Message Keys below.
@@ -51,6 +51,8 @@
 
         this.frame;
         this.windowNo;
+
+        var widgetSelf = this;
 
         var $root = $('<div class="vas-ra-root">');
         var $busy;
@@ -521,7 +523,7 @@
             $dialogBody.find('.vas-ra-make-grn').prop('disabled', true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_NewGRNWidget/CreateGRN',
+                url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/CreateGRN',
                 type: 'POST',
                 cache: false,
                 data: { poId: currentPO.poId, linesJson: JSON.stringify(lines) },
@@ -567,7 +569,7 @@
         function loadQAHolds(page) {
             showDialogBusy(true);
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_QAHoldsWidget/GetQAHolds',
+                url: VIS.Application.contextUrl + 'VAS_086_QAHoldsWidget/GetQAHolds',
                 type: 'GET',
                 cache: false,
                 data: { pageNo: page, pageSize: 1 },
@@ -691,7 +693,7 @@
             $dialogBody.find('.vas-ra-save-qa').prop('disabled', true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_QAHoldsWidget/SaveQAResult',
+                url: VIS.Application.contextUrl + 'VAS_086_QAHoldsWidget/SaveQAResult',
                 type: 'POST',
                 cache: false,
                 data: {
@@ -846,12 +848,40 @@
                         '</div>'
                     );
                     $(document).trigger('vas-receiving-actions-updated');
+
+                    /* Call the print service: launch the GRN report process
+                       (DTD001_GRNReport) against this GRN's M_InOut record via
+                       VIS.APrint. When the process is not configured yet the server
+                       returns AD_Process_ID = 0 and we just leave the queued
+                       confirmation on screen. */
+                    launchGRNLabelPrint(data, grnId);
                 },
                 error: function () {
                     showDialogBusy(false);
                     notify(lbl("VAS_090_PrintFailed", "Print failed."));
                 }
             });
+        }
+
+        /* Hands the GRN report process (DTD001_GRNReport) to VIS.APrint - the same
+           launcher the standard document print uses - to generate the label PDF for
+           the selected GRN. Degrades silently when the process / engine is not
+           available so the queued confirmation still stands. */
+        function launchGRNLabelPrint(data, grnId) {
+            if (!window.VIS || typeof VIS.APrint !== "function") { return; }
+
+            var processId = Number((data && data.AD_Process_ID) || 0);
+            var tableId = Number((data && data.AD_Table_ID) || 0);
+            var recordId = Number((data && data.Record_ID) || grnId || 0);
+
+            if (processId <= 0 || tableId <= 0 || recordId <= 0) { return; }
+
+            var windowNo = widgetSelf && widgetSelf.windowNo ? widgetSelf.windowNo : 0;
+
+            /* Signature: new VIS.APrint(AD_Process_ID, AD_Table_ID, Record_ID, windowNo, null). */
+            var prin = new VIS.APrint(processId, tableId, recordId, windowNo, null);
+            try { prin.startPdf(function () { }); }
+            catch (e) { try { prin.startPdf(); } catch (e2) { /* swallow */ } }
         }
 
         this.refreshWidget = function () {

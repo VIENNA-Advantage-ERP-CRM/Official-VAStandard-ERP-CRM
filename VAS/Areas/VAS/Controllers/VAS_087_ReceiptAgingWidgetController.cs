@@ -61,25 +61,14 @@ namespace VIS.Controllers
             if (pageSize > 4) { pageSize = 4; }
 
             int offset = (pageNo - 1) * pageSize;
-            bool hasLineConfirmTable = HasTable("M_InOutLineConfirm");
-            bool hasQualityCheckColumn = hasLineConfirmTable && HasColumn("M_InOutLineConfirm", "VA010_QualCheckMArk");
-
-            string lineConfirmJoin = hasLineConfirmTable
-                ? "LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID AND LineConfirm.IsActive='Y')"
-                : "";
-            string qualityCheckSql = hasQualityCheckColumn
-                ? "MAX(CASE WHEN COALESCE(LineConfirm.VA010_QualCheckMArk, 'N')='Y' THEN 1 ELSE 0 END)"
-                : "0";
-            string differenceSql = hasLineConfirmTable
-                ? "SUM(COALESCE(LineConfirm.DifferenceQty, 0))"
-                : "0";
 
             string headerSql = @"
                 SELECT InOut.M_InOut_ID AS Receipt_Id,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Supplier,
                        COALESCE(PurchaseOrder.DocumentNo, " + NLiteral("-") + @") AS Linked_PO_No,
-                       InOut.MovementDate AS Received_On
+                       InOut.MovementDate AS Received_On,
+                       InOut.DocStatus AS Doc_Status
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN C_Order PurchaseOrder ON (PurchaseOrder.C_Order_ID=InOut.C_Order_ID AND PurchaseOrder.IsActive='Y')
@@ -113,8 +102,7 @@ namespace VIS.Controllers
                        AgingData.Total_Qty,
                        AgingData.Uom,
                        AgingData.Received_On,
-                       AgingData.Has_Quality_Check,
-                       AgingData.Difference_Qty,
+                       AgingData.Doc_Status,
                        AgingData.TotalRecords,
                        AgingData.Oldest_Received_On
                 FROM (
@@ -127,8 +115,7 @@ namespace VIS.Controllers
                            SUM(COALESCE(InOutLine.MovementQty, 0)) AS Total_Qty,
                            MIN(COALESCE(UOM.UOMSymbol, UOM.Name)) AS Uom,
                            HeaderData.Received_On,
-                           " + qualityCheckSql + @" AS Has_Quality_Check,
-                           " + differenceSql + @" AS Difference_Qty,
+                           HeaderData.Doc_Status,
                            COUNT(1) OVER () AS TotalRecords,
                            MIN(HeaderData.Received_On) OVER () AS Oldest_Received_On
                     FROM (
@@ -137,12 +124,12 @@ namespace VIS.Controllers
                     INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=HeaderData.Receipt_Id AND InOutLine.IsActive='Y' AND InOutLine.AD_Client_ID=@Line_AD_Client_ID)
                     INNER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
                     LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=InOutLine.C_UOM_ID AND UOM.IsActive='Y')
-                    " + lineConfirmJoin + @"
                     GROUP BY HeaderData.Receipt_Id,
                              HeaderData.GRN_No,
                              HeaderData.Supplier,
                              HeaderData.Linked_PO_No,
-                             HeaderData.Received_On
+                             HeaderData.Received_On,
+                             HeaderData.Doc_Status
                 ) AgingData
                 ORDER BY AgingData.Received_On ASC, AgingData.GRN_No ASC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
@@ -173,8 +160,7 @@ namespace VIS.Controllers
                         oldestReceivedOnValue = oldestReceivedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture);
                     }
 
-                    int hasQualityCheck = Util.GetValueOfInt(dr["Has_Quality_Check"]);
-                    decimal differenceQty = Util.GetValueOfDecimal(dr["Difference_Qty"]);
+                    string docStatus = Util.GetValueOfString(dr["Doc_Status"]);
 
                     rows.Add(new
                     {
@@ -187,9 +173,8 @@ namespace VIS.Controllers
                         totalQty = Util.GetValueOfDecimal(dr["Total_Qty"]),
                         uom = Util.GetValueOfString(dr["Uom"]),
                         receivedOn = receivedOn.HasValue ? receivedOn.Value.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture) : "",
-                        hasQualityCheck = hasQualityCheck,
-                        differenceQty = differenceQty,
-                        statusCode = GetStatusCode(hasQualityCheck, differenceQty)
+                        statusCode = docStatus,
+                        statusText = GetDocStatusName(ctx, docStatus)
                     });
                 }
 
@@ -236,7 +221,6 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
             bool hasLineConfirmTable = HasTable("M_InOutLineConfirm");
-            bool hasQualityCheckColumn = hasLineConfirmTable && HasColumn("M_InOutLineConfirm", "VA010_QualCheckMArk");
 
             string lineConfirmJoin = hasLineConfirmTable
                 ? "LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutLine_ID=InOutLine.M_InOutLine_ID AND LineConfirm.IsActive='Y')"
@@ -247,32 +231,13 @@ namespace VIS.Controllers
             string locatorSql = hasLineConfirmTable
                 ? "COALESCE(Locator.Value, " + NLiteral("-") + ")"
                 : NLiteral("-");
-            string statusSql = "'Unloading'";
-
-            if (hasLineConfirmTable && hasQualityCheckColumn)
-            {
-                statusSql = @"
-                    CASE
-                        WHEN COALESCE(LineConfirm.VA010_QualCheckMArk, 'N')='Y' THEN 'Quality check'
-                        WHEN COALESCE(LineConfirm.DifferenceQty, 0) <> 0 THEN 'Count mismatch'
-                        ELSE 'Unloading'
-                    END";
-            }
-            else if (hasLineConfirmTable)
-            {
-                statusSql = @"
-                    CASE
-                        WHEN COALESCE(LineConfirm.DifferenceQty, 0) <> 0 THEN 'Count mismatch'
-                        ELSE 'Unloading'
-                    END";
-            }
 
             string linesSql = @"
                 SELECT Product.Name AS Item_Name,
                        COALESCE(InOutLine.MovementQty, 0) AS Received_Qty,
                        COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom,
                        " + locatorSql + @" AS Locator_Code,
-                       " + statusSql + @" AS Line_Status
+                       InOut.DocStatus AS Doc_Status
                 FROM M_InOut InOut
                 INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=InOut.M_InOut_ID AND InOutLine.IsActive='Y')
                 INNER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
@@ -314,7 +279,7 @@ namespace VIS.Controllers
                         receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
                         uom = Util.GetValueOfString(dr["Uom"]),
                         locatorCode = Util.GetValueOfString(dr["Locator_Code"]),
-                        status = Util.GetValueOfString(dr["Line_Status"])
+                        status = GetDocStatusName(ctx, Util.GetValueOfString(dr["Doc_Status"]))
                     });
                 }
 
@@ -334,11 +299,28 @@ namespace VIS.Controllers
             }
         }
 
-        private string GetStatusCode(int hasQualityCheck, decimal differenceQty)
+        /// <summary>
+        /// Resolves a receipt's document-status code (M_InOut.DocStatus) to its
+        /// human-readable name from the system's own DocStatus reference list
+        /// (AD_Reference_ID 131) - the same source MInOut.GetDocStatusName uses.
+        /// Falls back to the raw code if the list name cannot be resolved.
+        /// </summary>
+        /// <param name="ctx">Session context.</param>
+        /// <param name="docStatus">Raw DocStatus code (e.g. CO, DR, IP).</param>
+        /// <returns>The system status name, or the raw code as a fallback.</returns>
+        private string GetDocStatusName(Ctx ctx, string docStatus)
         {
-            if (hasQualityCheck == 1) { return "quality"; }
-            if (differenceQty != decimal.Zero) { return "mismatch"; }
-            return "unloading";
+            if (string.IsNullOrEmpty(docStatus)) { return ""; }
+
+            try
+            {
+                string name = MRefList.GetListName(ctx, 131, docStatus);
+                return string.IsNullOrEmpty(name) ? docStatus : name;
+            }
+            catch
+            {
+                return docStatus;
+            }
         }
 
         private bool HasTable(string tableName)
@@ -360,42 +342,6 @@ namespace VIS.Controllers
             }
 
             SqlParameter[] parameters = { new SqlParameter("@TableName", tableName) };
-
-            try
-            {
-                return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) > 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool HasColumn(string tableName, string columnName)
-        {
-            string sql;
-            if (DB.IsPostgreSQL())
-            {
-                sql = @"
-                    SELECT COUNT(1)
-                    FROM information_schema.columns
-                    WHERE UPPER(table_name)=UPPER(@TableName)
-                      AND UPPER(column_name)=UPPER(@ColumnName)";
-            }
-            else
-            {
-                sql = @"
-                    SELECT COUNT(1)
-                    FROM USER_TAB_COLUMNS
-                    WHERE TABLE_NAME=UPPER(@TableName)
-                      AND COLUMN_NAME=UPPER(@ColumnName)";
-            }
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter("@TableName", tableName),
-                new SqlParameter("@ColumnName", columnName)
-            };
 
             try
             {

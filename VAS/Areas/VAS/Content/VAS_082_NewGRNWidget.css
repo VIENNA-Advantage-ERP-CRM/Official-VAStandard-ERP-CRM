@@ -407,15 +407,20 @@
     font-family: inherit;
     font-size: .9rem;
     text-align: right;
-    border: 1px solid #D9E1E8;
-    border-radius: 8px;
-    padding: 7px 10px;
+    border: 0;
+    border-bottom: 1px solid #D7D7D7;
+    background: transparent;
+    border-radius: 0;
+    padding: 7px 4px;
     outline: none;
+    box-shadow: none;
     color: #102C3F;
 }
 
     .vas-ngrn-rcv-in:focus {
-        border-color: #0083DA;
+        outline: none;
+        box-shadow: none;
+        border-bottom-color: #1F83FF;
     }
 
 .vas-ngrn-rcv-line.invalid {
