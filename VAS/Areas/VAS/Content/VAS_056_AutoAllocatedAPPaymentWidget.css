@@ -906,7 +906,13 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-amount,
-.VAS-056-AutoAllocatedAPPayment-td-amount {
-    text-align: right;
+.VAS-056-AutoAllocatedAPPayment-td-amount,
+.VAS-056-AutoAllocatedAPPayment-dialog-table thead th:last-child,
+.VAS-056-AutoAllocatedAPPayment-dialog-table tbody td:last-child {
+    text-align: right !important;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-summary strong {
+    text-align: left;
 }
 

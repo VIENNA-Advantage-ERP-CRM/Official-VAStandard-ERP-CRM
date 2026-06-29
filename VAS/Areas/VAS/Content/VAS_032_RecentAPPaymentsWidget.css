@@ -1131,5 +1131,5 @@
 
 .vas-allocation-summary-grid .vas-summary-item:nth-child(5) .vas-summary-value,
 .vas-allocation-summary-grid .vas-summary-item:nth-child(6) .vas-summary-value {
-    text-align: right;
+    text-align: left;
 }

@@ -802,18 +802,20 @@
 }
 
 .vas-scheduled-ap-payment-th-amount,
-.vas-scheduled-ap-payment-td-amount {
-    text-align: right;
+.vas-scheduled-ap-payment-td-amount,
+.vas-scheduled-ap-payment-dialog-table thead th:last-child,
+.vas-scheduled-ap-payment-dialog-table tbody td:last-child {
+    text-align: right !important;
 }
 
 .vas-scheduled-ap-payment-dialog-table thead th.vas-scheduled-ap-payment-th-amount,
 .vas-scheduled-ap-payment-dialog-table tbody td.vas-scheduled-ap-payment-td-amount {
-    text-align: right;
+    text-align: right !important;
 }
 
 .vas-scheduled-ap-payment-summary-total {
     display: block;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 

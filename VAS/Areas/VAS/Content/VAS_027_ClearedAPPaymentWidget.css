@@ -751,11 +751,11 @@
 
 .vas-cpa-dialog-table th:last-child,
 .vas-cpa-td-amount {
-    text-align: right;
+    text-align: right !important;
 }
 
 .vas-cpa-summary-amount {
     display: block;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }

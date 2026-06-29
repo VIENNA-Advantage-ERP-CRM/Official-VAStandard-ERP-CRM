@@ -811,15 +811,17 @@
 }
 
 .vas-ptm-th-amount,
-.vas-ptm-td-amount {
-    text-align: right;
+.vas-ptm-td-amount,
+.vas-ptm-dialog-table th:last-child,
+.vas-ptm-dialog-table td:last-child {
+    text-align: right !important;
 }
 
 .vas-ptm-summary-total,
 .vas-ptm-summary-avg,
 .vas-ptm-summary-largest {
     display: block;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 

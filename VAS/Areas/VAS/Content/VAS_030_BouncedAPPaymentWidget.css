@@ -732,7 +732,9 @@
 }
 
 .vas-bounced-ap-payment-th-amount,
-.vas-bounced-ap-payment-td-amount {
-    text-align: right;
+.vas-bounced-ap-payment-td-amount,
+.vas-bounced-ap-payment-dialog-table th:last-child,
+.vas-bounced-ap-payment-dialog-table td:last-child {
+    text-align: right !important;
 }
 
