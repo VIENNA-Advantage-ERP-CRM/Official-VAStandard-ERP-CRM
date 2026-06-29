@@ -810,3 +810,16 @@
     font-size: 0.85rem;
 }
 
+.vas-ptm-th-amount,
+.vas-ptm-td-amount {
+    text-align: right;
+}
+
+.vas-ptm-summary-total,
+.vas-ptm-summary-avg,
+.vas-ptm-summary-largest {
+    display: block;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+

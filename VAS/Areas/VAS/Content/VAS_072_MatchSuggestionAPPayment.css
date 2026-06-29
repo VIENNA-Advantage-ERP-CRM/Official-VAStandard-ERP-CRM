@@ -1375,3 +1375,13 @@
     min-width: 3.5rem;
     font-size: 0.85rem;
 }
+
+.VAS-072-MatchSuggestionAPPayment-review-pane-value,
+.VAS-072-MatchSuggestionAPPayment-review-balance strong {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-072-MatchSuggestionAPPayment-review-pane-head strong {
+    text-align: right;
+}

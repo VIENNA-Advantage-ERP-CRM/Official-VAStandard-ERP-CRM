@@ -964,3 +964,15 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
     min-width: 3.5rem;
     font-size: 0.85rem;
 }
+
+.vas-upcoming-ap-runs-invoice-side,
+.vas-upcoming-ap-runs-invoice-side strong,
+.vas-upcoming-ap-runs-invoice-side small,
+.vas-upcoming-ap-runs-amount {
+    text-align: right;
+}
+
+.vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

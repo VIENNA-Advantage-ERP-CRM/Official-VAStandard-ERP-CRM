@@ -905,3 +905,8 @@
     font-size: 0.85rem;
 }
 
+.VAS-056-AutoAllocatedAPPayment-th-amount,
+.VAS-056-AutoAllocatedAPPayment-td-amount {
+    text-align: right;
+}
+

@@ -731,3 +731,8 @@
     font-size: 0.85rem;
 }
 
+.vas-bounced-ap-payment-th-amount,
+.vas-bounced-ap-payment-td-amount {
+    text-align: right;
+}
+

@@ -748,3 +748,14 @@
     min-width: 3.5rem;
     font-size: 0.85rem;
 }
+
+.vas-cpa-dialog-table th:last-child,
+.vas-cpa-td-amount {
+    text-align: right;
+}
+
+.vas-cpa-summary-amount {
+    display: block;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}

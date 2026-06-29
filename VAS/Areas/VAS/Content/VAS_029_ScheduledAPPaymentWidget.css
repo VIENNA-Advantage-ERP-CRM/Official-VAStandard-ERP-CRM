@@ -801,3 +801,19 @@
     font-size: 0.85rem;
 }
 
+.vas-scheduled-ap-payment-th-amount,
+.vas-scheduled-ap-payment-td-amount {
+    text-align: right;
+}
+
+.vas-scheduled-ap-payment-dialog-table thead th.vas-scheduled-ap-payment-th-amount,
+.vas-scheduled-ap-payment-dialog-table tbody td.vas-scheduled-ap-payment-td-amount {
+    text-align: right;
+}
+
+.vas-scheduled-ap-payment-summary-total {
+    display: block;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+

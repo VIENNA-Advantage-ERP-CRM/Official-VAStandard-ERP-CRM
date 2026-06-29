@@ -1121,3 +1121,15 @@
     min-width: 3.5rem;
     font-size: 0.85rem;
 }
+
+.vas-recent-ap-payments-dialog-amount-field .vas-recent-ap-payments-dialog-value,
+.vas-recent-ap-payments-dialog-amount {
+    display: block;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-allocation-summary-grid .vas-summary-item:nth-child(5) .vas-summary-value,
+.vas-allocation-summary-grid .vas-summary-item:nth-child(6) .vas-summary-value {
+    text-align: right;
+}
