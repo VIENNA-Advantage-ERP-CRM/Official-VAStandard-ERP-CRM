@@ -629,3 +629,10 @@
 .VAS_054_counterparties-page-text {
     font-size: 0.85rem;
 }
+
+.VAS_054_counterparties-table .VAS_054_counterparties-col-volume,
+.VAS_054_counterparties-table .VAS_054_counterparties-cell-volume,
+.VAS_054_counterparties-table thead th:last-child,
+.VAS_054_counterparties-table tbody td:last-child {
+    text-align: right !important;
+}

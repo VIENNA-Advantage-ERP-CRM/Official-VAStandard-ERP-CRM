@@ -595,3 +595,9 @@
 .VAS_052_cashbook-page-text {
     font-size: 0.85rem;
 }
+
+.VAS_052_cashbook-table .VAS_052_cashbook-col-amount,
+.VAS_052_cashbook-table thead th:last-child,
+.VAS_052_cashbook-table tbody td:last-child {
+    text-align: right !important;
+}

@@ -826,3 +826,10 @@
     min-width: 3.5rem;
     font-size: 0.85rem;
 }
+
+.VAS-047-cash-in-dialog-table .VAS-047-cash-in-th-amount,
+.VAS-047-cash-in-dialog-table .VAS-047-cash-in-td-amount,
+.VAS-047-cash-in-dialog-table thead th:last-child,
+.VAS-047-cash-in-dialog-table tbody td:last-child {
+    text-align: right !important;
+}

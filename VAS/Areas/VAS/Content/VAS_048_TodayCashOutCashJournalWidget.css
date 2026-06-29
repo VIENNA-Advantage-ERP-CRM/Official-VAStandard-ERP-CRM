@@ -342,3 +342,10 @@
         font-size: 1.375em;
     }
 }
+
+.VAS-048-cash-out-dialog .VAS-047-cash-in-dialog-table .VAS-047-cash-in-th-amount,
+.VAS-048-cash-out-dialog .VAS-047-cash-in-dialog-table .VAS-047-cash-in-td-amount,
+.VAS-048-cash-out-dialog .VAS-047-cash-in-dialog-table thead th:last-child,
+.VAS-048-cash-out-dialog .VAS-047-cash-in-dialog-table tbody td:last-child {
+    text-align: right !important;
+}

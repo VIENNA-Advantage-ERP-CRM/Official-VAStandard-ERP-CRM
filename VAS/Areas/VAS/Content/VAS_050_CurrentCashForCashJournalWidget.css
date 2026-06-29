@@ -535,3 +535,10 @@
         font-size: 1.375em;
     }
 }
+
+.VAS-050-current-cash-table .VAS-050-current-cash-th-amount,
+.VAS-050-current-cash-table .VAS-050-current-cash-td-amount,
+.VAS-050-current-cash-table thead th:last-child,
+.VAS-050-current-cash-table tbody td:last-child {
+    text-align: right !important;
+}
