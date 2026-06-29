@@ -1017,3 +1017,17 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     pointer-events: none;
 }
+
+/* Table amount columns only */
+.VAS-glju-dialog-table .VAS-glju-amt,
+.VAS-glju-detail-lines .VAS-glju-amt,
+.VAS-glju-dialog-table th:nth-child(5),
+.VAS-glju-dialog-table th:nth-child(6),
+.VAS-glju-dialog-table td:nth-child(5),
+.VAS-glju-dialog-table td:nth-child(6),
+.VAS-glju-detail-lines th:nth-child(2),
+.VAS-glju-detail-lines th:nth-child(3),
+.VAS-glju-detail-lines td:nth-child(2),
+.VAS-glju-detail-lines td:nth-child(3) {
+    text-align: right;
+}

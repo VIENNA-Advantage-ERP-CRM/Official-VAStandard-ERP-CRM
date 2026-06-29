@@ -1019,3 +1019,12 @@ html[dir="rtl"] .VAS-gljpq-item {
     margin-top: auto;
     border-top: 1px solid #EDF2F6;
 }
+
+/* Table amount columns only */
+.VAS-gljpq-detail-lines .VAS-gljpq-detail-amt,
+.VAS-gljpq-detail-lines th:nth-child(2),
+.VAS-gljpq-detail-lines th:nth-child(3),
+.VAS-gljpq-detail-lines td:nth-child(2),
+.VAS-gljpq-detail-lines td:nth-child(3) {
+    text-align: right;
+}

@@ -1568,3 +1568,17 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     pointer-events: none;
 }
+
+/* Table amount columns only */
+.VAS-glje-dialog-table .VAS-glje-amt,
+.VAS-glje-detail-lines .VAS-glje-amt,
+.VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table th:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-detail-lines th:nth-child(2),
+.VAS-glje-detail-lines th:nth-child(3),
+.VAS-glje-detail-lines td:nth-child(2),
+.VAS-glje-detail-lines td:nth-child(3) {
+    text-align: right;
+}

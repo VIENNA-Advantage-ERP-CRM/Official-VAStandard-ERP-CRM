@@ -1164,3 +1164,15 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     pointer-events: none;
 }
+
+/* Table amount columns only */
+.VAS-gljr-table .VAS-gljr-col-num,
+.VAS-gljr-detail-lines .VAS-gljr-num,
+.VAS-gljr-detail-lines .VAS-gljr-detail-amt,
+.VAS-gljr-table th.VAS-gljr-num,
+.VAS-gljr-detail-lines th:nth-child(2),
+.VAS-gljr-detail-lines th:nth-child(3),
+.VAS-gljr-detail-lines td:nth-child(2),
+.VAS-gljr-detail-lines td:nth-child(3) {
+    text-align: right;
+}
