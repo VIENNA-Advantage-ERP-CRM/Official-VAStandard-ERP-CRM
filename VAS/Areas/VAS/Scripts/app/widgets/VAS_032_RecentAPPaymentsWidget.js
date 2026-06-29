@@ -67,6 +67,9 @@
         var pageNo = 1;
         var pageSize = 7;
         var totalPages = 0;
+        var resizeObserver = null;
+        var widgetRowHeight = 36;
+        var widgetMinimumRows = 3;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -84,6 +87,7 @@
 
         this.Initalize = function () {
             createWidget();
+            setupAdaptivePagination();
             loadData();
         };
 
@@ -103,9 +107,17 @@
             var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_032_MessageRecentPayments', 'Recent payments'));
 
             $pager = $('<div class="vas-recent-ap-payments-pager">');
-            $pagerPrev = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">‹</button>');
+            $pagerPrev = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>' +
+                '</button>');
             $pagerText = $('<span class="vas-recent-ap-payments-page-text">');
-            $pagerNext = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">›</button>');
+            $pagerNext = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>' +
+                '</button>');
 
             $pager.append($pagerPrev).append($pagerText).append($pagerNext);
 
@@ -233,6 +245,49 @@
 
             renderTable(pagePayments);
             updatePager();
+        }
+
+        function updateAdaptivePageSize() {
+            if (!$tableWrap || !$tableWrap[0]) {
+                return;
+            }
+
+            var headerHeight = $tableWrap.find('thead').outerHeight() || 34;
+            var availableHeight = Math.max(0, $tableWrap[0].clientHeight - headerHeight);
+            var nextPageSize = Math.max(widgetMinimumRows, Math.floor(availableHeight / widgetRowHeight));
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (paymentsData && paymentsData.length > 0) {
+                renderPage();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            if (!$tableWrap || !$tableWrap[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+            if (window.ResizeObserver) {
+                resizeObserver = new ResizeObserver(function () {
+                    updateAdaptivePageSize();
+                });
+
+                resizeObserver.observe($tableWrap[0]);
+            }
         }
 
         function renderTable(payments) {
@@ -1212,6 +1267,12 @@
 
         this.disposeComponent = function () {
             isDisposed = true;
+
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
             $root.remove();
             closeDialog();
             $(document).off('keydown.vas-recent-ap-payments');

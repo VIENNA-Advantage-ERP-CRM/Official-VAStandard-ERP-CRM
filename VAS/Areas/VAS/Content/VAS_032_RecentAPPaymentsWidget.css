@@ -1102,3 +1102,22 @@
     font-size: 0.8125em;
     text-align: center;
 }
+
+.vas-recent-ap-payments-footer {
+    justify-content: flex-end;
+}
+
+.vas-recent-ap-payments-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.vas-recent-ap-payments-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-recent-ap-payments-page-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}

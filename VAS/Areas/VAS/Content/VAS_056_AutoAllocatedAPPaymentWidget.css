@@ -874,3 +874,34 @@
     }
 }
 
+.VAS-056-AutoAllocatedAPPayment-dialog-footer {
+    justify-content: space-between;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-helper {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
+

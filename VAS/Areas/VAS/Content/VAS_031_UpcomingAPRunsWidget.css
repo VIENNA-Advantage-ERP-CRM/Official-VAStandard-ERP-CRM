@@ -933,3 +933,34 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
         border-radius: 0;
     }
 }
+
+.vas-upcoming-ap-runs-footer {
+    justify-content: space-between;
+}
+
+.vas-upcoming-ap-runs-showing {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.vas-upcoming-ap-runs-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.vas-upcoming-ap-runs-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-upcoming-ap-runs-page-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}

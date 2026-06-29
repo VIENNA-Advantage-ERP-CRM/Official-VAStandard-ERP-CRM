@@ -125,6 +125,9 @@
         var activeListRequest = null;
         var activeActionRequest = null;
         var activeDetailRequest = null;
+        var resizeObserver = null;
+        var widgetRowHeight = 54;
+        var widgetMinimumRows = 2;
 
         function lbl(key, fallback) {
             var text = null;
@@ -2827,6 +2830,54 @@
             );
         }
 
+        function updateAdaptivePageSize(shouldReload) {
+            if (!$rows || !$rows[0]) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                widgetMinimumRows,
+                Math.floor($rows[0].clientHeight / widgetRowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+            pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            if (shouldReload) {
+                loadData();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            if (!$rows || !$rows[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize(false);
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize(true);
+            }, 0);
+
+            if (window.ResizeObserver) {
+                resizeObserver = new ResizeObserver(function () {
+                    updateAdaptivePageSize(true);
+                });
+
+                resizeObserver.observe($rows[0]);
+            }
+        }
+
         function abortRequest(request) {
             if (
                 request &&
@@ -2848,6 +2899,7 @@
 
         this.Initalize = function () {
             createWidget();
+            setupAdaptivePagination();
             createReviewDialog();
             loadData();
         };
@@ -2889,6 +2941,11 @@
             abortRequest(
                 activeDetailRequest
             );
+
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
 
             activeListRequest = null;
             activeActionRequest = null;

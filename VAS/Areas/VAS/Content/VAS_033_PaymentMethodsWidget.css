@@ -537,3 +537,34 @@
     }
 }
 
+.vas-payment-methods-foot {
+    justify-content: space-between;
+}
+
+.vas-payment-methods-foot-text {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.vas-payment-methods-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.vas-payment-methods-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-payment-methods-page-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
+

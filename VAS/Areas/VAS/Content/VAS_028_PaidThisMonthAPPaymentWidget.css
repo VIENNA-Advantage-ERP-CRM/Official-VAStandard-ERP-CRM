@@ -779,3 +779,34 @@
     }
 }
 
+.vas-ptm-dialog-footer {
+    justify-content: space-between;
+}
+
+.vas-ptm-pager-helper {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.vas-ptm-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.vas-ptm-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-ptm-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
+

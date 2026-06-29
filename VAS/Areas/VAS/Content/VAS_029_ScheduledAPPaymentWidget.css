@@ -770,3 +770,34 @@
     }
 }
 
+.vas-scheduled-ap-payment-dialog-footer {
+    justify-content: space-between;
+}
+
+.vas-scheduled-ap-payment-pager-helper {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.vas-scheduled-ap-payment-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.vas-scheduled-ap-payment-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-scheduled-ap-payment-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
+

@@ -1344,3 +1344,34 @@
     flex: 0 0 auto;
     margin-left: 0.0625em;
 }
+
+.VAS-072-MatchSuggestionAPPayment-footer {
+    justify-content: space-between;
+}
+
+.VAS-072-MatchSuggestionAPPayment-footer-summary {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS-072-MatchSuggestionAPPayment-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}

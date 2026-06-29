@@ -42,6 +42,9 @@
         var pageNo = 1;
         var pageSize = 3;
         var totalPages = 0;
+        var resizeObserver = null;
+        var widgetRowHeight = 50;
+        var widgetMinimumRows = 2;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -50,6 +53,7 @@
 
         this.Initalize = function () {
             createWidget();
+            setupAdaptivePagination();
             loadData();
         };
 
@@ -67,9 +71,17 @@
             var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_033_MessagePaymentMethods', 'Payment methods'));
 
             $pager = $('<div class="vas-payment-methods-pager">');
-            $pagerPrev = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">‹</button>');
+            $pagerPrev = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>' +
+                '</button>');
             $pagerText = $('<span class="vas-payment-methods-page-text">');
-            $pagerNext = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">›</button>');
+            $pagerNext = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>' +
+                '</button>');
 
             $pager.append($pagerPrev).append($pagerText).append($pagerNext);
 
@@ -203,6 +215,50 @@
             }
 
             updatePager();
+        }
+
+        function updateAdaptivePageSize() {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                widgetMinimumRows,
+                Math.floor($body[0].clientHeight / widgetRowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (methodsData && methodsData.length > 0) {
+                renderPage();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+            if (window.ResizeObserver) {
+                resizeObserver = new ResizeObserver(function () {
+                    updateAdaptivePageSize();
+                });
+
+                resizeObserver.observe($body[0]);
+            }
         }
 
         function updatePager() {
@@ -387,6 +443,12 @@
 
         this.disposeComponent = function () {
             isDisposed = true;
+
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
             $root.remove();
             $card = null;
             $body = null;
