@@ -86,7 +86,7 @@
             });
             var sign = numericValue < 0 ? '-' : '';
 
-            return currencyLabel ? sign + amount + ' ' + currencyLabel : sign + amount;
+            return currencyLabel ? sign + currencyLabel + amount : sign + amount;
         }
 
         function getCurrencyLabel(currencySymbol, currencyISO) {
@@ -232,7 +232,7 @@
                 var charge = row.chargeName || '-';
                 var amountText = formatAmount(row.amount, row.stdPrecision);
                 var currencyLabel = getCurrencyLabel(row.currencySymbol, row.currencyISO);
-                var amountWithCurrency = currencyLabel ? amountText + ' ' + currencyLabel : amountText;
+                var amountWithCurrency = currencyLabel ? currencyLabel + amountText : amountText;
                 var status = row.docStatusName || row.docStatusValue || '-';
                 var description = row.description || '-';
 

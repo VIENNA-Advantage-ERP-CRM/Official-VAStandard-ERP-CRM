@@ -126,7 +126,7 @@
 
         function formatAmountWithCurrency(value, precision, currencyLabel) {
             var amount = formatAmount(value, precision);
-            return currencyLabel ? amount + ' ' + currencyLabel : amount;
+            return currencyLabel ? currencyLabel + amount : amount;
         }
 
         function getAmountParts(value, precision) {

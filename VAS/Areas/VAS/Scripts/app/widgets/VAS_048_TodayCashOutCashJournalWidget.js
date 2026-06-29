@@ -135,7 +135,7 @@
 
         function formatDialogAmountWithCurrency(value, precision, currencyLabel) {
             var amount = formatDialogAmount(value, precision);
-            return currencyLabel ? amount + ' ' + currencyLabel : amount;
+            return currencyLabel ? currencyLabel + amount : amount;
         }
 
         function formatDialogDate(value) {
