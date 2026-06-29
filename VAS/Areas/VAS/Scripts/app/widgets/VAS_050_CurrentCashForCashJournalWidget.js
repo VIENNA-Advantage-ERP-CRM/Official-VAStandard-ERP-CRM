@@ -91,7 +91,7 @@
 
         function getCurrencyLabel(currencySymbol, currencyISO) {
             var label = String(currencyISO || currencySymbol || '').trim();
-            return label.toUpperCase() === 'ID' ? 'IQD' : label;
+            return label.toUpperCase() === 'IQD' ? 'ID' : label;
         }
 
         function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {

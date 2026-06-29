@@ -27,11 +27,13 @@
         var ajaxRequest = null;
 
         var $footer = null;
+        var $body = null;
         var $pageInfo = null;
         var $pager = null;
         var $prevBtn = null;
         var $nextBtn = null;
         var $pageText = null;
+        var resizeObserver = null;
 
         var pageNo = 1;
         var pageSize = 2;
@@ -68,11 +70,16 @@
             return '';
         }
 
+        function normalizeCurrencyLabel(value) {
+            var label = firstText(value);
+            return label.toUpperCase() === 'IQD' ? 'ID' : label;
+        }
+
         function formatCurrencyAmount(value, currencySymbol, currencyISO, currencyId, precision) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
-            var symbol = firstText(currencySymbol);
-            var iso = firstText(currencyISO);
+            var symbol = normalizeCurrencyLabel(currencySymbol);
+            var iso = normalizeCurrencyLabel(currencyISO);
             var id = firstText(currencyId);
 
             var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
@@ -95,7 +102,7 @@
         function renderCurrencyAmount($target, value, currencySymbol, currencyISO, currencyId, precision) {
             var numericValue = Number(value || 0);
             var stdPrecision = getPrecision(precision);
-            var prefix = firstText(currencySymbol, currencyISO);
+            var prefix = normalizeCurrencyLabel(firstText(currencySymbol, currencyISO));
             var id = firstText(currencyId);
 
             if (!prefix && id) {
@@ -198,7 +205,7 @@
                 'text': lbl('VAS_055_Today', 'Today')
             });
 
-            var $body = $('<div>', {
+            $body = $('<div>', {
                 'class': 'VAS_055_cash-category-body',
                 'id': 'VAS_055_cash-category-body-' + widgetId
             });
@@ -330,6 +337,44 @@
             if ($pager) {
                 $pager.css('display', totalPages > 1 ? 'inline-flex' : 'none');
             }
+        }
+
+        function updateAdaptivePageSize(shouldReload) {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            var nextPageSize = Math.max(2, Math.floor($body[0].clientHeight / 72));
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (shouldReload) {
+                loadData();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            updateAdaptivePageSize(false);
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize(true);
+            }, 0);
+
+            if (!window.ResizeObserver || !$body || !$body[0]) {
+                return;
+            }
+
+            resizeObserver = new ResizeObserver(function () {
+                updateAdaptivePageSize(true);
+            });
+
+            resizeObserver.observe($body[0]);
         }
 
         function createRow(item, index, currencySymbol, currencyISO, currencyId, precisionFallback) {
@@ -488,6 +533,7 @@
 
         this.initalize = function () {
             buildLayout();
+            setupAdaptivePagination();
             loadData();
         };
 
@@ -508,7 +554,13 @@
                 $root.remove();
             }
 
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            }
+
             ajaxRequest = null;
+            resizeObserver = null;
+            $body = null;
             $root = null;
             $self = null;
         };

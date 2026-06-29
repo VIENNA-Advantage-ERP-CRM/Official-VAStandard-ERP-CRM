@@ -39,10 +39,12 @@
         var ajaxRequest = null;
 
         var $footer = null;
+        var $body = null;
         var $pageInfo = null;
         var $prevBtn = null;
         var $nextBtn = null;
         var $pageText = null;
+        var resizeObserver = null;
 
         var pageNo = 1;
         var pageSize = 2;
@@ -228,7 +230,7 @@
                 'text': lbl('VAS_054_Last30Days', 'Last 30 Days')
             });
 
-            var $body = $('<div>', {
+            $body = $('<div>', {
                 'class': 'VAS_054_counterparties-body'
             });
 
@@ -392,6 +394,46 @@
             if ($footer) {
                 $footer.css('display', totalPages > 1 ? 'flex' : 'none');
             }
+        }
+
+        function updateAdaptivePageSize(shouldReload) {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            var headerHeight = $body.find('thead').outerHeight() || 0;
+            var availableHeight = Math.max(0, $body[0].clientHeight - headerHeight);
+            var nextPageSize = Math.max(3, Math.floor(availableHeight / 48));
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (shouldReload) {
+                loadData();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            updateAdaptivePageSize(false);
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize(true);
+            }, 0);
+
+            if (!window.ResizeObserver || !$body || !$body[0]) {
+                return;
+            }
+
+            resizeObserver = new ResizeObserver(function () {
+                updateAdaptivePageSize(true);
+            });
+
+            resizeObserver.observe($body[0]);
         }
 
         function resetHorizontalScroll() {
@@ -592,6 +634,7 @@
 
         this.initalize = function () {
             buildLayout();
+            setupAdaptivePagination();
             loadData();
         };
 
@@ -612,7 +655,13 @@
                 $root.remove();
             }
 
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            }
+
             ajaxRequest = null;
+            resizeObserver = null;
+            $body = null;
             $root = null;
         };
 

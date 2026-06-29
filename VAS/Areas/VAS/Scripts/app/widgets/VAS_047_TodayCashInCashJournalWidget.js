@@ -121,7 +121,7 @@
         /* ── Amount formatter ───────────────────────────────────────── */
         function getCurrencyLabel(currencySymbol, currencyISO) {
             var label = String(currencyISO || currencySymbol || '').trim();
-            return label.toUpperCase() === 'ID' ? 'IQD' : label;
+            return label.toUpperCase() === 'IQD' ? 'ID' : label;
         }
 
         function formatAmountWithCurrency(value, precision, currencyLabel) {

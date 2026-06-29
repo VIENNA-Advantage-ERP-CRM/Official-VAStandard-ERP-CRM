@@ -598,3 +598,34 @@
     padding: 0.25em 0.5em;
     margin: -0.25em -0.5em;
 }
+
+/* Canonical dashboard widget footer pager. */
+.VAS_054_counterparties-footer {
+    justify-content: space-between;
+}
+
+.VAS_054_counterparties-footer-info {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS_054_counterparties-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS_054_counterparties-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS_054_counterparties-page-text {
+    font-size: 0.85rem;
+}

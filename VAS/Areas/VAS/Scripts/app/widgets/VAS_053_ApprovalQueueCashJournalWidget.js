@@ -36,6 +36,8 @@
         var $root = null;
         var isDisposed = false;
         var ajaxRequest = null;
+        var $list = null;
+        var resizeObserver = null;
         var pageNo = 1;
         var pageSize = 3;
         var totalPages = 0;
@@ -229,7 +231,7 @@
                 'class': 'VAS_053_approval-footer'
             });
 
-            var $body = $('<div>', {
+            $list = $('<div>', {
                 'class': 'VAS_053_approval-list',
                 'id': 'VAS_053_approval-list-' + widgetId
             });
@@ -242,7 +244,7 @@
             $titleRow.append($icon).append($title).append($meta);
             $header.append($titleRow);
             $footer.append($pager);
-            $card.append($busy).append($header).append($body).append($state).append($footer);
+            $card.append($busy).append($header).append($list).append($state).append($footer);
             $root.append($card);
 
             bindEvents();
@@ -297,6 +299,44 @@
             if ($next) {
                 $next.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
             }
+        }
+
+        function updateAdaptivePageSize(shouldReload) {
+            if (!$list || !$list[0]) {
+                return;
+            }
+
+            var nextPageSize = Math.max(3, Math.floor($list[0].clientHeight / 72));
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (shouldReload) {
+                loadData();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            updateAdaptivePageSize(false);
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize(true);
+            }, 0);
+
+            if (!window.ResizeObserver || !$list || !$list[0]) {
+                return;
+            }
+
+            resizeObserver = new ResizeObserver(function () {
+                updateAdaptivePageSize(true);
+            });
+
+            resizeObserver.observe($list[0]);
         }
 
         function setState(message) {
@@ -465,6 +505,7 @@
 
         this.initalize = function () {
             buildLayout();
+            setupAdaptivePagination();
             loadData();
         };
 
@@ -485,7 +526,13 @@
                 $root.remove();
             }
 
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            }
+
             ajaxRequest = null;
+            resizeObserver = null;
+            $list = null;
             $root = null;
             $self = null;
         };

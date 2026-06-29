@@ -564,3 +564,34 @@
     box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
     border-radius: 6px;
 }
+
+/* Canonical dashboard widget footer pager. */
+.VAS_052_cashbook-footer {
+    justify-content: space-between;
+}
+
+.VAS_052_cashbook-footer-info {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS_052_cashbook-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS_052_cashbook-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS_052_cashbook-page-text {
+    font-size: 0.85rem;
+}

@@ -810,3 +810,19 @@
         font-size: 1.375em;
     }
 }
+
+/* Canonical compact widget/dialog pager controls. */
+.VAS-047-cash-in-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS-047-cash-in-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS-047-cash-in-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}

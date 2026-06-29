@@ -44,10 +44,12 @@
         var ajaxRequest = null;
 
         var $footer = null;
+        var $body = null;
         var $pageInfo = null;
         var $prevBtn = null;
         var $nextBtn = null;
         var $pageText = null;
+        var resizeObserver = null;
 
         var pageNo = 1;
         var pageSize = 3;
@@ -412,7 +414,7 @@
                         )
                 });
 
-            var $body =
+            $body =
                 $('<div>', {
                     'class':
                         'VAS_052_cashbook-body'
@@ -735,6 +737,52 @@
                         : 'none'
                 );
             }
+        }
+
+        function updateAdaptivePageSize(shouldReload) {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            var headerHeight =
+                $body.find('thead').outerHeight() || 0;
+            var availableHeight =
+                Math.max(0, $body[0].clientHeight - headerHeight);
+            var nextPageSize =
+                Math.max(3, Math.floor(availableHeight / 42));
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (shouldReload) {
+                loadData();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            updateAdaptivePageSize(false);
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize(true);
+            }, 0);
+
+            if (!window.ResizeObserver || !$body || !$body[0]) {
+                return;
+            }
+
+            resizeObserver =
+                new ResizeObserver(function () {
+                    updateAdaptivePageSize(true);
+                });
+
+            resizeObserver.observe($body[0]);
         }
 
         function createEntryRow(
@@ -1151,6 +1199,7 @@
         this.initalize =
             function () {
                 buildLayout();
+                setupAdaptivePagination();
                 loadData();
             };
 
@@ -1176,7 +1225,12 @@
                     $root.remove();
                 }
 
+                if (resizeObserver) {
+                    resizeObserver.disconnect();
+                }
+
                 ajaxRequest = null;
+                resizeObserver = null;
                 $root = null;
                 $self = null;
             };

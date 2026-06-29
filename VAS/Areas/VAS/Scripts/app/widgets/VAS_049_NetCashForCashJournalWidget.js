@@ -38,7 +38,8 @@
         }
 
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            return currencySymbol || currencyISO || '';
+            var label = String(currencySymbol || currencyISO || '').trim();
+            return label.toUpperCase() === 'IQD' ? 'ID' : label;
         }
 
         function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {

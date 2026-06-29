@@ -559,3 +559,17 @@
     padding: 0.25em 0.5em;
     margin: -0.25em -0.5em;
 }*/
+
+/* Canonical dashboard widget footer pager. */
+.VAS_053_approval-footer {
+    justify-content: flex-end;
+}
+
+.VAS_053_approval-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS_053_approval-page-text {
+    font-size: 0.85rem;
+}
