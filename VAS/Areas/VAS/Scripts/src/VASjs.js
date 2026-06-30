@@ -110,7 +110,7 @@ import "../app/forms/VAS_CashFlowWidget.js";
 import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
-
+import "../app/tabpanel/VAS_092_OverviewPurchaseOrder.js";
 import "../app/widgets/RequestWidget.js";
 
 import "../app/widgets/VAS_027_ClearedAPPaymentWidget.js";
