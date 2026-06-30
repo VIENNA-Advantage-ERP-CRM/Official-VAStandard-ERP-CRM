@@ -81,6 +81,10 @@
 }
 
 .vas-qah-row {
+    /* Share the list height across exactly 5 rows so the 5th never gets clipped. */
+    flex: 0 0 20%;
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -90,7 +94,7 @@
     background: transparent;
     border: 0;
     border-bottom: 1px solid #EDF2F6;
-    padding: 0.55em 0.25em;
+    padding: 0.35em 0.25em;
     cursor: pointer;
 }
 
