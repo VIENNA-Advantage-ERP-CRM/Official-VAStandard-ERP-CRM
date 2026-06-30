@@ -149,7 +149,11 @@
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
 
         this.fetchData = function (recordID) {
-            showBusy(true);
+            // NOTE: no showBusy() here. The framework already paints its own
+            // vis-apanel-busy / vis_widgetloader over the tab while it loads a record;
+            // adding ours (identical markup) stacked a SECOND spinner on line load. The
+            // per-panel $busy is kept for our own dialog AJAX (lot/serno/attribute/delete)
+            // that the framework does not cover.
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetPanelData",
                 type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0 },
@@ -169,9 +173,8 @@
                     editing = null; morePopoverFor = null;
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
-                    showBusy(false);
                 },
-                error: function (err) { console.log(err); showBusy(false); }
+                error: function (err) { console.log(err); }
             });
         };
 
@@ -194,7 +197,7 @@
             vals.Description = r.Description || "";
             if (vals.Discount == null) vals.Discount = 0;
             if (vals.Notes == null) vals.Notes = "";
-            return {
+            var line = {
                 rowId: "r" + (++rowCounter), status: "saved", dirty: false, _priceOverride: false,
                 _productType: r.ProductType || "",
                 values: vals,
@@ -204,6 +207,35 @@
                     attrName: r.AttrName || "", hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName || !!r.HasAttributeSet)
                 }
             };
+            // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
+            // revert any later edits back to this. Refreshed every time a row is rebuilt
+            // from the server (initial load + mergeSavedLines after a save).
+            line._saved = snapshotLine(line);
+            return line;
+        }
+
+        /* Deep-clone the revertible parts of a line for the Undo snapshot. */
+        function snapshotLine(line) {
+            return {
+                values: $.extend(true, {}, line.values),
+                display: $.extend(true, {}, line.display),
+                _productType: line._productType,
+                _priceOverride: line._priceOverride
+            };
+        }
+
+        /* Revert a dirty saved row to its last pristine (loaded/saved) snapshot. New
+           (never-saved) rows have no snapshot - they are removed via Delete instead. */
+        function undoLine(line) {
+            if (!line || !line._saved) return;
+            if (editing && editing.rowId === line.rowId) editing = null;
+            commitMorePopover(); morePopoverFor = null;
+            line.values = $.extend(true, {}, line._saved.values);
+            line.display = $.extend(true, {}, line._saved.display);
+            line._productType = line._saved._productType;
+            line._priceOverride = line._saved._priceOverride;
+            line.dirty = false;
+            render();
         }
 
         /* Seed every C_InvoiceLine column (from the cached columnMeta) on a new
@@ -558,6 +590,13 @@
         function renderMoreCell(line) {
             var editable = parent && parent.IsEditable;
             var cell = $('<div class="vas-cil-cell vas-cil-cell--more" role="cell" style="position:relative"></div>');
+            // Undo: only on a SAVED row that currently has unsaved edits. Reverts the row
+            // to its last pristine snapshot. (New rows have no snapshot - use Delete.)
+            if (editable && line.status === "saved" && line.dirty && line._saved && !line._saving) {
+                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(lbl("VAS_074_UndoChanges", "Undo changes")) + '">' + icon("rotate-ccw", "↺") + "</button>");
+                $undo.on("click", function (e) { e.stopPropagation(); undoLine(line); });
+                cell.append($undo);
+            }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
             $btn.prop("disabled", !editable);
@@ -590,7 +629,7 @@
             dialog.html(
                 '<header class="vas-cil-dialog__header"><div class="vas-cil-dialog__header-row">' +
                 '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3></div></header>" +
-                '<div class="vas-cil-dialog__body vas-cil-more-grid" id="vasCilMoreBody"></div>' +
+                '<div class="vas-cil-dialog__body vas-cil-more-body vas-cil-more-grid" id="vasCilMoreBody"></div>' +
                 '<footer class="vas-cil-dialog__footer vas-cil-dialog__footer--end">' +
                 '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="close-more">' + esc(lbl("VAS_074_Done", "Done")) + "</button></footer>");
             backdrop.append(dialog);
@@ -600,7 +639,9 @@
 
             // Close ONLY via the Done button - not on backdrop click (so an outside
             // click, e.g. on the framework lookup popup, doesn't dismiss the modal).
-            function done() { commitMorePopover(); closeDialogs(); render(); }
+            // Return focus to the row's "..." button so Tab continues the row's chain
+            // (Tab off "..." saves the row) without the user re-grabbing the mouse.
+            function done() { commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line); }
             dialog.on("click", "[data-act=close-more]", done);
 
             // Building the curated fields is heavy (each FK builds a native Vienna
@@ -850,8 +891,19 @@
                 commitCatalogItem(line, catalog.results[+$(this).attr("data-idx")]);
             });
             catalog.$pop.on("mouseenter", ".vas-cil-catalog-popover__item", function () { setHighlight(+$(this).attr("data-idx")); });
+            // Show a loading row so the dropdown isn't an empty bordered box (which read
+            // as a stray second line under the input) before the first results arrive.
+            catalog.$pop.html('<div class="vas-cil-catalog__hint">' + esc(lbl("VAS_074_Loading", "Loading…")) + "</div>");
             inner.append(catalog.$pop);
             loadCatalogPage(inner, line, $inp, true);
+        }
+
+        /* Remove the catalog dropdown immediately (used on commit, before the row's busy
+           opacity would make a still-open popover translucent). */
+        function closeCatalog() {
+            if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
+            if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
+            catalog.results = []; catalog.loading = false;
         }
 
         function loadCatalogPage(inner, line, $inp, isReset) {
@@ -926,6 +978,10 @@
             line._priceOverride = false;
             markDirty(line);
             editing = null;
+            // Remove the dropdown NOW - the callout below marks the row busy (opacity),
+            // and a still-open popover (a child of that row) would turn translucent and
+            // bleed the row content through until the post-callout render() rebuilds it.
+            closeCatalog();
             runCallout(line, item.Kind === "C" ? "C_Charge_ID" : "M_Product_ID", function () {
                 // Warm the per-row UOM / tax lists for the new product / charge context.
                 ensureRowLookups(line);
@@ -1824,7 +1880,7 @@
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
             closeDialogs();
-            attrState = { line: line, options: [], selected: "", mode: "list", search: "", error: "", newAttr: blankAttr(), product: line.display.productName };
+            attrState = { line: line, options: [], selected: "", mode: "list", search: "", page: 0, error: "", newAttr: blankAttr(), product: line.display.productName };
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetProductAttributes",
@@ -1838,7 +1894,14 @@
                     // encrypted SELECT we supply); the "New attribute" form still uses
                     // the set definition from GetProductAttributes above.
                     attrState.options = loadExistingInstances(line);
-                    attrState.selected = (attrState.options[0] && optionKey(attrState.options[0])) || "";
+                    // Pre-select (and page to) the row matching the line's already-chosen
+                    // instance so reopening the picker shows the current value as selected
+                    // by default; fall back to the first row when nothing is set yet.
+                    var curAsi = parseInt(line.values.M_AttributeSetInstance_ID, 10) || 0;
+                    var selIdx = curAsi > 0 ? indexOfAsi(attrState.options, curAsi) : -1;
+                    if (selIdx < 0) selIdx = attrState.options.length ? 0 : -1;
+                    attrState.selected = selIdx >= 0 ? optionKey(attrState.options[selIdx]) : "";
+                    attrState.page = selIdx > 0 ? Math.floor(selIdx / ATTR_PAGE_SIZE) : 0;
                     buildAttrDialog();
                 },
                 error: function (err) { console.log(err); showBusy(false); }
@@ -1860,27 +1923,34 @@
             return out;
         }
 
-        // Stable selection identity for a list row (existing instances key on the ASI).
-        function optionKey(o) { return (o && (o.key || o.code)) || ""; }
+        // Stable selection identity for a list row - unique PER ROW (rowKey), so two
+        // rows of the same ASI (different locators) don't select together.
+        function optionKey(o) { return (o && (o.rowKey || o.key || o.code)) || ""; }
 
-        /* Loads the product's existing M_AttributeSetInstance rows through the
-           framework PAttributes/GetAttributeData endpoint. That action runs the
-           (encrypted) SELECT we supply and returns its projected columns. The SQL is
-           cross-DB safe and the product id is an int, so there is no injection
-           surface. Returns [] when the framework data context is unavailable. */
+        // First row index whose instance matches the given M_AttributeSetInstance_ID
+        // (one ASI may span several locator rows; the first is enough to highlight/page).
+        function indexOfAsi(options, asi) {
+            for (var i = 0; i < options.length; i++) {
+                if ((parseInt(options[i].M_AttributeSetInstance_ID, 10) || 0) === asi) return i;
+            }
+            return -1;
+        }
+
+        /* Loads the product's existing M_AttributeSetInstance rows through the framework
+           PAttributes/GetAttributeData endpoint - the SAME data the framework "Select
+           Existing" grid (pattributeinstance.js) shows. IMPORTANT: that endpoint builds
+           its own SELECT ... FROM (storage / locator / shelf-life joins) and appends
+           `WHERE <the string we send>`, binding @M_Product_ID - so we must pass a WHERE
+           clause (+ ORDER BY), NOT a full SELECT. The clause mirrors the framework's
+           msqlWhere. Returns [] when the framework data context is unavailable. */
         function loadExistingInstances(line) {
             var pid = parseInt(line.values.M_Product_ID, 10) || 0;
             if (pid <= 0) return [];
             try {
                 if (!(window.VIS && VIS.secureEngine && VIS.dataContext && typeof VIS.dataContext.getJSONData === "function")) return [];
-                var sql = "SELECT asi.M_AttributeSetInstance_ID, COALESCE(asi.Description, '') AS Description, "
-                    + "COALESCE(asi.Lot, '') AS Lot, COALESCE(asi.SerNo, '') AS SerNo, asi.GuaranteeDate "
-                    + "FROM M_AttributeSetInstance asi "
-                    + "INNER JOIN M_Product p ON (p.M_AttributeSet_ID = asi.M_AttributeSet_ID) "
-                    + "WHERE asi.IsActive = 'Y' AND p.M_Product_ID = " + pid + " "
-                    + "ORDER BY asi.M_AttributeSetInstance_ID DESC";
+                var where = "patr.M_Product_ID=@M_Product_ID AND patr.M_AttributeSetInstance_ID != 0 ORDER BY asi.GuaranteeDate, QtyOnHand DESC";
                 var rows = VIS.dataContext.getJSONData(VIS.Application.contextUrl + "PAttributes/GetAttributeData",
-                    { Sq1Atribute: VIS.secureEngine.encrypt(sql), Product_ID: pid }, null);
+                    { Sq1Atribute: VIS.secureEngine.encrypt(where), Product_ID: pid }, null);
                 return flattenInstances(rows);
             } catch (e) { console.log(e); return []; }
         }
@@ -1889,14 +1959,22 @@
             if (rows && rows.length) {
                 for (var i = 0; i < rows.length; i++) {
                     var r = rows[i];
+                    var qoh = +r.QtyOnHand || 0;
                     out.push({
+                        // Per-ROW identity: GetAttributeData joins M_Storage, so one ASI can
+                        // appear on several rows (one per locator) - keying selection by ASI
+                        // would light up every row of that ASI. rowKey is unique per row.
+                        rowKey: "r" + i,
                         key: "ASI:" + r.M_AttributeSetInstance_ID,
                         code: r.Lot || r.SerNo || ("#" + r.M_AttributeSetInstance_ID),
                         label: r.Description || "",
-                        spec: r.SerNo || "",
-                        priceDelta: "—",
-                        availability: "—",
-                        M_AttributeSetInstance_ID: r.M_AttributeSetInstance_ID
+                        spec: r.GuaranteeDate ? dateStr(r.GuaranteeDate) : "",   // guarantee / expiration
+                        locator: r.Value || "",                                  // l.Value (locator)
+                        availability: fmtMoney(qoh),                             // QtyOnHand
+                        qtyOnHand: qoh,
+                        M_AttributeSetInstance_ID: r.M_AttributeSetInstance_ID,
+                        M_Locator_ID: +r.M_Locator_ID || 0,
+                        lot: r.Lot || "", serno: r.SerNo || "", guaranteeDate: r.GuaranteeDate ? dateStr(r.GuaranteeDate) : ""
                     });
                 }
             }
@@ -1910,84 +1988,108 @@
                 '<header class="vas-cil-dialog__header">' +
                 '<div class="vas-cil-dialog__header-row"><h3 class="vas-cil-dialog__title" id="vasCilAttrTitle">' + esc(lbl("VAS_074_SelectAttribute", "Select attribute")) + "</h3>" +
                 '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill vas-cil-is-hidden" data-act="attr-back">' + icon("arrow-left", "←") + "<span>" + esc(lbl("VAS_074_Back", "Back")) + "</span></button>" +
-                '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-create">' + icon("plus", "+") + "<span>" + esc(lbl("VAS_074_NewAttribute", "New attribute")) + "</span></button></div>" +
+                (attrState.info && attrState.info.IsCanCreate ?
+                    '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-create">' + icon("plus", "+") + "<span>" + esc(lbl("VAS_074_NewAttribute", "New attribute")) + "</span></button>" : "") + "</div>" +
                 '<div class="vas-cil-dialog__type"><span class="vas-cil-badge vas-cil-badge--product">' + esc(lbl("VAS_074_Product", "Product")) + '</span><p class="vas-cil-dialog__primary-name">' + esc(attrState.product) + "</p></div>" +
                 '<div class="vas-cil-search-input" id="vasCilAttrSearchRow">' + icon("search", "🔍") + '<input type="text" id="vasCilAttrSearch" placeholder="' + esc(lbl("VAS_074_AttrSearch", "Search attribute values")) + '" /></div>' +
                 "</header>" +
                 '<div class="vas-cil-dialog__body vas-cil-dialog__body--fixed">' +
-                '<div id="vasCilAttrList"><div class="vas-cil-attr-grid__head"><div></div><div>' + esc(lbl("VAS_074_Code", "Code")) + "</div><div>" + esc(lbl("Description", "Description")) +
-                "</div><div>" + esc(lbl("VAS_074_Spec", "Spec")) + "</div><div>" + esc(lbl("VAS_074_DeltaPrice", "Δ Price")) + "</div><div>" + esc(lbl("VAS_074_Stock", "Stock")) + '</div></div><div class="vas-cil-attr-grid__body" id="vasCilAttrRows"></div></div>' +
+                '<div id="vasCilAttrList"' + (attrState.info && attrState.info.IsCanEdit ? ' class="vas-cil-attr-grid--editable"' : "") + '><div class="vas-cil-attr-grid__head"><div></div><div>' + esc(lbl("VAS_074_Code", "Code")) + "</div><div>" + esc(lbl("Description", "Description")) +
+                "</div><div>" + esc(lbl("GuaranteeDate", "Guarantee Date")) + "</div><div>" + esc(lbl("M_Locator_ID", "Locator")) + '</div><div class="vas-cil-attr-h-right">' + esc(lbl("QtyOnHand", "On Hand")) + "</div>" +
+                (attrState.info && attrState.info.IsCanEdit ? "<div>" + esc(lbl("VAS_074_Edit", "Edit")) + "</div>" : "") +
+                '</div><div class="vas-cil-attr-grid__body" id="vasCilAttrRows"></div></div>' +
                 '<div id="vasCilAttrCreate" class="vas-cil-is-hidden">' + attrCreateForm() + "</div>" +
                 "</div>" +
                 '<footer class="vas-cil-dialog__footer vas-cil-dialog__footer--end">' +
-                '<div id="vasCilAttrListFoot"><button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-ok">' + esc(lbl("VAS_074_OK", "OK")) + "</button></div>" +
+                '<div id="vasCilAttrListFoot">' +
+                '<div class="vas-cil-attr-pager"><button type="button" class="vas-cil-attr-pagebtn" data-act="attr-prev" aria-label="' + esc(lbl("VAS_074_Prev", "Previous")) + '">' + icon("chevron-left", "‹") + '</button>' +
+                '<span class="vas-cil-attr-pageinfo" id="vasCilAttrPageInfo"></span>' +
+                '<button type="button" class="vas-cil-attr-pagebtn" data-act="attr-next" aria-label="' + esc(lbl("VAS_074_Next", "Next")) + '">' + icon("chevron-right", "›") + "</button></div>" +
+                '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-ok">' + esc(lbl("VAS_074_OK", "OK")) + "</button></div>" +
                 '<div id="vasCilAttrCreateFoot" class="vas-cil-is-hidden"><button type="button" class="vas-cil-btn vas-cil-btn--ghost" data-act="attr-cancel">' + esc(lbl("VAS_074_Cancel", "Cancel")) +
                 '</button><button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-submit" disabled>' + esc(lbl("VAS_074_AddAttribute", "Add attribute")) + "</button></div></footer>");
             backdrop.append(dialog);
             $("body").append(backdrop);
 
-            backdrop.on("mousedown", function (e) { if (e.target === backdrop[0]) closeDialogs(); });
-            dialog.on("click", "[data-act=attr-create]", function () { attrState.mode = "create"; attrState.newAttr = blankAttr(); attrState.error = ""; renderAttr(); });
-            dialog.on("click", "[data-act=attr-back],[data-act=attr-cancel]", function () { attrState.mode = "list"; attrState.error = ""; renderAttr(); });
+            // Do NOT close on outside/backdrop click - a stray click (incl. on a framework
+            // lookup popup) must not dismiss the picker; it closes only via OK / Cancel.
+            dialog.on("click", "[data-act=attr-create]", function () { openCreateForm(null); });
+            dialog.on("click", "[data-act=attr-back],[data-act=attr-cancel]", function () { attrState.mode = "list"; attrState.editAsi = null; attrState.error = ""; renderAttr(); });
             dialog.on("click", "[data-act=attr-ok]", commitAttribute);
             dialog.on("click", "[data-act=attr-submit]", submitNewAttribute);
+            dialog.on("click", "[data-act=attr-edit]", function (e) {
+                e.stopPropagation();
+                var key = $(this).attr("data-key");
+                var o = attrState.options.filter(function (x) { return optionKey(x) === key; })[0];
+                if (o) editExistingInstance(o);
+            });
             dialog.on("click", "[data-act=attr-newlot]", createNewLot);
             dialog.on("click", "[data-act=attr-genserno]", generateSerNo);
-            dialog.find("#vasCilAttrSearch").on("input", function () { attrState.search = $(this).val(); renderAttrRows(); });
+            dialog.on("click", "[data-act=attr-prev]", function () { if (attrState.page > 0) { attrState.page--; renderAttrRows(); } });
+            dialog.on("click", "[data-act=attr-next]", function () { attrState.page++; renderAttrRows(); });
+            dialog.find("#vasCilAttrSearch").on("input", function () { attrState.search = $(this).val(); attrState.page = 0; renderAttrRows(); });
             renderAttr();
             setTimeout(function () { dialog.find("#vasCilAttrSearch").focus(); }, 0);
         }
 
         /* Dynamic create-mode form, generated from the product's M_AttributeSet
-           (mirrors the framework PAttribute form): one control per INSTANCE
-           attribute - list -> dropdown, number -> numeric, string -> text - plus
-           Lot / Serial No / Guarantee Date when the set captures them. */
+           (mirrors the framework PAttributesForm.LoadInit markup): one control per
+           INSTANCE attribute - List -> <select>, Number -> numeric, Text -> text -
+           plus Lot / Serial No / Guarantee Date when the set captures them. Every
+           control is wrapped in the framework borderless field structure
+           (`input-group vis-input-wrap` -> `vis-control-wrap` + floating <label>), so
+           it matches both the PAttributesForm controls and design.md's Form Field spec
+           (label above value, bottom-border-only, primary-blue utility actions). */
         function attrCreateForm() {
             var info = attrState.info || { Attributes: [] };
-            var html = '<div class="vas-cil-form-grid">';
+            var html = '<div class="vas-cil-attr-form vas-cil-more-grid">';
             var any = false;
             var attrs = (info.Attributes || []).filter(function (a) { return a.IsInstanceAttribute; });
             for (var i = 0; i < attrs.length; i++) {
                 var a = attrs[i];
                 any = true;
                 var id = "vasCilAttrF_" + a.M_Attribute_ID;
-                var req = a.IsMandatory ? ' <em>*</em>' : "";
                 var ctrl;
                 if (a.ValueType === "L") {
-                    ctrl = '<select class="vas-cil-field__input" id="' + id + '"><option value="">' + esc(lbl("VAS_074_SelectOption", "Select")) + "</option>";
+                    ctrl = '<select id="' + id + '" placeholder=" " data-placeholder=""><option value=""> </option>';
                     for (var v = 0; v < (a.Values || []).length; v++) {
                         var val = a.Values[v];
                         ctrl += '<option value="' + val.M_AttributeValue_ID + '">' + esc((val.Code ? val.Code + " - " : "") + val.Name) + "</option>";
                     }
                     ctrl += "</select>";
                 } else if (a.ValueType === "N") {
-                    ctrl = '<input type="text" inputmode="decimal" class="vas-cil-field__input" id="' + id + '" placeholder="0" />';
+                    ctrl = '<input type="text" inputmode="decimal" id="' + id + '" placeholder=" " data-placeholder="" />';
                 } else {
-                    ctrl = '<input type="text" class="vas-cil-field__input" id="' + id + '" />';
+                    ctrl = '<input type="text" id="' + id + '" placeholder=" " data-placeholder="" />';
                 }
-                html += '<label class="vas-cil-field"><span class="vas-cil-field__label">' + esc(a.Name) + req + "</span>" + ctrl + "</label>";
+                html += attrField(ctrl, a.Name, null, a.IsMandatory);
             }
-            if (info.IsLot) { any = true; html += attrTextFieldBtn("vasCilAttrLot", lbl("VAS_074_Lot", "Lot"), "attr-newlot", lbl("VAS_074_NewLot", "New")); }
-            if (info.IsSerNo) { any = true; html += attrTextFieldBtn("vasCilAttrSerNo", lbl("VAS_074_SerialNo", "Serial No"), "attr-genserno", lbl("VAS_074_Generate", "Generate")); }
-            if (info.IsGuaranteeDate) { any = true; html += attrDateField("vasCilAttrGuarantee", lbl("VAS_074_GuaranteeDate", "Guarantee Date")); }
+            if (info.IsLot) { any = true; html += attrField(attrTextInput("vasCilAttrLot", true), lbl("VAS_074_Lot", "Lot"), attrFieldBtn("attr-newlot", lbl("VAS_074_NewLot", "New")), false); }
+            if (info.IsSerNo) { any = true; html += attrField(attrTextInput("vasCilAttrSerNo", true), lbl("VAS_074_SerialNo", "Serial No"), attrFieldBtn("attr-genserno", lbl("VAS_074_Generate", "Generate")), false); }
+            if (info.IsGuaranteeDate) { any = true; html += attrField('<input type="date" id="vasCilAttrGuarantee" placeholder=" " data-placeholder="" />', lbl("VAS_074_GuaranteeDate", "Guarantee Date"), null, false); }
             html += "</div>";
             if (!any) html = '<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoInstanceAttr", "No instance attributes to capture")) + "</p>";
             return html + '<p class="vas-cil-form-error vas-cil-is-hidden" id="vasCilAttrCreateError"></p>';
         }
-        function attrTextField(id, label) {
-            return '<label class="vas-cil-field"><span class="vas-cil-field__label">' + esc(label) +
-                '</span><input type="text" class="vas-cil-field__input" id="' + id + '" /></label>';
+
+        /* Wrap a control (HTML string) in the framework borderless floating-label field
+           structure. `btnHtml` (optional) adds a trailing utility action via
+           .input-group-append (the control then carries data-hasbtn so vis-input-wrap
+           reserves room for it). The framework CSS renders the floating <label>; the
+           mandatory asterisk is added manually for these non-dictionary controls. */
+        function attrField(ctrlHtml, caption, btnHtml, mandatory) {
+            var cap = esc(caption) + (mandatory ? ' <em class="vas-cil-req">*</em>' : "");
+            var inner = '<div class="vis-control-wrap">' + ctrlHtml + "<label>" + cap + "</label></div>";
+            if (btnHtml) return '<div class="input-group vis-input-wrap">' + inner + '<div class="input-group-append">' + btnHtml + "</div></div>";
+            return '<div class="input-group vis-input-wrap">' + inner + "</div>";
         }
-        function attrDateField(id, label) {
-            return '<label class="vas-cil-field"><span class="vas-cil-field__label">' + esc(label) +
-                '</span><input type="date" class="vas-cil-field__input" id="' + id + '" /></label>';
+        function attrTextInput(id, hasBtn) {
+            return '<input type="text" id="' + id + '" placeholder=" " data-placeholder=""' + (hasBtn ? ' data-hasbtn=" "' : "") + " />";
         }
-        // Text field with a trailing action button (e.g. Lot + New, Serial No + Generate).
-        function attrTextFieldBtn(id, label, act, btnLabel) {
-            return '<label class="vas-cil-field"><span class="vas-cil-field__label">' + esc(label) + "</span>" +
-                '<span style="display:flex; gap:0.5em; align-items:center;">' +
-                '<input type="text" class="vas-cil-field__input" id="' + id + '" />' +
-                '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="' + act + '">' + esc(btnLabel) + "</button></span></label>";
+        // Trailing utility action button (Lot + New, Serial No + Generate) - primary-blue
+        // text action per design.md's Right Utility Icons / action-link guidance.
+        function attrFieldBtn(act, label) {
+            return '<button type="button" class="vas-cil-attr-fieldbtn" data-act="' + act + '">' + esc(label) + "</button>";
         }
 
         /* Create a new lot for the product via the framework PAttributes/CreateLot
@@ -2044,28 +2146,109 @@
             d.find("#vasCilAttrCreate").toggleClass("vas-cil-is-hidden", !isCreate);
             d.find("#vasCilAttrListFoot").toggleClass("vas-cil-is-hidden", isCreate);
             d.find("#vasCilAttrCreateFoot").toggleClass("vas-cil-is-hidden", !isCreate);
-            if (isCreate) { updateAttrError(); updateAttrSubmit(); setTimeout(function () { d.find("#vasCilAttrCreate").find("input, select").first().focus(); }, 0); }
+            if (isCreate) {
+                // Submit button reflects edit (update existing) vs add (new) mode.
+                d.find("[data-act=attr-submit]").text(attrState.editAsi ? lbl("VAS_074_UpdateAttribute", "Update attribute") : lbl("VAS_074_AddAttribute", "Add attribute"));
+                updateAttrError(); updateAttrSubmit();
+                setTimeout(function () { d.find("#vasCilAttrCreate").find("input, select").first().focus(); }, 0);
+            }
             else renderAttrRows();
         }
 
+        var ATTR_PAGE_SIZE = 20;
         function renderAttrRows() {
             var body = $("#vasCilAttrRows"); body.empty();
+            var canEdit = !!(attrState.info && attrState.info.IsCanEdit);
             var q = (attrState.search || "").trim().toLowerCase();
-            var visible = attrState.options.filter(function (o) {
+            var matched = attrState.options.filter(function (o) {
                 if (!q) return true;
-                return (o.code + " " + o.label + " " + o.spec).toLowerCase().indexOf(q) !== -1;
+                return (o.code + " " + o.label + " " + o.spec + " " + (o.locator || "")).toLowerCase().indexOf(q) !== -1;
             });
-            if (!visible.length) { body.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoMatches", "No matches")) + "</p>"); return; }
+            // Clamp the page to the available range, then take this page's 20 rows.
+            var pageCount = Math.max(1, Math.ceil(matched.length / ATTR_PAGE_SIZE));
+            if (attrState.page > pageCount - 1) attrState.page = pageCount - 1;
+            if (attrState.page < 0) attrState.page = 0;
+            var start = attrState.page * ATTR_PAGE_SIZE;
+            var visible = matched.slice(start, start + ATTR_PAGE_SIZE);
+            renderAttrPager(matched.length, pageCount, start, visible.length);
+            if (!matched.length) { body.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoMatches", "No matches")) + "</p>"); return; }
+            // Row is a div (not a <button>) so the per-row Edit button can nest legally.
             visible.forEach(function (o) {
-                var $row = $('<button type="button" class="vas-cil-attr-grid__row"></button>');
+                var $row = $('<div class="vas-cil-attr-grid__row" role="button" tabindex="0"></div>');
                 var key = optionKey(o);
                 if (key === attrState.selected) $row.addClass("is-selected");
+                var editCell = (canEdit && o.M_AttributeSetInstance_ID > 0) ?
+                    '<span class="vas-cil-attr-edit"><button type="button" class="vas-cil-attr-editbtn" data-act="attr-edit" data-key="' + esc(key) +
+                    '" title="' + esc(lbl("VAS_074_Edit", "Edit")) + '">' + icon("pencil", "✎") + "</button></span>" : (canEdit ? "<span></span>" : "");
                 $row.html('<span class="vas-cil-attr-radio">' + (key === attrState.selected ? '<span class="vas-cil-attr-radio__dot"></span>' : "") + "</span>" +
                     '<span class="vas-cil-attr-code">' + esc(o.code) + '</span><span class="vas-cil-attr-label">' + esc(o.label) + "</span>" +
-                    '<span class="vas-cil-attr-spec">' + esc(o.spec) + '</span><span class="vas-cil-attr-delta">' + esc(o.priceDelta) + "</span>" +
-                    '<span class="vas-cil-attr-avail">' + esc(o.availability) + "</span>");
-                $row.on("click", function () { attrState.selected = key; renderAttrRows(); });
+                    '<span class="vas-cil-attr-spec">' + esc(o.spec) + '</span><span class="vas-cil-attr-delta">' + esc(o.locator || "—") + "</span>" +
+                    '<span class="vas-cil-attr-avail">' + esc(o.availability) + "</span>" + editCell);
+                // Ignore clicks on the Edit button - the row's re-render would detach it
+                // before the delegated attr-edit handler runs, so let that handler take it.
+                $row.on("click", function (e) { if ($(e.target).closest("[data-act=attr-edit]").length) return; attrState.selected = key; renderAttrRows(); });
+                $row.on("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); attrState.selected = key; renderAttrRows(); } });
                 body.append($row);
+            });
+        }
+
+        /* Update the list pager: "start-end of total" + prev/next enabled state. */
+        function renderAttrPager(total, pageCount, start, shown) {
+            var info = $("#vasCilAttrPageInfo");
+            if (!info.length) return;
+            if (!total) { info.text(lbl("VAS_074_NoRecords", "No records")); }
+            else { info.text((start + 1) + "-" + (start + shown) + " " + lbl("VAS_074_Of", "of") + " " + total); }
+            $("#vasCilAttr [data-act=attr-prev]").prop("disabled", attrState.page <= 0);
+            $("#vasCilAttr [data-act=attr-next]").prop("disabled", attrState.page >= pageCount - 1);
+        }
+
+        /* Switch the dialog into create/edit mode. Rebuilds the create form fresh (so a
+           prior edit's prefilled values don't linger) and, when an existing instance is
+           passed, autofills it for editing. editAsi != null -> the submit UPDATES that
+           M_AttributeSetInstance in place; null -> creates a new one. */
+        function openCreateForm(editAsi) {
+            attrState.editAsi = editAsi || null;
+            attrState.mode = "create";
+            attrState.error = "";
+            $("#vasCilAttrCreate").html(attrCreateForm());   // fresh, empty controls
+            renderAttr();
+            if (editAsi) prefillCreateForm(editAsi);
+        }
+
+        /* Edit an existing instance in the panel's OWN create form: open it, autofill the
+           selected record's values (set-level lot/serno/guarantee from the row, plus the
+           per-attribute values fetched from GetInstanceValues), and let the user update.
+           Shown only when the role allows editing (info.IsCanEdit). */
+        function editExistingInstance(o) {
+            if (!o || o.M_AttributeSetInstance_ID <= 0) return;
+            openCreateForm(o);
+        }
+
+        /* Autofill the (already-rendered) create form from an existing instance. */
+        function prefillCreateForm(o) {
+            if (o.lot) $("#vasCilAttrLot").val(o.lot);
+            if (o.serno) $("#vasCilAttrSerNo").val(o.serno);
+            if (o.guaranteeDate) $("#vasCilAttrGuarantee").val(o.guaranteeDate);
+            var asi = parseInt(o.M_AttributeSetInstance_ID, 10) || 0;
+            if (asi <= 0) return;
+            showBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetInstanceValues",
+                type: "GET", dataType: "json", data: { M_AttributeSetInstance_ID: asi },
+                success: function (raw) {
+                    showBusy(false);
+                    if (attrState.mode !== "create" || !attrState.editAsi || attrState.editAsi.M_AttributeSetInstance_ID !== asi) return;  // moved on
+                    var vals = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    if (!vals || !vals.length) return;
+                    for (var i = 0; i < vals.length; i++) {
+                        var v = vals[i], $el = $("#vasCilAttrF_" + v.M_Attribute_ID);
+                        if (!$el.length) continue;
+                        if (v.ValueType === "L") $el.val(v.M_AttributeValue_ID > 0 ? String(v.M_AttributeValue_ID) : "");
+                        else if (v.ValueType === "N") $el.val(v.NumberValue != null ? String(v.NumberValue) : "");
+                        else $el.val(v.StringValue || "");
+                    }
+                },
+                error: function (e) { console.log(e); showBusy(false); }
             });
         }
 
@@ -2081,6 +2264,14 @@
             var sel = attrState.options.filter(function (o) { return optionKey(o) === attrState.selected; })[0];
             var line = attrState.line;
             if (!sel) { closeDialogs(); return; }
+            // Unchanged selection: the dialog pre-selects the line's current instance, so
+            // OK'ing without picking a different one must NOT re-dirty the line or re-run
+            // the callout (that would reset the attribute / price). Just close.
+            var curAsi = parseInt(line.values.M_AttributeSetInstance_ID, 10) || 0;
+            if (curAsi > 0 && (parseInt(sel.M_AttributeSetInstance_ID, 10) || 0) === curAsi) {
+                closeDialogs();
+                return;
+            }
             // Reuse an existing M_AttributeSetInstance loaded via GetAttributeData:
             // bind it straight to the line and re-run the callout - no save needed.
             if (sel.M_AttributeSetInstance_ID > 0) {
@@ -2162,7 +2353,10 @@
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveAttribute",
                 type: "POST", dataType: "json",
-                data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID, Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values }) },
+                // editAsi set -> UPDATE that instance in place; else create a new one.
+                data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID,
+                    M_AttributeSetInstance_ID: (attrState.editAsi && attrState.editAsi.M_AttributeSetInstance_ID) || 0,
+                    Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values }) },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;

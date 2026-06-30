@@ -1641,6 +1641,15 @@ namespace VASLogic.Models
             info.M_Product_ID = M_Product_ID;
             info.ProductName = product.GetName();
 
+            // Role permissions (mirrors PAttributesModel.LoadInit) - drive whether the
+            // picker offers the "New attribute" (create) and per-row "Edit" actions.
+            MRole role = MRole.GetDefault(ctx);
+            if (role != null)
+            {
+                info.IsCanCreate = role.IsCanCreateAttribute();
+                info.IsCanEdit = role.IsCanEditAttribute();
+            }
+
             // Set-level instance controls (drives Lot / Serial / Guarantee Date
             // fields in the dynamic editor, mirroring the PAttribute form).
             MAttributeSet mas = MAttributeSet.Get(ctx, M_AttributeSet_ID);
@@ -1702,99 +1711,36 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Creates (or reuses) an M_AttributeSetInstance for the given product
-        /// from the chosen list values, lot and guarantee date, mirroring the
-        /// PAttributes save path. The selected M_AttributeValue ids are written
-        /// as M_AttributeInstance rows under the new instance. Wrapped in a single
-        /// transaction so a partial save rolls back.
+        /// Returns the per-attribute values stored on an existing attribute-set instance,
+        /// typed by the attribute's value type - used to autofill the edit form.
         /// </summary>
         /// <param name="ctx">session context</param>
-        /// <param name="req">attribute save request</param>
-        /// <returns>new instance id + its description (0 / empty on failure)</returns>
-        public AttributeSaveResult SaveAttribute(Ctx ctx, AttributeSaveRequest req)
+        /// <param name="M_AttributeSetInstance_ID">instance to read</param>
+        /// <returns>one entry per M_AttributeInstance row</returns>
+        public List<AttributeInstanceValue> GetInstanceValues(Ctx ctx, int M_AttributeSetInstance_ID)
         {
-            AttributeSaveResult res = new AttributeSaveResult();
-            if (req == null || req.M_Product_ID <= 0) return res;
-
-            MProduct product = MProduct.Get(ctx, req.M_Product_ID);
-            if (product == null || product.GetM_AttributeSet_ID() <= 0) return res;
-
-            Trx trx = Trx.Get("VAS074_ASI_" + req.M_Product_ID, true);
-            try
+            List<AttributeInstanceValue> list = new List<AttributeInstanceValue>();
+            if (M_AttributeSetInstance_ID <= 0) return list;
+            string sql = @"SELECT ai.M_Attribute_ID, a.AttributeValueType,
+                                  ai.M_AttributeValue_ID, COALESCE(ai.Value, N'') AS StringValue, ai.ValueNumber
+                           FROM M_AttributeInstance ai
+                           INNER JOIN M_Attribute a ON (ai.M_Attribute_ID = a.M_Attribute_ID)
+                           WHERE ai.M_AttributeSetInstance_ID = @asi";
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@asi", M_AttributeSetInstance_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0) return list;
+            foreach (DataRow r in ds.Tables[0].Rows)
             {
-                MAttributeSetInstance asi = new MAttributeSetInstance(ctx, 0, trx);
-                asi.SetM_AttributeSet_ID(product.GetM_AttributeSet_ID());
-                // Set-level instance values (lot / serial / guarantee date).
-                if (!string.IsNullOrEmpty(req.Lot)) asi.SetLot(req.Lot, req.M_Product_ID);
-                if (!string.IsNullOrEmpty(req.SerNo)) asi.SetSerNo(req.SerNo);
-                if (!string.IsNullOrEmpty(req.GuaranteeDate))
-                {
-                    DateTime gd;
-                    if (DateTime.TryParse(req.GuaranteeDate, System.Globalization.CultureInfo.InvariantCulture,
-                        System.Globalization.DateTimeStyles.None, out gd))
-                        asi.SetGuaranteeDate(gd);
-                }
-                if (!asi.Save())
-                {
-                    trx.Rollback();
-                    log.Warning("VAS_074 SaveAttribute: M_AttributeSetInstance save failed for product " + req.M_Product_ID);
-                    return res;
-                }
-
-                // Persist each entered attribute value as an attribute instance,
-                // typed by the attribute's value type (list / number / string).
-                if (req.Values != null)
-                {
-                    foreach (AttributeValueSelection sel in req.Values)
-                    {
-                        if (sel.M_Attribute_ID <= 0) continue;
-                        string type = sel.ValueType ?? "";
-                        MAttributeInstance ai;
-                        if (type == "L")
-                        {
-                            if (sel.M_AttributeValue_ID <= 0) continue;
-                            ai = new MAttributeInstance(ctx, sel.M_Attribute_ID,
-                                asi.GetM_AttributeSetInstance_ID(), sel.M_AttributeValue_ID, sel.DisplayValue, trx);
-                        }
-                        else if (type == "N")
-                        {
-                            if (!sel.NumberValue.HasValue) continue;
-                            ai = new MAttributeInstance(ctx, sel.M_Attribute_ID,
-                                asi.GetM_AttributeSetInstance_ID(), sel.NumberValue, trx);
-                        }
-                        else
-                        {
-                            if (string.IsNullOrEmpty(sel.StringValue)) continue;
-                            ai = new MAttributeInstance(ctx, sel.M_Attribute_ID,
-                                asi.GetM_AttributeSetInstance_ID(), sel.StringValue, trx);
-                        }
-                        if (!ai.Save())
-                        {
-                            trx.Rollback();
-                            log.Warning("VAS_074 SaveAttribute: M_AttributeInstance save failed for attribute " + sel.M_Attribute_ID);
-                            return res;
-                        }
-                    }
-                }
-
-                asi.SetDescription();   // rebuilds the human-readable description
-                asi.Save();
-                trx.Commit();
-
-                res.M_AttributeSetInstance_ID = asi.GetM_AttributeSetInstance_ID();
-                res.Description = asi.GetDescription();
+                AttributeInstanceValue v = new AttributeInstanceValue();
+                v.M_Attribute_ID = Util.GetValueOfInt(r["M_Attribute_ID"]);
+                v.ValueType = Util.GetValueOfString(r["AttributeValueType"]);
+                v.M_AttributeValue_ID = Util.GetValueOfInt(r["M_AttributeValue_ID"]);
+                v.StringValue = Util.GetValueOfString(r["StringValue"]);
+                if (r["ValueNumber"] != null && r["ValueNumber"] != DBNull.Value)
+                    v.NumberValue = Util.GetValueOfDecimal(r["ValueNumber"]);
+                list.Add(v);
             }
-            catch (Exception ex)
-            {
-                trx.Rollback();
-                log.Log(Level.SEVERE, "VAS_074 SaveAttribute failed", ex);
-            }
-            finally
-            {
-                trx.Close();
-                trx = null;
-            }
-            return res;
+            return list;
         }
 
         #endregion
@@ -2243,6 +2189,8 @@ namespace VASLogic.Models
         public bool IsSerNo { get; set; }          // set captures a serial number
         public bool IsGuaranteeDate { get; set; }  // set captures a guarantee date
         public bool IsMandatory { get; set; }      // attribute set instance is mandatory
+        public bool IsCanCreate { get; set; }      // role may create attribute instances
+        public bool IsCanEdit { get; set; }        // role may edit attribute instances
         public List<AttributeDef> Attributes { get; set; }
         public AttributeSetInfo() { Attributes = new List<AttributeDef>(); }
     }
@@ -2270,6 +2218,7 @@ namespace VASLogic.Models
     public class AttributeSaveRequest
     {
         public int M_Product_ID { get; set; }
+        public int M_AttributeSetInstance_ID { get; set; }   // > 0 -> UPDATE this instance in place (edit); 0 -> create new
         public string Lot { get; set; }
         public string SerNo { get; set; }
         public string GuaranteeDate { get; set; }   // ISO yyyy-MM-dd
@@ -2287,11 +2236,22 @@ namespace VASLogic.Models
         public string DisplayValue { get; set; }     // human label for the instance
     }
 
+    /// <summary>One stored attribute value on an existing instance (for edit autofill).</summary>
+    public class AttributeInstanceValue
+    {
+        public int M_Attribute_ID { get; set; }
+        public string ValueType { get; set; }        // 'L' list, 'N' number, 'S' string
+        public int M_AttributeValue_ID { get; set; } // list selection
+        public decimal? NumberValue { get; set; }    // number attribute
+        public string StringValue { get; set; }      // string attribute
+    }
+
     /// <summary>Result of creating an attribute set instance.</summary>
     public class AttributeSaveResult
     {
         public int M_AttributeSetInstance_ID { get; set; }
         public string Description { get; set; }
+        public string Error { get; set; }   // framework mandatory / save error (empty on success)
     }
 
     /// <summary>One inbound line to insert / update.</summary>

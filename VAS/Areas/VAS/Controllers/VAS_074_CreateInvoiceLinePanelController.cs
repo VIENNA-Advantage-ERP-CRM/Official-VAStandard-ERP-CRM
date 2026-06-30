@@ -12,9 +12,11 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Web.Mvc;
+using VAdvantage.Model;
 using VAdvantage.Utility;
 using VASLogic.Models;
 using VIS.Filters;
+using VIS.Models;
 
 namespace VAS.Controllers
 {
@@ -206,6 +208,23 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
+        /// <summary>Returns an existing attribute-set instance's stored values for the edit form.</summary>
+        /// <param name="M_AttributeSetInstance_ID">instance whose values are read</param>
+        /// <returns>serialized list of typed attribute values</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetInstanceValues(int M_AttributeSetInstance_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_074_CreateInvoiceLinePanelModel model = new VAS_074_CreateInvoiceLinePanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetInstanceValues(ctx, M_AttributeSetInstance_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
         /// <summary>Looks up a product / charge by a scanned barcode.</summary>
         /// <param name="C_Invoice_ID">parent invoice (client scope)</param>
         /// <param name="code">scanned code</param>
@@ -224,9 +243,16 @@ namespace VAS.Controllers
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
-        /// <summary>Creates an M_AttributeSetInstance from the picker selection.</summary>
+        /// <summary>
+        /// Creates (or reuses) an M_AttributeSetInstance from the picker selection
+        /// by delegating to the framework's <see cref="PAttributesModel.SaveAttribute"/>
+        /// (VIS.dll) so the dedup, mandatory-validation and AttrCode/UPC behaviour
+        /// stays identical to the standard ASI control. The picker selection is
+        /// translated into the positional <c>List&lt;KeyNamePair&gt;</c> that method
+        /// expects (one entry per instance attribute, in M_AttributeSet order).
+        /// </summary>
         /// <param name="payload">serialized AttributeSaveRequest</param>
-        /// <returns>serialized new instance id + description</returns>
+        /// <returns>serialized new instance id + description (id 0 + Error on failure)</returns>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -237,10 +263,96 @@ namespace VAS.Controllers
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 AttributeSaveRequest req = JsonConvert.DeserializeObject<AttributeSaveRequest>(payload);
-                VAS_074_CreateInvoiceLinePanelModel model = new VAS_074_CreateInvoiceLinePanelModel();
-                retJSON = JsonConvert.SerializeObject(model.SaveAttribute(ctx, req));
+                AttributeSaveResult res = new AttributeSaveResult();
+
+                MProduct product = req != null && req.M_Product_ID > 0 ? MProduct.Get(ctx, req.M_Product_ID) : null;
+                if (product != null && product.GetM_AttributeSet_ID() > 0)
+                {
+                    // Build the positional value list the framework indexes by attribute
+                    // order (aset.GetMAttributes(true), i.e. instance attributes ordered
+                    // by SeqNo). Every attribute must have an entry or the framework's
+                    // unchecked editors[i] access goes out of range.
+                    MAttributeSet aset = MAttributeSet.Get(ctx, product.GetM_AttributeSet_ID());
+                    List<KeyNamePair> values = BuildAttributeValues(aset, req.Values);
+
+                    bool isEdited = req.M_AttributeSetInstance_ID > 0;
+                    AttributeInstance fres = new PAttributesModel().SaveAttribute(
+                        0, req.Lot, req.SerNo, req.GuaranteeDate, "",
+                        false, req.M_AttributeSetInstance_ID, req.M_Product_ID, 0,
+                        "", isEdited, values, ctx);
+
+                    if (fres != null)
+                    {
+                        if (string.IsNullOrEmpty(fres.Error))
+                        {
+                            res.M_AttributeSetInstance_ID = fres.M_AttributeSetInstance_ID;
+                            res.Description = fres.M_AttributeSetInstanceName;
+                        }
+                        else
+                        {
+                            res.Error = fres.Error;
+                        }
+                    }
+                }
+
+                retJSON = JsonConvert.SerializeObject(res);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Maps the picker selection onto the positional <c>List&lt;KeyNamePair&gt;</c>
+        /// expected by <see cref="PAttributesModel.SaveAttribute"/>: one entry per
+        /// instance attribute, in the same order as <c>aset.GetMAttributes(true)</c>,
+        /// typed by the attribute's own value type (list / number / string). A missing
+        /// selection yields an empty placeholder so positional indexing stays aligned
+        /// (and the framework's mandatory check still fires).
+        /// </summary>
+        private List<KeyNamePair> BuildAttributeValues(MAttributeSet aset, List<AttributeValueSelection> selections)
+        {
+            List<KeyNamePair> values = new List<KeyNamePair>();
+            if (aset == null) return values;
+
+            // Index the incoming selections by attribute for positional lookup.
+            Dictionary<int, AttributeValueSelection> byAttr = new Dictionary<int, AttributeValueSelection>();
+            if (selections != null)
+            {
+                foreach (AttributeValueSelection sel in selections)
+                {
+                    if (sel != null && sel.M_Attribute_ID > 0)
+                        byAttr[sel.M_Attribute_ID] = sel;
+                }
+            }
+
+            MAttribute[] attributes = aset.GetMAttributes(true);
+            foreach (MAttribute attr in attributes)
+            {
+                AttributeValueSelection sel;
+                byAttr.TryGetValue(attr.Get_ID(), out sel);
+
+                if (MAttribute.ATTRIBUTEVALUETYPE_List.Equals(attr.GetAttributeValueType()))
+                {
+                    // List: Key = M_AttributeValue_ID, Name = display label.
+                    int valId = sel != null ? sel.M_AttributeValue_ID : 0;
+                    string label = sel != null ? sel.DisplayValue : "";
+                    values.Add(new KeyNamePair(valId, label));
+                }
+                else if (MAttribute.ATTRIBUTEVALUETYPE_Number.Equals(attr.GetAttributeValueType()))
+                {
+                    // Number: Name = numeric string ("0" when blank avoids the
+                    // framework's Convert.ToDecimal on an empty string).
+                    string num = sel != null && sel.NumberValue.HasValue
+                        ? sel.NumberValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : "0";
+                    values.Add(new KeyNamePair(0, num));
+                }
+                else
+                {
+                    // String/text: Name = raw value.
+                    values.Add(new KeyNamePair(0, sel != null ? (sel.StringValue ?? "") : ""));
+                }
+            }
+            return values;
         }
 
         /// <summary>Inserts / updates the supplied invoice lines through MInvoiceLine.</summary>
