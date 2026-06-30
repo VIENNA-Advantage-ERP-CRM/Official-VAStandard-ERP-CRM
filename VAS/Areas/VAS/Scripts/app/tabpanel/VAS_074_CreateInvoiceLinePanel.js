@@ -259,7 +259,9 @@
                 '</h2><p class="vas-cil-panel__subtitle">' + esc(lbl("VAS_074_LinesSubtitle", "Lines, navigation, and posting totals")) + "</p></div>");
 
             var $actions = $('<div class="vas-cil-panel__actions"></div>');
-            var $scanBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="open-scan">' + icon("scan-line", "▭") +
+            // Scan hidden for now (handler/markup kept so it can be re-enabled by
+            // dropping the vas-cil-is-hidden class).
+            var $scanBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline vas-cil-is-hidden" data-action="open-scan">' + icon("scan-line", "▭") +
                 "<span>" + esc(lbl("VAS_074_Scan", "Scan")) + "</span></button>");
             $addBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="add-line">' + icon("plus", "+") +
                 "<span>" + esc(lbl("VAS_074_AddLine", "Add line")) + "</span></button>");
@@ -594,7 +596,14 @@
             // to its last pristine snapshot. (New rows have no snapshot - use Delete.)
             if (editable && line.status === "saved" && line.dirty && line._saved && !line._saving) {
                 var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(lbl("VAS_074_UndoChanges", "Undo changes")) + '">' + icon("rotate-ccw", "↺") + "</button>");
-                $undo.on("click", function (e) { e.stopPropagation(); undoLine(line); });
+                // Act on mousedown + preventDefault (like Save): a single click while a
+                // cell editor is focused would otherwise blur->commit->re-render and
+                // destroy this button before its click fired, needing a second click.
+                // preventDefault keeps the focused input from blurring; Undo discards the
+                // pending edit anyway by restoring the snapshot.
+                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoLine(line); });
+                // Keyboard activation (Enter/Space) fires click with detail 0, no mousedown.
+                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoLine(line); } });
                 cell.append($undo);
             }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
