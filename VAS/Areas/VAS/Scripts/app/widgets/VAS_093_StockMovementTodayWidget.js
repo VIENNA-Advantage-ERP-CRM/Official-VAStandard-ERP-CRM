@@ -250,19 +250,6 @@
         }
 
         function loadMovements() {
-            /* ===== TEMP FAKE DATA — testing only, remove when told (per request) ===== */
-            rows = [
-                { item_name: 'Portland Cement 50kg Bag', movement_type: 'V+', movement_qty: 500, warehouse_name: 'Main Warehouse', locator_value: 'A-01-01', movement_date: '2026-06-30 08:12:00', qty_on_hand: 5400 },
-                { item_name: 'Steel Rebar 16mm', movement_type: 'C-', movement_qty: -120, warehouse_name: 'Main Warehouse', locator_value: 'B-03-02', movement_date: '2026-06-30 09:05:00', qty_on_hand: 2380 },
-                { item_name: 'Ceramic Floor Tiles 60x60', movement_type: 'I-', movement_qty: -45, warehouse_name: 'Central Store', locator_value: 'C-02-04', movement_date: '2026-06-30 09:48:00', qty_on_hand: 8650 },
-                { item_name: 'LED Bulb 12W', movement_type: 'C+', movement_qty: 60, warehouse_name: 'Central Store', locator_value: 'C-05-01', movement_date: '2026-06-30 10:20:00', qty_on_hand: 9220 },
-                { item_name: 'Sunflower Oil 1L', movement_type: 'V+', movement_qty: 1200, warehouse_name: 'Cold Store', locator_value: 'D-01-01', movement_date: '2026-06-30 10:55:00', qty_on_hand: 14500 }
-            ];
-            setBusy(false);
-            renderRows(18);
-            return;
-            /* ===== END TEMP FAKE DATA ===== */
-
             if (request && request.readyState !== 4) { request.abort(); }
 
             setBusy(true);

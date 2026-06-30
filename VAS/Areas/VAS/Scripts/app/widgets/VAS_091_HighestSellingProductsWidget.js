@@ -125,28 +125,6 @@
         }
 
         function loadProducts() {
-            /* ===== TEMP FAKE DATA — testing only, remove when told (per request) ===== */
-            state.page = 0;
-            state.rows = [
-                { product_name: 'Portland Cement 50kg Bag', current_year_value: 845200000, current_year_units: 12450, previous_year_value: 712500000, previous_year_units: 10980 },
-                { product_name: 'Steel Rebar 16mm', current_year_value: 690400000, current_year_units: 8300, previous_year_value: 540000000, previous_year_units: 6900 },
-                { product_name: 'Ceramic Floor Tiles 60x60', current_year_value: 512750000, current_year_units: 22100, previous_year_value: 498200000, previous_year_units: 21400 },
-                { product_name: 'White Sugar 50kg', current_year_value: 430000000, current_year_units: 18600, previous_year_value: 410300000, previous_year_units: 17900 },
-                { product_name: 'Sunflower Oil 1L', current_year_value: 388900000, current_year_units: 96300, previous_year_value: 350100000, previous_year_units: 88200 },
-                { product_name: 'Bottled Water 1.5L', current_year_value: 305600000, current_year_units: 210500, previous_year_value: 280400000, previous_year_units: 190000 },
-                { product_name: 'Diesel Generator 5kVA', current_year_value: 268000000, current_year_units: 540, previous_year_value: 245000000, previous_year_units: 510 },
-                { product_name: 'PVC Pipe 4 inch', current_year_value: 196750000, current_year_units: 9800, previous_year_value: 175300000, previous_year_units: 8600 },
-                { product_name: 'Wall Paint 20L', current_year_value: 152300000, current_year_units: 7250, previous_year_value: 140900000, previous_year_units: 6800 },
-                { product_name: 'LED Bulb 12W', current_year_value: 98450000, current_year_units: 41200, previous_year_value: 88000000, previous_year_units: 36500 }
-            ];
-            currencySymbol = 'ID';
-            currencyIso = 'ID';
-            stdPrecision = 0;
-            setBusy(false);
-            render();
-            return;
-            /* ===== END TEMP FAKE DATA ===== */
-
             if (request && request.readyState !== 4) { request.abort(); }
 
             setBusy(true);

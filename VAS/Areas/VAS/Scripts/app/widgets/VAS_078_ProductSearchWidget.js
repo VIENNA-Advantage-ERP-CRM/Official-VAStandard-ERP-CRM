@@ -472,17 +472,6 @@
                     }
 
                     productDetail = parsed;
-
-                    /* ===== TEMP FAKE DATA — testing only, remove when told (per request) =====
-                       Realistic ID (Iraqi Dinar) stock value in the popup header, stable per product. */
-                    var fakeSeed = (Number(productId) || 1) % 50;
-                    productDetail.CurrencySymbol = 'ID';
-                    productDetail.CurrencyIso = 'ID';
-                    productDetail.StdPrecision = 0;
-                    productDetail.OnHandQty = 1800 + fakeSeed * 135;
-                    productDetail.StockValue = 25000000 + fakeSeed * 1750000;
-                    /* ===== END TEMP FAKE DATA ===== */
-
                     activeTab = 'overview';
                     tabPages = {};
                     renderProductDialog();
