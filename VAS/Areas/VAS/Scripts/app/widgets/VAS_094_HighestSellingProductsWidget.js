@@ -6,8 +6,8 @@
  *  1 | Highest Selling Products             | VAS_HighestSellingProduct
  *  2 | Last Year                            | VAS_017_LastYear
  *  3 | Current Year                         | VAS_CurrentYear
- *  4 | units                                | VAS_091_Units
- *  5 | No completed AR invoice sales found. | VAS_091_NoCompletedARSales
+ *  4 | units                                | VAS_094_Units
+ *  5 | No completed AR invoice sales found. | VAS_094_NoCompletedARSales
  *  6 | of                                   | VAS_Of
  *  7 | Previous                             | VAS_Previous
  *  8 | Next                                 | VAS_Next
@@ -17,7 +17,7 @@
 
 ; (function (VAS, $) {
 
-    VAS.VAS_091_HighestSellingProductsWidget = function () {
+    VAS.VAS_094_HighestSellingProductsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -79,7 +79,7 @@
             var formattedAmount = formatAmount(amount);
             var compactUnits = formatUnits(units, true);
             var fullUnits = formatUnits(units, false);
-            var unitsLabel = label('VAS_091_Units', 'units');
+            var unitsLabel = label('VAS_094_Units', 'units');
 
             $element
                 .empty()
@@ -93,7 +93,7 @@
             if (!total) {
                 $content.addClass('MPC-hsp-hidden');
                 $footer.addClass('MPC-hsp-hidden');
-                $empty.removeClass('MPC-hsp-hidden').text(label('VAS_091_NoCompletedARSales', 'No completed AR invoice sales found.'));
+                $empty.removeClass('MPC-hsp-hidden').text(label('VAS_094_NoCompletedARSales', 'No completed AR invoice sales found.'));
                 return;
             }
 
@@ -129,7 +129,7 @@
 
             setBusy(true);
             request = $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_091_HighestSellingProductsWidget/GetHighestSellingProducts',
+                url: VIS.Application.contextUrl + 'VAS_094_HighestSellingProductsWidget/GetHighestSellingProducts',
                 type: 'GET',
                 cache: false,
                 success: function (response) {
@@ -260,7 +260,7 @@
         };
     };
 
-    VAS.VAS_091_HighestSellingProductsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_094_HighestSellingProductsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
@@ -268,13 +268,13 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VAS.VAS_091_HighestSellingProductsWidget.prototype.widgetSizeChange = function () { };
+    VAS.VAS_094_HighestSellingProductsWidget.prototype.widgetSizeChange = function () { };
 
-    VAS.VAS_091_HighestSellingProductsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_094_HighestSellingProductsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_091_HighestSellingProductsWidget.prototype.dispose = function () {
+    VAS.VAS_094_HighestSellingProductsWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;

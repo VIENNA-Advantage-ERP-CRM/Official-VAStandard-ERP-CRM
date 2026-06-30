@@ -13,14 +13,14 @@ using VIS.Filters;
 namespace VAS.Controllers
 {
     /// <summary>
-    /// Module Name : VAS_091_HighestSellingProductsWidget
+    /// Module Name : VAS_094_HighestSellingProductsWidget
     /// Purpose     : Supplies accounting-year sales rankings for the Overall Inventory dashboard.
     /// Chronological development:
     ///   VAI154      2026-06-22 Created
     /// </summary>
-    public class VAS_091_HighestSellingProductsWidgetController : Controller
+    public class VAS_094_HighestSellingProductsWidgetController : Controller
     {
-        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_091_HighestSellingProductsWidgetController).FullName);
+        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_094_HighestSellingProductsWidgetController).FullName);
 
         /// <summary>
         /// Returns the ten highest-selling products for the current accounting year.
@@ -546,7 +546,7 @@ namespace VAS.Controllers
         /// <returns>Localized JSON error.</returns>
         private JsonResult ErrorResult(Ctx ctx, Exception ex)
         {
-            Log.Log(Level.SEVERE, "VAS_091_HighestSellingProductsWidget.GetHighestSellingProducts", ex);
+            Log.Log(Level.SEVERE, "VAS_094_HighestSellingProductsWidget.GetHighestSellingProducts", ex);
             string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
             return Json(json, JsonRequestBehavior.AllowGet);
         }

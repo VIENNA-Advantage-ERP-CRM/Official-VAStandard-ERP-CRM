@@ -1,29 +1,29 @@
 /*
  * Stock Movement - Today message summary
- * VAS_093_StockMovementToday       Stock Movement - Today
+ * VAS_096_StockMovementToday       Stock Movement - Today
  * Item                             Item
  * Type                             Type
  * Qty                              Qty
  * Location                         Location
- * VAS_093_Location                 Location
- * VAS_093_Receipt                  Receipt
- * VAS_093_VendorReturn             Vendor Return
- * VAS_093_CustomerReturn           Customer Return
- * VAS_093_ShipmentIssue            Shipment / Issue
- * VAS_093_MovementIn               Movement In
- * VAS_093_MovementOut              Movement Out
- * VAS_093_InventoryIncrease        Inventory Increase
- * VAS_093_InventoryDecrease        Inventory Decrease
- * VAS_093_ProductionIn             Production In
- * VAS_093_ProductionOut            Production Out
- * VAS_093_ShowingLatestMovements   Showing latest 5 movements
- * VAS_093_MovementDetail           Stock Movement Detail
+ * VAS_096_Location                 Location
+ * VAS_096_Receipt                  Receipt
+ * VAS_096_VendorReturn             Vendor Return
+ * VAS_096_CustomerReturn           Customer Return
+ * VAS_096_ShipmentIssue            Shipment / Issue
+ * VAS_096_MovementIn               Movement In
+ * VAS_096_MovementOut              Movement Out
+ * VAS_096_InventoryIncrease        Inventory Increase
+ * VAS_096_InventoryDecrease        Inventory Decrease
+ * VAS_096_ProductionIn             Production In
+ * VAS_096_ProductionOut            Production Out
+ * VAS_096_ShowingLatestMovements   Showing latest 5 movements
+ * VAS_096_MovementDetail           Stock Movement Detail
  * MovementType                     Movement Type
  * Quantity                         Quantity
  * Warehouse                        Warehouse
  * Locator                          Locator
  * MovementDate                     Movement Date
- * VAS_093_NoMovementsToday         No stock movements today.
+ * VAS_096_NoMovementsToday         No stock movements today.
  * Close                            Close
  * VAS_CouldntLoad                  Couldn't load
  */
@@ -52,7 +52,7 @@
         write();
     }
 
-    VAS.VAS_093_StockMovementTodayWidget = function () {
+    VAS.VAS_096_StockMovementTodayWidget = function () {
         var $self = this;
         var $root = $('<div class="MPC-stock-movement-root"></div>');
         var $list;
@@ -106,16 +106,16 @@
             // Receipt/Transfer -> info, outbound issues/returns -> bad,
             // builds/customer returns (inbound) -> ok, adjustments -> warn.
             var types = {
-                'V+': ['VAS_093_Receipt', 'Receipt', 'info'],
-                'V-': ['VAS_093_VendorReturn', 'Vendor Return', 'bad'],
-                'C+': ['VAS_093_CustomerReturn', 'Customer Return', 'ok'],
-                'C-': ['VAS_093_ShipmentIssue', 'Shipment / Issue', 'bad'],
-                'M+': ['VAS_093_MovementIn', 'Movement In', 'info'],
-                'M-': ['VAS_093_MovementOut', 'Movement Out', 'info'],
-                'I+': ['VAS_093_InventoryIncrease', 'Inventory Increase', 'warn'],
-                'I-': ['VAS_093_InventoryDecrease', 'Inventory Decrease', 'warn'],
-                'P+': ['VAS_093_ProductionIn', 'Production In', 'ok'],
-                'P-': ['VAS_093_ProductionOut', 'Production Out', 'ok']
+                'V+': ['VAS_096_Receipt', 'Receipt', 'info'],
+                'V-': ['VAS_096_VendorReturn', 'Vendor Return', 'bad'],
+                'C+': ['VAS_096_CustomerReturn', 'Customer Return', 'ok'],
+                'C-': ['VAS_096_ShipmentIssue', 'Shipment / Issue', 'bad'],
+                'M+': ['VAS_096_MovementIn', 'Movement In', 'info'],
+                'M-': ['VAS_096_MovementOut', 'Movement Out', 'info'],
+                'I+': ['VAS_096_InventoryIncrease', 'Inventory Increase', 'warn'],
+                'I-': ['VAS_096_InventoryDecrease', 'Inventory Decrease', 'warn'],
+                'P+': ['VAS_096_ProductionIn', 'Production In', 'ok'],
+                'P-': ['VAS_096_ProductionOut', 'Production Out', 'ok']
             };
             var type = types[code];
             return type
@@ -203,14 +203,14 @@
             if (!rows.length) {
                 $list.addClass('MPC-smt-hidden');
                 $footer.addClass('MPC-smt-hidden');
-                $empty.removeClass('MPC-smt-hidden').text(label('VAS_093_NoMovementsToday', 'No stock movements today.'));
+                $empty.removeClass('MPC-smt-hidden').text(label('VAS_096_NoMovementsToday', 'No stock movements today.'));
                 return;
             }
 
             $empty.addClass('MPC-smt-hidden');
             $list.removeClass('MPC-smt-hidden');
             $footer.toggleClass('MPC-smt-hidden', totalRecords <= 5);
-            $footer.text(label('VAS_093_ShowingLatestMovements', 'Showing latest 5 movements'));
+            $footer.text(label('VAS_096_ShowingLatestMovements', 'Showing latest 5 movements'));
 
             rows.forEach(function (row, index) {
                 var movementType = typeInfo(row.movement_type);
@@ -254,7 +254,7 @@
 
             setBusy(true);
             request = $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_093_StockMovementTodayWidget/GetStockMovements',
+                url: VIS.Application.contextUrl + 'VAS_096_StockMovementTodayWidget/GetStockMovements',
                 type: 'GET',
                 cache: false,
                 success: function (response) {
@@ -337,11 +337,11 @@
                 '</div>'
             );
 
-            $card.find('.MPC-smt-title').text(label('VAS_093_StockMovementToday', 'Stock Movement - Today'));
+            $card.find('.MPC-smt-title').text(label('VAS_096_StockMovementToday', 'Stock Movement - Today'));
             $card.find('.MPC-smt-head-item').text(label('Item', 'Item'));
             $card.find('.MPC-smt-head-type').text(label('Type', 'Type'));
             $card.find('.MPC-smt-head-quantity').text(label('Qty', 'Qty'));
-            $card.find('.MPC-smt-head-location').text(label('VAS_093_Location', 'Location'));
+            $card.find('.MPC-smt-head-location').text(label('VAS_096_Location', 'Location'));
             $list = $card.find('.MPC-smt-list');
             $empty = $card.find('.MPC-smt-empty');
             $footer = $card.find('.MPC-smt-footer');
@@ -381,7 +381,7 @@
         };
     };
 
-    VAS.VAS_093_StockMovementTodayWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_096_StockMovementTodayWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
@@ -389,13 +389,13 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VAS.VAS_093_StockMovementTodayWidget.prototype.widgetSizeChange = function () { };
+    VAS.VAS_096_StockMovementTodayWidget.prototype.widgetSizeChange = function () { };
 
-    VAS.VAS_093_StockMovementTodayWidget.prototype.refreshWidget = function () {
+    VAS.VAS_096_StockMovementTodayWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_093_StockMovementTodayWidget.prototype.dispose = function () {
+    VAS.VAS_096_StockMovementTodayWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;

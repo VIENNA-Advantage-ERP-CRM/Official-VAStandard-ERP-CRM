@@ -296,9 +296,9 @@
     <Compile Include="Areas\VAS\Controllers\VAS_078_ProductSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_079_TopValueItemsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_080_WarehouseStockWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_091_HighestSellingProductsWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_092_QuickOperationsWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_093_StockMovementTodayWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_094_HighestSellingProductsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_095_QuickOperationsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_096_StockMovementTodayWidgetController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_032_RecentAPPaymentsWidget.js" />
@@ -400,9 +400,9 @@
     <Content Include="Areas\VAS\Content\VAS_078_ProductSearchWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_079_TopValueItemsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_080_WarehouseStockWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_091_HighestSellingProductsWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_092_QuickOperationsWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_093_StockMovementTodayWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_094_HighestSellingProductsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_095_QuickOperationsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_096_StockMovementTodayWidget.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
@@ -429,13 +429,11 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingTransferWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ScheduleDetail.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingDeliveryWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvoiceSummary.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_LowestPrMonthlySalesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedDeliveryWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PrMonthlySalesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_HighestSellProduct.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvGrandTotalWidget.js" />
@@ -525,9 +523,9 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_078_ProductSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_079_TopValueItemsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_080_WarehouseStockWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_091_HighestSellingProductsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_092_QuickOperationsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_093_StockMovementTodayWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_094_HighestSellingProductsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_095_QuickOperationsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_096_StockMovementTodayWidget.js" />
 
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />

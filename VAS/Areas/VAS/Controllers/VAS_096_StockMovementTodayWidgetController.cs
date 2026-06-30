@@ -14,14 +14,14 @@ using VIS.Filters;
 namespace VAS.Controllers
 {
     /// <summary>
-    /// Module Name : VAS_093_StockMovementTodayWidget
+    /// Module Name : VAS_096_StockMovementTodayWidget
     /// Purpose     : Supplies today's latest stock movements for the Overall Inventory dashboard.
     /// Chronological development:
     ///   VAI154      2026-06-23 Created
     /// </summary>
-    public class VAS_093_StockMovementTodayWidgetController : Controller
+    public class VAS_096_StockMovementTodayWidgetController : Controller
     {
-        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_093_StockMovementTodayWidgetController).FullName);
+        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_096_StockMovementTodayWidgetController).FullName);
 
         /// <summary>Returns the five latest active, non-reversed stock movements from today.</summary>
         [AjaxAuthorizeAttribute]
@@ -38,7 +38,7 @@ namespace VAS.Controllers
             }
             catch (Exception ex)
             {
-                Log.Log(Level.SEVERE, "VAS_093_StockMovementTodayWidget.GetStockMovements", ex);
+                Log.Log(Level.SEVERE, "VAS_096_StockMovementTodayWidget.GetStockMovements", ex);
                 string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
                 return Json(json, JsonRequestBehavior.AllowGet);
             }

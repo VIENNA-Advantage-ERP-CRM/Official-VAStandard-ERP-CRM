@@ -11,14 +11,14 @@ using VIS.Filters;
 namespace VAS.Controllers
 {
     /// <summary>
-    /// Module Name : VAS_092_QuickOperationsWidget
+    /// Module Name : VAS_095_QuickOperationsWidget
     /// Purpose     : Resolves the existing inventory forms used by Quick Operations.
     /// Chronological development:
     ///   VAI154      2026-06-23 Created
     /// </summary>
-    public class VAS_092_QuickOperationsWidgetController : Controller
+    public class VAS_095_QuickOperationsWidgetController : Controller
     {
-        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_092_QuickOperationsWidgetController).FullName);
+        private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_095_QuickOperationsWidgetController).FullName);
 
         private const string StockManagementFormName = "VA011_WarehouseForm";
         private const string MaterialIssueFormName = "DTD001_MaterialIssueForm";
@@ -45,7 +45,7 @@ namespace VAS.Controllers
             }
             catch (Exception ex)
             {
-                Log.Log(Level.SEVERE, "VAS_092_QuickOperationsWidget.GetFormIds", ex);
+                Log.Log(Level.SEVERE, "VAS_095_QuickOperationsWidget.GetFormIds", ex);
                 string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
                 return Json(json, JsonRequestBehavior.AllowGet);
             }

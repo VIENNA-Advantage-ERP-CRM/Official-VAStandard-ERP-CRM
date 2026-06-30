@@ -4,18 +4,18 @@
  * Summary Message Table
  *  # | Current Text                              | Message Key
  * ---+-------------------------------------------+---------------------------------------
- *  1 | Quick Operations                          | VAS_092_QuickOperations
- *  2 | Stock Management Form                     | VAS_092_StockManagementForm
- *  3 | Add, move, or block stock                 | VAS_092_AddMoveOrBlockStock
- *  4 | Material Issue Form                       | VAS_092_MaterialIssueForm
- *  5 | Issue stock to work order or cost centre  | VAS_092_IssueStockToWorkOrder
- *  6 | Unable to open the form.                  | VAS_092_CouldntOpenForm
+ *  1 | Quick Operations                          | VAS_095_QuickOperations
+ *  2 | Stock Management Form                     | VAS_095_StockManagementForm
+ *  3 | Add, move, or block stock                 | VAS_095_AddMoveOrBlockStock
+ *  4 | Material Issue Form                       | VAS_095_MaterialIssueForm
+ *  5 | Issue stock to work order or cost centre  | VAS_095_IssueStockToWorkOrder
+ *  6 | Unable to open the form.                  | VAS_095_CouldntOpenForm
  */
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
 
-    VAS.VAS_092_QuickOperationsWidget = function () {
+    VAS.VAS_095_QuickOperationsWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -34,10 +34,10 @@
 
         function showOpenError() {
             VIS.ADialog.error(
-                'VAS_092_CouldntOpenForm',
+                'VAS_095_CouldntOpenForm',
                 true,
                 '',
-                label('VAS_092_CouldntOpenForm', 'Unable to open the form.')
+                label('VAS_095_CouldntOpenForm', 'Unable to open the form.')
             );
         }
 
@@ -77,7 +77,7 @@
             setLoading(true);
 
             request = $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_092_QuickOperationsWidget/GetFormIds',
+                url: VIS.Application.contextUrl + 'VAS_095_QuickOperationsWidget/GetFormIds',
                 type: 'GET',
                 cache: false,
                 success: function (response) {
@@ -100,10 +100,10 @@
         }
 
         this.Initalize = function () {
-            var stockTitle = label('VAS_092_StockManagementForm', 'Stock Management Form');
-            var stockDescription = label('VAS_092_AddMoveOrBlockStock', 'Add, move, or block stock');
-            var issueTitle = label('VAS_092_MaterialIssueForm', 'Material Issue Form');
-            var issueDescription = label('VAS_092_IssueStockToWorkOrder', 'Issue stock to work order or cost centre');
+            var stockTitle = label('VAS_095_StockManagementForm', 'Stock Management Form');
+            var stockDescription = label('VAS_095_AddMoveOrBlockStock', 'Add, move, or block stock');
+            var issueTitle = label('VAS_095_MaterialIssueForm', 'Material Issue Form');
+            var issueDescription = label('VAS_095_IssueStockToWorkOrder', 'Issue stock to work order or cost centre');
             var $card = $(
                 '<div class="MPC-quick-operations-card">' +
                     '<div class="MPC-quick-operations-header">' +
@@ -140,7 +140,7 @@
                 '</div>'
             );
 
-            $card.find('.MPC-quick-operations-title').text(label('VAS_092_QuickOperations', 'Quick Operations'));
+            $card.find('.MPC-quick-operations-title').text(label('VAS_095_QuickOperations', 'Quick Operations'));
             $card.find('.MPC-quick-operations-stock-title').text(stockTitle);
             $card.find('.MPC-quick-operations-stock-description').text(stockDescription);
             $card.find('.MPC-quick-operations-issue-title').text(issueTitle);
@@ -174,7 +174,7 @@
         };
     };
 
-    VAS.VAS_092_QuickOperationsWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_095_QuickOperationsWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.windowNo = windowNo;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
@@ -182,13 +182,13 @@
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VAS.VAS_092_QuickOperationsWidget.prototype.widgetSizeChange = function () { };
+    VAS.VAS_095_QuickOperationsWidget.prototype.widgetSizeChange = function () { };
 
-    VAS.VAS_092_QuickOperationsWidget.prototype.refreshWidget = function () {
+    VAS.VAS_095_QuickOperationsWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_092_QuickOperationsWidget.prototype.dispose = function () {
+    VAS.VAS_095_QuickOperationsWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
