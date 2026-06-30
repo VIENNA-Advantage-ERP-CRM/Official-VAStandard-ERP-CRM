@@ -261,6 +261,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_068_APPaymentSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_069_CashJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_092_OverviewPurchaseOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
@@ -294,9 +295,11 @@
     <Compile Include="Areas\VAS\Controllers\VPaySelectController.cs" />
     <Compile Include="Areas\VAS\Controllers\VTrxMaterialController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_092_OverviewPurchaseOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
     <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
