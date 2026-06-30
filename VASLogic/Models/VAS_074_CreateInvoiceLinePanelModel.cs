@@ -229,12 +229,17 @@ namespace VASLogic.Models
                                   COALESCE(f.IsReadOnly, 'N')     AS IsReadOnly,
                                   COALESCE(f.DisplayLogic, N'')   AS DisplayLogic,
                                   COALESCE(f.SeqNo, 0)            AS SeqNo,
+                                  COALESCE(f.AD_Image_ID, 0)      AS AD_Image_ID,
+                                  COALESCE(img.FontName, N'')     AS FontName,
+                                  COALESCE(img.ImageExtension, N'') AS ImageExtension,
                                   t.SeqNo                         AS TabSeqNo
                            FROM AD_Field f
                            INNER JOIN AD_Tab t ON (f.AD_Tab_ID = t.AD_Tab_ID)
                            INNER JOIN AD_Column c ON (f.AD_Column_ID = c.AD_Column_ID)
                            LEFT JOIN AD_Val_Rule vr ON (c.AD_Val_Rule_ID = vr.AD_Val_Rule_ID
                                 AND vr.IsActive = 'Y')
+                           LEFT JOIN AD_Image img ON (img.AD_Image_ID = f.AD_Image_ID
+                                AND img.IsActive = 'Y')
                            WHERE f.AD_Tab_ID IN (" + inList + @")
                              AND f.IsActive = 'Y'
                              AND c.IsActive = 'Y'
@@ -324,8 +329,38 @@ namespace VASLogic.Models
                 m.IsReadOnly = Util.GetValueOfString(r["IsReadOnly"]) == "Y";
                 m.SeqNo = Util.GetValueOfInt(r["SeqNo"]);
                 m.DisplayLogic = Util.GetValueOfString(r["DisplayLogic"]);
+                // AD_Field image (window-driven). Only the field query selects these
+                // columns; the all-columns merge (fromField == false) does not.
+                // FontName (icon font) takes FIRST priority - when set, the bitmap thumbnail
+                // is not resolved (the client renders the font glyph instead).
+                m.AD_Image_ID = Util.GetValueOfInt(r["AD_Image_ID"]);
+                m.IconFont = Util.GetValueOfString(r["FontName"]);
+                if (string.IsNullOrEmpty(m.IconFont))
+                    m.ImageUrl = FieldImageUrl(m.AD_Image_ID, Util.GetValueOfString(r["ImageExtension"]));
             }
             return m;
+        }
+
+        /// <summary>
+        /// Resolves an AD_Field's AD_Image_ID to a servable thumbnail URL, using the same
+        /// convention as VASAttachUserToBP / VAS_TimeSheetInvoice
+        /// (Images/Thumb46x46/&lt;id&gt;&lt;ext&gt;). Returns "" when the id is unset or the
+        /// thumbnail file is missing, so the client can simply skip rendering an image.
+        /// </summary>
+        /// <param name="adImageId">AD_Field.AD_Image_ID</param>
+        /// <param name="imageExtension">AD_Image.ImageExtension (e.g. ".png")</param>
+        /// <returns>relative image URL or ""</returns>
+        private string FieldImageUrl(int adImageId, string imageExtension)
+        {
+            if (adImageId <= 0 || string.IsNullOrEmpty(imageExtension)) return "";
+            try
+            {
+                string file = GlobalVariable.ImagePath + "\\Thumb46x46\\" + adImageId + imageExtension;
+                if (System.IO.File.Exists(file))
+                    return "Images/Thumb46x46/" + adImageId + imageExtension;
+            }
+            catch { /* path/IO issue -> no image */ }
+            return "";
         }
 
         /// <summary>
@@ -2016,6 +2051,9 @@ namespace VASLogic.Models
         public string DisplayLogic { get; set; }     // AD_Field.DisplayLogic (dynamic show/hide expr)
         public int AD_Reference_Value_ID { get; set; } // List/Table reference value (AD_Ref_List / AD_Ref_Table)
         public string Name { get; set; }             // field caption (AD_Field.Name / AD_Column.Name)
+        public int AD_Image_ID { get; set; }         // AD_Field.AD_Image_ID (window-driven field image)
+        public string IconFont { get; set; }         // AD_Image.FontName (icon-font class) - takes priority over ImageUrl
+        public string ImageUrl { get; set; }         // resolved Thumb46x46 URL ("" when none / file missing / a font is set)
         public List<RefListItem> RefListValues { get; set; }   // inline values for a List (ref 17) field
         public ColumnMeta() { RefListValues = new List<RefListItem>(); }
     }

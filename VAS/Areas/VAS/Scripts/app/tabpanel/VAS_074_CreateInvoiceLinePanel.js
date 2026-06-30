@@ -1463,6 +1463,33 @@
                 $field = $('<div class="input-group vis-input-wrap"></div>')
                     .append($('<div class="vis-control-wrap"></div>').append($c).append($('<label></label>').text(caption)));
             }
+            // Prepend the AD_Field image using the framework's NATIVE icon-prepend structure
+            // (input-group-prepend > input-group-text > i/img) INSIDE the .vis-input-wrap,
+            // before .vis-control-wrap - so it sits in the same bordered flex row as the
+            // framework's own field icons and is styled by the global .input-group-text CSS.
+            // FIRST priority is the AD_Image FontName (icon-font class, e.g. "vis vis-xxx");
+            // only when no font is set do we fall back to the bitmap thumbnail (ImageUrl).
+            // data-col stays on $field (the direct child) so the modal reconcile logic is
+            // unaffected. A broken image removes just its prepend box.
+            // Always render a leading icon for alignment: AD_Image FontName first, then the
+            // bitmap thumbnail, else the default "fa fa-file-text". A bitmap that fails to
+            // load falls back to the default icon (keeps every field's left edge aligned).
+            // EXCEPTION: YesNo (checkbox) fields - they carry their own vis-ec-col-lblchkbox
+            // label and have no input-group/underline, so an icon prepend doesn't fit.
+            if (kind !== "yesno") {
+                var $prep = $('<div class="input-group-prepend"><span class="input-group-text"></span></div>');
+                var $cell = $prep.find(".input-group-text");
+                if (m.IconFont) {
+                    $cell.append($('<i aria-hidden="true"></i>').attr("class", m.IconFont));
+                } else if (m.ImageUrl) {
+                    var base = (window.VIS && VIS.Application && VIS.Application.contextUrl) || "";
+                    $cell.append($('<img alt="" />').attr("src", base + m.ImageUrl)
+                        .on("error", function () { $cell.empty().append('<i aria-hidden="true" class="fa fa-file-text"></i>'); }));
+                } else {
+                    $cell.append('<i aria-hidden="true" class="fa fa-file-text"></i>');
+                }
+                $field.prepend($prep);
+            }
             return $field.attr("data-col", m.ColumnName);
         }
 
@@ -1570,7 +1597,7 @@
                 // Lookup controls (VComboBox + VTextBoxButton/search) expose a trailing
                 // button via getBtn(0) (the ellipsis / zoom); wrap in .input-group with
                 // .input-group-append so the framework CSS lays it out.
-                if (typeof ctrl.getBtn === "function") {
+                /*if (typeof ctrl.getBtn === "function") {
                     var btn0 = null;
                     try { btn0 = ctrl.getBtn(0); } catch (eb) { btn0 = null; }
                     var $bw = btn0 ? $('<div class="input-group-append"></div>').append(btn0) : null;
@@ -1578,7 +1605,7 @@
                         $c.attr("data-hasbtn", " ");
                         return $('<div class="input-group vis-input-wrap"></div>').append($cw).append($bw);
                     }
-                }
+                }*/
                 // Non-lookup control: same framework container so vis-input-wrap styles it.
                 return $('<div class="input-group vis-input-wrap"></div>').append($cw);
             } catch (e) { if (window.console) console.log("VAS_074 vienna wrap error " + col, e); return null; }
