@@ -17,7 +17,7 @@
  *  6 | Unable to load product detail.                | VAS_ProductDetailLoadError
  *  7 | Showing latest 5 records.                     | VAS_ShowingLatest5Records
  *  8 | No records found for this product.            | VAS_NoProductRecords
- *  9 | On Hand                                       | VAS_OnHand
+ *  9 | On Hand Qty                                   | VAS_OnHandQty
  * 10 | Stock Value                                   | VAS_StockValue
  * 11 | Reorder Point                                 | VAS_ReorderPoint
  * 12 | Overview                                      | VAS_Overview
@@ -232,8 +232,23 @@
         }
 
         function createSuggestionList() {
+            // The dropdown lives on <body> so the dashboard cell's overflow/stacking
+            // cannot clip it or paint sibling widgets above it; it is positioned as a
+            // fixed popover anchored to the search pill (matching the pill's width).
             $suggest = $('<div class="MPC-product-search-suggest" id="MPC-product-search-suggestions-' + escapeHtml($self.windowNo || '') + '" role="listbox">');
-            $root.find('.MPC-product-search-input-wrap').append($suggest);
+            $('body').append($suggest);
+        }
+
+        function positionSuggest() {
+            if (!$suggest) { return; }
+            var pill = $root.find('.MPC-product-search-pill')[0];
+            if (!pill) { return; }
+            var rect = pill.getBoundingClientRect();
+            $suggest.css({
+                left: Math.round(rect.left) + 'px',
+                top: Math.round(rect.bottom + 6) + 'px',
+                width: Math.round(rect.width) + 'px'
+            });
         }
 
         function createDialog() {
@@ -297,6 +312,9 @@
             });
 
             $(window).on('scroll' + eventNamespace, closeSuggestions);
+            $(window).on('resize' + eventNamespace, function () {
+                if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
+            });
 
             $dashboardScroll = $root.closest('.vis-widget-container, [data-dashboard-container]');
             if ($dashboardScroll.length) {
@@ -369,7 +387,6 @@
                 );
                 var metadata = [
                     product.ProductCode,
-                    product.SKU,
                     productTypeLabel(product.ProductType),
                     product.CategoryName
                 ].filter(function (value) { return value; }).join(' \u00b7 ');
@@ -385,6 +402,7 @@
             }).join('');
 
             $suggest.html(html).addClass('is-open');
+            positionSuggest();
             $input.attr('aria-expanded', 'true');
         }
 
@@ -392,6 +410,7 @@
             suggestions = [];
             suggestionIndex = -1;
             $suggest.html('<div class="MPC-product-search-suggest-state">' + escapeHtml(message) + '</div>').addClass('is-open');
+            positionSuggest();
             $input.attr('aria-expanded', 'true');
         }
 
@@ -453,6 +472,17 @@
                     }
 
                     productDetail = parsed;
+
+                    /* ===== TEMP FAKE DATA — testing only, remove when told (per request) =====
+                       Realistic ID (Iraqi Dinar) stock value in the popup header, stable per product. */
+                    var fakeSeed = (Number(productId) || 1) % 50;
+                    productDetail.CurrencySymbol = 'ID';
+                    productDetail.CurrencyIso = 'ID';
+                    productDetail.StdPrecision = 0;
+                    productDetail.OnHandQty = 1800 + fakeSeed * 135;
+                    productDetail.StockValue = 25000000 + fakeSeed * 1750000;
+                    /* ===== END TEMP FAKE DATA ===== */
+
                     activeTab = 'overview';
                     tabPages = {};
                     renderProductDialog();
@@ -500,7 +530,7 @@
                     '<div class="MPC-product-search-chips">' + chips + '</div>' +
                 '</div>' +
                 '<div class="MPC-product-search-stats">' +
-                    statTile(label('VAS_OnHand', 'On Hand'), formatCompactQty(productDetail.OnHandQty), '') +
+                    statTile(label('VAS_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '') +
                     statTile(label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), '') +
                     statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning') +
                     statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : '') +
@@ -561,13 +591,12 @@
             var fields = [
                 [label('VAS_ProductCode', 'Product Code'), overview.ProductCode],
                 [label('Name', 'Name'), overview.ProductName],
-                [label('SKU', 'SKU'), overview.SKU],
                 [label('UPC', 'UPC'), overview.UPC],
                 [label('VAS_ProductType', 'Type'), productTypeLabel(overview.ProductType)],
-                [label('VAS_ProductCategory', 'Category'), overview.CategoryName],
+                [label('VAS_ProductCategory', 'Product Category'), overview.CategoryName],
                 [label('VAS_UnitOfMeasure', 'Unit of Measure'), overview.UomName],
                 [label('VAS_PreferredSupplier', 'Preferred Supplier'), productDetail.PreferredSupplier],
-                [label('VAS_OnHand', 'On Hand'), formatQty(productDetail.OnHandQty), true],
+                [label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true],
                 [label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true],
                 [label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)],
                 [label('Status', 'Status'), productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive')]
@@ -593,7 +622,7 @@
             });
 
             return renderTable(
-                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('Qty', 'Qty'), label('Value', 'Value')],
+                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
                 rows,
                 [2, 3],
                 'stock'
@@ -607,7 +636,7 @@
                 label('DatePromised', 'Promised'),
                 label('VAS_OrderedQty', 'Ordered Qty'),
                 label('VAS_DeliveredQty', 'Delivered Qty'),
-                label('Value', 'Value'),
+                label('Amount', 'Amount'),
                 label('Status', 'Status')
             ];
 
