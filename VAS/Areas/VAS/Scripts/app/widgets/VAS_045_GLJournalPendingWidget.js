@@ -72,7 +72,6 @@
         var $detailBody = null;
         var $detailBusy = null;
 
-        var $approveButton = null;
         var $postButton = null;
         var $detailCloseButton = null;
 
@@ -1313,19 +1312,6 @@
 
                     '<button type="button" ' +
 
-                    'class="VAS-gljpq-dialog-secondary VAS-gljpq-action-approve">' +
-
-                    esc(
-                        lbl(
-                            "VAS_045_Approve",
-                            "Approve"
-                        )
-                    ) +
-
-                    "</button>" +
-
-                    '<button type="button" ' +
-
                     'class="VAS-gljpq-dialog-primary VAS-gljpq-action-post">' +
 
                     esc(
@@ -1370,11 +1356,6 @@
                     ".VAS-gljpq-dialog-busy"
                 );
 
-            $approveButton =
-                $detailDialog.find(
-                    ".VAS-gljpq-action-approve"
-                );
-
             $postButton =
                 $detailDialog.find(
                     ".VAS-gljpq-action-post"
@@ -1388,16 +1369,6 @@
             showDetailBusy(false);
 
             updateActionButtons();
-
-            $approveButton.on(
-                "click.VAS045Approve",
-                function () {
-                    executeJournalAction(
-                        "ApproveJournal",
-                        "approve"
-                    );
-                }
-            );
 
             $postButton.on(
                 "click.VAS045Post",
@@ -2560,15 +2531,6 @@
                     ""
                 ).toUpperCase();
 
-            var canApprove =
-                detailLoaded &&
-                !selectedJournalPosted &&
-                (
-                    status === "DR" ||
-                    status === "IP" ||
-                    status === "NA"
-                );
-
             var canPost =
                 detailLoaded &&
                 !selectedJournalPosted &&
@@ -2577,17 +2539,6 @@
                     status === "CO" ||
                     status === "CL"
                 );
-
-            if ($approveButton) {
-                $approveButton
-                    .toggle(canApprove)
-                    .prop(
-                        "disabled",
-                        journalActionInProgress ||
-                        !canApprove ||
-                        selectedJournalId <= 0
-                    );
-            }
 
             if ($postButton) {
                 $postButton
@@ -2777,21 +2728,6 @@
             actionType
         ) {
             showDetailBusy(busy);
-
-            if ($approveButton) {
-                $approveButton.text(
-                    busy &&
-                        actionType === "approve"
-                        ? lbl(
-                            "VAS_045_Approving",
-                            "Approving..."
-                        )
-                        : lbl(
-                            "VAS_045_Approve",
-                            "Approve"
-                        )
-                );
-            }
 
             if ($postButton) {
                 $postButton.text(
@@ -3034,9 +2970,6 @@
                     null;
 
                 $detailBusy =
-                    null;
-
-                $approveButton =
                     null;
 
                 $postButton =

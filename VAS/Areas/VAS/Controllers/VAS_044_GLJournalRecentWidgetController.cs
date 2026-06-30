@@ -2416,17 +2416,7 @@ AND AD_Tab.AD_Process_ID > 0
 AND AD_Tab.IsActive = 'Y'
 AND AD_Process.IsActive = 'Y'
 AND AD_Process.IsReport = 'Y'
-AND AD_Process.AD_ReportView_ID IS NOT NULL
-AND EXISTS
-(
-    SELECT
-        1
-    FROM AD_PrintFormat AD_PrintFormat
-    WHERE AD_PrintFormat.AD_ReportView_ID =
-        AD_Process.AD_ReportView_ID
-    AND AD_PrintFormat.AD_Table_ID = @AD_Table_ID
-    AND AD_PrintFormat.IsActive = 'Y'
-)
+
 ORDER BY
     AD_Tab.SeqNo",
                             windowParameters,
@@ -2472,17 +2462,7 @@ AND AD_Tab.IsActive = 'Y'
 AND AD_Window.IsActive = 'Y'
 AND AD_Process.IsActive = 'Y'
 AND AD_Process.IsReport = 'Y'
-AND AD_Process.AD_ReportView_ID IS NOT NULL
-AND EXISTS
-(
-    SELECT
-        1
-    FROM AD_PrintFormat AD_PrintFormat
-    WHERE AD_PrintFormat.AD_ReportView_ID =
-        AD_Process.AD_ReportView_ID
-    AND AD_PrintFormat.AD_Table_ID = @AD_Table_ID
-    AND AD_PrintFormat.IsActive = 'Y'
-)
+
 ORDER BY
     CASE
         WHEN AD_Window.Name = 'VAS_GLJournal' THEN 0
