@@ -164,6 +164,7 @@
     <Compile Include="Areas\VAS\Controllers\AutoAllocatedController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_AttributeControlController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
     <Compile Include="Areas\VAS\Controllers\CalloutOrderController.cs" />
@@ -456,6 +457,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\ExpectedThisWeekWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\util\CurrencyFormat.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />

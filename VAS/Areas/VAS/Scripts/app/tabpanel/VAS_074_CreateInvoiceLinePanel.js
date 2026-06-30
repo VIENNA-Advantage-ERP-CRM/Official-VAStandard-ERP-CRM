@@ -1913,34 +1913,29 @@
         }
 
         /* ---------- attribute picker dialog ---------- */
+        // Attribute picker: now delegated to the shared, reusable VIS.AttributeControl
+        // (Scripts/app/util/AttributeControl.js). We pass this panel's helpers so the look
+        // and behaviour are unchanged, and apply the chosen instance to the line in onApply.
+        // (The control handles the pre-select + unchanged-OK no-op internally.)
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
             closeDialogs();
-            attrState = { line: line, options: [], selected: "", mode: "list", search: "", page: 0, error: "", newAttr: blankAttr(), product: line.display.productName };
-            showBusy(true);
-            $.ajax({
-                url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetProductAttributes",
-                type: "GET", dataType: "json", data: { M_Product_ID: line.values.M_Product_ID },
-                success: function (raw) {
-                    showBusy(false);
-                    var info = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    attrState.info = info || { Attributes: [] };
-                    // List the product's EXISTING attribute-set instances through the
-                    // framework PAttributes/GetAttributeData endpoint (it runs the
-                    // encrypted SELECT we supply); the "New attribute" form still uses
-                    // the set definition from GetProductAttributes above.
-                    attrState.options = loadExistingInstances(line);
-                    // Pre-select (and page to) the row matching the line's already-chosen
-                    // instance so reopening the picker shows the current value as selected
-                    // by default; fall back to the first row when nothing is set yet.
-                    var curAsi = parseInt(line.values.M_AttributeSetInstance_ID, 10) || 0;
-                    var selIdx = curAsi > 0 ? indexOfAsi(attrState.options, curAsi) : -1;
-                    if (selIdx < 0) selIdx = attrState.options.length ? 0 : -1;
-                    attrState.selected = selIdx >= 0 ? optionKey(attrState.options[selIdx]) : "";
-                    attrState.page = selIdx > 0 ? Math.floor(selIdx / ATTR_PAGE_SIZE) : 0;
-                    buildAttrDialog();
-                },
-                error: function (err) { console.log(err); showBusy(false); }
+            VIS.AttributeControl.open({
+                M_Product_ID: line.values.M_Product_ID,
+                M_AttributeSetInstance_ID: line.values.M_AttributeSetInstance_ID,
+                productName: line.display.productName,
+                lbl: lbl, esc: esc, icon: icon,
+                showBusy: showBusy, showToast: showToast,
+                dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
+                onApply: function (res) {
+                    var asi = (res && res.M_AttributeSetInstance_ID) || 0;
+                    line.values.M_AttributeSetInstance_ID = asi;
+                    line.display.attrName = (res && res.description) || "";
+                    markDirty(line);
+                    editing = { rowId: line.rowId, field: "description" };
+                    if (asi > 0) runCallout(line, "M_AttributeSetInstance_ID");
+                    else render();
+                }
             });
         }
         function blankAttr() { return { code: "", label: "", spec: "", priceDelta: "", availability: "", M_Attribute_ID: 0, M_AttributeValue_ID: 0 }; }
