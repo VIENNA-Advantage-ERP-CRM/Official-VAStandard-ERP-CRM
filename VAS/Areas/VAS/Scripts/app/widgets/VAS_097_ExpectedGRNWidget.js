@@ -7,9 +7,9 @@
  *           opens the shared GRN line-entry modal (Item | PO Qty | Received
  *           editable input, defaulting to open qty) whose "Select & Make GRN"
  *           button creates and completes the receipt.
- * Backend - VAS_092_ExpectedGRNWidget/GetExpectedPurchaseOrders
- *           VAS_092_ExpectedGRNWidget/GetPurchaseOrderLines
- *           VAS_092_ExpectedGRNWidget/CreateGRN
+ * Backend - VAS_097_ExpectedGRNWidget/GetExpectedPurchaseOrders
+ *           VAS_097_ExpectedGRNWidget/GetPurchaseOrderLines
+ *           VAS_097_ExpectedGRNWidget/CreateGRN
  * Summary Message Table: see Labels / Message Keys below.
  *
  * Labels / Message Keys
@@ -54,7 +54,7 @@
         write();
     }
 
-    VAS.VAS_092_ExpectedGRNWidget = function () {
+    VAS.VAS_097_ExpectedGRNWidget = function () {
 
         this.frame;
         this.windowNo;
@@ -208,7 +208,7 @@
             if ($nextBtn) { $nextBtn.prop("disabled", true); }
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_092_ExpectedGRNWidget/GetExpectedPurchaseOrders',
+                url: VIS.Application.contextUrl + 'VAS_097_ExpectedGRNWidget/GetExpectedPurchaseOrders',
                 type: 'GET',
                 cache: false,
                 data: { pageNo: page, pageSize: pageSize },
@@ -368,7 +368,7 @@
             showDialogBusy(true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_092_ExpectedGRNWidget/GetPurchaseOrderLines',
+                url: VIS.Application.contextUrl + 'VAS_097_ExpectedGRNWidget/GetPurchaseOrderLines',
                 type: 'GET',
                 cache: false,
                 data: { poId: po.poId },
@@ -509,7 +509,7 @@
             showDialogBusy(true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_092_ExpectedGRNWidget/CreateGRN',
+                url: VIS.Application.contextUrl + 'VAS_097_ExpectedGRNWidget/CreateGRN',
                 type: 'POST',
                 data: {
                     poId: currentPO.poId,
@@ -560,15 +560,15 @@
         };
     };
 
-    VAS.VAS_092_ExpectedGRNWidget.prototype.widgetFirevalueChanged = function (value) {
+    VAS.VAS_097_ExpectedGRNWidget.prototype.widgetFirevalueChanged = function (value) {
         if (this.listener) { this.listener.widgetFirevalueChanged(value); }
     };
 
-    VAS.VAS_092_ExpectedGRNWidget.prototype.addChangeListener = function (listener) {
+    VAS.VAS_097_ExpectedGRNWidget.prototype.addChangeListener = function (listener) {
         this.listener = listener;
     };
 
-    VAS.VAS_092_ExpectedGRNWidget.prototype.init = function (windowNo, frame) {
+    VAS.VAS_097_ExpectedGRNWidget.prototype.init = function (windowNo, frame) {
         this.frame = frame;
         this.widgetInfo = frame.widgetInfo;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
@@ -582,15 +582,15 @@
         }, 50);
     };
 
-    VAS.VAS_092_ExpectedGRNWidget.prototype.widgetSizeChange = function (widget) {
+    VAS.VAS_097_ExpectedGRNWidget.prototype.widgetSizeChange = function (widget) {
         this.widgetInfo = widget;
     };
 
-    VAS.VAS_092_ExpectedGRNWidget.prototype.refreshWidget = function () {
+    VAS.VAS_097_ExpectedGRNWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    VAS.VAS_092_ExpectedGRNWidget.prototype.dispose = function () {
+    VAS.VAS_097_ExpectedGRNWidget.prototype.dispose = function () {
         this.disposeComponent();
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;

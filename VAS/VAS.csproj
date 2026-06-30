@@ -239,7 +239,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_089_ReceiptsMTDWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_090_ReceivingActionsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_091_MaterialReceiptSearchWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_092_ExpectedGRNWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_097_ExpectedGRNWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_031_UpcomingAPRunsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\ReceiptsController.cs" />
     <Compile Include="Areas\VAS\Controllers\TotalAmountReceivedThisMonthController.cs" />
@@ -340,7 +340,7 @@
     <Content Include="Areas\VAS\Content\PaidthismonthWidget.css" />
     <Content Include="Areas\VAS\Content\PaymentRule.css" />
     <Content Include="Areas\VAS\Content\SalesInvoiceCustomerSearchWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_092_ExpectedGRNWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_097_ExpectedGRNWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_081_MaterialReceiptRegisterWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_082_NewGRNWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_083_OpenGRNsWidget.css" />
@@ -430,7 +430,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingTransferWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ScheduleDetail.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_VendorReturnWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_092_ExpectedGRNWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_097_ExpectedGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_PendingDeliveryWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpectedInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_InvoiceSummary.js" />

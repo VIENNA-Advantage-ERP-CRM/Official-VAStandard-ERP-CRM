@@ -36,7 +36,7 @@ namespace VIS.Controllers
     ///                       dedicated controller, MRole, parameterized SQL and the
     ///                       shared GRN line-entry create flow.
     /// </summary>
-    public class VAS_092_ExpectedGRNWidgetController : Controller
+    public class VAS_097_ExpectedGRNWidgetController : Controller
     {
         /// <summary>
         /// One page of completed vendor purchase orders whose expected (promised)

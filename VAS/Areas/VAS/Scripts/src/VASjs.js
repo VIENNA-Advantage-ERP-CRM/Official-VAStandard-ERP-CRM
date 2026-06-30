@@ -92,7 +92,7 @@ import "../app/forms/VAS_DueOrderWidget.js";
 import "../app/forms/VAS_ExpectedDeliveryWidget.js";
 import "../app/forms/VAS_PendingDeliveryWidget.js";
 import "../app/forms/VAS_ExpectedInvoiceWidget.js";
-import "../app/widgets/VAS_092_ExpectedGRNWidget.js";
+import "../app/widgets/VAS_097_ExpectedGRNWidget.js";
 import "../app/widgets/VAS_093_PendingGRNWidget.js";
 import "../app/forms/VAS_CustomerRMAWidget.js";
 import "../app/forms/VAS_VendorReturnWidget.js";
