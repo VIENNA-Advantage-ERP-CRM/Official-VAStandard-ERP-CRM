@@ -170,6 +170,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_029_ScheduledAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_030_BouncedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\AutoAllocatedController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_056_AutoAllocatedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
@@ -244,7 +245,6 @@
     <Compile Include="Areas\VAS\Controllers\OverdueController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_016_AvgPaymentPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_017_MonthlyPurchaseSpendWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_018_OverduePayablesWidgetController.cs" />
@@ -269,13 +269,12 @@
     <Compile Include="Areas\VAS\Controllers\VAS_053_ApprovalQueueCashJournalController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_054_TopCounterpartiesCashJournalController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_055_CashByCategoryCashJournalController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_067_APInvoiceSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_068_APPaymentSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_069_CashJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_072_MatchSuggestionAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_092_OverviewPurchaseOrderController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
@@ -310,6 +309,8 @@
     <Compile Include="Areas\VAS\Controllers\VTrxMaterialController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_047_TodayCashInCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_056_AutoAllocatedAPPaymentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_072_MatchSuggestionAPPayment.css" />
     <Content Include="Areas\VAS\Content\VAS_092_OverviewPurchaseOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
@@ -506,6 +507,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_024_TotalOutstandingWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_025_TotalPurchasesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_026_VendorCreditUtilisationWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_056_AutoAllocatedAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_067_APInvoiceSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_068_APPaymentSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_069_CashJournalSearchWidget.js" />
@@ -531,6 +533,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_053_ApprovalQueueCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_054_TopCounterpartiesCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_055_CashByCategoryCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_072_MatchSuggestionAPPayment.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
