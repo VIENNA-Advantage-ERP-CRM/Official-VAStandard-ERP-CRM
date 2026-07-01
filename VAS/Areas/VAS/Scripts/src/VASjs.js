@@ -169,6 +169,7 @@ import "../app/widgets/VAS_015_OutstandingVsReceived.js";
 import "../app/widgets/VAS_034_ExpectedReceipts.js";
 import "../app/widgets/VAS_035_MatchSuggestions.js";
 import "../app/util/CurrencyFormat.js";
+import "../app/util/AttributeControl.js";
 
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/AgingReceivablesWidget.js";
@@ -226,8 +227,6 @@ import "../app/widgets/VAS_054_TopCounterpartiesCashJournalWidget.js";
 
 import "../app/widgets/VAS_055_CashByCategoryCashJournalWidget.js";
 import "../app/tabpanel/VAS_065_APInvoicePanel.js";
-
-
+import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
-
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
