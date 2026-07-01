@@ -138,6 +138,10 @@ namespace ModelLibrary.Process
                     }
                     lead.SetStatus(X_C_Lead.STATUS_Converted);
                     lead.SetProcessed(true);
+                    if (lead.Get_ColumnIndex("VAS_IsArchived") >= 0)
+                        lead.Set_Value("VAS_IsArchived", "Y");
+                    if (lead.Get_ColumnIndex("VAS_ArchivedReason") >= 0)
+                        lead.Set_Value("VAS_ArchivedReason", "90");
                     lead.Save();
                     // Send Opportunity Data to Knowledge Base
                     VAS_CommonMethod.SendInfoToAI(ToTableID, opp.Get_ID(), Get_Trx(), GetCtx());

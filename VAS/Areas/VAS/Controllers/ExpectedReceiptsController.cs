@@ -23,7 +23,7 @@ namespace VIS.Controllers
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetExpectedReceipts(string filterType, string fromDate, string toDate, string searchText, int pageNo = 1, int pageSize = 5)
+        public JsonResult GetExpectedReceipts(string filterType, string fromDate, string toDate, string searchText, int pageNo = 1, int pageSize = 9)
         {
             if (Session["ctx"] == null)
             {
@@ -42,7 +42,7 @@ namespace VIS.Controllers
 
             if (pageSize <= 0)
             {
-                pageSize = 5;
+                pageSize = 9;
             }
 
             DateTime startDate;

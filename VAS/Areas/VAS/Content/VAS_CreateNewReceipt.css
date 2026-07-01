@@ -16,8 +16,9 @@
 .vas-cnr-root {
     width: 100%;
     height: 100%;
+    overflow: hidden;           /* prevent card min-height from bleeding outside the cell */
     container-type: inline-size;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-cnr-root,
@@ -31,7 +32,10 @@
     width: 100%;
     height: 100%;
     min-height: 8.75em;
-    font-size: 1em;
+    /* Anchored to the widget's own inline width (cqi resolves against .vas-cnr-root's
+       container-type: inline-size) so interior type scales with the cell, not the viewport
+       (foundations.md §Responsive Unit Rules). 1x1 quick-action tile → 8cqi. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     font-family: inherit;
     /* No visible border — the mock relies on the pale-blue surface alone
        to define the tile, sitting flush with the dashboard background. */
@@ -96,18 +100,20 @@
 
 .vas-cnr-title {
     display: block;
-    /* Bumped to 1.5em (24px @ base) so the title reads at the same scale
-       as the "New Lead" mock; was 1.125em / 18px which rendered noticeably
-       smaller in screenshots. */
-    font-size: 1.5em;
+    /* Dashboard-width-anchored clamp (via --dash-inline-size — the dashboard's
+       visible content width in px, written to :root by the widget bootstrap;
+       falls back to 100vw when unset) instead of the old fixed 1.5em, which
+       rode the cell base up to ~48px on big dashboards and truncated
+       "New Receipt" to "New Rec…". Allowed to WRAP so the full name shows. */
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.01), 32px);
     font-weight: 700;
     color: #141414;
     line-height: 1.2;
     letter-spacing: -0.00625em;
+    min-width: 0;               /* allow flex item to shrink below content width */
     max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;        /* wrap rather than truncate — show full name */
+    overflow-wrap: break-word;
     align-self: flex-start;
 }
 

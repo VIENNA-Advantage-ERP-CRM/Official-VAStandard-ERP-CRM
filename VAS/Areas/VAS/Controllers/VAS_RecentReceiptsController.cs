@@ -27,7 +27,7 @@ namespace VAS.Controllers
         /// totalRecords and totalPages so the widget can render its pager
         /// without a second round-trip.
         /// </summary>
-        public JsonResult GetRecentReceipts(int pageNo = 1, int pageSize = 5)
+        public JsonResult GetRecentReceipts(int pageNo = 1, int pageSize = 8)
         {
             string retJSON = "";
             if (Session["ctx"] != null)

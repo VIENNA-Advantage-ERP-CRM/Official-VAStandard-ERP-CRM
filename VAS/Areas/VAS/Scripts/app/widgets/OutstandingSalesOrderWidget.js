@@ -6,21 +6,43 @@
  *           pill with explanatory copy. The card fills 100% of its grid cell and
  *           scales responsively via OutstandingSalesOrderWidget.css.
  *
- * ── Labels / Message Keys ───────────────────────────────────────────────────────────────
- *  #  | Current Text                                   | Message Key                        | MsgText
- * ----+------------------------------------------------+------------------------------------+------------------------------------------------
- *  1  | Outstanding                                    | VIS_Outstanding                    | Outstanding
- *  2  | Money owed to you                              | VIS_MoneyOwedToYou                 | Money owed to you
- *  3  | WHY                                            | VIS_Why                            | WHY
- *  4  | Total unpaid invoices across all customers.    | VIS_TotalUnpaidInvoices            | Total unpaid invoices across all customers.
- *  5  | unpaid order / unpaid orders                   | VIS_UnpaidOrder / VIS_UnpaidOrders | unpaid order / unpaid orders
- *  6  | across all customers.                          | VIS_AcrossAllCustomers             | across all customers.
- *  7  | Largest:                                       | VIS_Largest                        | Largest:
- * ───────────────────────────────────────────────────────────────────────────────────────
+ * ── Labels / Message Keys ───────────────────────────────────────────────────────────────────────
+ *  #  | Current Text                                   | Message Key                                | MsgText
+ * ----+------------------------------------------------+--------------------------------------------+------------------------------------------------
+ *  1  | Outstanding                                    | VAS_057_Outstanding                        | Outstanding
+ *  2  | Money owed to you                              | VAS_057_MoneyOwedToYou                     | Money owed to you
+ *  3  | WHY                                            | VAS_057_Why                                | WHY
+ *  4  | Total unpaid invoices across all customers.    | VAS_057_TotalUnpaidInvoices                | Total unpaid invoices across all customers.
+ *  5  | unpaid order / unpaid orders                   | VAS_057_UnpaidOrder / VAS_057_UnpaidOrders | unpaid order / unpaid orders
+ *  6  | across all customers.                          | VAS_057_AcrossAllCustomers                 | across all customers.
+ *  7  | Largest:                                       | VAS_057_Largest                            | Largest:
+ * ───────────────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     /* Dollar-circle icon (lucide-style). Stroke inherits the icon-well color via currentColor. */
     var ICON_SVG =
@@ -69,7 +91,7 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalOutstanding, data.orderCount, data.topCustomer, data.curSymbol);
+                        renderMetric(data.totalOutstanding, data.orderCount, data.topCustomer, data.curSymbol, data.isoCode, data.stdPrecision);
                     }
                 },
                 error: function () {
@@ -79,42 +101,35 @@
             });
         }
 
-        /* ── Format a currency amount into a compact, locale-aware string ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-            var sign = value < 0 ? '-' : '';
-            var absVal = Math.abs(value);
-
-            if (absVal >= 1000000) {
-                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return sign + Math.round(absVal / 1000) + 'k';
-            }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
+        /* ── Format a currency amount into a compact, locale-aware string ──
+           Magnitude formatting (Indian vs international numbering by base currency,
+           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount;
+           the minus sign is prepended here. */
+        function formatCurrency(value, isoCode, precision) {
+            return (value < 0 ? '-' : '') + VIS.Util.formatCompactAmount(value, isoCode, precision);
         }
 
         /* ── Build the WHY explanatory copy from the optional count / top-customer data ── */
         function buildWhyText(count, topCustomer) {
-            var why = lbl("VIS_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.');
+            var why = lbl("VAS_057_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.');
 
             if (count > 0) {
                 var orderLabel = count !== 1
-                    ? lbl("VIS_UnpaidOrders", 'unpaid orders')
-                    : lbl("VIS_UnpaidOrder", 'unpaid order');
-                why = count + ' ' + orderLabel + ' ' + lbl("VIS_AcrossAllCustomers", 'across all customers.');
+                    ? lbl("VAS_057_UnpaidOrders", 'unpaid orders')
+                    : lbl("VAS_057_UnpaidOrder", 'unpaid order');
+                why = count + ' ' + orderLabel + ' ' + lbl("VAS_057_AcrossAllCustomers", 'across all customers.');
             }
             if (topCustomer) {
-                why += ' ' + lbl("VIS_Largest", 'Largest:') + ' ' + topCustomer + '.';
+                why += ' ' + lbl("VAS_057_Largest", 'Largest:') + ' ' + topCustomer + '.';
             }
             return why;
         }
 
         /* ── Render metric values ── */
-        function renderMetric(total, count, topCustomer, symbol) {
+        function renderMetric(total, count, topCustomer, symbol, isoCode, precision) {
             if ($metricEl) {
                 /* Base-currency symbol (from the accounting schema) sits before the amount. */
-                $metricEl.text((symbol || '') + formatCurrency(total));
+                $metricEl.text((symbol || '') + formatCurrency(total, isoCode, precision));
             }
             if ($whyText) {
                 $whyText.text(buildWhyText(count, topCustomer));
@@ -130,8 +145,8 @@
                 '<div class="vas-oso-header">' +
                     '<div class="vas-oso-icon">' + ICON_SVG + '</div>' +
                     '<div class="vas-oso-labels">' +
-                        '<div class="vas-oso-title">' + lbl("VIS_Outstanding", 'Outstanding') + '</div>' +
-                        '<div class="vas-oso-subtitle">' + lbl("VIS_MoneyOwedToYou", 'Money owed to you') + '</div>' +
+                        '<div class="vas-oso-title">' + lbl("VAS_057_Outstanding", 'Outstanding') + '</div>' +
+                        '<div class="vas-oso-subtitle">' + lbl("VAS_057_MoneyOwedToYou", 'Money owed to you') + '</div>' +
                     '</div>' +
                 '</div>'
             );
@@ -142,12 +157,12 @@
             /* WHY pill + explanatory text */
             $whyText = $(
                 '<span class="vas-oso-why-text">' +
-                lbl("VIS_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.') +
+                lbl("VAS_057_TotalUnpaidInvoices", 'Total unpaid invoices across all customers.') +
                 '</span>'
             );
 
             var $why = $('<div class="vas-oso-why-wrap">')
-                /*.append('<span class="vas-oso-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>')*/
+                /*.append('<span class="vas-oso-why-pill">' + lbl("VAS_057_Why", 'WHY') + '</span>')*/
                 .append($whyText);
 
             $root.append(
@@ -189,6 +204,9 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.OutstandingSalesOrderWidget.prototype.widgetSizeChange = function (height, width) { };

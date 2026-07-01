@@ -9,7 +9,7 @@
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
  *  #  | Current Text                                  | Message Key                    | MsgText
  * ----+-----------------------------------------------+--------------------------------+-----------------------------------------------
- *  1  | Avg days to pay                               | VAS_AvgDaysToPay               | Avg days to pay
+ *  1  | Avg Days to Pay                               | VAS_056_AvgDaysToPay           | Avg days to pay
  *  2  | Loading…                                      | VIS_Loading                    | Loading…
  *  3  | No change                                     | VIS_NoChange                   | No change
  * ──────────────────────────────────────────────────────────────────────────────────────
@@ -17,6 +17,28 @@
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.AvgDaysToPayWidget = function () {
 
@@ -94,7 +116,7 @@
                     '</div>' +
 
                     '<div class="vas-adtp-title">' +
-                        lbl('VAS_AvgDaysToPay', 'Avg days to pay') +
+                        lbl('VAS_056_AvgDaysToPay', 'Avg Days to Pay') +
                     '</div>' +
 
                 '</div>'
@@ -151,6 +173,9 @@
         this.windowNo            = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.AvgDaysToPayWidget.prototype.widgetSizeChange = function (height, width) {};

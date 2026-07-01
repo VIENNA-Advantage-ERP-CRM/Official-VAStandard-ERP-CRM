@@ -41,6 +41,28 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_003_OnAccountReceipts = function () {
 
         this.frame;
@@ -212,7 +234,7 @@
             });
         }
 
-        /* Symbol before the amount; sign before symbol when negative. */
+        /* Symbol before the amount; '-' for negative, no sign for positive/zero. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
@@ -282,10 +304,12 @@
                 var customer = row.customer || "";
                 var bankText = formatBankAccount(row);
                 var stdPrecision = Number(row.stdPrecision || getStdPrecision());
-                var amtText = formatExactAmount(row.amount, stdPrecision);
+                var rawAmt = Number(row.amount || 0);
+                var amtSign = rawAmt < 0 ? '-' : '';
+                var amtText = formatExactAmount(Math.abs(rawAmt), stdPrecision);
                 var iso = row.currencyIso || "";
                 var sym = row.curSymbol || iso || "";
-                var amtHtml = (sym ? '<span class="vas-oar-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
+                var amtHtml = escapeHtml(amtSign) + (sym ? '<span class="vas-oar-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
 
                 var $tr = $(
                     '<tr>' +
@@ -300,7 +324,7 @@
                     '<span class="vas-oar-truncate">' + escapeHtml(bankText) + '</span>' +
                     '</td>' +
                     '<td class="vas-oar-td-currency" title="' + escapeHtml(iso) + '">' + escapeHtml(iso) + '</td>' +
-                    '<td class="vas-oar-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
+                    '<td class="vas-oar-td-amount" title="' + escapeHtml(amtSign + (sym ? sym + ' ' : '') + amtText) + '">' + amtHtml + '</td>' +
                     '</tr>'
                 );
 
@@ -445,10 +469,6 @@
                 '<div class="vas-oar-icon">' + cardIconSvg() + '</div>' +
                 '<span class="vas-oar-label">' + escapeHtml(lbl("VAS_003_OnAccount", "On-account")) + '</span>' +
                 '</div>' +
-                '<button type="button" class="vas-oar-view">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>' +
-                '<span>' + escapeHtml(lbl("VAS_View", "View")) + '</span>' +
-                '</button>' +
                 '</div>' +
 
                 '<div class="vas-oar-metric">—</div>' +
@@ -468,11 +488,6 @@
                     openDialog();
                 }
             });
-            $card.find('.vas-oar-view').on('click', function (e) {
-                e.stopPropagation();
-                openDialog();
-            });
-
             $root.append($card);
 
             $busy = $('<div class="vas-oar-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
@@ -504,6 +519,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_003_OnAccountReceipts.prototype.widgetSizeChange = function (height, width) { };

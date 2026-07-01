@@ -30,6 +30,7 @@ namespace VIS.Controllers
                 SELECT AD_ClientInfo.AD_Client_ID,
                        C_AcctSchema.C_Currency_ID AS Acct_Currency_ID,
                        C_Currency.StdPrecision,
+                       C_Currency.ISO_Code AS ISOCode,
                        COALESCE(C_Currency.CurSymbol, C_Currency.ISO_Code) AS CurSymbol
                 FROM AD_ClientInfo AD_ClientInfo
                 INNER JOIN C_AcctSchema C_AcctSchema ON (C_AcctSchema.C_AcctSchema_ID=AD_ClientInfo.C_AcctSchema1_ID)
@@ -104,13 +105,17 @@ namespace VIS.Controllers
                     " + outstandingDataSql + @"
                 )
                 SELECT ROUND(COALESCE(SUM(OutstandingData.OutstandingAmount), 0), SchemaCurrency.StdPrecision) AS TotalOutstanding,
-                       SchemaCurrency.CurSymbol AS CurSymbol
+                       SchemaCurrency.CurSymbol AS CurSymbol,
+                       SchemaCurrency.ISOCode AS ISOCode,
+                       SchemaCurrency.StdPrecision AS StdPrecision
                 FROM SchemaCurrency SchemaCurrency
                 LEFT OUTER JOIN OutstandingData OutstandingData ON (OutstandingData.AD_Client_ID=SchemaCurrency.AD_Client_ID)
-                GROUP BY SchemaCurrency.StdPrecision, SchemaCurrency.CurSymbol";
+                GROUP BY SchemaCurrency.StdPrecision, SchemaCurrency.CurSymbol, SchemaCurrency.ISOCode";
 
             decimal totalOutstanding = 0;
             string curSymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
 
             IDataReader dr = null;
 
@@ -122,6 +127,8 @@ namespace VIS.Controllers
                 {
                     totalOutstanding = Util.GetValueOfDecimal(dr["TotalOutstanding"]);
                     curSymbol = Util.GetValueOfString(dr["CurSymbol"]);
+                    isoCode = Util.GetValueOfString(dr["ISOCode"]);
+                    stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
                 }
             }
             finally
@@ -135,7 +142,9 @@ namespace VIS.Controllers
             var result = new
             {
                 totalOutstanding = totalOutstanding,
-                curSymbol = curSymbol
+                curSymbol = curSymbol,
+                isoCode = isoCode,
+                stdPrecision = stdPrecision
             };
 
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

@@ -90,10 +90,10 @@ namespace ModelLibrary.Process
                 throw new ArgumentException("VAS_Opportunity_ID == 0");
             }
             MOpportunity fromOpportunity = new MOpportunity(GetCtx(), _VAS_Opportunity_ID, Get_TrxName());
-            if (fromOpportunity.GetGenerate_Order().Trim() == "Y")
-            {
-                throw new ArgumentException("Sales Order already generated");
-            }
+            //if (fromOpportunity.GetGenerate_Order().Trim() == "Y")
+            //{
+            //    throw new ArgumentException("Sales Order already generated");
+            //}
 
             // if Business Partner or Prospect is not selected then gives error
             if (fromOpportunity.GetC_BPartner_ID() == 0 && fromOpportunity.GetC_BPartnerSR_ID() == 0)
@@ -250,19 +250,23 @@ namespace ModelLibrary.Process
                     ol = new MOrderLine(order);
                     ol.SetLine(lines[i].GetLine());
                     ol.SetDescription(lines[i].GetDescription());
-                    ol.SetM_Product_ID(lines[i].GetM_Product_ID(), true);
+                    if (lines[i].GetC_Charge_ID() > 0)
+                    {
+                        ol.SetC_Charge_ID(lines[i].GetC_Charge_ID());
+                    }
+                    else {
+                        ol.SetM_Product_ID(lines[i].GetM_Product_ID(), true);
+                        // Set Attribute and UOM from Opportunity Lines
+                        if (lines[i].Get_ColumnIndex("M_AttributeSetInstance_ID") >= 0)
+                        {
+                            ol.SetM_AttributeSetInstance_ID(lines[i].GetM_AttributeSetInstance_ID());
+                        }
+                    }
                     ol.SetQtyEntered(lines[i].GetPlannedQty());
                     ol.SetQtyOrdered(lines[i].GetPlannedQty());
                     ol.SetPriceEntered(lines[i].GetPlannedPrice());
                     ol.SetPriceActual(lines[i].GetPlannedPrice());
                     ol.SetPriceList(lines[i].GetPriceList());
-
-                    // Set Attribute and UOM from Opportunity Lines
-                    if (lines[i].Get_ColumnIndex("M_AttributeSetInstance_ID") >= 0)
-                    {
-                        ol.SetM_AttributeSetInstance_ID(lines[i].GetM_AttributeSetInstance_ID());
-                    }
-
                     if (lines[i].Get_ColumnIndex("C_UOM_ID") >= 0)
                     {
                         ol.SetC_UOM_ID(Util.GetValueOfInt(lines[i].Get_Value("C_UOM_ID")));

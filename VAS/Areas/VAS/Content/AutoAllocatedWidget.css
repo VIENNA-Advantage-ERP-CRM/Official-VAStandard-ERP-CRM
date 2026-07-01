@@ -13,7 +13,7 @@
     height: 100%;
     container-type: inline-size;
     position: relative;
-    font-family: Roboto, sans-serif;
+    /*font-family: Roboto, sans-serif;*/
 }
 
     .vas-aa-root,
@@ -35,18 +35,25 @@
 /* ── KPI card (glass widget, tint-success) ────────────────────────── */
 
 .vas-aa-card {
-    font-size: 1em;
+    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
+       every inner value is em so the whole card rescales with the cell. cqi resolves
+       against .vas-aa-root (container-type: inline-size), so the spec's 1.4cqi is
+       retuned for the 2-col cell width (≈5.6cqi) and the ceiling raised to 32px so
+       content keeps pace with the grid on 2560-wide dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 0.5em;
-    background: linear-gradient(135deg, rgba(206, 238, 212, 0.78), rgba(255, 255, 255, 0.62));
+    gap: 0.25em;                     /* spec stack gap between label/value/meta */
+    /* Shared neutral glass surface across all KPI cards (dashboard-widgets.md: keep the
+       default surface; semantic meaning comes from icon/text/border, not a tinted surface). */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
     border: 0.125em solid #FFFFFF;
     border-radius: 0.875em;
     box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 1em 1em 1.125em;
+    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
     cursor: pointer;
     transition: box-shadow 180ms ease;
@@ -98,51 +105,32 @@
     }
 
 .vas-aa-label {
-    /* design.md / dashboard-widgets.md §"Widget Header": 18px black title.
-       Per project request the weight is Bold (700) instead of the spec's
-       Medium (500). */
-    font-size: 1.125em;
-    color: #141414;
-    font-weight: 700;
+    /* dashboard-widgets.md §"KPI And Summary Widget": the stat label IS the
+       widget title (shared Widget Header style, dark #102C3F, line-height 1.3).
+       Per project request the weight is Medium (500). Shared title clamp,
+       anchored on --dash-inline-size (the dashboard's visible content width;
+       spec §Widget Header / §Measurement Setup; falls back to 100vw when
+       unset). Bounds = 0.97 × the 16–32px root range. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    color: #102C3F;
+    font-weight: 400;
+    line-height: 1.3;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.vas-aa-view {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    padding: 0.3125em 0.625em;
-    border-radius: 999em;
-    color: #0083DA;
-    font-size: 0.75em;
-    font-weight: 500;
-    font-family: inherit;
-    flex-shrink: 0;
-}
-
-    .vas-aa-view svg {
-        width: 0.875em;
-        height: 0.875em;
-        stroke: currentColor;
-    }
-
-    .vas-aa-view:hover {
-        background: rgba(0, 131, 218, 0.08);
-        color: #0069AE;
-    }
-
 /* Big percentage — success green to match the tint. */
 .vas-aa-metric {
-    font-size: 2.5em;                 /* 40px design.md KPI value */
+    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
+    /* dashboard-widgets.md §"Widget Stat Values": canonical KPI stat —
+       2em, line-height 1.1. Per project request the weight is Bold
+       (700) instead of the spec's Medium (500). */
+    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
     font-weight: 700;
     color: #0B6B45;
-    line-height: 1;
+    line-height: 1.1;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
     min-width: 0;
@@ -156,9 +144,12 @@
     display: block;
     align-self: flex-start;
     max-width: 100%;
-    font-size: 0.75em;
-    color: #5F7283;
-    font-weight: 500;
+    /* dashboard-widgets.md KPI meta: xs token, muted, one step below the
+       label so the explanation reads as secondary. */
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    color: #717182;
+    font-weight: 400;
+    line-height: 1.3;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -183,8 +174,11 @@
 }
 
 .vas-aa-dialog {
-    font-family: Roboto, sans-serif;
-    font-size: 1em;
+    /*font-family: Roboto, sans-serif;*/
+    /* Viewport-anchored dialog base (0.75em of it = the shared data clamp
+       0.88vw): dialog data matches widget data px and the whole em-sized
+       dialog scales in proportion. 16px floor = unchanged small screens. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
@@ -208,12 +202,12 @@
 
 .vas-aa-dialog-card {
     position: relative;
-    width: min(64em, 100%);           /* ~1024px on wide screens */
+    width: min(64em, 100%); /* ~1024px on wide screens */
     /* Fixed dialog height sized so 10 page rows + tabs + header + footer all
        fit inside without forcing the body to show a scrollbar. The body still
        has `overflow: auto` as a safety net but should rarely engage at the
        default pageSize of 10. */
-    height: min(40em, 100%);
+    height: min(34em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -233,11 +227,12 @@
 }
 
 .vas-aa-dialog-icon {
-    width: 2.25em;
-    height: 2.25em;
-    min-width: 2.25em;
-    border-radius: 0.5em;
-    background: #E5F5EA;
+    /* Family icon well (2em, glass gradient) — matches the widget header icon. */
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
     border: 0.0625em solid #B6E1C2;
     color: #0B6B45;
     display: flex;
@@ -258,15 +253,17 @@
 }
 
 .vas-aa-dialog-title {
-    font-size: 1.125em;
-    font-weight: 700;
+    /* Shared viewport-anchored title clamp — matches the widget titles. */
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
 
 .vas-aa-dialog-subtitle {
     margin-top: 0.125em;
-    font-size: 0.8125em;
+    /* Shared viewport-anchored sm clamp — matches the widget subtitles. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #748494;
     line-height: 1.3;
 }
@@ -317,8 +314,10 @@
     cursor: pointer;
     padding: 0.875em 0.625em;
     font-family: inherit;
+    /* 0.875em of the viewport-anchored dialog base = the shared 14–28px
+       token, so the tab labels match the family at every screen size. */
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     color: #748494;
 }
 
@@ -352,7 +351,10 @@
     border-radius: 999em;
     background: #F3F7FB;
     color: #5F7283;
-    font-size: 0.75em;
+    /* Chip text = xs token. 0.7857em counters the 0.875em tab font so the
+       chip lands on 0.6875em of the dialog base (11–22px), matching the
+       family's chips/metadata at every screen size. */
+    font-size: 0.7857em;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
@@ -392,7 +394,7 @@
         position: sticky;
         top: 0;
         background: #FFFFFF;
-        font-size: 0.8125em;
+        font-size: 0.75em;            /* sm — 0.75em of the dialog base = shared data clamp */
         font-weight: 400;
         color: #748494;
         text-align: left;
@@ -416,7 +418,7 @@
            height without forcing a scrollbar. */
         padding: 0.6875em 0.75em;
         border-bottom: 0.0625em solid #EDF2F6;
-        font-size: 0.875em;
+        font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -451,13 +453,13 @@
 }
 
 .vas-aa-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    /*font-family: "Roboto Mono", "Roboto", monospace;*/
     color: #5F7283;
-    font-size: 0.8125em;
+    font-size: 0.6875em;              /* xs — secondary metadata cell */
 }
 
 .vas-aa-td-customer {
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -468,13 +470,13 @@
 .vas-aa-td-currency {
     text-align: center;
     color: #5F7283;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: 0.02em;
 }
 
 .vas-aa-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -494,7 +496,7 @@
     padding: 2.25em 1em;
     text-align: center;
     color: #748494;
-    font-size: 0.875em;
+    font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;
 }
 
@@ -528,11 +530,13 @@
 }
 
 .vas-aa-pager-btn {
-    width: 2em;
-    height: 2em;
+    /* Spec §Pager Buttons: 24px square (1.5em) with a 14px (0.875em)
+       chevron — same as the widget footer pagers. */
+    width: 1.5em;
+    height: 1.5em;
     padding: 0;
     border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    border-radius: 0.375em;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -542,8 +546,8 @@
 }
 
     .vas-aa-pager-btn svg {
-        width: 1em;
-        height: 1em;
+        width: 0.875em;
+        height: 0.875em;
         stroke: currentColor;
     }
 
@@ -561,7 +565,7 @@
     min-width: 3em;
     text-align: center;
     font-size: 0.875em;
-    font-weight: 500;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

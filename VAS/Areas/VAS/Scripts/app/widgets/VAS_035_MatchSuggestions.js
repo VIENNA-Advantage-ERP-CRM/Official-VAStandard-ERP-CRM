@@ -85,6 +85,28 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_035_MatchSuggestions = function () {
 
         this.frame;
@@ -149,16 +171,17 @@
         }
 
         function formatAmount(amount, symbol, precision) {
-            var text = Number(amount || 0).toLocaleString(window.navigator.language, {
+            var raw = Number(amount || 0);
+            var sign = raw < 0 ? '-' : '';
+            var text = Number(Math.abs(raw)).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: Number(precision || 0),
                 maximumFractionDigits: Number(precision || 0)
             });
 
             var sym = symbol ? symbol.toString() : "";
-            if (!sym) { return text; }
-
             /* 3-char ISO codes read better after the amount; glyph symbols before. */
-            return sym.length === 3 ? (text + " " + sym) : (sym + text);
+            var formatted = sym.length === 3 ? (text + " " + sym) : (sym ? (sym + text) : text);
+            return sign + formatted;
         }
 
         function formatDate(value) {
@@ -468,7 +491,7 @@
                 paneRow(lbl("VAS_035_PaymentTerms", "Payment Terms"), data.PaymentTerms) +
                 paneRow(lbl("VAS_035_DueDate", "Due Date"), formatDate(data.DueDate)) +
                 paneRow(lbl("VAS_035_GrandTotal", "Grand Total"), grandTotal) +
-                paneRow(lbl("VAS_PaymentCurrency", "Currency"), data.InvoiceCurrency) +
+                paneRow(lbl("VAS_035_InvCurrency", "Currency"), data.InvoiceCurrency) +
                 paneRow(lbl("VAS_035_OpenAmount", "Open Amount"), openAmt, 'vas-msug-amount-open') +
                 '</div>';
 
@@ -481,8 +504,9 @@
                 invoicePane +
                 '</div>';
 
-            /* 3 — balance strip (receipt currency): exact / short / over. */
-            var balanceAmt = formatAmount(Math.abs(balance), data.ReceiptCurrencySymbol, data.ReceiptPrecision);
+            /* 3 — balance strip (receipt currency): exact / short / over.
+               Pass the raw signed balance; formatAmount prefixes + or -. */
+            var balanceAmt = formatAmount(balance, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
             var balanceStrip;
             if (isShort) {
                 /* Receipt is short — the difference stays open on the schedule. */
@@ -728,6 +752,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_035_MatchSuggestions.prototype.widgetSizeChange = function (height, width) { };

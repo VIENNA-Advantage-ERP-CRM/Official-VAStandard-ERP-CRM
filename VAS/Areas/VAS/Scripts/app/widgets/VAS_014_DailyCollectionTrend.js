@@ -33,6 +33,28 @@
     /* Per-instance id suffix so multiple widgets' SVG gradient defs never clash. */
     var instanceSeq = 0;
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_014_DailyCollectionTrend = function () {
 
         this.frame;
@@ -123,13 +145,15 @@
         function formatAmount(value) {
             var sym = (trend && trend.CurrencySymbol) || "";
             var prec = trend ? Number(trend.StdPrecision) : getStdPrecision();
-            return (sym ? sym : "") + formatCompactAmount(value, prec);
+            var sign = (Number(value) < 0) ? '-' : '';
+            return sign + (sym ? sym : "") + formatCompactAmount(Math.abs(Number(value || 0)), prec);
         }
 
         function formatExactAmount(value) {
             var sym = (trend && trend.CurrencySymbol) || "";
             var prec = trend ? Number(trend.StdPrecision) : getStdPrecision();
-            return (sym ? ' ' + sym : '') + Number(value || 0).toLocaleString(window.navigator.language, {
+            var sign = (Number(value) < 0) ? '-' : '';
+            return sign + (sym ? sym : '') + Number(Math.abs(Number(value || 0))).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: prec, maximumFractionDigits: prec
             });
         }
@@ -168,8 +192,12 @@
             var n = points.length;
             var avg = Number(trend.Average || 0);
 
+            /* Scale chart geometry with the widget's resolved font-size so the chart grows
+               to fill tall cells on large dashboards (16px base => s = 1). */
+            var s = (parseFloat(window.getComputedStyle($chartEl[0]).fontSize) || 16) / 16;
+
             /* Plot box (px). Bottom band reserved for the dated x-axis. */
-            var padL = 10, padR = 12, padTop = 12, padBottom = 22;
+            var padL = 10 * s, padR = 12 * s, padTop = 12 * s, padBottom = 22 * s;
             var plotW = Math.max(1, w - padL - padR);
             var plotH = Math.max(1, h - padTop - padBottom);
             var bottom = padTop + plotH;
@@ -214,7 +242,7 @@
             var peakDot = "";
             if (peakIdx >= 0) {
                 peakDot = '<circle cx="' + xOf(peakIdx).toFixed(1) + '" cy="' + yOf(points[peakIdx].Amount).toFixed(1) +
-                    '" r="4.5" class="vas-dct-peak-dot"/>';
+                    '" r="' + (4.5 * s).toFixed(1) + '" class="vas-dct-peak-dot"/>';
             }
 
             /* X-axis date labels (every other day). */
@@ -222,7 +250,7 @@
             for (var x = 0; x < n; x++) {
                 if (x % 2 !== 0) { continue; }
                 var anchor = (x === 0) ? 'start' : (x === n - 1 ? 'end' : 'middle');
-                labels += '<text x="' + xOf(x).toFixed(1) + '" y="' + (h - 6) + '" text-anchor="' + anchor +
+                labels += '<text x="' + xOf(x).toFixed(1) + '" y="' + (h - 6 * s).toFixed(1) + '" text-anchor="' + anchor +
                     '" class="vas-dct-axis-label">' + escapeHtml(formatDay(points[x].Day)) + '</text>';
             }
 
@@ -240,7 +268,7 @@
                 labels +
                 /* Hover guide line + dot (shown/positioned on mousemove). */
                 '<line class="vas-dct-hover-line" x1="0" y1="' + padTop.toFixed(1) + '" x2="0" y2="' + bottom.toFixed(1) + '" style="display:none"/>' +
-                '<circle class="vas-dct-hover-dot" r="4.5" style="display:none"/>' +
+                '<circle class="vas-dct-hover-dot" r="' + (4.5 * s).toFixed(1) + '" style="display:none"/>' +
                 '</svg>';
 
             $chartEl.html(svg);
@@ -283,7 +311,24 @@
                 var maxW = $chartEl[0].clientWidth;
                 if (left < half) { left = half; }
                 if (left > maxW - half) { left = maxW - half; }
-                $tooltip.css({ display: 'block', left: left + 'px', top: c.y + 'px' });
+
+                /* Clamp vertically: default position is above the dot (transform
+                   pulls it up by its own height + 0.625em gap). If that would push it
+                   above the chart top, flip it below the dot instead so the card's
+                   overflow:hidden never clips it. */
+                var tipH = $tooltip.outerHeight();
+                var gapEm = parseFloat(window.getComputedStyle($tooltip[0]).fontSize) * 0.625;
+                var topAbove = c.y - tipH - gapEm;
+                var topStyle, transformStyle;
+                if (topAbove < 0) {
+                    /* Flip below: position top just below the dot; no upward transform. */
+                    topStyle = (c.y + gapEm) + 'px';
+                    transformStyle = 'translateX(-50%)';
+                } else {
+                    topStyle = c.y + 'px';
+                    transformStyle = 'translate(-50%, calc(-100% - 0.625em))';
+                }
+                $tooltip.css({ display: 'block', left: left + 'px', top: topStyle, transform: transformStyle });
             }
         }
 
@@ -423,6 +468,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_014_DailyCollectionTrend.prototype.widgetSizeChange = function (height, width) {

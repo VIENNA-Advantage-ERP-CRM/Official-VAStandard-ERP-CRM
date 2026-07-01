@@ -28,6 +28,28 @@
 
 ; (function (VAS, $) {
 
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     /* Per-instance id suffix so multiple widgets' SVG gradient defs never clash. */
     var instanceSeq = 0;
 
@@ -106,11 +128,11 @@
             return 2;
         }
 
-        /* Compact-amount formatter: 10M→Cr, 100K→L, 1K→K; below 1000 → locale. */
+        /* Compact-amount formatter: 10M→Cr, 100K→L, 1K→K; below 1000 → locale.
+           Returns the magnitude string only (no sign, no currency symbol).
+           Callers are responsible for prepending sign + symbol. */
         function formatCompactAmount(value, stdPrecision) {
-            value = Number(value || 0);
-            var neg = value < 0;
-            var abs = Math.abs(value);
+            var abs = Math.abs(Number(value || 0));
             var out;
             if (abs >= 10000000) { out = (abs / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr"; }
             else if (abs >= 100000) { out = (abs / 100000).toFixed(2).replace(/\.00$/, "") + "L"; }
@@ -121,21 +143,29 @@
                     minimumFractionDigits: prec, maximumFractionDigits: prec
                 });
             }
-            return (neg ? "-" : "") + out;
+            return out;
         }
 
+        /* Currency amount with explicit leading sign (before the symbol):
+           "+$63K" / "-$13K".  value < 0 → "-"; value >= 0 → "+". */
         function formatAmount(value) {
             var sym = (series && series.CurrencySymbol) || "";
             var prec = series ? Number(series.StdPrecision) : getStdPrecision();
-            return (sym ? sym : "") + formatCompactAmount(value, prec);
+            var sign = Number(value || 0) < 0 ? "-" : "";
+            return sign + (sym ? sym : "") + formatCompactAmount(value, prec);
         }
 
+        /* Exact currency amount with explicit leading sign (before the symbol):
+           "+$63,000.00" / "-$13,000.00".  value < 0 → "-"; value >= 0 → "+". */
         function formatExactAmount(value) {
             var sym = (series && series.CurrencySymbol) || "";
             var prec = series ? Number(series.StdPrecision) : getStdPrecision();
-            return (sym ? ' ' + sym : '') + Number(value || 0).toLocaleString(window.navigator.language, {
+            var v = Number(value || 0);
+            var sign = v < 0 ? "-" : "";
+            var magnitude = Math.abs(v).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: prec, maximumFractionDigits: prec
             });
+            return sign + (sym ? sym : "") + magnitude;
         }
 
         /* "Jan 2026" from a yyyy-MM key (month name + year; local-time safe —
@@ -177,9 +207,13 @@
             var pts = series.Months;
             var n = pts.length;
 
+            /* Scale chart geometry with the widget's resolved font-size so the chart grows
+               to fill tall cells on large dashboards (16px base => s = 1). */
+            var s = (parseFloat(window.getComputedStyle($chartEl[0]).fontSize) || 16) / 16;
+
             /* Plot box (px). Bottom band reserved for the dated x-axis. Tight side
                insets so the bars/line use the full card width. */
-            var padL = 6, padR = 6, padTop = 12, padBottom = 22;
+            var padL = 6 * s, padR = 6 * s, padTop = 12 * s, padBottom = 22 * s;
             var plotW = Math.max(1, w - padL - padR);
             var plotH = Math.max(1, h - padTop - padBottom);
             var bottom = padTop + plotH;
@@ -212,7 +246,7 @@
             }
 
             /* Outstanding bars (pale blue), centred in each month band. */
-            var barW = Math.max(4, bandW * 0.46);
+            var barW = Math.max(4 * s, bandW * 0.46);
             var bars = "";
             var bandRefs = [];
             for (var b = 0; b < n; b++) {
@@ -244,13 +278,13 @@
             var lineD = 'M' + linePts.join(' L');
             for (var d2 = 0; d2 < n; d2++) {
                 dots += '<circle cx="' + centerOf(d2).toFixed(1) + '" cy="' + yOf(pts[d2].Received).toFixed(1) +
-                    '" r="4" class="vas-ovr-dot"/>';
+                    '" r="' + (4 * s).toFixed(1) + '" class="vas-ovr-dot"/>';
             }
 
             /* X-axis month labels (one per band). */
             var labels = "";
             for (var x = 0; x < n; x++) {
-                labels += '<text x="' + centerOf(x).toFixed(1) + '" y="' + (h - 6) +
+                labels += '<text x="' + centerOf(x).toFixed(1) + '" y="' + (h - 6 * s).toFixed(1) +
                     '" text-anchor="middle" class="vas-ovr-axis-label">' +
                     escapeHtml(formatMonth(pts[x].Month)) + '</text>';
             }
@@ -308,7 +342,23 @@
                 var maxW = $chartEl[0].clientWidth;
                 if (left < half) { left = half; }
                 if (left > maxW - half) { left = maxW - half; }
-                $tooltip.css({ display: 'block', left: left + 'px', top: c.lineY + 'px' });
+
+                /* Clamp vertically: the CSS transform shifts the tooltip upward by
+                   its own height + the 0.625em gap.  When the line point is near the
+                   top of the plot the tooltip would be clipped by the card's
+                   overflow:hidden.  If it would go above y=0 (chart-area top), flip
+                   it below the point with a small offset instead. */
+                var ttH = $tooltip.outerHeight();
+                var gap = parseFloat(window.getComputedStyle($tooltip[0]).fontSize) * 0.625;
+                var top;
+                if (c.lineY - ttH - gap < 0) {
+                    /* Flip below: override the upward CSS transform with an inline
+                       transform that positions the top edge just below the point. */
+                    top = c.lineY + gap;
+                    $tooltip.css({ display: 'block', left: left + 'px', top: top + 'px', transform: 'translate(-50%, 0)' });
+                } else {
+                    $tooltip.css({ display: 'block', left: left + 'px', top: c.lineY + 'px', transform: '' });
+                }
             }
         }
 
@@ -416,6 +466,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_015_OutstandingVsReceived.prototype.widgetSizeChange = function (height, width) {
