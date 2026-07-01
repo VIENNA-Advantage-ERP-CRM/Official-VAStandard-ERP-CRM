@@ -201,3 +201,10 @@ import "../app/widgets/VAS_054_TopCounterpartiesCashJournalWidget.js";
 
 import "../app/widgets/VAS_055_CashByCategoryCashJournalWidget.js";
 import "../app/tabpanel/VAS_065_APInvoicePanel.js";
+
+
+import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
+
+import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
+
+

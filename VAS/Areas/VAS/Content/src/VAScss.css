@@ -36,6 +36,14 @@
 
 @import "../VAS_033_PaymentMethodsWidget.css";
 @import "../VAS_046_ReconciliationStatusWidget.css";
+
+
+@import "../VAS_056_AutoAllocatedAPPaymentWidget.css";
+
+@import "../VAS_072_MatchSuggestionAPPayment.css";
+
+
+
 @import "../VAS_047_TodayCashInCashJournalWidget.css";
 
 
