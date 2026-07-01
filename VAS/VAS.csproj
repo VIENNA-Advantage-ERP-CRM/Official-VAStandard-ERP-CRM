@@ -156,6 +156,14 @@
     <Content Include="Areas\VAS\Content\VAS_028_PaidThisMonthAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_032_RecentAPPaymentsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_033_PaymentMethodsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_048_TodayCashOutCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_049_NetCashForCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_050_CurrentCashForCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_051_SevenDayCashFlowCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_052_TodaysCashbookCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_053_ApprovalQueueCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_054_TopCounterpartiesCashJournalWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_055_CashByCategoryCashJournalWidget.css" />
     <Compile Include="Areas\VAS\Controllers\AcctViewerDataController.cs" />
     <Compile Include="Areas\VAS\Controllers\AgingReceivablesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AlertSQLGenerateController.cs" />
@@ -236,6 +244,7 @@
     <Compile Include="Areas\VAS\Controllers\OverdueController.cs" />
     <Compile Include="Areas\VAS\Controllers\TopDebtorsController.cs" />
     <Compile Include="Areas\VAS\Controllers\VASAttachUserToBPController.cs" />
+
     <Compile Include="Areas\VAS\Controllers\VAS_016_AvgPaymentPeriodWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_017_MonthlyPurchaseSpendWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_018_OverduePayablesWidgetController.cs" />
@@ -251,11 +260,22 @@
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_042_GLJournalVolumeWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_047_TodayCashInCashJournalWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_048_TodayCashOutCashJournalController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_049_NetCashForCashJournalWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_050_CurrentCashForCashJournalController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_051_SevenDayCashFlowCashJournalController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_052_TodaysCashbookCashJournalController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_053_ApprovalQueueCashJournalController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_054_TopCounterpartiesCashJournalController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_055_CashByCategoryCashJournalController.cs" />
+
     <Compile Include="Areas\VAS\Controllers\VAS_067_APInvoiceSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_068_APPaymentSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_069_CashJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_092_OverviewPurchaseOrderController.cs" />
+
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
@@ -289,6 +309,7 @@
     <Compile Include="Areas\VAS\Controllers\VPaySelectController.cs" />
     <Compile Include="Areas\VAS\Controllers\VTrxMaterialController.cs" />
     <Content Include="Areas\VAS\Content\VAS_046_ReconciliationStatusWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_047_TodayCashInCashJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_092_OverviewPurchaseOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
@@ -299,6 +320,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_032_RecentAPPaymentsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_033_PaymentMethodsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_047_TodayCashInCashJournalWidget.js" />
     <Compile Include="Areas\VAS\VASAreaRegistration.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -501,6 +523,14 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_014_DailyCollectionTrend.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_015_OutstandingVsReceived.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_035_MatchSuggestions.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_048_TodayCashOutCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_049_NetCashForCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_050_CurrentCashForCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_051_SevenDayCashFlowCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_052_TodaysCashbookCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_053_ApprovalQueueCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_054_TopCounterpartiesCashJournalWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_055_CashByCategoryCashJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
@@ -545,6 +575,8 @@
     <Content Include="Areas\VAS\Scripts\src\reactjs.js" />
     <Content Include="Areas\VAS\Scripts\src\VASjs.js" />
     <Content Include="Areas\VAS\Scripts\VAS.all.min.js" />
+    <Content Include="Areas\VAS\Scripts\dist\React.min.js" />
+    <Content Include="Areas\VAS\Scripts\dist\VAS.all.min.js" />
     <Content Include="Areas\VAS\Views\web.config" />
     <Content Include="Areas\VAS\Views\PaymentAllocation\Index.cshtml" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ExpRevProfitWidget.js" />
@@ -583,7 +615,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Areas\VAS\Data\" />
-    <Folder Include="Areas\VAS\Scripts\dist\" />
     <Folder Include="Areas\VAS\Scripts\react\component\" />
     <Folder Include="Areas\VAS\Scripts\react\pages\" />
     <Folder Include="Areas\VAS\Views\AlertRuleSQLGenerate\" />
