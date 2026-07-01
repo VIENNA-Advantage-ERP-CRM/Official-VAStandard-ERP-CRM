@@ -1,0 +1,918 @@
+.VAS-056-AutoAllocatedAPPayment-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    container-type: inline-size;
+    contain: layout style;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    position: relative;
+    overflow: hidden;
+}
+
+.VAS-056-AutoAllocatedAPPayment-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.VAS-056-AutoAllocatedAPPayment-busy.is-visible {
+    display: flex;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-busy.is-visible {
+    display: flex;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager {
+    gap: 0.5em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    background: #fbfdff;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+    color: #0083da;
+    height: 1.5em;
+    width: 1.5em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn svg {
+    height: 0.875em;
+    width: 0.875em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn:hover:not(:disabled),
+.VAS-056-AutoAllocatedAPPayment-pager-btn:focus-visible:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #b8c6d2;
+    cursor: default;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-text {
+    font-size: 0.85em;
+    font-weight: 500;
+    min-width: 3.75em;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-root,
+    .VAS-056-AutoAllocatedAPPayment-root * {
+        box-sizing: border-box;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    padding: 0.875em;
+    gap: 0.375em;
+    border: 2px solid #ffffff;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102c3f;
+    position: relative;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-card:focus-visible {
+        outline: 2px solid #0083da;
+        outline-offset: 2px;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-header {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    overflow: hidden;
+}
+
+.VAS-056-AutoAllocatedAPPayment-icon-box {
+    flex: 0 0 auto;
+    width: 1.75em;
+    height: 1.75em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
+    background: rgba(255, 255, 255, 0.90);
+    color: #d78b10;
+}
+
+.VAS-056-AutoAllocatedAPPayment-icon {
+    width: 1em;
+    height: 1em;
+    display: block;
+    flex: 0 0 auto;
+    color: currentColor;
+    stroke: currentColor;
+    stroke-width: 0.1125em;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.VAS-056-AutoAllocatedAPPayment-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em;
+    font-weight: 400;
+    line-height: 1.2;
+    color: #102c3f;
+}
+
+.VAS-056-AutoAllocatedAPPayment-arrow {
+    align-items: center;
+    color: #748494;
+    display: flex;
+    flex-shrink: 0;
+    font-size: .875em;
+    margin-left: auto;
+    opacity: .55;
+    text-decoration: none !important;
+    transition: opacity .15s, color .15s;
+}
+
+.VAS-056-AutoAllocatedAPPayment-arrow svg {
+    width: 1em;
+    height: 1em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+}
+
+.VAS-056-AutoAllocatedAPPayment-value {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.375em;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+    color: #9a6500;
+}
+
+.VAS-056-AutoAllocatedAPPayment-footer {
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    overflow: hidden;
+    color: #5f7283;
+}
+
+.VAS-056-AutoAllocatedAPPayment-badge {
+    flex: 0 1 auto;
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.1875em 0.4375em;
+    border: 1px solid rgba(0, 131, 218, 0.15);
+    border-radius: 62.4375em;
+    background: rgba(255, 255, 255, 0.85);
+    color: #0083da;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 0.075em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-desc {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #5f7283;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    line-clamp: 1;
+}
+
+.VAS-056-AutoAllocatedAPPayment-body.VAS-056-AutoAllocatedAPPayment-state .VAS-056-AutoAllocatedAPPayment-value {
+    font-size: 0.75em;
+    font-weight: 500;
+    letter-spacing: 0;
+    color: #5f7283;
+}
+
+.VAS-056-AutoAllocatedAPPayment-busy,
+.VAS-056-AutoAllocatedAPPayment-state-message {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    border-radius: 14px;
+    text-align: center;
+    color: #5f7283;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-busy.is-visible,
+    .VAS-056-AutoAllocatedAPPayment-state-message.is-visible {
+        display: flex;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-root.VAS-056-AutoAllocatedAPPayment-compact .VAS-056-AutoAllocatedAPPayment-card {
+    padding: 0.75em;
+    gap: 0.375em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-root.VAS-056-AutoAllocatedAPPayment-compact .VAS-056-AutoAllocatedAPPayment-icon-box {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 0.375em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-root.VAS-056-AutoAllocatedAPPayment-compact .VAS-056-AutoAllocatedAPPayment-icon {
+    width: 0.875em;
+    height: 0.875em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-root.VAS-056-AutoAllocatedAPPayment-compact .VAS-056-AutoAllocatedAPPayment-value {
+    font-size: 1.375em;
+}
+
+@container (max-width: 300px) {
+    .VAS-056-AutoAllocatedAPPayment-card {
+        padding: 0.75em;
+        gap: 0.375em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-title {
+        font-size: 0.8125em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-value {
+        font-size: 1.375em;
+    }
+}
+
+@container (max-width: 220px) {
+    .VAS-056-AutoAllocatedAPPayment-card {
+        padding: 0.625em;
+        gap: 0.3125em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-icon-box {
+        width: 1.625em;
+        height: 1.625em;
+        border-radius: 0.375em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-icon {
+        width: 0.8125em;
+        height: 0.8125em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-title {
+        font-size: 0.75em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-value {
+        font-size: 1em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-badge,
+    .VAS-056-AutoAllocatedAPPayment-desc {
+        font-size: 0.625em;
+    }
+}
+
+.VAS-056-AutoAllocatedAPPayment-body-lock {
+    overflow: hidden;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog,
+.VAS-056-AutoAllocatedAPPayment-dialog * {
+    box-sizing: border-box;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-card {
+    position: relative;
+    width: min(74em, 100%);
+    height: min(38em, 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 1em;
+    background: #ffffff;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    color: #102c3f;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #edf2f6;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-icon {
+    flex: 0 0 auto;
+    width: 2.25em;
+    height: 2.25em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0.0625em solid #f4d89b;
+    border-radius: 0.5em;
+    background: #fff4dd;
+    color: #d78b10;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-title {
+    font-size: 1.125em;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #102c3f;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-subtitle {
+    min-width: 0;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    line-height: 1.3;
+    color: #748494;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-close {
+    flex: 0 0 auto;
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #5f7283;
+    cursor: pointer;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-close svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-close:hover {
+        background: #f3f7fb;
+        color: #102c3f;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-dialog-summary {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1em;
+    padding: 1em 1.25em;
+    border-bottom: 1px solid #edf2f6;
+    background: #fbfdff;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-summary div {
+        min-width: 0;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-summary span,
+    .VAS-056-AutoAllocatedAPPayment-dialog-summary strong {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-summary span {
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1.2;
+        color: #748494;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-summary strong {
+        margin-top: 0.45em;
+        font-size: 1.25em;
+        font-weight: 800;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+        color: #102c3f;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.125em;
+    position: relative;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-busy.is-visible {
+    display: flex;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-table {
+    width: 100%;
+    min-width: 68em;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 1em 0.75em;
+        border-bottom: 1px solid #edf2f6;
+        background: #ffffff;
+        color: #748494;
+        font-size: 0.75em;
+        font-weight: 700;
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-transform: capitalize;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-table tbody td {
+        padding: 0.875em 0.75em;
+        border-bottom: 1px solid #edf2f6;
+        color: #102c3f;
+        font-size: 0.875em;
+        line-height: 1.2;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-table tbody tr:hover td {
+        background: #f8fbfe;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-th-doc,
+.VAS-056-AutoAllocatedAPPayment-td-doc {
+    width: 9em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-date,
+.VAS-056-AutoAllocatedAPPayment-td-date {
+    width: 8em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-customer,
+.VAS-056-AutoAllocatedAPPayment-td-customer {
+    width: 13em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-bank,
+.VAS-056-AutoAllocatedAPPayment-td-bank {
+    width: 13em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-currency,
+.VAS-056-AutoAllocatedAPPayment-td-currency {
+    width: 7em;
+    text-align: left;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-amount,
+.VAS-056-AutoAllocatedAPPayment-td-amount {
+    width: 14em;
+    text-align: left;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-date,
+.VAS-056-AutoAllocatedAPPayment-td-bank,
+.VAS-056-AutoAllocatedAPPayment-td-currency {
+    color: #5f7283;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-customer {
+    font-weight: 700;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-method,
+.VAS-056-AutoAllocatedAPPayment-td-method {
+    width: 10em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-truncate {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-doc {
+    font-family: "Roboto Mono", "Roboto", monospace;
+    font-weight: 700;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-date,
+.VAS-056-AutoAllocatedAPPayment-td-bank,
+.VAS-056-AutoAllocatedAPPayment-td-currency,
+.VAS-056-AutoAllocatedAPPayment-td-method {
+    color: #5f7283;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-customer {
+    font-weight: 700;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-amount {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+.VAS-056-AutoAllocatedAPPayment-cur-inline {
+    margin-inline-end: 0.2em;
+    font-weight: inherit;
+    color: inherit;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-empty {
+    padding: 2.25em 1em !important;
+    text-align: center;
+    color: #748494 !important;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.25em;
+    border-top: 0.0625em solid #edf2f6;
+    background: #fafcfe;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-helper {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    color: #748494;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0.0625em solid #e4edf4;
+    border-radius: 0.5em;
+    background: #fbfdff;
+    color: #0083da;
+    cursor: pointer;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-pager-btn svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-pager-btn:hover:not(:disabled) {
+        background: #eaf8ff;
+        border-color: #bfe4ff;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-pager-btn:disabled {
+        color: #b8c6d2;
+        cursor: default;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-pager-text {
+    min-width: 3em;
+    text-align: center;
+    white-space: nowrap;
+    font-size: 0.875em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: #102c3f;
+}
+
+@media (max-width: 48em) {
+    .VAS-056-AutoAllocatedAPPayment-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-th-doc,
+    .VAS-056-AutoAllocatedAPPayment-td-doc {
+        width: 8em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-th-customer,
+    .VAS-056-AutoAllocatedAPPayment-td-customer {
+        width: 11em;
+    }
+}
+
+@media (max-width: 36em) {
+    .VAS-056-AutoAllocatedAPPayment-dialog {
+        padding: 0;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-table thead th,
+    .VAS-056-AutoAllocatedAPPayment-dialog-table tbody td {
+        padding: 0.625em 0.5em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-th-date,
+    .VAS-056-AutoAllocatedAPPayment-td-date {
+        display: none;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-dialog-footer {
+        flex-wrap: wrap;
+        gap: 0.625em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-pager-helper {
+        flex: 1 1 100%;
+        order: 2;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-pager {
+        order: 1;
+    }
+}
+
+
+/* =========================================================
+   VAS_056 Auto Allocated AP Payment - Tabs
+   ========================================================= */
+
+.VAS-056-AutoAllocatedAPPayment-tabs {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.75em 1.25em 0;
+    border-bottom: 1px solid #edf2f6;
+    background: #ffffff;
+}
+
+.VAS-056-AutoAllocatedAPPayment-tab {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 0.625em 0.875em;
+    border: 0;
+    border-bottom: 0.1875em solid transparent;
+    background: transparent;
+    color: #748494;
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+    .VAS-056-AutoAllocatedAPPayment-tab:hover {
+        color: #102c3f;
+        background: #f8fbfe;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-tab.VAS-056-AutoAllocatedAPPayment-tab-active {
+        border-bottom-color: #d78b10;
+        color: #9a6500;
+    }
+
+.VAS-056-AutoAllocatedAPPayment-tab-count {
+    min-width: 1.75em;
+    padding: 0.125em 0.4375em;
+    border-radius: 62.4375em;
+    background: #edf2f6;
+    color: #5f7283;
+    text-align: center;
+    font-size: 0.875em;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS-056-AutoAllocatedAPPayment-tab.VAS-056-AutoAllocatedAPPayment-tab-active .VAS-056-AutoAllocatedAPPayment-tab-count {
+    background: #fff4dd;
+    color: #9a6500;
+}
+
+@media (max-width: 48em) {
+    .VAS-056-AutoAllocatedAPPayment-th-customer,
+    .VAS-056-AutoAllocatedAPPayment-td-customer,
+    .VAS-056-AutoAllocatedAPPayment-th-bank,
+    .VAS-056-AutoAllocatedAPPayment-td-bank {
+        width: 11em;
+    }
+}
+
+@media (max-width: 36em) {
+    .VAS-056-AutoAllocatedAPPayment-tabs {
+        padding: 0.625em 0.75em 0;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-tab {
+        flex: 1 1 50%;
+        padding-inline: 0.5em;
+    }
+
+    .VAS-056-AutoAllocatedAPPayment-th-bank,
+    .VAS-056-AutoAllocatedAPPayment-td-bank {
+        display: none;
+    }
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-footer {
+    justify-content: space-between;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-helper {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS-056-AutoAllocatedAPPayment-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-amount,
+.VAS-056-AutoAllocatedAPPayment-td-amount,
+.VAS-056-AutoAllocatedAPPayment-dialog-table thead th:last-child,
+.VAS-056-AutoAllocatedAPPayment-dialog-table tbody td:last-child {
+    text-align: right !important;
+}
+
+.VAS-056-AutoAllocatedAPPayment-dialog-summary strong {
+    text-align: left;
+}
+

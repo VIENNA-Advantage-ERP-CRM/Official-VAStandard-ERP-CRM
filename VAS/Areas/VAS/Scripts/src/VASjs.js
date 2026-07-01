@@ -145,6 +145,12 @@ import "../app/widgets/VAS_033_PaymentMethodsWidget.js";
 import "../app/widgets/VAS_046_ReconciliationStatusWidget.js";
 
 
+import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
+
+import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
+
+
+
 import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
 
 import "../app/widgets/VAS_010_CashGlCashInWidget.js";
@@ -176,6 +182,8 @@ import "../app/widgets/OutstandingSalesOrderWidget.js";
 import "../app/widgets/OverdueWidget.js";
 import "../app/widgets/PaidthismonthWidget.js";
 import "../app/widgets/TopDebtorsWidget.js";
+
+
 
 import "../app/widgets/VAS_041_GLJournalEntriesWidget.js";
 import "../app/widgets/VAS_036_GLJournalUnpostedWidget.js";
