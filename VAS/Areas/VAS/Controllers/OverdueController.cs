@@ -37,7 +37,7 @@ namespace VIS.Controllers
                 overdueDateCondition = " AND TRUNC(ips.DueDate) < TRUNC(SYSDATE)";
             }
 
-            string cteSchemaCurrency = @"SELECT ci.AD_Client_ID, cs.C_Currency_ID AS Acct_Currency_ID, cur.StdPrecision,
+            string cteSchemaCurrency = @"SELECT ci.AD_Client_ID, cs.C_Currency_ID AS Acct_Currency_ID, cur.StdPrecision, cur.ISO_Code AS ISO_Code,
                     CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                     FROM AD_ClientInfo ci 
                     INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID) 
@@ -49,7 +49,7 @@ namespace VIS.Controllers
                     WHEN i.IsReturnTrx='Y' THEN 
                      -CurrencyConvert(COALESCE(ips.DueAmt, 0), i.C_Currency_ID, sc.Acct_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
                     ELSE 0 END), 0), MAX(sc.StdPrecision)) AS Total_Overdue_Outstanding_Amount, COUNT(DISTINCT i.C_Invoice_ID) AS Overdue_Invoice_Count,
-                    MAX(sc.Cur_Symbol) AS Cur_Symbol 
+                    MAX(sc.Cur_Symbol) AS Cur_Symbol, MAX(sc.ISO_Code) AS ISO_Code, MAX(sc.StdPrecision) AS Std_Precision
                     FROM C_InvoicePaySchedule ips 
                     INNER JOIN C_Invoice i ON (ips.C_Invoice_ID=i.C_Invoice_ID) 
                     INNER JOIN schema_currency sc ON (sc.AD_Client_ID=i.AD_Client_ID) 
@@ -69,6 +69,8 @@ namespace VIS.Controllers
             /* Base-currency symbol (accounting schema currency); amounts above are
                already converted to this currency. Carried by the schema_currency CTE. */
             string currencySymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
 
             IDataReader dr = null;
             try
@@ -79,6 +81,12 @@ namespace VIS.Controllers
                     totalOverdue = Util.GetValueOfDecimal(dr["Total_Overdue_Outstanding_Amount"]);
                     invoiceCount = Util.GetValueOfInt(dr["Overdue_Invoice_Count"]);
                     currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    isoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                    /* No overdue rows -> MAX returns NULL; keep the default precision of 2. */
+                    if (dr["Std_Precision"] != null && dr["Std_Precision"] != System.DBNull.Value)
+                    {
+                        stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]);
+                    }
                 }
             }
             finally
@@ -90,7 +98,9 @@ namespace VIS.Controllers
             {
                 totalOverdue = totalOverdue,
                 invoiceCount = invoiceCount,
-                symbol = currencySymbol
+                symbol = currencySymbol,
+                isoCode = isoCode,
+                stdPrecision = stdPrecision
             };
 
             return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

@@ -91,7 +91,7 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalOutstanding, data.orderCount, data.topCustomer, data.curSymbol);
+                        renderMetric(data.totalOutstanding, data.orderCount, data.topCustomer, data.curSymbol, data.isoCode, data.stdPrecision);
                     }
                 },
                 error: function () {
@@ -101,19 +101,12 @@
             });
         }
 
-        /* ── Format a currency amount into a compact, locale-aware string ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-            var sign = value < 0 ? '-' : '';
-            var absVal = Math.abs(value);
-
-            if (absVal >= 1000000) {
-                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return sign + Math.round(absVal / 1000) + 'k';
-            }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
+        /* ── Format a currency amount into a compact, locale-aware string ──
+           Magnitude formatting (Indian vs international numbering by base currency,
+           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount;
+           the minus sign is prepended here. */
+        function formatCurrency(value, isoCode, precision) {
+            return (value < 0 ? '-' : '') + VIS.Util.formatCompactAmount(value, isoCode, precision);
         }
 
         /* ── Build the WHY explanatory copy from the optional count / top-customer data ── */
@@ -133,10 +126,10 @@
         }
 
         /* ── Render metric values ── */
-        function renderMetric(total, count, topCustomer, symbol) {
+        function renderMetric(total, count, topCustomer, symbol, isoCode, precision) {
             if ($metricEl) {
                 /* Base-currency symbol (from the accounting schema) sits before the amount. */
-                $metricEl.text((symbol || '') + formatCurrency(total));
+                $metricEl.text((symbol || '') + formatCurrency(total, isoCode, precision));
             }
             if ($whyText) {
                 $whyText.text(buildWhyText(count, topCustomer));

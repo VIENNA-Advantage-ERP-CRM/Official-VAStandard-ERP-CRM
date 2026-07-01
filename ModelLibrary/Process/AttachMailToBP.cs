@@ -629,7 +629,7 @@ namespace VAdvantage.Process
 
             using (AIApiService service = new AIApiService(mailDataIn.token))
             {
-                var outp = service.ExecuteRequest(mailDataIn, "callOrchestrationForEmail");
+                var outp = service.ExecuteRequest(mailDataIn, "callOrchestrationForAISuggestion");
                 if (!outp.isError)
                 {
                     try

@@ -38,7 +38,17 @@
 @import "../VAS_046_ReconciliationStatusWidget.css";
 
 
+@import "../VAS_056_AutoAllocatedAPPaymentWidget.css";
+
+@import "../VAS_072_MatchSuggestionAPPayment.css";
+
+
+
+@import "../VAS_047_TodayCashInCashJournalWidget.css";
+
+
 @import "../VAS_010_CashGlCashInWidget.css";
+@import "../VAS_092_OverviewPurchaseOrder.css";
 
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_CreateARInvoice.css";
@@ -91,3 +101,30 @@
 @import "../VAS_094_HighestSellingProductsWidget.css";
 @import "../VAS_095_QuickOperationsWidget.css";
 @import "../VAS_096_StockMovementTodayWidget.css";
+@import "../VAS_DocumentSearchWidgets.css";
+
+@import "../VAS_081_MaterialReceiptRegisterWidget.css"; 
+@import "../VAS_082_NewGRNWidget.css"; 
+@import "../VAS_083_OpenGRNsWidget.css"; 
+@import "../VAS_084_PendingInspectionWidget.css"; 
+@import "../VAS_085_POFulfilmentWidget.css"; 
+@import "../VAS_086_QAHoldsWidget.css"; 
+@import "../VAS_087_ReceiptAgingWidget.css"; 
+@import "../VAS_088_ReceiptQueueWidget.css";
+@import "../VAS_089_ReceiptsMTDWidget.css"; 
+@import "../VAS_090_ReceivingActionsWidget.css";
+
+@import "../VAS_097_ExpectedGRNWidget.css";
+
+
+@import "../VAS_048_TodayCashOutCashJournalWidget.css";
+@import "../VAS_049_NetCashForCashJournalWidget.css";
+@import "../VAS_050_CurrentCashForCashJournalWidget.css";
+@import "../VAS_051_SevenDayCashFlowCashJournalWidget.css";
+@import "../VAS_052_TodaysCashbookCashJournalWidget.css";
+@import "../VAS_053_ApprovalQueueCashJournalWidget.css";
+@import "../VAS_054_TopCounterpartiesCashJournalWidget.css";
+@import "../VAS_055_CashByCategoryCashJournalWidget.css";
+
+@import "../VAS_065_APInvoicePanel.css";
+

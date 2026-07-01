@@ -51,6 +51,9 @@
         var $listBody;
         /* Base-currency symbol from the backend; rendered before each amount. */
         var currencySymbol = '';
+        /* Base-currency ISO code (drives Indian vs international abbreviation) and precision. */
+        var currencyIso = '';
+        var currencyPrecision = null;
         /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
         var $busy;
 
@@ -88,8 +91,10 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && typeof data === 'object') {
-                        /* Backend returns { symbol, rows[] }; tolerate a bare array too. */
+                        /* Backend returns { symbol, isoCode, stdPrecision, rows[] }; tolerate a bare array too. */
                         currencySymbol = data.symbol || '';
+                        currencyIso = data.isoCode || '';
+                        currencyPrecision = (data.stdPrecision === undefined || data.stdPrecision === null) ? null : data.stdPrecision;
                         renderRows(Array.isArray(data) ? data : (data.rows || []));
                     }
                 },
@@ -98,27 +103,15 @@
             });
         }
 
-        /* ── Format the numeric part of an amount (k / M abbreviations) ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-            var absVal = Math.abs(Number(value) || 0);
-
-            if (absVal >= 1000000) {
-                return (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return Math.round(absVal / 1000) + 'k';
-            }
-            return absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
-        }
-
         /* Build amount markup with the base-currency symbol placed *before* the amount;
-           the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
+           the minus sign (if any) precedes the symbol (e.g. -$1.2M). The compact
+           magnitude (Indian vs international numbering by base currency, kept to the
+           currency precision) comes from VIS.Util.formatCompactAmount. */
         function formatMetric(value, symbol) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
             var symHtml = symbol ? '<span class="vas-td-cur">' + escapeHtml(symbol) + '</span>' : '';
-            return sign + symHtml + formatCurrency(value);
+            return sign + symHtml + VIS.Util.formatCompactAmount(value, currencyIso, currencyPrecision);
         }
 
         /* ── Avatar initials ── */

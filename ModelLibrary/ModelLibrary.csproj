@@ -603,6 +603,7 @@
     <Compile Include="Process\AlertTestMailAttachment.cs" />
     <Compile Include="Process\ReCostingCalculationTransaction.cs" />
     <Compile Include="Process\RenewalContract.cs" />
+    <Compile Include="Process\VAS_ArchiveOpportunity.cs" />
     <Compile Include="Process\VAS_GenerateQuotation.cs" />
     <Compile Include="Process\VAS_GenerateOrder.cs" />
     <Compile Include="Process\YearCreatePeriods.cs" />
