@@ -1,0 +1,659 @@
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Globalization;
+using System.Web.Mvc;
+using VAdvantage.Classes;
+using VAdvantage.DataBase;
+using VAdvantage.Model;
+using VAdvantage.Utility;
+using VIS.Filters;
+
+namespace VIS.Controllers
+{
+    /// <summary>
+    /// Module Name : Receiving Actions (Material Receipt / GRN dashboard)
+    /// Purpose     : Data endpoints for the 3x2 receiving action widget. The
+    ///               widget reuses VAS_082_NewGRNWidget/CreateGRN for receipt
+    ///               creation and VAS_086_QAHoldsWidget/GetQAHolds + SaveQAResult
+    ///               for the QA inspection load/save.
+    /// Chronological development:
+    ///   &lt;EmpCode&gt;   2026-06-20 Created
+    /// </summary>
+    public class VAS_090_ReceivingActionsWidgetController : Controller
+    {
+        /// <summary>
+        /// Renders a string literal compatible with the active database: Oracle uses
+        /// the national-character N'...' prefix, PostgreSQL a plain quoted literal
+        /// (PostgreSQL does not support the N'...' syntax).
+        /// </summary>
+        /// <param name="text">Literal text (no quotes).</param>
+        /// <returns>A DB-appropriate quoted literal.</returns>
+        private static string NLiteral(string text)
+        {
+            return DB.IsPostgreSQL() ? "'" + text + "'" : "N'" + text + "'";
+        }
+
+        /// <summary>
+        /// One page of completed vendor purchase orders that still have open
+        /// quantity, with supplier, warehouse, receiving dock and promised date.
+        /// </summary>
+        /// <param name="pageNo">1-based page number.</param>
+        /// <param name="pageSize">Rows per page (max 20).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 8)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (pageNo <= 0) { pageNo = 1; }
+            if (pageSize <= 0) { pageSize = 8; }
+            if (pageSize > 20) { pageSize = 20; }
+
+            int offset = (pageNo - 1) * pageSize;
+            string dockSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(ReceiveLocator.LocatorCombination, ReceiveLocator.Value, " + NLiteral("-") + ")"
+                : "COALESCE(ReceiveLocator.Value, " + NLiteral("-") + ")";
+
+            string rawSql = @"
+                SELECT PurchaseOrder.C_Order_ID AS PO_ID,
+                       PurchaseOrder.DocumentNo AS PO_No,
+                       BPartner.Name AS Supplier_Name,
+                       COALESCE(Warehouse.Name, " + NLiteral("-") + @") AS Warehouse_Name,
+                       " + dockSql + @" AS Dock_Name,
+                       COALESCE(PurchaseOrder.POReference, " + NLiteral("-") + @") AS Supplier_Reference,
+                       COALESCE(OrderLine.DatePromised, PurchaseOrder.DatePromised) AS Line_Promise_Date,
+                       OrderLine.C_OrderLine_ID AS PO_Line_ID
+                FROM C_Order PurchaseOrder
+                INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
+                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=PurchaseOrder.C_BPartner_ID AND BPartner.IsActive='Y')
+                LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=PurchaseOrder.M_Warehouse_ID AND Warehouse.IsActive='Y')
+                LEFT OUTER JOIN M_Locator ReceiveLocator ON (ReceiveLocator.M_Locator_ID=Warehouse.M_RcvLocator_ID AND ReceiveLocator.IsActive='Y')
+                WHERE PurchaseOrder.IsActive='Y'
+                  AND PurchaseOrder.IsSOTrx='N'
+                  AND PurchaseOrder.DocStatus='CO'
+                  AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
+                  AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
+
+            rawSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawSql,
+                "PurchaseOrder",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string sql = @"
+                SELECT OpenPO.PO_ID,
+                       OpenPO.PO_No,
+                       OpenPO.Supplier_Name,
+                       OpenPO.Warehouse_Name,
+                       OpenPO.Dock_Name,
+                       OpenPO.Supplier_Reference,
+                       OpenPO.Promise_Date,
+                       OpenPO.Open_Line_Count,
+                       COUNT(1) OVER () AS TotalRecords
+                FROM (
+                    SELECT RawData.PO_ID,
+                           RawData.PO_No,
+                           RawData.Supplier_Name,
+                           RawData.Warehouse_Name,
+                           RawData.Dock_Name,
+                           RawData.Supplier_Reference,
+                           MIN(RawData.Line_Promise_Date) AS Promise_Date,
+                           COUNT(RawData.PO_Line_ID) AS Open_Line_Count
+                    FROM (
+                        " + rawSql + @"
+                    ) RawData
+                    GROUP BY RawData.PO_ID,
+                             RawData.PO_No,
+                             RawData.Supplier_Name,
+                             RawData.Warehouse_Name,
+                             RawData.Dock_Name,
+                             RawData.Supplier_Reference
+                ) OpenPO
+                ORDER BY OpenPO.Promise_Date, OpenPO.PO_No
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@Offset", offset));
+            parameters.Add(new SqlParameter("@PageSize", pageSize));
+
+            List<object> rows = new List<object>();
+            int totalRecords = 0;
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+
+                while (dr != null && dr.Read())
+                {
+                    totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
+                    DateTime? promiseDate = Util.GetValueOfDateTime(dr["Promise_Date"]);
+
+                    rows.Add(new
+                    {
+                        poId = Util.GetValueOfInt(dr["PO_ID"]),
+                        poNo = Util.GetValueOfString(dr["PO_No"]),
+                        supplier = Util.GetValueOfString(dr["Supplier_Name"]),
+                        warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
+                        dockName = Util.GetValueOfString(dr["Dock_Name"]),
+                        supplierReference = Util.GetValueOfString(dr["Supplier_Reference"]),
+                        promiseDate = promiseDate.HasValue ? promiseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                        openLineCount = Util.GetValueOfInt(dr["Open_Line_Count"])
+                    });
+                }
+
+                return Ok(new
+                {
+                    rows = rows,
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+                    totalRecords = totalRecords,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize))
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Open (un-received) order lines for one purchase order, with the default
+        /// received quantity pre-set to the remaining open quantity.
+        /// </summary>
+        /// <param name="poId">C_Order_ID of the selected purchase order.</param>
+        /// <returns>JSON { rows[] }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetPurchaseOrderLines(int poId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            string sql = @"
+                SELECT OrderLine.C_OrderLine_ID AS PO_Line_ID,
+                       OrderLine.Line AS Line_No,
+                       COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
+                       COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
+                       COALESCE(OrderLine.QtyDelivered, 0) AS Already_Received_Qty,
+                       COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) AS Open_Qty,
+                       COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom
+                FROM C_Order PurchaseOrder
+                INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
+                LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=OrderLine.M_Product_ID AND Product.IsActive='Y')
+                LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=OrderLine.C_UOM_ID AND UOM.IsActive='Y')
+                WHERE PurchaseOrder.IsActive='Y'
+                  AND PurchaseOrder.IsSOTrx='N'
+                  AND PurchaseOrder.DocStatus='CO'
+                  AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
+                  AND PurchaseOrder.C_Order_ID=@PO_ID
+                  AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql,
+                "PurchaseOrder",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            sql += @"
+                ORDER BY OrderLine.Line";
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@PO_ID", poId));
+
+            List<object> rows = new List<object>();
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+
+                while (dr != null && dr.Read())
+                {
+                    decimal openQty = Util.GetValueOfDecimal(dr["Open_Qty"]);
+
+                    rows.Add(new
+                    {
+                        poLineId = Util.GetValueOfInt(dr["PO_Line_ID"]),
+                        lineNo = Util.GetValueOfInt(dr["Line_No"]),
+                        itemName = Util.GetValueOfString(dr["Item_Name"]),
+                        poQty = Util.GetValueOfDecimal(dr["PO_Qty"]),
+                        alreadyReceivedQty = Util.GetValueOfDecimal(dr["Already_Received_Qty"]),
+                        openQty = openQty,
+                        defaultReceivedQty = openQty,
+                        uom = Util.GetValueOfString(dr["Uom"])
+                    });
+                }
+
+                return Ok(new { rows = rows });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// One page of vendor GRNs for label printing, filtered by an optional
+        /// document-number / supplier-name search, with copy count and print format.
+        /// </summary>
+        /// <param name="searchText">Optional GRN number or supplier name fragment.</param>
+        /// <param name="pageNo">1-based page number.</param>
+        /// <param name="pageSize">Rows per page (max 10).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult SearchGRNLabels(string searchText = "", int pageNo = 1, int pageSize = 5)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (pageNo <= 0) { pageNo = 1; }
+            if (pageSize <= 0) { pageSize = 5; }
+            if (pageSize > 10) { pageSize = 10; }
+
+            int offset = (pageNo - 1) * pageSize;
+            string trimmedSearch = (searchText ?? "").Trim();
+            bool hasSearch = !string.IsNullOrEmpty(trimmedSearch);
+            string searchWhere = "";
+
+            if (hasSearch)
+            {
+                searchWhere = @"
+                      AND (UPPER(InOut.DocumentNo) LIKE UPPER(@Search_DocumentNo)
+                           OR UPPER(BPartner.Name) LIKE UPPER(@Search_PartnerName))";
+            }
+
+            string copiesSql = HasColumn("C_DocType", "DocumentCopies")
+                ? "COALESCE(DocType.DocumentCopies, 1)"
+                : "1";
+            string printFormatSql = HasColumn("C_DocType", "AD_PrintFormat_ID")
+                ? "COALESCE(DocType.AD_PrintFormat_ID, 0)"
+                : "0";
+
+            string rawLabelSql = @"
+                SELECT InOut.M_InOut_ID AS GRN_ID,
+                       InOut.DocumentNo AS GRN_No,
+                       BPartner.Name AS Party_Name,
+                       COALESCE(InOutLine.MovementQty, 0) AS Line_Qty,
+                       " + copiesSql + @" AS Copies,
+                       " + printFormatSql + @" AS Print_Format_ID,
+                       COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Sort_Date
+                FROM M_InOut InOut
+                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
+                LEFT OUTER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOut_ID=InOut.M_InOut_ID AND InOutLine.IsActive='Y')
+                LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=InOut.C_DocType_ID AND DocType.IsActive='Y')
+                WHERE InOut.IsActive='Y'
+                  AND InOut.MovementType='V+'
+                  AND InOut.AD_Client_ID=@AD_Client_ID" + searchWhere;
+
+            rawLabelSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawLabelSql,
+                "InOut",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string sql = @"
+                SELECT LabelData.GRN_ID,
+                       LabelData.GRN_No,
+                       LabelData.Party_Name,
+                       LabelData.Received_Qty,
+                       LabelData.Copies,
+                       LabelData.Print_Format_ID,
+                       LabelData.TotalRecords
+                FROM (
+                    SELECT RawData.GRN_ID,
+                           RawData.GRN_No,
+                           RawData.Party_Name,
+                           COALESCE(SUM(RawData.Line_Qty), 0) AS Received_Qty,
+                           MAX(RawData.Copies) AS Copies,
+                           MAX(RawData.Print_Format_ID) AS Print_Format_ID,
+                           MAX(RawData.Sort_Date) AS Sort_Date,
+                           COUNT(1) OVER () AS TotalRecords
+                    FROM (
+                        " + rawLabelSql + @"
+                    ) RawData
+                    GROUP BY RawData.GRN_ID,
+                             RawData.GRN_No,
+                             RawData.Party_Name
+                ) LabelData
+                ORDER BY LabelData.Sort_Date DESC, LabelData.GRN_No DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            if (hasSearch)
+            {
+                string searchLike = "%" + trimmedSearch + "%";
+                parameters.Add(new SqlParameter("@Search_DocumentNo", searchLike));
+                parameters.Add(new SqlParameter("@Search_PartnerName", searchLike));
+            }
+            parameters.Add(new SqlParameter("@Offset", offset));
+            parameters.Add(new SqlParameter("@PageSize", pageSize));
+
+            List<object> rows = new List<object>();
+            int totalRecords = 0;
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+
+                while (dr != null && dr.Read())
+                {
+                    totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
+                    int printFormatId = Util.GetValueOfInt(dr["Print_Format_ID"]);
+
+                    rows.Add(new
+                    {
+                        grnId = Util.GetValueOfInt(dr["GRN_ID"]),
+                        grnNo = Util.GetValueOfString(dr["GRN_No"]),
+                        partyName = Util.GetValueOfString(dr["Party_Name"]),
+                        receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
+                        copies = Math.Max(1, Util.GetValueOfInt(dr["Copies"])),
+                        printFormatId = printFormatId,
+                        printFormat = GetPrintFormatText(printFormatId)
+                    });
+                }
+
+                return Ok(new
+                {
+                    rows = rows,
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+                    totalRecords = totalRecords,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize))
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolves the print metadata (copies, print format) for one GRN and returns
+        /// a queued-label confirmation payload.
+        /// </summary>
+        /// <param name="grnId">M_InOut_ID of the GRN to print.</param>
+        /// <returns>JSON { success, grnId, grnNo, copies, printFormat, ... } or { error }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult QueueGRNLabelPrint(int grnId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            if (grnId <= 0)
+            {
+                return Fail("GRN is required.");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            string copiesSql = HasColumn("C_DocType", "DocumentCopies")
+                ? "COALESCE(DocType.DocumentCopies, 1)"
+                : "1";
+            string printFormatSql = HasColumn("C_DocType", "AD_PrintFormat_ID")
+                ? "COALESCE(DocType.AD_PrintFormat_ID, 0)"
+                : "0";
+
+            string sql = @"
+                SELECT InOut.M_InOut_ID AS GRN_ID,
+                       InOut.DocumentNo AS GRN_No,
+                       " + copiesSql + @" AS Copies,
+                       " + printFormatSql + @" AS Print_Format_ID
+                FROM M_InOut InOut
+                LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=InOut.C_DocType_ID AND DocType.IsActive='Y')
+                WHERE InOut.IsActive='Y'
+                  AND InOut.MovementType='V+'
+                  AND InOut.AD_Client_ID=@AD_Client_ID
+                  AND InOut.M_InOut_ID=@GRN_ID";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql,
+                "InOut",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@GRN_ID", grnId)
+            };
+
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters);
+                if (dr == null || !dr.Read())
+                {
+                    return Fail("GRN was not found.");
+                }
+
+                int printFormatId = Util.GetValueOfInt(dr["Print_Format_ID"]);
+                int resolvedGrnId = Util.GetValueOfInt(dr["GRN_ID"]);
+                string grnNo = Util.GetValueOfString(dr["GRN_No"]);
+                int copies = Math.Max(1, Util.GetValueOfInt(dr["Copies"]));
+
+                // Close the reader before issuing further scalar lookups on the connection.
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                // Resolve the GRN print/report process so the client can launch it via
+                // VIS.APrint against this M_InOut record. The process (Value/Name
+                // "DTD001_GRNReport") may not exist yet - in that case processId stays 0
+                // and the client simply shows the queued confirmation without printing.
+                int printProcessId = GetGRNPrintProcessId(ctx);
+                int inOutTableId = GetTableId("M_InOut");
+
+                return Ok(new
+                {
+                    success = true,
+                    grnId = resolvedGrnId,
+                    grnNo = grnNo,
+                    copies = copies,
+                    printFormatId = printFormatId,
+                    printFormat = GetPrintFormatText(printFormatId),
+                    printer = "Default printer",
+                    includes = "Barcode + locator",
+                    status = "Queued",
+                    AD_Process_ID = printProcessId,
+                    AD_Table_ID = inOutTableId,
+                    Record_ID = resolvedGrnId
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolves the AD_Process_ID of the GRN label/report process, matched by
+        /// either Value or Name "DTD001_GRNReport". Prefers a client-specific record,
+        /// falls back to system (AD_Client_ID = 0). Returns 0 when the process has not
+        /// been created yet, so the print confirmation can still be shown.
+        /// </summary>
+        /// <param name="ctx">Session context (for the active client).</param>
+        /// <returns>AD_Process_ID, or 0 when not found.</returns>
+        private int GetGRNPrintProcessId(Ctx ctx)
+        {
+            const string grnProcessKey = "DTD001_GRNReport";
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@Key", grnProcessKey),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+            };
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Process_ID
+                      FROM AD_Process
+                      WHERE (Value=@Key OR Name=@Key)
+                        AND IsActive='Y'
+                        AND AD_Client_ID IN (0, @AD_Client_ID)
+                      ORDER BY AD_Client_ID DESC
+                      FETCH FIRST 1 ROW ONLY",
+                    parameters, null));
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>Resolves the AD_Table_ID for a physical table name (0 when missing).</summary>
+        /// <param name="tableName">Physical table name, e.g. "M_InOut".</param>
+        /// <returns>AD_Table_ID, or 0 when not found.</returns>
+        private int GetTableId(string tableName)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Table_ID FROM AD_Table WHERE TableName=@TableName AND IsActive='Y'",
+                    new SqlParameter[] { new SqlParameter("@TableName", tableName) }, null));
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>Display text for a print format id (or the default put-away label).</summary>
+        /// <param name="printFormatId">AD_PrintFormat_ID, or 0 when none.</param>
+        /// <returns>Human-readable print-format label.</returns>
+        private string GetPrintFormatText(int printFormatId)
+        {
+            return printFormatId > 0
+                ? "Print format " + printFormatId.ToString(CultureInfo.InvariantCulture)
+                : "Put-away label 4x6";
+        }
+
+        /// <summary>
+        /// Whether a column exists on a table in the active database (PostgreSQL or
+        /// Oracle), so optional columns can be referenced safely.
+        /// </summary>
+        /// <param name="tableName">Physical table name.</param>
+        /// <param name="columnName">Column name to test.</param>
+        /// <returns>True when the column exists.</returns>
+        private bool HasColumn(string tableName, string columnName)
+        {
+            string sql;
+            if (DB.IsPostgreSQL())
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM information_schema.columns
+                    WHERE UPPER(table_name)=UPPER(@TableName)
+                      AND UPPER(column_name)=UPPER(@ColumnName)";
+            }
+            else
+            {
+                sql = @"
+                    SELECT COUNT(1)
+                    FROM USER_TAB_COLUMNS
+                    WHERE TABLE_NAME=UPPER(@TableName)
+                      AND COLUMN_NAME=UPPER(@ColumnName)";
+            }
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@TableName", tableName),
+                new SqlParameter("@ColumnName", columnName)
+            };
+
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Wraps a success payload as a serialized JSON result.</summary>
+        /// <param name="result">Anonymous payload object to serialize.</param>
+        /// <returns>JSON result.</returns>
+        private JsonResult Ok(object result)
+        {
+            return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>Wraps a failure message as a serialized JSON result.</summary>
+        /// <param name="message">User-facing error/message text.</param>
+        /// <returns>JSON result with success:false.</returns>
+        private JsonResult Fail(string message)
+        {
+            return Json(JsonConvert.SerializeObject(new
+            {
+                success = false,
+                error = message,
+                message = message
+            }), JsonRequestBehavior.AllowGet);
+        }
+    }
+}

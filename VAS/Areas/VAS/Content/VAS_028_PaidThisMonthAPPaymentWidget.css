@@ -1,4 +1,4 @@
-﻿.vas-ptm-root {
+.vas-ptm-root.vas-ptm-ap-root {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -7,28 +7,113 @@
     container-type: inline-size;
     contain: layout style;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(0.875rem, 1.4cqi, 1.25rem);
+    font-size: clamp(16px, 1.4cqi, 24px);
     position: relative;
     overflow: hidden;
 }
 
-    .vas-ptm-root,
-    .vas-ptm-root * {
+.vas-ptm-ap-busy {
+    align-items: center;
+    border-radius: 14px;
+    color: #5f7283;
+    display: none;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    inset: 0;
+    justify-content: center;
+    line-height: 1.35;
+    padding: 0.875em;
+    position: absolute;
+    text-align: center;
+    z-index: 2;
+}
+
+.vas-ptm-ap-busy.is-visible {
+    display: flex;
+}
+
+.vas-ptm-dialog-busy {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.62);
+    display: none;
+    inset: 0;
+    justify-content: center;
+    position: absolute;
+    z-index: 5;
+}
+
+.vas-ptm-dialog-busy.is-visible {
+    display: flex;
+}
+
+.vas-ptm-pager {
+    gap: 0.5em;
+}
+
+.vas-ptm-pager-btn {
+    background: #fbfdff;
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+    color: #0083da;
+    height: 1.5em;
+    width: 1.5em;
+}
+
+.vas-ptm-pager-btn:hover:not(:disabled),
+.vas-ptm-pager-btn:focus-visible:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #bfe4ff;
+    box-shadow: none;
+    outline: none;
+}
+
+.vas-ptm-pager-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #b8c6d2;
+    cursor: default;
+}
+
+.vas-ptm-pager-text {
+    font-size: 0.85em;
+    font-weight: 500;
+    min-width: 3.75em;
+}
+
+.vas-ptm-ap-busy {
+    background: rgba(255, 255, 255, 0.55);
+}
+
+    .vas-ptm-root.vas-ptm-ap-root,
+    .vas-ptm-root.vas-ptm-ap-root * {
         box-sizing: border-box;
     }
 
-.vas-ptm-busy {
+.vas-ptm-ap-busy,
+.vas-ptm-state-message {
     position: absolute;
     inset: 0;
-    display: flex;
+    z-index: 2;
+    display: none;
     align-items: center;
     justify-content: center;
-    background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
-    z-index: 10;
+    padding: 0.875em;
+    border-radius: 14px;
+    text-align: center;
+    color: #5f7283;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125em;
+    font-weight: 600;
+    line-height: 1.35;
 }
 
-.vas-ptm-card {
+.vas-ptm-ap-busy.is-visible,
+.vas-ptm-state-message.is-visible {
+    display: flex;
+}
+
+.vas-ptm-ap-root .vas-ptmonth-card {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -39,14 +124,26 @@
     overflow: hidden;
     padding: 0.875em;
     gap: 0.5em;
-    border: 0.125em solid #ffffff;
-    border-radius: 0.875em;
-    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    border: 2px solid #ffffff;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
+    position: relative;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
 }
 
-.vas-ptm-header {
+.vas-ptm-ap-root .vas-ptmonth-card:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+}
+
+.vas-ptm-ap-root .vas-ptmonth-card:focus-visible {
+    outline: 2px solid #0083da;
+    outline-offset: 2px;
+}
+
+.vas-ptm-ap-root .vas-ptmonth-header {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
@@ -56,20 +153,20 @@
     overflow: hidden;
 }
 
-.vas-ptm-icon {
+.vas-ptm-ap-root .vas-ptm-icon {
     flex: 0 0 auto;
-    width: 2em;
-    height: 2em;
+    width: 1.75em;
+    height: 1.75em;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 0.0625em solid rgba(255, 255, 255, 0.95);
-    border-radius: 0.625em;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
     background: rgba(255, 255, 255, 0.90);
-    color: #019d89;
+    color: #0083da;
 }
 
-    .vas-ptm-icon svg {
+    .vas-ptm-ap-root .vas-ptm-icon svg {
         width: 1em;
         height: 1em;
         display: block;
@@ -81,24 +178,41 @@
         stroke-linejoin: round;
     }
 
-.vas-ptm-header-text {
+.vas-ptm-ap-root .vas-ptm-header-text {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
 }
 
-.vas-ptm-title {
+.vas-ptm-ap-root .vas-ptm-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.875em;
-    font-weight: 700;
+    font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
 }
 
-.vas-ptm-subtitle {
+.vas-ptm-ap-root .vas-ptm-arrow {
+    align-items: center;
+    color: #748494;
+    display: flex;
+    flex-shrink: 0;
+    font-size: .875em;
+    margin-left: auto;
+    opacity: .55;
+    text-decoration: none !important;
+    transition: opacity .15s, color .15s;
+}
+
+.vas-ptm-ap-root .vas-ptm-arrow svg {
+    width: 1em;
+    height: 1em;
+}
+
+.vas-ptm-ap-root .vas-ptm-subtitle {
     min-width: 0;
     margin-top: 0.125em;
     overflow: hidden;
@@ -108,11 +222,10 @@
     font-weight: 400;
     line-height: 1.3;
     letter-spacing: 0.02em;
-    text-transform: uppercase;
     color: #748494;
 }
 
-.vas-ptm-body {
+.vas-ptm-ap-root .vas-ptm-body {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
@@ -121,7 +234,7 @@
     overflow: hidden;
 }
 
-.vas-ptm-metric {
+.vas-ptm-ap-root .vas-ptm-metric {
     display: block;
     width: 100%;
     min-width: 0;
@@ -129,15 +242,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: clamp(1.125em, 5.5cqi, 1.375em);
+    font-size: 1.375em;
     font-weight: 700;
     line-height: 1.1;
-    letter-spacing: -0.025em;
+    letter-spacing: 0;
     font-variant-numeric: tabular-nums;
-    color: #019d89;
+    color: #106ab0;
 }
 
-.vas-ptm-why-wrap {
+.vas-ptm-ap-root .vas-ptm-why-wrap {
     flex: 0 0 auto;
     min-width: 0;
     min-height: 0;
@@ -148,7 +261,7 @@
     color: #5f7283;
 }
 
-.vas-ptm-why-pill {
+.vas-ptm-ap-root .vas-ptm-why-pill {
     flex: 0 1 auto;
     display: inline-flex;
     align-items: center;
@@ -158,22 +271,21 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     padding: 0.1875em 0.4375em;
-    border: 0.0625em solid rgba(0, 131, 218, 0.15);
+    border: 1px solid rgba(0, 131, 218, 0.15);
     border-radius: 999em;
     background: #dff1ff;
-    color: #106ab0;
+    color: #0083da;
     font-size: 0.6875em;
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: 0.075em;
-    text-transform: uppercase;
 }
 
-.vas-ptm-why-text {
+.vas-ptm-ap-root .vas-ptm-why-text {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    font-size: 0.6875em;
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.3;
     color: #5f7283;
@@ -183,81 +295,533 @@
     line-clamp: 2;
 }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-card {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptmonth-card {
     padding: 0.75em;
     gap: 0.375em;
 }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-icon {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-icon {
     width: 1.75em;
     height: 1.75em;
-    border-radius: 0.5625em;
+    border-radius: 0.375em;
 }
 
-    .vas-ptm-root.vas-ptm-compact .vas-ptm-icon svg {
+    .vas-ptm-ap-root.vas-ptm-compact .vas-ptm-icon svg {
         width: 0.875em;
         height: 0.875em;
     }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-metric {
-    font-size: clamp(1em, 5cqi, 1.125em);
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-metric {
+    font-size: 1.375em;
 }
 
-.vas-ptm-root.vas-ptm-compact .vas-ptm-why-text {
+.vas-ptm-ap-root.vas-ptm-compact .vas-ptm-why-text {
     -webkit-line-clamp: 1;
     line-clamp: 1;
 }
 
 @container (max-width: 300px) {
-    .vas-ptm-card {
+    .vas-ptm-ap-root .vas-ptmonth-card {
         padding: 0.75em;
         gap: 0.375em;
     }
 
-    .vas-ptm-title {
+    .vas-ptm-ap-root .vas-ptm-title {
         font-size: 0.8125em;
     }
 
-    .vas-ptm-subtitle {
+    .vas-ptm-ap-root .vas-ptm-subtitle {
         font-size: 0.625em;
     }
 
-    .vas-ptm-metric {
-        font-size: clamp(1em, 5.5cqi, 1.25em);
+    .vas-ptm-ap-root .vas-ptm-metric {
+        font-size: 1.375em;
     }
 }
 
 @container (max-width: 220px) {
-    .vas-ptm-card {
+    .vas-ptm-ap-root .vas-ptmonth-card {
         padding: 0.625em;
         gap: 0.3125em;
     }
 
-    .vas-ptm-icon {
+    .vas-ptm-ap-root .vas-ptm-icon {
         width: 1.625em;
         height: 1.625em;
-        border-radius: 0.5em;
+        border-radius: 0.375em;
     }
 
-        .vas-ptm-icon svg {
+        .vas-ptm-ap-root .vas-ptm-icon svg {
             width: 0.8125em;
             height: 0.8125em;
         }
 
-    .vas-ptm-title {
+    .vas-ptm-ap-root .vas-ptm-title {
         font-size: 0.75em;
     }
 
-    .vas-ptm-subtitle {
+    .vas-ptm-ap-root .vas-ptm-subtitle {
         font-size: 0.5625em;
     }
 
-    .vas-ptm-metric {
-        font-size: clamp(0.9375em, 6cqi, 1.125em);
+    .vas-ptm-ap-root .vas-ptm-metric {
+        font-size: 1em;
     }
 
-    .vas-ptm-why-pill,
-    .vas-ptm-why-text {
+    .vas-ptm-ap-root .vas-ptm-why-pill,
+    .vas-ptm-ap-root .vas-ptm-why-text {
         font-size: 0.625em;
     }
 }
+
+.vas-ptm-body-lock {
+    overflow: hidden;
+}
+
+.vas-ptm-dialog,
+.vas-ptm-dialog * {
+    box-sizing: border-box;
+}
+
+.vas-ptm-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+}
+
+.vas-ptm-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-ptm-dialog-card {
+    position: relative;
+    width: min(90em, 100%);
+    height: min(46em, 100%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 1em;
+    background: #ffffff;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    color: #102c3f;
+}
+
+.vas-ptm-dialog-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1.25em 2em;
+    border-bottom: 1px solid #edf2f6;
+    flex-shrink: 0;
+}
+
+.vas-ptm-dialog-icon {
+    width: 2.25em;
+    height: 2.25em;
+    min-width: 2.25em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #bfe4ff;
+    border-radius: 0.5em;
+    background: #eef8ff;
+    color: #0083da;
+}
+
+.vas-ptm-dialog-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vas-ptm-dialog-title-group {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-ptm-dialog-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.125em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #102c3f;
+}
+
+.vas-ptm-dialog-subtitle {
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    line-height: 1.3;
+    color: #667386;
+}
+
+.vas-ptm-dialog-close {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #1f2933;
+    cursor: pointer;
+}
+
+.vas-ptm-dialog-close svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-ptm-dialog-close:hover {
+    background: #f3f7fb;
+}
+
+.vas-ptm-dialog-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25em;
+    padding: 1.25em 2em;
+    border-bottom: 1px solid #edf2f6;
+    background: #fbfdff;
+    flex-shrink: 0;
+}
+
+.vas-ptm-dialog-summary div {
+    min-width: 0;
+}
+
+.vas-ptm-dialog-summary span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #748494;
+}
+
+.vas-ptm-dialog-summary strong {
+    display: block;
+    margin-top: 0.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.25em;
+    line-height: 1.15;
+    font-weight: 800;
+    color: #102c3f;
+}
+
+.vas-ptm-dialog-body {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 0 1.5em;
+}
+
+.vas-ptm-dialog-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.68);
+    color: #60748a;
+    font-size: 0.875em;
+    font-weight: 600;
+}
+
+.vas-ptm-dialog-busy.is-visible {
+    display: flex;
+}
+
+.vas-ptm-dialog-table {
+    width: 100%;
+    min-width: 72em;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.vas-ptm-dialog-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 1em 0.75em;
+    border-bottom: 1px solid #edf2f6;
+    background: #ffffff;
+    color: #748494;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    text-align: left;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.vas-ptm-dialog-table td {
+    padding: 0.875em 0.75em;
+    border-bottom: 1px solid #edf2f6;
+    color: #102c3f;
+    font-size: 0.875em;
+    line-height: 1.2;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ptm-dialog-table tbody tr:hover td {
+    background: #f8fbfe;
+}
+
+.vas-ptm-td-doc {
+    width: 10em;
+    font-family: "Roboto Mono", "Roboto", monospace;
+    font-weight: 700;
+}
+
+.vas-ptm-td-date {
+    width: 9em;
+    color: #60748a !important;
+}
+
+.vas-ptm-td-vendor {
+    width: 14em;
+    font-weight: 700;
+}
+
+.vas-ptm-td-bank {
+    width: 13em;
+    color: #60748a !important;
+}
+
+.vas-ptm-td-currency {
+    width: 6em;
+    color: #60748a !important;
+}
+
+.vas-ptm-th-amount,
+.vas-ptm-td-amount {
+    width: 14em;
+    text-align: left;
+}
+
+.vas-ptm-td-amount {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-ptm-td-method {
+    width: 8em;
+    color: #60748a !important;
+}
+
+.vas-ptm-td-status {
+    width: 8em;
+}
+
+.vas-ptm-dialog-status {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.3125em 0.75em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    line-height: 1.1;
+    font-weight: 700;
+}
+
+.vas-ptm-dialog-status::before {
+    content: "";
+    width: 0.45em;
+    height: 0.45em;
+    margin-right: 0.4em;
+    border-radius: 999px;
+    background: currentColor;
+    flex: 0 0 auto;
+}
+
+.vas-ptm-dialog-status-cleared {
+    background: #cbf0dc;
+    color: #006c47;
+}
+
+.vas-ptm-dialog-status-intransit {
+    background: #fff0c2;
+    color: #8a5a00;
+}
+
+.vas-ptm-dialog-status-bounced {
+    background: #ffe1e1;
+    color: #a33333;
+}
+
+.vas-ptm-dialog-empty {
+    padding: 2.5em 1em !important;
+    text-align: center;
+    color: #748494 !important;
+}
+
+.vas-ptm-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.875em 2em;
+    border-top: 1px solid #edf2f6;
+    background: #fbfdff;
+    flex-shrink: 0;
+}
+
+.vas-ptm-pager-helper {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125em;
+}
+
+.vas-ptm-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75em;
+    flex-shrink: 0;
+}
+
+.vas-ptm-pager-btn {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083da;
+    cursor: pointer;
+    font: inherit;
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(15, 61, 97, 0.04);
+}
+
+.vas-ptm-pager-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.vas-ptm-pager-btn:disabled {
+    color: #b8c6d2;
+    background: rgba(255, 255, 255, 0.64);
+    cursor: default;
+}
+
+.vas-ptm-pager-text {
+    min-width: 4.25em;
+    text-align: center;
+    color: #102c3f;
+    font-size: 1em;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 48em) {
+    .vas-ptm-dialog {
+        padding: 0;
+    }
+
+    .vas-ptm-dialog-card {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .vas-ptm-dialog-header,
+    .vas-ptm-dialog-summary,
+    .vas-ptm-dialog-footer {
+        padding-left: 1em;
+        padding-right: 1em;
+    }
+
+    .vas-ptm-dialog-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .vas-ptm-dialog-body {
+        padding: 0 0.75em;
+    }
+}
+
+.vas-ptm-dialog-footer {
+    justify-content: space-between;
+}
+
+.vas-ptm-pager-helper {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.vas-ptm-pager-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.vas-ptm-pager-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-ptm-pager-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
+
+.vas-ptm-th-amount,
+.vas-ptm-td-amount,
+.vas-ptm-dialog-table th:last-child,
+.vas-ptm-dialog-table td:last-child {
+    text-align: right !important;
+}
+
+.vas-ptm-summary-total,
+.vas-ptm-summary-avg,
+.vas-ptm-summary-largest {
+    display: block;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
