@@ -47,12 +47,12 @@ namespace VIS.Controllers
                 SELECT i.C_BPartner_ID,
                        CurrencyConvert(
                            al.Amount,
-                           i.C_Currency_ID,
+                           ah.C_Currency_ID,
                            sc.Acct_Currency_ID,
                            ah.DateAcct,
-                           i.C_ConversionType_ID,
-                           i.AD_Client_ID,
-                           i.AD_Org_ID
+                           ah.C_ConversionType_ID,
+                           ah.AD_Client_ID,
+                           ah.AD_Org_ID
                        ) AS PaidAmount,
                        sc.StdPrecision,
                        sc.ISO_Code,
