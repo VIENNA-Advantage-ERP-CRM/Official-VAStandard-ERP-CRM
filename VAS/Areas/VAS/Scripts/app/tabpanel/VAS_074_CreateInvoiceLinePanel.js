@@ -446,7 +446,7 @@
                 $inp.on("input", function () { scheduleCatalog($(this).val(), inner, line, $inp); });
                 $inp.on("blur", function (e) {
                     if (e.relatedTarget && $(e.relatedTarget).attr("data-catalog-item") === "true") return;
-                    commitPrimary(line, editing.field, $inp.val());
+                    commitPrimary(line, editing && editing.field, $inp.val());
                 });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
@@ -666,6 +666,16 @@
             // (Tab off "..." saves the row) without the user re-grabbing the mouse.
             function done() { commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line); }
             dialog.on("click", "[data-act=close-more]", done);
+            // Enter / Space on the focused Done button must close the dialog. A native
+            // <button> would do this itself, but the framework shell swallows Enter (its
+            // global handler preventDefaults it), so wire it explicitly - same pattern as
+            // the row "..." button. stopPropagation keeps the key from bubbling to that
+            // global handler.
+            dialog.on("keydown", "[data-act=close-more]", function (e) {
+                if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault(); e.stopPropagation(); done();
+                }
+            });
 
             // Building the curated fields is heavy (each FK builds a native Vienna
             // control + lookup, synchronously). Paint the dialog with a spinner FIRST,
@@ -1018,15 +1028,19 @@
         }
 
         function commitPrimary(line, field, newValue, fromTab) {
-            var d = line.display;
-            var oldValue = field === "product" ? d.productName : d.chargeName;
+            // Product / Charge is a LOOKUP: a valid value is set ONLY by picking a catalog
+            // row (commitCatalogItem). Text that was typed into the search box but never
+            // selected from the dropdown is NOT a product/charge, so leaving the cell
+            // (Tab / blur) discards it and keeps the cell on the committed record (or empty
+            // on a new line). Previously the free text was kept as the display name, leaving
+            // a name that no M_Product_ID / C_Charge_ID matched.
+            if (fromTab) { editing = null; return; }   // advanceField owns the next field + render
+            // Blur: only act while still editing THIS row's primary. If a catalog pick has
+            // already advanced focus (e.g. to Description), leave that state untouched.
+            if (!(editing && editing.rowId === line.rowId &&
+                  (editing.field === "product" || editing.field === "charge"))) return;
             editing = null;
-            var nv = (newValue == null ? "" : String(newValue)).trim();
-            if (nv === "" || nv === oldValue) { if (!fromTab) render(); return; }
-            // free-typed text that did not match a catalog row: keep as display name only
-            if (field === "product") { d.productName = nv; } else { d.chargeName = nv; }
-            markDirty(line);
-            if (!fromTab) render();
+            render();   // repaint the cell from the committed value (revert the typed text)
         }
 
         /* ---------- callout host (runs the REAL framework callout) ----------
