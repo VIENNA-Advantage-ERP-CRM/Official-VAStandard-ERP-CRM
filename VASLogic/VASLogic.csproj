@@ -145,10 +145,10 @@
     <Compile Include="Models\ProductContainerModel.cs" />
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
-
+    <Compile Include="Models\VAS_065_APInvoicePanelModel.cs" />
+    <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
-
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
     <Compile Include="Models\VAS_013_TopCustomerReceiptsModel.cs" />
     <Compile Include="Models\VAS_014_DailyCollectionTrendModel.cs" />

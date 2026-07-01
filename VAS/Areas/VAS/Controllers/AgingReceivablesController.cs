@@ -29,6 +29,7 @@ namespace VIS.Controllers
                 SELECT ci.AD_Client_ID,
                        cs.C_Currency_ID AS Acct_Currency_ID,
                        cur.StdPrecision,
+                       cur.ISO_Code AS ISO_Code,
                        CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
@@ -122,7 +123,9 @@ namespace VIS.Controllers
                        ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_61_90' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_61_90_Amount,
                        ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_91_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_91_120_Amount,
                        ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_Over_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_Over_120_Amount,
-                       MAX(sc.Cur_Symbol) AS Currency_Symbol
+                       MAX(sc.Cur_Symbol) AS Currency_Symbol,
+                       MAX(sc.ISO_Code) AS ISO_Code,
+                       MAX(sc.StdPrecision) AS Std_Precision
                 FROM bucketed b
                 INNER JOIN schema_currency sc ON (sc.AD_Client_ID=b.AD_Client_ID)";
 
@@ -143,7 +146,11 @@ namespace VIS.Controllers
                         days61To90Amount = Util.GetValueOfDecimal(dr["Days_61_90_Amount"]),
                         days91To120Amount = Util.GetValueOfDecimal(dr["Days_91_120_Amount"]),
                         daysOver120Amount = Util.GetValueOfDecimal(dr["Days_Over_120_Amount"]),
-                        symbol = Util.GetValueOfString(dr["Currency_Symbol"])
+                        symbol = Util.GetValueOfString(dr["Currency_Symbol"]),
+                        isoCode = Util.GetValueOfString(dr["ISO_Code"]),
+                        stdPrecision = (dr["Std_Precision"] != null && dr["Std_Precision"] != System.DBNull.Value)
+                            ? Util.GetValueOfInt(dr["Std_Precision"])
+                            : 2
                     };
                 }
             }

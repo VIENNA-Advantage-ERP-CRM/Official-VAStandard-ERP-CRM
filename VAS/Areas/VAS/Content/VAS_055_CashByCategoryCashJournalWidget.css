@@ -1,0 +1,554 @@
+/*
+ * VAS_055_CashByCategoryCashJournalWidget.css
+ * Widget : Cash Out by Category - Cash Journal
+ * Screen : Cash Journal
+ * Prefix : VAS_055_
+ * Scope  : All selectors are scoped under the widget root.
+ */
+
+.VAS_055_cash-category-root,
+.VAS_055_cash-category-root * {
+    box-sizing: border-box;
+}
+
+.VAS_055_cash-category-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    container-type: inline-size;
+    font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
+}
+
+.VAS_055_cash-category-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    padding: 0.875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+}
+
+.VAS_055_cash-category-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.VAS_055_cash-category-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.VAS_055_cash-category-icon {
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
+    background: rgba(79, 131, 216, 0.08);
+    color: #4F83D8;
+}
+
+    .VAS_055_cash-category-icon svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.VAS_055_cash-category-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em;
+    line-height: 1.2;
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.VAS_055_cash-category-meta {
+    flex: 0 0 auto;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #738090;
+    white-space: nowrap;
+}
+
+.VAS_055_cash-category-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 1em;
+    min-width: 0;
+    min-height: 0;
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+.VAS_055_cash-category-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.VAS_055_cash-category-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+}
+
+.VAS_055_cash-category-name,
+.VAS_055_cash-category-percent {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.VAS_055_cash-category-metrics {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 60%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.125em;
+    overflow: hidden;
+}
+
+.VAS_055_cash-category-percent {
+    display: block;
+    max-width: 100%;
+    text-align: left;
+    font-size: 0.75em;
+}
+
+.VAS_055_cash-category-amount {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    font-size: 0.6875em;
+    line-height: 1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #60748A;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.08em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.78;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-prefix:empty,
+.VAS_055_cash-category-amount .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 1em;
+    line-height: 1;
+    color: currentColor;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.26em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.66;
+}
+
+.VAS_055_cash-category-amount .VAS-cash-amount-prefix,
+.VAS_055_cash-category-amount .VAS-cash-amount-decimal {
+    align-self: baseline;
+    margin-top: 0;
+    color: currentColor;
+    font-size: 1em;
+    font-weight: 600;
+    opacity: 1;
+}
+
+.VAS_055_cash-category-track {
+    width: 100%;
+    height: 0.625em;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(228, 237, 228, 0.78);
+}
+
+.VAS_055_cash-category-fill {
+    width: var(--VAS_055_bar-width, 0%);
+    height: 100%;
+    min-width: 0.25em;
+    border-radius: inherit;
+    transition: width 0.25s ease;
+}
+
+.VAS_055_cash-category-bar-1 {
+    background: linear-gradient(90deg, #E6A85C, #D19537);
+}
+
+.VAS_055_cash-category-bar-2 {
+    background: linear-gradient(90deg, #7DBEA7, #5DA38E);
+}
+
+.VAS_055_cash-category-bar-3 {
+    background: linear-gradient(90deg, #A996FF, #8578F0);
+}
+
+.VAS_055_cash-category-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    min-width: 0;
+    flex-shrink: 0;
+    margin-top: 0.25em;
+    padding-top: 0.5em;
+    border-top: 1px solid rgba(212, 225, 234, 0.66);
+    font-size: 0.75em;
+    line-height: 1.3;
+    color: #60748A;
+}
+
+.VAS_055_cash-category-footer-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    overflow: hidden;
+}
+
+.VAS_055_cash-category-footer-info {
+    display: none;
+}
+
+.VAS_055_cash-category-why {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.25em 0.625em;
+    border-radius: 7px;
+    background: rgba(0, 131, 218, 0.08);
+    color: #4F83D8;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+.VAS_055_cash-category-why-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #60748A;
+    font-weight: 400;
+}
+
+.VAS_055_cash-category-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.VAS_055_cash-category-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+    font: inherit;
+    font-size: 0.875em;
+    line-height: 1;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.VAS_055_cash-category-page-btn svg {
+    width: 0.875em;
+    height: 0.875em;
+    stroke: currentColor;
+    stroke-width: 2.4;
+}
+
+.VAS_055_cash-category-page-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.VAS_055_cash-category-page-btn:disabled {
+    color: #c7d3df;
+    background: rgba(255, 255, 255, 0.64);
+    cursor: default;
+}
+
+.VAS_055_cash-category-page-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 1em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #141414;
+    font-variant-numeric: tabular-nums;
+}
+
+.VAS_055_cash-category-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    background: rgba(255, 255, 255, 0.74);
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 14px;
+}
+
+.VAS_055_cash-category-busy.is-visible {
+    display: flex;
+}
+
+.VAS_055_cash-category-state {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 14px;
+}
+
+.VAS_055_cash-category-state.is-visible {
+    display: flex;
+}
+
+@container (max-width: 24em) {
+    .VAS_055_cash-category-card {
+        padding: 0.75em;
+        gap: 0.375em;
+        border-radius: 12px;
+    }
+
+    .VAS_055_cash-category-title-row {
+        gap: 0.625em;
+    }
+
+    .VAS_055_cash-category-icon {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 0.375em;
+    }
+
+    .VAS_055_cash-category-title {
+        font-size: 0.875em;
+    }
+
+    .VAS_055_cash-category-meta {
+        display: none;
+    }
+
+    .VAS_055_cash-category-body {
+        gap: 0.75em;
+    }
+
+    .VAS_055_cash-category-name,
+    .VAS_055_cash-category-percent,
+    .VAS_055_cash-category-amount {
+        font-size: 0.875em;
+    }
+
+    .VAS_055_cash-category-footer {
+        font-size: 0.6875em;
+    }
+
+    .VAS_055_cash-category-page-btn {
+        width: 1.6em;
+        height: 1.6em;
+    }
+
+    .VAS_055_cash-category-page-text {
+        min-width: 2.25em;
+        font-size: 0.7em;
+    }
+}
+
+@container (max-width: 16em) {
+    .VAS_055_cash-category-card {
+        padding: 0.625em;
+        gap: 0.25em;
+    }
+
+    .VAS_055_cash-category-icon {
+        width: 1.75em;
+        height: 1.75em;
+    }
+
+    .VAS_055_cash-category-title {
+        font-size: 0.875em;
+    }
+
+    .VAS_055_cash-category-body {
+        gap: 0.55em;
+    }
+
+    .VAS_055_cash-category-name,
+    .VAS_055_cash-category-percent,
+    .VAS_055_cash-category-amount {
+        font-size: 0.75em;
+    }
+
+    .VAS_055_cash-category-track {
+        height: 0.5em;
+    }
+
+    .VAS_055_cash-category-footer {
+        gap: 0.375em;
+    }
+
+    .VAS_055_cash-category-footer-text {
+        display: none;
+    }
+}
+
+.VAS_055_cash-category-pager {
+    gap: 0.625em;
+}
+
+.VAS_055_cash-category-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+}
+
+.VAS_055_cash-category-page-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.VAS_055_cash-category-page-btn:disabled {
+    color: #c7d3df;
+    background: rgba(255, 255, 255, 0.64);
+}
+
+.VAS_055_cash-category-page-text {
+    display: inline-block;
+    min-width: 3em;
+    font-size: 1em;
+    font-weight: 700;
+    color: #141414;
+}
+
+/* ── Hover expand: show full category name on pointer-over ─────────────── */
+.VAS_055_cash-category-name {
+    cursor: default;
+}
+
+.VAS_055_cash-category-name:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    position: relative;
+    z-index: 30;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
+    border-radius: 6px;
+    padding: 0.25em 0.5em;
+    margin: -0.25em -0.5em;
+}
+
+/* Canonical dashboard widget footer pager. */
+.VAS_055_cash-category-footer-info {
+    display: inline;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS_055_cash-category-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS_055_cash-category-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS_055_cash-category-page-text {
+    font-size: 0.85rem;
+}

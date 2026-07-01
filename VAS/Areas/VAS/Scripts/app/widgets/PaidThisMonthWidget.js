@@ -5,20 +5,42 @@
  *            large bold metric in success green, WHY pill with customer count + explanatory copy.
  *
  * ── Labels / Message Keys ──────────────────────────────────────────────────────────────
- *  #  | Current Text                                        | Message Key                  | MsgText
- * ----+-----------------------------------------------------+------------------------------+-----------------------------------------------------
- *  1  | Paid this month                                     | VIS_PaidThisMonth            | Paid this month
- *  2  | Cash received                                       | VIS_CashReceived             | Cash received
- *  3  | WHY                                                 | VIS_Why                      | WHY
- *  5  | Received from ... customer/s so far this month.     | VIS_ReceivedFromCustomers    | Received from
- *  6  | customer / customers                                | VIS_Customer / VIS_Customers | customer / customers
- *  7  | so far this month.                                  | VIS_SoFarThisMonth           | so far this month.
- *  8  | No payments received this month.                    | VIS_NoPaymentsThisMonth      | No payments received this month.
+ *  #  | Current Text                                        | Message Key                       | MsgText
+ * ----+-----------------------------------------------------+-----------------------------------+-----------------------------------------------------
+ *  1  | Paid this month                                     | VAS_058_PaidThisMonth             | Paid this month
+ *  2  | Cash received                                       | VAS_058_CashReceived              | Cash received
+ *  3  | WHY                                                 | VAS_058_Why                       | WHY
+ *  5  | Received from ... customer/s so far this month.     | VAS_058_ReceivedFrom              | Received from
+ *  6  | customer / customers                                | VAS_058_Customer / VAS_058_Customers | customer / customers
+ *  7  | so far this month.                                  | VAS_058_SoFarThisMonth            | so far this month.
+ *  8  | No payments received this month.                    | VAS_058_NoPaymentsThisMonth       | No payments received this month.
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
 
 ; (function (VIS, $) {
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VIS.PaidthismonthWidget = function () {
 
@@ -58,7 +80,7 @@
                 success: function (res) {
                     var data = typeof res === 'string' ? JSON.parse(res) : res;
                     if (data && !data.error) {
-                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol);
+                        renderMetric(data.totalPaidAmount, data.customerCount, data.symbol, data.isoCode, data.stdPrecision);
                     }
                 },
                 error: function () {
@@ -68,44 +90,30 @@
             });
         }
 
-        /* ── Format currency ── */
-        function formatCurrency(value) {
-            var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-
-            var sign = value < 0 ? '-' : '';
-            var absVal = Math.abs(value);
-
-            if (absVal >= 1000000) {
-                return sign + (absVal / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-            }
-            if (absVal >= 1000) {
-                return sign + Math.round(absVal / 1000) + 'k';
-            }
-            return sign + absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
-        }
-
         /* Build metric markup with the base-currency symbol placed *before* the
-           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). */
-        function formatMetric(value, symbol) {
+           amount; the minus sign (if any) precedes the symbol (e.g. -$1.2M). The
+           compact magnitude (Indian vs international numbering by base currency,
+           kept to the currency precision) comes from VIS.Util.formatCompactAmount. */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var absStr = formatCurrency(Math.abs(value));
+            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
             var symHtml = symbol ? '<span class="vas-ptm-cur">' + symbol + '</span>' : '';
             return sign + symHtml + absStr;
         }
 
         /* ── Render metric values ── */
-        function renderMetric(total, count, symbol) {
+        function renderMetric(total, count, symbol, isoCode, precision) {
             if ($metricEl) {
-                $metricEl.html(formatMetric(total, symbol));
+                $metricEl.html(formatMetric(total, symbol, isoCode, precision));
             }
             if ($whyText) {
                 var customerLabel = count !== 1
-                    ? lbl("VIS_Customers", 'customers')
-                    : lbl("VIS_Customer", 'customer');
+                    ? lbl("VAS_058_Customers", 'customers')
+                    : lbl("VAS_058_Customer", 'customer');
                 var countStr = count > 0
-                    ? lbl("VIS_ReceivedFromCustomers", 'Received from') + ' ' + count + ' ' + customerLabel + ' ' + lbl("VIS_SoFarThisMonth", 'so far this month.')
-                    : lbl("VIS_NoPaymentsThisMonth", 'No payments received this month.');
+                    ? lbl("VAS_058_ReceivedFrom", 'Received from') + ' ' + count + ' ' + customerLabel + ' ' + lbl("VAS_058_SoFarThisMonth", 'so far this month.')
+                    : lbl("VAS_058_NoPaymentsThisMonth", 'No payments received this month.');
                 $whyText.text(countStr);
             }
         }
@@ -133,8 +141,8 @@
                 '</div>' +
 
                 '<div>' +
-                '<div class="vas-ptm-title">' + lbl("VIS_PaidThisMonth", 'Paid this month') + '</div>' +
-                '<div class="vas-ptm-subtitle">' + lbl("VIS_CashReceived", 'Cash received') + '</div>' +
+                '<div class="vas-ptm-title">' + lbl("VAS_058_PaidThisMonth", 'Paid this month') + '</div>' +
+                '<div class="vas-ptm-subtitle">' + lbl("VAS_058_CashReceived", 'Cash received') + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -152,7 +160,7 @@
             );
 
             var $pill = $(
-                /*'<span class="vas-ptm-why-pill">' + lbl("VIS_Why", 'WHY') + '</span>'*/
+                /*'<span class="vas-ptm-why-pill">' + lbl("VAS_058_Why", 'WHY') + '</span>'*/
             );
 
             /* Empty until data loads; the busy overlay covers the wait. */
@@ -196,6 +204,9 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VIS.PaidthismonthWidget.prototype.widgetSizeChange = function (height, width) { };
