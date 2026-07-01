@@ -400,6 +400,13 @@
                 .append('<span class="vas-cil-amt">' + (amt > 0 ? esc(fmtMoney(amt)) : "") + "</span>"));
 
             $row.append(renderMoreCell(line));
+            // Per-row inline validation error (set by validateUnsaved on Save) - shown as a
+            // red label on the row itself instead of a global toast, so each failing record
+            // in a multi-row save is flagged in place.
+            if (line._error) {
+                $row.addClass("is-invalid")
+                    .append('<div class="vas-cil-row-error" role="alert">' + esc(line._error) + "</div>");
+            }
             // Re-apply the per-row spinner after a re-render so an in-flight save (or
             // callout) keeps its indicator even if render() rebuilds the rows (e.g. the
             // user added a new line while this row was still saving).
@@ -709,7 +716,7 @@
             render();
         }
 
-        function markDirty(line) { line.dirty = true; }
+        function markDirty(line) { line.dirty = true; line._error = ""; }   // editing the row clears its inline error
 
         /* Loose value compare so re-committing the same value (e.g. clicking into a
            cell and tabbing out without typing) does NOT flag the line dirty - the
@@ -917,6 +924,7 @@
            new rows - the whole list is never rebuilt (that was the scroll jank). */
         function resetCatalog(term, inner, line, $inp) {
             catalog.term = term || ""; catalog.offset = 0; catalog.hasMore = true; catalog.results = []; catalog.seq++; catalog.highlight = 0;
+            catalog.$inp = $inp;   // kept so positionCatalog() can re-measure as rows load
             inner.find(".vas-cil-catalog-popover").remove();
             catalog.$pop = $('<div class="vas-cil-catalog-popover"></div>');
             catalog.$pop.on("scroll", function () {
@@ -932,7 +940,43 @@
             // as a stray second line under the input) before the first results arrive.
             catalog.$pop.html('<div class="vas-cil-catalog__hint">' + esc(lbl("VAS_074_Loading", "Loading…")) + "</div>");
             inner.append(catalog.$pop);
+            positionCatalog();
             loadCatalogPage(inner, line, $inp, true);
+        }
+
+        /* Place the dropdown so it is NEVER clipped by the panel root (which is
+           overflow-y:auto, a hard clip box). Open below by default; flip ABOVE only when the
+           list can't fit below AND there is more room above. Either way the popover's
+           max-height is clamped to the space actually available on the chosen side WITHIN
+           the root, so it stays fully visible and every row is reachable via internal scroll
+           (fixes: flipped-up list clipped at the top, top rows unreachable). Re-measured as
+           rows load. The --above modifier attaches it flush over the input (see CSS). */
+        var CATALOG_MAX_PX = 260;   // keep in sync with .vas-cil-catalog-popover max-height (16.25em)
+        function positionCatalog() {
+            if (!catalog.$pop || !catalog.$pop.length) return;
+            var $inp = catalog.$inp;
+            if (!$inp || !$inp.length || !$inp[0].getBoundingClientRect) return;
+            var r = $inp[0].getBoundingClientRect();
+            // Clip boundary = the root's scroll box; fall back to the viewport.
+            var clipTop = 0, clipBottom = window.innerHeight;
+            if ($root && $root.length && $root[0].getBoundingClientRect) {
+                var rr = $root[0].getBoundingClientRect();
+                clipTop = Math.max(clipTop, rr.top);
+                clipBottom = Math.min(clipBottom, rr.bottom);
+            }
+            var GAP = 4;   // small breathing gap from the clip edge
+            var spaceBelow = clipBottom - r.bottom - GAP;
+            var spaceAbove = r.top - clipTop - GAP;
+            // Natural (unclamped) content height + borders, to decide whether it fits.
+            var natural = (catalog.$pop[0].scrollHeight || CATALOG_MAX_PX) + 2;
+            var above;
+            if (natural <= spaceBelow) above = false;         // fits below - default
+            else if (natural <= spaceAbove) above = true;     // fits above
+            else above = spaceAbove > spaceBelow;             // neither fits - pick the roomier side
+            var avail = above ? spaceAbove : spaceBelow;
+            var maxH = Math.min(CATALOG_MAX_PX, Math.max(avail, 0));
+            catalog.$pop.css("max-height", maxH > 0 ? (maxH + "px") : "");
+            catalog.$pop.toggleClass("vas-cil-catalog-popover--above", above);
         }
 
         /* Remove the catalog dropdown immediately (used on commit, before the row's busy
@@ -940,6 +984,7 @@
         function closeCatalog() {
             if (catalog.debounce) { clearTimeout(catalog.debounce); catalog.debounce = null; }
             if (catalog.$pop) { catalog.$pop.remove(); catalog.$pop = null; }
+            catalog.$inp = null;
             catalog.results = []; catalog.loading = false;
         }
 
@@ -970,12 +1015,16 @@
             if (!catalog.$pop) return;
             if (startIdx === 0 && !items.length) {
                 catalog.$pop.html('<div class="vas-cil-catalog__hint">' + esc(lbl("VAS_074_NoMatches", "No matches")) + "</div>");
+                positionCatalog();
                 return;
             }
             if (startIdx === 0) catalog.$pop.empty();
             var html = "";
             for (var i = 0; i < items.length; i++) html += catalogRowHtml(items[i], startIdx + i);
             catalog.$pop.append(html);
+            // Re-measure only on the first page (height jumps from the Loading hint to the
+            // list); later scroll-paged appends must NOT re-flip mid-scroll.
+            if (startIdx === 0) positionCatalog();
         }
 
         function catalogRowHtml(it, idx) {
@@ -2019,20 +2068,25 @@
             return null;
         }
 
-        /* Validate all unsaved lines; highlights the first offending row and
-           returns false when a violation is found. */
+        /* Validate every unsaved line and record its error ON THE LINE (line._error) so the
+           row renders its own red message - instead of a single toast that only named the
+           first failure. Repaints so every offending record in a multi-row save is flagged
+           in place; returns false when any line is invalid. */
         function validateUnsaved() {
             var dirty = unsavedLines();
+            var anyBad = false;
             for (var i = 0; i < dirty.length; i++) {
                 var err = validateLine(dirty[i]);
-                if (err) {
-                    $linesBody.find(".vas-cil-row--line").removeClass("is-invalid");
-                    $linesBody.find('[data-rowid="' + dirty[i].rowId + '"]').addClass("is-invalid");
-                    showToast(err.msg);
-                    return false;
-                }
+                dirty[i]._error = err ? err.msg : "";   // clear on now-valid rows too
+                if (err) anyBad = true;
             }
-            return true;
+            render();   // paint each row's inline error (and clear the ones that passed)
+            if (anyBad) {
+                // Bring the first failing row into view so it isn't missed off-screen.
+                var $first = $linesBody.find(".vas-cil-row--line.is-invalid").first();
+                if ($first.length && $first[0].scrollIntoView) $first[0].scrollIntoView({ block: "nearest" });
+            }
+            return !anyBad;
         }
 
         /* ---------- attribute picker dialog ---------- */
