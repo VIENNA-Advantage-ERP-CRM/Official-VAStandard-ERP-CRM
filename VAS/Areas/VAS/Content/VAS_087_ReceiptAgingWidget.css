@@ -1,0 +1,564 @@
+/*
+ * Receipt Aging - 3x2 glass age-bar chart + receipt detail modal.
+ * Design: Onfinity Receipt Aging docs; widget sizing is owned by the grid.
+ */
+
+.vas-rag-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas-rag-root,
+    .vas-rag-root * {
+        box-sizing: border-box;
+    }
+
+.vas-rag-card {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+    padding: 0.875em;
+}
+
+.vas-rag-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex: 0 0 auto;
+    margin-bottom: 0.35em;
+}
+
+.vas-rag-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+}
+
+    .vas-rag-ico svg {
+        width: 1.125em;
+        height: 1.125em;
+    }
+
+.vas-rag-titles {
+    min-width: 0;
+}
+
+.vas-rag-title {
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 16px);
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.3;
+}
+
+.vas-rag-sub {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    line-height: 1.25;
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-rag-summary {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.6875em;
+    color: #748494;
+    margin-bottom: 0.35em;
+    min-width: 0;
+}
+
+    .vas-rag-summary svg {
+        width: 0.9em;
+        height: 0.9em;
+        flex: 0 0 auto;
+        color: #0083DA;
+    }
+
+    .vas-rag-summary span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-rag-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 0.26em;
+    overflow: hidden;
+}
+
+.vas-rag-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12em;
+    width: 100%;
+    min-height: 0;
+    text-align: left;
+    padding: 0.06em 0.15em;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(16, 44, 63, 0.07);
+    cursor: pointer;
+}
+
+    .vas-rag-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.vas-rag-row-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.vas-rag-row-label {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    line-height: 1.12;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-rag-age {
+    flex: 0 0 auto;
+    font-size: 0.75em;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.12;
+    white-space: nowrap;
+}
+
+    .vas-rag-age.info {
+        color: #0083DA;
+    }
+
+    .vas-rag-age.warn {
+        color: #D78B10;
+    }
+
+    .vas-rag-age.bad {
+        color: #ED1C24;
+    }
+
+.vas-rag-row-sub {
+    font-size: 0.625em;
+    color: #748494;
+    line-height: 1.12;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-rag-track {
+    display: block;
+    width: 100%;
+    height: 0.42em;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    overflow: hidden;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.vas-rag-track::-webkit-progress-bar {
+    background: rgba(16, 44, 63, 0.07);
+    border-radius: 999px;
+}
+
+.vas-rag-track::-webkit-progress-value {
+    border-radius: 999px;
+}
+
+    .vas-rag-track.info::-webkit-progress-value {
+        background: #0083DA;
+    }
+
+    .vas-rag-track.warn::-webkit-progress-value {
+        background: #D78B10;
+    }
+
+    .vas-rag-track.bad::-webkit-progress-value {
+        background: #ED1C24;
+    }
+
+.vas-rag-track::-moz-progress-bar {
+    border-radius: 999px;
+}
+
+.vas-rag-track.info::-moz-progress-bar {
+    background: #0083DA;
+}
+
+.vas-rag-track.warn::-moz-progress-bar {
+    background: #D78B10;
+}
+
+.vas-rag-track.bad::-moz-progress-bar {
+    background: #ED1C24;
+}
+
+.vas-rag-empty {
+    padding: 1.5em 0.5em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;
+}
+
+.vas-rag-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 0.3em;
+    margin-top: 0.25em;
+    border-top: 1px solid #EDF2F6;
+}
+
+.vas-rag-foot-info {
+    font-size: 0.6875rem;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.vas-rag-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-shrink: 0;
+}
+
+.vas-rag-pgbtn {
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.8);
+    color: #0083DA;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-rag-pgbtn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+    .vas-rag-pgbtn:hover:not(:disabled) {
+        background: #E7F4FF;
+    }
+
+    .vas-rag-pgbtn:disabled {
+        color: #B8C6D2;
+        cursor: default;
+    }
+
+.vas-rag-pgtext {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #102C3F;
+    min-width: 3.2em;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-rag-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    z-index: 5;
+}
+
+.vas-rag-body-lock {
+    overflow: hidden;
+}
+
+.vas-rag-dialog {
+    font-size: 16px;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+}
+
+    .vas-rag-dialog,
+    .vas-rag-dialog * {
+        box-sizing: border-box;
+    }
+
+.vas-rag-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 38, 64, 0.28);
+    backdrop-filter: blur(2px);
+}
+
+.vas-rag-modal {
+    position: relative;
+    width: min(880px, 100%);
+    max-height: 88vh;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas-rag-modal-head {
+    flex: 0 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 20px;
+    border-bottom: 1px solid #1F83FF;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.vas-rag-modal-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-rag-modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 400;
+    color: #141414;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-rag-modal-status {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+}
+
+.vas-rag-pill {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.92em;
+    font-weight: 400;
+    padding: 0.18em 0.7em;
+    border-radius: 999px;
+    line-height: 1.35;
+    vertical-align: middle;
+}
+
+    .vas-rag-pill.info {
+        background: #DFF1FF;
+        color: #106AB0;
+    }
+
+    .vas-rag-pill.warn {
+        background: #FCF1DD;
+        color: #9A6500;
+    }
+
+    .vas-rag-pill.bad {
+        background: #FBE3E4;
+        color: #A33F3F;
+    }
+
+.vas-rag-modal-close {
+    width: 32px;
+    height: 32px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    color: #141414;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+    .vas-rag-modal-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .vas-rag-modal-close:hover {
+        background: #F3F7FB;
+        color: #102C3F;
+    }
+
+.vas-rag-modal-body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 22px 24px;
+    position: relative;
+}
+
+.vas-rag-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 24px;
+}
+
+.vas-rag-field {
+    padding: 8px 12px;
+    border-bottom: 1px solid #D7D7D7;
+    min-width: 0;
+}
+
+.vas-rag-field-lbl {
+    font-size: 0.75rem;
+    color: #5F7283;
+}
+
+.vas-rag-field-val {
+    font-size: 1rem;
+    color: #102C3F;
+    margin-top: 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    .vas-rag-field-val.strong {
+        font-weight: 400;
+    }
+
+.vas-rag-lines-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #000000;
+    padding: 18px 0 8px;
+}
+
+.vas-rag-lines-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 6px;
+}
+
+    .vas-rag-lines-table thead th {
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: #748494;
+        padding: 6px 8px;
+        border-bottom: 1px solid #EDF2F6;
+        text-transform: capitalize;
+    }
+
+    .vas-rag-lines-table tbody td {
+        font-size: 0.875rem;
+        color: #5F7283;
+        padding: 8px;
+        border-bottom: 1px solid #EDF2F6;
+        vertical-align: middle;
+    }
+
+    .vas-rag-lines-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+.vas-rag-lines-table tbody td.vas-rag-l-item {
+    font-weight: 400;
+    color: #102C3F;
+}
+
+.vas-rag-l-item {
+    min-width: 0;
+}
+
+.vas-rag-l-num {
+    width: 9em;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-rag-l-location {
+    width: 9em;
+}
+
+.vas-rag-l-status {
+    width: 9em;
+}
+
+.vas-rag-trunc {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-rag-modal-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.vas-rag-hidden {
+    display: none !important;
+}
+
+@media (max-width: 40em) {
+    .vas-rag-form {
+        grid-template-columns: 1fr;
+    }
+
+    .vas-rag-l-num,
+    .vas-rag-l-location,
+    .vas-rag-l-status {
+        width: auto;
+    }
+}

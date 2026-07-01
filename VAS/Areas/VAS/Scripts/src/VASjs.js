@@ -191,6 +191,20 @@ import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+
+import "../app/widgets/VAS_081_MaterialReceiptRegisterWidget.js"; 
+import "../app/widgets/VAS_082_NewGRNWidget.js"; 
+import "../app/widgets/VAS_083_OpenGRNsWidget.js";
+import "../app/widgets/VAS_084_PendingInspectionWidget.js"; 
+import "../app/widgets/VAS_085_POFulfilmentWidget.js"; 
+import "../app/widgets/VAS_086_QAHoldsWidget.js"; 
+import "../app/widgets/VAS_087_ReceiptAgingWidget.js"; 
+import "../app/widgets/VAS_088_ReceiptQueueWidget.js";
+import "../app/widgets/VAS_089_ReceiptsMTDWidget.js"; 
+import "../app/widgets/VAS_090_ReceivingActionsWidget.js";
+import "../app/widgets/VAS_091_MaterialReceiptSearchWidget.js";
+import "../app/widgets/VAS_093_PendingGRNWidget.js";
+import "../app/widgets/VAS_097_ExpectedGRNWidget.js";
 import "../app/widgets/VAS_048_TodayCashOutCashJournalWidget.js";
 import "../app/widgets/VAS_049_NetCashForCashJournalWidget.js";
 import "../app/widgets/VAS_050_CurrentCashForCashJournalWidget.js";
@@ -206,5 +220,3 @@ import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
-
-
