@@ -1,46 +1,58 @@
+/* =========================================================
+ * VAS_031 Upcoming AP Runs Widget
+ * Onfinity Dashboard Design System
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-root,
+.vas-upcoming-ap-runs-root * {
+    box-sizing: border-box;
+}
+
 .vas-upcoming-ap-runs-root {
+    position: relative;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    box-sizing: border-box;
-    container-type: inline-size;
-    contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(0.875rem, 1.4cqi, 1.25rem);
     overflow: hidden;
+    contain: layout style;
+    container-type: inline-size;
+    color: #102c3f;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, 1.4cqi, 24px);
 }
 
-    .vas-upcoming-ap-runs-root,
-    .vas-upcoming-ap-runs-root * {
-        box-sizing: border-box;
-    }
+/* =========================================================
+ * Widget surface
+ * ========================================================= */
 
 .vas-upcoming-ap-runs-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
     padding: 0.875em;
-    gap: 0.5em;
-    border-radius: 0.875em;
-    border: 0.125em solid #ffffff;
+    overflow: hidden;
+    border: 2px solid #ffffff;
+    border-radius: 14px;
     background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    color: #102c3f;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
+
+/* =========================================================
+ * Header
+ * ========================================================= */
 
 .vas-upcoming-ap-runs-head {
     flex: 0 0 auto;
-    min-width: 0;
-    min-height: 0;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.625em;
+    min-width: 0;
+    gap: 0.75em;
     overflow: hidden;
 }
 
@@ -51,32 +63,31 @@
 }
 
 .vas-upcoming-ap-runs-title-row {
-    min-width: 0;
     display: flex;
     align-items: center;
+    min-width: 0;
     gap: 0.625em;
     overflow: hidden;
 }
 
 .vas-upcoming-ap-runs-icon-box {
     flex: 0 0 auto;
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 0.0625em solid rgba(255, 255, 255, 0.95);
-    border-radius: 0.625em;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    border: 1px solid #e4edf4;
+    border-radius: 0.375em;
     background: rgba(255, 255, 255, 0.90);
     color: #0083da;
 }
 
 .vas-upcoming-ap-runs-icon {
+    display: block;
     width: 1em;
     height: 1em;
-    display: block;
-    flex: 0 0 auto;
     color: currentColor;
 }
 
@@ -84,77 +95,111 @@
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
+    color: #102c3f;
+    font-size: 0.875em;
+    font-weight: 400;
+    line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: 0;
-    color: #102c3f;
 }
+
+.vas-upcoming-ap-runs-arrow {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    margin-left: auto;
+    color: #748494;
+    opacity: 0.55;
+}
+
+    .vas-upcoming-ap-runs-arrow svg {
+        width: 1em;
+        height: 1em;
+    }
 
 .vas-upcoming-ap-runs-sub {
     min-width: 0;
     margin-top: 0.125em;
+    padding-left: 2.375em;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: #748494;
     font-size: 0.6875em;
     font-weight: 400;
     line-height: 1.3;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    color: #748494;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+
+/* =========================================================
+ * Body
+ * ========================================================= */
 
 .vas-upcoming-ap-runs-body {
     flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    margin-top: 0.75em;
     overflow: hidden;
 }
 
 .vas-upcoming-ap-runs-row {
-    flex: 0 1 auto;
-    min-width: 0;
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 0.625em;
-    padding: 0.5em 0;
+    min-width: 0;
+    min-height: 3.5em;
+    padding: 0.5em;
+    gap: 0.75em;
     overflow: hidden;
-    border-bottom: 0.0625em solid rgba(237, 242, 246, 0.95);
+    border-bottom: 1px solid #edf2f6;
+    border-radius: 0.375em;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
     .vas-upcoming-ap-runs-row:last-child {
-        border-bottom: none;
+        border-bottom-color: transparent;
+    }
+
+    .vas-upcoming-ap-runs-row:hover,
+    .vas-upcoming-ap-runs-row:focus-visible,
+    .vas-upcoming-ap-runs-row:focus-within {
+        background: rgba(234, 248, 255, 0.72);
     }
 
 .vas-upcoming-ap-runs-bar {
     flex: 0 0 auto;
     width: 0.1875em;
-    height: 2em;
-    border-radius: 0.125em;
+    height: 2.25em;
+    border-radius: 2px;
     background: #0083da;
 }
 
-    .vas-upcoming-ap-runs-bar.vas-upcoming-ap-runs-bar-rtgs {
-        background: #8b7cff;
-    }
+.vas-upcoming-ap-runs-bar-rtgs {
+    background: #8b7cff;
+}
 
-    .vas-upcoming-ap-runs-bar.vas-upcoming-ap-runs-bar-upi {
-        background: #019d89;
-    }
+.vas-upcoming-ap-runs-bar-upi {
+    background: #019d89;
+}
 
-    .vas-upcoming-ap-runs-bar.vas-upcoming-ap-runs-bar-card {
-        background: #d78b10;
-    }
+.vas-upcoming-ap-runs-bar-card {
+    background: #d78b10;
+}
 
-    .vas-upcoming-ap-runs-bar.vas-upcoming-ap-runs-bar-cheque {
-        background: #d14545;
-    }
+.vas-upcoming-ap-runs-bar-cheque {
+    background: #d14545;
+}
+
+.vas-upcoming-ap-runs-bar-neft {
+    background: #0083da;
+}
 
 .vas-upcoming-ap-runs-info {
     flex: 1 1 auto;
@@ -165,156 +210,769 @@
 .vas-upcoming-ap-runs-run-title {
     min-width: 0;
     overflow: hidden;
+    color: #102c3f;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.35;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.75em;
-    font-weight: 500;
-    line-height: 1.25;
-    color: #102c3f;
 }
 
 .vas-upcoming-ap-runs-meta {
     min-width: 0;
-    margin-top: 0.125em;
+    margin-top: 0.1875em;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: #748494;
     font-size: 0.6875em;
     font-weight: 400;
-    line-height: 1.25;
-    color: #748494;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-upcoming-ap-runs-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+    max-width: 55%;
+    gap: 0.625em;
 }
 
 .vas-upcoming-ap-runs-amount {
     flex: 0 1 auto;
-    min-width: 0;
-    max-width: 42%;
+    max-width: 8.5em;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: right;
+    color: #102c3f;
     font-size: 0.75em;
     font-weight: 700;
-    line-height: 1.2;
     font-variant-numeric: tabular-nums;
+    line-height: 1.35;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-upcoming-ap-runs-pay-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4.5em;
+    min-height: 2em;
+    padding: 0.4375em 0.75em;
+    gap: 0.375em;
+    border: 1px solid #bfe4ff;
+    border-radius: 999px;
+    background: #e5f3fb;
+    color: #0083da;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+    .vas-upcoming-ap-runs-pay-btn:hover,
+    .vas-upcoming-ap-runs-pay-btn:focus-visible {
+        border-color: #9ed1ff;
+        background: #cce6f8;
+        color: #0069ae;
+        outline: none;
+    }
+
+.vas-upcoming-ap-runs-pay-arrow {
+    font-size: 1.15em;
+    line-height: 1;
+}
+
+/* =========================================================
+ * States
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-state {
+    flex: 1 1 auto;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    padding: 1em;
+    overflow: hidden;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.4;
+    text-align: center;
+}
+
+    .vas-upcoming-ap-runs-state.is-visible {
+        display: flex;
+    }
+
+.vas-upcoming-ap-runs-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.68);
+    backdrop-filter: blur(0.125em);
+}
+
+    .vas-upcoming-ap-runs-busy.is-visible {
+        display: flex;
+    }
+
+/* =========================================================
+ * Footer pager
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    min-height: 2em;
+    margin-top: 0.625em;
+    padding-top: 0.5em;
+    gap: 0.75em;
+    overflow: hidden;
+    border-top: 1px solid #edf2f6;
+}
+
+.vas-upcoming-ap-runs-showing {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: #748494;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-upcoming-ap-runs-pager {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-upcoming-ap-runs-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #bfe4ff;
+    border-radius: 0.375em;
+    background: rgba(255, 255, 255, 0.80);
+    color: #0083da;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+    .vas-upcoming-ap-runs-page-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+    }
+
+    .vas-upcoming-ap-runs-page-btn:hover:not(:disabled),
+    .vas-upcoming-ap-runs-page-btn:focus-visible:not(:disabled) {
+        border-color: #9ed1ff;
+        background: #eaf8ff;
+        color: #0069ae;
+        outline: none;
+    }
+
+    .vas-upcoming-ap-runs-page-btn:disabled {
+        border-color: #e4edf4;
+        background: rgba(255, 255, 255, 0.55);
+        color: #b8c6d2;
+        cursor: default;
+    }
+
+.vas-upcoming-ap-runs-page-text {
+    min-width: 3.75em;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* =========================================================
+ * Dialog
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-body-lock {
+    overflow: hidden !important;
+}
+
+.vas-upcoming-ap-runs-pay-dialog,
+.vas-upcoming-ap-runs-pay-dialog * {
+    box-sizing: border-box;
+}
+
+.vas-upcoming-ap-runs-pay-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5em;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1em;
+    font-weight: 400;
     color: #102c3f;
 }
 
-.vas-upcoming-ap-runs-state {
-    width: 100%;
-    min-width: 0;
+.vas-upcoming-ap-runs-pay-dialog.is-visible {
+    display: flex;
+}
+
+.vas-upcoming-ap-runs-pay-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 38, 64, 0.36);
+    backdrop-filter: blur(0.125em);
+}
+
+.vas-upcoming-ap-runs-pay-card {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    width: min(80em, calc(100vw - 3em));
+    max-height: calc(100vh - 2em);
+    min-height: 0;
     overflow: hidden;
+    border: 1px solid #e4edf4;
+    border-radius: 0.75em;
+    background: #ffffff;
+    box-shadow: 0 1.5em 4em rgba(0, 38, 64, 0.22);
+}
+
+/* =========================================================
+ * Dialog header
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-pay-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    padding: 1em 1.25em;
+    gap: 1em;
+    border-bottom: 1px solid #edf2f6;
+    background: #ffffff;
+}
+
+.vas-upcoming-ap-runs-pay-heading {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vas-upcoming-ap-runs-pay-title {
+    overflow: hidden;
+    color: #102c3f;
+    font-size: 1em;
+    font-weight: 700;
+    line-height: 1.3;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: center;
-    font-size: 0.75em;
-    font-weight: 500;
-    line-height: 1.3;
+}
+
+.vas-upcoming-ap-runs-pay-sub {
+    margin-top: 0.125em;
+    overflow: hidden;
     color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-card {
-    padding: 0.75em;
-    gap: 0.375em;
+.vas-upcoming-ap-runs-pay-close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2em;
+    height: 2em;
+    padding: 0;
+    border: none;
+    border-radius: 0.375em;
+    background: transparent;
+    color: #5f7283;
+    cursor: pointer;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1.375em;
+    font-weight: 400;
+    line-height: 1;
 }
 
-.vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-icon-box {
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
-    border-radius: 0.5625em;
+    .vas-upcoming-ap-runs-pay-close:hover,
+    .vas-upcoming-ap-runs-pay-close:focus-visible {
+        background: #eef6ff;
+        color: #0083da;
+        outline: none;
+    }
+
+/* =========================================================
+ * Dialog notice
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-pay-notice {
+    flex: 0 0 auto;
+    margin: 1em 1.25em 0;
+    padding: 0.625em 0.75em;
+    border: 1px solid #bfe4ff;
+    border-radius: 0.5em;
+    background: #eef8ff;
+    color: #102c3f;
+    font-size: 0.8125em;
+    font-weight: 400;
+    line-height: 1.4;
 }
 
-.vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-icon {
-    width: 0.875em;
-    height: 0.875em;
+    .vas-upcoming-ap-runs-pay-notice strong {
+        font-weight: 700;
+    }
+
+    .vas-upcoming-ap-runs-pay-notice.vas-upcoming-ap-runs-pay-error {
+        border-color: #f4b6b6;
+        background: #fff1f1;
+        color: #a33f3f;
+    }
+
+/* =========================================================
+ * Dialog content — single scroll container per spec
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-pay-content {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: minmax(15.625em, 0.8fr) minmax(0, 2fr);
+    min-width: 0;
+    min-height: 0;
+    padding: 1em 1.25em 1.25em;
+    gap: 1.5em;
+    overflow-y: auto;
 }
 
-.vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-row {
+/* =========================================================
+ * Invoice panel
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-invoice-panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding-right: 1.25em;
+    overflow: hidden;
+    border-right: 1px solid #edf2f6;
+}
+
+.vas-upcoming-ap-runs-invoice-list-title {
+    flex: 0 0 auto;
+    margin-bottom: 0.5em;
+    color: #102c3f;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.vas-upcoming-ap-runs-invoice-list {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-invoice-list-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-invoice-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    width: 100%;
+    padding: 0.625em 0.5em;
+    gap: 0.75em;
+    border: none;
+    border-bottom: 1px solid #edf2f6;
+    background: transparent;
+    color: #102c3f;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+}
+
+    .vas-upcoming-ap-runs-invoice-row:hover,
+    .vas-upcoming-ap-runs-invoice-row:focus-visible {
+        background: #eef8ff;
+        outline: none;
+    }
+
+    .vas-upcoming-ap-runs-invoice-row.is-selected {
+        background: linear-gradient( 109deg, #eaf8ff 0%, #caedff 100% );
+    }
+
+.vas-upcoming-ap-runs-invoice-main,
+.vas-upcoming-ap-runs-invoice-side {
+    min-width: 0;
+}
+
+.vas-upcoming-ap-runs-invoice-side {
+    text-align: right;
+}
+
+    .vas-upcoming-ap-runs-invoice-main strong,
+    .vas-upcoming-ap-runs-invoice-side strong {
+        display: block;
+        overflow: hidden;
+        color: #102c3f;
+        font-size: 0.8125em;
+        font-weight: 700;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .vas-upcoming-ap-runs-invoice-main small,
+    .vas-upcoming-ap-runs-invoice-side small {
+        display: block;
+        margin-top: 0.1875em;
+        overflow: hidden;
+        color: #748494;
+        font-size: 0.75em;
+        font-weight: 400;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+/* =========================================================
+ * Form
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-form-panel {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.vas-upcoming-ap-runs-pay-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+    column-gap: 1.5em;
+    row-gap: 0.75em;
+}
+
+.vas-upcoming-ap-runs-field {
+    min-width: 0;
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid #d7d7d7;
+    background: #ffffff;
+    transition: border-color 0.15s ease;
+}
+
+    .vas-upcoming-ap-runs-field:hover,
+    .vas-upcoming-ap-runs-field:focus-within {
+        border-bottom-color: #0083da;
+    }
+
+.vas-upcoming-ap-runs-field-label {
+    display: flex;
+    align-items: center;
+    min-width: 0;
     gap: 0.5em;
-    padding: 0.4375em 0;
+    color: #5f7283;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.3;
 }
 
-.vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-bar {
+    .vas-upcoming-ap-runs-field-label > span {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.125em 0.4375em;
+        border: 1px solid rgba(1, 157, 137, 0.18);
+        border-radius: 999px;
+        background: rgba(1, 157, 137, 0.10);
+        color: #0b6b45;
+        font-size: 0.6875em;
+        font-weight: 500;
+        line-height: 1.2;
+    }
+
+.vas-upcoming-ap-runs-field-value {
+    min-width: 0;
+    margin-top: 0.375em;
+}
+
+.vas-upcoming-ap-runs-edit-control {
+    display: block;
+    width: 100%;
+    min-width: 0;
     height: 1.75em;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    color: #111827;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 400;
+    line-height: 1.3;
+    outline: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: none !important;
+    background: none !important;
 }
 
-.vas-upcoming-ap-runs-root.vas-upcoming-ap-runs-compact .vas-upcoming-ap-runs-meta {
-    font-size: 0.625em;
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-calendar-picker-indicator,
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-inner-spin-button,
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-clear-button {
+    display: block;
 }
 
-@container (max-width: 300px) {
-    .vas-upcoming-ap-runs-card {
-        padding: 0.75em;
+input[type="date"].vas-upcoming-ap-runs-edit-control {
+    padding-right: 1.5em;
+    cursor: pointer;
+    -webkit-appearance: auto;
+    -moz-appearance: auto;
+    appearance: auto;
+}
+
+input[type="date"].vas-upcoming-ap-runs-edit-control::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.72;
+}
+
+select.vas-upcoming-ap-runs-edit-control:not(:disabled) {
+    padding-right: 1.25em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23748494' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.125em center;
+    background-size: 0.875em 0.875em;
+    cursor: pointer;
+}
+
+select.vas-upcoming-ap-runs-edit-control:disabled {
+    padding-right: 0;
+    background-image: none;
+}
+
+.vas-upcoming-ap-runs-edit-control:disabled,
+.vas-upcoming-ap-runs-edit-control[readonly] {
+    color: #748494;
+    -webkit-text-fill-color: #748494;
+    background-color: transparent;
+    cursor: default;
+    opacity: 1;
+}
+
+/* =========================================================
+ * Dialog footer
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-pay-footer {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 0.75em 1.25em;
+    gap: 0.625em;
+    border-top: 1px solid #edf2f6;
+    background: #fbfdff;
+}
+
+.vas-upcoming-ap-runs-pay-cancel,
+.vas-upcoming-ap-runs-pay-save {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 6em;
+    min-height: 2.5em;
+    padding: 0.625em 1.125em;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.vas-upcoming-ap-runs-pay-cancel {
+    border: 1px solid #bfe4ff;
+    background: #e5f3fb;
+    color: #0083da;
+}
+
+    .vas-upcoming-ap-runs-pay-cancel:hover,
+    .vas-upcoming-ap-runs-pay-cancel:focus-visible {
+        background: #cce6f8;
+        outline: none;
+    }
+
+.vas-upcoming-ap-runs-pay-save {
+    border: 1px solid #1f83ff;
+    background: #1f83ff;
+    color: #ffffff;
+}
+
+    .vas-upcoming-ap-runs-pay-save:hover,
+    .vas-upcoming-ap-runs-pay-save:focus-visible {
+        border-color: #0069ae;
+        background: #0069ae;
+        outline: none;
+    }
+
+    .vas-upcoming-ap-runs-pay-save:disabled,
+    .vas-upcoming-ap-runs-pay-cancel:disabled {
+        cursor: default;
+        opacity: 0.55;
+    }
+
+/* =========================================================
+ * Dialog busy
+ * ========================================================= */
+
+.vas-upcoming-ap-runs-pay-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.70);
+    backdrop-filter: blur(0.125em);
+}
+
+    .vas-upcoming-ap-runs-pay-busy.is-visible {
+        display: flex;
+    }
+
+/* =========================================================
+ * Responsive
+ * ========================================================= */
+
+@media (max-width: 53.75em) {
+    .vas-upcoming-ap-runs-pay-card {
+        width: min(45em, calc(100vw - 1.5em));
+        max-height: calc(100vh - 1.5em);
+    }
+
+    .vas-upcoming-ap-runs-pay-content {
+        grid-template-columns: 1fr;
+    }
+
+    .vas-upcoming-ap-runs-invoice-panel {
+        padding-right: 0;
+        padding-bottom: 1em;
+        border-right: none;
+        border-bottom: 1px solid #edf2f6;
+    }
+
+    .vas-upcoming-ap-runs-pay-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 35em) {
+    .vas-upcoming-ap-runs-actions {
+        max-width: 48%;
         gap: 0.375em;
     }
 
-    .vas-upcoming-ap-runs-title-row {
-        gap: 0.5em;
-    }
-
-    .vas-upcoming-ap-runs-title {
-        font-size: 0.8125em;
-    }
-
-    .vas-upcoming-ap-runs-sub {
-        font-size: 0.625em;
-    }
-
-    .vas-upcoming-ap-runs-row {
-        gap: 0.5em;
-        padding: 0.4375em 0;
+    .vas-upcoming-ap-runs-pay-btn {
+        min-width: 2.25em;
+        padding-left: 0.5em;
+        padding-right: 0.5em;
     }
 
     .vas-upcoming-ap-runs-amount {
-        max-width: 40%;
+        max-width: 6em;
+    }
+
+    .vas-upcoming-ap-runs-pay-dialog {
+        padding: 0;
+    }
+
+    .vas-upcoming-ap-runs-pay-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
     }
 }
 
-@container (max-width: 220px) {
-    .vas-upcoming-ap-runs-card {
-        padding: 0.625em;
-        gap: 0.3125em;
-    }
+.vas-upcoming-ap-runs-footer {
+    justify-content: space-between;
+}
 
-    .vas-upcoming-ap-runs-icon-box {
-        width: 1.625em;
-        height: 1.625em;
-        min-width: 1.625em;
-        border-radius: 0.5em;
-    }
+.vas-upcoming-ap-runs-showing {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
 
-    .vas-upcoming-ap-runs-icon {
-        width: 0.8125em;
-        height: 0.8125em;
-    }
+.vas-upcoming-ap-runs-page-btn {
+    width: 24px;
+    height: 24px;
+}
 
-    .vas-upcoming-ap-runs-title {
-        font-size: 0.75em;
-    }
+.vas-upcoming-ap-runs-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
 
-    .vas-upcoming-ap-runs-sub,
-    .vas-upcoming-ap-runs-meta {
-        font-size: 0.5625em;
-    }
+.vas-upcoming-ap-runs-page-text {
+    min-width: 3.5rem;
+    font-size: 0.85rem;
+}
 
-    .vas-upcoming-ap-runs-run-title,
-    .vas-upcoming-ap-runs-amount,
-    .vas-upcoming-ap-runs-state {
-        font-size: 0.625em;
-    }
+.vas-upcoming-ap-runs-invoice-side,
+.vas-upcoming-ap-runs-invoice-side strong,
+.vas-upcoming-ap-runs-invoice-side small,
+.vas-upcoming-ap-runs-amount {
+    text-align: right;
+}
 
-    .vas-upcoming-ap-runs-row {
-        gap: 0.4375em;
-        padding: 0.375em 0;
-    }
-
-    .vas-upcoming-ap-runs-bar {
-        width: 0.1875em;
-        height: 1.625em;
-    }
-
-    .vas-upcoming-ap-runs-amount {
-        max-width: 38%;
-    }
+.vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
