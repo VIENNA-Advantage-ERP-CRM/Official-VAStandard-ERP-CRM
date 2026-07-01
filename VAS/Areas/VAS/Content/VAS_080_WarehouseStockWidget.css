@@ -1,0 +1,516 @@
+/* Overall Inventory Warehouse Stock widget. All selectors are MPC-prefixed. */
+
+.MPC-warehouse-stock-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-warehouse-stock-root,
+.MPC-warehouse-stock-root * {
+    box-sizing: border-box;
+}
+
+.MPC-ws-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+.MPC-ws-header {
+    display: flex;
+    align-items: center;
+    gap: 0.55em;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.MPC-ws-icon {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2em;
+    padding: 0.5em;
+    color: #0083da;
+    background: rgba(0, 131, 218, 0.10);
+    border-radius: 10px;
+}
+
+.MPC-ws-icon svg,
+.MPC-ws-chevron svg,
+.MPC-ws-pager svg {
+    width: 100%;
+    height: 100%;
+}
+
+.MPC-ws-title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 1em;
+    font-weight: 500;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-ws-select-wrap {
+    position: relative;
+    min-width: 0;
+    margin-inline-start: auto;
+}
+
+.MPC-ws-select {
+    width: 9em;
+    max-width: 100%;
+    min-height: 2.1em;
+    padding: 0.35em 0.55em;
+    overflow: hidden;
+    color: #102c3f;
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    outline: none;
+}
+
+.MPC-ws-select:focus {
+    border-color: #0083da;
+}
+
+.MPC-ws-summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45em;
+    flex: 0 0 auto;
+    margin-top: 0.5em;
+    color: #748494;
+    font-size: 0.625em;
+    white-space: nowrap;
+}
+
+.MPC-ws-summary strong {
+    color: #102c3f;
+    font-size: 1.3em;
+    font-weight: 400;
+}
+
+.MPC-ws-summary .MPC-ws-accent {
+    color: #0083da;
+}
+
+.MPC-ws-summary i {
+    width: 3px;
+    height: 3px;
+    flex: 0 0 auto;
+    background: #c3d0da;
+    border-radius: 50%;
+}
+
+.MPC-ws-table-head,
+.MPC-ws-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3.4em 4.6em 0.85em;
+    gap: 0.4em;
+    align-items: center;
+}
+
+.MPC-ws-table-head {
+    flex: 0 0 auto;
+    margin-top: 0.5em;
+    padding: 0 0.2em 0.3em;
+    color: #748494;
+    font-size: 0.625em;
+    text-transform: capitalize;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #edf2f6;
+}
+
+.MPC-ws-table-head span:nth-child(2),
+.MPC-ws-table-head span:nth-child(3) {
+    text-align: end;
+}
+
+.MPC-ws-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-ws-row {
+    width: 100%;
+    min-width: 0;
+    padding: 0.34em 0.2em;
+    color: inherit;
+    font-family: inherit;
+    text-align: start;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid #edf2f6;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.MPC-ws-row:hover,
+.MPC-ws-row:focus-visible {
+    background: rgba(234, 248, 255, 0.70);
+    outline: none;
+}
+
+.MPC-ws-locator,
+.MPC-ws-locator-line {
+    min-width: 0;
+}
+
+.MPC-ws-locator {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+}
+
+.MPC-ws-locator-line {
+    display: block;
+    overflow: hidden;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-ws-locator-line strong {
+    font-size: 0.75em;
+    font-weight: 400;
+}
+
+.MPC-ws-locator-line small {
+    color: #5f7283;
+    font-size: 0.6875em;
+}
+
+.MPC-ws-spark {
+    width: 100%;
+    max-width: 9em;
+    height: 0.3em;
+    display: flex;
+    overflow: hidden;
+    background: #e9eef3;
+    border-radius: 999px;
+}
+
+.MPC-ws-spark svg,
+.MPC-ws-age-stack svg,
+.MPC-ws-age-track svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.MPC-ws-band-0 {
+    background: #20a464;
+    fill: #20a464;
+}
+
+.MPC-ws-band-1 {
+    background: #0083da;
+    fill: #0083da;
+}
+
+.MPC-ws-band-2 {
+    background: #d78b10;
+    fill: #d78b10;
+}
+
+.MPC-ws-band-3 {
+    background: #ed1c24;
+    fill: #ed1c24;
+}
+
+.MPC-ws-qty,
+.MPC-ws-value {
+    overflow: hidden;
+    font-size: 0.75em;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-ws-qty {
+    color: #5f7283;
+}
+
+.MPC-ws-value {
+    color: #0083da;
+    font-weight: 400;
+}
+
+.MPC-ws-chevron {
+    width: 0.8em;
+    height: 0.8em;
+    display: inline-flex;
+    color: #b8c6d2;
+}
+
+.MPC-ws-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 1em;
+    color: #748494;
+    font-size: 0.75em;
+    text-align: center;
+}
+
+.MPC-ws-footer {
+    min-height: 1.5em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex: 0 0 auto;
+    margin-top: 0.35em;
+    color: #748494;
+    font-size: 0.625em;
+}
+
+.MPC-ws-pager {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+}
+
+.MPC-ws-pager button {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px;
+    color: #0083da;
+    background: rgba(255, 255, 255, 0.70);
+    border: 1px solid #e4edf4;
+    border-radius: 6px;
+}
+
+.MPC-ws-pager button:disabled {
+    color: #9f9f9f;
+    cursor: default;
+    opacity: 0.55;
+}
+
+.MPC-ws-pager strong {
+    color: #5f7283;
+    font-weight: 400;
+}
+
+.MPC-ws-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-ws-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-ws-modal.MPC-ws-modal-open {
+    display: flex;
+}
+
+.MPC-ws-modal-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 38, 64, 0.38);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-ws-modal-dialog {
+    position: relative;
+    width: min(54em, calc(100vw - 2em));
+    min-height: min(34em, calc(100vh - 2em));
+    max-height: calc(100vh - 2em);
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid rgba(31, 131, 255, 0.35);
+    border-radius: 14px;
+    box-shadow: 0 24px 70px rgba(0, 38, 64, 0.24);
+}
+
+.MPC-ws-modal-header {
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0 1em;
+    color: #102c3f;
+    font-size: 1rem;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid #1f83ff;
+}
+
+.MPC-ws-modal-badge {
+    margin-inline-start: auto;
+    padding: 0.2em 0.65em;
+    color: #106ab0;
+    font-size: 0.75em;
+    font-weight: 400;
+    background: #dff1ff;
+    border-radius: 999px;
+}
+
+.MPC-ws-modal-close {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    color: #5f7283;
+    font-size: 1.5rem;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+}
+
+.MPC-ws-modal-close:hover,
+.MPC-ws-modal-close:focus-visible {
+    color: #0083da;
+    background: #eef6ff;
+    outline: none;
+}
+
+.MPC-ws-modal-body {
+    max-height: calc(100vh - 8em);
+    padding: 1.25em;
+    overflow-y: auto;
+}
+
+.MPC-ws-age-total {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.MPC-ws-age-total strong {
+    color: #102c3f;
+    font-size: 1.75rem;
+    font-weight: 400;
+    line-height: 1.1;
+}
+
+.MPC-ws-age-total span {
+    color: #748494;
+    font-size: 0.78rem;
+}
+
+.MPC-ws-age-stack {
+    width: 100%;
+    height: 0.75em;
+    display: flex;
+    margin: 1.1em 0;
+    overflow: hidden;
+    background: #e9eef3;
+    border-radius: 999px;
+}
+
+.MPC-ws-age-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+}
+
+.MPC-ws-age-row {
+    display: grid;
+    grid-template-columns: 7em minmax(5em, 1fr) 6.5em;
+    gap: 0.75em;
+    align-items: center;
+}
+
+.MPC-ws-age-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+    color: #102c3f;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.MPC-ws-age-label i {
+    width: 0.6em;
+    height: 0.6em;
+    flex: 0 0 auto;
+    border-radius: 50%;
+}
+
+.MPC-ws-age-track {
+    height: 0.45em;
+    overflow: hidden;
+    background: #edf2f6;
+    border-radius: 999px;
+}
+
+.MPC-ws-age-track i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.MPC-ws-age-track svg {
+    border-radius: 999px;
+}
+
+.MPC-ws-age-value {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-ws-age-value strong {
+    color: #102c3f;
+    font-size: 0.8rem;
+    font-weight: 400;
+}
+
+.MPC-ws-age-value small {
+    color: #748494;
+    font-size: 0.68rem;
+}
+
+[dir="rtl"] .MPC-ws-chevron,
+[dir="rtl"] .MPC-ws-pager svg {
+    transform: scaleX(-1);
+}
+
+@media (max-width: 600px) {
+    .MPC-ws-age-row {
+        grid-template-columns: 6.5em 1fr;
+    }
+
+    .MPC-ws-age-value {
+        grid-column: 2;
+        align-items: flex-start;
+    }
+}

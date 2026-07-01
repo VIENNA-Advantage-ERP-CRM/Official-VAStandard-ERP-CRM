@@ -79,3 +79,15 @@
 @import "../VAS_045_GLJournalPendingWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
+
+@import "../VAS_073_LowStockCountWidget.css";
+@import "../VAS_074_PendingGRNsWidget.css";
+@import "../VAS_075_TotalInventoryValueWidget.css";
+@import "../VAS_076_TotalStockQtyWidget.css";
+@import "../VAS_077_NewStockAdjustmentWidget.css";
+@import "../VAS_078_ProductSearchWidget.css";
+@import "../VAS_079_TopValueItemsWidget.css";
+@import "../VAS_080_WarehouseStockWidget.css";
+@import "../VAS_094_HighestSellingProductsWidget.css";
+@import "../VAS_095_QuickOperationsWidget.css";
+@import "../VAS_096_StockMovementTodayWidget.css";
