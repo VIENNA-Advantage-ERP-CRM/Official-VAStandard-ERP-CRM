@@ -1,0 +1,454 @@
+/* Overall Inventory Stock Movement - Today widget. All selectors are MPC-prefixed.
+   Mirrors the Onfinity reference design (overall-stock-movement-today.html):
+   glass data widget, em-based internal sizing against a clamped root font-size. */
+
+.MPC-stock-movement-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-stock-movement-root,
+.MPC-stock-movement-root * {
+    box-sizing: border-box;
+}
+
+.MPC-smt-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header: icon well + title, with the gap below it that the reference carries
+   on .w-head (margin-bottom), not on the column-header row. */
+.MPC-smt-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-bottom: 0.625em;
+}
+
+.MPC-smt-icon {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 2em;
+    padding: 0.5em;
+    color: #0083da;
+    background: rgba(0, 131, 218, 0.10);
+    border-radius: 10px;
+}
+
+.MPC-smt-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.MPC-smt-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #102c3f;
+    /* Reference w-title clamp(13px, 1.1375cqi, 16px): stays a modest size and
+       caps at 16px instead of scaling up with the dashboard width. */
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    font-weight: 500;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Shared four-column track for the header row and every data row.
+   Reference column weights: Item 2.2 | Type 1.5 | Qty 1 | Location 2. */
+.MPC-smt-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 2fr);
+    gap: 0.75em;
+    align-items: center;
+}
+
+.MPC-smt-table-head {
+    flex: 0 0 auto;
+    padding: 0 0.5em 0.4em;
+    color: #748494;
+    font-size: 0.75em;
+    border-bottom: 1px solid #edf2f6;
+}
+
+.MPC-smt-head-type {
+    text-align: center;
+}
+
+.MPC-smt-head-quantity {
+    text-align: end;
+}
+
+.MPC-smt-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-smt-row {
+    /* Share the list height across exactly 5 rows so the 5th never gets clipped. */
+    flex: 0 0 20%;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.35em 0.5em;
+    color: inherit;
+    font-family: inherit;
+    text-align: start;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid #edf2f6;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.MPC-smt-row:last-child {
+    border-bottom: 0;
+}
+
+.MPC-smt-row:hover,
+.MPC-smt-row:focus-visible {
+    background: rgba(31, 131, 255, 0.06);
+    outline: none;
+}
+
+.MPC-smt-cell {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 0.75em;
+    font-weight: 400;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-smt-item {
+    font-weight: 700;
+    color: #102c3f;
+}
+
+/* Type pill — coloured by movement class (reference .pill palette).
+   justify-self centers the pill within the Type grid column (ignored for the
+   modal badge, which sits in a flex header). */
+.MPC-smt-type {
+    justify-self: center;
+    width: fit-content;
+    max-width: 100%;
+    overflow: hidden;
+    padding: 0.18em 0.7em;
+    border-radius: 999px;
+    /* Match the GRN status pill's effective size: there the pill is nested in a
+       0.75em cell with its own 0.92em (=> 0.69em of root); ours sits at root, so
+       0.69em renders the same size. */
+    font-size: 0.69em;
+    font-weight: 400;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+}
+
+.MPC-smt-type-ok {
+    color: #0b6b45;
+    background: #e2f6ef;
+}
+
+.MPC-smt-type-bad {
+    color: #a33f3f;
+    background: #fbe3e4;
+}
+
+.MPC-smt-type-info {
+    color: #106ab0;
+    background: #dff1ff;
+}
+
+.MPC-smt-type-warn {
+    color: #9a6500;
+    background: #fcf1dd;
+}
+
+.MPC-smt-type-neutral {
+    color: #5f7283;
+    background: #eef2f6;
+}
+
+/* Qty — signed; emphasized blue at zero, green when positive, red when negative. */
+.MPC-smt-quantity {
+    font-weight: 700;
+    color: #0083da;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+}
+
+.MPC-smt-quantity-positive {
+    color: #0b6b45;
+}
+
+.MPC-smt-quantity-negative {
+    color: #d14545;
+}
+
+.MPC-smt-location {
+    font-weight: 400;
+    color: #5f7283;
+}
+
+.MPC-smt-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1em;
+    color: #748494;
+    font-size: 0.75em;
+    text-align: center;
+}
+
+.MPC-smt-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    border-top: 1px solid #edf2f6;
+    padding-top: 0.6em;
+    margin-top: 0.4em;
+    color: #748494;
+    font-size: 0.6875em;
+    font-weight: 400;
+}
+
+.MPC-smt-hidden,
+.MPC-smt-busy-hidden {
+    display: none;
+}
+
+.MPC-smt-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-smt-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    /* Modal is shell/chrome: stable 16px base (like the reference's rem) so it
+       stays a steady size instead of scaling with the dashboard width. */
+    font-size: 16px;
+}
+
+.MPC-smt-modal.MPC-smt-modal-open {
+    display: flex;
+}
+
+.MPC-smt-modal-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 38, 64, 0.38);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-smt-modal-dialog {
+    position: relative;
+    width: min(880px, calc(100vw - 2em));
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+}
+
+.MPC-smt-modal-header {
+    flex: 0 0 auto;
+    height: 3.5em;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0 1.25em;
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid #1f83ff;
+}
+
+.MPC-smt-modal-title {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    color: #141414;
+    font-size: 1em;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-smt-modal-badge {
+    flex: 0 0 auto;
+    font-size: 0.72em;
+}
+
+.MPC-smt-modal-close {
+    width: 2em;
+    height: 2em;
+    margin-inline-start: auto;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #141414;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.MPC-smt-modal-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.MPC-smt-modal-close:focus {
+    outline: none;
+}
+
+.MPC-smt-modal-close:hover,
+.MPC-smt-modal-close:focus-visible {
+    color: #0083da;
+    background: #eef6ff;
+}
+
+.MPC-smt-modal-dialog:focus {
+    outline: none;
+}
+
+.MPC-smt-modal-body {
+    flex: 1 1 auto;
+    padding: 1.375em 1.5em;
+    overflow: auto;
+}
+
+.MPC-smt-modal-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.5em;
+    background: #fff;
+}
+
+.MPC-smt-stock-effect {
+    margin-top: 0.5em;
+}
+
+.MPC-smt-effect-head {
+    font-size: 1em;
+    font-weight: 700;
+    color: #000;
+    padding: 1.125em 0 0.5em;
+}
+
+.MPC-smt-effect-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.375em;
+}
+
+.MPC-smt-effect-table th {
+    text-align: left;
+    font-size: 0.75em;
+    color: #748494;
+    font-weight: 400;
+    padding: 0.375em 0.5em;
+    border-bottom: 1px solid #edf2f6;
+}
+
+.MPC-smt-effect-table td {
+    font-size: 0.875em;
+    padding: 0.5em 0.5em;
+    color: #5f7283;
+    border-bottom: 1px solid #edf2f6;
+}
+
+.MPC-smt-effect-table td.is-strong {
+    font-weight: 700;
+    color: #102c3f;
+}
+
+.MPC-smt-effect-table th.is-center,
+.MPC-smt-effect-table td.is-center {
+    text-align: center;
+}
+
+.MPC-smt-effect-table th.is-right,
+.MPC-smt-effect-table td.is-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-smt-effect-table tr:last-child td {
+    border-bottom: 0;
+}
+
+.MPC-smt-detail {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid #d7d7d7;
+}
+
+.MPC-smt-detail-label {
+    color: #5f7283;
+    font-size: 0.75em;
+    font-weight: 400;
+}
+
+.MPC-smt-detail-value {
+    overflow-wrap: anywhere;
+    font-size: 1em;
+    font-weight: 400;
+    color: #102c3f;
+    line-height: 1.35;
+    margin-top: 0.375em;
+}
+
+.MPC-smt-detail-value.is-strong {
+    font-weight: 700;
+}
+
+@media (max-width: 600px) {
+    .MPC-smt-grid {
+        gap: 0.5em;
+    }
+
+    .MPC-smt-modal-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

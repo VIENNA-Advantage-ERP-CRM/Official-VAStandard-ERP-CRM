@@ -192,6 +192,17 @@ import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
 
+import "../app/widgets/VAS_073_LowStockCountWidget.js";
+import "../app/widgets/VAS_074_PendingGRNsWidget.js";
+import "../app/widgets/VAS_075_TotalInventoryValueWidget.js";
+import "../app/widgets/VAS_076_TotalStockQtyWidget.js";
+import "../app/widgets/VAS_077_NewStockAdjustmentWidget.js";
+import "../app/widgets/VAS_078_ProductSearchWidget.js";
+import "../app/widgets/VAS_079_TopValueItemsWidget.js";
+import "../app/widgets/VAS_080_WarehouseStockWidget.js";
+import "../app/widgets/VAS_094_HighestSellingProductsWidget.js";
+import "../app/widgets/VAS_095_QuickOperationsWidget.js";
+import "../app/widgets/VAS_096_StockMovementTodayWidget.js";
 import "../app/widgets/VAS_081_MaterialReceiptRegisterWidget.js"; 
 import "../app/widgets/VAS_082_NewGRNWidget.js"; 
 import "../app/widgets/VAS_083_OpenGRNsWidget.js";

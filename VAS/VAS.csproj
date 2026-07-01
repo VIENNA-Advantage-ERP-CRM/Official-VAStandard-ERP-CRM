@@ -297,6 +297,19 @@
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_037_GLJournalTotalDebitWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_041_GLJournalEntriesWidgetController.cs" />
+
+    <Compile Include="Areas\VAS\Controllers\VAS_073_LowStockCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_074_PendingGRNsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_075_TotalInventoryValueWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_076_TotalStockQtyWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_077_NewStockAdjustmentWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_078_ProductSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_079_TopValueItemsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_080_WarehouseStockWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_094_HighestSellingProductsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_095_QuickOperationsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_096_StockMovementTodayWidgetController.cs" />
+
     <Compile Include="Areas\VAS\Controllers\VAS_081_MaterialReceiptRegisterWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_082_NewGRNWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_083_OpenGRNsWidgetController.cs" />
@@ -309,6 +322,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_090_ReceivingActionsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_091_MaterialReceiptSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_097_ExpectedGRNWidgetController.cs" />
+
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -421,6 +435,19 @@
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_ReceiptSearch.css" />
     <Content Include="Areas\VAS\Content\VAS_RecentReceiptsWidget.css" />
+    
+    <Content Include="Areas\VAS\Content\VAS_073_LowStockCountWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_074_PendingGRNsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_075_TotalInventoryValueWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_076_TotalStockQtyWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_077_NewStockAdjustmentWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_078_ProductSearchWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_079_TopValueItemsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_080_WarehouseStockWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_094_HighestSellingProductsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_095_QuickOperationsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_096_StockMovementTodayWidget.css" />
+
     <Content Include="Areas\VAS\Content\VAS_081_MaterialReceiptRegisterWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_082_NewGRNWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_083_OpenGRNsWidget.css" />
@@ -432,6 +459,7 @@
     <Content Include="Areas\VAS\Content\VAS_089_ReceiptsMTDWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_090_ReceivingActionsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_097_ExpectedGRNWidget.css" />
+
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
@@ -559,6 +587,18 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_072_MatchSuggestionAPPayment.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_ReceiptSearch.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_RecentReceiptsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_073_LowStockCountWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_074_PendingGRNsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_075_TotalInventoryValueWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_076_TotalStockQtyWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_077_NewStockAdjustmentWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_078_ProductSearchWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_079_TopValueItemsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_080_WarehouseStockWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_094_HighestSellingProductsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_095_QuickOperationsWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_096_StockMovementTodayWidget.js" />
+
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_081_MaterialReceiptRegisterWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_082_NewGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_083_OpenGRNsWidget.js" />
@@ -572,6 +612,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_091_MaterialReceiptSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_093_PendingGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_097_ExpectedGRNWidget.js" />
+
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
