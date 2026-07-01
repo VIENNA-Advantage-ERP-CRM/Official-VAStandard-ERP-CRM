@@ -1043,7 +1043,7 @@
     background: var(--cil-surface);
     border-radius: 0.875em;
     box-shadow: var(--cil-shadow-dialog);
-    width: 42.5em;
+    width: 45em;
     max-width: 100%;
     max-height: 90vh;
     overflow: hidden;

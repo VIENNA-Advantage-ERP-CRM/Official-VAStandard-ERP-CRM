@@ -42,6 +42,12 @@
         var uomList = [], taxList = [], taxRateById = {};
         /* AD_Column metadata cache (callout code + validation), keyed by column */
         var columnMeta = {};
+        /* lower-cased ColumnName -> canonical (dictionary-cased) ColumnName. Used to
+           canonicalise a DB-cased line.values key (PostgreSQL lowercases, Oracle uppercases)
+           back to the dictionary case when priming the window context - so we never emit two
+           case-variant keys for the same column (the server merges window context into a
+           case-INSENSITIVE dictionary, and two variants throw "same key already added"). */
+        var columnNameByLc = {};
         /* client-side line rows + reactive UI state */
         var lines = [];
         var rowCounter = 0;
@@ -166,8 +172,16 @@
                     for (var i = 0; i < taxList.length; i++) taxRateById[taxList[i].C_Tax_ID] = +taxList[i].Rate || 0;
                     // Cache the AD_Column meta (callout code + validation) once per load.
                     columnMeta = {};
+                    columnNameByLc = {};
                     var cols = (parent && parent.Columns) || [];
-                    for (var c = 0; c < cols.length; c++) columnMeta[cols[c].ColumnName] = cols[c];
+                    for (var c = 0; c < cols.length; c++) {
+                        columnMeta[cols[c].ColumnName] = cols[c];
+                        columnNameByLc[String(cols[c].ColumnName).toLowerCase()] = cols[c].ColumnName;
+                    }
+                    // A validated MLookup caches its list at first load; drop the cache on a
+                    // new invoice so its val rule re-resolves against the new header context
+                    // (e.g. a different C_BPartner_ID) instead of serving the prior invoice's list.
+                    _mlookupCache = {};
                     lines = [];
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
                     editing = null; morePopoverFor = null;
@@ -662,6 +676,10 @@
             setTimeout(function () {
                 if (morePopoverFor !== line.rowId || !$body.parent().length) return;   // closed meanwhile
                 $body.removeClass("vas-cil-dialog__body--loading").addClass("vas-cil-more-grid").empty();
+                // Prime the window context with this line before building the FK controls,
+                // so each control's AD_Val_Rule (e.g. C_Withholding_ID) validates against the
+                // current line/header and actually loads data.
+                primeLineContext(line);
                 // Curated "Additional Info" fields (callout / read-only / validation / val-rule
                 // honoured per control); shown 2-up via the .vas-cil-more-grid layout.
                 appendDynFields(line, $body);
@@ -1523,6 +1541,93 @@
             return dt == DT.YesNo || DT.IsDate(dt) || DT.IsLookup(dt) || dt == DT.ID;
         }
 
+        /* MLookup cache. Building a column's lookup (VIS.MLookupFactory.getMLookUp) is the
+           bulk of the "..." modal's open cost, and the SAME Additional-Info columns are
+           rebuilt every time ANY line's modal opens. Cache the lookup per column+type so it
+           is created once and reused on every later open (instant after the first). One modal
+           is open at a time and the lookup is a shared read data source, so reuse is safe;
+           the cache lives for the panel session and is dropped when the panel is disposed. */
+        var _mlookupCache = {};
+        function getCachedMLookUp(vctx, windowNo, adColumnId, displayType) {
+            var key = (adColumnId || 0) + "_" + displayType;
+            if (!_mlookupCache[key]) {
+                _mlookupCache[key] = VIS.MLookupFactory.getMLookUp(vctx, windowNo, adColumnId, displayType);
+            }
+            return _mlookupCache[key];
+        }
+
+        /* Prime the framework window context (VIS.context @ this panel's windowNo) with the
+           invoice HEADER + the CURRENT line's column values, so a modal FK control's
+           AD_Val_Rule resolves its @tokens@ against THIS line before the MLookup loads.
+           Without this the panel never populates the line-tab context (it bypasses the
+           framework GridTab), so a validated lookup like C_Withholding_ID parses its
+           validation against empty tokens (e.g. `... AND C_BPartner_ID=`) and loads no
+           data. A validated MLookup caches its list at first load (getData2 refreshes only
+           when !allLoaded), so this MUST run before the control is built - callers prime
+           right before appendDynFields / refreshMoreDialog / on a value change (setDyn).
+           Header keys are set first, then the line's own values (current-row wins);
+           login / accounting-element tokens (parent.LoginContext, @#Tok@ / @$Tok@) are set
+           as #global context so element-gated rules resolve too. */
+        function primeLineContext(line) {
+            if (!window.VIS) return;
+            var ctx = VIS.context || (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx());
+            if (!ctx || typeof ctx.setContext !== "function") return;
+            var wn = $self.windowNo || 0;
+            // Stage into a case-insensitive bag FIRST, then write each column exactly once.
+            // The framework merges this window context into a case-INSENSITIVE dictionary on
+            // the server, so emitting a DB-cased line key (e.g. "c_invoice_id") alongside a
+            // dictionary-cased one ("C_Invoice_ID") would collide -> "same key already added".
+            // Keying by lower-case (canonical dictionary name preferred) collapses variants;
+            // line values are staged AFTER the header so the current-row value wins.
+            var bag = {};   // lc -> { name, value }
+            function coerce(val) {
+                if (val === true || val === false) return val ? "Y" : "N";
+                if (val instanceof Date) return dateStr(val);
+                if (val == null) return "";
+                return String(val);
+            }
+            function stage(col, val) {
+                if (col == null) return;
+                var lc = String(col).toLowerCase();
+                // Canonicalise to the dictionary's ColumnName so the key matches whatever the
+                // framework already set for this window (also dictionary-cased).
+                var name = columnNameByLc[lc] || col;
+                bag[lc] = { name: name, value: coerce(val) };
+            }
+            if (parent) {
+                stage("C_Invoice_ID", parent.C_Invoice_ID || 0);
+                stage("C_BPartner_ID", parent.C_BPartner_ID || 0);
+                stage("C_BPartner_Location_ID", parent.C_BPartner_Location_ID || 0);
+                stage("M_PriceList_ID", parent.M_PriceList_ID || 0);
+                stage("C_Currency_ID", parent.C_Currency_ID || 0);
+                stage("AD_Org_ID", parent.AD_Org_ID || 0);
+                stage("AD_Client_ID", parent.AD_Client_ID || 0);
+                stage("M_Warehouse_ID", parent.M_Warehouse_ID || 0);
+                stage("DateInvoiced", parent.DateInvoiced);
+                stage("IsSOTrx", !!parent.IsSOTrx);
+                stage("IsTaxIncluded", !!parent.IsTaxIncluded);
+                stage("Processed", !!parent.Processed);
+                stage("DocStatus", parent.DocStatus || "");
+            }
+            // Current line's own C_InvoiceLine columns (current-row context) - staged last.
+            var v = line.values || {};
+            for (var k in v) { if (v.hasOwnProperty(k)) stage(k, v[k]); }
+            // Write each column once.
+            for (var key in bag) {
+                if (!bag.hasOwnProperty(key)) continue;
+                try { ctx.setContext(wn, bag[key].name, bag[key].value); } catch (e) { }
+            }
+            // Login / accounting-element tokens (@#Global@ / @$Element_*@) as #global context.
+            // These live in a separate namespace (own prefix), so no case-merge concern here.
+            if (parent) {
+                var glc = parent.LoginContext || {};
+                for (var gk in glc) {
+                    if (!glc.hasOwnProperty(gk)) continue;
+                    try { ctx.setContext(String(gk), String(glc[gk])); } catch (e) { }
+                }
+            }
+        }
+
         /* Build the framework control for a column (or null when unsupported). */
         function makeViennaCtrl(displayType, columnName, header, refValueId, mandatory, readOnly, adColumnId) {
             var DT = VIS.DisplayType, C = VIS.Controls, upd = !readOnly;
@@ -1532,7 +1637,7 @@
             if (DT.IsDate(displayType)) { var vd = new C.VDate(columnName, mandatory, readOnly, upd, displayType, header); vd.setName(columnName); return vd; }
             if (DT.IsLookup(displayType) || DT.ID == displayType) {
                 var vctx = VIS.context || (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx());
-                var lookup = VIS.MLookupFactory.getMLookUp(vctx, ($self.windowNo || 0), (adColumnId || 0), displayType);
+                var lookup = getCachedMLookUp(vctx, ($self.windowNo || 0), (adColumnId || 0), displayType);
                 if (displayType != DT.Search && displayType != DT.MultiKey) {
                     return new C.VComboBox(columnName, mandatory, readOnly, upd, lookup, 50);
                 }
@@ -1706,6 +1811,9 @@
         function setDyn(line, col, value, refresh) {
             var prev = lineVal(line, col);
             setLineVal(line, col, value);
+            // Keep the window context current so a dependent FK's val rule (and any control
+            // built by a following refreshMoreDialog) resolves against the new value.
+            primeLineContext(line);
             if (!sameVal(prev, value)) markDirty(line);   // genuine change only
             var m = columnMeta[col];
             if (m && m.Callout) {
@@ -1772,6 +1880,7 @@
         function refreshMoreDialog(line) {
             var $b = $("#vasCilMoreBody");
             if (!$b.length || morePopoverFor !== line.rowId) return;
+            primeLineContext(line);   // newly-visible FK controls validate against this line
             var cols = additionalInfoColumns(line);
             $b.children(".vas-cil-empty-message").remove();
             var existing = {};
