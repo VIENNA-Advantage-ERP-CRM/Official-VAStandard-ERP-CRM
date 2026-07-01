@@ -1,0 +1,627 @@
+/*
+ * VAS_054_TopCounterpartiesCashJournalWidget.css
+ * Widget : Top Counterparties - Cash Journal
+ * Screen : Cash Journal
+ * Prefix : VAS_054_
+ * Scope  : All selectors are scoped under the widget root.
+ */
+
+.VAS_054_counterparties-root,
+.VAS_054_counterparties-root * {
+    box-sizing: border-box;
+}
+
+.VAS_054_counterparties-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    container-type: inline-size;
+    font-family: Roboto, Arial, sans-serif;
+    color: #102C3F;
+}
+
+.VAS_054_counterparties-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+    padding: 0.875em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #102C3F;
+}
+
+.VAS_054_counterparties-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-width: 0;
+    flex-shrink: 0;
+}
+
+.VAS_054_counterparties-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.VAS_054_counterparties-icon {
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #E4EDF4;
+    border-radius: 0.375em;
+    background: rgba(0, 131, 218, 0.08);
+    color: #4F83D8;
+}
+
+    .VAS_054_counterparties-icon svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.VAS_054_counterparties-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875em;
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS_054_counterparties-meta {
+    flex: 0 0 auto;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #748494;
+}
+
+.VAS_054_counterparties-action {
+    flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #3B7DD8;
+    font: inherit;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+
+/* Scroll body — wraps col-headers + rows so both scroll together */
+.VAS_054_counterparties-body {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+    direction: ltr;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
+}
+
+.VAS_054_counterparties-body::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+.VAS_054_counterparties-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.VAS_054_counterparties-body::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(16, 44, 63, 0.18);
+}
+
+.VAS_054_counterparties-table {
+    width: 100%;
+    min-width: 46em;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.VAS_054_counterparties-table th,
+.VAS_054_counterparties-table td {
+    min-width: 0;
+    padding: 0.375em 0.5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(212, 225, 234, 0.66);
+}
+
+.VAS_054_counterparties-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
+    padding-top: 0;
+    padding-bottom: 0.5em;
+    color: #748494;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-align: left;
+    text-transform: capitalize;
+    border-bottom-color: rgba(212, 225, 234, 0.72);
+}
+
+.VAS_054_counterparties-table td {
+    text-align: left !important;
+}
+
+.VAS_054_counterparties-table tbody tr {
+    height: 3em;
+}
+
+.VAS_054_counterparties-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.VAS_054_counterparties-col-avatar,
+.VAS_054_counterparties-cell-avatar {
+    width: 2em;
+}
+
+.VAS_054_counterparties-col-party,
+.VAS_054_counterparties-cell-party {
+    width: 12em;
+}
+
+.VAS_054_counterparties-col-type,
+.VAS_054_counterparties-cell-type {
+    width: 7em;
+}
+
+.VAS_054_counterparties-col-txns,
+.VAS_054_counterparties-count {
+    width: 3em;
+    text-align: left !important;
+}
+
+.VAS_054_counterparties-col-trend,
+.VAS_054_counterparties-spark-wrap {
+    width: 9em;
+}
+
+.VAS_054_counterparties-col-volume,
+.VAS_054_counterparties-cell-volume {
+    width: 20em;
+    text-align: left !important;
+}
+
+.VAS_054_counterparties-avatar {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: #FFFFFF;
+    font-size: 0.75em;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.VAS_054_counterparties-avatar-vendor {
+    background: #D69A3A;
+}
+
+.VAS_054_counterparties-avatar-customer {
+    background: #6E5DCB;
+}
+
+.VAS_054_counterparties-avatar-bank {
+    background: #5B8CCF;
+}
+
+.VAS_054_counterparties-avatar-cashbook {
+    background: #61A88E;
+}
+
+.VAS_054_counterparties-avatar-other {
+    background: #7C8795;
+}
+
+.VAS_054_counterparties-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    unicode-bidi: plaintext;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.VAS_054_counterparties-chip {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.3em 0.75em;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    font-size: 0.625em;
+    line-height: 1.1;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: capitalize;
+}
+
+.VAS_054_counterparties-chip-vendor {
+    background: rgba(164, 67, 67, 0.08);
+    border-color: rgba(164, 67, 67, 0.35);
+    color: #9F4545;
+}
+
+.VAS_054_counterparties-chip-customer {
+    background: rgba(12, 116, 87, 0.07);
+    border-color: rgba(12, 116, 87, 0.35);
+    color: #2D7555;
+}
+
+.VAS_054_counterparties-chip-bank,
+.VAS_054_counterparties-chip-cashbook,
+.VAS_054_counterparties-chip-other {
+    background: rgba(0, 120, 212, 0.07);
+    border-color: rgba(0, 120, 212, 0.30);
+    color: #2C6EAA;
+}
+
+.VAS_054_counterparties-count {
+    color: #748494;
+    font-size: 0.8125em;
+    font-weight: 600;
+}
+
+.VAS_054_counterparties-spark-wrap {
+    height: 2.25em;
+}
+
+.VAS_054_counterparties-sparkline {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+    .VAS_054_counterparties-sparkline polyline {
+        fill: none;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+.VAS_054_counterparties-sparkline-up polyline {
+    stroke: #519B67;
+}
+
+.VAS_054_counterparties-sparkline-down polyline {
+    stroke: #B94E4B;
+}
+
+.VAS_054_counterparties-sparkline-flat polyline {
+    stroke: #748494;
+    stroke-dasharray: 3 3;
+}
+
+.VAS_054_counterparties-amount {
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    text-align: left;
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 0;
+    font-size: 0.8125em;
+    line-height: 1;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.VAS_054_counterparties-amount .VAS-cash-amount-prefix {
+    flex: 0 0 auto;
+    margin-top: 0.08em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.78;
+}
+
+.VAS_054_counterparties-amount .VAS-cash-amount-prefix:empty,
+.VAS_054_counterparties-amount .VAS-cash-amount-decimal:empty {
+    display: none;
+    margin: 0;
+}
+
+.VAS_054_counterparties-amount .VAS-cash-amount-main {
+    min-width: 0;
+    overflow: visible;
+    text-overflow: clip;
+    font-size: 1em;
+    line-height: 1;
+    font-weight: 700;
+    color: currentColor;
+}
+
+.VAS_054_counterparties-amount .VAS-cash-amount-decimal {
+    flex: 0 0 auto;
+    margin-top: 0.26em;
+    font-size: 0.72em;
+    line-height: 1;
+    font-weight: 500;
+    color: currentColor;
+    opacity: 0.66;
+}
+
+.VAS_054_counterparties-amount .VAS-cash-amount-prefix,
+.VAS_054_counterparties-amount .VAS-cash-amount-decimal {
+    align-self: baseline;
+    margin-top: 0;
+    color: currentColor;
+    font-size: 1em;
+    font-weight: 700;
+    opacity: 1;
+}
+
+.VAS_054_counterparties-busy {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    background: rgba(255, 255, 255, 0.76);
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 14px;
+}
+
+    .VAS_054_counterparties-busy.is-visible {
+        display: flex;
+    }
+
+.VAS_054_counterparties-state {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0.875em;
+    color: #60748A;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    font-weight: 600;
+    text-align: center;
+    border-radius: 14px;
+    pointer-events: none;
+}
+
+    .VAS_054_counterparties-state.is-visible {
+        display: flex;
+    }
+
+/* Pagination - same design as VAS_053 Approval Queue */
+.VAS_054_counterparties-footer {
+    flex-shrink: 0;
+    display: none;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625em;
+    margin-top: 0.25em;
+    padding-top: 0.5em;
+    border-top: 1px solid rgba(212, 225, 234, 0.66);
+}
+
+.VAS_054_counterparties-footer-info {
+    display: none;
+}
+
+.VAS_054_counterparties-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.VAS_054_counterparties-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+    font: inherit;
+    font-size: 0.875em;
+    line-height: 1;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+    .VAS_054_counterparties-page-btn svg {
+        width: 0.875em;
+        height: 0.875em;
+        stroke: currentColor;
+        stroke-width: 2.4;
+    }
+
+    .VAS_054_counterparties-page-btn:hover:not(:disabled) {
+        background: #eaf8ff;
+        border-color: #9ed1ff;
+    }
+
+    .VAS_054_counterparties-page-btn:disabled {
+        color: #c7d3df;
+        background: rgba(255, 255, 255, 0.64);
+        cursor: default;
+    }
+
+.VAS_054_counterparties-page-text {
+    min-width: 3em;
+    text-align: center;
+    font-size: 1em;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #141414;
+    font-variant-numeric: tabular-nums;
+}
+
+@container (max-width: 38em) {
+    .VAS_054_counterparties-meta {
+        display: none;
+    }
+}
+
+@container (max-width: 26em) {
+    .VAS_054_counterparties-card {
+        padding: 0.75em;
+        gap: 0.375em;
+        border-radius: 12px;
+    }
+
+    .VAS_054_counterparties-action {
+        display: none;
+    }
+
+    .VAS_054_counterparties-icon {
+        width: 1.75em;
+        height: 1.75em;
+        border-radius: 0.375em;
+    }
+
+    .VAS_054_counterparties-footer {
+        justify-content: flex-end;
+        gap: 0.5em;
+        margin-top: 0.25em;
+        padding-top: 0.45em;
+    }
+
+    .VAS_054_counterparties-page-btn {
+        width: 1.6em;
+        height: 1.6em;
+    }
+
+    .VAS_054_counterparties-page-text {
+        min-width: 2.25em;
+        font-size: 0.7em;
+    }
+}
+
+.VAS_054_counterparties-pager {
+    gap: 0.625em;
+}
+
+.VAS_054_counterparties-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    border: 1px solid #cfe9ff;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+}
+
+.VAS_054_counterparties-page-btn:hover:not(:disabled) {
+    background: #eaf8ff;
+    border-color: #9ed1ff;
+}
+
+.VAS_054_counterparties-page-btn:disabled {
+    color: #c7d3df;
+    background: rgba(255, 255, 255, 0.64);
+}
+
+.VAS_054_counterparties-page-text {
+    display: inline-block;
+    min-width: 3em;
+    font-size: 1em;
+    font-weight: 700;
+    color: #141414;
+}
+
+/* ── Hover expand: show full counterparty name on pointer-over ─────────── */
+.VAS_054_counterparties-name {
+    cursor: default;
+}
+
+
+
+/* Canonical dashboard widget footer pager. */
+.VAS_054_counterparties-footer {
+    justify-content: space-between;
+}
+
+.VAS_054_counterparties-footer-info {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.8125rem;
+    font-weight: 400;
+}
+
+.VAS_054_counterparties-page-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.VAS_054_counterparties-page-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.VAS_054_counterparties-page-text {
+    font-size: 0.85rem;
+}
+
+.VAS_054_counterparties-table .VAS_054_counterparties-col-volume,
+.VAS_054_counterparties-table .VAS_054_counterparties-cell-volume,
+.VAS_054_counterparties-table thead th:last-child,
+.VAS_054_counterparties-table tbody td:last-child {
+    text-align: right !important;
+}
