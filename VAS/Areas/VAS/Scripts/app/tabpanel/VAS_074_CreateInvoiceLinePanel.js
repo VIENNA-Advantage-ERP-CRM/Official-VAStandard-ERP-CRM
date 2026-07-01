@@ -2712,7 +2712,7 @@
             var v = l.values;
             // Core fields drive the business setters; Values carries the full column
             // bag so every callout-set column is persisted server-side.
-            return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
+            return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                 M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
                 Values: v };
@@ -2738,10 +2738,43 @@
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (res && res.Success) { mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
-                    else { batch.forEach(function (l) { setRowBusy(l, false); }); render(); showToast(lbl((res && res.ErrorKey) || "VAS_074_SaveFailed", "Save failed") + (res && res.ErrorDetail ? " - " + res.ErrorDetail : "")); if (done) done(false); }
+                    else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                 },
-                error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); render(); showToast(lbl("VAS_074_SaveFailed", "Save failed")); if (done) done(false); }
+                error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
             });
+        }
+
+        /* Paint server-side save failures on their record rows (line._error) instead of a
+           single toast - so every failing record in a multi-row save is flagged in place.
+           Falls back to the first row (then a toast) for a batch-level error with no per-line
+           mapping. */
+        function showServerSaveErrors(batch, res) {
+            var errs = (res && res.LineErrors) || [];
+            var mapped = 0;
+            for (var i = 0; i < errs.length; i++) {
+                var l = findBatchLine(batch, errs[i]);
+                if (l) { l._error = errs[i].Message || lbl("VAS_074_SaveFailed", "Save failed"); mapped++; }
+            }
+            if (!mapped) {
+                // No per-line info (e.g. a batch-level exception) - still show it in place on
+                // the first row, and toast as a safety net.
+                var detail = (res && res.ErrorDetail) ? res.ErrorDetail : "";
+                var msg = lbl((res && res.ErrorKey) || "VAS_074_SaveFailed", "Save failed") + (detail ? " - " + detail : "");
+                if (batch.length) batch[0]._error = msg; else showToast(msg);
+            }
+            render();
+            var $first = $linesBody.find(".vas-cil-row--line.is-invalid").first();
+            if ($first.length && $first[0].scrollIntoView) $first[0].scrollIntoView({ block: "nearest" });
+        }
+
+        /* Match a server LineSaveError back to its client line: by RowKey (the client rowId),
+           then by C_InvoiceLine_ID (existing lines), then by Line number. */
+        function findBatchLine(batch, e) {
+            var i;
+            if (e && e.RowKey) { for (i = 0; i < batch.length; i++) if (batch[i].rowId === e.RowKey) return batch[i]; }
+            if (e && e.C_InvoiceLine_ID > 0) { for (i = 0; i < batch.length; i++) if ((batch[i].values.C_InvoiceLine_ID || 0) === e.C_InvoiceLine_ID) return batch[i]; }
+            if (e && e.Line > 0) { for (i = 0; i < batch.length; i++) if ((batch[i].values.Line || 0) === e.Line) return batch[i]; }
+            return null;
         }
 
         /* Replace just the saved lines with the server's fresh copies, while PRESERVING

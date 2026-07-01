@@ -1888,14 +1888,41 @@ namespace VASLogic.Models
 
                     if (!line.Save())
                     {
+                        string err = string.Empty;
                         ValueNamePair pp = VLogger.RetrieveError();
-                        string err = (pp != null) ? pp.GetName() : "";
-                        trx.Rollback();
-                        log.Warning("VAS_074 SaveLines: line save failed - " + err);
-                        res.ErrorKey = "VAS_074_SaveFailed";
-                        res.ErrorDetail = err;
-                        return res;
+                        if (pp != null)
+                        {
+                            string val = pp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = Msg.GetMsg(ctx,  pp.GetValue());
+                            }
+                            err = val;
+                        }
+                        log.Warning("VAS_074 SaveLines: line save failed (Line " + input.Line + ") - " + err);
+                        // Record the failure against THIS line and keep going, so every
+                        // failing record is reported on its own row (the whole batch is rolled
+                        // back below). Safe because the panel pre-validates mandatory fields,
+                        // so remaining rejections are beforeSave business rules that run no SQL
+                        // (they don't poison the transaction).
+                        res.LineErrors.Add(new LineSaveError
+                        {
+                            RowKey = input.RowKey,
+                            C_InvoiceLine_ID = input.C_InvoiceLine_ID,
+                            Line = input.Line,
+                            Message = err
+                        });
                     }
+                }
+
+                // Any line failed -> roll the whole batch back (all-or-nothing) and return the
+                // per-line errors; the client paints each on its record row.
+                if (res.LineErrors.Count > 0)
+                {
+                    trx.Rollback();
+                    res.ErrorKey = "VAS_074_SaveFailed";
+                    res.ErrorDetail = res.LineErrors[0].Message;
+                    return res;
                 }
 
                 trx.Commit();
@@ -2296,6 +2323,7 @@ namespace VASLogic.Models
     public class InvoiceLineInput
     {
         public int C_InvoiceLine_ID { get; set; }   // 0 / negative -> insert
+        public string RowKey { get; set; }          // client rowId, echoed back on a per-line save error
         public int Line { get; set; }
         public int M_Product_ID { get; set; }
         public int C_Charge_ID { get; set; }
@@ -2332,14 +2360,25 @@ namespace VASLogic.Models
         public DeleteLinesRequest() { LineIds = new List<int>(); }
     }
 
+    /// <summary>A save failure for one specific line, echoed back so the client can show
+    /// the message on that record's row instead of a single global toast.</summary>
+    public class LineSaveError
+    {
+        public string RowKey { get; set; }          // client rowId (primary match key)
+        public int C_InvoiceLine_ID { get; set; }   // fallback match for existing lines
+        public int Line { get; set; }               // fallback match (line number)
+        public string Message { get; set; }
+    }
+
     /// <summary>Result of a save / delete batch.</summary>
     public class SaveLinesResult
     {
         public bool Success { get; set; }
         public string ErrorKey { get; set; }
         public string ErrorDetail { get; set; }
+        public List<LineSaveError> LineErrors { get; set; }   // per-line failures (empty on success)
         public List<InvoiceLineRow> Lines { get; set; }
-        public SaveLinesResult() { Lines = new List<InvoiceLineRow>(); }
+        public SaveLinesResult() { Lines = new List<InvoiceLineRow>(); LineErrors = new List<LineSaveError>(); }
     }
 
     #endregion
