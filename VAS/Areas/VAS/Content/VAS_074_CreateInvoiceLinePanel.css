@@ -303,16 +303,16 @@
     box-shadow: inset 0.1875em 0 0 var(--cil-danger);
 }
 
-    /* Per-row inline validation message (replaces the global toast on Save). Spans the
+/* Per-row inline validation message (replaces the global toast on Save). Spans the
        whole grid row on its own line, red, under the offending line's cells. */
-    .vas-cil-row--line .vas-cil-row-error {
-        grid-column: 1 / -1;
-        margin: 0.125em 0 0 2.5em;
-        font-size: 0.75em;
-        font-weight: 600;
-        line-height: 1.3;
-        color: var(--cil-danger);
-    }
+.vas-cil-row--line .vas-cil-row-error {
+    grid-column: 1 / -1;
+    margin: 0.125em 0 0 2.5em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cil-danger);
+}
 
 .vas-cil-row--totals {
     border-top: 0.0625em solid var(--cil-divider-strong);
@@ -427,7 +427,7 @@
 .vas-cil-attr-link {
     display: block;
     margin-top: 0.125em;
-    font-size: 0.75em;
+    font-size: 0.85em;
     font-weight: 600;
     color: var(--cil-action-blue);
     white-space: nowrap;
@@ -464,7 +464,7 @@
     background-color: transparent;
     padding: 0.1em 0;
     font-family: inherit;
-    font-size: 0.875em;
+    font-size: 1em;
     border-bottom: 0.0938em solid transparent;
     transition: border-color .12s;
     text-overflow: ellipsis;
@@ -500,7 +500,7 @@
 }
 /* read-only invoice */
 .vas-cil-cell-edit input.vas-cil-cell-disp--sub {
-    font-size: 0.75em;
+    font-size: 0.85em;
     font-weight: 400;
     color: var(--cil-text-muted);
 }
@@ -508,7 +508,7 @@
 .vas-cil-cell-edit input.vas-cil-qtyval {
     text-align: right;
     font-weight: 700;
-    font-size: 0.875em;
+    font-size: 1em;
 }
 
 .vas-cil-cell-edit input.vas-cil-uomsub {
@@ -517,14 +517,14 @@
 }
 
 .vas-cil-cell-edit input.vas-cil-taxval {
-    font-size: 0.875em;
+    font-size: 0.975em;
     font-weight: 400;
     color: var(--cil-text-secondary);
 }
 
 .vas-cil-amt {
     font-weight: 700;
-    font-size: 0.875em;
+    font-size: 0.975em;
     color: var(--cil-text);
     font-variant-numeric: tabular-nums;
 }
@@ -754,6 +754,13 @@
     .vas-cil-more-grid > .input-group {
         flex-wrap: nowrap;
     }
+
+/* A curated "..." field hidden by its AD_Field.DisplayLogic. The field is still BUILT
+   (control + lookup preserved) and only toggled off, so it drops out of the grid layout
+   without being re-created when the logic flips back to visible. */
+.vas-cil-dyn-hidden {
+    display: none !important;
+}
 /* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
 .vas-cil-fk-popover {
     min-width: 0;
@@ -848,6 +855,23 @@
         pointer-events: auto;
     }
 
+    /* Search-reference lookup button (getBtn(0) = button.input-group-text): no
+       border/outline/box-shadow in any state - the focus/hover cue is the field's own
+       underline, not a box on the button. !important + the :focus-within ancestor case
+       are needed to beat the framework's VIS.all.min.css rules
+       (.input-group:focus-within .input-group-append .input-group-text {border:primary}
+       and .vis-input-wrap .input-group-text:focus {border-left-color:...!important}). */
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:hover,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:focus,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:active,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:focus-visible,
+    .vas-cil-dialog .input-group:focus-within .input-group-append .input-group-text {
+        border: 0 !important;
+        outline: 0 !important;
+        box-shadow: none !important;
+    }
+
 .vas-cil-dialog .input-group-prepend .input-group-text i {
     color: rgba(var(--v-c-on-secondary),.7);
     cursor: default;
@@ -867,6 +891,17 @@
     border-radius: 0;
     position: relative;
     top: -8px;
+}
+
+.vas-cil-dialog .input-group-text i {
+    color: rgba(var(--v-c-primary),1);
+}
+
+.vas-cil-dialog .vis-input-wrap .input-group-text {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 0;
+    box-shadow: none
 }
 
 /* (3) "..." modal only: float the field label a touch higher (top: -11px). */
