@@ -1755,6 +1755,17 @@ namespace VASLogic.Models
                 info.IsSerNo = mas.IsSerNo();
                 info.IsGuaranteeDate = mas.IsGuaranteeDate();
                 info.IsMandatory = mas.IsMandatory();
+                // Default guarantee date for a NEW instance: today + configured GuaranteeDays.
+                // GuaranteeDays is set on the PRODUCT MASTER (M_Product.GuaranteeDays) - read it
+                // from the product first, only falling back to the attribute set's value; when
+                // neither has days, fall back to today so the field is still autofilled.
+                if (info.IsGuaranteeDate)
+                {
+                    int gdays = product.GetGuaranteeDays();
+                    if (gdays <= 0) gdays = mas.GetGuaranteeDays();
+                    DateTime gdt = gdays > 0 ? DateTime.Now.AddDays(gdays) : DateTime.Now;
+                    info.GuaranteeDateDefault = gdt.ToString("yyyy-MM-dd");
+                }
             }
 
             // Attributes belonging to the set, with their list values (if any).
@@ -2314,6 +2325,7 @@ namespace VASLogic.Models
         public bool IsLot { get; set; }            // set captures a lot number
         public bool IsSerNo { get; set; }          // set captures a serial number
         public bool IsGuaranteeDate { get; set; }  // set captures a guarantee date
+        public string GuaranteeDateDefault { get; set; }  // ISO yyyy-MM-dd default for a NEW instance (today + GuaranteeDays, else today)
         public bool IsMandatory { get; set; }      // attribute set instance is mandatory
         public bool IsCanCreate { get; set; }      // role may create attribute instances
         public bool IsCanEdit { get; set; }        // role may edit attribute instances
