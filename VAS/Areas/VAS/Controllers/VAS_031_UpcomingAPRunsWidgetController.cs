@@ -458,14 +458,15 @@ ORDER BY
         #endregion
 
 
+
         #region Upcoming Invoice Details
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetUpcomingAPRunDetails(
-            string runDate,
-            int paymentMethodId = 0,
-            int currencyId = 0)
+    string runDate,
+    int paymentMethodId = 0,
+    int currencyId = 0)
         {
             Ctx ctx = GetContext();
 
@@ -493,7 +494,9 @@ ORDER BY
                 {
                     success = false,
                     error = invalidDateMessage,
-                    errorText = invalidDateMessage
+                    errorText = invalidDateMessage,
+                    hasData = false,
+                    rows = new List<object>()
                 }, JsonRequestBehavior.AllowGet);
             }
 
@@ -509,7 +512,9 @@ ORDER BY
                 {
                     success = false,
                     error = currencyMessage,
-                    errorText = currencyMessage
+                    errorText = currencyMessage,
+                    hasData = false,
+                    rows = new List<object>()
                 }, JsonRequestBehavior.AllowGet);
             }
 
@@ -517,9 +522,6 @@ ORDER BY
 
             try
             {
-                DateTime dateFrom = parsedRunDate.Date;
-                DateTime dateTo = dateFrom.AddDays(1);
-
                 string clientIdSql =
                     ctx.GetAD_Client_ID().ToString(
                         CultureInfo.InvariantCulture
@@ -537,6 +539,26 @@ ORDER BY
                     currencyId.ToString(
                         CultureInfo.InvariantCulture
                     );
+
+                string runDateText =
+                    parsedRunDate.ToString(
+                        "yyyy-MM-dd",
+                        CultureInfo.InvariantCulture
+                    );
+
+                string runDateSql =
+                    DB.IsOracle()
+                        ? "TO_DATE('" +
+                          runDateText +
+                          "', 'YYYY-MM-DD')"
+                        : "DATE '" +
+                          runDateText +
+                          "'";
+
+                string periodEndExclusiveSql =
+                    DB.IsOracle()
+                        ? "Period.EndDate + 1"
+                        : "Period.EndDate + INTERVAL '1 DAY'";
 
                 string invoiceAccessSql = @"
 SELECT
@@ -559,7 +581,8 @@ FROM C_Invoice Invoice
 
 WHERE Invoice.IsActive = 'Y'
 
-AND Invoice.AD_Client_ID = " + clientIdSql + @"
+AND Invoice.AD_Client_ID =
+    " + clientIdSql + @"
 
 AND Invoice.IsSOTrx = 'N'
 
@@ -571,12 +594,13 @@ AND Invoice.DocStatus IN
 
 AND EXISTS
 (
-    SELECT 1
+    SELECT
+        1
 
     FROM C_DocType InvoiceDocumentType
 
     WHERE InvoiceDocumentType.C_DocType_ID =
-          Invoice.C_DocType_ID
+        Invoice.C_DocType_ID
 
     AND InvoiceDocumentType.IsActive = 'Y'
 
@@ -585,7 +609,8 @@ AND EXISTS
     AND InvoiceDocumentType.IsSOTrx = 'N'
 )
 
-AND Invoice.C_Currency_ID = " + currencyIdSql + @"
+AND Invoice.C_Currency_ID =
+    " + currencyIdSql + @"
 
 AND COALESCE
 (
@@ -593,15 +618,72 @@ AND COALESCE
     0
 ) = " + paymentMethodIdSql;
 
-                invoiceAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    invoiceAccessSql,
-                    "Invoice",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                invoiceAccessSql =
+                    MRole.GetDefault(ctx).AddAccessSQL(
+                        invoiceAccessSql,
+                        "Invoice",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
                 string sql = @"
-WITH SecuredInvoice AS
+WITH SelectedPeriodSource AS
+(
+    SELECT
+        Period.C_Period_ID,
+        Period.StartDate AS DateFrom,
+        Period.EndDate AS DateTo,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                Period.StartDate DESC,
+                Period.C_Period_ID DESC
+        ) AS PeriodRowNumber
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+            ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+            YearData.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+        " + clientIdSql + @"
+
+    AND " + runDateSql + @" >=
+        Period.StartDate
+
+    AND " + runDateSql + @" <
+        " + periodEndExclusiveSql + @"
+),
+
+SelectedPeriod AS
+(
+    SELECT
+        SelectedPeriodSource.C_Period_ID,
+        SelectedPeriodSource.DateFrom,
+        SelectedPeriodSource.DateTo
+
+    FROM SelectedPeriodSource SelectedPeriodSource
+
+    WHERE SelectedPeriodSource.PeriodRowNumber = 1
+),
+
+SecuredInvoice AS
 (
 " + invoiceAccessSql + @"
 ),
@@ -636,8 +718,7 @@ ScheduleAllocation AS
 
     WHERE AllocationLine.IsActive = 'Y'
 
-    AND AllocationLine.C_InvoicePaySchedule_ID
-        IS NOT NULL
+    AND AllocationLine.C_InvoicePaySchedule_ID IS NOT NULL
 
     GROUP BY
         AllocationLine.C_InvoicePaySchedule_ID
@@ -650,17 +731,33 @@ InvoiceAllocation AS
 
         SUM
         (
-            COALESCE(AllocationLine.Amount, 0)
-            + COALESCE(AllocationLine.DiscountAmt, 0)
-            + COALESCE(AllocationLine.WriteOffAmt, 0)
+            COALESCE
+            (
+                AllocationLine.Amount,
+                0
+            )
+            +
+            COALESCE
+            (
+                AllocationLine.DiscountAmt,
+                0
+            )
+            +
+            COALESCE
+            (
+                AllocationLine.WriteOffAmt,
+                0
+            )
         ) AS AllocatedAmt
 
     FROM C_AllocationLine AllocationLine
 
     WHERE AllocationLine.IsActive = 'Y'
+
     AND AllocationLine.C_Invoice_ID IS NOT NULL
 
-    GROUP BY AllocationLine.C_Invoice_ID
+    GROUP BY
+        AllocationLine.C_Invoice_ID
 ),
 
 InvoiceOpenBalance AS
@@ -671,14 +768,40 @@ InvoiceOpenBalance AS
         CASE
             WHEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
-                - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
+                COALESCE
+                (
+                    Invoice.GrandTotal,
+                    0
+                )
+                -
+                ABS
+                (
+                    COALESCE
+                    (
+                        InvoiceAllocation.AllocatedAmt,
+                        0
+                    )
+                )
             ) > 0
+
             THEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
-                - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
+                COALESCE
+                (
+                    Invoice.GrandTotal,
+                    0
+                )
+                -
+                ABS
+                (
+                    COALESCE
+                    (
+                        InvoiceAllocation.AllocatedAmt,
+                        0
+                    )
+                )
             )
+
             ELSE 0
         END AS InvoiceOpenAmount
 
@@ -686,7 +809,8 @@ InvoiceOpenBalance AS
 
     LEFT OUTER JOIN InvoiceAllocation InvoiceAllocation ON
     (
-        InvoiceAllocation.C_Invoice_ID = Invoice.C_Invoice_ID
+        InvoiceAllocation.C_Invoice_ID =
+            Invoice.C_Invoice_ID
     )
 ),
 
@@ -694,9 +818,7 @@ UnpaidSchedule AS
 (
     SELECT
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
-
         InvoicePaySchedule.C_Invoice_ID,
-
         InvoicePaySchedule.DueDate,
 
         COALESCE
@@ -729,6 +851,7 @@ UnpaidSchedule AS
                     )
                 )
             ) > 0
+
             THEN
             (
                 COALESCE
@@ -772,10 +895,6 @@ UnpaidSchedule AS
         0
     ) > 0
 
-    /*
-     * Hide schedule when the payment engine would reject it as already
-     * assigned/paid.
-     */
     AND COALESCE
     (
         InvoicePaySchedule.C_Payment_ID,
@@ -790,7 +909,8 @@ UnpaidSchedule AS
 
     AND NOT EXISTS
     (
-        SELECT 1
+        SELECT
+            1
 
         FROM C_Payment ExistingPayment
 
@@ -812,15 +932,12 @@ UnpaidSchedule AS
 
 SELECT
     Invoice.C_Invoice_ID,
-
     Invoice.DocumentNo,
-
     Invoice.AD_Org_ID,
 
     Organization.Name AS OrganizationName,
 
     Invoice.C_BPartner_ID,
-
     Invoice.C_BPartner_Location_ID,
 
     UnpaidSchedule.C_InvoicePaySchedule_ID,
@@ -832,7 +949,9 @@ SELECT
     CASE
         WHEN UnpaidSchedule.ScheduleOpenAmount <
              InvoiceOpenBalance.InvoiceOpenAmount
+
         THEN UnpaidSchedule.ScheduleOpenAmount
+
         ELSE InvoiceOpenBalance.InvoiceOpenAmount
     END AS ScheduleOpenAmount,
 
@@ -871,9 +990,17 @@ SELECT
     CASE
         WHEN UnpaidSchedule.ScheduleOpenAmount <
              InvoiceOpenBalance.InvoiceOpenAmount
+
         THEN UnpaidSchedule.ScheduleOpenAmount
+
         ELSE InvoiceOpenBalance.InvoiceOpenAmount
-    END AS OpenAmount
+    END AS OpenAmount,
+
+    SelectedPeriod.C_Period_ID,
+
+    SelectedPeriod.DateFrom AS PeriodDateFrom,
+
+    SelectedPeriod.DateTo AS PeriodDateTo
 
 FROM SecuredInvoice Invoice
 
@@ -888,16 +1015,36 @@ INNER JOIN UnpaidSchedule UnpaidSchedule ON
     UnpaidSchedule.C_Invoice_ID =
         Invoice.C_Invoice_ID
 
-    /*
-     * Only unpaid schedules appear in popup.
-     */
     AND UnpaidSchedule.ScheduleOpenAmount > 0
 )
 
 INNER JOIN InvoiceOpenBalance InvoiceOpenBalance ON
 (
-    InvoiceOpenBalance.C_Invoice_ID = Invoice.C_Invoice_ID
+    InvoiceOpenBalance.C_Invoice_ID =
+        Invoice.C_Invoice_ID
+
     AND InvoiceOpenBalance.InvoiceOpenAmount > 0
+)
+
+INNER JOIN SelectedPeriod SelectedPeriod ON
+(
+    COALESCE
+    (
+        UnpaidSchedule.DueDate,
+        Invoice.DateAcct
+    ) >= SelectedPeriod.DateFrom
+
+    AND COALESCE
+    (
+        UnpaidSchedule.DueDate,
+        Invoice.DateAcct
+    ) <
+        " +
+                (
+                    DB.IsOracle()
+                        ? "SelectedPeriod.DateTo + 1"
+                        : "SelectedPeriod.DateTo + INTERVAL '1 DAY'"
+                ) + @"
 )
 
 LEFT OUTER JOIN AD_Org Organization ON
@@ -927,16 +1074,6 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 WHERE BusinessPartner.IsActive = 'Y'
 
 AND BusinessPartner.IsVendor = 'Y'
-"
-        + GetDateFilter(
-                    @"COALESCE
-(
-    UnpaidSchedule.DueDate,
-    Invoice.DateAcct
-)",
-                    dateFrom,
-                    dateTo
-                ) + @"
 
 ORDER BY
     DueDate,
@@ -950,76 +1087,117 @@ ORDER BY
                     null
                 );
 
-                List<object> rows = new List<object>();
+                List<object> rows =
+                    new List<object>();
+
+                DateTime? periodDateFrom = null;
+                DateTime? periodDateTo = null;
+
+                int periodId = 0;
 
                 while (
                     reader != null &&
                     reader.Read()
                 )
                 {
-                    DateTime? dueDate = GetNullableDateTime(
-                        reader,
-                        "DueDate"
-                    );
+                    DateTime? dueDate =
+                        GetNullableDateTime(
+                            reader,
+                            "DueDate"
+                        );
 
-                    DateTime? dateInvoiced = GetNullableDateTime(
-                        reader,
-                        "DateInvoiced"
-                    );
+                    DateTime? dateInvoiced =
+                        GetNullableDateTime(
+                            reader,
+                            "DateInvoiced"
+                        );
 
-                    string currencyISO = GetString(
-                        reader,
-                        "CurrencyISO"
-                    );
+                    if (!periodDateFrom.HasValue)
+                    {
+                        periodDateFrom =
+                            GetNullableDateTime(
+                                reader,
+                                "PeriodDateFrom"
+                            );
+                    }
 
-                    string currencySymbol = GetString(
-                        reader,
-                        "CurrencySymbol"
-                    );
+                    if (!periodDateTo.HasValue)
+                    {
+                        periodDateTo =
+                            GetNullableDateTime(
+                                reader,
+                                "PeriodDateTo"
+                            );
+                    }
+
+                    if (periodId <= 0)
+                    {
+                        periodId = GetInt(
+                            reader,
+                            "C_Period_ID"
+                        );
+                    }
+
+                    string currencyISO =
+                        GetString(
+                            reader,
+                            "CurrencyISO"
+                        );
+
+                    string currencySymbol =
+                        GetString(
+                            reader,
+                            "CurrencySymbol"
+                        );
 
                     if (string.IsNullOrWhiteSpace(
                         currencySymbol
                     ))
                     {
-                        currencySymbol = currencyISO;
+                        currencySymbol =
+                            currencyISO;
                     }
 
-                    int invoiceId = GetInt(
-                        reader,
-                        "C_Invoice_ID"
-                    );
+                    int invoiceId =
+                        GetInt(
+                            reader,
+                            "C_Invoice_ID"
+                        );
 
-                    int vendorId = GetInt(
-                        reader,
-                        "C_BPartner_ID"
-                    );
+                    int vendorId =
+                        GetInt(
+                            reader,
+                            "C_BPartner_ID"
+                        );
 
-                    int invoicePayScheduleId = GetInt(
-                        reader,
-                        "C_InvoicePaySchedule_ID"
-                    );
+                    int invoicePayScheduleId =
+                        GetInt(
+                            reader,
+                            "C_InvoicePaySchedule_ID"
+                        );
 
-                    decimal scheduleDueAmount = GetDecimal(
-                        reader,
-                        "ScheduleDueAmount"
-                    );
+                    decimal scheduleDueAmount =
+                        GetDecimal(
+                            reader,
+                            "ScheduleDueAmount"
+                        );
 
-                    decimal scheduleAllocatedAmount = GetDecimal(
-                        reader,
-                        "ScheduleAllocatedAmount"
-                    );
+                    decimal scheduleAllocatedAmount =
+                        GetDecimal(
+                            reader,
+                            "ScheduleAllocatedAmount"
+                        );
 
-                    decimal scheduleOpenAmount = GetDecimal(
-                        reader,
-                        "ScheduleOpenAmount"
-                    );
+                    decimal scheduleOpenAmount =
+                        GetDecimal(
+                            reader,
+                            "ScheduleOpenAmount"
+                        );
 
-                    /*
-                     * Final C# protection:
-                     * never add a paid schedule to popup rows.
-                     */
-                    if (invoicePayScheduleId <= 0 ||
-                        scheduleOpenAmount <= 0)
+                    if (
+                        invoicePayScheduleId <= 0 ||
+                        scheduleOpenAmount <= 0
+                    )
                     {
                         continue;
                     }
@@ -1027,9 +1205,7 @@ ORDER BY
                     rows.Add(new
                     {
                         invoiceId = invoiceId,
-
                         sourceInvoiceId = invoiceId,
-
                         cInvoiceId = invoiceId,
 
                         invoicePayScheduleId =
@@ -1038,116 +1214,136 @@ ORDER BY
                         cInvoicePayScheduleId =
                             invoicePayScheduleId,
 
-                        invoiceDocumentNo = GetString(
-                            reader,
-                            "DocumentNo"
-                        ),
-
-                        documentNo = GetString(
-                            reader,
-                            "DocumentNo"
-                        ),
-
-                        organizationId = GetInt(
-                            reader,
-                            "AD_Org_ID"
-                        ),
-
-                        adOrgId = GetInt(
-                            reader,
-                            "AD_Org_ID"
-                        ),
-
-                        organizationName = GetString(
-                            reader,
-                            "OrganizationName"
-                        ),
-
-                        vendorId = vendorId,
-
-                        cBPartnerId = vendorId,
-
-                        bPartnerLocationId = GetInt(
-                            reader,
-                            "C_BPartner_Location_ID"
-                        ),
-
-                        cBPartnerLocationId = GetInt(
-                            reader,
-                            "C_BPartner_Location_ID"
-                        ),
-
-                        vendorName = GetString(
-                            reader,
-                            "VendorName"
-                        ),
-
-                        isVendor = string.Equals(
+                        invoiceDocumentNo =
                             GetString(
                                 reader,
-                                "IsVendor"
+                                "DocumentNo"
                             ),
-                            "Y",
-                            StringComparison.OrdinalIgnoreCase
-                        ),
 
-                        cCurrencyId = GetInt(
-                            reader,
-                            "C_Currency_ID"
-                        ),
+                        documentNo =
+                            GetString(
+                                reader,
+                                "DocumentNo"
+                            ),
 
-                        currencyId = GetInt(
-                            reader,
-                            "C_Currency_ID"
-                        ),
+                        organizationId =
+                            GetInt(
+                                reader,
+                                "AD_Org_ID"
+                            ),
+
+                        adOrgId =
+                            GetInt(
+                                reader,
+                                "AD_Org_ID"
+                            ),
+
+                        organizationName =
+                            GetString(
+                                reader,
+                                "OrganizationName"
+                            ),
+
+                        vendorId = vendorId,
+                        cBPartnerId = vendorId,
+
+                        bPartnerLocationId =
+                            GetInt(
+                                reader,
+                                "C_BPartner_Location_ID"
+                            ),
+
+                        cBPartnerLocationId =
+                            GetInt(
+                                reader,
+                                "C_BPartner_Location_ID"
+                            ),
+
+                        vendorName =
+                            GetString(
+                                reader,
+                                "VendorName"
+                            ),
+
+                        isVendor =
+                            string.Equals(
+                                GetString(
+                                    reader,
+                                    "IsVendor"
+                                ),
+                                "Y",
+                                StringComparison.OrdinalIgnoreCase
+                            ),
+
+                        cCurrencyId =
+                            GetInt(
+                                reader,
+                                "C_Currency_ID"
+                            ),
+
+                        currencyId =
+                            GetInt(
+                                reader,
+                                "C_Currency_ID"
+                            ),
 
                         currencyISO = currencyISO,
 
-                        currencySymbol = currencySymbol,
+                        currencySymbol =
+                            currencySymbol,
 
-                        stdPrecision = NormalizePrecision(
+                        stdPrecision =
+                            NormalizePrecision(
+                                GetInt(
+                                    reader,
+                                    "StdPrecision",
+                                    2
+                                )
+                            ),
+
+                        conversionTypeId =
                             GetInt(
                                 reader,
-                                "StdPrecision",
-                                2
-                            )
-                        ),
+                                "C_ConversionType_ID"
+                            ),
 
-                        conversionTypeId = GetInt(
-                            reader,
-                            "C_ConversionType_ID"
-                        ),
+                        cConversionTypeId =
+                            GetInt(
+                                reader,
+                                "C_ConversionType_ID"
+                            ),
 
-                        cConversionTypeId = GetInt(
-                            reader,
-                            "C_ConversionType_ID"
-                        ),
+                        currencyTypeName =
+                            GetString(
+                                reader,
+                                "CurrencyTypeName"
+                            ),
 
-                        currencyTypeName = GetString(
-                            reader,
-                            "CurrencyTypeName"
-                        ),
+                        dateInvoiced =
+                            FormatDate(
+                                dateInvoiced
+                            ),
 
-                        dateInvoiced = FormatDate(
-                            dateInvoiced
-                        ),
+                        dueDate =
+                            FormatDate(
+                                dueDate
+                            ),
 
-                        dueDate = FormatDate(
-                            dueDate
-                        ),
+                        transactionDate =
+                            FormatDate(
+                                dueDate
+                            ),
 
-                        transactionDate = FormatDate(
-                            dueDate
-                        ),
+                        dateTrx =
+                            FormatDate(
+                                dueDate
+                            ),
 
-                        dateTrx = FormatDate(
-                            dueDate
-                        ),
-
-                        grandTotal = GetDecimal(
-                            reader,
-                            "GrandTotal"
-                        ),
+                        grandTotal =
+                            GetDecimal(
+                                reader,
+                                "GrandTotal"
+                            ),
 
                         scheduleDueAmount =
                             scheduleDueAmount,
@@ -1167,27 +1363,25 @@ ORDER BY
                         payAmt =
                             scheduleOpenAmount,
 
-                        paymentMethodId = GetInt(
-                            reader,
-                            "VA009_PaymentMethod_ID"
-                        ),
-
-                        paymentMethodName = GetPaymentMethodName(
-                            ctx,
-                            GetString(
+                        paymentMethodId =
+                            GetInt(
                                 reader,
-                                "PaymentMethodName"
-                            )
-                        ),
+                                "VA009_PaymentMethod_ID"
+                            ),
+
+                        paymentMethodName =
+                            GetPaymentMethodName(
+                                ctx,
+                                GetString(
+                                    reader,
+                                    "PaymentMethodName"
+                                )
+                            ),
 
                         bankAccountId = 0,
-
                         docTypeId = 0,
-
                         cDocTypeId = 0,
-
                         tenderType = string.Empty,
-
                         paymentDocumentNo = string.Empty
                     });
                 }
@@ -1196,8 +1390,25 @@ ORDER BY
                 {
                     success = true,
                     error = string.Empty,
-                    hasData = rows.Count > 0,
-                    rows = rows
+
+                    hasData =
+                        rows.Count > 0,
+
+                    periodId =
+                        periodId,
+
+                    dateFrom =
+                        FormatDate(
+                            periodDateFrom
+                        ),
+
+                    dateTo =
+                        FormatDate(
+                            periodDateTo
+                        ),
+
+                    rows =
+                        rows
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
