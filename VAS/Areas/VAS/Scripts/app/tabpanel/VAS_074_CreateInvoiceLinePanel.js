@@ -700,9 +700,9 @@
                 // Curated "Additional Info" fields (callout / read-only / validation / val-rule
                 // honoured per control); shown 2-up via the .vas-cil-more-grid layout.
                 appendDynFields(line, $body);
-                if (!$body.children().length)
+                if (!$body.children("[data-col]:not(.vas-cil-dyn-hidden)").length)
                     $body.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
-                $body.find("input,select,textarea").first().focus();
+                $body.find("[data-col]:not(.vas-cil-dyn-hidden)").find("input,select,textarea").first().focus();
             }, 0);
         }
 
@@ -1373,18 +1373,41 @@
             var col = FIELD_COL[field];
             return col ? isColumnReadOnly(line, col) : false;
         }
-        /* Resolve a logic token. Login/session tokens (@$Element_OT@, @#Global@) come
-           from the server-sent login context; everything else from the current line
-           then the invoice header. Returns null when a login token can't be resolved so
-           the caller can default (display logic -> show). */
+        /* Read a login/global token from the live framework context (VIS.Env / VIS.context).
+           The 1-arg getContext(name) reads the GLOBAL bag where $/# tokens (e.g. the
+           accounting-element flags $Element_*) live. Returns "" when absent / unavailable. */
+        function frameworkGlobalCtxVal(key) {
+            try {
+                if (!window.VIS) return "";
+                var ctx = VIS.context || (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx());
+                if (ctx && typeof ctx.getContext === "function") return ctx.getContext(String(key));
+            } catch (e) { }
+            return "";
+        }
+        /* Resolve a logic token. Login/session tokens (@$Element_OT@, @#Global@) come from
+           the live framework context first, then the server-sent login context; everything
+           else from the current line then the invoice header. A not-found login token
+           resolves to "" (empty) - matching the framework evaluator - so the comparison
+           evaluates (a ='Y' gate fails -> field hidden) instead of defaulting to show. */
         function logicCtxVal(line, key) {
             key = String(key);
             if (key.charAt(0) === "$" || key.charAt(0) === "#") {
+                // Accounting-element flags ($Element_OT/PJ/...) and other login/global tokens
+                // are set into the LIVE framework context (VIS.Env) at window load - the same
+                // source the framework's own display-logic evaluator reads - so resolve from
+                // there FIRST. The server session ctx does not reliably carry these, so the
+                // server-sent parent.LoginContext is only a fallback.
+                var fv = frameworkGlobalCtxVal(key);
+                if (fv !== null && fv !== undefined && fv !== "") return String(fv);
                 var lc = (parent && parent.LoginContext) || {};
                 if (lc.hasOwnProperty(key)) return String(lc[key]);
                 var bare = key.replace(/^[#$]/, "");
                 if (lc.hasOwnProperty(bare)) return String(lc[bare]);
-                return null;   // unresolved login token
+                // Not found -> empty string (NOT null), matching the framework evaluator: an
+                // unresolved login token evaluates as "" so e.g. @$Element_MC@='Y' becomes
+                // "" = 'Y' -> false -> the field is HIDDEN (treated as "N"), rather than the
+                // tuple defaulting to SHOW. Login/global gates fail CLOSED when absent.
+                return "";
             }
             var rv = lineVal(line, key);
             if (rv !== undefined && rv !== null && rv !== "") return String(rv);
@@ -1493,8 +1516,12 @@
             return true;
         }
 
-        /* Curated column metas to show for this line (skips missing columns + unmet
-           conditions, keeps list order). */
+        /* Curated CANDIDATE column metas for this line (skips missing columns + unmet
+           `when` conditions - module presence / product type - keeps list order). NOTE:
+           DisplayLogic is NOT applied here: the field is still BUILT, and its show/hide is
+           decided AFTER buildDynField by applyDynDisplay (per the design - build the control
+           first, then apply display logic), so a control keeps its state and just toggles
+           visibility instead of being dropped/rebuilt. */
         function additionalInfoColumns(line) {
             var out = [];
             for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++) {
@@ -1502,12 +1529,30 @@
                 var m = columnMeta[spec.col];
                 if (!m) continue;
                 if (!dynCondMet(line, spec.when)) continue;
-                // AD_Field.DisplayLogic ($Element_*/record tokens); default SHOW when a
-                // token can't be resolved (per the requirement).
-                if (m.DisplayLogic && !evalLogic(line, m.DisplayLogic, true)) continue;
                 out.push(m);
             }
             return out;
+        }
+
+        /* Whether a built field is visible per its AD_Field.DisplayLogic. Default SHOW when
+           the logic is empty or a token can't be resolved ($Element_record tokens). */
+        function dynFieldVisible(line, m) {
+            return !(m && m.DisplayLogic && !evalLogic(line, m.DisplayLogic, true));
+        }
+
+        /* Apply DisplayLogic to the ALREADY-BUILT modal fields: toggle each field's
+           visibility (display:none via .vas-cil-dyn-hidden) instead of adding/removing DOM,
+           so a control - and its native lookup - is preserved across toggles. Returns the
+           number of currently-visible fields (so the caller can show the empty message). */
+        function applyDynDisplay(line, $body) {
+            var visible = 0;
+            $body.children("[data-col]").each(function () {
+                var m = columnMeta[$(this).attr("data-col")];
+                var show = dynFieldVisible(line, m);
+                $(this).toggleClass("vas-cil-dyn-hidden", !show);
+                if (show) visible++;
+            });
+            return visible;
         }
 
         /* AD_Reference_ID -> control kind. */
@@ -1527,7 +1572,10 @@
 
         function appendDynFields(line, $body) {
             var cols = additionalInfoColumns(line);
+            // Build every candidate field FIRST (control + lookup created), then apply
+            // DisplayLogic to show/hide - so display logic runs AFTER buildDynField.
             for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i]));
+            applyDynDisplay(line, $body);
             // No overflow clip on the body - an FK dropdown would be cut off.
         }
 
@@ -1762,10 +1810,13 @@
                 }
                 var $c = $(ctrl.getControl()).attr("placeholder", " ").attr("data-placeholder", "");
                 var $cw = $('<div class="vis-control-wrap"></div>').append($c).append($('<label></label>').text(caption || ""));
-                // Lookup controls (VComboBox + VTextBoxButton/search) expose a trailing
-                // button via getBtn(0) (the ellipsis / zoom); wrap in .input-group with
-                // .input-group-append so the framework CSS lays it out.
-                /*if (typeof ctrl.getBtn === "function") {
+                // Search reference (AD_Reference_ID == 30) renders a VTextBoxButton whose
+                // getBtn(0) is the info/zoom button that opens the framework Info window
+                // (the control wires the click internally, same as createforecast.js). Wrap
+                // it in .input-group-append and flag the control data-hasbtn so vis-input-wrap
+                // lays out the button. Only for Search - TableDir/Table use VComboBox's own
+                // dropdown and don't need the extra button.
+                if (dt == VIS.DisplayType.Search && typeof ctrl.getBtn === "function") {
                     var btn0 = null;
                     try { btn0 = ctrl.getBtn(0); } catch (eb) { btn0 = null; }
                     var $bw = btn0 ? $('<div class="input-group-append"></div>').append(btn0) : null;
@@ -1773,7 +1824,7 @@
                         $c.attr("data-hasbtn", " ");
                         return $('<div class="input-group vis-input-wrap"></div>').append($cw).append($bw);
                     }
-                }*/
+                }
                 // Non-lookup control: same framework container so vis-input-wrap styles it.
                 return $('<div class="input-group vis-input-wrap"></div>').append($cw);
             } catch (e) { if (window.console) console.log("VAS_074 vienna wrap error " + col, e); return null; }
@@ -1916,6 +1967,8 @@
                 var $old = $b.children('[data-col="' + c + '"]');
                 if ($old.length) $old.replaceWith(buildDynField(line, cols[i]));
             }
+            // A rebuilt field starts without the hidden class - re-apply DisplayLogic.
+            applyDynDisplay(line, $b);
         }
 
         /* Rebuild the modal only when ANOTHER curated field's DisplayLogic / ReadOnlyLogic
@@ -1937,15 +1990,15 @@
         /* Rebuild the open modal's fields in place (after a value change) so display
            logic, read-only state and callout-updated values reflect immediately. */
         /* Reconcile the modal fields in place: keep existing field DOM (and its native
-           controls / lookups), create ONLY the newly-visible fields and remove the ones
-           now hidden. So toggling a field (e.g. Asset Related) doesn't rebuild the whole
-           modal / re-create every lookup - which was the slow part. */
+           controls / lookups), build only candidates not yet present, drop only `when`-
+           excluded ones, then re-apply DisplayLogic via applyDynDisplay (show/hide toggle).
+           So toggling a field (e.g. Asset Related) doesn't rebuild the whole modal /
+           re-create every lookup - which was the slow part. */
         function refreshMoreDialog(line) {
             var $b = $("#vasCilMoreBody");
             if (!$b.length || morePopoverFor !== line.rowId) return;
             primeLineContext(line);   // newly-visible FK controls validate against this line
             var cols = additionalInfoColumns(line);
-            $b.children(".vas-cil-empty-message").remove();
             var existing = {};
             $b.children("[data-col]").each(function () { existing[$(this).attr("data-col")] = this; });
             var seen = {}, prev = null;
@@ -1955,8 +2008,13 @@
                 if (prev) $(node).insertAfter(prev); else $b.prepend(node);
                 prev = node;
             }
+            // Only `when`-excluded fields (module / product-type) are removed from the DOM;
+            // DisplayLogic-hidden fields stay built and are toggled by applyDynDisplay so a
+            // control (and its lookup) is preserved when it re-appears.
             $b.children("[data-col]").each(function () { if (!seen[$(this).attr("data-col")]) $(this).remove(); });
-            if (!cols.length)
+            var visible = applyDynDisplay(line, $b);
+            $b.children(".vas-cil-empty-message").remove();
+            if (!visible)
                 $b.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
         }
 
@@ -2058,6 +2116,8 @@
             var dyn = additionalInfoColumns(line);
             for (var d = 0; d < dyn.length; d++) {
                 var dm = dyn[d];
+                // A field hidden by DisplayLogic can't be set by the user - don't require it.
+                if (!dynFieldVisible(line, dm)) continue;
                 if (!dm.IsMandatory || isColumnReadOnly(line, dm.ColumnName)) continue;
                 var dv = lineVal(line, dm.ColumnName);
                 var isFk = (dm.AD_Reference_ID === 18 || dm.AD_Reference_ID === 19 || dm.AD_Reference_ID === 30 || dm.AD_Reference_ID === 13);

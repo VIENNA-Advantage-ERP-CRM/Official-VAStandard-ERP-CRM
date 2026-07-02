@@ -15,7 +15,8 @@ namespace VIS.Controllers
         /// Returns the weighted-average days-to-pay for the current quarter (amount-weighted),
         /// the same figure for the previous quarter, the day difference, and a display label
         /// such as "3 days faster than last quarter". Uses C_InvoicePaySchedule joined to
-        /// C_AllocationLine and C_Payment, filtered to IsSoTrx = 'Y', DocStatus IN ('CO','CL').
+        /// C_AllocationLine and its settlement - either C_Payment or a cash-journal
+        /// C_CashLine -> C_Cash - filtered to IsSoTrx = 'Y', DocStatus IN ('CO','CL').
         /// Quarter boundaries are derived from the client's configured fiscal calendar.
         /// </summary>
         [AjaxAuthorizeAttribute]
@@ -45,13 +46,13 @@ namespace VIS.Controllers
                    parses the SQL for its main FROM clause to anchor the access filter; the
                    FROM token inside EXTRACT(...) would be mistaken for that clause and break
                    MRole injection. date_part(...) carries no FROM keyword and avoids this. */
-                daysToPayCondition = " GREATEST(CAST(date_part('epoch', (CAST(pay.DateAcct AS TIMESTAMP) - CAST(ips.DueDate AS TIMESTAMP))) / 86400 AS NUMERIC), 0) ";
+                daysToPayCondition = " GREATEST(CAST(date_part('epoch', (CAST(COALESCE(pay.DateAcct, csh.DateAcct) AS TIMESTAMP) - CAST(ips.DueDate AS TIMESTAMP))) / 86400 AS NUMERIC), 0) ";
             }
             else
             {
                 currentPeriodDateCondition = " TRUNC(SYSDATE) BETWEEN TRUNC(p.StartDate) AND TRUNC(p.EndDate) ";
                 /* Oracle: DATE - DATE already returns the number of days. */
-                daysToPayCondition = " GREATEST(TRUNC(pay.DateAcct) - TRUNC(ips.DueDate), 0) ";
+                daysToPayCondition = " GREATEST(TRUNC(COALESCE(pay.DateAcct, csh.DateAcct)) - TRUNC(ips.DueDate), 0) ";
             }
 
             string currentPeriodSql = @"
@@ -70,21 +71,30 @@ namespace VIS.Controllers
                (CurrentPeriod) is intentionally NOT cross-joined inside this MRole-wrapped
                body — doing so passed a CTE alias to AddAccessSQL, which the core could not
                resolve as a physical table and led to a runaway/OutOfMemoryException. */
-            string paymentsSql = @"SELECT CAST(TO_CHAR(pay.DateAcct, 'Q') AS NUMERIC) AS PayQuarter,
-                       CAST(TO_CHAR(pay.DateAcct, 'YYYY') AS NUMERIC) AS PayYear,
+            /* Settlement date = the payment's DateAcct, or - for cash-journal settlements
+               (C_AllocationLine.C_CashLine_ID) - the parent C_Cash.DateAcct. Both are joined
+               as LEFT so an allocation settled either way contributes; the active flags (and,
+               for cash, DocStatus <> 'VO' to exclude voided journals) are pushed into the ON so
+               an inactive/voided payment/cash yields NULL and is dropped by the "settlement
+               date IS NOT NULL" guard (this preserves the original payment-only behaviour
+               exactly and just ADDS the non-voided cash rows). */
+            string paymentsSql = @"SELECT CAST(TO_CHAR(COALESCE(pay.DateAcct, csh.DateAcct), 'Q') AS NUMERIC) AS PayQuarter,
+                       CAST(TO_CHAR(COALESCE(pay.DateAcct, csh.DateAcct), 'YYYY') AS NUMERIC) AS PayYear,
                        " + daysToPayCondition + @" AS Days_To_Pay,
                        COALESCE(al.Amount, 0) AS Amount
                 FROM C_Invoice i
                 INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID=i.C_Invoice_ID)
                 INNER JOIN C_AllocationLine al ON (al.C_InvoicePaySchedule_ID=ips.C_InvoicePaySchedule_ID)
-                INNER JOIN C_Payment pay ON (pay.C_Payment_ID=al.C_Payment_ID)
-                WHERE i.IsSoTrx='Y'
+                LEFT JOIN C_Payment pay ON (pay.C_Payment_ID=al.C_Payment_ID AND pay.IsActive='Y')
+                LEFT JOIN C_CashLine cl ON (cl.C_CashLine_ID=al.C_CashLine_ID AND cl.IsActive='Y')
+                LEFT JOIN C_Cash csh ON (csh.C_Cash_ID=cl.C_Cash_ID AND csh.IsActive='Y' AND csh.DocStatus NOT IN ('VO'))
+                WHERE i.IsSoTrx='Y' 
                 AND i.DocStatus IN ('CO', 'CL')
-                AND al.C_Payment_ID IS NOT NULL
+                AND (al.C_Payment_ID IS NOT NULL OR al.C_CashLine_ID IS NOT NULL)
                 AND i.IsActive='Y'
                 AND ips.IsActive='Y'
                 AND al.IsActive='Y'
-                AND pay.IsActive='Y'";
+                AND COALESCE(pay.DateAcct, csh.DateAcct) IS NOT NULL";
 
             /* MRole only on the main physical table (C_Invoice, alias i) in the CTE body. */
             paymentsSql = MRole.GetDefault(ctx).AddAccessSQL(
