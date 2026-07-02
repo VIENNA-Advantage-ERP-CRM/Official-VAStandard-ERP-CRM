@@ -19,6 +19,19 @@
  *                        radii and borders follow the Surface Quick Reference;
  *                        typography follows the Typography Quick Reference.
  *                        Glassmorphism gradients / shadows removed.
+ *   VAI163   2026-07-01  Header restyled to the reference design: soft-gradient
+ *                        title strip (.MPC-vaspo-hdr) with priority / status
+ *                        pills (.MPC-vaspo-hdrPill), and a white two-column
+ *                        details card (.MPC-vaspo-hdrCard) for vendor + terms.
+ *                        Replaces the Hero Status Card and 2-col Metric Grid.
+ *   VAI163   2026-07-01  Replaced the Compact List with a Generated From chip
+ *                        strip (.MPC-vaspo-genfrom / .MPC-vaspo-chip) and added
+ *                        a four-card metric snapshot (.MPC-vaspo-snap /
+ *                        .MPC-vaspo-metric) above Order Progress.
+ *   VAI163   2026-07-01  Replaced the vertical activity timeline with a two-
+ *                        column bottom row (.MPC-vaspo-bottom) — Terms & Notes
+ *                        beside a typed Recent Activity list (.MPC-vaspo-actList
+ *                        / .MPC-vaspo-actRow / .MPC-vaspo-actTag).
  ***********************************************************/
 
 .MPC-vaspo-root {
@@ -137,49 +150,53 @@
 .MPC-vaspo-pill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
 /* ----------------------------------------------------------- */
-/*  Hero Status Card                                            */
+/*  Header — title strip                                        */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-hero {
+/* Soft-gradient banner (no border) carrying the title + subtitle and the
+   priority / delivery-status pills, per the reference design. */
+.MPC-vaspo-hdr {
     border-radius: 14px;
-    padding: 0.875em;
-    border: 1px solid;
+    padding: 0.875em 1em;
+    background: linear-gradient(100deg, #ECF6EC 0%, #F4F7E3 50%, #FCF2DB 100%);
 }
 
-.MPC-vaspo-hero.tone-info    { background: linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%); border-color: #CFE0ED; }
-.MPC-vaspo-hero.tone-success { background: linear-gradient(180deg, #EFF9F3 0%, #F7FBF8 100%); border-color: #CFEAD9; }
-.MPC-vaspo-hero.tone-warning { background: linear-gradient(180deg, #FFF8E8 0%, #FBFAF3 100%); border-color: #EBD7A6; }
-.MPC-vaspo-hero.tone-risk    { background: linear-gradient(180deg, #FCEFEF 0%, #FBF7F7 100%); border-color: #EDC8C8; }
-.MPC-vaspo-hero.tone-neutral { background: linear-gradient(180deg, #EEF8FF 0%, #F7FBFF 100%); border-color: #CFE0ED; }
-
-.MPC-vaspo-heroTop {
+.MPC-vaspo-hdrTop {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 0.75em;
+    gap: 0.875em;
 }
 
-.MPC-vaspo-heroTitleWrap { min-width: 0; }
+.MPC-vaspo-hdrTitleWrap { min-width: 0; }
 
-.MPC-vaspo-heroTitle {
-    font-size: 1.125em;
+.MPC-vaspo-hdrTitle {
+    font-size: 1.25em;
     font-weight: 700;
     color: var(--vaspo-text);
     line-height: 1.2;
 }
 
-.MPC-vaspo-heroSub {
+.MPC-vaspo-hdrSub {
     font-size: 0.75em;
     color: var(--vaspo-sub);
-    margin-top: 0.25em;
+    margin-top: 0.3125em;
 }
 
-/* Status pill in the hero uses a white chip with the tone's text colour. */
-.MPC-vaspo-heroPill {
+.MPC-vaspo-hdrPills {
     flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+/* Header pill — tinted chip; priority carries a chevron, status a leading dot. */
+.MPC-vaspo-hdrPill {
     display: inline-flex;
     align-items: center;
+    gap: 0.3125em;
     border-radius: 999px;
-    background: #fff;
     padding: 0.3125em 0.625em;
     font-size: 0.6875em;
     font-weight: 700;
@@ -187,74 +204,80 @@
     white-space: nowrap;
 }
 
-.MPC-vaspo-hero.tone-info    .MPC-vaspo-heroPill { color: var(--vaspo-info-tx); }
-.MPC-vaspo-hero.tone-success .MPC-vaspo-heroPill { color: var(--vaspo-success-tx); }
-.MPC-vaspo-hero.tone-warning .MPC-vaspo-heroPill { color: var(--vaspo-warning-tx); }
-.MPC-vaspo-hero.tone-risk    .MPC-vaspo-heroPill { color: var(--vaspo-risk-tx); }
-.MPC-vaspo-hero.tone-neutral .MPC-vaspo-heroPill { color: var(--vaspo-neutral-tx); }
+.MPC-vaspo-hdrPill.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.MPC-vaspo-hdrPill.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.MPC-vaspo-hdrPill.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.MPC-vaspo-hdrPill.tone-risk    { background: var(--vaspo-risk-bg);    color: var(--vaspo-risk-tx); }
+.MPC-vaspo-hdrPill.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.MPC-vaspo-hdrPill.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
 
-.MPC-vaspo-heroEmph {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5em;
-    margin-top: 0.625em;
+.MPC-vaspo-hdrPill .MPC-vaspo-ic { color: currentColor; }
+
+.MPC-vaspo-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
 }
-
-.MPC-vaspo-heroEmphVal {
-    font-size: 1.5em;
-    font-weight: 700;
-    line-height: 1.1;
-    color: var(--vaspo-text);
-}
-
-.MPC-vaspo-hero.tone-success .MPC-vaspo-heroEmphVal { color: var(--vaspo-success-tx); }
-.MPC-vaspo-hero.tone-warning .MPC-vaspo-heroEmphVal { color: var(--vaspo-warning-tx); }
-
-.MPC-vaspo-heroEmphQual {
-    font-size: 0.75em;
-    color: var(--vaspo-sub);
-}
-
-.MPC-vaspo-hero .MPC-vaspo-mgrid { margin-top: 0.75em; }
 
 /* ----------------------------------------------------------- */
-/*  2-Col Metric Grid                                           */
+/*  Header — details card (vendor | terms)                      */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-mgrid {
+.MPC-vaspo-hdrCard {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    column-gap: 0.875em;
-    row-gap: 0.375em;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--vaspo-card-bd);
+    border-radius: var(--vaspo-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
 }
 
-.MPC-vaspo-mcell { min-width: 0; }
+.MPC-vaspo-hdrColL { min-width: 0; }
 
-.MPC-vaspo-mLabel {
+.MPC-vaspo-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vaspo-hdrField { min-width: 0; }
+
+/* Field label (uppercase caption) + value */
+.MPC-vaspo-fLabel {
     font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
     color: var(--vaspo-muted);
     line-height: 1.3;
 }
 
-.MPC-vaspo-mVal {
+.MPC-vaspo-fVal {
     font-size: 0.8125em;
     font-weight: 700;
     color: var(--vaspo-text);
-    line-height: 1.3;
-    margin-top: 0.0625em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.35;
+    margin-top: 0.125em;
+}
+
+/* Narrow panels: stack the two columns and drop the pills below the title. */
+@container (max-width: 460px) {
+    .MPC-vaspo-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vaspo-hdrTop  { flex-direction: column; }
+    .MPC-vaspo-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
-/*  Vendor identity                                             */
+/*  Vendor identity                                            */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-vendId { margin-bottom: 0.625em; }
-
 .MPC-vaspo-vendName {
-    font-size: 0.875em;
+    font-size: 0.9375em;
     font-weight: 700;
     color: var(--vaspo-text);
+    margin-top: 0.1875em;
 }
 
 .MPC-vaspo-vendAddr {
@@ -285,51 +308,149 @@
 .MPC-vaspo-ic svg { display: block; }
 
 /* ----------------------------------------------------------- */
-/*  Compact List                                                */
+/*  Generated From (chip strip)                                 */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-clist {
+/* Light rounded strip carrying an uppercase caption and one chip per origin
+   document (Sales Order / Requisition / Production Order). */
+.MPC-vaspo-genfrom {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em 0.875em;
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
+    background: #F6FAF6;
+    padding: 0.625em 0.75em;
+}
+
+.MPC-vaspo-gfLabel {
+    flex: none;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--vaspo-muted);
+}
+
+.MPC-vaspo-gfChips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+/* Chip: white pill with a leading (tinted) icon, grey label, dark value and an
+   optional trailing status pill. */
+.MPC-vaspo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
     background: #fff;
+    border: 1px solid var(--vaspo-card-bd);
+    border-radius: 8px;
+    padding: 0.3125em 0.5625em;
+    font-size: 0.75em;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+.MPC-vaspo-chip .MPC-vaspo-ic          { color: var(--vaspo-muted); }
+.MPC-vaspo-chip.ic-info    .MPC-vaspo-ic { color: var(--vaspo-info-tx); }
+.MPC-vaspo-chip.ic-success .MPC-vaspo-ic { color: var(--vaspo-success-tx); }
+.MPC-vaspo-chip.ic-muted   .MPC-vaspo-ic { color: var(--vaspo-muted); }
+
+.MPC-vaspo-chipLabel { color: var(--vaspo-muted); }
+.MPC-vaspo-chipVal   { color: var(--vaspo-text); font-weight: 700; }
+.MPC-vaspo-chip .MPC-vaspo-pill { margin-left: 0.0625em; }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (metric grid)                                      */
+/* ----------------------------------------------------------- */
+.MPC-vaspo-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+/* Metric card: flat white surface with a colour-accented left border. */
+.MPC-vaspo-metric {
+    min-width: 0;
+    border: 1px solid var(--vaspo-card-bd);
+    border-left: 3px solid var(--vaspo-neutral-tx);
+    border-radius: var(--vaspo-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vaspo-metric.tone-total    { border-left-color: var(--vaspo-info-tx); }
+.MPC-vaspo-metric.tone-delivery { border-left-color: var(--vaspo-purple-tx); }
+.MPC-vaspo-metric.tone-lines    { border-left-color: var(--vaspo-success-tx); }
+.MPC-vaspo-metric.tone-received { border-left-color: #E08A1E; }
+
+.MPC-vaspo-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vaspo-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--vaspo-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vaspo-metric.tone-total    .MPC-vaspo-mHead .MPC-vaspo-ic { color: var(--vaspo-info-tx); }
+.MPC-vaspo-metric.tone-delivery .MPC-vaspo-mHead .MPC-vaspo-ic { color: var(--vaspo-purple-tx); }
+.MPC-vaspo-metric.tone-lines    .MPC-vaspo-mHead .MPC-vaspo-ic { color: var(--vaspo-success-tx); }
+.MPC-vaspo-metric.tone-received .MPC-vaspo-mHead .MPC-vaspo-ic { color: #E08A1E; }
+
+.MPC-vaspo-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--vaspo-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vaspo-mSub {
+    font-size: 0.6875em;
+    color: var(--vaspo-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vaspo-mBar {
+    margin-top: 0.5em;
+    height: 5px;
+    border-radius: 999px;
+    background: #E7EEF4;
     overflow: hidden;
 }
-
-.MPC-vaspo-crow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75em;
-    padding: 0.625em 0.75em;
-    border-bottom: 1px solid var(--vaspo-row-div);
-}
-.MPC-vaspo-crow:last-child { border-bottom: none; }
-
-.MPC-vaspo-cLeft { min-width: 0; }
-
-.MPC-vaspo-cPri {
-    font-size: 0.75em;
-    font-weight: 700;
-    color: var(--vaspo-text);
-    line-height: 1.3;
+.MPC-vaspo-mBar i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: #E08A1E;
 }
 
-.MPC-vaspo-cMeta {
-    font-size: 0.75em;
-    color: var(--vaspo-sub);
-    margin-top: 0.1875em;
+/* Narrow panels: 2-up, then single-column. */
+@container (max-width: 620px) {
+    .MPC-vaspo-snap { grid-template-columns: repeat(2, 1fr); }
 }
-
-.MPC-vaspo-cRight {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 0.625em;
-}
-
-.MPC-vaspo-cVal {
-    font-size: 0.8125em;
-    font-weight: 700;
-    color: var(--vaspo-text);
+@container (max-width: 340px) {
+    .MPC-vaspo-snap { grid-template-columns: 1fr; }
 }
 
 /* ----------------------------------------------------------- */
@@ -418,68 +539,75 @@
 .MPC-vaspo-step.is-active .MPC-vaspo-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
-/*  Vertical timeline (Recent Activity)                         */
+/*  Bottom row (Terms & Notes | Recent Activity)                */
 /* ----------------------------------------------------------- */
-.MPC-vaspo-tl { display: flex; flex-direction: column; gap: 0.75em; }
-
-.MPC-vaspo-tlEntry { display: flex; align-items: flex-start; gap: 0.75em; }
-
-.MPC-vaspo-tlRail {
-    flex: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+/* Auto-fitting two-column footer: one section fills the row, both stack when
+   the panel is too narrow for two comfortable columns. */
+.MPC-vaspo-bottom {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0.875em;
+    align-items: start;
 }
 
-.MPC-vaspo-tlDot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: #1F83FF;
-    margin-top: 0.375em;
-}
-
-.MPC-vaspo-tlEntry.is-pending .MPC-vaspo-tlDot { background: #CBD5DF; }
-.MPC-vaspo-tlEntry.is-done    .MPC-vaspo-tlDot { background: #1F83FF; }
-
-.MPC-vaspo-tlTrail {
-    margin-top: 0.25em;
-    height: 2.5em;
-    width: 1px;
-    background: #D9E6F2;
-}
-.MPC-vaspo-tlEntry:last-child .MPC-vaspo-tlTrail { display: none; }
-
-.MPC-vaspo-tlCard {
-    min-width: 0;
-    flex: 1;
+/* ----------------------------------------------------------- */
+/*  Recent Activity (typed feed)                                */
+/* ----------------------------------------------------------- */
+.MPC-vaspo-actList {
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
     background: #fff;
-    padding: 0.625em 0.75em;
+    overflow: hidden;
 }
 
-.MPC-vaspo-tlTop {
+/* Row: tag chip | title | right-aligned timestamp. */
+.MPC-vaspo-actRow {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5em;
+    gap: 0.625em;
+    padding: 0.625em 0.75em;
+    border-bottom: 1px solid var(--vaspo-row-div);
 }
+.MPC-vaspo-actRow:last-child { border-bottom: none; }
 
-.MPC-vaspo-tlTitle {
-    font-size: 0.875em;
+/* Tag chip — tinted, with a leading icon. */
+.MPC-vaspo-actTag {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.6875em;
     font-weight: 700;
-    color: var(--vaspo-text);
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vaspo-actTag .MPC-vaspo-ic { color: currentColor; }
+.MPC-vaspo-actTag .MPC-vaspo-ic svg { width: 0.9375em; height: 0.9375em; }
+
+.MPC-vaspo-actTag.tone-info    { background: var(--vaspo-info-bg);    color: var(--vaspo-info-tx); }
+.MPC-vaspo-actTag.tone-success { background: var(--vaspo-success-bg); color: var(--vaspo-success-tx); }
+.MPC-vaspo-actTag.tone-warning { background: var(--vaspo-warning-bg); color: var(--vaspo-warning-tx); }
+.MPC-vaspo-actTag.tone-purple  { background: var(--vaspo-purple-bg);  color: var(--vaspo-purple-tx); }
+.MPC-vaspo-actTag.tone-neutral { background: var(--vaspo-neutral-bg); color: var(--vaspo-neutral-tx); }
+
+.MPC-vaspo-actTitle {
+    flex: 1 1 auto;
     min-width: 0;
+    font-size: 0.8125em;
+    color: var(--vaspo-text);
+    line-height: 1.35;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.MPC-vaspo-tlMeta {
-    font-size: 0.75em;
+.MPC-vaspo-actWhen {
+    flex: none;
+    font-size: 0.6875em;
     color: var(--vaspo-muted);
-    margin-top: 0.375em;
+    white-space: nowrap;
 }
 
 /* ----------------------------------------------------------- */
