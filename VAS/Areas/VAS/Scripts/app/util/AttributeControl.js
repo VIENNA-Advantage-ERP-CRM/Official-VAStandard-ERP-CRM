@@ -12,6 +12,8 @@
  *   M_Product_ID            (int, required)   product whose attribute set drives the form
  *   M_AttributeSetInstance_ID (int)           the currently-selected instance (pre-selected
  *                                             in the list; an unchanged OK is a no-op)
+ *   newAttribute            (bool)            true -> open directly on the "New attribute"
+ *                                             create form; false/omitted -> the instance list
  *   productName             (string)          shown in the dialog header
  *   onApply(result)         (fn)              called when the user picks/creates an instance.
  *                                             result = { M_AttributeSetInstance_ID, description }
@@ -83,6 +85,9 @@
             M_Product_ID: parseInt(opts.M_Product_ID, 10) || 0,
             M_AttributeSetInstance_ID: parseInt(opts.M_AttributeSetInstance_ID, 10) || 0,
             productName: opts.productName || "",
+            // opts.newAttribute === true -> open straight on the "New attribute" create form;
+            // false / omitted -> the existing-instance list (default). Caller decides the rule.
+            newAttribute: !!opts.newAttribute,
             options: [], selected: "", mode: "list", search: "", page: 0, error: ""
         };
         cfg.BUSY(true);
@@ -95,13 +100,16 @@
                 st.info = info || { Attributes: [] };
                 st.options = loadExistingInstances();
                 // Pre-select (and page to) the row matching the current instance so reopening
-                // shows the chosen value selected by default; else fall back to the first row.
+                // shows the chosen value selected by default. When the line has NO attribute yet
+                // (cur == 0) pre-select NOTHING - do NOT default to the first row (request #1).
                 var cur = st.M_AttributeSetInstance_ID;
                 var selIdx = cur > 0 ? indexOfAsi(st.options, cur) : -1;
-                if (selIdx < 0) selIdx = st.options.length ? 0 : -1;
                 st.selected = selIdx >= 0 ? optionKey(st.options[selIdx]) : "";
                 st.page = selIdx > 0 ? Math.floor(selIdx / ATTR_PAGE_SIZE) : 0;
                 buildDialog();
+                // newAttribute === true: jump straight to the create form (only when the role
+                // may create); otherwise stay on the existing-instance list.
+                if (st.newAttribute && st.info && st.info.IsCanCreate) openCreateForm(null);
             },
             error: function (err) { console.log(err); cfg.BUSY(false); }
         });
@@ -186,9 +194,16 @@
             '<div class="vas-cil-attr-pager"><button type="button" class="vas-cil-attr-pagebtn" data-act="attr-prev" aria-label="' + E(L("VAS_074_Prev", "Previous")) + '">' + IC("chevron-left", "‹") + '</button>' +
             '<span class="vas-cil-attr-pageinfo" id="vasCilAttrPageInfo"></span>' +
             '<button type="button" class="vas-cil-attr-pagebtn" data-act="attr-next" aria-label="' + E(L("VAS_074_Next", "Next")) + '">' + IC("chevron-right", "›") + "</button></div>" +
-            '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-ok">' + E(L("VAS_074_OK", "OK")) + "</button></div>" +
-            '<div id="vasCilAttrCreateFoot" class="vas-cil-is-hidden"><button type="button" class="vas-cil-btn vas-cil-btn--ghost" data-act="attr-cancel">' + E(L("VAS_074_Cancel", "Cancel")) +
-            '</button><button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-submit" disabled>' + E(L("VAS_074_AddAttribute", "Add attribute")) + "</button></div></footer>");
+            // Error (left, red) fills the middle so the buttons stay grouped on the right.
+            '<span class="vas-cil-foot-error"></span>' +
+            '<div class="vas-cil-dialog__actions">' +
+            '<button type="button" class="vas-cil-btn vas-cil-btn--ghost" data-act="attr-listclose">' + E(L("VAS_074_Cancel", "Cancel")) + "</button>" +
+            '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-ok">' + E(L("VAS_074_OK", "OK")) + "</button></div></div>" +
+            // No Cancel in create mode - the header "Back" button already returns to the list.
+            '<div id="vasCilAttrCreateFoot" class="vas-cil-is-hidden">' +
+            '<span class="vas-cil-foot-error"></span>' +
+            '<div class="vas-cil-dialog__actions">' +
+            '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-submit" disabled>' + E(L("VAS_074_AddAttribute", "Add attribute")) + "</button></div></div></footer>");
         backdrop.append(dialog);
         $("body").append(backdrop);
 
@@ -196,6 +211,8 @@
         dialog.on("click", "[data-act=attr-create]", function () { openCreateForm(null); });
         dialog.on("click", "[data-act=attr-back],[data-act=attr-cancel]", function () { st.mode = "list"; st.editAsi = null; st.error = ""; renderAttr(); });
         dialog.on("click", "[data-act=attr-ok]", commit);
+        // List-mode Cancel closes the whole control (there is no backdrop-click close).
+        dialog.on("click", "[data-act=attr-listclose]", function () { closeDialog(); });
         dialog.on("click", "[data-act=attr-submit]", submitNew);
         dialog.on("click", "[data-act=attr-edit]", function (e) {
             e.stopPropagation();
@@ -226,10 +243,17 @@
             var id = "vasCilAttrF_" + a.M_Attribute_ID;
             var ctrl;
             if (a.ValueType === "L") {
-                ctrl = '<select id="' + id + '" placeholder=" " data-placeholder=""><option value=""> </option>';
+                // Mandatory: a hidden+disabled placeholder is selected initially so NO real
+                // value is auto-picked AND no selectable blank row shows in the open dropdown -
+                // the user MUST choose (validation enforces it). Optional: a normal blank row
+                // the user can leave empty.
+                ctrl = '<select id="' + id + '" placeholder=" " data-placeholder="">'
+                    + (a.IsMandatory ? '<option value="" disabled selected hidden></option>' : '<option value=""> </option>');
                 for (var v = 0; v < (a.Values || []).length; v++) {
                     var val = a.Values[v];
-                    ctrl += '<option value="' + val.M_AttributeValue_ID + '">' + E((val.Code ? val.Code + " - " : "") + val.Name) + "</option>";
+                    // Show only the value NAME in the dropdown (the Code/value prefix is not
+                    // wanted); fall back to the code only when the name is empty.
+                    ctrl += '<option value="' + val.M_AttributeValue_ID + '">' + E(val.Name || val.Code) + "</option>";
                 }
                 ctrl += "</select>";
             } else if (a.ValueType === "N") {
@@ -241,10 +265,17 @@
         }
         if (info.IsLot) { any = true; html += attrField(attrTextInput("vasCilAttrLot", true), L("VAS_074_Lot", "Lot"), attrFieldBtn("attr-newlot", L("VAS_074_NewLot", "New")), false); }
         if (info.IsSerNo) { any = true; html += attrField(attrTextInput("vasCilAttrSerNo", true), L("VAS_074_SerialNo", "Serial No"), attrFieldBtn("attr-genserno", L("VAS_074_Generate", "Generate")), false); }
-        if (info.IsGuaranteeDate) { any = true; html += attrField('<input type="date" id="vasCilAttrGuarantee" placeholder=" " data-placeholder="" />', L("VAS_074_GuaranteeDate", "Guarantee Date"), null, false); }
+        if (info.IsGuaranteeDate) {
+            any = true;
+            // Autofill the guarantee date for a NEW instance from the product/attribute-set
+            // config (today + GuaranteeDays, else today) - request #3. On EDIT leave it blank
+            // here; prefillCreateForm sets it from the existing instance.
+            var gval = (!st.editAsi && info.GuaranteeDateDefault) ? info.GuaranteeDateDefault : "";
+            html += attrField('<input type="date" id="vasCilAttrGuarantee" value="' + E(gval) + '" placeholder=" " data-placeholder="" />', L("VAS_074_GuaranteeDate", "Guarantee Date"), null, false);
+        }
         html += "</div>";
         if (!any) html = '<p class="vas-cil-empty-message">' + E(L("VAS_074_NoInstanceAttr", "No instance attributes to capture")) + "</p>";
-        return html + '<p class="vas-cil-form-error vas-cil-is-hidden" id="vasCilAttrCreateError"></p>';
+        return html;   // save/validation errors render in the footer (.vas-cil-foot-error), not the body
     }
 
     function attrField(ctrlHtml, caption, btnHtml, mandatory) {
@@ -399,9 +430,10 @@
         });
     }
 
+    // Error now renders in the footer (left side, red) for BOTH modes - not a toast.
+    // Both foots carry a .vas-cil-foot-error span; only the visible one is shown.
     function updateAttrError() {
-        var el = $("#vasCilAttrCreateError");
-        el.text(st.error).toggleClass("vas-cil-is-hidden", !st.error);
+        $("#vasCilAttr .vas-cil-foot-error").text(st.error || "");
     }
     function updateAttrSubmit() { $("#vasCilAttr [data-act=attr-submit]").prop("disabled", false); }
     function attrErr(name) { st.error = cfg.L("VAS_074_FieldRequired", "Required") + ": " + name; updateAttrError(); }
@@ -438,9 +470,13 @@
                 var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                 if (res && res.M_AttributeSetInstance_ID > 0) {
                     apply({ M_AttributeSetInstance_ID: res.M_AttributeSetInstance_ID, description: sel.code });
-                } else { cfg.TOAST(cfg.L("VAS_074_AttrSaveFailed", "Could not save attribute")); }
+                } else {
+                    // Accurate server error (empty -> generic) in the footer, left/red - not a toast.
+                    st.error = (res && res.Error) ? res.Error : cfg.L("VAS_074_AttrSaveFailed", "Could not save attribute");
+                    updateAttrError();
+                }
             },
-            error: function (err) { console.log(err); cfg.BUSY(false); cfg.TOAST(cfg.L("VAS_074_AttrSaveFailed", "Could not save attribute")); }
+            error: function (err) { console.log(err); cfg.BUSY(false); st.error = cfg.L("VAS_074_AttrSaveFailed", "Could not save attribute"); updateAttrError(); }
         });
     }
 
@@ -493,9 +529,15 @@
                 var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                 if (res && res.M_AttributeSetInstance_ID > 0) {
                     apply({ M_AttributeSetInstance_ID: res.M_AttributeSetInstance_ID, description: res.Description || labelParts.join(", ") });
-                } else { cfg.TOAST(L("VAS_074_AttrSaveFailed", "Could not save attribute")); }
+                } else {
+                    // Surface the ACCURATE server message (framework mandatory / save error)
+                    // inline in the create form (where the user is) and as a toast; fall back
+                    // to the generic label only when the server sent no message.
+                    st.error = (res && res.Error) ? res.Error : L("VAS_074_AttrSaveFailed", "Could not save attribute");
+                    updateAttrError();
+                }
             },
-            error: function (err) { console.log(err); cfg.BUSY(false); cfg.TOAST(L("VAS_074_AttrSaveFailed", "Could not save attribute")); }
+            error: function (err) { console.log(err); cfg.BUSY(false); st.error = L("VAS_074_AttrSaveFailed", "Could not save attribute"); updateAttrError(); }
         });
     }
 

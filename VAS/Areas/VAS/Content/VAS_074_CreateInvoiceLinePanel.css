@@ -1546,13 +1546,30 @@
         background: var(--cil-blue-soft);
     }
 /* List footer: pager on the left, OK on the right. */
-#vasCilAttrListFoot {
+#vasCilAttrListFoot, #vasCilAttrCreateFoot {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     width: 100%;
     gap: 0.75em;
 }
+
+    /* Save/validation error: left side, red, fills the middle so the Cancel + OK /
+       Cancel + Add attribute buttons stay grouped together on the right (aligned). */
+    #vasCilAttrListFoot .vas-cil-foot-error,
+    #vasCilAttrCreateFoot .vas-cil-foot-error {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 0.75em;
+        line-height: 1.3;
+        color: var(--cil-danger);
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
+
+    #vasCilAttrListFoot .vas-cil-dialog__actions,
+    #vasCilAttrCreateFoot .vas-cil-dialog__actions {
+        flex: 0 0 auto;
+    }
 
 .vas-cil-attr-pager {
     display: flex;

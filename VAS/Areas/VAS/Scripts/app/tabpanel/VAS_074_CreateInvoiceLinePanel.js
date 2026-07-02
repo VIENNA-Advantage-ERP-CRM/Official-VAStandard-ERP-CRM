@@ -362,19 +362,27 @@
                 '<span class="vas-cil-total-item__label">' + esc(label) + '</span><span class="vas-cil-total-item__value">' + esc(value) + "</span></span>";
         }
 
+        /* The panel is editable only while the invoice can still take line changes -
+           server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
+           When false the whole panel is read-only: no Add / Save / Delete and no cell edit. */
+        function panelEditable() { return !!(parent && parent.IsEditable); }
+
         function renderHeaderButtons() {
             var n = unsavedLines().length;
+            var locked = !panelEditable();
             // Add and Save are BOTH always visible (no swap). Swapping them on the same
             // toolbar slot caused a click that committed an edit (which flipped the
             // dirty count) to land on the other button mid-press, so Save needed two
             // clicks. Save is only muted (not hidden) when there is nothing to save.
-            $addBtn.removeClass("vas-cil-is-hidden");
-            $saveBtn.removeClass("vas-cil-is-hidden").toggleClass("vas-cil-is-disabled", n === 0);
+            // When the doc is completed/void/reversed/closed (locked) Add + Save are
+            // fully disabled (native `disabled` blocks the mousedown/click handlers).
+            $addBtn.removeClass("vas-cil-is-hidden").prop("disabled", locked).toggleClass("vas-cil-is-disabled", locked);
+            $saveBtn.removeClass("vas-cil-is-hidden").prop("disabled", locked).toggleClass("vas-cil-is-disabled", locked || n === 0);
             var plural = n > 1 ? lbl("VAS_074_PluralS", "s") : "";
             var countTxt = n > 0 ? " (" + n + ")" : "";
             $saveBtn.html(icon("hard-drive", "💾") + "<span>" + esc(lbl("VAS_074_SaveRow", "Save row")) + plural + countTxt + "</span>");
             var sc = selectedCount();
-            $deleteBtn.prop("disabled", sc === 0 || !(parent && parent.IsEditable)).toggleClass("vas-cil-is-disabled", sc === 0);
+            $deleteBtn.prop("disabled", sc === 0 || locked).toggleClass("vas-cil-is-disabled", sc === 0 || locked);
             $deleteBtn.find(".vas-cil-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
             if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length);
         }
@@ -708,6 +716,7 @@
 
         /* ---------- edit / commit ---------- */
         function startEdit(line, field) {
+            if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
             if (line._saving) return;                 // row is being saved - locked until it returns
             if (fieldReadOnly(line, field)) return;   // AD_Column.ReadOnlyLogic / IsReadOnly
             commitMorePopover(); morePopoverFor = null;
@@ -1298,7 +1307,14 @@
             var v = line.values;
             for (var col in ID_COLS) if (ID_COLS.hasOwnProperty(col)) v[col] = parseInt(v[col], 10) || 0;
             v.PriceEntered = parseNum(v.PriceEntered);
-            if (v.QtyInvoiced != null && v.QtyInvoiced !== "") v.QtyEntered = parseNum(v.QtyInvoiced);
+            // The panel's Qty column IS QtyEntered (user-entered, in the entered UOM). The
+            // framework callout ALSO writes QtyInvoiced = QtyEntered converted to the product
+            // base UOM (the purchasing-UOM multiply). Do NOT copy QtyInvoiced back onto
+            // QtyEntered: that replaced the user's qty, and because the next callout (e.g. an
+            // attribute change) reconverts, it compounded the multiplication. QtyInvoiced is
+            // recomputed server-side on save (MInvoiceLine.beforeSave for PO), so keep it only
+            // as a numeric scratch value for any callout that reads it back.
+            if (v.QtyInvoiced != null && v.QtyInvoiced !== "") v.QtyInvoiced = parseNum(v.QtyInvoiced);
         }
 
         /* Refresh display labels + product/charge exclusivity after the callout. */
@@ -2161,6 +2177,9 @@
                 M_Product_ID: line.values.M_Product_ID,
                 M_AttributeSetInstance_ID: line.values.M_AttributeSetInstance_ID,
                 productName: line.display.productName,
+                // true -> open straight on the New-attribute form; false -> instance list.
+                // Set this per your own requirement.
+                newAttribute: true,
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
@@ -2784,6 +2803,7 @@
            (Add line, edit other rows) while the save is in flight. */
         function saveRows(done) {
             commitMorePopover();
+            if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
             var batch = unsavedLines();
             if (!batch.length || !parent) { if (done) done(false); return; }
             if (!validateUnsaved()) { if (done) done(false); return; }   // AD_Column mandatory validation
@@ -2867,6 +2887,7 @@
         }
 
         function deleteSelected() {
+            if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
             var sel = selectedLines(); if (!sel.length) return;
             var ids = [], localOnly = [];
             sel.forEach(function (l) { if (l.values.C_InvoiceLine_ID > 0) ids.push(l.values.C_InvoiceLine_ID); else localOnly.push(l); });
