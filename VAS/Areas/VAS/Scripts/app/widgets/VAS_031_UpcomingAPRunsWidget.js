@@ -1875,14 +1875,12 @@
                     )
                 );
 
-            currencyId =
-                getValidLookupValue(
-                    currencies,
-                    firstPositiveValue(
-                        row.currencyId,
-                        row.cCurrencyId
-                    )
-                );
+            /*
+             * Display exactly the currency returned by
+             * GetUpcomingAPRunDetails SQL query.
+             * Do not validate, replace, or select a fallback currency.
+             */
+            currencyId = row.currencyId;
 
             bankAccountId =
                 getValidLookupValue(
@@ -2022,10 +2020,10 @@
                         'currencyId',
                         currencies,
                         currencyId,
-                        true
+                        false
                     ),
 
-                    true
+                    false
                 ) +
 
                 fieldHtml(
@@ -2294,10 +2292,7 @@
 
                     currencyId:
                         Number(
-                            firstPositiveValue(
-                                run.currencyId,
-                                run.cCurrencyId
-                            )
+                            run.currencyId
                         )
                 },
 
@@ -2782,6 +2777,12 @@
             );
 
             if (
+                Number(payload.currencyId) === Number(
+                    firstPositiveValue(
+                        selectedInvoiceRow.currencyId,
+                        selectedInvoiceRow.cCurrencyId
+                    )
+                ) &&
                 !isNaN(maximumAmount) &&
                 maximumAmount > 0 &&
                 payload.payAmt > maximumAmount

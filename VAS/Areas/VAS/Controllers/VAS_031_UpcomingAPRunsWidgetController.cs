@@ -1998,13 +1998,6 @@ ORDER BY
                     );
                 }
 
-                if (invoice.GetC_Currency_ID() != currencyId)
-                {
-                    throw new InvalidOperationException(
-                        "Selected currency does not match the invoice."
-                    );
-                }
-
                 int validatedInvoicePayScheduleId =
                     ValidateInvoicePaySchedule(
                         invoiceId,
@@ -2052,7 +2045,10 @@ ORDER BY
                     );
                 }
 
-                if (payAmt > openAmountBeforePayment)
+                if (
+                    invoice.GetC_Currency_ID() == currencyId &&
+                    payAmt > openAmountBeforePayment
+                )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -2334,7 +2330,7 @@ AND PaymentMethod.AD_Client_ID IN
                 );
 
                 payment.SetC_Currency_ID(
-                    invoice.GetC_Currency_ID()
+                    currencyId
                 );
 
                 payment.SetC_ConversionType_ID(

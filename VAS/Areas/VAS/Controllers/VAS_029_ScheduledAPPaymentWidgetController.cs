@@ -15,6 +15,7 @@ using System;
  * 6  | Not Specified                        | VAS_029_MessageNotSpecified
  * 7  | invoices                             | VAS_029_MessageInvoices
  * 8  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
+ * 9  | Total                                | VAS_029_MessageTotal
  */
 
 using System.Collections.Generic;
@@ -33,7 +34,7 @@ namespace VAS.Controllers
     /// <summary>
     /// Module Name : VAS Dashboard
     /// Purpose     : Provides scheduled AP payment KPI widget data
-    ///               grouped by payment method.
+    ///               returned as one total amount.
     ///
     /// Compatible with:
     /// - Oracle
@@ -43,7 +44,7 @@ namespace VAS.Controllers
     {
         /// <summary>
         /// Returns AP invoice schedule amounts due during
-        /// the next seven days, grouped by payment method.
+        /// the next seven days, returned as one total amount.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -217,34 +218,6 @@ namespace VAS.Controllers
                             MidpointRounding.AwayFromZero
                         );
 
-                    groups.Add(
-                        new
-                        {
-                            paymentMethodName =
-                                paymentMethodName,
-
-                            value =
-                                scheduledAmount,
-
-                            scheduledAmount =
-                                scheduledAmount,
-
-                            cCurrencyId =
-                                groupCurrencyId,
-
-                            currencyISO =
-                                groupCurrencyISO,
-
-                            currencySymbol =
-                                groupCurrencySymbol,
-
-                            symbol =
-                                groupCurrencySymbol,
-
-                            precision =
-                                groupPrecision
-                        }
-                    );
                 }
 
                 precision =
@@ -258,6 +231,39 @@ namespace VAS.Controllers
                         precision,
                         MidpointRounding.AwayFromZero
                     );
+
+                groups.Add(
+                    new
+                    {
+                        paymentMethodName =
+                            GetMsg(
+                                ctx,
+                                "VAS_029_MessageTotal",
+                                "Total"
+                            ),
+
+                        value =
+                            scheduledAmountThisWeek,
+
+                        scheduledAmount =
+                            scheduledAmountThisWeek,
+
+                        cCurrencyId =
+                            cCurrencyId,
+
+                        currencyISO =
+                            currencyISO,
+
+                        currencySymbol =
+                            currencySymbol,
+
+                        symbol =
+                            currencySymbol,
+
+                        precision =
+                            precision
+                    }
+                );
 
                 return Json(
                     new

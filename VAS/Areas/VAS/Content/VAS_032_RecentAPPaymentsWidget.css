@@ -297,7 +297,7 @@
         font-weight: 400;
         line-height: 1.2;
         letter-spacing: 0;
-        text-align: right;
+        text-align: left;
         text-transform: capitalize;
     }
 
@@ -307,6 +307,7 @@
         color: #102c3f;
         font-size: 0.75em;
         line-height: 1.25;
+        text-align: left;
         vertical-align: middle;
     }
 
@@ -356,6 +357,10 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+.vas-recent-ap-payments-table th.vas-recent-ap-payments-amount {
+    text-align: right;
 }
 
 .vas-recent-ap-payments-row {
@@ -884,6 +889,7 @@
         color: #102c3f;
         font-size: 0.875em;
         line-height: 1.2;
+        text-align: left;
         vertical-align: middle;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -905,6 +911,7 @@
         font-size: 0.875em;
         font-weight: 700;
         line-height: 1.2;
+        text-align: left;
         vertical-align: middle;
     }
 
@@ -912,6 +919,12 @@
     text-align: right;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+.vas-recent-ap-payments-alloc-table thead th.vas-recent-ap-payments-alloc-num,
+.vas-recent-ap-payments-alloc-table tbody td.vas-recent-ap-payments-alloc-num,
+.vas-recent-ap-payments-alloc-table tfoot td.vas-recent-ap-payments-alloc-num {
+    text-align: right;
 }
 
 .vas-recent-ap-payments-alloc-total-cell {
