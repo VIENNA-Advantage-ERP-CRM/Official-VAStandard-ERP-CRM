@@ -99,12 +99,55 @@ namespace VASLogic.Models
                 if (!string.IsNullOrEmpty(m.ReadOnlyLogic))
                     foreach (Match mt in rx.Matches(m.ReadOnlyLogic)) tokens.Add(mt.Groups[1].Value);
             }
+            // Accounting-element flags ($Element_OT/PJ/MC/AY/...) gate the accounting
+            // dimension fields. They are NOT reliably present in an AJAX session ctx (nor in
+            // the client VIS.Env), so a DisplayLogic like @$Element_MC@='Y' resolved to empty
+            // -> the client defaulted to SHOW and the logic looked ignored. Resolve them
+            // AUTHORITATIVELY from the primary accounting schema's active elements (what login
+            // does): $Element_<TYPE> = 'Y' when that ElementType is an active C_AcctSchema_Element.
+            HashSet<string> activeElementTypes = null;
             foreach (string tok in tokens)
             {
-                string val = ctx.GetContext(tok);
-                if (string.IsNullOrEmpty(val)) val = ctx.GetContext(tok.TrimStart('#', '$'));
+                string val;
+                if (tok.StartsWith("$Element_", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (activeElementTypes == null) activeElementTypes = LoadActiveAcctElementTypes(ctx);
+                    string type = tok.Substring("$Element_".Length);
+                    val = activeElementTypes.Contains(type) ? "Y" : "N";
+                }
+                else
+                {
+                    val = ctx.GetContext(tok);
+                    if (string.IsNullOrEmpty(val)) val = ctx.GetContext(tok.TrimStart('#', '$'));
+                }
                 if (!string.IsNullOrEmpty(val)) data.LoginContext[tok] = val;
             }
+        }
+
+        /// <summary>
+        /// Returns the set of accounting ElementTypes (OT, PJ, MC, AY, SR, U1, U2, ...) that
+        /// are ACTIVE on the client's primary accounting schema (AD_ClientInfo.C_AcctSchema1_ID).
+        /// Used to resolve the @$Element_XX@ display/read-only-logic flags server-side.
+        /// </summary>
+        /// <param name="ctx">session context (for the client id)</param>
+        /// <returns>active element-type codes (case-insensitive)</returns>
+        private HashSet<string> LoadActiveAcctElementTypes(Ctx ctx)
+        {
+            HashSet<string> types = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string sql = @"SELECT DISTINCT ase.ElementType
+                           FROM C_AcctSchema_Element ase
+                           WHERE ase.IsActive = 'Y'
+                             AND ase.C_AcctSchema_ID = (SELECT ci.C_AcctSchema1_ID
+                                                        FROM AD_ClientInfo ci
+                                                        WHERE ci.AD_Client_ID = @client)";
+            DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@client", ctx.GetAD_Client_ID()) }, null);
+            if (ds != null && ds.Tables.Count > 0)
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    string t = Util.GetValueOfString(r["ElementType"]);
+                    if (!string.IsNullOrEmpty(t)) types.Add(t);
+                }
+            return types;
         }
 
         /// <summary>
@@ -283,7 +326,21 @@ namespace VASLogic.Models
                                   COALESCE(c.ReadOnlyLogic, N'')  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
                                   COALESCE(vr.Type, N'')          AS ValRuleType,
-                                  COALESCE(vr.Code, N'')          AS ValRuleCode
+                                  COALESCE(vr.Code, N'')          AS ValRuleCode,
+                                  -- DisplayLogic lives on AD_Field, not AD_Column: pick a
+                                  -- representative non-empty expression from any active
+                                  -- C_InvoiceLine field for this column, so a curated modal
+                                  -- field that isn't on the resolved window tab still has its
+                                  -- show/hide logic applied (uniform per column in practice).
+                                  COALESCE((SELECT MAX(f2.DisplayLogic)
+                                            FROM AD_Field f2
+                                            INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
+                                            INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
+                                            WHERE f2.AD_Column_ID = c.AD_Column_ID
+                                              AND f2.IsActive = 'Y'
+                                              AND tt2.TableName = 'C_InvoiceLine'
+                                              AND f2.DisplayLogic IS NOT NULL
+                                              AND f2.DisplayLogic <> ''), N'') AS DisplayLogic
                            FROM AD_Column c
                            INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
                            LEFT JOIN AD_Val_Rule vr ON (c.AD_Val_Rule_ID = vr.AD_Val_Rule_ID
@@ -323,12 +380,16 @@ namespace VASLogic.Models
                 Name = Util.GetValueOfString(r["FieldName"]),
                 IsDisplayed = true
             };
+            // DisplayLogic is selected by BOTH the tab-field query (AD_Field.DisplayLogic) and
+            // the all-columns merge (representative C_InvoiceLine field via subquery), so read
+            // it whenever the row carries the column - the curated modal applies it either way.
+            if (r.Table.Columns.Contains("DisplayLogic"))
+                m.DisplayLogic = Util.GetValueOfString(r["DisplayLogic"]);
             if (fromField)
             {
                 m.IsDisplayed = Util.GetValueOfString(r["IsDisplayed"]) == "Y";
                 m.IsReadOnly = Util.GetValueOfString(r["IsReadOnly"]) == "Y";
                 m.SeqNo = Util.GetValueOfInt(r["SeqNo"]);
-                m.DisplayLogic = Util.GetValueOfString(r["DisplayLogic"]);
                 // AD_Field image (window-driven). Only the field query selects these
                 // columns; the all-columns merge (fromField == false) does not.
                 // FontName (icon font) takes FIRST priority - when set, the bitmap thumbnail
