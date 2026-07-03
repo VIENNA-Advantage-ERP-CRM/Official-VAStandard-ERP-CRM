@@ -514,6 +514,20 @@
             cb.on("change", function () { line._sel = this.checked; renderHeaderButtons(); $row.toggleClass("is-selected", this.checked); });
             $row.append($('<div class="vas-cil-cell vas-cil-cell--check" role="cell"></div>').append(cb));
 
+            // Clicking anywhere on the row toggles its selection checkbox, so the whole
+            // record is easy to pick (e.g. for delete). Clicks that land on an interactive
+            // control - the editable field inputs, the UOM / Tax selects, the "..." / attr
+            // buttons and links, or the checkbox itself - keep their own behaviour (enter
+            // edit / open control) and must NOT also toggle selection.
+            $row.on("click", function (e) {
+                if (!panelEditable()) return;   // checkbox is disabled on a locked invoice
+                if ($(e.target).closest("input, select, textarea, button, a, [role=button], .vas-cil-attr-link").length) return;
+                line._sel = !line._sel;
+                cb.prop("checked", line._sel);
+                $row.toggleClass("is-selected", line._sel);
+                renderHeaderButtons();
+            });
+
             $row.append(renderPrimaryCell(line));
             $row.append(renderEditableCell(line, "description", v.Description, lbl("VAS_074_AddDescription", "Add description…"), { maxLength: colFieldLength("Description") }));
             $row.append(renderQtyUomCell(line));
@@ -616,9 +630,13 @@
                     var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_074_SetAttribute", "Set attribute…");
                     var $attr = $('<span class="vas-cil-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
                     if (!hasAttr) $attr.addClass("vas-cil-attr-link--empty");
-                    // On a read-only invoice the attribute is informational only - not a
-                    // link (no click, no pointer cursor / hover underline).
-                    if (editable) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    // Clickable only when the invoice is editable AND the product actually
+                    // carries an attribute set (M_AttributeSet_ID > 0). On a read-only invoice,
+                    // or on a saved line whose product has no attribute set defined (e.g. the
+                    // set was removed after the line was created but the old ASI description
+                    // still shows), the attribute is informational only - not a link (no click,
+                    // no pointer cursor / hover underline).
+                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
                     else $attr.addClass("vas-cil-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -873,8 +891,14 @@
             else if (field === "price") { if (!sameVal(v.PriceEntered, value)) { v.PriceEntered = value; line._priceOverride = true; changed = true; } }
             if (changed) markDirty(line);
             // A quantity change re-runs the line callout (quantity price-breaks + amounts,
-            // attribute-aware) - same as UOM. Description / manual price don't re-price.
+            // attribute-aware) - same as UOM.
             if (changed && field === "quantity" && v.M_Product_ID > 0) runCallout(line, "QtyEntered");
+            // A manual price change re-runs the line callout too (CalloutInvoice.amt) so the
+            // line net / tax amounts recompute from the entered price - same mechanism as a
+            // product change. The PriceEntered branch of `amt` keeps the entered price
+            // (PriceActual = PriceEntered) and only recomputes amounts, so the manual
+            // override is preserved (line._priceOverride stays set).
+            else if (changed && field === "price" && v.M_Product_ID > 0) runCallout(line, "PriceEntered");
         }
 
         function setUom(line, uomId, uomName) {
@@ -2042,6 +2066,21 @@
             v[col] = value;
         }
 
+        /* True when the line's product actually carries an attribute set (M_AttributeSet_ID > 0).
+           Reads the raw server flag VASCILDISP_HasAttrSet (= COALESCE(p.M_AttributeSet_ID, 0))
+           off the line's value bag, case-insensitively via lineVal - a saved line's keys are
+           DB-cased (PostgreSQL lowercases the alias to "vascildisp_hasattrset", Oracle uppercases
+           it). This is authoritative: unlike line.display.hasAttributeSet it is NOT OR'd with an
+           existing ASI description, so a line whose product no longer has an attribute set (but
+           still carries an old ASI, so AttrName is set) correctly reports false. Falls back to the
+           display flag when the raw column isn't on the line - e.g. a brand-new (unsaved) line,
+           which has no server projection but carries the pure product flag in display. */
+        function productHasAttributeSet(line) {
+            var raw = lineVal(line, "VASCILDISP_HasAttrSet");
+            if (raw === undefined || raw === null || raw === "") return !!(line.display && line.display.hasAttributeSet);
+            return (parseInt(raw, 10) || 0) > 0;
+        }
+
         /* Lightweight fallback control (plain element, no custom class - the framework
            .vis-control-wrap styles it) for when the native Vienna control is unavailable. */
         function buildFallbackControl(line, m, kind, ro) {
@@ -2347,6 +2386,13 @@
         // (The control handles the pre-select + unchanged-OK no-op internally.)
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
+            // The product must actually carry an attribute set (M_AttributeSet_ID > 0) for
+            // the attribute control to be meaningful. A saved line whose product has no
+            // attribute set defined must not open the control even if it's clicked - guard
+            // here as well as at the link's click binding so no caller can bypass it. Uses the
+            // raw VASCILDISP_HasAttrSet flag off the line (case-insensitive), not the AttrName-
+            // conflated display flag - see productHasAttributeSet.
+            if (!productHasAttributeSet(line)) return;
             closeDialogs();
             VIS.AttributeControl.open({
                 M_Product_ID: line.values.M_Product_ID,
