@@ -132,13 +132,35 @@
 
         /* ---------- per-line calculation (mirrors the prototype formulas) ---------- */
         function taxRate(id) { return taxRateById[id] || 0; }
-        function lineSubtotal(line) {
+        /* Entered line amount (qty x price less discount). On a tax-inclusive invoice this
+           is the GROSS (price already contains tax); otherwise it is the net. */
+        function lineGross(line) {
             var v = line.values;
             var disc = (+v.Discount || 0) / 100;
             return (+v.QtyEntered || 0) * (+v.PriceEntered || 0) * (1 - disc);
         }
-        function lineTaxAmount(line) { return lineSubtotal(line) * (taxRate(line.values.C_Tax_ID) / 100); }
-        function lineAmount(line) { return lineSubtotal(line) /*+ lineTaxAmount(line)*/; }
+        /* Line tax. Tax-inclusive: EXTRACT it from the gross (gross*r/(100+r)) - mirrors
+           the framework MTax.CalculateTax(amount, taxIncluded=true). Tax-exclusive: add
+           it on top of the net (net*r/100). */
+        function lineTaxAmount(line) {
+            var rate = taxRate(line.values.C_Tax_ID);
+            var gross = lineGross(line);
+            if (parent && parent.IsTaxIncluded) return rate ? gross * rate / (100 + rate) : 0;
+            return gross * rate / 100;
+        }
+        /* Surcharge amount (SurchargeAmt) - an extra tax the framework computes for a tax that
+           has a Surcharge_Tax_ID (MInvoiceLine.SetTaxAmt / CalloutTax). It's a stored value
+           (the client can't derive it from a rate), read case-insensitively. */
+        function lineSurcharge(line) { return +lineVal(line, "SurchargeAmt") || 0; }
+        /* Total line tax = base tax + surcharge (per request: totalTax = TaxAmt + SurchargeAmt). */
+        function lineTaxTotal(line) { return lineTaxAmount(line) + lineSurcharge(line); }
+        /* Net (tax-excluded) line amount = the Subtotal contribution. Tax-inclusive: gross
+           minus the extracted tax (incl. surcharge); tax-exclusive: the gross IS the net. */
+        function lineSubtotal(line) {
+            var gross = lineGross(line);
+            return (parent && parent.IsTaxIncluded) ? gross - lineTaxTotal(line) : gross;
+        }
+        function lineAmount(line) { return lineSubtotal(line); }
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
@@ -226,7 +248,14 @@
             // Start from the full column bag (every C_InvoiceLine column) so the
             // line VO carries all columns the callout may read / write.
             var vals = {};
-            if (r.Values) for (var k in r.Values) if (r.Values.hasOwnProperty(k)) vals[k] = r.Values[k];
+            // Canonicalize each DB-cased key (PostgreSQL lowercases, Oracle uppercases) to the
+            // dictionary ColumnName so the line bag holds exactly ONE key per column. Without
+            // this, an edit / callout writes a proper-cased key (e.g. "QtyInvoiced") ALONGSIDE
+            // the loaded DB-cased one ("qtyinvoiced"), and BOTH are sent on save.
+            if (r.Values) for (var k in r.Values) if (r.Values.hasOwnProperty(k)) {
+                var canon = columnNameByLc[String(k).toLowerCase()] || k;
+                vals[canon] = r.Values[k];
+            }
             vals.C_InvoiceLine_ID = r.C_InvoiceLine_ID;
             vals.Line = r.Line;
             vals.M_Product_ID = r.M_Product_ID || 0;
@@ -430,7 +459,8 @@
             // Base = saved totals of every OTHER page (server), plus the live sum of the
             // current page below, so the row shows the WHOLE invoice's grand total.
             var sub = otherSub, tax = otherTax, tcs = otherTcs;
-            for (var i = 0; i < lines.length; i++) { sub += lineSubtotal(lines[i]); tax += lineTaxAmount(lines[i]); tcs += lineTcs(lines[i]); }
+            // Tax column includes the surcharge (totalTax = TaxAmt + SurchargeAmt).
+            for (var i = 0; i < lines.length; i++) { sub += lineSubtotal(lines[i]); tax += lineTaxTotal(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
             $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
             $totalsRow.append(totalItem(lbl("Tax", "Tax"), fmtMoney(tax), false));
@@ -487,7 +517,7 @@
             $row.append(renderPrimaryCell(line));
             $row.append(renderEditableCell(line, "description", v.Description, lbl("VAS_074_AddDescription", "Add description…"), { maxLength: colFieldLength("Description") }));
             $row.append(renderQtyUomCell(line));
-            $row.append(renderEditableCell(line, "price", v.PriceEntered, "0" + decSep + "00", { align: "right", amount: true }));
+            $row.append(renderEditableCell(line, "price", v.PriceEntered, "0" + decSep + "00", { align: "right", amount: true, maxLength: colFieldLength("PriceEntered") }));
             $row.append(renderTaxCell(line));
 
             var amt = lineAmount(line);
@@ -528,7 +558,15 @@
             if (opts.cls) $i.addClass(opts.cls);
             $i.attr("title", text || "");
             if (editable && !opts.readOnly) $i.on("click", function () { startEdit(line, field); });
-            else $i.addClass("vas-cil-cell-disp--ro");
+            else {
+                $i.addClass("vas-cil-cell-disp--ro");
+                // A COLUMN-level read-only field (e.g. C_UOM_ID ReadOnlyLogic true) is rendered
+                // DISABLED, not just readonly: `readonly` has no effect on a <select> and a plain
+                // readonly text cell still looks editable, so disable + grey it so it's clearly
+                // locked and browser-enforced. (A whole-invoice lock keeps the lighter readonly
+                // look; that path leaves opts.readOnly unset.)
+                if (opts.readOnly) $i.prop("disabled", true);
+            }
             return $i;
         }
 
@@ -634,6 +672,7 @@
             // quantity (top)
             if (editQty) {
                 var $q = $('<input type="text" class="vas-cil-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
+                var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
@@ -833,6 +872,9 @@
             else if (field === "quantity") { var nq = value > 0 ? value : 0; if (!sameVal(v.QtyEntered, nq)) { v.QtyEntered = nq; changed = true; } }
             else if (field === "price") { if (!sameVal(v.PriceEntered, value)) { v.PriceEntered = value; line._priceOverride = true; changed = true; } }
             if (changed) markDirty(line);
+            // A quantity change re-runs the line callout (quantity price-breaks + amounts,
+            // attribute-aware) - same as UOM. Description / manual price don't re-price.
+            if (changed && field === "quantity" && v.M_Product_ID > 0) runCallout(line, "QtyEntered");
         }
 
         function setUom(line, uomId, uomName) {
@@ -846,10 +888,13 @@
         }
 
         function setTax(line, taxId, taxName) {
-            if (sameVal(line.values.C_Tax_ID, taxId)) return;   // unchanged - no dirty
+            if (sameVal(line.values.C_Tax_ID, taxId)) return;   // unchanged - no dirty / callout
             line.values.C_Tax_ID = taxId;
             line.display.taxName = taxId > 0 ? taxName : "";
             markDirty(line);
+            // Re-run the line callout so tax amount / line total recompute server-side
+            // (honours the chosen C_Tax_ID; a manual price override is preserved).
+            runCallout(line, "C_Tax_ID");
         }
 
         /* ---------- per-row context-filtered lookups (AD_Val_Rule) ----------
@@ -1210,6 +1255,33 @@
             C_UOM_ID: 1, PriceEntered: 1, PriceActual: 1, PriceList: 1, PriceLimit: 1, C_Tax_ID: 1,
             C_Currency_ID: 1, Discount: 1, LineNetAmt: 1, Description: 1, PrintDescription: 1, C_Invoice_ID: 1
         };
+        // FALLBACK ONLY. The Compiere callout configured in the dictionary
+        // (AD_Column.Callout -> columnMeta[col].Callout) ALWAYS takes priority (see
+        // runCallout); this map is used ONLY when a pricing / amount column has NO callout
+        // configured, so Attribute / Qty / UOM / Tax still recompute the SAME way a Product
+        // change does (the real client CalloutInvoice). CalloutInvoice.Qty branches on the
+        // changed column (mField.getColumnName()) and re-fetches prices via MInvoice/GetPrices
+        // INCLUDING the M_AttributeSetInstance_ID, so attribute-level prices apply;
+        // CalloutInvoice.Amt recomputes the line/tax amounts for a chosen tax (Tax would
+        // RE-DETERMINE C_Tax_ID and overwrite the user's pick, so use Amt). To override any
+        // of these, just set AD_Column.Callout on the column - no code change needed.
+        var DEFAULT_CALLOUTS = {
+            M_AttributeSetInstance_ID: "ViennaAdvantage.Model.CalloutInvoice.Qty",
+            QtyEntered: "ViennaAdvantage.Model.CalloutInvoice.Qty; ViennaAdvantage.Model.CalloutInvoice.Amt",
+            C_UOM_ID: "VAdvantage.Model.CalloutInvoice.qty; VAdvantage.Model.CalloutInvoice.amt",
+            C_Tax_ID: "VAdvantage.Model.CalloutInvoice.amt;VAdvantage.Model.CalloutTax.SetTaxExemptReason",
+            PriceEntered: "VAdvantage.Model.CalloutInvoice.amt;"
+        };
+        /* The callout string to run for a column: the Compiere callout(s) configured in the
+           dictionary (AD_Column.Callout -> columnMeta[col].Callout) ALWAYS win; only when a
+           column has none do we fall back to DEFAULT_CALLOUTS. The value may be a single
+           callout or a ';'-separated chain across one or more classes (e.g. CalloutInvoice
+           + CalloutTax); resolveCallouts parses + resolves each in order. Returns null when
+           neither applies (runCallout then takes the server recompute path). */
+        function columnCalloutStr(column) {
+            var m = columnMeta[column];
+            return (m && m.Callout) || DEFAULT_CALLOUTS[column] || null;
+        }
 
         function runCallout(line, column, done) {
             if (!parent) { if (done) done(); return; }
@@ -1218,8 +1290,10 @@
             // Default qty so pricing / discount-break logic has a quantity.
             if (!(v.QtyEntered > 0)) { v.QtyEntered = 1; v.QtyInvoiced = 1; }
 
-            var meta = columnMeta[column];
-            var chain = (meta && meta.Callout) ? resolveCallouts(meta.Callout) : null;
+            // Resolve the callout(s) to run - dictionary AD_Column.Callout first, else the
+            // DEFAULT_CALLOUTS fallback (see columnCalloutStr).
+            var calloutStr = columnCalloutStr(column);
+            var chain = calloutStr ? resolveCallouts(calloutStr) : null;
             if (chain && chain.length) {
                 // The framework callout runs synchronously (blocking sync AJAX), so
                 // paint the row busy indicator first, then run on the next tick so
@@ -1306,7 +1380,10 @@
                 // CalloutInvoice reads mTab.getField(col).getDisplayType() / .value and
                 // may call field UI mutators - return a GridField shim (was missing,
                 // which crashed the callout with "mTab.getField is not a function").
-                getField: function (col) { return makeFieldShim(line, col); }
+                getField: function (col) { return makeFieldShim(line, col); },
+                // The panel's grid is the C_InvoiceLine tab; CalloutTax.SetTaxExemptReason
+                // (and other callouts) branch on the tab's key column.
+                getKeyColumnName: function () { return "C_InvoiceLine_ID"; }
             };
         }
         function makeMField(column, line) { return makeFieldShim(line, column); }
@@ -1452,7 +1529,10 @@
             for (var col in vals) {
                 if (!vals.hasOwnProperty(col)) continue;
                 if (col === "PriceEntered" && line._priceOverride) continue;
-                if (Object.prototype.hasOwnProperty.call(v, col)) v[col] = vals[col];
+                // Case-insensitive write: a saved line keys columns in DB case (PG lowercases,
+                // e.g. "pricelist") which won't match the dictionary-cased "PriceList" the
+                // callout returns, so a direct v[col]= would silently drop PriceList etc.
+                setLineVal(line, col, vals[col]);
             }
             if (disp.uomName != null) d.uomName = disp.uomName;
             if (disp.taxName != null) d.taxName = disp.taxName;

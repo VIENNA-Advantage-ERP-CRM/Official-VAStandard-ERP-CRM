@@ -83,7 +83,7 @@ namespace VASLogic.Models
             data.LinePage = page;
             data.LinePageSize = LINE_PAGE_SIZE;
             decimal oNet, oTax, oTcs;
-            ComputeOtherPageTotals(ctx, C_Invoice_ID, data.Lines, out oNet, out oTax, out oTcs);
+            ComputeOtherPageTotals(ctx, C_Invoice_ID, data.Lines, data.IsTaxIncluded, out oNet, out oTax, out oTcs);
             data.OtherPagesSubtotal = oNet; data.OtherPagesTax = oTax; data.OtherPagesTcs = oTcs;
             LoadCatalogs(ctx, data);                   // UOM + tax dropdown lists
             LoadColumns(ctx, data, tabIds);            // tab-field meta (callout + validation), cached client-side
@@ -255,6 +255,37 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// SELECT expression for ReadOnlyLogic giving AD_Field priority over AD_Column
+        /// (per request). AD_Field.ReadOnlyLogic is guarded by ColumnExists (not present in
+        /// every schema). When present: the resolved tab field's value first (only when the
+        /// query aliases AD_Field f, i.e. <paramref name="hasTabField"/>), then a
+        /// representative non-empty value from ANY active C_InvoiceLine field for the column
+        /// (so logic set on a sibling field / another tab is still honoured - mirrors how
+        /// DisplayLogic is resolved), then AD_Column.ReadOnlyLogic.
+        /// </summary>
+        /// <param name="hasTabField">true when the outer query aliases AD_Field as f</param>
+        /// <returns>a COALESCE(...) SQL expression aliased by the caller as ReadOnlyLogic</returns>
+        private string ReadOnlyLogicSelectExpr(bool hasTabField)
+        {
+            bool fieldCol = ColumnExists("AD_Field", "ReadOnlyLogic");
+            StringBuilder sb = new StringBuilder("COALESCE(");
+            if (hasTabField && fieldCol)
+                sb.Append("NULLIF(f.ReadOnlyLogic, N''), ");
+            if (fieldCol)
+                sb.Append(@"NULLIF((SELECT MAX(f2.ReadOnlyLogic)
+                                    FROM AD_Field f2
+                                    INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
+                                    INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
+                                    WHERE f2.AD_Column_ID = c.AD_Column_ID
+                                      AND f2.IsActive = 'Y'
+                                      AND tt2.TableName = 'C_InvoiceLine'
+                                      AND f2.ReadOnlyLogic IS NOT NULL
+                                      AND f2.ReadOnlyLogic <> ''), N''), ");
+            sb.Append("c.ReadOnlyLogic, N'')");
+            return sb.ToString();
+        }
+
+        /// <summary>
         /// Reads the AD_Field -> AD_Column metadata across ALL the window's invoice-line
         /// tabs and adds each DISTINCT column once (first occurrence wins, tabs taken in
         /// sequence then field sequence). Returns false (so the caller can fall back)
@@ -268,6 +299,8 @@ namespace VASLogic.Models
         {
             // Tab ids come from the dictionary (never user input) - safe to inline.
             string inList = string.Join(",", AD_Tab_IDs.ToArray());
+            // ReadOnlyLogic: AD_Field (tab field, then any C_InvoiceLine field) over AD_Column.
+            string roLogicExpr = ReadOnlyLogicSelectExpr(true);
             string sql = @"SELECT c.ColumnName,
                                   c.AD_Column_ID,
                                   COALESCE(c.Callout, N'')        AS Callout,
@@ -277,7 +310,7 @@ namespace VASLogic.Models
                                   COALESCE(f.Name, c.Name, c.ColumnName) AS FieldName,
                                   COALESCE(c.IsUpdateable, 'Y')   AS IsUpdateable,
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
-                                  COALESCE(c.ReadOnlyLogic, N'')  AS ReadOnlyLogic,
+                                  " + roLogicExpr + @"  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
                                   COALESCE(vr.Type, N'')          AS ValRuleType,
                                   COALESCE(vr.Code, N'')          AS ValRuleCode,
@@ -327,6 +360,10 @@ namespace VASLogic.Models
             HashSet<string> have = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (ColumnMeta cm in data.Columns) have.Add(cm.ColumnName);
 
+            // ReadOnlyLogic: a representative AD_Field value (any active C_InvoiceLine field)
+            // over AD_Column - so a column merged in (not on the resolved tab, e.g. C_UOM_ID
+            // when it isn't a tab field) still gets its field-level read-only logic.
+            string roLogicExpr = ReadOnlyLogicSelectExpr(false);
             string sql = @"SELECT c.ColumnName,
                                   c.AD_Column_ID,
                                   COALESCE(c.Callout, N'')        AS Callout,
@@ -336,7 +373,7 @@ namespace VASLogic.Models
                                   COALESCE(c.Name, c.ColumnName)  AS FieldName,
                                   COALESCE(c.IsUpdateable, 'Y')   AS IsUpdateable,
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
-                                  COALESCE(c.ReadOnlyLogic, N'')  AS ReadOnlyLogic,
+                                  " + roLogicExpr + @"  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
                                   COALESCE(vr.Type, N'')          AS ValRuleType,
                                   COALESCE(vr.Code, N'')          AS ValRuleCode,
@@ -713,8 +750,8 @@ namespace VASLogic.Models
                         TableName = table,
                         KeyColumn = key,
                         DisplayExpr = display,
-                        HasIsActive = ColumnExists(table, "IsActive"),
-                        HasClientId = ColumnExists(table, "AD_Client_ID")
+                        HasIsActive = true, /*ColumnExists(table, "IsActive")*/
+                        HasClientId = true /*ColumnExists(table, "AD_Client_ID")*/
                     };
                 }
             }
@@ -972,7 +1009,10 @@ namespace VASLogic.Models
             net = 0; tax = 0; tcs = 0;
             string tcsExpr = ColumnExists("C_InvoiceLine", "VA106_TCSAmount")
                 ? "COALESCE(SUM(il.VA106_TCSAmount), 0)" : "0";
-            string sql = "SELECT COALESCE(SUM(il.LineNetAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0) AS Tax, "
+            // Tax total includes the surcharge (totalTax = TaxAmt + SurchargeAmt) when the
+            // SurchargeAmt column is installed, matching the client per-line lineTaxTotal.
+            string surExpr = " + COALESCE(SUM(il.SurchargeAmt), 0)";
+            string sql = "SELECT COALESCE(SUM(il.LineNetAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0)" + surExpr + " AS Tax, "
                 + tcsExpr + " AS Tcs"
                 + " FROM C_InvoiceLine il WHERE il.C_Invoice_ID = @C_Invoice_ID AND il.IsActive = 'Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -994,7 +1034,7 @@ namespace VASLogic.Models
         /// yet still updates instantly while a page is being edited.
         /// </summary>
         private void ComputeOtherPageTotals(Ctx ctx, int C_Invoice_ID, List<InvoiceLineRow> pageRows,
-            out decimal otherNet, out decimal otherTax, out decimal otherTcs)
+            bool taxIncluded, out decimal otherNet, out decimal otherTax, out decimal otherTcs)
         {
             decimal gNet, gTax, gTcs;
             LoadGrandTotals(ctx, C_Invoice_ID, out gNet, out gTax, out gTcs);
@@ -1003,21 +1043,33 @@ namespace VASLogic.Models
                 foreach (InvoiceLineRow row in pageRows)
                 {
                     pNet += row.LineNetAmt;
-                    pTax += row.TaxAmt;
+                    pTax += row.TaxAmt + RowDecimal(row, "SurchargeAmt");   // totalTax = TaxAmt + SurchargeAmt
                     pTcs += RowTcs(row);
                 }
             otherNet = gNet - pNet;
             otherTax = gTax - pTax;
             otherTcs = gTcs - pTcs;
+            // On a tax-inclusive invoice the framework stores LineNetAmt as the GROSS
+            // (PriceActual already contains tax) and TaxAmt as the tax EXTRACTED from it,
+            // so the true net Subtotal is LineNetAmt - TaxAmt. Reduce it here so the totals
+            // row shows net (and Total = net + tax = the entered gross), not gross + tax.
+            if (taxIncluded) otherNet -= otherTax;
         }
 
         /// <summary>Per-line TCS amount (VA106_TCSAmount) read case-insensitively; 0 when
         /// the column isn't installed or set.</summary>
         private static decimal RowTcs(InvoiceLineRow row)
         {
+            return RowDecimal(row, "VA106_TCSAmount");
+        }
+
+        /// <summary>Reads a decimal column from a line's value bag case-insensitively (the
+        /// keys are DB-cased: PG lowercases, Oracle uppercases); 0 when absent / not set.</summary>
+        private static decimal RowDecimal(InvoiceLineRow row, string columnName)
+        {
             if (row == null || row.Values == null) return 0;
             foreach (KeyValuePair<string, object> kv in row.Values)
-                if (string.Equals(kv.Key, "VA106_TCSAmount", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(kv.Key, columnName, StringComparison.OrdinalIgnoreCase))
                     return Util.GetValueOfDecimal(kv.Value);
             return 0;
         }
@@ -1558,7 +1610,7 @@ namespace VASLogic.Models
             }
             else if (req.M_Product_ID > 0)
             {
-                line.SetPrice(inv.GetM_PriceList_ID(), inv.GetC_BPartner_ID());
+                SetLinePriceWithAttribute(line, inv, req.M_AttributeSetInstance_ID);
             }
             else
             {
@@ -1582,6 +1634,40 @@ namespace VASLogic.Models
                 line.SetTaxAmt();
 
             return line;
+        }
+
+        /// <summary>
+        /// Prices a product line from the price list using the ACTUAL attribute-set-instance
+        /// so attribute-level M_ProductPrice entries apply (PriceList / PriceStd / PriceLimit).
+        /// The framework MInvoiceLine.SetPrice() prices via a PRIVATE M_AttributeSetInstance_ID
+        /// field that its public SetM_AttributeSetInstance_ID setter never assigns (only the
+        /// ship / order-line copy paths do) - so on a manually entered line the attribute price
+        /// (and hence ListPrice) is ignored. This mirrors SetPrice via MProductPricing but
+        /// passes the line's real ASI.
+        /// </summary>
+        /// <param name="line">the line to price (product already set)</param>
+        /// <param name="inv">parent invoice (price list / partner / date / SO flag)</param>
+        /// <param name="asi">the line's M_AttributeSetInstance_ID (0 = none)</param>
+        private void SetLinePriceWithAttribute(MInvoiceLine line, MInvoice inv, int asi)
+        {
+            if (line.GetM_Product_ID() == 0) return;
+            MProductPricing pp = new MProductPricing(line.GetAD_Client_ID(), line.GetAD_Org_ID(),
+                line.GetM_Product_ID(), inv.GetC_BPartner_ID(), line.GetQtyInvoiced(), inv.IsSOTrx());
+            pp.SetM_PriceList_ID(inv.GetM_PriceList_ID());
+            pp.SetPriceDate(inv.GetDateInvoiced());
+            pp.SetM_AttributeSetInstance_ID(asi);
+            if (Env.IsModuleInstalled("ED011_"))
+                pp.SetC_UOM_ID(line.GetC_UOM_ID());
+            line.SetPriceActual(pp.GetPriceStd());
+            line.SetPriceList(pp.GetPriceList());
+            line.SetPriceLimit(pp.GetPriceLimit());
+            if (decimal.Compare(line.GetQtyEntered(), line.GetQtyInvoiced()) == 0)
+                line.SetPriceEntered(line.GetPriceActual());
+            else
+                line.SetPriceEntered(decimal.Multiply(line.GetPriceActual(),
+                    decimal.Round(decimal.Divide(line.GetQtyInvoiced(), line.GetQtyEntered()), 6)));
+            if (line.GetC_UOM_ID() == 0)
+                line.SetC_UOM_ID(pp.GetC_UOM_ID());
         }
 
         /// <summary>
@@ -1705,7 +1791,7 @@ namespace VASLogic.Models
             "C_InvoiceLine_ID", "C_Invoice_ID", "AD_Client_ID", "AD_Org_ID",
             "Created", "CreatedBy", "Updated", "UpdatedBy", "IsActive",
             "M_Product_ID", "C_Charge_ID", "M_AttributeSetInstance_ID",
-            "QtyEntered", "QtyInvoiced", "C_UOM_ID", "PriceEntered", "PriceActual",
+            "QtyEntered", "C_UOM_ID", "PriceEntered", "PriceActual",
             "C_Tax_ID", "Line", "Description", "LineNetAmt", "TaxAmt", "LineTotalAmt", "Discount"
         };
 
@@ -2013,19 +2099,25 @@ namespace VASLogic.Models
                     }
                     else
                     {
-                        line.SetPrice(inv.GetM_PriceList_ID(), inv.GetC_BPartner_ID());
+                        //  SetLinePriceWithAttribute(line, inv, input.M_AttributeSetInstance_ID);
                     }
 
                     // Line discount percent reduces the actual price.
-                    ApplyDiscount(line, input.Discount);
+                    // ApplyDiscount(line, input.Discount);
 
                     if (input.C_Tax_ID > 0)
+                    {
                         line.SetC_Tax_ID(input.C_Tax_ID);
+                    }
                     else
+                    {
                         line.SetTax();
+                    }
 
                     if (input.Line > 0)
+                    {
                         line.SetLine(input.Line);
+                    }
 
                     line.SetDescription(input.Description ?? "");
 
@@ -2036,9 +2128,22 @@ namespace VASLogic.Models
                     // above keep their business-rule values (denylist below).
                     ApplyExtraColumns(line, input.Values);
 
-                    line.SetLineNetAmt();
-                    if (line.GetC_Tax_ID() > 0)
-                        line.SetTaxAmt();
+                    // QtyInvoiced (base UOM). SetQty() set QtyInvoiced = QtyEntered (raw); the
+                    // framework only converts it to the product base UOM in MInvoiceLine.beforeSave
+                    // for PURCHASE invoices (!IsSOTrx), so a SALES invoice with a non-base entered
+                    // UOM would persist the entered qty as invoiced. Convert here so the base-UOM
+                    // QtyInvoiced is correct for both (idempotent for PO - beforeSave re-converts).
+                    //if (input.M_Product_ID > 0 && line.GetC_UOM_ID() > 0)
+                    //{
+                    //    decimal? convQty = MUOMConversion.ConvertProductFrom(
+                    //        ctx, input.M_Product_ID, line.GetC_UOM_ID(), line.GetQtyEntered());
+                    //    if (convQty != null && convQty.Value != 0)
+                    //        line.SetQtyInvoiced(convQty.Value);
+                    //}
+
+                    //line.SetLineNetAmt();
+                    //if (line.GetC_Tax_ID() > 0)
+                    //    line.SetTaxAmt();
 
                     if (!line.Save())
                     {
@@ -2049,7 +2154,7 @@ namespace VASLogic.Models
                             string val = pp.GetName();
                             if (String.IsNullOrEmpty(val))
                             {
-                                val = Msg.GetMsg(ctx,  pp.GetValue());
+                                val = Msg.GetMsg(ctx, pp.GetValue());
                             }
                             err = val;
                         }
@@ -2103,7 +2208,7 @@ namespace VASLogic.Models
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
             decimal soNet, soTax, soTcs;
-            ComputeOtherPageTotals(ctx, C_Invoice_ID, res.Lines, out soNet, out soTax, out soTcs);
+            ComputeOtherPageTotals(ctx, C_Invoice_ID, res.Lines, ctxData.IsTaxIncluded, out soNet, out soTax, out soTcs);
             res.OtherPagesSubtotal = soNet; res.OtherPagesTax = soTax; res.OtherPagesTcs = soTcs;
             return res;
         }
@@ -2143,8 +2248,26 @@ namespace VASLogic.Models
                     if (!line.Delete(true, trx))
                     {
                         trx.Rollback();
+                        string err = string.Empty;
+                        ValueNamePair pp = VLogger.RetrieveError();
+                        if (pp != null)
+                        {
+                            string val = pp.GetName();
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                val = Msg.GetMsg(ctx, pp.GetValue());
+                            }
+                            if (String.IsNullOrEmpty(val))
+                            {
+                                err = Msg.GetMsg(ctx, "VAS_074_DeleteFailed");
+                            }
+                            else
+                            {
+                                err = val;
+                            }
+                        }
                         log.Warning("VAS_074 DeleteLines: delete failed for line " + id);
-                        res.ErrorKey = "VAS_074_DeleteFailed";
+                        res.ErrorKey = err;
                         return res;
                     }
                 }
@@ -2180,7 +2303,7 @@ namespace VASLogic.Models
             res.LinePage = page;
             res.LinePageSize = LINE_PAGE_SIZE;
             decimal doNet, doTax, doTcs;
-            ComputeOtherPageTotals(ctx, C_Invoice_ID, res.Lines, out doNet, out doTax, out doTcs);
+            ComputeOtherPageTotals(ctx, C_Invoice_ID, res.Lines, ctxData.IsTaxIncluded, out doNet, out doTax, out doTcs);
             res.OtherPagesSubtotal = doNet; res.OtherPagesTax = doTax; res.OtherPagesTcs = doTcs;
             return res;
         }

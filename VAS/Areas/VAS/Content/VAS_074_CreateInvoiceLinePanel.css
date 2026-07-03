@@ -533,6 +533,22 @@
 .vas-cil-cell-edit input.vas-cil-cell-disp--ro {
     cursor: not-allowed !important;
 }
+/* Column read-only field rendered DISABLED (e.g. C_UOM_ID ReadOnlyLogic true): grey the
+   text but keep the borderless transparent look (override the browser's disabled styling).
+   Chromium ignores `cursor` on a disabled control, so pass pointer events through to the
+   cell wrapper, which shows the not-allowed cursor. */
+.vas-cil-cell-edit input.vas-cil-cell-disp:disabled {
+    color: var(--cil-text-disabled);
+    -webkit-text-fill-color: var(--cil-text-disabled);
+    background: transparent;
+    opacity: 1;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.vas-cil-cell-edit:has(input.vas-cil-cell-disp:disabled) {
+    cursor: not-allowed;
+}
 .vas-cil-cell-edit input.vas-cil-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 400;
