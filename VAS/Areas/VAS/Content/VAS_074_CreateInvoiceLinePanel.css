@@ -355,6 +355,20 @@
     accent-color: var(--cil-action-blue);
     cursor: pointer;
 }
+/* Read-only invoice (.vas-cil-locked): the selection / select-all checkbox and the
+   "..." button are disabled -> not-allowed. A disabled control IGNORES its own `cursor`
+   in Chromium, so put the cursor on the (enabled) parent cell and let the disabled
+   control pass pointer events through to it (pointer-events:none). */
+.vas-cil-locked .vas-cil-cell--check,
+.vas-cil-locked .vas-cil-cell--more {
+    cursor: not-allowed;
+}
+
+    .vas-cil-locked .vas-cil-cell--check input[type="checkbox"]:disabled,
+    .vas-cil-locked .vas-cil-more-btn:disabled {
+        cursor: not-allowed;
+        pointer-events: none;
+    }
 
 .vas-cil-emptyrow {
     padding: 1.5em;
@@ -445,6 +459,15 @@
     font-style: italic;
     color: var(--cil-text-muted);
 }
+/* Read-only invoice: attribute is informational text, not an interactive link. */
+.vas-cil-attr-link--disabled {
+    color: var(--cil-text-secondary);
+    cursor: default;
+}
+
+    .vas-cil-attr-link--disabled:hover {
+        text-decoration: none;
+    }
 /* Editing / resting cell controls. These MUST out-specify the framework
    input[type=text] reset (which paints a filled, bordered, rounded, padded box):
    scope by wrapper + element tag so the control stays flush and TRANSPARENT,
@@ -492,13 +515,24 @@
 }
 
 .vas-cil-cell-disp {
-    cursor: pointer;
+    /* Resting cells are click-to-edit, never drag targets - block text selection so a
+       press-and-move doesn't start a drag. */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
-/* resting display input */
-.vas-cil-cell-disp--ro {
-    cursor: default;
+/* Cursor: the resting cell is a readonly <input>, so the framework's input reset forces
+   `cursor: not-allowed` on it (higher specificity than a bare class). Override with a
+   tag+class selector (scoped under .vas-cil-cell-edit) AND !important so it always wins:
+   an editable cell is click-to-edit -> pointer; a locked/read-only cell -> not-allowed. */
+.vas-cil-cell-edit input.vas-cil-cell-disp {
+    cursor: pointer !important;
 }
-/* read-only invoice */
+/* read-only invoice or read-only column */
+.vas-cil-cell-edit input.vas-cil-cell-disp--ro {
+    cursor: not-allowed !important;
+}
 .vas-cil-cell-edit input.vas-cil-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 400;
@@ -658,6 +692,16 @@
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
+    /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
+    .vas-cil-more-btn:disabled {
+        cursor: not-allowed !important;
+        color: var(--cil-text-disabled);
+    }
+
+        .vas-cil-more-btn:disabled:hover {
+            background: transparent;
+            color: var(--cil-text-disabled);
+        }
 /* Row Undo: only shown on a saved row with unsaved edits; reverts to last snapshot.
    Amber to read as "discard pending change" against the unsaved-row tint. */
 .vas-cil-undo-btn {

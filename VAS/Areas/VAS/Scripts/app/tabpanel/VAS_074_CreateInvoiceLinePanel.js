@@ -365,6 +365,10 @@
         function render() {
             if (!parent || !parent.C_Invoice_ID) { $body.hide(); $emptyState.show(); return; }
             $emptyState.hide(); $body.show();
+            // Read-only invoice: mark the panel so disabled controls (checkbox, "...")
+            // show a not-allowed cursor via their (enabled) parent cell - a disabled
+            // control ignores its own `cursor` in Chromium, so the cell shows it instead.
+            $body.toggleClass("vas-cil-locked", !panelEditable());
 
             $linesBody.empty();
             if (!lines.length) {
@@ -465,7 +469,7 @@
             var sc = selectedCount();
             $deleteBtn.prop("disabled", sc === 0 || locked).toggleClass("vas-cil-is-disabled", sc === 0 || locked);
             $deleteBtn.find(".vas-cil-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
-            if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length);
+            if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length).prop("disabled", locked);
         }
 
         function renderRow(line) {
@@ -474,12 +478,14 @@
             if (line._sel) $row.addClass("is-selected");
             if (line.status === "new" || line.dirty) $row.addClass("is-unsaved");
 
-            var cb = $('<input type="checkbox" />').prop("checked", !!line._sel);
+            // Read-only invoice (completed/void/reversed/closed): the row can't be
+            // deleted, so its selection checkbox is disabled too.
+            var cb = $('<input type="checkbox" />').prop("checked", !!line._sel).prop("disabled", !panelEditable());
             cb.on("change", function () { line._sel = this.checked; renderHeaderButtons(); $row.toggleClass("is-selected", this.checked); });
             $row.append($('<div class="vas-cil-cell vas-cil-cell--check" role="cell"></div>').append(cb));
 
             $row.append(renderPrimaryCell(line));
-            $row.append(renderEditableCell(line, "description", v.Description, lbl("VAS_074_AddDescription", "Add description…"), {}));
+            $row.append(renderEditableCell(line, "description", v.Description, lbl("VAS_074_AddDescription", "Add description…"), { maxLength: colFieldLength("Description") }));
             $row.append(renderQtyUomCell(line));
             $row.append(renderEditableCell(line, "price", v.PriceEntered, "0" + decSep + "00", { align: "right", amount: true }));
             $row.append(renderTaxCell(line));
@@ -513,7 +519,9 @@
         function dispInput(line, field, text, opts) {
             opts = opts || {};
             var editable = parent && parent.IsEditable;
-            var $i = $('<input type="text" readonly tabindex="-1" class="vas-cil-cell-edit__input vas-cil-cell-disp" />');
+            // draggable=false stops the browser starting a text-drag on the readonly
+            // input (which flashes the "not-allowed" / no-drop cursor while dragging).
+            var $i = $('<input type="text" readonly tabindex="-1" draggable="false" class="vas-cil-cell-edit__input vas-cil-cell-disp" />');
             $i.val(text || "");
             if (opts.placeholder) $i.attr("placeholder", opts.placeholder);
             if (opts.align === "right") $i.css("text-align", "right");
@@ -570,7 +578,10 @@
                     var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_074_SetAttribute", "Set attribute…");
                     var $attr = $('<span class="vas-cil-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
                     if (!hasAttr) $attr.addClass("vas-cil-attr-link--empty");
-                    $attr.on("click", function (e) { e.stopPropagation(); if (editable) openAttrDialog(line); });
+                    // On a read-only invoice the attribute is informational only - not a
+                    // link (no click, no pointer cursor / hover underline).
+                    if (editable) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    else $attr.addClass("vas-cil-attr-link--disabled");
                     wrap.append($attr);
                 }
             }
@@ -590,6 +601,7 @@
                 var $inp = $('<input type="text" class="vas-cil-cell-edit__input" />');
                 $inp.val(opts.amount ? fmtAmtInput(value, field === "quantity" ? 2 : precision()) : (value || ""));
                 $inp.attr("placeholder", placeholder || "");
+                if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
                 if (opts.amount) bindAmountInput($inp);
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
@@ -1452,6 +1464,8 @@
          * AD_Column must hold a value before the line can be saved. Returns the
          * first violation (column + message) or null. */
         function isMandatory(col) { var m = columnMeta[col]; return !!(m && m.IsMandatory); }
+        /* AD_Column.FieldLength for a column (0 when unknown) - caps text input length. */
+        function colFieldLength(col) { var m = columnMeta[col]; return (m && +m.FieldLength) || 0; }
 
         /* ---------- AD_Column read-only logic ----------
          * A field is read-only when AD_Field.IsReadOnly is set or the column's
