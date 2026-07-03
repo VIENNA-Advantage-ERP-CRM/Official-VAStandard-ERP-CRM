@@ -33,14 +33,14 @@ namespace VAS.Controllers
         /// <returns>serialized panel view model</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPanelData(int C_Invoice_ID, int AD_Window_ID)
+        public JsonResult GetPanelData(int C_Invoice_ID, int AD_Window_ID, int page = 0)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 VAS_074_CreateInvoiceLinePanelModel model = new VAS_074_CreateInvoiceLinePanelModel();
-                retJSON = JsonConvert.SerializeObject(model.GetPanelData(ctx, C_Invoice_ID, AD_Window_ID));
+                retJSON = JsonConvert.SerializeObject(model.GetPanelData(ctx, C_Invoice_ID, AD_Window_ID, page));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
@@ -369,7 +369,7 @@ namespace VAS.Controllers
                 Ctx ctx = Session["ctx"] as Ctx;
                 SaveLinesRequest req = JsonConvert.DeserializeObject<SaveLinesRequest>(payload);
                 VAS_074_CreateInvoiceLinePanelModel model = new VAS_074_CreateInvoiceLinePanelModel();
-                retJSON = JsonConvert.SerializeObject(model.SaveLines(ctx, req.C_Invoice_ID, req.AD_Window_ID, req.Lines));
+                retJSON = JsonConvert.SerializeObject(model.SaveLines(ctx, req.C_Invoice_ID, req.AD_Window_ID, req.Lines, req.Page));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
@@ -388,7 +388,7 @@ namespace VAS.Controllers
                 Ctx ctx = Session["ctx"] as Ctx;
                 DeleteLinesRequest req = JsonConvert.DeserializeObject<DeleteLinesRequest>(payload);
                 VAS_074_CreateInvoiceLinePanelModel model = new VAS_074_CreateInvoiceLinePanelModel();
-                retJSON = JsonConvert.SerializeObject(model.DeleteLines(ctx, req.C_Invoice_ID, req.AD_Window_ID, req.LineIds));
+                retJSON = JsonConvert.SerializeObject(model.DeleteLines(ctx, req.C_Invoice_ID, req.AD_Window_ID, req.LineIds, req.Page));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

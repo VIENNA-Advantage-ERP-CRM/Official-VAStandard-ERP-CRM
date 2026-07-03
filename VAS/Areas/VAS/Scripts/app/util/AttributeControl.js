@@ -107,9 +107,20 @@
                 st.selected = selIdx >= 0 ? optionKey(st.options[selIdx]) : "";
                 st.page = selIdx > 0 ? Math.floor(selIdx / ATTR_PAGE_SIZE) : 0;
                 buildDialog();
-                // newAttribute === true: jump straight to the create form (only when the role
-                // may create); otherwise stay on the existing-instance list.
-                if (st.newAttribute && st.info && st.info.IsCanCreate) openCreateForm(null);
+                // newAttribute === true: jump straight to the create/edit form.
+                //  - a value is ALREADY selected -> open THAT instance in EDIT mode (prefilled
+                //    values + "Update attribute"), when the role may edit;
+                //  - nothing selected -> a blank New-attribute form, when the role may create.
+                // (If neither applies, stay on the existing-instance list.)
+                if (st.newAttribute) {
+                    var curAsi = st.M_AttributeSetInstance_ID;
+                    var curIdx = curAsi > 0 ? indexOfAsi(st.options, curAsi) : -1;
+                    if (curIdx >= 0) {
+                        if (st.info && st.info.IsCanEdit) editExistingInstance(st.options[curIdx]);
+                    } else if (st.info && st.info.IsCanCreate) {
+                        openCreateForm(null);
+                    }
+                }
             },
             error: function (err) { console.log(err); cfg.BUSY(false); }
         });
@@ -338,9 +349,12 @@
         d.find("#vasCilAttrCreate").toggleClass("vas-cil-is-hidden", !isCreate);
         d.find("#vasCilAttrListFoot").toggleClass("vas-cil-is-hidden", isCreate);
         d.find("#vasCilAttrCreateFoot").toggleClass("vas-cil-is-hidden", !isCreate);
+        // Refresh the footer error for BOTH modes so a stale message is cleared when e.g.
+        // Back returns to the list (the handler sets st.error="" before renderAttr()).
+        updateAttrError();
         if (isCreate) {
             d.find("[data-act=attr-submit]").text(st.editAsi ? L("VAS_074_UpdateAttribute", "Update attribute") : L("VAS_074_AddAttribute", "Add attribute"));
-            updateAttrError(); updateAttrSubmit();
+            updateAttrSubmit();
             setTimeout(function () { d.find("#vasCilAttrCreate").find("input, select").first().focus(); }, 0);
         }
         else renderAttrRows();

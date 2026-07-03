@@ -45,6 +45,9 @@ namespace VASLogic.Models
         /// <summary>First page size for the Product / Charge catalog search.</summary>
         private const int CATALOG_PAGE_SIZE = 50;
 
+        /// <summary>Saved invoice lines loaded per page (server-side paging).</summary>
+        private const int LINE_PAGE_SIZE = 20;
+
         #region Panel (read) data
 
         /// <summary>
@@ -56,7 +59,7 @@ namespace VASLogic.Models
         /// <param name="ctx">session context</param>
         /// <param name="C_Invoice_ID">parent invoice</param>
         /// <returns>panel view model</returns>
-        public CreateInvoiceLinePanelData GetPanelData(Ctx ctx, int C_Invoice_ID, int AD_Window_ID)
+        public CreateInvoiceLinePanelData GetPanelData(Ctx ctx, int C_Invoice_ID, int AD_Window_ID, int page = 0)
         {
             CreateInvoiceLinePanelData data = new CreateInvoiceLinePanelData();
             if (C_Invoice_ID <= 0) return data;
@@ -71,7 +74,17 @@ namespace VASLogic.Models
             List<int> tabIds = ResolveInvoiceLineTabs(AD_Window_ID);
             data.AD_Tab_IDs = tabIds;
             data.AD_Tab_ID = tabIds.Count > 0 ? tabIds[0] : 0;   // first tab (info)
-            data.Lines = LoadLines(ctx, C_Invoice_ID, tabIds);
+            // Server-side paging: return only LINE_PAGE_SIZE saved lines for the requested
+            // page (0-based) plus the total count so the client can render a pager.
+            if (page < 0) page = 0;
+            int total;
+            data.Lines = LoadLines(ctx, C_Invoice_ID, tabIds, page, out total);
+            data.LinesTotal = total;
+            data.LinePage = page;
+            data.LinePageSize = LINE_PAGE_SIZE;
+            decimal oNet, oTax, oTcs;
+            ComputeOtherPageTotals(ctx, C_Invoice_ID, data.Lines, out oNet, out oTax, out oTcs);
+            data.OtherPagesSubtotal = oNet; data.OtherPagesTax = oTax; data.OtherPagesTcs = oTcs;
             LoadCatalogs(ctx, data);                   // UOM + tax dropdown lists
             LoadColumns(ctx, data, tabIds);            // tab-field meta (callout + validation), cached client-side
             LoadLoginContext(ctx, data);               // $Element_*/#Global tokens used by display/read-only logic
@@ -861,9 +874,16 @@ namespace VASLogic.Models
         /// <param name="AD_Tab_IDs">resolved C_InvoiceLine tabs whose distinct AD_Field
         ///   columns are projected (empty -> fall back to every active column)</param>
         /// <returns>saved invoice lines</returns>
-        private List<InvoiceLineRow> LoadLines(Ctx ctx, int C_Invoice_ID, List<int> AD_Tab_IDs)
+        private List<InvoiceLineRow> LoadLines(Ctx ctx, int C_Invoice_ID, List<int> AD_Tab_IDs, int page, out int total)
         {
             List<InvoiceLineRow> rows = new List<InvoiceLineRow>();
+
+            // Total saved-line count (same filter + MRole as the paged query) so the client
+            // can render "X-Y of N" and prev/next.
+            string countSql = "SELECT COUNT(*) FROM C_InvoiceLine il WHERE il.C_Invoice_ID = @C_Invoice_ID AND il.IsActive = 'Y'";
+            countSql = MRole.GetDefault(ctx).AddAccessSQL(countSql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            total = Util.GetValueOfInt(DB.ExecuteScalar(countSql,
+                new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null));
 
             // Project the C_InvoiceLine columns configured across the window's tabs
             // (AD_Field -> AD_Column, distinct). The essential grid columns are always
@@ -897,7 +917,8 @@ namespace VASLogic.Models
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            sql += " ORDER BY il.Line";
+            if (page < 0) page = 0;
+            sql += " ORDER BY il.Line" + PagingSuffix(LINE_PAGE_SIZE, page * LINE_PAGE_SIZE);
 
             DataSet ds = DB.ExecuteDataset(sql,
                 new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
@@ -938,6 +959,67 @@ namespace VASLogic.Models
                 rows.Add(row);
             }
             return rows;
+        }
+
+        /// <summary>
+        /// Sums the saved-line amounts across the WHOLE invoice (every active line,
+        /// same MRole filter as the pager count) so the totals row can show the invoice
+        /// grand total, not just the current page. TCS (VA106) is summed only when the
+        /// column is installed.
+        /// </summary>
+        private void LoadGrandTotals(Ctx ctx, int C_Invoice_ID, out decimal net, out decimal tax, out decimal tcs)
+        {
+            net = 0; tax = 0; tcs = 0;
+            string tcsExpr = ColumnExists("C_InvoiceLine", "VA106_TCSAmount")
+                ? "COALESCE(SUM(il.VA106_TCSAmount), 0)" : "0";
+            string sql = "SELECT COALESCE(SUM(il.LineNetAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0) AS Tax, "
+                + tcsExpr + " AS Tcs"
+                + " FROM C_InvoiceLine il WHERE il.C_Invoice_ID = @C_Invoice_ID AND il.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                DataRow r = ds.Tables[0].Rows[0];
+                net = Util.GetValueOfDecimal(r["Net"]);
+                tax = Util.GetValueOfDecimal(r["Tax"]);
+                tcs = Util.GetValueOfDecimal(r["Tcs"]);
+            }
+        }
+
+        /// <summary>
+        /// Computes the totals of every saved line NOT on the current page (invoice
+        /// grand total minus the loaded page rows). The client adds its live per-line
+        /// sum of the current page to these so the totals row reflects the WHOLE invoice
+        /// yet still updates instantly while a page is being edited.
+        /// </summary>
+        private void ComputeOtherPageTotals(Ctx ctx, int C_Invoice_ID, List<InvoiceLineRow> pageRows,
+            out decimal otherNet, out decimal otherTax, out decimal otherTcs)
+        {
+            decimal gNet, gTax, gTcs;
+            LoadGrandTotals(ctx, C_Invoice_ID, out gNet, out gTax, out gTcs);
+            decimal pNet = 0, pTax = 0, pTcs = 0;
+            if (pageRows != null)
+                foreach (InvoiceLineRow row in pageRows)
+                {
+                    pNet += row.LineNetAmt;
+                    pTax += row.TaxAmt;
+                    pTcs += RowTcs(row);
+                }
+            otherNet = gNet - pNet;
+            otherTax = gTax - pTax;
+            otherTcs = gTcs - pTcs;
+        }
+
+        /// <summary>Per-line TCS amount (VA106_TCSAmount) read case-insensitively; 0 when
+        /// the column isn't installed or set.</summary>
+        private static decimal RowTcs(InvoiceLineRow row)
+        {
+            if (row == null || row.Values == null) return 0;
+            foreach (KeyValuePair<string, object> kv in row.Values)
+                if (string.Equals(kv.Key, "VA106_TCSAmount", StringComparison.OrdinalIgnoreCase))
+                    return Util.GetValueOfDecimal(kv.Value);
+            return 0;
         }
 
         private List<string> _ilColumns;
@@ -1865,7 +1947,7 @@ namespace VASLogic.Models
         /// <param name="AD_Window_ID">source window (drives the refreshed line column set)</param>
         /// <param name="rows">lines to persist</param>
         /// <returns>save result with refreshed lines / totals or an error message key</returns>
-        public SaveLinesResult SaveLines(Ctx ctx, int C_Invoice_ID, int AD_Window_ID, List<InvoiceLineInput> rows)
+        public SaveLinesResult SaveLines(Ctx ctx, int C_Invoice_ID, int AD_Window_ID, List<InvoiceLineInput> rows, int page = 0)
         {
             SaveLinesResult res = new SaveLinesResult();
             if (C_Invoice_ID <= 0 || rows == null || rows.Count == 0)
@@ -2014,7 +2096,15 @@ namespace VASLogic.Models
             }
 
             res.Success = true;
-            res.Lines = LoadLines(ctx, C_Invoice_ID, ResolveInvoiceLineTabs(AD_Window_ID));
+            if (page < 0) page = 0;
+            int total;
+            res.Lines = LoadLines(ctx, C_Invoice_ID, ResolveInvoiceLineTabs(AD_Window_ID), page, out total);
+            res.LinesTotal = total;
+            res.LinePage = page;
+            res.LinePageSize = LINE_PAGE_SIZE;
+            decimal soNet, soTax, soTcs;
+            ComputeOtherPageTotals(ctx, C_Invoice_ID, res.Lines, out soNet, out soTax, out soTcs);
+            res.OtherPagesSubtotal = soNet; res.OtherPagesTax = soTax; res.OtherPagesTcs = soTcs;
             return res;
         }
 
@@ -2027,7 +2117,7 @@ namespace VASLogic.Models
         /// <param name="AD_Window_ID">source window (drives the refreshed line column set)</param>
         /// <param name="lineIds">C_InvoiceLine ids to remove</param>
         /// <returns>save result with the refreshed line list</returns>
-        public SaveLinesResult DeleteLines(Ctx ctx, int C_Invoice_ID, int AD_Window_ID, List<int> lineIds)
+        public SaveLinesResult DeleteLines(Ctx ctx, int C_Invoice_ID, int AD_Window_ID, List<int> lineIds, int page = 0)
         {
             SaveLinesResult res = new SaveLinesResult();
             if (C_Invoice_ID <= 0 || lineIds == null || lineIds.Count == 0)
@@ -2075,7 +2165,23 @@ namespace VASLogic.Models
             }
 
             res.Success = true;
-            res.Lines = LoadLines(ctx, C_Invoice_ID, ResolveInvoiceLineTabs(AD_Window_ID));
+            if (page < 0) page = 0;
+            int total;
+            res.Lines = LoadLines(ctx, C_Invoice_ID, ResolveInvoiceLineTabs(AD_Window_ID), page, out total);
+            // Deleting the last row(s) on a page can leave the requested page past the end;
+            // step back so the client shows a populated page.
+            int pageCount = System.Math.Max(1, (int)System.Math.Ceiling(total / (double)LINE_PAGE_SIZE));
+            if (page > pageCount - 1)
+            {
+                page = pageCount - 1;
+                res.Lines = LoadLines(ctx, C_Invoice_ID, ResolveInvoiceLineTabs(AD_Window_ID), page, out total);
+            }
+            res.LinesTotal = total;
+            res.LinePage = page;
+            res.LinePageSize = LINE_PAGE_SIZE;
+            decimal doNet, doTax, doTcs;
+            ComputeOtherPageTotals(ctx, C_Invoice_ID, res.Lines, out doNet, out doTax, out doTcs);
+            res.OtherPagesSubtotal = doNet; res.OtherPagesTax = doTax; res.OtherPagesTcs = doTcs;
             return res;
         }
 
@@ -2101,6 +2207,15 @@ namespace VASLogic.Models
         public string DocStatus { get; set; }
         public bool Processed { get; set; }
         public bool IsEditable { get; set; }
+        public int LinesTotal { get; set; }          // total saved lines (for the pager)
+        public int LinePage { get; set; }            // 0-based page returned
+        public int LinePageSize { get; set; }        // rows per page (LINE_PAGE_SIZE)
+        // Saved totals of every line NOT on the current page (invoice grand total minus
+        // this page). The client adds its live current-page sum so the totals row shows
+        // the WHOLE invoice yet still updates while a page is edited.
+        public decimal OtherPagesSubtotal { get; set; }
+        public decimal OtherPagesTax { get; set; }
+        public decimal OtherPagesTcs { get; set; }
         public int StdPrecision { get; set; }
         public string CurSymbol { get; set; }
         public string CurISO { get; set; }
@@ -2420,6 +2535,7 @@ namespace VASLogic.Models
     {
         public int C_Invoice_ID { get; set; }
         public int AD_Window_ID { get; set; }   // source window (refreshed line column set)
+        public int Page { get; set; }           // current 0-based line page (refreshed after save)
         public List<InvoiceLineInput> Lines { get; set; }
         public SaveLinesRequest() { Lines = new List<InvoiceLineInput>(); }
     }
@@ -2429,6 +2545,7 @@ namespace VASLogic.Models
     {
         public int C_Invoice_ID { get; set; }
         public int AD_Window_ID { get; set; }   // source window (refreshed line column set)
+        public int Page { get; set; }           // current 0-based line page (refreshed after delete)
         public List<int> LineIds { get; set; }
         public DeleteLinesRequest() { LineIds = new List<int>(); }
     }
@@ -2451,6 +2568,12 @@ namespace VASLogic.Models
         public string ErrorDetail { get; set; }
         public List<LineSaveError> LineErrors { get; set; }   // per-line failures (empty on success)
         public List<InvoiceLineRow> Lines { get; set; }
+        public int LinesTotal { get; set; }                   // total saved lines (pager)
+        public int LinePage { get; set; }                     // 0-based page returned
+        public int LinePageSize { get; set; }                 // rows per page
+        public decimal OtherPagesSubtotal { get; set; }       // saved totals of lines NOT on this page
+        public decimal OtherPagesTax { get; set; }
+        public decimal OtherPagesTcs { get; set; }
         public SaveLinesResult() { Lines = new List<InvoiceLineRow>(); LineErrors = new List<LineSaveError>(); }
     }
 
