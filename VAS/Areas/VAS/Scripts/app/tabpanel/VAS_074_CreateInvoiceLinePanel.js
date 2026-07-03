@@ -3107,6 +3107,31 @@
             render();
         }
 
+        /* Rebuild from the server rows after a DELETE while PRESERVING unsaved client work,
+           so deleting one existing record doesn't discard other rows the user is still
+           creating / editing. Brand-new client lines (id<=0) and dirty edits on existing
+           lines (id>0) are kept as-is; clean saved lines are refreshed from the server rows.
+           A deleted line is simply absent from serverRows (and any selected client-only new
+           line was already spliced out by the caller), so it drops out naturally. Because
+           page navigation is blocked while unsaved lines exist (gotoLinePage), all unsaved /
+           dirty rows are on the current page, so the returned page rows cover them. Mirrors
+           mergeSavedLines (the save path) - the delete is the only other full server reload. */
+        function reloadLinesKeepingUnsaved(serverRows) {
+            var dirtyById = {};
+            lines.forEach(function (l) {
+                var id = l.values.C_InvoiceLine_ID || 0;
+                if (id > 0 && l.dirty) dirtyById[id] = l;   // edited-but-unsaved existing line
+            });
+            var newKeep = lines.filter(function (l) { return (l.values.C_InvoiceLine_ID || 0) <= 0; });
+            var merged = (serverRows || []).map(function (r) {
+                return dirtyById[r.C_InvoiceLine_ID] || fromServerRow(r);
+            });
+            lines = newKeep.concat(merged);
+            morePopoverFor = null;
+            if (editing && !lineById(editing.rowId)) editing = null;   // clear edit target if it was deleted
+            render();
+        }
+
         function deleteSelected() {
             if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
             var sel = selectedLines(); if (!sel.length) return;
@@ -3121,7 +3146,7 @@
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); reloadLines(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_074_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_074_DeleteFailed", "Delete failed")); }
