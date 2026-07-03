@@ -33,11 +33,17 @@
         this.panelWidth = null;
 
         var $self = this;
-        var $root, $busy, $body, $emptyState, $linesBody, $totalsRow;
+        var $root, $busy, $body, $emptyState, $linesBody, $totalsRow, $pager;
         var $addBtn, $saveBtn, $deleteBtn, $selectAll;
 
         /* parent invoice context returned by GetPanelData */
         var parent = null;
+        /* server-side line paging (20/page): current 0-based page, total saved lines, size */
+        var linePage = 0, linesTotal = 0, linePageSize = 20;
+        /* saved totals of every line NOT on the current page (invoice grand total minus this
+           page). renderTotals adds the live current-page sum so the totals row reflects the
+           WHOLE invoice, not just the loaded page, while still updating during edits. */
+        var otherSub = 0, otherTax = 0, otherTcs = 0;
         /* dropdown catalogs */
         var uomList = [], taxList = [], taxRateById = {};
         /* AD_Column metadata cache (callout code + validation), keyed by column */
@@ -154,7 +160,18 @@
         }
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
 
-        this.fetchData = function (recordID) {
+        this.fetchData = function (recordID, page) {
+            // Framework calls fetchData(recordID) on record load -> reset to page 0; the
+            // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
+            var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
+            // record - including after a save - and a still-open dialog's position:fixed
+            // backdrop would otherwise be left orphaned over the page (morePopoverFor is
+            // cleared below but the DOM node isn't), swallowing clicks/scroll ("scroll stops
+            // working after save"). closeDialogs() removes #vasCilMore/#vasCilScan/#vasCilAttr;
+            // also reset the reusable AttributeControl's own state.
+            closeDialogs();
+            try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
             // NOTE: no showBusy() here. The framework already paints its own
             // vis-apanel-busy / vis_widgetloader over the tab while it loads a record;
             // adding ours (identical markup) stacked a SECOND spinner on line load. The
@@ -162,10 +179,16 @@
             // that the framework does not cover.
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetPanelData",
-                type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0 },
+                type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0, page: reqPage },
                 success: function (raw) {
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
+                    linesTotal = (parent && parent.LinesTotal) || 0;
+                    linePage = (parent && +parent.LinePage) || 0;
+                    linePageSize = (parent && +parent.LinePageSize) || 20;
+                    otherSub = (parent && +parent.OtherPagesSubtotal) || 0;
+                    otherTax = (parent && +parent.OtherPagesTax) || 0;
+                    otherTcs = (parent && +parent.OtherPagesTcs) || 0;
                     uomList = (parent && parent.UomList) || [];
                     taxList = (parent && parent.TaxList) || [];
                     taxRateById = {};
@@ -192,7 +215,12 @@
             });
         };
 
-        this.clear = function () { parent = null; lines = []; render(); };
+        this.clear = function () {
+            // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
+            closeDialogs();
+            try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
+            parent = null; lines = []; render();
+        };
 
         function fromServerRow(r) {
             // Start from the full column bag (every C_InvoiceLine column) so the
@@ -293,6 +321,11 @@
             $totalsRow = $('<div class="vas-cil-row vas-cil-row--totals"></div>');
             $table.append($totalsRow);
             $panel.append($table);
+            // Server-side line pager (20/page): "X-Y of N" + prev/next.
+            $pager = $('<div class="vas-cil-linepager" style="display:none;"></div>');
+            $pager.on("click", "[data-act=lp-prev]", function () { gotoLinePage(linePage - 1); });
+            $pager.on("click", "[data-act=lp-next]", function () { gotoLinePage(linePage + 1); });
+            $panel.append($pager);
             $body.append($panel);
 
             $header.on("click", "[data-action=open-scan]", openScanDialog);
@@ -341,10 +374,58 @@
             }
             renderTotals();
             renderHeaderButtons();
+            renderPager();
+        }
+
+        /* Server-side line pager: "Showing X-Y of N" on the left, "‹ P of Q ›" on the
+           right. Shown whenever the invoice has saved lines (even a single page). */
+        function renderPager() {
+            if (!$pager) return;
+            var total = linesTotal || 0, size = linePageSize || 20;
+            if (!total) { $pager.hide().empty(); return; }
+            var pageCount = Math.max(1, Math.ceil(total / size));
+            var start = linePage * size + 1;
+            var end = Math.min(total, (linePage + 1) * size);
+            var showing = lbl("VAS_074_Showing", "Showing") + " " + start + "–" + end + " " + lbl("VAS_074_Of", "of") + " " + total;
+            var pageInfo = (linePage + 1) + " " + lbl("VAS_074_Of", "of") + " " + pageCount;
+            $pager.html(
+                '<span class="vas-cil-linepager__showing">' + esc(showing) + "</span>" +
+                '<div class="vas-cil-linepager__nav">' +
+                '<button type="button" class="vas-cil-attr-pagebtn" data-act="lp-prev"' + (linePage <= 0 ? " disabled" : "") +
+                ' aria-label="' + esc(lbl("VAS_074_Prev", "Previous")) + '">' + icon("chevron-left", "‹") + "</button>" +
+                '<span class="vas-cil-linepager__info">' + esc(pageInfo) + "</span>" +
+                '<button type="button" class="vas-cil-attr-pagebtn" data-act="lp-next"' + (linePage >= pageCount - 1 ? " disabled" : "") +
+                ' aria-label="' + esc(lbl("VAS_074_Next", "Next")) + '">' + icon("chevron-right", "›") + "</button>" +
+                "</div>"
+            ).show();
+        }
+
+        /* Sync the pager state from a save/delete response (which returns the refreshed page). */
+        function applyLinePaging(res) {
+            if (!res) return;
+            if (typeof res.LinesTotal === "number") linesTotal = res.LinesTotal;
+            if (typeof res.LinePage === "number") linePage = res.LinePage;
+            if (res.LinePageSize) linePageSize = +res.LinePageSize || linePageSize;
+            if (typeof res.OtherPagesSubtotal === "number") otherSub = res.OtherPagesSubtotal;
+            if (typeof res.OtherPagesTax === "number") otherTax = res.OtherPagesTax;
+            if (typeof res.OtherPagesTcs === "number") otherTcs = res.OtherPagesTcs;
+        }
+
+        /* Load another page of saved lines. Guards unsaved work so a page change never
+           silently discards a new/edited row. */
+        function gotoLinePage(p) {
+            if (!parent || !parent.C_Invoice_ID) return;
+            var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 20)));
+            if (p < 0) p = 0; if (p > pageCount - 1) p = pageCount - 1;
+            if (p === linePage) return;
+            if (unsavedLines().length) { showToast(lbl("VAS_074_SavePageFirst", "Save or discard your changes before changing page")); return; }
+            $self.fetchData(parent.C_Invoice_ID, p);
         }
 
         function renderTotals() {
-            var sub = 0, tax = 0, tcs = 0;
+            // Base = saved totals of every OTHER page (server), plus the live sum of the
+            // current page below, so the row shows the WHOLE invoice's grand total.
+            var sub = otherSub, tax = otherTax, tcs = otherTcs;
             for (var i = 0; i < lines.length; i++) { sub += lineSubtotal(lines[i]); tax += lineTaxAmount(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
             $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
@@ -2813,11 +2894,11 @@
             renderHeaderButtons();   // the batch no longer counts as "unsaved" -> Save mutes
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveLines",
-                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Lines: rows }) },
+                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, Lines: rows }) },
                 success: function (raw) {
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
+                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                 },
                 error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
@@ -2896,11 +2977,11 @@
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/DeleteLines",
-                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, LineIds: ids }) },
+                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, LineIds: ids }) },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { reloadLines(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLines(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_074_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_074_DeleteFailed", "Delete failed")); }

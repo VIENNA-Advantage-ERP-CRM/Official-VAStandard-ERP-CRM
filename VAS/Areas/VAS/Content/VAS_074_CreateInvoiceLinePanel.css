@@ -1607,6 +1607,34 @@
         cursor: default;
     }
 
+/* Server-side line pager (20/page) below the lines table:
+   "Showing X-Y of N" on the left, "‹ P of Q ›" nav on the right. */
+.vas-cil-linepager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+}
+
+.vas-cil-linepager__showing {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-linepager__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-cil-linepager__info {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
 .vas-cil-empty-message {
     padding: 1.25em;
     text-align: center;
