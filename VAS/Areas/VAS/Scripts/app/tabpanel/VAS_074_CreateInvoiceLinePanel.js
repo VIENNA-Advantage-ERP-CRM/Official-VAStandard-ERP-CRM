@@ -319,6 +319,18 @@
             render();
         }
 
+        /* Undo for a NEW (never-saved) line = remove it entirely. It was never persisted,
+           so this is a client-only discard (no DeleteLines call) and there is no pristine
+           snapshot to revert to - mirrors deleteSelected's localOnly splice. */
+        function discardNewLine(line) {
+            if (!line) return;
+            if (editing && editing.rowId === line.rowId) editing = null;
+            if (morePopoverFor === line.rowId) { morePopoverFor = null; closeDialogs(); }
+            var i = lines.indexOf(line);
+            if (i >= 0) lines.splice(i, 1);
+            render();
+        }
+
         /* Seed every C_InvoiceLine column (from the cached columnMeta) on a new
            line so the VO carries all columns; explicit defaults already set are
            preserved. */
@@ -783,18 +795,23 @@
         function renderMoreCell(line) {
             var editable = parent && parent.IsEditable;
             var cell = $('<div class="vas-cil-cell vas-cil-cell--more" role="cell" style="position:relative"></div>');
-            // Undo: only on a SAVED row that currently has unsaved edits. Reverts the row
-            // to its last pristine snapshot. (New rows have no snapshot - use Delete.)
-            if (editable && line.status === "saved" && line.dirty && line._saved && !line._saving) {
-                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(lbl("VAS_074_UndoChanges", "Undo changes")) + '">' + icon("rotate-ccw", "↺") + "</button>");
+            // Undo affordance (↺). On a SAVED row with unsaved edits it reverts the row to
+            // its last pristine snapshot; on a NEW (never-saved) row it removes the row
+            // entirely (client-only discard - a new line has no snapshot to revert to).
+            var canUndoEdits = line.status === "saved" && line.dirty && line._saved;
+            var canDiscardNew = line.status === "new";
+            if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
+                var undoTitle = canDiscardNew ? lbl("VAS_074_UndoNewLine", "Undo (remove line)") : lbl("VAS_074_UndoChanges", "Undo changes");
+                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
+                var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
                 // cell editor is focused would otherwise blur->commit->re-render and
                 // destroy this button before its click fired, needing a second click.
                 // preventDefault keeps the focused input from blurring; Undo discards the
-                // pending edit anyway by restoring the snapshot.
-                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoLine(line); });
+                // pending edit anyway (revert snapshot / remove the row).
+                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoAct(line); });
                 // Keyboard activation (Enter/Space) fires click with detail 0, no mousedown.
-                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoLine(line); } });
+                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoAct(line); } });
                 cell.append($undo);
             }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
