@@ -1,10 +1,24 @@
 /**
  * GL Journal Volume by Day Chart Widget
- * Purpose  : Bar chart of GL Journal count per day with a net-value trend
- *            line overlay. Bars are colour-coded: Posted, Weekend, This week.
- *            Supports a Week / Month period toggle.
- * Tables   : GL_Journal, GL_JournalLine, C_AcctSchema, C_Currency
+ * Purpose - Bar chart of GL journal count per day with a net-value trend line.
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Journal Volume by Day                | VAS_042_JournalVolumeByDay
+ *  2  | Count vs Value                       | VAS_042_CountVsValue
+ *  3  | Week                                 | VAS_042_Week
+ *  4  | Month                                | VAS_042_Month
+ *  5  | Posted                               | VAS_042_Posted
+ *  6  | Weekend                              | VAS_042_Weekend
+ *  7  | This week                            | VAS_042_ThisWeek
+ *  8  | Net value trend                      | VAS_042_NetValueTrend
+ *  9  | Entries                              | VAS_042_GLJEntries
+ * 10  | No Data                              | VIS_NoData
+ * 11  | Error Loading Data                   | VIS_Error
+ * ---------------------------------------------------------------------
  */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
@@ -19,6 +33,28 @@
     function lbl(key, fallback) {
         var t = VIS.Msg.getMsg(key);
         return (t && t.charAt(0) !== '[') ? t : fallback;
+    }
+
+    function esc(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function fmtAmt(amount, precision) {
+        var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+        var prec = (typeof precision === 'number' && precision >= 0) ? precision : stdPrecision;
+        return parseFloat(Math.abs(amount) || 0).toLocaleString(window.navigator.language, {
+            minimumFractionDigits: prec,
+            maximumFractionDigits: prec
+        });
+    }
+
+    function fmtMoney(amount, currency, precision) {
+        var val = parseFloat(amount || 0);
+        return (val < 0 ? '-' : '') + (currency || '') + fmtAmt(val, precision);
     }
 
     // ── SVG chart constants ───────────────────────────────────────────────────
@@ -43,7 +79,7 @@
     }
 
     // ── Build the entire SVG string from the day array ────────────────────────
-    function buildSVG(days) {
+    function buildSVG(days, currency, precision) {
         var n = days.length;
 
         // No data guard
@@ -104,14 +140,20 @@
                 fill = C_POSTED; opacity = '0.85';
             }
 
-            parts.push('<rect x="' + barX.toFixed(1) + '" y="' + by.toFixed(1)
+            var info = (d.DateStr || d.DayNum)
+                + ' - ' + d.JournalCount + ' ' + lbl('VAS_042_GLJEntries', 'Entries')
+                + ', ' + lbl('VAS_042_NetValueTrend', 'Net value trend')
+                + ': ' + fmtMoney(d.NetValue, currency, precision);
+
+            parts.push('<rect class="VAS-gljv-bar" x="' + barX.toFixed(1) + '" y="' + by.toFixed(1)
                 + '" width="' + barW.toFixed(1) + '" height="' + bh.toFixed(1)
-                + '" rx="3" fill="' + fill + '" opacity="' + opacity + '"/>');
+                + '" rx="3" fill="' + fill + '" opacity="' + opacity + '">'
+                + '<title>' + esc(info) + '</title></rect>');
 
             // Trend point — scaled independently to 85 % of chart height
             var tx = slotX + slotW / 2;
             var ty = MT + CHART_H - (Math.abs(d.NetValue) / maxNetVal) * CHART_H * 0.85;
-            trendPts.push({ x: tx.toFixed(1), y: ty.toFixed(1), isWeek: d.IsThisWeek });
+            trendPts.push({ x: tx.toFixed(1), y: ty.toFixed(1), isWeek: d.IsThisWeek, info: info });
         }
         parts.push('</g>');
 
@@ -123,8 +165,9 @@
         // ── Trend dots ────────────────────────────────────────────────────────
         for (var i = 0; i < trendPts.length; i++) {
             var p = trendPts[i];
-            parts.push('<circle cx="' + p.x + '" cy="' + p.y + '" r="2.5"'
-                + ' fill="' + (p.isWeek ? C_TREND_W : C_TREND) + '"/>');
+            parts.push('<circle class="VAS-gljv-dot" cx="' + p.x + '" cy="' + p.y + '" r="2.5"'
+                + ' fill="' + (p.isWeek ? C_TREND_W : C_TREND) + '">'
+                + '<title>' + esc(p.info) + '</title></circle>');
         }
 
         // ── X-axis labels (every day for week; every 2 days for month) ────────
@@ -247,14 +290,16 @@
                         var data = JSON.parse(result);
                         if (data && data.Days) {
                             var id = $self.AD_UserHomeWidgetID;
-                            // Update sub-label: "APR 1 – 18 · Count vs Value"
+                            // Update sub-label: "APR 1 – 18 \u00B7 Count vs Value"
                             $root.find('#VAS-gljv-sub-' + id).text(
-                                (data.PeriodLabel || '').toUpperCase()
-                                + ' · '
+                                (data.PeriodLabel || '')
+                                + ' \u00B7 '
                                 + lbl('VAS_042_CountVsValue', 'Count vs Value')
                             );
                             // Inject SVG
-                            $root.find('#VAS-gljv-chart-' + id).html(buildSVG(data.Days));
+                            $root.find('#VAS-gljv-chart-' + id).html(
+                                buildSVG(data.Days, data.CurSymbol || data.ISOCode || '', data.StdPrecision)
+                            );
                         } else {
                             showError();
                         }

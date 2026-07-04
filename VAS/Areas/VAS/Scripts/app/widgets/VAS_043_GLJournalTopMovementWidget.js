@@ -1,10 +1,23 @@
 /**
  * GL Journal Top Ledger Movement Widget
- * Purpose  : Horizontal bar chart of the top 10 accounts by absolute net
- *            movement (DR − CR) for posted GL journals, in the accounting
- *            schema base currency. Supports month / YTD period toggle.
- * Tables   : GL_Journal, GL_JournalLine, C_ElementValue, C_AcctSchema, C_Currency
+ * Purpose - Horizontal bar chart of the top accounts by absolute net movement.
+ *
+ * -- Labels / Message Keys --------------------------------------------
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Top Ledger Movement                  | VAS_043_TopLedgerMovement
+ *  2  | by value                             | VAS_043_ByValue
+ *  3  | Month                                | VAS_043_Month
+ *  4  | YTD                                  | VAS_043_YTD
+ *  5  | Loading                              | VIS_Loading
+ *  6  | No Data                              | VIS_NoData
+ *  7  | Previous                             | VIS_Previous
+ *  8  | Next                                 | VIS_Next
+ *  9  | Of                                   | VIS_Of
+ * 10  | Error Loading Data                   | VIS_Error
+ * ---------------------------------------------------------------------
  */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
@@ -45,6 +58,11 @@
         var $self        = this;
         var $root        = $('<div class="VAS-gljtm-root">');
         var activePeriod = 'month';
+        var currentData  = null;
+        var pageNo       = 1;
+        var pageSize     = 5;
+        var totalPages   = 0;
+        var refreshTimer = null;
         var baseUrl      = VIS.Application.contextUrl;
 
         this.Initalize = function () {
@@ -52,7 +70,7 @@
             createBusyIndicator();
             showBusy(true);
             loadData();
-            setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
+            refreshTimer = setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {
@@ -90,6 +108,7 @@
                 + '</div>'
 
                 + '<div class="VAS-gljtm-body" id="VAS-gljtm-body-' + id + '"></div>'
+                + renderPager()
 
                 + '</div>';
 
@@ -97,32 +116,74 @@
 
             $root.find('#VAS-gljtm-toggle-' + id).on('click', function () {
                 activePeriod = (activePeriod === 'month') ? 'ytd' : 'month';
+                pageNo = 1;
                 $(this).text(activePeriod === 'month'
                     ? lbl('VAS_043_Month', 'Month')
                     : lbl('VAS_043_YTD', 'YTD'));
                 showBusy(true);
                 loadData();
             });
+
+            $root.on('click', '.VAS-gljtm-page-prev', function () {
+                if (pageNo <= 1) { return; }
+                pageNo -= 1;
+                loadData();
+            });
+
+            $root.on('click', '.VAS-gljtm-page-next', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) { return; }
+                pageNo += 1;
+                loadData();
+            });
+        }
+
+        function normalizeResponse(result) {
+            if (!result) {
+                return null;
+            }
+
+            if (result.d) {
+                result = result.d;
+            }
+
+            if (typeof result === 'string') {
+                try {
+                    result = JSON.parse(result);
+                } catch (e1) {
+                    return null;
+                }
+            }
+
+            if (typeof result === 'string') {
+                try {
+                    result = JSON.parse(result);
+                } catch (e2) {
+                    return null;
+                }
+            }
+
+            return result;
         }
 
         function loadData() {
+            showLoading();
+
             $.ajax({
                 url: baseUrl + 'VAS/VAS_043_GLJournalTopMovementWidget/GetTopMovement',
                 type     : 'GET',
                 dataType : 'json',
                 cache    : false,
-                data     : { period: activePeriod },
+                data     : { period: activePeriod, pageNo: pageNo },
                 success  : function (result) {
-                    try {
-                        var data = JSON.parse(result);
-                        if (data && data.Accounts) {
-                            renderBars(data);
-                        } else {
-                            showError();
-                        }
-                    } catch (e) {
+                    var data = normalizeResponse(result);
+
+                    if (data && data.Accounts) {
+                        currentData = data;
+                        renderBars(data);
+                    } else {
                         showError();
                     }
+
                     showBusy(false);
                 },
                 error: function () {
@@ -132,25 +193,61 @@
             });
         }
 
+        function showLoading() {
+            var id = $self.AD_UserHomeWidgetID;
+
+            totalPages = 0;
+            $root.find('#VAS-gljtm-body-' + id).html(
+                '<div class="VAS-gljtm-loading">' + esc(lbl('VIS_Loading', 'Loading...')) + '</div>'
+            );
+        }
+
         function renderBars(data) {
             var id       = $self.AD_UserHomeWidgetID;
             var accounts = data.Accounts || [];
-            var sym      = esc(data.CurSymbol || '');
-            var prec     = data.StdPrecision;
+            var sym      = esc(data.currencySymbol || data.CurSymbol || data.currencyISO || data.ISOCode || '');
+            var prec     = data.stdPrecision || data.StdPrecision;
             var $body    = $root.find('#VAS-gljtm-body-' + id);
+            var serverPageSize = parseInt(data.PageSize || data.pageSize || pageSize, 10);
+
+            if (!isNaN(serverPageSize) && serverPageSize > 0) {
+                pageSize = serverPageSize;
+            }
 
             if (accounts.length === 0) {
+                $body.addClass('is-empty');
                 $body.html('<div class="VAS-gljtm-empty">' + lbl('VIS_NoData', 'No data available.') + '</div>');
+                totalPages = 0;
+                updatePager();
                 return;
             }
 
+            $body.removeClass('is-empty');
+
+            totalPages = parseInt(data.TotalPages || data.totalPages || 1, 10);
+
+            if (isNaN(totalPages) || totalPages < 1) {
+                totalPages = 1;
+            }
+
+            pageNo = parseInt(data.PageNo || data.pageNo || pageNo || 1, 10);
+
+            if (isNaN(pageNo) || pageNo < 1) {
+                pageNo = 1;
+            }
+
+            var pageAccounts = accounts;
             var html = '<div class="VAS-gljtm-list">';
-            for (var i = 0; i < accounts.length; i++) {
-                var a       = accounts[i];
+            for (var i = 0; i < pageAccounts.length; i++) {
+                var a       = pageAccounts[i];
                 var fillCls = 'VAS-gljtm-fill' + (a.IsCredit ? ' VAS-gljtm-fill-cr' : '');
                 var valStr  = sym + fmtAmt(a.NetMovement, prec);
+                var rowInfo = esc((a.AccountCode || '') + ' ' + (a.AccountName || '')
+                    + ' - Net Movement: ' + valStr
+                    + ', Debit: ' + sym + fmtAmt(a.TotalDebit, prec)
+                    + ', Credit: ' + sym + fmtAmt(a.TotalCredit, prec));
 
-                html += '<div class="VAS-gljtm-row">'
+                html += '<div class="VAS-gljtm-row" title="' + rowInfo + '">'
                     +     '<div class="VAS-gljtm-row-head">'
                     +       '<span class="VAS-gljtm-label">'
                     +         '<span class="VAS-gljtm-acct">' + esc(a.AccountCode) + '</span>'
@@ -158,25 +255,63 @@
                     +       '</span>'
                     +       '<span class="VAS-gljtm-val">' + esc(valStr) + '</span>'
                     +     '</div>'
-                    +     '<div class="VAS-gljtm-track">'
+                    +     '<div class="VAS-gljtm-track" title="' + rowInfo + '">'
                     +       '<div class="' + fillCls + '" style="--bar-w:' + a.BarPct + '%"></div>'
                     +     '</div>'
                     +   '</div>';
             }
             html += '</div>';
             $body.html(html);
+            updatePager();
+        }
+
+        function renderPager() {
+            return '<div class="VAS-gljtm-pager">'
+                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-prev" aria-label="' + esc(lbl('VIS_Previous', 'Previous')) + '">&#8249;</button>'
+                + '<span class="VAS-gljtm-page-text"></span>'
+                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-next" aria-label="' + esc(lbl('VIS_Next', 'Next')) + '">&#8250;</button>'
+                + '</div>';
+        }
+
+        function updatePager() {
+            var $pageText = $root.find('.VAS-gljtm-page-text');
+            var $prevBtn = $root.find('.VAS-gljtm-page-prev');
+            var $nextBtn = $root.find('.VAS-gljtm-page-next');
+
+            if (totalPages > 1) {
+                $pageText.text(pageNo + ' ' + lbl('VIS_Of', 'of') + ' ' + totalPages);
+            } else {
+                $pageText.text('');
+            }
+
+            $prevBtn.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            $nextBtn.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
         }
 
         function showError() {
             var id = $self.AD_UserHomeWidgetID;
-            $root.find('#VAS-gljtm-body-' + id).html(
+            $root.find('#VAS-gljtm-body-' + id).addClass('is-empty').html(
                 '<div class="VAS-gljtm-empty">' + lbl('VIS_Error', 'Error loading data.') + '</div>'
             );
+            totalPages = 0;
+            updatePager();
         }
 
         this.refreshWidget    = function () { showBusy(true); loadData(); };
         this.getRoot          = function () { return $root; };
-        this.disposeComponent = function () { $root.remove(); };
+        this.disposeComponent = function () {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+
+            if ($root) {
+                $root.off();
+                $root.remove();
+            }
+
+            currentData = null;
+        };
     };
 
     VAS.VAS_043_GLJournalTopMovementWidget.prototype.refreshWidget = function () {
