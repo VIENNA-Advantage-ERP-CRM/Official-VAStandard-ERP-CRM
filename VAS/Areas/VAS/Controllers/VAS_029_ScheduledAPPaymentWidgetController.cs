@@ -1276,7 +1276,7 @@ ORDER BY
             }
 
             return
-                "CURRENT_DATE + 7";
+                "CURRENT_DATE + INTERVAL '7 DAY'";
         }
 
         private string GetWeekEndDisplaySql()
@@ -1288,7 +1288,7 @@ ORDER BY
             }
 
             return
-                "CURRENT_DATE + 6";
+                "CURRENT_DATE + INTERVAL '6 DAY'";
         }
 
         private string GetPaymentMethodDisplayColumn(

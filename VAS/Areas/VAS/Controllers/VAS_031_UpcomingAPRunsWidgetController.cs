@@ -226,7 +226,7 @@ namespace VAS.Controllers
 
             string dateToSql = DB.IsOracle()
                 ? "TRUNC(CURRENT_DATE) + 7"
-                : "CURRENT_DATE + 7";
+                : "CURRENT_DATE + INTERVAL '7 DAY'";
 
             string invoiceAccessSql = @"
 SELECT
