@@ -170,7 +170,18 @@
             var gross = lineGross(line);
             return (parent && parent.IsTaxIncluded) ? gross - lineTaxTotal(line) : gross;
         }
-        function lineAmount(line) { return lineSubtotal(line); }
+        /* Per-row "Line Amount" = the line NET (tax base), so the column reconciles with the
+           Subtotal total (which sums TaxBaseAmt). A clean SAVED line uses the framework's stored
+           TaxBaseAmt - already correct for a tax-inclusive OR exclusive price, and exact (no
+           rate-extraction rounding). A new / edited line has no fresh stored base, so it falls
+           back to the live, tax-mode-aware calc (exclusive: gross; inclusive: gross - tax). */
+        function lineAmount(line) {
+            if (line.status === "saved" && !line.dirty) {
+                var base = lineVal(line, "TaxBaseAmt");
+                if (base != null && base !== "") return +base || 0;
+            }
+            return lineSubtotal(line);
+        }
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
@@ -1433,7 +1444,15 @@
                 // CalloutInvoice reads mTab.getField(col).getDisplayType() / .value and
                 // may call field UI mutators - return a GridField shim (was missing,
                 // which crashed the callout with "mTab.getField is not a function").
-                getField: function (col) { return makeFieldShim(line, col); },
+                // Mirror a real GridTab: only ACTUAL tab fields (AD_Field on the window tab)
+                // have a GridField; a merged-only table column (e.g. SurchargeAmt, present in
+                // columnMeta via MergeAllColumns but not a field on this tab) returns null, so
+                // callouts that gate on `getField(col) != null` (e.g. CalloutInvoice's "reset
+                // SurchargeAmt to 0") skip it exactly as on the standard invoice window.
+                getField: function (col) {
+                    var fm = columnMeta[col];
+                    return (fm && fm.IsTabField) ? makeFieldShim(line, col) : null;
+                },
                 // The panel's grid is the C_InvoiceLine tab; CalloutTax.SetTaxExemptReason
                 // (and other callouts) branch on the tab's key column.
                 getKeyColumnName: function () { return "C_InvoiceLine_ID"; }
