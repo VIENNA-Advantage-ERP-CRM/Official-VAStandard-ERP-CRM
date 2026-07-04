@@ -218,6 +218,7 @@
 .vas-dssrch-chip-payment   { background: rgba(1, 157, 137, 0.12);  color: #019D89; }
 .vas-dssrch-chip-cash      { background: rgba(215, 139, 16, 0.14); color: #B5740C; }
 .vas-dssrch-chip-gljournal { background: rgba(123, 97, 255, 0.14); color: #6B4BE0; }
+.vas-dssrch-chip-receipt   { background: rgba(46, 158, 91, 0.14);  color: #2E9E5B; }
 
 .vas-dssrch-main {
     flex: 1 1 auto;

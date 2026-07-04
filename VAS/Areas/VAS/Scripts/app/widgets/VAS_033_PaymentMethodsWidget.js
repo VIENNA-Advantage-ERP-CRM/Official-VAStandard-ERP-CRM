@@ -6,11 +6,14 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Payment methods                      | VAS_033_MessagePaymentMethods
- *  2  | WHY                                  | VAS_033_MessageWhy
- *  3  | UPI is cheapest · shift sub-₹2L payments where possible | VAS_033_MessagePaymentMethodWhy
- *  4  | Loading                              | VAS_033_MessageLoading
- *  5  | No Data                              | VAS_033_MessageNoData
- *  6  | Not Specified                        | VAS_033_MessageNotSpecified
+ *  2  | Upi is cheapest - shift small payments where possible | VAS_033_MessagePaymentMethodWhy
+ *  3  | Loading                              | VAS_033_MessageLoading
+ *  4  | No Data                              | VAS_033_MessageNoData
+ *  5  | Not Specified                        | VAS_033_MessageNotSpecified
+ *  6  | Previous                             | VAS_Previous
+ *  7  | Next                                 | VAS_Next
+ *  8  | Could not load data                  | VAS_ErrorLoading
+ *  9  | Of                                   | VAS_Of
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -28,6 +31,20 @@
         var $card;
         var $body;
         var $foot;
+        var $pager;
+        var $pagerPrev;
+        var $pagerNext;
+        var $pagerText;
+        var $busy;
+        var $state;
+        var isDisposed = false;
+        var methodsData = [];
+        var pageNo = 1;
+        var pageSize = 3;
+        var totalPages = 0;
+        var resizeObserver = null;
+        var widgetRowHeight = 50;
+        var widgetMinimumRows = 2;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -36,6 +53,7 @@
 
         this.Initalize = function () {
             createWidget();
+            setupAdaptivePagination();
             loadData();
         };
 
@@ -52,23 +70,63 @@
             );
             var $title = $('<div class="vas-payment-methods-title">').text(lbl('VAS_033_MessagePaymentMethods', 'Payment methods'));
 
+            $pager = $('<div class="vas-payment-methods-pager">');
+            $pagerPrev = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="15 18 9 12 15 6"></polyline>' +
+                '</svg>' +
+                '</button>');
+            $pagerText = $('<span class="vas-payment-methods-page-text">');
+            $pagerNext = $('<button type="button" class="vas-payment-methods-page-btn" aria-label="' + lbl('VAS_Next', 'Next') + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<polyline points="9 18 15 12 9 6"></polyline>' +
+                '</svg>' +
+                '</button>');
+
+            $pager.append($pagerPrev).append($pagerText).append($pagerNext);
+
             $iconBox.append($icon);
             $head.append($iconBox).append($title);
 
             $body = $('<div class="vas-payment-methods-body">');
 
             $foot = $('<div class="vas-payment-methods-foot">');
-            var $whyTag = $('<span class="vas-payment-methods-why-tag">').text(lbl('VAS_033_MessageWhy', 'WHY'));
-            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'UPI is cheapest · shift sub-₹2L payments where possible'));
+          
+            var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'Upi is cheapest - shift small payments where possible'));
 
-            $foot.append($whyTag).append($whyText);
+            $foot.append($whyText).append($pager);
+            $busy = $('<div class="vas-payment-methods-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $state = $('<div class="vas-payment-methods-state-message">');
 
-            $card.append($head).append($body).append($foot);
+            $card.append($head).append($body).append($foot).append($busy).append($state);
             $root.empty().append($card);
+
+            $pagerPrev.on('click', function () {
+                if (pageNo <= 1) {
+                    return;
+                }
+
+                pageNo--;
+                renderPage();
+            });
+
+            $pagerNext.on('click', function () {
+                if (totalPages <= 1 || pageNo >= totalPages) {
+                    return;
+                }
+
+                pageNo++;
+                renderPage();
+            });
         }
 
         function loadData() {
-            setLoading();
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_033_PaymentMethodsWidget/GetPaymentMethods',
@@ -76,6 +134,10 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
                     var data = response;
 
                     if (typeof response === 'string') {
@@ -83,49 +145,156 @@
                             data = JSON.parse(response);
                         }
                         catch (e) {
-                            setNoData();
+                            showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                             return;
                         }
                     }
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
                 }
             });
         }
 
         function renderData(data) {
-            var methods = $.isArray(data.methods) ? data.methods : [];
+            methodsData = $.isArray(data.methods)
+                ? $.grep(data.methods, function (method) {
+                    return method != null;
+                })
+                : [];
 
-            if (methods.length === 0) {
+            if (methodsData.length === 0) {
                 setNoData();
                 return;
             }
 
+            pageNo = 1;
+            totalPages = Math.ceil(methodsData.length / pageSize);
+            renderPage();
+        }
+
+        function renderPage() {
+            if (!methodsData || methodsData.length === 0) {
+                setNoData();
+                return;
+            }
+
+            totalPages = Math.max(1, Math.ceil(methodsData.length / pageSize));
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
+            }
+
+            showState(false, '');
             $body.empty();
             $foot.show();
 
-            for (var i = 0; i < methods.length && i < 4; i++) {
-                $body.append(createMethodRow(methods[i]));
+            var startIndex = (pageNo - 1) * pageSize;
+            var pageItems = methodsData.slice(startIndex, startIndex + pageSize);
+
+            for (var i = 0; i < pageItems.length; i++) {
+                $body.append(createMethodRow(pageItems[i]));
+            }
+
+            updatePager();
+        }
+
+        function updateAdaptivePageSize() {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                widgetMinimumRows,
+                Math.floor($body[0].clientHeight / widgetRowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                return;
+            }
+
+            var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstVisibleRecord / pageSize));
+
+            if (methodsData && methodsData.length > 0) {
+                renderPage();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            if (!$body || !$body[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+            if (window.ResizeObserver) {
+                resizeObserver = new ResizeObserver(function () {
+                    updateAdaptivePageSize();
+                });
+
+                resizeObserver.observe($body[0]);
+            }
+        }
+
+        function updatePager() {
+            if (!$pager) {
+                return;
+            }
+
+            if ($pagerText) {
+                if (totalPages > 1) {
+                    $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
+                }
+                else {
+                    $pagerText.text('');
+                }
+            }
+
+            if ($pagerPrev) {
+                $pagerPrev.prop('disabled', pageNo <= 1 || totalPages <= 1);
+            }
+
+            if ($pagerNext) {
+                $pagerNext.prop('disabled', totalPages <= 1 || pageNo >= totalPages);
             }
         }
 
         function createMethodRow(method) {
             var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
             var percentage = Number(method.percentage || 0);
+            var amountText = formatCurrencyAmount(
+                method.paymentAmount,
+                method.currencySymbol || method.symbol,
+                method.currencyISO,
+                method.stdPrecision
+            );
 
             if (isNaN(percentage)) {
-                percentage = 0;
-            }
-
-            if (percentage < 0) {
                 percentage = 0;
             }
 
@@ -136,15 +305,28 @@
             var $row = $('<div class="vas-payment-methods-row">');
             var $top = $('<div class="vas-payment-methods-row-top">');
             var $name = $('<span class="vas-payment-methods-name">').text(methodName);
-            var $percent = $('<span class="vas-payment-methods-percent">').text(formatPercentage(percentage));
-            var $track = $('<div class="vas-payment-methods-track">');
+            var $metrics = $('<span class="vas-payment-methods-metrics">');
+            var percentText = formatPercentage(percentage);
+            var $percent = $('<span class="vas-payment-methods-percent">').text(percentText);
+            var $amount = $('<span class="vas-payment-methods-amount">').text(amountText);
+            var tooltipText = methodName + ' | ' + percentText + ' | ' + amountText;
+            var $track = $('<div class="vas-payment-methods-track">').attr({
+                role: 'progressbar',
+                tabindex: '0',
+                'aria-label': tooltipText,
+                'aria-valuemin': 0,
+                'aria-valuemax': 100,
+                'aria-valuenow': percentage
+            });
             var $fill = $('<div class="vas-payment-methods-fill">').addClass(getMethodClass(methodName));
+            var $tooltip = $('<div class="vas-payment-methods-tooltip">').text(tooltipText);
 
             $fill.css('width', percentage + '%');
 
-            $top.append($name).append($percent);
+            $metrics.append($percent).append($amount);
+            $top.append($name).append($metrics);
             $track.append($fill);
-            $row.append($top).append($track);
+            $row.append($top).append($track).append($tooltip);
 
             return $row;
         }
@@ -181,14 +363,22 @@
             }) + '%';
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
-            var stdPrecision = getStdPrecision();
+            var stdPrecision = normalizePrecision(precision);
+            var sign = numericValue < 0 ? '-' : '';
+            var absValue = Math.abs(numericValue);
 
-            return numericValue.toLocaleString(window.navigator.language, {
+            var amount = absValue.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         function getStdPrecision() {
@@ -205,24 +395,42 @@
             return stdPrecision;
         }
 
-        function setLoading() {
+        function normalizePrecision(precision) {
+            var stdPrecision = Number(precision);
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = getStdPrecision();
+            }
+
+            return Math.min(stdPrecision, 2);
+        }
+
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
+            }
+
             if ($foot) {
-                $foot.hide();
+                $foot.toggle(!show);
             }
 
             if ($body) {
-                $body.empty().append($('<div class="vas-payment-methods-state">').text(lbl('VAS_033_MessageLoading', 'Loading')));
+                $body.toggle(!show);
+            }
+
+            if ($pager) {
+                $pager.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($foot) {
-                $foot.hide();
-            }
-
-            if ($body) {
-                $body.empty().append($('<div class="vas-payment-methods-state">').text(lbl('VAS_033_MessageNoData', 'No Data')));
-            }
+            showState(true, lbl('VAS_033_MessageNoData', 'No Data'));
         }
 
         this.refreshWidget = function () {
@@ -234,10 +442,24 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
+
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
             $root.remove();
             $card = null;
             $body = null;
             $foot = null;
+            $pager = null;
+            $pagerPrev = null;
+            $pagerNext = null;
+            $pagerText = null;
+            $busy = null;
+            $state = null;
+            methodsData = [];
         };
     };
 

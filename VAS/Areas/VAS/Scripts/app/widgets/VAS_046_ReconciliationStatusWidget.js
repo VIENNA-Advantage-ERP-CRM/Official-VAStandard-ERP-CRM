@@ -13,6 +13,11 @@
  *  6  | Review unmatched                     | VAS_046_ReviewUnmatched
  *  7  | Loading                              | VAS_046_Loading
  *  8  | No Data                              | VAS_046_NoData
+ *  9  | Could not load data                  | VAS_ErrorLoading
+ * 10  | Matched payments                     | VAS_046_MatchedPayments
+ * 11  | Need manual match                    | VAS_046_NeedManualMatch
+ * 12  | Total payments                       | VAS_046_TotalPayments
+ * 13  | Period                               | VAS_046_Period
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -30,10 +35,14 @@
         var $card;
         var $body;
         var $state;
+        var $busy;
+        var $donut;
         var $progress;
         var $percent;
+        var $tooltip;
         var $strong;
         var $subText;
+        var isDisposed = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -70,7 +79,7 @@
 
             $body = $('<div class="vas-reconciliation-status-body">');
 
-            var $donut = $('<div class="vas-reconciliation-status-donut">');
+            $donut = $('<div class="vas-reconciliation-status-donut" tabindex="0" role="img">');
             var $svg = $(
                 '<svg viewBox="0 0 140 140" aria-hidden="true" focusable="false">' +
                 '<circle class="vas-reconciliation-status-track" cx="70" cy="70" r="56"></circle>' +
@@ -91,26 +100,41 @@
             $strong = $('<div class="vas-reconciliation-status-strong">');
             $subText = $('<div class="vas-reconciliation-status-subtext">');
 
-            var $action = $('<button type="button" class="vas-reconciliation-status-action">');
-            var $actionIcon = $(
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
-                '<line x1="7" y1="17" x2="17" y2="7"></line>' +
-                '<polyline points="7 7 17 7 17 17"></polyline>' +
-                '</svg>'
-            );
+            //var $action = $('<button type="button" class="vas-reconciliation-status-action">');
+            //var $actionIcon = $(
+            //    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+            //    '<line x1="7" y1="17" x2="17" y2="7"></line>' +
+            //    '<polyline points="7 7 17 7 17 17"></polyline>' +
+            //    '</svg>'
+            //);
 
-            $action.append(document.createTextNode(lbl('VAS_046_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
-            $meta.append($strong).append($subText).append($action);
+            //$action.append(document.createTextNode(lbl('VAS_046_ReviewUnmatched', 'Review unmatched'))).append($actionIcon);
+            $meta.append($strong).append($subText);
 
             $body.append($donut).append($meta);
-            $state = $('<div class="vas-reconciliation-status-state">').hide();
+            $state = $('<div class="vas-reconciliation-status-state">');
+            $busy = $('<div class="vas-reconciliation-status-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $tooltip = $('<div class="vas-reconciliation-status-tooltip" role="tooltip">');
 
-            $card.append($head).append($body).append($state);
+            $card.append($head).append($body).append($busy).append($state).append($tooltip);
             $root.empty().append($card);
+
+            $donut.on('mouseenter focus', function (event) {
+                showTooltip(event);
+            });
+
+            $donut.on('mousemove', positionTooltip);
+
+            $donut.on('mouseleave blur', hideTooltip);
         }
 
         function loadData() {
-            setLoading();
+            if (isDisposed) {
+                return;
+            }
+
+            showBusy(true);
+            showState(false, '');
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_046_ReconciliationStatusWidget/GetReconciliationStatus',
@@ -118,6 +142,10 @@
                 dataType: 'json',
                 cache: false,
                 success: function (response) {
+                    if (isDisposed) {
+                        return;
+                    }
+
                     var data = response;
 
                     if (typeof response === 'string') {
@@ -125,20 +153,27 @@
                             data = JSON.parse(response);
                         }
                         catch (e) {
-                            setNoData();
+                            showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                             return;
                         }
                     }
 
                     if (!data || data.error) {
-                        setNoData();
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
                         return;
                     }
 
                     renderData(data);
                 },
                 error: function () {
-                    setNoData();
+                    if (!isDisposed) {
+                        showState(true, lbl('VAS_ErrorLoading', 'Could not load data'));
+                    }
+                },
+                complete: function () {
+                    if (!isDisposed) {
+                        showBusy(false);
+                    }
                 }
             });
         }
@@ -147,12 +182,7 @@
             var percentage = Number(data.matchedPercentage);
             var manualCount = Number(data.manualMatchCount || 0);
 
-            if (isNaN(percentage)) {
-                setNoData();
-                return;
-            }
-
-            if (percentage < 0) {
+            if (isNaN(percentage) || percentage < 0) {
                 percentage = 0;
             }
 
@@ -162,14 +192,109 @@
 
             var percentageText = formatPercentage(percentage);
 
-            $state.hide();
-            $body.show();
+            showState(false, '');
 
             $percent.text(percentageText);
             $progress.attr('stroke-dasharray', percentage + ' 100');
 
             $strong.text(lbl('VAS_046_PercentageAutoMatched', '{0} auto-matched').replace('{0}', percentageText));
             $subText.text(lbl('VAS_046_PaymentsNeedManualMatch', '{0} payments need manual match').replace('{0}', manualCount.toLocaleString(window.navigator.language)));
+
+            renderTooltip(data, percentageText, manualCount);
+        }
+
+        function renderTooltip(data, percentageText, manualCount) {
+            if (!$tooltip || !$donut) {
+                return;
+            }
+
+            var matchedCount = Number(data.matchedPayments || 0);
+            var totalCount = Number(data.totalPayments || 0);
+            var locale = window.navigator.language;
+            var period = '';
+
+            if (data.dateFrom && data.dateTo) {
+                period = data.dateFrom + ' - ' + data.dateTo;
+            }
+
+            $tooltip.empty()
+                .append($('<div class="vas-reconciliation-status-tooltip-title">').text(
+                    lbl('VAS_046_Matched', 'Matched') + ' · ' + percentageText
+                ))
+                .append(createTooltipRow(
+                    lbl('VAS_046_MatchedPayments', 'Matched payments'),
+                    matchedCount.toLocaleString(locale)
+                ))
+                .append(createTooltipRow(
+                    lbl('VAS_046_NeedManualMatch', 'Need manual match'),
+                    manualCount.toLocaleString(locale)
+                ))
+                .append(createTooltipRow(
+                    lbl('VAS_046_TotalPayments', 'Total payments'),
+                    totalCount.toLocaleString(locale)
+                ));
+
+            if (period) {
+                $tooltip.append(createTooltipRow(
+                    lbl('VAS_046_Period', 'Period'),
+                    period
+                ));
+            }
+
+            $donut.attr('aria-label',
+                lbl('VAS_046_Matched', 'Matched') + ' ' + percentageText + '. ' +
+                lbl('VAS_046_MatchedPayments', 'Matched payments') + ': ' + matchedCount.toLocaleString(locale) + '. ' +
+                lbl('VAS_046_NeedManualMatch', 'Need manual match') + ': ' + manualCount.toLocaleString(locale) + '. ' +
+                lbl('VAS_046_TotalPayments', 'Total payments') + ': ' + totalCount.toLocaleString(locale)
+            );
+        }
+
+        function createTooltipRow(label, value) {
+            return $('<div class="vas-reconciliation-status-tooltip-row">')
+                .append($('<span>').text(label))
+                .append($('<strong>').text(value));
+        }
+
+        function showTooltip(event) {
+            if (!$tooltip || !$tooltip.children().length) {
+                return;
+            }
+
+            $tooltip.addClass('is-visible');
+            positionTooltip(event);
+        }
+
+        function positionTooltip(event) {
+            if (!$tooltip || !$card || !$tooltip.hasClass('is-visible')) {
+                return;
+            }
+
+            var cardRect = $card[0].getBoundingClientRect();
+            var tooltipWidth = $tooltip.outerWidth();
+            var tooltipHeight = $tooltip.outerHeight();
+            var x;
+            var y;
+
+            if (event && event.type === 'mousemove') {
+                x = event.clientX - cardRect.left + 12;
+                y = event.clientY - cardRect.top + 12;
+            }
+            else {
+                var donutRect = $donut[0].getBoundingClientRect();
+                x = donutRect.right - cardRect.left + 8;
+                y = donutRect.top - cardRect.top + (donutRect.height - tooltipHeight) / 2;
+            }
+
+            x = Math.max(8, Math.min(x, cardRect.width - tooltipWidth - 8));
+            y = Math.max(8, Math.min(y, cardRect.height - tooltipHeight - 8));
+
+            $tooltip.css({ left: x + 'px', top: y + 'px' });
+        }
+
+        function hideTooltip() {
+            if ($tooltip) {
+                $tooltip.removeClass('is-visible');
+            }
         }
 
         function formatPercentage(value) {
@@ -206,24 +331,24 @@
             return stdPrecision;
         }
 
-        function setLoading() {
-            if ($body) {
-                $body.hide();
+        function showBusy(show) {
+            if ($busy) {
+                $busy.toggleClass('is-visible', !!show);
+            }
+        }
+
+        function showState(show, message) {
+            if ($state) {
+                $state.text(message || '').toggleClass('is-visible', !!show);
             }
 
-            if ($state) {
-                $state.text(lbl('VAS_046_Loading', 'Loading')).show();
+            if ($body) {
+                $body.toggle(!show);
             }
         }
 
         function setNoData() {
-            if ($body) {
-                $body.hide();
-            }
-
-            if ($state) {
-                $state.text(lbl('VAS_046_NoData', 'No Data')).show();
-            }
+            showState(true, lbl('VAS_046_NoData', 'No Data'));
         }
 
         this.refreshWidget = function () {
@@ -235,12 +360,16 @@
         };
 
         this.disposeComponent = function () {
+            isDisposed = true;
             $root.remove();
             $card = null;
             $body = null;
             $state = null;
+            $busy = null;
+            $donut = null;
             $progress = null;
             $percent = null;
+            $tooltip = null;
             $strong = null;
             $subText = null;
         };

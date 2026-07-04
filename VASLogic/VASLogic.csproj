@@ -146,6 +146,8 @@
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
     <Compile Include="Models\VAS_065_APInvoicePanelModel.cs" />
+    <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
+    <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
