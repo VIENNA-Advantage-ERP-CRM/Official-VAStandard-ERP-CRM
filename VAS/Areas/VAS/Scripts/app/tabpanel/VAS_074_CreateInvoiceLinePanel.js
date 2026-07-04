@@ -2434,6 +2434,9 @@
                 // true -> open straight on the New-attribute form; false -> instance list.
                 // Set this per your own requirement.
                 newAttribute: true,
+                // Default state of the instance list's "Show All (include zero and (-ve) qty)"
+                // checkbox for THIS screen. true -> show all; false -> only QtyOnHand > 0.
+                showAll: true,
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,

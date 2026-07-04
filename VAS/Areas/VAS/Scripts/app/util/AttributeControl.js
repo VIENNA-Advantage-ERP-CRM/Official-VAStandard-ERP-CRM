@@ -14,6 +14,10 @@
  *                                             in the list; an unchanged OK is a no-op)
  *   newAttribute            (bool)            true -> open directly on the "New attribute"
  *                                             create form; false/omitted -> the instance list
+ *   showAll                 (bool)            initial state of the "Show All (include zero and
+ *                                             (-ve) qty)" checkbox in the instance list. true
+ *                                             (default) -> no stock filter; false -> only rows
+ *                                             with QtyOnHand > 0. Caller sets it per screen.
  *   productName             (string)          shown in the dialog header
  *   onApply(result)         (fn)              called when the user picks/creates an instance.
  *                                             result = { M_AttributeSetInstance_ID, description }
@@ -90,6 +94,9 @@
             // opts.newAttribute === true -> open straight on the "New attribute" create form;
             // false / omitted -> the existing-instance list (default). Caller decides the rule.
             newAttribute: !!opts.newAttribute,
+            // "Show All (include zero and (-ve) qty)" checkbox default. Caller sets it per
+            // screen; omitted -> true (no QtyOnHand filter, preserves the prior behaviour).
+            showAll: (opts.showAll !== undefined) ? !!opts.showAll : true,
             options: [], selected: "", mode: "list", search: "", page: 0, error: ""
         };
         cfg.BUSY(true);
@@ -152,7 +159,11 @@
         if (pid <= 0) return [];
         try {
             if (!(window.VIS && VIS.secureEngine && VIS.dataContext && typeof VIS.dataContext.getJSONData === "function")) return [];
-            var where = "patr.M_Product_ID=@M_Product_ID AND patr.M_AttributeSetInstance_ID != 0 ORDER BY asi.GuaranteeDate, QtyOnHand DESC";
+            // "Show All" unchecked -> only rows with stock on hand (QtyOnHand > 0), matching the
+            // framework pattributeinstance grid's optional filter; checked -> include zero/-ve qty.
+            var where = "patr.M_Product_ID=@M_Product_ID AND patr.M_AttributeSetInstance_ID != 0"
+                + (st.showAll ? "" : " AND s.QtyOnHand > 0")
+                + " ORDER BY asi.GuaranteeDate, QtyOnHand DESC";
             var rows = VIS.dataContext.getJSONData(cfg.contextUrl + "PAttributes/GetAttributeData",
                 { Sq1Atribute: VIS.secureEngine.encrypt(where), Product_ID: pid }, null);
             return flattenInstances(rows);
@@ -182,6 +193,20 @@
         return out;
     }
 
+    /* Reload the existing-instance list after the "Show All" toggle changes. getJSONData is
+       synchronous, so this re-queries, re-resolves the current selection, resets to page 1
+       and repaints the rows in place. */
+    function reloadInstances() {
+        cfg.BUSY(true);
+        st.options = loadExistingInstances();
+        var cur = st.M_AttributeSetInstance_ID;
+        var selIdx = cur > 0 ? indexOfAsi(st.options, cur) : -1;
+        st.selected = selIdx >= 0 ? optionKey(st.options[selIdx]) : "";
+        st.page = 0;
+        cfg.BUSY(false);
+        renderAttrRows();
+    }
+
     function buildDialog() {
         var L = cfg.L, E = cfg.E, IC = cfg.IC;
         var backdrop = $('<div class="vas-cil-dialog-backdrop" id="vasCilAttr"></div>');
@@ -193,7 +218,10 @@
             (st.info && st.info.IsCanCreate ?
                 '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-create">' + IC("plus", "+") + "<span>" + E(L("VAS_074_NewAttribute", "New attribute")) + "</span></button>" : "") + "</div>" +
             '<div class="vas-cil-dialog__type"><span class="vas-cil-badge vas-cil-badge--product">' + E(L("VAS_074_Product", "Product")) + '</span><p class="vas-cil-dialog__primary-name">' + E(st.productName) + "</p></div>" +
+            '<div class="vas-cil-attr-listctrls" id="vasCilAttrListCtrls">' +
             '<div class="vas-cil-search-input" id="vasCilAttrSearchRow">' + IC("search", "🔍") + '<input type="text" id="vasCilAttrSearch" placeholder="' + E(L("VAS_074_AttrSearch", "Search attribute values")) + '" /></div>' +
+            '<label class="vas-cil-attr-showall" id="vasCilAttrShowAllRow"><input type="checkbox" id="vasCilAttrShowAll"' + (st.showAll ? " checked" : "") + ' /><span>' + E(L("VAS_074_ShowAll", "Show All (include zero and (-ve) qty)")) + "</span></label>" +
+            "</div>" +
             "</header>" +
             '<div class="vas-cil-dialog__body vas-cil-dialog__body--fixed">' +
             '<div id="vasCilAttrList"' + (st.info && st.info.IsCanEdit ? ' class="vas-cil-attr-grid--editable"' : "") + '><div class="vas-cil-attr-grid__head"><div></div><div>' + E(L("VAS_074_Code", "Code")) + "</div><div>" + E(L("Description", "Description")) +
@@ -238,6 +266,7 @@
         dialog.on("click", "[data-act=attr-prev]", function () { if (st.page > 0) { st.page--; renderAttrRows(); } });
         dialog.on("click", "[data-act=attr-next]", function () { st.page++; renderAttrRows(); });
         dialog.find("#vasCilAttrSearch").on("input", function () { st.search = $(this).val(); st.page = 0; renderAttrRows(); });
+        dialog.find("#vasCilAttrShowAll").on("change", function () { st.showAll = this.checked; reloadInstances(); });
         renderAttr();
         setTimeout(function () { dialog.find("#vasCilAttrSearch").focus(); }, 0);
     }
@@ -348,7 +377,7 @@
         var L = cfg.L;
         var d = $("#vasCilAttr");
         var isCreate = st.mode === "create";
-        d.find("#vasCilAttrSearchRow").toggleClass("vas-cil-is-hidden", isCreate);
+        d.find("#vasCilAttrListCtrls").toggleClass("vas-cil-is-hidden", isCreate);
         d.find("#vasCilAttrTitle").toggleClass("vas-cil-is-hidden", isCreate);
         d.find("[data-act=attr-back]").toggleClass("vas-cil-is-hidden", !isCreate);
         d.find("[data-act=attr-create]").toggleClass("vas-cil-is-hidden", isCreate);
