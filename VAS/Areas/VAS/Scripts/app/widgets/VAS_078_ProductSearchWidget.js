@@ -39,6 +39,7 @@
  * 28 | Next page                                     | VAS_NextPage
  * 29 | Showing                                       | VAS_Showing
  * 30 | of                                            | VAS_Of
+ * 31 | Discontinued From                             | VAS_DiscontinuedFrom
  */
 ; VAS = window.VAS || {};
 
@@ -512,8 +513,24 @@
                 return '<span class="MPC-product-search-chip">' + escapeHtml(value) + '</span>';
             }).join('');
 
+            var imageUrl = overview.ImageUrl;
+            if (imageUrl && imageUrl.indexOf('http') !== 0 && imageUrl.indexOf('data:') !== 0) {
+                var contextUrl = VIS.Application.contextUrl || '';
+                if (contextUrl && contextUrl.lastIndexOf('/') !== contextUrl.length - 1 && imageUrl.indexOf('/') !== 0) {
+                    imageUrl = contextUrl + '/' + imageUrl;
+                } else if (contextUrl && contextUrl.lastIndexOf('/') === contextUrl.length - 1 && imageUrl.indexOf('/') === 0) {
+                    imageUrl = contextUrl + imageUrl.substring(1);
+                } else {
+                    imageUrl = contextUrl + imageUrl;
+                }
+            }
+
+            var heroIconContent = imageUrl
+                ? '<img class="MPC-product-search-hero-img" src="' + escapeHtml(imageUrl) + '" alt="">'
+                : icon('product');
+
             var hero = '<section class="MPC-product-search-hero">' +
-                '<span class="MPC-product-search-hero-icon">' + icon('product') + '</span>' +
+                '<span class="MPC-product-search-hero-icon' + (overview.ImageUrl ? ' has-image' : '') + '">' + heroIconContent + '</span>' +
                 '<div class="MPC-product-search-hero-main">' +
                     '<div class="MPC-product-search-hero-name">' + escapeHtml(overview.ProductName) + '</div>' +
                     '<div class="MPC-product-search-chips">' + chips + '</div>' +
@@ -588,7 +605,8 @@
                 [label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true],
                 [label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true],
                 [label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)],
-                [label('Status', 'Status'), productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive')]
+                [label('Status', 'Status'), productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive')],
+                [label('VAS_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]
             ];
 
             return '<div class="MPC-product-search-form-grid">' + fields.map(function (field) {
@@ -726,6 +744,9 @@
 
         function closeDialog() {
             if (!$dialog) { return; }
+            if (document.activeElement && $dialog[0].contains(document.activeElement)) {
+                if ($input && $input.length) { $input.focus(); } else { document.activeElement.blur(); }
+            }
             $dialog.removeClass('is-open').attr('aria-hidden', 'true');
             $('body').removeClass('MPC-product-search-modal-open');
             productDetail = null;

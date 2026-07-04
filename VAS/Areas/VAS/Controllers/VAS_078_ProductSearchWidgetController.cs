@@ -37,6 +37,7 @@ namespace VAS.Controllers
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
+        [ValidateInput(false)]
         public JsonResult SearchProducts(string q, int max = 7)
         {
             if (Session["ctx"] == null)
@@ -334,10 +335,14 @@ namespace VAS.Controllers
                        Product.ProductType AS Product_Type,
                        ProductCategory.Name AS Category_Name,
                        UOM.Name AS UOM_Name,
-                       Product.IsActive
+                       Product.IsActive,
+                       Product.DiscontinuedBy,
+                       Product.AD_Image_ID,
+                       ProductImage.ImageExtension
                 FROM M_Product Product
                 LEFT OUTER JOIN M_Product_Category ProductCategory ON (ProductCategory.M_Product_Category_ID=Product.M_Product_Category_ID AND ProductCategory.IsActive=N'Y')
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=Product.C_UOM_ID AND UOM.IsActive=N'Y')
+                LEFT OUTER JOIN AD_Image ProductImage ON (ProductImage.AD_Image_ID=Product.AD_Image_ID AND ProductImage.IsActive=N'Y')
                 WHERE Product.M_Product_ID=@M_Product_ID
                   AND Product.IsActive=N'Y'
                   AND Product.AD_Client_ID=@AD_Client_ID
@@ -358,6 +363,9 @@ namespace VAS.Controllers
                 dr = DB.ExecuteReader(sql, parameters);
                 if (dr == null || !dr.Read()) { return null; }
 
+                int adImageId = Util.GetValueOfInt(dr["AD_Image_ID"]);
+                string imageExtension = Util.GetValueOfString(dr["ImageExtension"]);
+
                 return new ProductOverview
                 {
                     ProductId = Util.GetValueOfInt(dr["M_Product_ID"]),
@@ -368,12 +376,72 @@ namespace VAS.Controllers
                     ProductType = Util.GetValueOfString(dr["Product_Type"]),
                     CategoryName = Util.GetValueOfString(dr["Category_Name"]),
                     UomName = Util.GetValueOfString(dr["UOM_Name"]),
-                    IsActive = Util.GetValueOfString(dr["IsActive"]) == "Y"
+                    IsActive = Util.GetValueOfString(dr["IsActive"]) == "Y",
+                    DiscontinuedFrom = FormatDate(Util.GetValueOfDateTime(dr["DiscontinuedBy"])),
+                    ImageUrl = GetProductImageUrl(ctx, adImageId, imageExtension)
                 };
             }
             finally
             {
                 CloseReader(dr);
+            }
+        }
+
+        /// <summary>
+        /// Resolves a product's AD_Image_ID to a relative thumbnail URL by checking the
+        /// server's file system directly - same convention as VASAttachUserToBP /
+        /// VAS_TimeSheetInvoice / VAS_074_CreateInvoiceLinePanelModel
+        /// (Images/Thumb500x375/&lt;id&gt;&lt;ext&gt;). No BLOB read, no base64. Returns null
+        /// when the id is unset or the thumbnail file is missing, so the client falls back
+        /// to the icon. The client prepends VIS.Application.contextUrl to the result.
+        /// </summary>
+        /// <param name="adImageId">M_Product.AD_Image_ID</param>
+        /// <param name="imageExtension">AD_Image.ImageExtension (e.g. ".png")</param>
+        private string GetProductImageUrl(Ctx ctx, int adImageId, string imageExtension)
+        {
+            if (adImageId <= 0) { return null; }
+
+            // Always construct the absolute URL. We bypass System.IO.File.Exists
+            // because images might be hosted on a separate web server or CDN
+            // where the local IIS worker process does not have physical disk access.
+            if (!string.IsNullOrEmpty(imageExtension))
+            {
+                // Note: The user reported the URL is /images/ (lowercase is safer on Linux servers)
+                return ctx.GetApplicationUrl() + "Images/" + adImageId + imageExtension;
+            }
+
+            // Fallback for Blob
+            if (ctx != null)
+            {
+                MImage image = MImage.Get(ctx, adImageId);
+                if (image != null)
+                {
+                    if (!string.IsNullOrEmpty(image.GetImageURL()))
+                    {
+                        return image.GetImageURL();
+                    }
+
+                    byte[] data = image.GetBinaryData();
+                    if (data != null && data.Length > 0)
+                    {
+                        return "data:" + GetImageMimeType(imageExtension) + ";base64," + Convert.ToBase64String(data);
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        private string GetImageMimeType(string imageExtension)
+        {
+            switch ((imageExtension ?? "").Trim().ToLowerInvariant())
+            {
+                case ".jpg":
+                case ".jpeg": return "image/jpeg";
+                case ".gif": return "image/gif";
+                case ".bmp": return "image/bmp";
+                case ".webp": return "image/webp";
+                default: return "image/png";
             }
         }
 
@@ -930,6 +998,8 @@ namespace VAS.Controllers
             public string CategoryName { get; set; }
             public string UomName { get; set; }
             public bool IsActive { get; set; }
+            public string DiscontinuedFrom { get; set; }
+            public string ImageUrl { get; set; }
         }
 
         private class ProductStockRow

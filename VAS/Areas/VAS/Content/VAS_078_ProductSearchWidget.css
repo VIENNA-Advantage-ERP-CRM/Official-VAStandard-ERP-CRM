@@ -351,6 +351,19 @@
     height: 32px;
 }
 
+.MPC-product-search-hero-icon.has-image {
+    padding: 0;
+    overflow: hidden;
+}
+
+.MPC-product-search-hero-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 15px;
+}
+
 .MPC-product-search-hero-main {
     min-width: 180px;
     flex: 1 1 220px;
