@@ -154,6 +154,16 @@
         function lineSurcharge(line) { return +lineVal(line, "SurchargeAmt") || 0; }
         /* Total line tax = base tax + surcharge (per request: totalTax = TaxAmt + SurchargeAmt). */
         function lineTaxTotal(line) { return lineTaxAmount(line) + lineSurcharge(line); }
+        /* ---------- bottom-panel totals: use the SAVED line columns, not a live recompute ----------
+           The invoice totals row reflects the actual stored C_InvoiceLine amounts:
+             Subtotal = TaxBaseAmt, Tax = TaxAmt + SurchargeAmt, Total = TaxBaseAmt + TaxAmt + SurchargeAmt.
+           These are the values the framework writes on save (tax already accounted for whether the
+           price is tax-inclusive or exclusive), so the row updates after the record is saved and does
+           NOT need recomputing on every amount edit. Read case-insensitively (PG lowercases keys);
+           an unsaved/edited line contributes its last saved value (0 for a brand-new line). */
+        function lineTaxBaseSaved(line) { return +lineVal(line, "TaxBaseAmt") || 0; }
+        function lineTaxSaved(line) { return +lineVal(line, "TaxAmt") || 0; }
+        function lineTaxTotalSaved(line) { return lineTaxSaved(line) + lineSurcharge(line); }
         /* Net (tax-excluded) line amount = the Subtotal contribution. Tax-inclusive: gross
            minus the extracted tax (incl. surcharge); tax-exclusive: the gross IS the net. */
         function lineSubtotal(line) {
@@ -309,6 +319,18 @@
             render();
         }
 
+        /* Undo for a NEW (never-saved) line = remove it entirely. It was never persisted,
+           so this is a client-only discard (no DeleteLines call) and there is no pristine
+           snapshot to revert to - mirrors deleteSelected's localOnly splice. */
+        function discardNewLine(line) {
+            if (!line) return;
+            if (editing && editing.rowId === line.rowId) editing = null;
+            if (morePopoverFor === line.rowId) { morePopoverFor = null; closeDialogs(); }
+            var i = lines.indexOf(line);
+            if (i >= 0) lines.splice(i, 1);
+            render();
+        }
+
         /* Seed every C_InvoiceLine column (from the cached columnMeta) on a new
            line so the VO carries all columns; explicit defaults already set are
            preserved. */
@@ -459,8 +481,10 @@
             // Base = saved totals of every OTHER page (server), plus the live sum of the
             // current page below, so the row shows the WHOLE invoice's grand total.
             var sub = otherSub, tax = otherTax, tcs = otherTcs;
-            // Tax column includes the surcharge (totalTax = TaxAmt + SurchargeAmt).
-            for (var i = 0; i < lines.length; i++) { sub += lineSubtotal(lines[i]); tax += lineTaxTotal(lines[i]); tcs += lineTcs(lines[i]); }
+            // Subtotal = SUM(TaxBaseAmt), Tax = SUM(TaxAmt + SurchargeAmt) - both from the SAVED
+            // line columns (server supplies the other pages; these add the current page). No live
+            // recompute, so the row is exact and refreshes on save.
+            for (var i = 0; i < lines.length; i++) { sub += lineTaxBaseSaved(lines[i]); tax += lineTaxTotalSaved(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
             $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
             $totalsRow.append(totalItem(lbl("Tax", "Tax"), fmtMoney(tax), false));
@@ -771,18 +795,23 @@
         function renderMoreCell(line) {
             var editable = parent && parent.IsEditable;
             var cell = $('<div class="vas-cil-cell vas-cil-cell--more" role="cell" style="position:relative"></div>');
-            // Undo: only on a SAVED row that currently has unsaved edits. Reverts the row
-            // to its last pristine snapshot. (New rows have no snapshot - use Delete.)
-            if (editable && line.status === "saved" && line.dirty && line._saved && !line._saving) {
-                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(lbl("VAS_074_UndoChanges", "Undo changes")) + '">' + icon("rotate-ccw", "↺") + "</button>");
+            // Undo affordance (↺). On a SAVED row with unsaved edits it reverts the row to
+            // its last pristine snapshot; on a NEW (never-saved) row it removes the row
+            // entirely (client-only discard - a new line has no snapshot to revert to).
+            var canUndoEdits = line.status === "saved" && line.dirty && line._saved;
+            var canDiscardNew = line.status === "new";
+            if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
+                var undoTitle = canDiscardNew ? lbl("VAS_074_UndoNewLine", "Undo (remove line)") : lbl("VAS_074_UndoChanges", "Undo changes");
+                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
+                var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
                 // cell editor is focused would otherwise blur->commit->re-render and
                 // destroy this button before its click fired, needing a second click.
                 // preventDefault keeps the focused input from blurring; Undo discards the
-                // pending edit anyway by restoring the snapshot.
-                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoLine(line); });
+                // pending edit anyway (revert snapshot / remove the row).
+                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoAct(line); });
                 // Keyboard activation (Enter/Space) fires click with detail 0, no mousedown.
-                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoLine(line); } });
+                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoAct(line); } });
                 cell.append($undo);
             }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
@@ -1578,6 +1607,10 @@
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the invoice header / document context. */
         function isColumnReadOnly(line, col) {
+            // C_UOM_ID is locked once the line is saved (C_InvoiceLine_ID > 0): the unit of
+            // measure must not change on an existing invoice line. Checked before the meta
+            // lookup so it holds even when column meta is absent.
+            if (col === "C_UOM_ID" && line && line.values && (line.values.C_InvoiceLine_ID || 0) > 0) return true;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
@@ -2401,6 +2434,9 @@
                 // true -> open straight on the New-attribute form; false -> instance list.
                 // Set this per your own requirement.
                 newAttribute: true,
+                // Default state of the instance list's "Show All (include zero and (-ve) qty)"
+                // checkbox for THIS screen. true -> show all; false -> only QtyOnHand > 0.
+                showAll: true,
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,

@@ -1012,7 +1012,10 @@ namespace VASLogic.Models
             // Tax total includes the surcharge (totalTax = TaxAmt + SurchargeAmt) when the
             // SurchargeAmt column is installed, matching the client per-line lineTaxTotal.
             string surExpr = " + COALESCE(SUM(il.SurchargeAmt), 0)";
-            string sql = "SELECT COALESCE(SUM(il.LineNetAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0)" + surExpr + " AS Tax, "
+            // Subtotal = SUM(TaxBaseAmt) - the actual stored tax base (net) the framework writes on
+            // save. This is correct whether the price is tax-inclusive or exclusive, so no further
+            // inclusive adjustment is needed (see ComputeOtherPageTotals).
+            string sql = "SELECT COALESCE(SUM(il.TaxBaseAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0)" + surExpr + " AS Tax, "
                 + tcsExpr + " AS Tcs"
                 + " FROM C_InvoiceLine il WHERE il.C_Invoice_ID = @C_Invoice_ID AND il.IsActive = 'Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1042,18 +1045,16 @@ namespace VASLogic.Models
             if (pageRows != null)
                 foreach (InvoiceLineRow row in pageRows)
                 {
-                    pNet += row.LineNetAmt;
+                    pNet += RowDecimal(row, "TaxBaseAmt");                  // Subtotal base = stored TaxBaseAmt
                     pTax += row.TaxAmt + RowDecimal(row, "SurchargeAmt");   // totalTax = TaxAmt + SurchargeAmt
                     pTcs += RowTcs(row);
                 }
             otherNet = gNet - pNet;
             otherTax = gTax - pTax;
             otherTcs = gTcs - pTcs;
-            // On a tax-inclusive invoice the framework stores LineNetAmt as the GROSS
-            // (PriceActual already contains tax) and TaxAmt as the tax EXTRACTED from it,
-            // so the true net Subtotal is LineNetAmt - TaxAmt. Reduce it here so the totals
-            // row shows net (and Total = net + tax = the entered gross), not gross + tax.
-            if (taxIncluded) otherNet -= otherTax;
+            // Subtotal now comes from the stored TaxBaseAmt (already the net base whether the price
+            // is tax-inclusive or exclusive), so no LineNetAmt-minus-TaxAmt inclusive adjustment is
+            // needed here. The taxIncluded flag is retained on the signature for the call sites.
         }
 
         /// <summary>Per-line TCS amount (VA106_TCSAmount) read case-insensitively; 0 when
