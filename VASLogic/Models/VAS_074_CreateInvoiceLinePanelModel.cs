@@ -428,7 +428,11 @@ namespace VASLogic.Models
                 ValRuleCode = Util.GetValueOfString(r["ValRuleCode"]),
                 AD_Reference_Value_ID = Util.GetValueOfInt(r["AD_Reference_Value_ID"]),
                 Name = Util.GetValueOfString(r["FieldName"]),
-                IsDisplayed = true
+                IsDisplayed = true,
+                // fromField == true -> loaded from AD_Field on the window tab (a real GridField
+                // exists). Merged-only columns (fromField == false) have no tab field, so the
+                // client callout shim's getField() must return null for them (GridTab parity).
+                IsTabField = fromField
             };
             // DisplayLogic is selected by BOTH the tab-field query (AD_Field.DisplayLogic) and
             // the all-columns merge (representative C_InvoiceLine field via subquery), so read
@@ -1793,10 +1797,11 @@ namespace VASLogic.Models
             "Created", "CreatedBy", "Updated", "UpdatedBy", "IsActive",
             "M_Product_ID", "C_Charge_ID", "M_AttributeSetInstance_ID",
             "QtyEntered", "C_UOM_ID", "PriceEntered", "PriceActual",
-            "C_Tax_ID", "Line", "Description", "LineNetAmt", "TaxAmt", "LineTotalAmt", "Discount"
+            "C_Tax_ID", "Line", "Description"/*, "LineNetAmt", "TaxAmt", "LineTotalAmt", "Discount"*/
         };
 
         private HashSet<string> _updateableColumns;
+        private HashSet<string> _yesNoColumns;
 
         /// <summary>
         /// Persists every NON-core, updateable C_InvoiceLine column present in the
@@ -1817,7 +1822,15 @@ namespace VASLogic.Models
                 if (kv.Value == null) continue;
                 if (CORE_OR_SYSTEM_COLUMNS.Contains(col)) continue;
                 if (updateable.Count > 0 && !updateable.Contains(col)) continue;
-                try { line.Set_Value(col, CoerceJsonValue(kv.Value)); }
+                try
+                {
+                    // YesNo (AD_Reference 20) columns: PO.Set_Value expects a CLR boolean,
+                    // NOT the client's "Y"/"N" string - coerce so the flag persists correctly.
+                    object val = GetYesNoColumns().Contains(col)
+                        ? (object)CoerceYesNo(kv.Value)
+                        : CoerceJsonValue(kv.Value);
+                    line.Set_Value(col, val);
+                }
                 catch (Exception ex) { log.Warning("VAS_074 SaveLines: skip column " + col + " - " + ex.Message); }
             }
         }
@@ -1847,14 +1860,16 @@ namespace VASLogic.Models
             return v;
         }
 
-        /// <summary>Active + updateable C_InvoiceLine column names (per-instance cached).</summary>
-        /// <returns>updateable column set</returns>
-        private HashSet<string> GetUpdateableColumns()
+        /// <summary>Loads (once) the active + updateable C_InvoiceLine columns AND, in the
+        /// same pass, the subset that are YesNo (AD_Reference 20) - one query serves both
+        /// GetUpdateableColumns and GetYesNoColumns.</summary>
+        private void EnsureColumnSets()
         {
-            if (_updateableColumns != null) return _updateableColumns;
+            if (_updateableColumns != null) return;
             _updateableColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _yesNoColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             DataSet ds = DB.ExecuteDataset(
-                @"SELECT c.ColumnName
+                @"SELECT c.ColumnName, c.AD_Reference_ID
                   FROM AD_Column c
                   INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
                   WHERE t.TableName = 'C_InvoiceLine'
@@ -1862,8 +1877,33 @@ namespace VASLogic.Models
                     AND COALESCE(c.IsUpdateable, 'Y') = 'Y'");
             if (ds != null && ds.Tables.Count > 0)
                 foreach (DataRow r in ds.Tables[0].Rows)
-                    _updateableColumns.Add(Util.GetValueOfString(r["ColumnName"]));
-            return _updateableColumns;
+                {
+                    string name = Util.GetValueOfString(r["ColumnName"]);
+                    _updateableColumns.Add(name);
+                    if (Util.GetValueOfInt(r["AD_Reference_ID"]) == 20) _yesNoColumns.Add(name);   // DisplayType.YesNo
+                }
+        }
+
+        /// <summary>Active + updateable C_InvoiceLine column names (per-instance cached).</summary>
+        /// <returns>updateable column set</returns>
+        private HashSet<string> GetUpdateableColumns() { EnsureColumnSets(); return _updateableColumns; }
+
+        /// <summary>Updateable C_InvoiceLine YesNo columns (AD_Reference 20), per-instance cached.
+        /// PO.Set_Value on these expects a CLR boolean rather than a "Y"/"N" string.</summary>
+        /// <returns>YesNo column-name set</returns>
+        private HashSet<string> GetYesNoColumns() { EnsureColumnSets(); return _yesNoColumns; }
+
+        /// <summary>Coerces a client YesNo value (bool, "Y"/"N", "true"/"false", 1/0) to a
+        /// CLR boolean for PO.Set_Value on a YesNo column.</summary>
+        /// <param name="v">deserialized client value</param>
+        /// <returns>true when the value represents Yes/true</returns>
+        private static bool CoerceYesNo(object v)
+        {
+            if (v is bool) return (bool)v;
+            string s = Util.GetValueOfString(v).Trim();
+            return s.Equals("Y", StringComparison.OrdinalIgnoreCase)
+                || s.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || s == "1";
         }
 
         /// <summary>Returns the UOM symbol (or name) for display, or empty.</summary>
@@ -2384,6 +2424,7 @@ namespace VASLogic.Models
         public string ValRuleType { get; set; }      // 'S' SQL, 'J' Java/JS, 'F' filter
         public string ValRuleCode { get; set; }
         public bool IsDisplayed { get; set; }        // AD_Field.IsDisplayed (window-driven)
+        public bool IsTabField { get; set; }         // true when this column is an actual AD_Field on the window tab (not a merged-only table column) - mirrors GridTab.getField() != null
         public bool IsReadOnly { get; set; }         // AD_Field.IsReadOnly (window-driven)
         public int SeqNo { get; set; }               // AD_Field.SeqNo (window-driven)
         public string DisplayLogic { get; set; }     // AD_Field.DisplayLogic (dynamic show/hide expr)
