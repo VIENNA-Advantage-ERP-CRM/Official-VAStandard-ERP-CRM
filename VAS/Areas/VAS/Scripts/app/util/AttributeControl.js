@@ -52,6 +52,8 @@
     function defParseNum(s) { var n = parseFloat(String(s == null ? "" : s).replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; }
 
     var ATTR_PAGE_SIZE = 20;
+    // Reference length for a String attribute (AttributeValueType "StringMax40").
+    var ATTR_STRING_MAX_LEN = 40;
 
     /* per-open config + state */
     var cfg = null;   // { L,E,IC,BUSY,TOAST,DSTR,MONEY,PNUM, contextUrl, ep, onApply }
@@ -268,9 +270,14 @@
                 }
                 ctrl += "</select>";
             } else if (a.ValueType === "N") {
-                ctrl = '<input type="text" inputmode="decimal" id="' + id + '" placeholder=" " data-placeholder="" />';
+                // Number attribute -> a real numeric input. step="any" so decimals are valid
+                // (default step=1 flags non-integers); the browser's numeric keypad follows.
+                ctrl = '<input type="number" step="any" id="' + id + '" placeholder=" " data-placeholder="" />';
             } else {
-                ctrl = '<input type="text" id="' + id + '" placeholder=" " data-placeholder="" />';
+                // String attributes are AttributeValueType "StringMax40" - the reference length
+                // is a fixed 40 chars, so cap the input client-side (the framework rejects longer
+                // values on save). Kept as a named constant so a schema change is one edit.
+                ctrl = '<input type="text" maxlength="' + ATTR_STRING_MAX_LEN + '" id="' + id + '" placeholder=" " data-placeholder="" />';
             }
             html += attrField(ctrl, a.Name, null, a.IsMandatory);
         }

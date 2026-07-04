@@ -154,6 +154,16 @@
         function lineSurcharge(line) { return +lineVal(line, "SurchargeAmt") || 0; }
         /* Total line tax = base tax + surcharge (per request: totalTax = TaxAmt + SurchargeAmt). */
         function lineTaxTotal(line) { return lineTaxAmount(line) + lineSurcharge(line); }
+        /* ---------- bottom-panel totals: use the SAVED line columns, not a live recompute ----------
+           The invoice totals row reflects the actual stored C_InvoiceLine amounts:
+             Subtotal = TaxBaseAmt, Tax = TaxAmt + SurchargeAmt, Total = TaxBaseAmt + TaxAmt + SurchargeAmt.
+           These are the values the framework writes on save (tax already accounted for whether the
+           price is tax-inclusive or exclusive), so the row updates after the record is saved and does
+           NOT need recomputing on every amount edit. Read case-insensitively (PG lowercases keys);
+           an unsaved/edited line contributes its last saved value (0 for a brand-new line). */
+        function lineTaxBaseSaved(line) { return +lineVal(line, "TaxBaseAmt") || 0; }
+        function lineTaxSaved(line) { return +lineVal(line, "TaxAmt") || 0; }
+        function lineTaxTotalSaved(line) { return lineTaxSaved(line) + lineSurcharge(line); }
         /* Net (tax-excluded) line amount = the Subtotal contribution. Tax-inclusive: gross
            minus the extracted tax (incl. surcharge); tax-exclusive: the gross IS the net. */
         function lineSubtotal(line) {
@@ -459,8 +469,10 @@
             // Base = saved totals of every OTHER page (server), plus the live sum of the
             // current page below, so the row shows the WHOLE invoice's grand total.
             var sub = otherSub, tax = otherTax, tcs = otherTcs;
-            // Tax column includes the surcharge (totalTax = TaxAmt + SurchargeAmt).
-            for (var i = 0; i < lines.length; i++) { sub += lineSubtotal(lines[i]); tax += lineTaxTotal(lines[i]); tcs += lineTcs(lines[i]); }
+            // Subtotal = SUM(TaxBaseAmt), Tax = SUM(TaxAmt + SurchargeAmt) - both from the SAVED
+            // line columns (server supplies the other pages; these add the current page). No live
+            // recompute, so the row is exact and refreshes on save.
+            for (var i = 0; i < lines.length; i++) { sub += lineTaxBaseSaved(lines[i]); tax += lineTaxTotalSaved(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
             $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
             $totalsRow.append(totalItem(lbl("Tax", "Tax"), fmtMoney(tax), false));
@@ -1578,6 +1590,10 @@
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the invoice header / document context. */
         function isColumnReadOnly(line, col) {
+            // C_UOM_ID is locked once the line is saved (C_InvoiceLine_ID > 0): the unit of
+            // measure must not change on an existing invoice line. Checked before the meta
+            // lookup so it holds even when column meta is absent.
+            if (col === "C_UOM_ID" && line && line.values && (line.values.C_InvoiceLine_ID || 0) > 0) return true;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
