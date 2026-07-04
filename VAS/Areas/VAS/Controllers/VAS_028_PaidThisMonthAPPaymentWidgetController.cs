@@ -196,7 +196,7 @@ namespace VAS.Controllers
                 string errorMessage = GetMsg(
                     ctx,
                     "VAS_ErrorLoading",
-                    "Could Not Load Data"
+                    "No Data"
                 );
 
                 return Json(
