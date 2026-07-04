@@ -1228,6 +1228,31 @@
     gap: 0.5em;
 }
 
+/* Header close (✕) - dismisses the whole attribute picker (create/edit mode). */
+.vas-cil-dialog__close {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--cil-text-muted);
+    font-size: 1em;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .12s, color .12s;
+}
+
+    .vas-cil-dialog__close:hover {
+        background: var(--cil-divider);
+        color: var(--cil-text);
+    }
+
 .vas-cil-dialog__title {
     margin: 0;
     font-size: 1em;
