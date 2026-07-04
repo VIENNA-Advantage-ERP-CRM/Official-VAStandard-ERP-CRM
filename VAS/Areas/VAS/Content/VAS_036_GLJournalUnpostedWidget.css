@@ -86,6 +86,12 @@
     color: #D78B10;
 }
 
+.VAS-glju-zoom svg {
+    width: 1em;
+    height: 1em;
+    stroke: currentColor;
+}
+
 /* ── KPI value — amber/warning color ────────────────────────────────────── */
 .VAS-glju-root .kpi-value {
     font-size: 2.125em;
@@ -103,18 +109,13 @@
 .VAS-glju-root .kpi-why {
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
-    background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
-    padding: 0.45em 0.6em;
-    border: 1px solid rgba(215, 139, 16, 0.18);
 }
 
 .VAS-glju-root .kpi-why-label {
     font-size: 0.6875em;
     font-weight: 700;
     color: #D78B10;
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
     flex-shrink: 0;
@@ -178,4 +179,915 @@ html[dir="rtl"] .VAS-glju-root .w-head {
 
 html[dir="rtl"] .VAS-glju-root .kpi-why {
     flex-direction: row-reverse;
+}
+
+/* Typography alignment with VAS_039_GLJournalPostedWidget */
+.VAS-glju-root {
+    container-type: inline-size;
+}
+
+.VAS-glju-root .kpi {
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.VAS-glju-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS-glju-root .kpi-value {
+    font-size: 1.375em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+.VAS-glju-root .kpi-why-text {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-glju-root .kpi,
+.VAS-glju-root .kpi.kpi-amber {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-glju-root .w-title,
+.VAS-glju-root .kpi-value {
+    color: #102C3F;
+}
+
+.VAS-glju-root .w-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #D78B10;
+}
+
+.VAS-glju-root .kpi-value.warning,
+.VAS-glju-root .kpi-why-label,
+.VAS-glju-zoom:hover {
+    color: #D78B10;
+}
+
+.VAS-glju-root .kpi-why-text,
+.VAS-glju-zoom {
+    color: #748494;
+}
+
+.VAS-glju-body-lock {
+    overflow: hidden;
+}
+
+.VAS-glju-dialog {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25em;
+}
+
+.VAS-glju-dialog,
+.VAS-glju-dialog * {
+    box-sizing: border-box;
+}
+
+.VAS-glju-dialog-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    backdrop-filter: blur(0.125em);
+}
+
+.VAS-glju-dialog-card {
+    position: relative;
+    width: min(62em, 100%);
+    height: min(34em, 100%);
+    background: #FFFFFF;
+    border-radius: 1em;
+    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.VAS-glju-detail-dialog {
+    z-index: 10020;
+}
+
+.VAS-glju-detail-card {
+    height: min(43em, 100%);
+}
+
+.VAS-glju-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    flex-shrink: 0;
+    margin-bottom: 12px;
+}
+
+.VAS-glju-dialog-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #1F8FFF 0%, #0878DE 100%);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.VAS-glju-dialog-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+    stroke: currentColor;
+}
+
+.VAS-glju-dialog-title-wrap {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-glju-dialog-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 600;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.VAS-glju-dialog-sub {
+    margin-top: 0.125em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    color: #748494;
+    line-height: 1.3;
+}
+
+.VAS-glju-dialog-close {
+    width: 2em;
+    height: 2em;
+    border: 0;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #5F7283;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.VAS-glju-dialog-close svg {
+    width: 1em;
+    height: 1em;
+}
+
+.VAS-glju-dialog-close:hover {
+    background: #F3F7FB;
+    color: #102C3F;
+}
+
+.VAS-glju-dialog-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.125em;
+    position: relative;
+}
+
+.VAS-glju-dialog-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
+    z-index: 5;
+}
+
+.VAS-glju-table-wrap {
+    height: 100%;
+    overflow: auto;
+}
+
+.VAS-glju-dialog-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+}
+
+.VAS-glju-dialog-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #F5F8FB;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-align: left;
+    padding: 0.875em 0.75em;
+    border-bottom: 0.0625em solid #E4EDF4;
+    white-space: nowrap;
+}
+
+.VAS-glju-dialog-table tbody td {
+    padding: 0.875em 0.75em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    font-size: 0.75em;
+    color: #102C3F;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-glju-dialog-table tbody tr:hover td {
+    background: #F8FBFE;
+}
+
+.VAS-glju-entry-row {
+    cursor: pointer;
+}
+
+.VAS-glju-dialog-table th:nth-child(1),
+.VAS-glju-dialog-table td:nth-child(1) {
+    width: 8.5em;
+}
+
+.VAS-glju-dialog-table th:nth-child(2),
+.VAS-glju-dialog-table td:nth-child(2) {
+    width: 8.5em;
+}
+
+.VAS-glju-dialog-table th:nth-child(4),
+.VAS-glju-dialog-table td:nth-child(4) {
+    width: 8em;
+}
+
+.VAS-glju-dialog-table th:nth-child(5),
+.VAS-glju-dialog-table th:nth-child(6),
+.VAS-glju-dialog-table td:nth-child(5),
+.VAS-glju-dialog-table td:nth-child(6) {
+    width: 10em;
+    text-align: right;
+}
+
+.VAS-glju-doc,
+.VAS-glju-date {
+    color: #5F7283;
+}
+
+.VAS-glju-desc {
+    color: #102C3F;
+}
+
+.VAS-glju-amt {
+    text-align: right;
+    font-weight: 600;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.VAS-glju-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.75em;
+    font-weight: 500;
+    padding: 0.2em 0.55em;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.VAS-glju-pill span {
+    width: 0.45em;
+    height: 0.45em;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.VAS-glju-pill-draft {
+    background: #EEF2F7;
+    color: #5F7283;
+}
+
+.VAS-glju-pill-posted {
+    background: rgba(1, 157, 137, 0.12);
+    color: #0B6B45;
+}
+
+.VAS-glju-pill-submit {
+    background: #EAF8FF;
+    color: #0083DA;
+}
+
+.VAS-glju-pill-pending,
+.VAS-glju-pill-returned {
+    background: rgba(215, 139, 16, 0.12);
+    color: #9A6500;
+}
+
+.VAS-glju-dialog-empty {
+    padding: 2.25em 1em;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;
+}
+
+.VAS-glju-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.75em 1.125em;
+    border-top: 0.0625em solid #EDF2F6;
+    background: #FAFCFE;
+    flex-shrink: 0;
+}
+
+.VAS-glju-dialog-total {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.VAS-glju-dialog-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.VAS-glju-detail-footer-spacer {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-glju-export,
+.VAS-glju-close-primary {
+    height: 2.25em;
+    min-width: 5.75em;
+    border-radius: 0.5em;
+    padding: 0 1em;
+    font-size: 0.875em;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.VAS-glju-export {
+    background: #FBFDFF;
+    border: 0.0625em solid #E4EDF4;
+    color: #5F7283;
+}
+
+.VAS-glju-export:hover {
+    background: #F3F7FB;
+}
+
+.VAS-glju-close-primary {
+    background: #0083DA;
+    border: 0.0625em solid #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-glju-close-primary:hover {
+    background: #0069AE;
+}
+
+.VAS-glju-detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25em;
+    min-height: 100%;
+}
+
+.VAS-glju-detail-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.15em 1.75em;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 0.75em;
+    padding: 1.125em 1.25em;
+    background: #FFFFFF;
+}
+
+.VAS-glju-detail-summary > div > span,
+.VAS-glju-detail-section-title,
+.VAS-glju-created-strip > div > span {
+    display: block;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+}
+
+.VAS-glju-detail-summary > div > strong {
+    display: block;
+    margin-top: 0.45em;
+    color: #000000;
+    font-size: 0.95em;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.VAS-glju-detail-description {
+    grid-column: 1 / -1;
+}
+
+.VAS-glju-detail-lines-wrap {
+    overflow: auto;
+    background: #FFFFFF;
+}
+
+.VAS-glju-detail-lines {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.875em;
+    min-width: 55em;
+}
+
+.VAS-glju-detail-lines th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-align: left;
+    padding: 0.875em 0.75em;
+    border-bottom: 0.0625em solid #E4EDF4;
+    white-space: nowrap;
+    text-transform: capitalize;
+}
+
+.VAS-glju-detail-lines td {
+    padding: 0.875em 0.75em;
+    color: #001D32;
+    font-size: 0.75em;
+    border-bottom: 0.0625em solid #EDF2F6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.VAS-glju-detail-lines tbody tr:hover td {
+    background: #F8FBFE;
+}
+
+.VAS-glju-detail-lines tfoot td {
+    background: #F5F8FB;
+    font-weight: 700;
+    border-bottom: 0;
+}
+
+.VAS-glju-detail-lines th:nth-child(1),
+.VAS-glju-detail-lines td:nth-child(1) {
+    width: 18em;
+}
+
+.VAS-glju-detail-lines th:nth-child(2),
+.VAS-glju-detail-lines th:nth-child(3),
+.VAS-glju-detail-lines td:nth-child(2),
+.VAS-glju-detail-lines td:nth-child(3) {
+    width: 10em;
+    text-align: right;
+}
+
+.VAS-glju-created-strip {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    background: #EAF8FF;
+    border-radius: 0.75em;
+    padding: 0.9em 1.125em;
+    color: #001D32;
+}
+
+.VAS-glju-created-strip strong {
+    color: #000000;
+    font-weight: 700;
+}
+
+.VAS-glju-avatar {
+    width: 2.25em;
+    height: 2.25em;
+    border-radius: 50%;
+    background: #4268E8;
+    color: #FFFFFF !important;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875em !important;
+    font-weight: 700 !important;
+    letter-spacing: 0 !important;
+    flex-shrink: 0;
+}
+
+@media (max-width: 40em) {
+    .VAS-glju-dialog {
+        padding: 0;
+    }
+
+    .VAS-glju-dialog-card {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    .VAS-glju-dialog-footer {
+        flex-wrap: wrap;
+    }
+
+    .VAS-glju-detail-footer-spacer {
+        display: none;
+    }
+
+    .VAS-glju-detail-dialog .VAS-glju-dialog-actions {
+        width: 100%;
+    }
+
+    .VAS-glju-detail-dialog .VAS-glju-export,
+    .VAS-glju-detail-dialog .VAS-glju-close-primary {
+        flex: 1;
+    }
+
+    .VAS-glju-detail-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dialog buttons: design-system primary / secondary pills */
+.VAS-glju-dialog-actions {
+    gap: 0.5rem;
+}
+
+.VAS-glju-export,
+.VAS-glju-close-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 6rem;
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    border-width: 1px;
+    border-style: solid;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.VAS-glju-export {
+    background: #E5F3FB;
+    border-color: #BFE4FF;
+    color: #0083DA;
+}
+
+.VAS-glju-export:hover {
+    background: #CCE6F8;
+    border-color: #9ED1FF;
+    color: #0069AE;
+}
+
+.VAS-glju-close-primary {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-glju-close-primary:hover {
+    background: #0069AE;
+    border-color: #0069AE;
+}
+
+.VAS-glju-export:focus-visible,
+.VAS-glju-close-primary:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.VAS-glju-export:disabled,
+.VAS-glju-close-primary:disabled {
+    opacity: 0.55;
+    cursor: default;
+    box-shadow: none;
+}
+
+/* Dialog close alignment */
+.VAS-glju-dialog-close {
+    margin-left: auto;
+    color: #5F7283;
+    background: transparent;
+}
+
+.VAS-glju-dialog-close:hover {
+    color: #102C3F;
+    background: #F3F7FB;
+}
+
+.VAS-glju-dialog-actions {
+    margin-left: auto;
+}
+
+.VAS-glju-line-pager {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    width: 100%;
+    margin: 0.75rem 0 1rem;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    border: 1px solid #BFE4FF;
+    background: #E5F3FB;
+    color: #0083DA;
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn:hover {
+    background: #CCE6F8;
+    color: #0069AE;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn.is-active {
+    background: #0083DA;
+    border-color: #0083DA;
+    color: #FFFFFF;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-text {
+    min-width: 4rem;
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.875rem;
+    font-weight: 700;
+}
+
+/* Popup pagination — compact */
+.VAS-glju-line-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4em;
+    width: 100%;
+    flex-shrink: 0;
+    margin: 0.25em 0 0;
+    padding: 0.25em 0.5em;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn {
+    width: 1.5em;
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #CFE9FF;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+    font-size: 0.8125em;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #9ED1FF;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #C7D3DF;
+    cursor: default;
+    opacity: 1;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-text {
+    display: inline-block;
+    min-width: 3em;
+    text-align: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: #141414;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Detail popup: pager compact, close to table */
+.VAS-glju-detail-content .VAS-glju-line-pager {
+    margin-top: calc(-1.25em);
+    position: relative;
+    z-index: 1;
+    padding: 0.3em 0.625em;
+    margin-bottom: 0;
+}
+
+/* Unified GL Journal list table design */
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0 1.125em;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-table-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    overflow: auto;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table {
+    width: 100%;
+    border: 0;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #FFFFFF;
+    border-bottom: 0.0625em solid #EDF2F6;
+    color: #748494;
+    font-size: 0.75em;
+    font-weight: 400;
+    letter-spacing: 0;
+    padding: 1em 0.75em;
+    text-align: left;
+    white-space: nowrap;
+    text-transform: capitalize;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table tbody td {
+    border-bottom: 0.0625em solid #EDF2F6;
+    color: #102C3F;
+    font-size: 0.75em;
+    padding: 1em 0.75em;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(5),
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(6),
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(5),
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(6) {
+    text-align: right;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-pager-slot {
+    flex: 0 0 auto;
+    margin-top: auto;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-pager {
+    margin: 0;
+    padding: 1.35em 0.625em 1em;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+/* ── Cell hover tooltip ──────────────────────────────────────────────────── */
+.VAS-glju-detail-lines td[title],
+.VAS-glju-dialog-table td[title] {
+    position: relative;
+    cursor: default;
+}
+
+.VAS-glju-detail-lines td[title]:hover::after,
+.VAS-glju-dialog-table td[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: 0;
+    top: calc(100% + 0.25em);
+    z-index: 9999;
+    background: rgba(15, 44, 63, 0.96);
+    color: #FFFFFF;
+    font-size: 0.8125em;
+    font-weight: 400;
+    padding: 0.4em 0.65em;
+    border-radius: 0.4em;
+    white-space: normal;
+    word-break: break-word;
+    min-width: 8em;
+    max-width: 22em;
+    line-height: 1.5;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+}
+
+/* Table amount columns only */
+.VAS-glju-dialog-table .VAS-glju-amt,
+.VAS-glju-detail-lines .VAS-glju-amt,
+.VAS-glju-dialog-table th:nth-child(5),
+.VAS-glju-dialog-table th:nth-child(6),
+.VAS-glju-dialog-table td:nth-child(5),
+.VAS-glju-dialog-table td:nth-child(6),
+.VAS-glju-detail-lines th:nth-child(2),
+.VAS-glju-detail-lines th:nth-child(3),
+.VAS-glju-detail-lines td:nth-child(2),
+.VAS-glju-detail-lines td:nth-child(3) {
+    text-align: right;
+}
+
+/* MD widget pager pattern */
+.VAS-glju-line-pager,
+.VAS-glju-dialog-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+    flex-shrink: 0;
+    margin: 8px 0 0;
+    padding: 8px 10px 0;
+    border-top: 1px solid #EDF2F6;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn,
+.VAS-glju-dialog-pager .VAS-glju-page-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.88);
+    color: #0083DA;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn:hover:not(:disabled),
+.VAS-glju-dialog-pager .VAS-glju-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-btn:disabled,
+.VAS-glju-dialog-pager .VAS-glju-page-btn:disabled {
+    background: rgba(255, 255, 255, 0.72);
+    color: #B8C6D2;
+    cursor: default;
+    opacity: 1;
+}
+
+.VAS-glju-line-pager .VAS-glju-page-text,
+.VAS-glju-dialog-pager .VAS-glju-page-text {
+    min-width: 52px;
+    text-align: center;
+    color: #102C3F;
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }

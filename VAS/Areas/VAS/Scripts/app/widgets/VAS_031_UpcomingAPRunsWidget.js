@@ -50,8 +50,11 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+    "use strict";
 
-    VAS.VAS_031_UpcomingAPRunsWidget = function () {
+    function lbl(key, fallback) {
+        var text =
+            VIS.Msg.getMsg(key);
 
         var $self = this;
 
@@ -3456,3 +3459,4 @@
     };
 
 })(VAS, jQuery);
+
