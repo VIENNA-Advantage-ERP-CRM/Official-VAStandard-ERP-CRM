@@ -6,7 +6,7 @@
  * ----+---------------------------------------------------+------------------------------
  *  1  | Paid this month                                   | VAS_028_MessagePaidThisMonth
  *  2  | Loading                                           | VAS_028_MessageLoading
- *  3  | Could not load data                               | VAS_ErrorLoading
+ *  3  | No Data                                           | VAS_ErrorLoading
  *  4  | vendor                                            | VAS_028_MessageVendor
  *  5  | vendors                                           | VAS_028_MessageVendors
  *  6  | Paid to                                           | VAS_028_MessagePaidTo
@@ -312,7 +312,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'Could not load data'
+                                'No Data'
                             )
                         );
 
@@ -328,7 +328,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'Could not load data'
+                                'No Data'
                             )
                         );
                     }

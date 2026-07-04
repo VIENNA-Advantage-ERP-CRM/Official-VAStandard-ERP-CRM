@@ -10,7 +10,7 @@ using System;
  * 1  | Due This Week                        | VAS_029_MessageScheduled
  * 2  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
  * 3  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
- * 4  | Could not load data                  | VAS_ErrorLoading
+ * 4  | No Data                              | VAS_ErrorLoading
  * 5  | Session Expired                      | SessionExpired
  * 6  | Not Specified                        | VAS_029_MessageNotSpecified
  * 7  | invoices                             | VAS_029_MessageInvoices
@@ -217,7 +217,7 @@ namespace VAS.Controllers
                         errorText = GetMsg(
                             ctx,
                             "VAS_ErrorLoading",
-                            "Could not load data"
+                            "No Data"
                         )
                     },
                     JsonRequestBehavior.AllowGet

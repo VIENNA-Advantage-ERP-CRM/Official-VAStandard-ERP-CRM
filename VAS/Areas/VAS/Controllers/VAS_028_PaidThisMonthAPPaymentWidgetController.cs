@@ -8,7 +8,7 @@ using System;
  * ---+--------------------------------------+--------------------------------
  * 1  | Paid this month                      | VAS_028_MessagePaidThisMonth
  * 2  | Cash paid                            | VAS_028_MessageCashPaid
- * 3  | Could not load data                  | VAS_ErrorLoading
+ * 3  | No Data                              | VAS_ErrorLoading
  * 4  | Session Expired                      | SessionExpired
  * 5  | Paid to                              | VAS_028_MessagePaidTo
  * 6  | so far this month.                   | VAS_028_MessageSoFarThisMonth
