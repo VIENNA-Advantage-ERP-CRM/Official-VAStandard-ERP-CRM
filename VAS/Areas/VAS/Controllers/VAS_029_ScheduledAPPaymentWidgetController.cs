@@ -73,7 +73,6 @@ namespace VAS.Controllers
                 );
 
                 decimal scheduledAmountThisWeek = 0;
-
                 int cCurrencyId = 0;
                 int precision = 2;
 
@@ -82,28 +81,12 @@ namespace VAS.Controllers
                 string dateFrom = string.Empty;
                 string dateTo = string.Empty;
 
-                List<object> groups =
-                    new List<object>();
-
-                while (
+                if (
                     dr != null &&
                     dr.Read()
                 )
                 {
-                    decimal scheduledAmount =
-                        GetDecimal(
-                            dr,
-                            "ScheduledAmount",
-                            0
-                        );
-
-                    int groupCurrencyId =
-                        GetInt(
-                            dr,
-                            "C_Currency_ID"
-                        );
-
-                    int groupPrecision =
+                    precision =
                         NormalizePrecision(
                             GetInt(
                                 dr,
@@ -112,14 +95,31 @@ namespace VAS.Controllers
                             )
                         );
 
-                    string groupCurrencyISO =
+                    scheduledAmountThisWeek =
+                        Math.Round(
+                            GetDecimal(
+                                dr,
+                                "ScheduledAmount",
+                                0
+                            ),
+                            precision,
+                            MidpointRounding.AwayFromZero
+                        );
+
+                    cCurrencyId =
+                        GetInt(
+                            dr,
+                            "C_Currency_ID"
+                        );
+
+                    currencyISO =
                         GetString(
                             dr,
                             "CurrencyISO",
                             string.Empty
                         );
 
-                    string groupCurrencySymbol =
+                    currencySymbol =
                         GetString(
                             dr,
                             "CurrencySymbol",
@@ -128,61 +128,15 @@ namespace VAS.Controllers
 
                     if (
                         string.IsNullOrWhiteSpace(
-                            groupCurrencySymbol
+                            currencySymbol
                         )
                     )
                     {
-                        groupCurrencySymbol =
-                            groupCurrencyISO;
-                    }
-
-                    string paymentMethodDisplay =
-                        GetString(
-                            dr,
-                            "PaymentMethodDisplay",
-                            string.Empty
-                        );
-
-                    string paymentRule =
-                        GetString(
-                            dr,
-                            "PaymentRule",
-                            string.Empty
-                        );
-
-                    string paymentMethodName =
-                        FirstNotEmpty(
-                            paymentMethodDisplay,
-                            paymentRule,
-                            GetMsg(
-                                ctx,
-                                "VAS_029_MessageNotSpecified",
-                                "Not Specified"
-                            )
-                        );
-
-                    scheduledAmountThisWeek +=
-                        scheduledAmount;
-
-                    if (cCurrencyId == 0)
-                    {
-                        cCurrencyId =
-                            groupCurrencyId;
-
-                        precision =
-                            groupPrecision;
-
-                        currencyISO =
-                            groupCurrencyISO;
-
                         currencySymbol =
-                            groupCurrencySymbol;
+                            currencyISO;
                     }
 
                     if (
-                        string.IsNullOrWhiteSpace(
-                            dateFrom
-                        ) &&
                         dr["DateFrom"] !=
                         DBNull.Value
                     )
@@ -196,9 +150,6 @@ namespace VAS.Controllers
                     }
 
                     if (
-                        string.IsNullOrWhiteSpace(
-                            dateTo
-                        ) &&
                         dr["DateTo"] !=
                         DBNull.Value
                     )
@@ -210,60 +161,7 @@ namespace VAS.Controllers
                                 )
                             );
                     }
-
-                    scheduledAmount =
-                        Math.Round(
-                            scheduledAmount,
-                            groupPrecision,
-                            MidpointRounding.AwayFromZero
-                        );
-
                 }
-
-                precision =
-                    NormalizePrecision(
-                        precision
-                    );
-
-                scheduledAmountThisWeek =
-                    Math.Round(
-                        scheduledAmountThisWeek,
-                        precision,
-                        MidpointRounding.AwayFromZero
-                    );
-
-                groups.Add(
-                    new
-                    {
-                        paymentMethodName =
-                            GetMsg(
-                                ctx,
-                                "VAS_029_MessageTotal",
-                                "Total"
-                            ),
-
-                        value =
-                            scheduledAmountThisWeek,
-
-                        scheduledAmount =
-                            scheduledAmountThisWeek,
-
-                        cCurrencyId =
-                            cCurrencyId,
-
-                        currencyISO =
-                            currencyISO,
-
-                        currencySymbol =
-                            currencySymbol,
-
-                        symbol =
-                            currencySymbol,
-
-                        precision =
-                            precision
-                    }
-                );
 
                 return Json(
                     new
@@ -285,9 +183,6 @@ namespace VAS.Controllers
 
                         scheduledAmountThisWeek =
                             scheduledAmountThisWeek,
-
-                        groups =
-                            groups,
 
                         cCurrencyId =
                             cCurrencyId,
@@ -313,13 +208,17 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Json(
                     new
                     {
                         error = true,
-                        errorText = ex.Message
+                        errorText = GetMsg(
+                            ctx,
+                            "VAS_ErrorLoading",
+                            "Could not load data"
+                        )
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -641,13 +540,17 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return Json(
                     new
                     {
                         error = true,
-                        errorText = ex.Message
+                        errorText = GetMsg(
+                            ctx,
+                            "VAS_ErrorLoading",
+                            "Could not load data"
+                        )
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -662,19 +565,6 @@ namespace VAS.Controllers
             Ctx ctx
         )
         {
-            bool hasPaymentMethod =
-                HasInvoicePaymentMethodColumn();
-
-            string paymentMethodDisplayColumn =
-                GetPaymentMethodDisplayColumn(
-                    hasPaymentMethod
-                );
-
-            bool hasPaymentMethodDisplayColumn =
-                !string.IsNullOrWhiteSpace(
-                    paymentMethodDisplayColumn
-                );
-
             string queryParametersFrom =
                 DB.IsOracle()
                     ? " FROM DUAL"
@@ -684,26 +574,6 @@ namespace VAS.Controllers
                 DB.IsOracle()
                     ? "NUMBER"
                     : "NUMERIC";
-
-            string paymentMethodIdSelect =
-                hasPaymentMethod
-                    ? "COALESCE(Invoice.VA009_PaymentMethod_ID, 0)"
-                    : "0";
-
-            string paymentMethodDisplaySelect =
-                hasPaymentMethodDisplayColumn
-                    ? paymentMethodDisplayColumn
-                    : "NULL";
-
-            string paymentMethodJoin =
-                hasPaymentMethodDisplayColumn
-                    ? @"
-LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
-(
-    PaymentMethod.VA009_PaymentMethod_ID =
-    Invoice.VA009_PaymentMethod_ID
-)"
-                    : string.Empty;
 
             string queryParametersSql = @"
 QueryParameters AS
@@ -731,13 +601,9 @@ SchemaCurrency AS
 (
     SELECT
         ClientInfo.AD_Client_ID,
-
         AcctSchema.C_Currency_ID,
-
         Currency.StdPrecision,
-
         Currency.ISO_Code,
-
         Currency.CurSymbol
 
     FROM AD_ClientInfo ClientInfo
@@ -774,14 +640,7 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.DateAcct,
     Invoice.C_ConversionType_ID,
-    Invoice.IsReturnTrx,
-    Invoice.PaymentRule" +
-                (
-                    hasPaymentMethod
-                        ? @",
-    Invoice.VA009_PaymentMethod_ID"
-                        : string.Empty
-                ) + @"
+    Invoice.IsReturnTrx
 
 FROM C_Invoice Invoice
 
@@ -851,26 +710,18 @@ InvoiceFiltered AS
 ScheduledData AS
 (
     SELECT
-        Invoice.C_Invoice_ID,
-        Invoice.C_BPartner_ID,
-
         SchemaCurrency.C_Currency_ID,
 
         SchemaCurrency.ISO_Code
             AS CurrencyISO,
 
-        SchemaCurrency.CurSymbol
-            AS CurrencySymbol,
+        CASE
+            WHEN SchemaCurrency.CurSymbol IS NOT NULL
+            THEN SchemaCurrency.CurSymbol
+            ELSE SchemaCurrency.ISO_Code
+        END AS CurrencySymbol,
 
         SchemaCurrency.StdPrecision,
-
-        " + paymentMethodIdSelect + @"
-            AS PaymentMethod_ID,
-
-        " + paymentMethodDisplaySelect + @"
-            AS PaymentMethodDisplay,
-
-        Invoice.PaymentRule,
 
         CAST
         (
@@ -918,8 +769,6 @@ ScheduledData AS
         AND InvoicePaySchedule.DueDate <
         WeekRange.DateToExclusive
     )
-"
-    + paymentMethodJoin + @"
 
     WHERE InvoicePaySchedule.IsActive = 'Y'
 
@@ -936,16 +785,28 @@ ScheduledData AS
     ) > 0
 )
 SELECT
-    ScheduledData.PaymentMethod_ID,
-    ScheduledData.PaymentMethodDisplay,
-    ScheduledData.PaymentRule,
-    ScheduledData.C_Currency_ID,
-    ScheduledData.CurrencyISO,
-    ScheduledData.CurrencySymbol,
+    MAX
+    (
+        ScheduledData.C_Currency_ID
+    ) AS C_Currency_ID,
 
     MAX
     (
-        ScheduledData.StdPrecision
+        ScheduledData.CurrencyISO
+    ) AS CurrencyISO,
+
+    MAX
+    (
+        ScheduledData.CurrencySymbol
+    ) AS CurrencySymbol,
+
+    COALESCE
+    (
+        MAX
+        (
+            ScheduledData.StdPrecision
+        ),
+        2
     ) AS StdPrecision,
 
     ROUND
@@ -987,24 +848,7 @@ SELECT
         ScheduledData.DateTo
     ) AS DateTo
 
-FROM ScheduledData ScheduledData
-
-GROUP BY
-    ScheduledData.PaymentMethod_ID,
-    ScheduledData.PaymentMethodDisplay,
-    ScheduledData.PaymentRule,
-    ScheduledData.C_Currency_ID,
-    ScheduledData.CurrencyISO,
-    ScheduledData.CurrencySymbol
-
-HAVING SUM
-(
-    ScheduledData.ScheduledAmount
-) > 0
-
-ORDER BY
-    ScheduledAmount DESC,
-    ScheduledData.PaymentMethod_ID";
+FROM ScheduledData ScheduledData";
 
             SqlParameter[] parameters =
                 new SqlParameter[]

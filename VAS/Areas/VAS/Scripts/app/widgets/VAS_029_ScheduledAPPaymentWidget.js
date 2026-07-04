@@ -1,36 +1,37 @@
 ﻿/**
- * Scheduled
- * Purpose - Displays AP invoice outstanding due amounts scheduled for payment during the current week, grouped by payment method.
- *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Due This Week                        | VAS_029_MessageScheduled
- *  2  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
- *  3  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
- *  4  | Loading                              | VAS_029_MessageLoading
- *  5  | No Data                              | VAS_029_MessageNoData
- *  6  | Could not load data                  | VAS_ErrorLoading
- *  7  | Not Specified                        | VAS_029_MessageNotSpecified
- *  8  | invoices                             | VAS_029_MessageInvoices
- *  9  | Showing                              | VAS_Showing
- * 10  | Of                                   | VAS_Of
- * 11  | Close                                | VAS_Close
- * 12  | Total due                            | VAS_029_MessageTotalDue
- * 13  | Vendors                              | VAS_029_MessageVendors
- * 14  | Payment methods                      | VAS_029_MessagePaymentMethods
- * 15  | Invoice No.                          | VIS_InvoiceNo
- * 16  | Invoice date                         | VIS_InvoiceDate
- * 17  | Vendor                               | VAS_029_MessageVendor
- * 18  | Due date                             | VIS_DueDate
- * 19  | Currency                             | VAS_PaymentCurrency
- * 20  | Amount                               | VAS_029_MessageAmount
- * 21  | Method                               | VAS_029_MessageMethod
- * 22  | Previous                             | VAS_Previous
- * 23  | Next                                 | VAS_Next
- * 24  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
- * ─────────────────────────────────────────────────────────────────────
- */
+
+* Scheduled
+* Purpose - Displays AP invoice outstanding due amounts scheduled for payment during the current week, grouped by payment method.
+*
+* ── Labels / Message Keys ─────────────────────────────────────────────
+* # | Current Text                         | Message Key
+* ----+--------------------------------------+--------------------------------
+* 1  | Due This Week                        | VAS_029_MessageScheduled
+* 2  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
+* 3  | Loading                              | VAS_029_MessageLoading
+* 4  | No Data                              | VAS_029_MessageNoData
+* 5  | Could not load data                  | VAS_ErrorLoading
+* 6  | Not Specified                        | VAS_029_MessageNotSpecified
+* 7  | invoices                             | VAS_029_MessageInvoices
+* 8  | Showing                              | VAS_Showing
+* 9  | Of                                   | VAS_Of
+* 10  | Close                                | VAS_Close
+* 11  | Total due                            | VAS_029_MessageTotalDue
+* 12  | Vendors                              | VAS_029_MessageVendors
+* 13  | Payment methods                      | VAS_029_MessagePaymentMethods
+* 14  | Invoice No.                          | VIS_InvoiceNo
+* 15  | Invoice date                         | VIS_InvoiceDate
+* 16  | Vendor                               | VAS_029_MessageVendor
+* 17  | Due date                             | VIS_DueDate
+* 18  | Currency                             | VAS_PaymentCurrency
+* 19  | Amount                               | VAS_029_MessageAmount
+* 20  | Method                               | VAS_029_MessageMethod
+* 21  | Previous                             | VAS_Previous
+* 22  | Next                                 | VAS_Next
+* 23  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
+* ─────────────────────────────────────────────────────────────────────
+  */
+
 
 
 ; VAS = window.VAS || {};
@@ -67,9 +68,6 @@
         var $pagerNext = null;
         var $pagerText = null;
 
-        var groups = [];
-        var groupIndex = 0;
-        var rotationTimer = null;
         var isDisposed = false;
         var rowsLoaded = false;
         var rowsLoading = false;
@@ -125,7 +123,7 @@
             $body.append($value);
 
             $footer = $('<div class="vas-scheduled-ap-payment-footer">');
-         
+
 
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
 
@@ -155,7 +153,6 @@
                 return;
             }
 
-            stopRotation();
             showBusy(true);
             showState(false, '');
 
@@ -215,25 +212,6 @@
 
         function renderData(data) {
             lastData = data || {};
-            groups = $.isArray(data.groups)
-                ? $.grep(data.groups, function (group) {
-                    var amount = Number(group.value);
-
-                    if (isNaN(amount)) {
-                        amount = Number(group.scheduledAmount);
-                    }
-
-                    return !isNaN(amount) && amount > 0;
-                })
-                : [];
-            groupIndex = 0;
-
-            if (groups.length > 0) {
-                renderGroup(groups[groupIndex], data);
-                startRotation(data);
-                refreshOpenDialog();
-                return;
-            }
 
             var totalAmount = Number(data.value);
 
@@ -256,7 +234,11 @@
             ));
 
             $description.text(
-                data.description || lbl('VAS_029_MessageScheduledForPaymentThisWeek', 'Scheduled for payment this week')
+                data.description ||
+                lbl(
+                    'VAS_029_MessageScheduledForPaymentThisWeek',
+                    'Scheduled for payment this week'
+                )
             );
 
             refreshOpenDialog();
@@ -405,7 +387,7 @@
             var symbol = (lastData && (lastData.currencySymbol || lastData.symbol)) || '';
             var precision = normalizePrecision(lastData && lastData.precision);
             var vendorCount = Number((data && data.vendorCount) || 0);
-            var methodCount = Number((data && data.paymentMethodCount) || groups.length || 0);
+            var methodCount = Number((data && data.paymentMethodCount) || 0);
 
             if ($summaryTotal) {
                 $summaryTotal.text(formatCurrencyAmount(totalAmount, symbol, lastData && lastData.currencyISO, precision));
@@ -466,73 +448,6 @@
 
             if ($pagerNext) {
                 $pagerNext.prop('disabled', rowsLoading || totalPages <= 1 || pageNo >= totalPages);
-            }
-        }
-
-        function renderGroup(group, data) {
-            if (!group) {
-                setNoData();
-                return;
-            }
-
-            var amount = Number(group.value);
-
-            if (isNaN(amount)) {
-                amount = Number(group.scheduledAmount);
-            }
-
-            if (isNaN(amount) || amount <= 0) {
-                setNoData();
-                return;
-            }
-
-            showState(false, '');
-
-            var precision = normalizePrecision(group.precision || data.precision);
-            var paymentMethodName = group.paymentMethodName || lbl('VAS_029_MessageNotSpecified', 'Not Specified');
-
-            var footerText = lbl(
-                'VAS_029_MessageQueuedForPaymentMethodRunThisWeek',
-                'Queued for {0} run this week'
-            ).replace('{0}', paymentMethodName);
-
-            $value.text(formatCurrencyAmount(
-                amount,
-                group.currencySymbol || data.currencySymbol || data.symbol,
-                group.currencyISO || data.currencyISO,
-                precision
-            ));
-
-            $description.text(footerText);
-        }
-
-        function startRotation(data) {
-            stopRotation();
-
-            if (groups.length <= 1) {
-                return;
-            }
-
-            rotationTimer = window.setInterval(function () {
-                if (isDisposed) {
-                    stopRotation();
-                    return;
-                }
-
-                groupIndex += 1;
-
-                if (groupIndex >= groups.length) {
-                    groupIndex = 0;
-                }
-
-                renderGroup(groups[groupIndex], data);
-            }, 5000);
-        }
-
-        function stopRotation() {
-            if (rotationTimer) {
-                window.clearInterval(rotationTimer);
-                rotationTimer = null;
             }
         }
 
@@ -795,7 +710,6 @@
 
         this.disposeComponent = function () {
             isDisposed = true;
-            stopRotation();
             $(document).off('keydown.vas-scheduled-ap-payment-dialog-' + self.AD_UserHomeWidgetID);
             $('body').removeClass('vas-scheduled-ap-payment-body-lock');
 
@@ -825,7 +739,6 @@
             $pagerPrev = null;
             $pagerNext = null;
             $pagerText = null;
-            groups = [];
             lastData = null;
         };
     };
