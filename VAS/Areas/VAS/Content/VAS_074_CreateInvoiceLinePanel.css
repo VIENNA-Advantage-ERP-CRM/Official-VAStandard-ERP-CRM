@@ -1090,6 +1090,41 @@
         color: var(--cil-text);
     }
 
+/* Attribute instance-list controls: search (left, grows) + "Show All" toggle (right)
+   share one row. */
+.vas-cil-attr-listctrls {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin-top: 0.75em;
+}
+
+    /* The search box provides its own top margin when standalone; inside the row the
+       wrapper owns the spacing, so zero it out and let the box take the free width. */
+    .vas-cil-attr-listctrls .vas-cil-search-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin-top: 0;
+    }
+
+/* "Show All (include zero and (-ve) qty)" toggle, pinned to the right of the row. */
+.vas-cil-attr-showall {
+    display: flex;
+    align-items: center;
+    gap: 0.4375em;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+    .vas-cil-attr-showall input {
+        cursor: pointer;
+        accent-color: var(--cil-action-blue);
+    }
+
 .vas-cil-scan-input {
     display: flex;
     align-items: center;
@@ -1192,6 +1227,31 @@
     align-items: center;
     gap: 0.5em;
 }
+
+/* Header close (✕) - dismisses the whole attribute picker (create/edit mode). */
+.vas-cil-dialog__close {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--cil-text-muted);
+    font-size: 1em;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .12s, color .12s;
+}
+
+    .vas-cil-dialog__close:hover {
+        background: var(--cil-divider);
+        color: var(--cil-text);
+    }
 
 .vas-cil-dialog__title {
     margin: 0;
