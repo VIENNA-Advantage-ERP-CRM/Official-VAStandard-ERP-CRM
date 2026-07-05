@@ -86,8 +86,21 @@
             });
         }
 
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping; all others get international grouping. The symbol
+        // always comes from the DB.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
         function formatQty(value) {
-            return Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            return Number(value || 0).toLocaleString(currencyLocale(warehouseStockState.currencyIso), { maximumFractionDigits: 2 });
         }
 
         function getPrecision(value) {
@@ -103,7 +116,7 @@
             var number = Number(value || 0);
             var precision = getPrecision(warehouseStockState.stdPrecision);
             var currency = warehouseStockState.currencySymbol || warehouseStockState.currencyIso;
-            var formatted = number.toLocaleString(window.navigator.language, {
+            var formatted = number.toLocaleString(currencyLocale(warehouseStockState.currencyIso), {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });

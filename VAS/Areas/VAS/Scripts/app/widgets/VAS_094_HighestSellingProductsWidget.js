@@ -12,6 +12,7 @@
  *  7 | Previous                             | VAS_Previous
  *  8 | Next                                 | VAS_Next
  *  9 | Couldn't load                        | VAS_CouldntLoad
+ * 10 | Attribute                            | VAS_Attribute
  */
 ; VAS = window.VAS || {};
 
@@ -27,6 +28,8 @@
         var $empty;
         var $rank;
         var $productName;
+        var $productImage;
+        var $productAttribute;
         var $previousValue;
         var $currentValue;
         var $pageText;
@@ -45,46 +48,89 @@
             return translated && translated.charAt(0) !== '[' ? translated : fallback;
         }
 
+        // Joins a backend-relative image URL (e.g. "Images/1004162.png") with the
+        // application context URL; absolute http/data URLs pass through unchanged.
+        function resolveImageUrl(imageUrl) {
+            if (!imageUrl) { return ''; }
+            if (imageUrl.indexOf('http') === 0 || imageUrl.indexOf('data:') === 0) { return imageUrl; }
+            var contextUrl = (VIS.Application && VIS.Application.contextUrl) || '';
+            if (contextUrl && contextUrl.charAt(contextUrl.length - 1) !== '/' && imageUrl.charAt(0) !== '/') {
+                return contextUrl + '/' + imageUrl;
+            }
+            if (contextUrl && contextUrl.charAt(contextUrl.length - 1) === '/' && imageUrl.charAt(0) === '/') {
+                return contextUrl + imageUrl.substring(1);
+            }
+            return contextUrl + imageUrl;
+        }
+
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping and Lakh/Crore compact notation; all others get
+        // international grouping and K/M/B. The symbol always comes from the DB.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        function formatCompactNumber(value, isoCode) {
+            var number = Number(value || 0);
+            var abs = Math.abs(number);
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { return trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            } else {
+                if (abs >= 1000000000) { return trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                if (abs >= 1000000) { return trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            }
+            return number.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 });
+        }
+
         function formatAmount(value) {
             var amount = Number(value || 0);
-            var formatted = amount.toLocaleString(window.navigator.language, {
+            var formatted = amount.toLocaleString(currencyLocale(currencyIso), {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
             return (currencySymbol || currencyIso) + ' ' + formatted;
         }
 
+        function formatCompactAmount(value) {
+            return (currencySymbol || currencyIso) + formatCompactNumber(value, currencyIso);
+        }
+
         function formatUnits(value, compact) {
             var units = Number(value || 0);
             if (!compact) {
-                return units.toLocaleString(window.navigator.language, {
+                return units.toLocaleString(currencyLocale(currencyIso), {
                     maximumFractionDigits: 2
                 });
             }
-
-            try {
-                return new Intl.NumberFormat(window.navigator.language, {
-                    notation: 'compact',
-                    maximumFractionDigits: 1
-                }).format(units);
-            }
-            catch (ignore) {
-                return units.toLocaleString(window.navigator.language, {
-                    maximumFractionDigits: 1
-                });
-            }
+            return formatCompactNumber(units, currencyIso);
         }
 
         function renderValue($element, amount, units) {
             var formattedAmount = formatAmount(amount);
+            var compactAmount = formatCompactAmount(amount);
             var compactUnits = formatUnits(units, true);
             var fullUnits = formatUnits(units, false);
             var unitsLabel = label('VAS_094_Units', 'units');
 
+            // Tile shows compact money (₹3.42 Cr / $34.2M); exact amount stays
+            // in the tooltip.
             $element
                 .empty()
                 .attr('title', formattedAmount + ' (' + fullUnits + ' ' + unitsLabel + ')')
-                .append($('<span class="MPC-hsp-amount">').text(formattedAmount))
+                .append($('<span class="MPC-hsp-amount">').text(compactAmount))
                 .append($('<small class="MPC-hsp-units">').text('(' + compactUnits + ' ' + unitsLabel + ')'));
         }
 
@@ -105,7 +151,23 @@
             $content.removeClass('MPC-hsp-hidden');
             $footer.removeClass('MPC-hsp-hidden');
             $rank.text('#' + (state.page + 1));
-            $productName.text(row.product_name || '').attr('title', row.product_name || '');
+
+            // Review #13: rows are ranked per product + attribute, so the attribute
+            // (batch/serial/variant) shows under the product name when present.
+            var attribute = row.attribute || '';
+            var productTitle = (row.product_name || '') + (attribute ? ' · ' + attribute : '');
+            $productName.text(row.product_name || '').attr('title', productTitle);
+            $productAttribute.text(attribute).attr('title', attribute).toggleClass('MPC-hsp-hidden', !attribute);
+
+            // Review #12: show the product's picture next to the name when the
+            // backend resolved one; a load failure falls back to no image.
+            var imageUrl = resolveImageUrl(row.image_url);
+            if (imageUrl) {
+                $productImage.attr('src', imageUrl).removeClass('MPC-hsp-hidden');
+            } else {
+                $productImage.removeAttr('src').addClass('MPC-hsp-hidden');
+            }
+
             renderValue($previousValue, row.previous_year_value, row.previous_year_units);
             renderValue($currentValue, row.current_year_value, row.current_year_units);
             $pageText.text((state.page + 1) + ' ' + label('VAS_Of', 'of') + ' ' + total);
@@ -182,7 +244,11 @@
                             '</svg>' +
                             '<div class="MPC-hsp-hero">' +
                                 '<span class="MPC-hsp-rank"></span>' +
-                                '<span class="MPC-hsp-product"></span>' +
+                                '<img class="MPC-hsp-product-image MPC-hsp-hidden" alt="" />' +
+                                '<span class="MPC-hsp-product-wrap">' +
+                                    '<span class="MPC-hsp-product"></span>' +
+                                    '<span class="MPC-hsp-attribute MPC-hsp-hidden"></span>' +
+                                '</span>' +
                             '</div>' +
                             '<div class="MPC-hsp-stats">' +
                                 '<div class="MPC-hsp-stat">' +
@@ -219,6 +285,11 @@
             $empty = $card.find('.MPC-hsp-empty');
             $rank = $card.find('.MPC-hsp-rank');
             $productName = $card.find('.MPC-hsp-product');
+            $productImage = $card.find('.MPC-hsp-product-image');
+            $productAttribute = $card.find('.MPC-hsp-attribute');
+            $productImage.on('error.MPCHighestSellingProducts', function () {
+                $(this).removeAttr('src').addClass('MPC-hsp-hidden');
+            });
             $previousValue = $card.find('.MPC-hsp-stat-value-previous');
             $currentValue = $card.find('.MPC-hsp-stat-value-current');
             $pageText = $card.find('.MPC-hsp-page-text');
@@ -255,6 +326,7 @@
             if (request && request.readyState !== 4) { request.abort(); }
             if ($previousButton) { $previousButton.off('.MPCHighestSellingProducts'); }
             if ($nextButton) { $nextButton.off('.MPCHighestSellingProducts'); }
+            if ($productImage) { $productImage.off('.MPCHighestSellingProducts'); }
             $root.remove();
             state.rows = [];
         };

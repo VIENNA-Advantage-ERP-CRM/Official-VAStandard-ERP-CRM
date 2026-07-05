@@ -69,6 +69,7 @@ namespace VIS.Controllers
                        TRIM(COALESCE(loc.Address1, '') || ' ' || COALESCE(loc.City, '')) AS Address_Line,
                        wh.Name AS Warehouse_Name,
                        cur.CurSymbol AS Cur_Symbol,
+                       cur.ISO_Code AS Currency_ISO,
                        cur.StdPrecision AS Std_Precision,
                        COALESCE(ol.DatePromised, o.DatePromised) AS Line_Promise_Date,
                        ol.C_OrderLine_ID AS PO_Line_ID,
@@ -102,6 +103,7 @@ namespace VIS.Controllers
                        ExpectedPO.Address_Line,
                        ExpectedPO.Warehouse_Name,
                        ExpectedPO.Cur_Symbol,
+                       ExpectedPO.Currency_ISO,
                        ExpectedPO.Std_Precision,
                        ExpectedPO.Promise_Date,
                        ExpectedPO.Line_Count,
@@ -114,6 +116,7 @@ namespace VIS.Controllers
                            RawData.Address_Line,
                            RawData.Warehouse_Name,
                            RawData.Cur_Symbol,
+                           RawData.Currency_ISO,
                            RawData.Std_Precision,
                            MIN(RawData.Line_Promise_Date) AS Promise_Date,
                            COUNT(RawData.PO_Line_ID) AS Line_Count,
@@ -127,6 +130,7 @@ namespace VIS.Controllers
                              RawData.Address_Line,
                              RawData.Warehouse_Name,
                              RawData.Cur_Symbol,
+                             RawData.Currency_ISO,
                              RawData.Std_Precision
                 ) ExpectedPO
                 ORDER BY ExpectedPO.Promise_Date, ExpectedPO.PO_NO
@@ -159,6 +163,7 @@ namespace VIS.Controllers
                         addressLine = Util.GetValueOfString(dr["Address_Line"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
+                        currencyIso = Util.GetValueOfString(dr["Currency_ISO"]),
                         stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]),
                         promiseDate = promiseDate.HasValue ? promiseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         lineCount = Util.GetValueOfInt(dr["Line_Count"]),

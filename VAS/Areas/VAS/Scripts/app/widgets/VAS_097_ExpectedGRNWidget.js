@@ -100,11 +100,19 @@
             return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
-        /* Format a currency amount using the precision read from the system (never hard-coded). */
-        function formatMoney(value, precision, symbol) {
+        /* Review #8 (common): digit grouping follows the currency's ISO 4217 family -
+           Indian grouping for INR/PKR/BDT/NPR/BTN/LKR, international otherwise.
+           Precision and symbol are read from the system (never hard-coded). */
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function currencyLocale(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0 ? 'en-IN' : 'en-US';
+        }
+
+        function formatMoney(value, precision, symbol, isoCode) {
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
-            var num = Number(value || 0).toLocaleString(window.navigator.language, {
+            var num = Number(value || 0).toLocaleString(currencyLocale(isoCode), {
                 minimumFractionDigits: p,
                 maximumFractionDigits: p
             });
@@ -268,7 +276,7 @@
                 var r = ROWS[i];
                 rowsById[r.poId] = r;
 
-                var valueText = formatMoney(r.poValue, r.stdPrecision, r.curSymbol);
+                var valueText = formatMoney(r.poValue, r.stdPrecision, r.curSymbol, r.currencyIso);
 
                 $rows.append(
                     '<button type="button" class="vas-egrn-row" data-poid="' + escapeHtml(r.poId) + '">' +

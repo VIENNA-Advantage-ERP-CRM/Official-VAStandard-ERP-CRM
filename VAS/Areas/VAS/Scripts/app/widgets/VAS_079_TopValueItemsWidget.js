@@ -62,18 +62,40 @@
             });
         }
 
-        function trimNumber(value) {
-            return Number(value).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping and Lakh/Crore compact notation; all others get
+        // international grouping and K/M/B. The symbol always comes from the DB.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        function formatCompactNumber(value, isoCode) {
+            var number = Number(value || 0);
+            var abs = Math.abs(number);
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { return trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            } else {
+                if (abs >= 1000000000) { return trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                if (abs >= 1000000) { return trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            }
+            return number.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 });
         }
 
         function formatQty(value) {
-            var number = Number(value || 0);
-            var absolute = Math.abs(number);
-
-            if (absolute >= 10000000) { return trimNumber(number / 10000000) + 'Cr'; }
-            if (absolute >= 100000) { return trimNumber(number / 100000) + 'L'; }
-            if (absolute >= 1000) { return trimNumber(number / 1000) + 'K'; }
-            return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            return formatCompactNumber(value, currencyIso);
         }
 
         function getPrecision(value) {
@@ -89,7 +111,7 @@
             var number = Number(value || 0);
             var precision = getPrecision(stdPrecision);
             var currency = currencySymbol || currencyIso;
-            var formatted = number.toLocaleString(window.navigator.language, {
+            var formatted = number.toLocaleString(currencyLocale(currencyIso), {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });

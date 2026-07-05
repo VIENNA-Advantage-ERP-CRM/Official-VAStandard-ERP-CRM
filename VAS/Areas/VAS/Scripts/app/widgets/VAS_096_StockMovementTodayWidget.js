@@ -88,16 +88,15 @@
             return text;
         }
 
+        // Review #11: the modal shows the movement date only - no time part.
         function formatDate(value) {
             if (!value) { return ''; }
             var date = new Date(value);
             if (isNaN(date.getTime())) { return value; }
-            return date.toLocaleString(window.navigator.language, {
+            return date.toLocaleDateString(window.navigator.language, {
                 year: 'numeric',
                 month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
+                day: 'numeric'
             });
         }
 
@@ -160,7 +159,7 @@
             addDetail($details, label('MovementType', 'Movement'), movementType.text);
             addDetail($details, label('Quantity', 'Quantity'), formatQuantity(row.movement_qty));
             addDetail($details, label('Locator', 'Location'), row.locator_value || '');
-            addDetail($details, label('MovementDate', 'Posted'), formatDate(row.movement_date));
+            addDetail($details, label('Date', 'Date'), formatDate(row.movement_date));
             addDetail($details, label('Warehouse', 'Warehouse'), row.warehouse_name || '');
 
             var $effect = $modal.find('.MPC-smt-stock-effect').empty().addClass('MPC-smt-hidden');

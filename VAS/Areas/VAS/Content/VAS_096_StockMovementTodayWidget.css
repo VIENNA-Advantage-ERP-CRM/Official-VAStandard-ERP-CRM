@@ -39,7 +39,7 @@
 .MPC-smt-header {
     display: flex;
     align-items: center;
-    gap: 0.625em;
+    gap: 0.55em;
     flex: 0 0 auto;
     min-width: 0;
     margin-bottom: 0.625em;
@@ -63,13 +63,12 @@
     height: 100%;
 }
 
+/* Review #10: sized and colored exactly like Warehouse Stock's .MPC-ws-title
+   so every dashboard widget heading reads the same. */
 .MPC-smt-title {
     min-width: 0;
     overflow: hidden;
-    color: #102c3f;
-    /* Reference w-title clamp(13px, 1.1375cqi, 16px): stays a modest size and
-       caps at 16px instead of scaling up with the dashboard width. */
-    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    font-size: 1em;
     font-weight: 500;
     line-height: 1.3;
     text-overflow: ellipsis;

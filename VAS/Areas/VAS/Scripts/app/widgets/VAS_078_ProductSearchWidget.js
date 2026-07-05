@@ -40,6 +40,10 @@
  * 29 | Showing                                       | VAS_Showing
  * 30 | of                                            | VAS_Of
  * 31 | Discontinued From                             | VAS_DiscontinuedFrom
+ * 32 | Attribute                                     | VAS_Attribute
+ * 33 | Delivered                                     | VAS_StatusDelivered
+ * 34 | Partial                                       | VAS_StatusPartial
+ * 35 | Discontinued                                  | VAS_StatusDiscontinued
  */
 ; VAS = window.VAS || {};
 
@@ -109,19 +113,56 @@
             return parsed || {};
         }
 
+        // Currencies whose countries use the Indian numbering system (ISO 4217) -
+        // these get Indian digit grouping and Lakh/Crore compact notation; every
+        // other currency gets international grouping and K/M/B compact notation.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function detailIso() {
+            return (productDetail && productDetail.CurrencyIso) || searchCurrency.iso || '';
+        }
+
         function formatQty(value) {
             var number = Number(value || 0);
-            return number.toLocaleString(window.navigator.language || 'en-IN', {
+            return number.toLocaleString(currencyLocale(detailIso()), {
                 maximumFractionDigits: 2
             });
         }
 
-        function formatCompactQty(value) {
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        function formatCompactNumber(value, isoCode) {
             var number = Number(value || 0);
-            if (Math.abs(number) >= 10000000) { return (number / 10000000).toFixed(2).replace(/\.00$/, '') + 'Cr'; }
-            if (Math.abs(number) >= 100000) { return (number / 100000).toFixed(2).replace(/\.00$/, '') + 'L'; }
-            if (Math.abs(number) >= 1000) { return (number / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; }
-            return formatQty(number);
+            var abs = Math.abs(number);
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { return trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            } else {
+                if (abs >= 1000000000) { return trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                if (abs >= 1000000) { return trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            }
+            return number.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 });
+        }
+
+        function formatCompactQty(value) {
+            return formatCompactNumber(value, detailIso());
+        }
+
+        function formatCompactAmount(value, symbol, isoCode) {
+            var currency = symbol || isoCode || '';
+            return currency + formatCompactNumber(value, isoCode);
         }
 
         function getPrecision(value) {
@@ -137,7 +178,7 @@
             var number = Number(value || 0);
             var currency = symbol || isoCode || '';
             var stdPrecision = getPrecision(precision);
-            var formatted = number.toLocaleString(window.navigator.language, {
+            var formatted = number.toLocaleString(currencyLocale(isoCode), {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
@@ -186,6 +227,27 @@
                 VO: label('VAS_StatusVoided', 'Voided')
             };
             return statuses[code] || code || '-';
+        }
+
+        // Review #5: a purchase order that ran (Completed/Closed) reports its delivery
+        // progress - Delivered when everything arrived, Partial when some quantity
+        // arrived, Completed while no GRN is made. Other documents keep their status.
+        function purchaseOrderStatusLabel(order) {
+            var code = order.DocumentStatus;
+            if (code !== 'CO' && code !== 'CL') { return documentStatusLabel(code); }
+            var ordered = Number(order.QuantityOrdered || 0);
+            var delivered = Number(order.QuantityDelivered || 0);
+            if (ordered > 0 && delivered >= ordered) { return label('VAS_StatusDelivered', 'Delivered'); }
+            if (delivered > 0) { return label('VAS_StatusPartial', 'Partial'); }
+            return label('VAS_StatusCompleted', 'Completed');
+        }
+
+        // Review #6: the status reads Active for every product unless the product
+        // is flagged Discontinued (controller sends Status 'D').
+        function productStatusLabel() {
+            return productDetail.Status === 'D'
+                ? label('VAS_StatusDiscontinued', 'Discontinued')
+                : label('Active', 'Active');
         }
 
         function movementTypeLabel(code) {
@@ -497,9 +559,7 @@
 
         function renderProductDialog() {
             var overview = productDetail.Overview;
-            var status = productDetail.Status === 'Y'
-                ? label('Active', 'Active')
-                : label('Inactive', 'Inactive');
+            var status = productStatusLabel();
 
             $dialogTitle.text(overview.ProductName);
             $dialogBadge.text(overview.ProductCode || '').toggle(!!overview.ProductCode);
@@ -537,9 +597,9 @@
                 '</div>' +
                 '<div class="MPC-product-search-stats">' +
                     statTile(label('VAS_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '') +
-                    statTile(label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), '') +
+                    statTile(label('VAS_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '') +
                     statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning') +
-                    statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : '') +
+                    statTile(label('Status', 'Status'), status, productDetail.Status === 'D' ? 'is-warning' : 'is-success') +
                 '</div>' +
             '</section>';
 
@@ -555,6 +615,13 @@
             }).join('');
 
             $dialogBody.html(hero + '<nav class="MPC-product-search-tabs">' + tabs + '</nav><div class="MPC-product-search-tab-body"></div>');
+
+            // A hero image that fails to load (file removed from the server, dead URL)
+            // degrades to the product icon instead of a broken-image glyph.
+            $dialogBody.find('.MPC-product-search-hero-img').on('error', function () {
+                $(this).closest('.MPC-product-search-hero-icon').removeClass('has-image').html(icon('product'));
+            });
+
             renderTab();
         }
 
@@ -605,7 +672,7 @@
                 [label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true],
                 [label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true],
                 [label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)],
-                [label('Status', 'Status'), productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive')],
+                [label('Status', 'Status'), productStatusLabel()],
                 [label('VAS_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]
             ];
 
@@ -623,15 +690,16 @@
                 return [
                     stock.WarehouseName,
                     stock.LocatorValue,
+                    stock.Attribute,
                     formatQty(stock.Quantity),
                     formatBaseAmount(stock.StockValue)
                 ];
             });
 
             return renderTable(
-                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
+                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_Attribute', 'Attribute'), label('VAS_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
                 rows,
-                [2, 3],
+                [3, 4],
                 'stock'
             );
         }
@@ -641,6 +709,7 @@
                 isSales ? label('SalesOrder', 'SO #') : label('PurchaseOrder', 'PO #'),
                 label('DateOrdered', 'Ordered'),
                 label('DatePromised', 'Promised'),
+                label('VAS_Attribute', 'Attribute'),
                 label('VAS_OrderedQty', 'Ordered Qty'),
                 label('VAS_DeliveredQty', 'Delivered Qty'),
                 label('Amount', 'Amount'),
@@ -652,14 +721,15 @@
                     order.DocumentNo,
                     formatDate(order.DateOrdered),
                     formatDate(order.DatePromised),
+                    order.Attribute,
                     formatQty(order.QuantityOrdered),
                     formatQty(order.QuantityDelivered),
                     formatAmount(order.LineNetAmount, order.CurrencySymbol, order.CurrencyIso, order.StdPrecision),
-                    documentStatusLabel(order.DocumentStatus)
+                    isSales ? documentStatusLabel(order.DocumentStatus) : purchaseOrderStatusLabel(order)
                 ];
             });
 
-            return latestRecordsNote() + renderTable(headers, rows, [3, 4, 5], isSales ? 'salesOrders' : 'purchaseOrders');
+            return latestRecordsNote() + renderTable(headers, rows, [4, 5, 6], isSales ? 'salesOrders' : 'purchaseOrders');
         }
 
         function renderMovements() {
@@ -667,6 +737,7 @@
                 return [
                     formatDate(movement.MovementDate),
                     movementTypeLabel(movement.MovementType),
+                    movement.Attribute,
                     (Number(movement.MovementQuantity) > 0 ? '+' : '') + formatQty(movement.MovementQuantity),
                     movement.WarehouseName,
                     movement.LocatorValue
@@ -674,9 +745,9 @@
             });
 
             return latestRecordsNote() + renderTable(
-                [label('MovementDate', 'Date'), label('MovementType', 'Type'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
+                [label('MovementDate', 'Date'), label('MovementType', 'Type'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
                 rows,
-                [2],
+                [3],
                 'movements'
             );
         }
@@ -687,6 +758,7 @@
                     requisition.DocumentNo,
                     formatDate(requisition.DocumentDate),
                     formatDate(requisition.RequiredDate),
+                    requisition.Attribute,
                     formatQty(requisition.Quantity),
                     formatQty(requisition.QuantityOrdered),
                     documentStatusLabel(requisition.DocumentStatus)
@@ -694,9 +766,9 @@
             });
 
             return latestRecordsNote() + renderTable(
-                [label('Requisition', 'Requisition #'), label('VAS_DocumentDate', 'Document Date'), label('VAS_RequiredDate', 'Required Date'), label('Qty', 'Qty'), label('VAS_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
+                [label('Requisition', 'Requisition #'), label('VAS_DocumentDate', 'Document Date'), label('VAS_RequiredDate', 'Required Date'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('VAS_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
                 rows,
-                [3, 4],
+                [4, 5],
                 'requisitions'
             );
         }

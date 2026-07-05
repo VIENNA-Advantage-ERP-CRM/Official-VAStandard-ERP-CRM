@@ -23,6 +23,28 @@
         var pageSize = 5;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
+
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping; all others get international grouping. The backend sends
+        // the currency symbol (which is the ISO code when no symbol is configured)
+        // and the standard precision - nothing is hardcoded here.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+        var INDIAN_CURRENCY_SYMBOLS = ['₹', 'Rs', 'Rs.', '₨', '৳', 'Nu.', 'रू'];
+
+        function usesIndianNumbering(symbolOrIso) {
+            var value = String(symbolOrIso || '').trim();
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(value.toUpperCase()) >= 0
+                || INDIAN_CURRENCY_SYMBOLS.indexOf(value) >= 0;
+        }
+
+        function formatMoney(value, symbolOrIso, precision) {
+            var p = Number(precision);
+            if (!isFinite(p) || p < 0) { p = 2; }
+            return Number(value || 0).toLocaleString(usesIndianNumbering(symbolOrIso) ? 'en-IN' : 'en-US', {
+                minimumFractionDigits: p,
+                maximumFractionDigits: p
+            });
+        }
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
             const orderContainer =
@@ -92,7 +114,7 @@
                                 '        <div class="VAS-lbl-text text-right" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + response.Orders[i]["ProductLocation"] + '</div>' +
                                 '    </div>' +
                                 '    <div class="VAS-spaceBetween-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("TotalAmount") + '"><span>' + response.Orders[i]["Symbol"] + '</span>' + ' ' + (response.Orders[i]["GrandTotal"]).toLocaleString() + '</div>' +
+                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("TotalAmount") + '"><span>' + response.Orders[i]["Symbol"] + '</span>' + ' ' + formatMoney(response.Orders[i]["GrandTotal"], response.Orders[i]["Symbol"], response.Orders[i]["StdPrecision"]) + '</div>' +
                                 '    </div>' +
                                 '</div>');
                             $root.find('#VAS_DeliveryBox_' + widgetID).append(boxHtml);

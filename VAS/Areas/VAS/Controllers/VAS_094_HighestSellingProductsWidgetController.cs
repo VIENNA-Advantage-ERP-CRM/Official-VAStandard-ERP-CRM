@@ -71,6 +71,7 @@ namespace VAS.Controllers
                        InvoiceLine.C_Invoice_ID,
                        InvoiceLine.C_OrderLine_ID,
                        InvoiceLine.M_Product_ID,
+                       COALESCE(InvoiceLine.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
                        InvoiceLine.LineNetAmt,
                        InvoiceLine.QtyInvoiced,
                        InvoiceLine.QtyEntered
@@ -113,8 +114,12 @@ namespace VAS.Controllers
 
             string productSql = @"
                 SELECT Product.M_Product_ID,
-                       Product.Name
+                       Product.Name,
+                       Product.AD_Image_ID,
+                       ProductImage.ImageExtension,
+                       ProductImage.ImageURL AS Image_URL
                 FROM M_Product Product
+                LEFT OUTER JOIN AD_Image ProductImage ON (ProductImage.AD_Image_ID=Product.AD_Image_ID AND ProductImage.IsActive=N'Y')
                 WHERE Product.IsActive=N'Y'
                   AND Product.AD_Client_ID=@Product_Client_ID
                   AND Product.AD_Org_ID IN (0,COALESCE(NULLIF(@Product_Org_ID,0),Product.AD_Org_ID))";
@@ -144,6 +149,11 @@ namespace VAS.Controllers
                 Sales AS (
                     SELECT Products.M_Product_ID,
                            Products.Name AS Product_Name,
+                           Products.AD_Image_ID,
+                           Products.ImageExtension,
+                           Products.Image_URL,
+                           COALESCE(InvoiceLines.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
+                           COALESCE(AttributeInstance.Description,N'') AS Attribute_Description,
                            SUM(
                                CASE
                                    WHEN Invoices.DateInvoiced>=@Current_Year_Start1 AND Invoices.DateInvoiced<@Current_Year_End2
@@ -177,11 +187,21 @@ namespace VAS.Controllers
                     INNER JOIN OrderLines ON (OrderLines.C_OrderLine_ID=InvoiceLines.C_OrderLine_ID)
                     INNER JOIN SalesOrders ON (SalesOrders.C_Order_ID=OrderLines.C_Order_ID)
                     INNER JOIN Products ON (Products.M_Product_ID=InvoiceLines.M_Product_ID)
+                    LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=InvoiceLines.M_AttributeSetInstance_ID)
                     GROUP BY Products.M_Product_ID,
-                             Products.Name
+                             Products.Name,
+                             Products.AD_Image_ID,
+                             Products.ImageExtension,
+                             Products.Image_URL,
+                             COALESCE(InvoiceLines.M_AttributeSetInstance_ID,0),
+                             COALESCE(AttributeInstance.Description,N'')
                 )
                 SELECT Sales.M_Product_ID,
                        Sales.Product_Name,
+                       Sales.AD_Image_ID,
+                       Sales.ImageExtension,
+                       Sales.Image_URL,
+                       Sales.Attribute_Description,
                        Sales.Current_Year_Value,
                        Sales.Current_Year_Units,
                        Sales.Previous_Year_Value,
@@ -233,6 +253,13 @@ namespace VAS.Controllers
                     {
                         product_id = Util.GetValueOfInt(reader["M_Product_ID"]),
                         product_name = Util.GetValueOfString(reader["Product_Name"]),
+                        attribute = Util.GetValueOfString(reader["Attribute_Description"]),
+                        image_url = GetProductImageUrl(
+                            ctx,
+                            Util.GetValueOfInt(reader["AD_Image_ID"]),
+                            Util.GetValueOfString(reader["ImageExtension"]),
+                            Util.GetValueOfString(reader["Image_URL"])
+                        ),
                         current_year_value = Util.GetValueOfDecimal(reader["Current_Year_Value"]),
                         current_year_units = Util.GetValueOfDecimal(reader["Current_Year_Units"]),
                         previous_year_value = Util.GetValueOfDecimal(reader["Previous_Year_Value"]),
@@ -539,6 +566,105 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// Resolves a product's AD_Image record to something the browser can render -
+        /// same resolution chain as VAS_078_ProductSearchWidget (review #12):
+        /// absolute ImageURL as-is, then an existing file under GlobalVariable.ImagePath
+        /// (original first, then the largest thumbnail), then AD_Image.BinaryData as a
+        /// base64 data URI. Returns null when nothing is available so the client keeps
+        /// its default graphic. The client prepends VIS.Application.contextUrl.
+        /// </summary>
+        /// <param name="adImageId">M_Product.AD_Image_ID</param>
+        /// <param name="imageExtension">AD_Image.ImageExtension (e.g. ".png")</param>
+        /// <param name="storedImageUrl">AD_Image.ImageURL (e.g. "Images/1004162.png")</param>
+        private string GetProductImageUrl(Ctx ctx, int adImageId, string imageExtension, string storedImageUrl)
+        {
+            if (ctx == null || adImageId <= 0) { return null; }
+
+            if (!string.IsNullOrEmpty(storedImageUrl)
+                && (storedImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    || storedImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                    || storedImageUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase)))
+            {
+                return storedImageUrl;
+            }
+
+            string fileName = GetImageFileName(adImageId, imageExtension, storedImageUrl);
+            if (!string.IsNullOrEmpty(fileName) && !string.IsNullOrEmpty(GlobalVariable.ImagePath))
+            {
+                string[] subFolders = { "", "Thumb500x375", "Thumb320x240", "Thumb320x185", "Thumb140x120", "Thumb46x46" };
+                foreach (string subFolder in subFolders)
+                {
+                    string folder = subFolder.Length == 0
+                        ? GlobalVariable.ImagePath
+                        : System.IO.Path.Combine(GlobalVariable.ImagePath, subFolder);
+                    if (System.IO.File.Exists(System.IO.Path.Combine(folder, fileName)))
+                    {
+                        return subFolder.Length == 0
+                            ? "Images/" + fileName
+                            : "Images/" + subFolder + "/" + fileName;
+                    }
+                }
+            }
+
+            MImage image = MImage.Get(ctx, adImageId);
+            if (image != null)
+            {
+                byte[] data = image.GetBinaryData();
+                if (data != null && data.Length > 0)
+                {
+                    return "data:" + GetImageMimeType(imageExtension, data) + ";base64," + Convert.ToBase64String(data);
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// File name of the uploaded image: the name stored on AD_Image.ImageURL when set
+        /// (stripped of any folders, so the value can never escape the Images directory),
+        /// otherwise the upload convention &lt;AD_Image_ID&gt;&lt;extension&gt;.
+        /// </summary>
+        private string GetImageFileName(int adImageId, string imageExtension, string storedImageUrl)
+        {
+            if (!string.IsNullOrEmpty(storedImageUrl))
+            {
+                try
+                {
+                    string fileName = System.IO.Path.GetFileName(storedImageUrl.Trim());
+                    if (!string.IsNullOrEmpty(fileName)) { return fileName; }
+                }
+                catch (ArgumentException)
+                {
+                    // Invalid path characters in the stored URL - fall through to the convention.
+                }
+            }
+            return !string.IsNullOrEmpty(imageExtension) ? adImageId + imageExtension : null;
+        }
+
+        private string GetImageMimeType(string imageExtension, byte[] data)
+        {
+            // The stored extension is unreliable for BLOB images, so sniff the magic bytes first.
+            if (data != null && data.Length > 11)
+            {
+                if (data[0] == 0xFF && data[1] == 0xD8) { return "image/jpeg"; }
+                if (data[0] == 0x89 && data[1] == 0x50) { return "image/png"; }
+                if (data[0] == 0x47 && data[1] == 0x49) { return "image/gif"; }
+                if (data[0] == 0x42 && data[1] == 0x4D) { return "image/bmp"; }
+                if (data[0] == 0x52 && data[1] == 0x49 && data[8] == 0x57 && data[9] == 0x45) { return "image/webp"; }
+            }
+
+            switch ((imageExtension ?? "").Trim().ToLowerInvariant())
+            {
+                case ".jpg":
+                case ".jpeg": return "image/jpeg";
+                case ".gif": return "image/gif";
+                case ".bmp": return "image/bmp";
+                case ".webp": return "image/webp";
+                default: return "image/png";
+            }
+        }
+
+        /// <summary>
         /// Logs a controller error and returns a localized error payload.
         /// </summary>
         /// <param name="ctx">Current application context.</param>
@@ -592,6 +718,8 @@ namespace VAS.Controllers
         {
             public int product_id { get; set; }
             public string product_name { get; set; }
+            public string attribute { get; set; }
+            public string image_url { get; set; }
             public decimal current_year_value { get; set; }
             public decimal current_year_units { get; set; }
             public decimal previous_year_value { get; set; }

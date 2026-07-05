@@ -135,6 +135,25 @@
     line-height: 1;
 }
 
+/* Review #12: product thumbnail between the rank and the name (hidden when the
+   backend resolved no image or the file fails to load). */
+.MPC-hsp-product-image {
+    flex: 0 0 auto;
+    width: 2.4em;
+    height: 2.4em;
+    object-fit: cover;
+    border: 1px solid rgba(15, 61, 97, 0.08);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.MPC-hsp-product-wrap {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
 .MPC-hsp-product {
     min-width: 0;
     display: -webkit-box;
@@ -145,6 +164,17 @@
     line-height: 1.2;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+}
+
+/* Review #13: attribute set instance (batch / variant) under the product name. */
+.MPC-hsp-attribute {
+    min-width: 0;
+    overflow: hidden;
+    color: #8a99a8;
+    font-size: 0.75em;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .MPC-hsp-stats {
