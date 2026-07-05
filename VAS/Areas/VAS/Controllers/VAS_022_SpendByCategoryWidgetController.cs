@@ -54,9 +54,43 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
-            DateTime now = DateTime.Now;
-            int currentYear  = now.Year;
-            int currentMonth = now.Month;
+
+            // Period Control: resolve the client's accounting calendar
+            // (Org-level calendar first, Client calendar as fallback).
+            // Reference pattern: PoReceiptTabPanelModel.cs (GetPurchaseStateDetail).
+            int calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar(
+                "SELECT C_Calendar_ID FROM AD_OrgInfo WHERE IsActive='Y' AND AD_Org_ID="
+                + ctx.GetAD_Org_ID(), null, null));
+            if (calendar_ID == 0)
+            {
+                calendar_ID = Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT C_Calendar_ID FROM AD_ClientInfo WHERE IsActive='Y' AND AD_Client_ID="
+                    + ctx.GetAD_Client_ID(), null, null));
+            }
+
+            // Period Control: resolve the current accounting period's StartDate/EndDate
+            // from C_Period joined with C_Year on the client's own calendar, so the
+            // widget follows the configured fiscal periods instead of the Gregorian month.
+            DateTime periodStart = DateTime.MinValue;
+            DateTime periodEnd   = DateTime.MaxValue;
+            if (calendar_ID > 0)
+            {
+                string periodSql = @"SELECT cp.StartDate, cp.EndDate
+                                       FROM C_Period cp
+                                      INNER JOIN C_Year cy ON (cy.C_Year_ID = cp.C_Year_ID)
+                                      WHERE TRUNC(CURRENT_DATE) BETWEEN cp.StartDate AND cp.EndDate
+                                        AND cp.IsActive = 'Y'
+                                        AND cy.IsActive = 'Y'
+                                        AND cy.C_Calendar_ID = " + calendar_ID;
+                DataSet pDs = DB.ExecuteDataset(periodSql, null, null);
+                if (pDs != null && pDs.Tables.Count > 0 && pDs.Tables[0].Rows.Count > 0)
+                {
+                    periodStart = Util.GetValueOfDateTime(pDs.Tables[0].Rows[0]["StartDate"]).Value;
+                    periodEnd   = Util.GetValueOfDateTime(pDs.Tables[0].Rows[0]["EndDate"]).Value;
+                }
+            }
+            string periodStartStr = periodStart.ToString("yyyy-MM-dd");
+            string periodEndStr   = periodEnd.ToString("yyyy-MM-dd");
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
@@ -81,9 +115,11 @@ namespace VAS.Areas.VAS.Controllers
 
             if (schemaCurrencyId == 0) { return result; }
 
-            // Round-trip 2 — category aggregation for current month.
+            // Round-trip 2 — category aggregation for the current accounting period.
             // MRole applied only to C_Invoice base query (join-free) to avoid OOM in AccessSqlParser.
             // C_InvoiceLine, M_Product, M_Product_Category joins are done outside MRole scope.
+            // Period Control: DateAcct is filtered by the period's StartDate/EndDate
+            // resolved above instead of EXTRACT(YEAR/MONTH) on the Gregorian calendar.
             string baseQuery = @"SELECT i.C_Invoice_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.IsReturnTrx
                     FROM C_Invoice i
                    WHERE i.IsSOTrx = 'N'
@@ -91,8 +127,7 @@ namespace VAS.Areas.VAS.Controllers
                      AND i.DocStatus IN ('CO', 'CL')
                      AND i.IsActive = 'Y'
                      AND i.AD_Client_ID = @ClientID
-                     AND EXTRACT(YEAR FROM i.DateAcct) = " + currentYear + @"
-                     AND EXTRACT(MONTH FROM i.DateAcct) = " + currentMonth;
+                     AND CAST(i.DateAcct AS DATE) BETWEEN DATE '" + periodStartStr + "' AND DATE '" + periodEndStr + "'";
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
