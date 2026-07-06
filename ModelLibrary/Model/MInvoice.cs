@@ -4307,7 +4307,7 @@ namespace VAdvantage.Model
                                             query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
                                                                 INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
                                                                 INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                                                WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                                                WHERE il.C_InvoiceLine_ID =  {costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
                                             DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
                                             if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
                                             {
@@ -5012,7 +5012,7 @@ namespace VAdvantage.Model
                                         query.Append($@"SELECT NVL(iol.MovementQty, 0) AS MovementQty, iol.M_Locator_ID, io.M_Warehouse_ID FROM C_InvoiceLine il
                                             INNER JOIN M_InoutLine iol ON (il.M_InoutLine_ID = iol.M_InoutLine_ID)
                                             INNER JOIN M_Inout io ON (io.M_InOut_ID = iol.M_InOut_ID)
-                                            WHERE il.C_InvoiceLine_ID =  { costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
+                                            WHERE il.C_InvoiceLine_ID =  {costingCheck.invoiceline.Get_ValueAsInt("Ref_InvoiceLineOrg_ID")}");
                                         DataSet dsRefInOut = DB.ExecuteDataset(query.ToString(), null, Get_Trx());
                                         if (dsRefInOut != null && dsRefInOut.Tables.Count > 0 && dsRefInOut.Tables[0].Rows.Count > 0)
                                         {
@@ -5338,7 +5338,8 @@ namespace VAdvantage.Model
                     }
 
                     //Create RecognoitionPlan and RecognitiontionRun
-                    if (Env.IsModuleInstalled("FRPT_") && line.Get_ColumnIndex("C_RevenueRecognition_ID") >= 0 && line.Get_Value("C_RevenueRecognition_ID") != null && !IsReversal())
+                    if (Env.IsModuleInstalled("FRPT_") && line.Get_ColumnIndex("C_RevenueRecognition_ID") >= 0 && 
+                        Util.GetValueOfInt(line.Get_Value("C_RevenueRecognition_ID")) > 0 && !IsReversal())
                     {
                         if (!MRevenueRecognition.CreateRevenueRecognitionPlan(line.GetC_InvoiceLine_ID(), Util.GetValueOfInt(line.Get_Value("C_RevenueRecognition_ID")), this))
                         {
@@ -8448,7 +8449,7 @@ namespace VAdvantage.Model
             if (Env.IsModuleInstalled("VA009_"))
             {
                 int invPaySchId = DB.GetSQLValue
-                    (Get_Trx(), $@"SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE { DBFunctionCollection.TypecastColumnAsInt("VA009_TransCurrency") } = " + C_Currency_ID
+                    (Get_Trx(), $@"SELECT C_InvoicePaySchedule_ID FROM C_InvoicePaySchedule WHERE {DBFunctionCollection.TypecastColumnAsInt("VA009_TransCurrency")} = " + C_Currency_ID
                       + " AND  C_Invoice_ID = " + GetC_Invoice_ID() + " AND  VA009_PaymentMethod_ID IN "
                       + " (SELECT p.VA009_PaymentMethod_ID FROM VA009_PaymentMethod p WHERE p.VA009_PaymentBaseType = "
                                      + " '" + X_C_Order.PAYMENTRULE_Cash + "' AND p.C_Currency_ID IS NULL AND p.IsActive = 'Y' AND p.AD_Client_ID = " + GetAD_Client_ID() + ") ");
