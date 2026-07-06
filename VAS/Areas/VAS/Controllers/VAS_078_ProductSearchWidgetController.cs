@@ -492,11 +492,11 @@ namespace VAS.Controllers
                 WHERE Cost.IsActive=N'Y'
                   AND Cost.C_AcctSchema_ID=@C_AcctSchema_ID
                   AND Cost.AD_Client_ID=@Cost_Client_ID
-                  AND COALESCE(NULLIF(CostCategory.CostingMethod,N''),AcctSchema.CostingMethod)=CostElement.CostingMethod
+                  AND COALESCE(NULLIF(CostCategory.CostingMethod,''),AcctSchema.CostingMethod)=CostElement.CostingMethod
                   AND (CASE
-                           WHEN NULLIF(CostCategory.CostingMethod,N'') IS NOT NULL AND CostCategory.CostingMethod=N'C' THEN CostCategory.M_CostElement_ID
-                           WHEN NULLIF(CostCategory.CostingMethod,N'') IS NOT NULL THEN (SELECT MIN(CategoryElement.M_CostElement_ID) FROM M_CostElement CategoryElement WHERE CategoryElement.CostingMethod=CostCategory.CostingMethod AND CategoryElement.AD_Client_ID=@Element_Client_ID1 AND CategoryElement.IsActive=N'Y')
-                           WHEN AcctSchema.CostingMethod=N'C' THEN AcctSchema.M_CostElement_ID
+                           WHEN NULLIF(CostCategory.CostingMethod,'') IS NOT NULL AND CostCategory.CostingMethod='C' THEN CostCategory.M_CostElement_ID
+                           WHEN NULLIF(CostCategory.CostingMethod,'') IS NOT NULL THEN (SELECT MIN(CategoryElement.M_CostElement_ID) FROM M_CostElement CategoryElement WHERE CategoryElement.CostingMethod=CostCategory.CostingMethod AND CategoryElement.AD_Client_ID=@Element_Client_ID1 AND CategoryElement.IsActive=N'Y')
+                           WHEN AcctSchema.CostingMethod='C' THEN AcctSchema.M_CostElement_ID
                            ELSE (SELECT MIN(SchemaElement.M_CostElement_ID) FROM M_CostElement SchemaElement WHERE SchemaElement.CostingMethod=AcctSchema.CostingMethod AND SchemaElement.AD_Client_ID=@Element_Client_ID2 AND SchemaElement.IsActive=N'Y')
                        END)=CostElement.M_CostElement_ID";
 
