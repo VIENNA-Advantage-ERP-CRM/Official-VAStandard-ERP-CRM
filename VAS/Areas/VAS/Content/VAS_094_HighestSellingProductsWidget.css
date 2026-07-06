@@ -135,16 +135,27 @@
     line-height: 1;
 }
 
-/* Review #12: product thumbnail between the rank and the name (hidden when the
-   backend resolved no image or the file fails to load). */
+/* Review #12: the product picture sits in the corner slot of the faded box
+   graphic (.MPC-hsp-graphic) and replaces it while an image is available;
+   without one (or on load failure) the box graphic shows again. */
 .MPC-hsp-product-image {
-    flex: 0 0 auto;
-    width: 2.4em;
-    height: 2.4em;
+    position: absolute;
+    inset-inline-end: 0;
+    top: 0;
+    /* Enlarged from the 3.6em box-graphic slot it replaces. */
+    width: 6em;
+    height: 6em;
     object-fit: cover;
     border: 1px solid rgba(15, 61, 97, 0.08);
     border-radius: 8px;
     background: #fff;
+    pointer-events: none;
+}
+
+/* The photo is opaque (unlike the faded graphic), so while one is showing the
+   hero row keeps clear of the enlarged corner slot. */
+.MPC-hsp-product-image:not(.MPC-hsp-hidden) ~ .MPC-hsp-hero {
+    padding-inline-end: 6.3em;
 }
 
 .MPC-hsp-product-wrap {

@@ -29,6 +29,7 @@
         var $rank;
         var $productName;
         var $productImage;
+        var $graphic;
         var $productAttribute;
         var $previousValue;
         var $currentValue;
@@ -159,13 +160,16 @@
             $productName.text(row.product_name || '').attr('title', productTitle);
             $productAttribute.text(attribute).attr('title', attribute).toggleClass('MPC-hsp-hidden', !attribute);
 
-            // Review #12: show the product's picture next to the name when the
-            // backend resolved one; a load failure falls back to no image.
+            // Review #12: the product's picture replaces the corner box graphic
+            // when the backend resolved one; without an image (or when the file
+            // fails to load) the original box graphic shows instead.
             var imageUrl = resolveImageUrl(row.image_url);
             if (imageUrl) {
                 $productImage.attr('src', imageUrl).removeClass('MPC-hsp-hidden');
+                $graphic.addClass('MPC-hsp-hidden');
             } else {
                 $productImage.removeAttr('src').addClass('MPC-hsp-hidden');
+                $graphic.removeClass('MPC-hsp-hidden');
             }
 
             renderValue($previousValue, row.previous_year_value, row.previous_year_units);
@@ -242,9 +246,9 @@
                                 '<polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>' +
                                 '<line x1="12" y1="22.08" x2="12" y2="12"></line>' +
                             '</svg>' +
+                            '<img class="MPC-hsp-product-image MPC-hsp-hidden" alt="" />' +
                             '<div class="MPC-hsp-hero">' +
                                 '<span class="MPC-hsp-rank"></span>' +
-                                '<img class="MPC-hsp-product-image MPC-hsp-hidden" alt="" />' +
                                 '<span class="MPC-hsp-product-wrap">' +
                                     '<span class="MPC-hsp-product"></span>' +
                                     '<span class="MPC-hsp-attribute MPC-hsp-hidden"></span>' +
@@ -286,9 +290,11 @@
             $rank = $card.find('.MPC-hsp-rank');
             $productName = $card.find('.MPC-hsp-product');
             $productImage = $card.find('.MPC-hsp-product-image');
+            $graphic = $card.find('.MPC-hsp-graphic');
             $productAttribute = $card.find('.MPC-hsp-attribute');
             $productImage.on('error.MPCHighestSellingProducts', function () {
                 $(this).removeAttr('src').addClass('MPC-hsp-hidden');
+                $graphic.removeClass('MPC-hsp-hidden');
             });
             $previousValue = $card.find('.MPC-hsp-stat-value-previous');
             $currentValue = $card.find('.MPC-hsp-stat-value-current');
