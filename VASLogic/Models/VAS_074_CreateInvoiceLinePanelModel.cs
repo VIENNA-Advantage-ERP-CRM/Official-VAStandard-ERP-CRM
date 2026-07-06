@@ -1802,6 +1802,7 @@ namespace VASLogic.Models
 
         private HashSet<string> _updateableColumns;
         private HashSet<string> _yesNoColumns;
+        private HashSet<string> _referenceColumns;
 
         /// <summary>
         /// Persists every NON-core, updateable C_InvoiceLine column present in the
@@ -1829,6 +1830,14 @@ namespace VASLogic.Models
                     object val = GetYesNoColumns().Contains(col)
                         ? (object)CoerceYesNo(kv.Value)
                         : CoerceJsonValue(kv.Value);
+                    // Table / TableDirect / Search (FK) columns hold a record ID; a null or
+                    // <= 0 value means "no selection" - leave the column untouched rather
+                    // than clobbering it with an invalid foreign key.
+                    if (GetReferenceColumns().Contains(col) &&
+                        (val == null || (decimal.TryParse(val.ToString(), out decimal number) && number == 0)))
+                    {
+                        continue;
+                    }
                     line.Set_Value(col, val);
                 }
                 catch (Exception ex) { log.Warning("VAS_074 SaveLines: skip column " + col + " - " + ex.Message); }
@@ -1868,6 +1877,7 @@ namespace VASLogic.Models
             if (_updateableColumns != null) return;
             _updateableColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             _yesNoColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _referenceColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             DataSet ds = DB.ExecuteDataset(
                 @"SELECT c.ColumnName, c.AD_Reference_ID
                   FROM AD_Column c
@@ -1880,7 +1890,10 @@ namespace VASLogic.Models
                 {
                     string name = Util.GetValueOfString(r["ColumnName"]);
                     _updateableColumns.Add(name);
-                    if (Util.GetValueOfInt(r["AD_Reference_ID"]) == 20) _yesNoColumns.Add(name);   // DisplayType.YesNo
+                    int refId = Util.GetValueOfInt(r["AD_Reference_ID"]);
+                    if (refId == 20) _yesNoColumns.Add(name);   // DisplayType.YesNo
+                    // Table (18), TableDirect (19), Search (30): FK references holding a record ID.
+                    if (refId == 18 || refId == 19 || refId == 30) _referenceColumns.Add(name);
                 }
         }
 
@@ -1892,6 +1905,11 @@ namespace VASLogic.Models
         /// PO.Set_Value on these expects a CLR boolean rather than a "Y"/"N" string.</summary>
         /// <returns>YesNo column-name set</returns>
         private HashSet<string> GetYesNoColumns() { EnsureColumnSets(); return _yesNoColumns; }
+
+        /// <summary>Updateable C_InvoiceLine FK columns (Table / TableDirect / Search).
+        /// A null or &lt;= 0 value for these means "no selection" and must not be persisted.</summary>
+        /// <returns>reference (FK) column-name set</returns>
+        private HashSet<string> GetReferenceColumns() { EnsureColumnSets(); return _referenceColumns; }
 
         /// <summary>Coerces a client YesNo value (bool, "Y"/"N", "true"/"false", 1/0) to a
         /// CLR boolean for PO.Set_Value on a YesNo column.</summary>
