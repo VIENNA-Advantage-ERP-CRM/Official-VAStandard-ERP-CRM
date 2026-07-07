@@ -142,6 +142,9 @@
     <Compile Include="Models\RelatedProductModel.cs" />
     <Compile Include="Models\VASAttachUserToBP.cs" />
     <Compile Include="Models\VAS_LeadModel.cs" />
+    <Compile Include="Models\VAS_AgingReceivablesWidgetModel.cs" />
+    <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
+    <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_PaymentWidgetModel.cs" />
     <Compile Include="Models\VAS_RequestModel.cs" />
     <Compile Include="Models\VAS_TimeSheetInvoice.cs" />

@@ -1,0 +1,193 @@
+/* Aging Receivables Widget — Onfinity glass widget pattern */
+
+.vas-aging-root {
+    height: 100%;
+    width: 100%;
+    --vas-aging-base: 14px;
+    --vas-aging-text:        #102C3F;
+    --vas-aging-text-muted:  #748494;
+    --vas-aging-track:       #EDF2F6;
+    --vas-aging-pill-bg:     #DFF1FF;
+    --vas-aging-pill-text:   #106AB0;
+    --vas-aging-icon-bg:     #EAF8FF;
+    --vas-aging-icon-color:  #0083DA;
+    --vas-aging-success:     #20A464;
+    --vas-aging-warn:        #D78B10;
+    --vas-aging-warn-strong: #C0701B;
+    --vas-aging-danger:      #ED1C24;
+    --vas-aging-danger-strong: #C0392B;
+}
+
+.vas-aging-container {
+    box-sizing: border-box;
+    height: 100%;
+    width: 100%;
+    padding: 1.15em 1.15em 1.3em 1.15em;
+    display: flex;
+    flex-direction: column;
+    font-size: var(--vas-aging-base);
+    color: var(--vas-aging-text);
+    font-family: Roboto, Arial, sans-serif;
+}
+
+/* ---- Header ---- */
+.vas-aging-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75em;
+    margin-bottom: 1.1em;
+}
+
+.vas-aging-header-icon {
+    width: 2.4em;
+    height: 2.4em;
+    flex: 0 0 2.4em;
+    border-radius: 0.6em;
+    background: var(--vas-aging-icon-bg);
+    color: var(--vas-aging-icon-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05em;
+}
+
+    .vas-aging-header-icon i {
+        font-size: 1.2em;
+    }
+
+.vas-aging-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+    line-height: 1.1;
+}
+
+.vas-aging-title {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: var(--vas-aging-text);
+}
+
+.vas-aging-subtitle {
+    font-size: 0.78em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--vas-aging-text-muted);
+    text-transform: uppercase;
+}
+
+/* ---- Body / rows ---- */
+.vas-aging-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85em;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.vas-aging-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+}
+
+.vas-aging-row-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.95em;
+}
+
+.vas-aging-bucket-label {
+    color: var(--vas-aging-text);
+    font-weight: 400;
+}
+
+.vas-aging-bucket-amount {
+    color: var(--vas-aging-text);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas-aging-bar-track {
+    height: 0.5em;
+    width: 100%;
+    background: var(--vas-aging-track);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vas-aging-bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+    .vas-aging-bar-fill.tone-success        { background: var(--vas-aging-success); }
+    .vas-aging-bar-fill.tone-warn           { background: var(--vas-aging-warn); }
+    .vas-aging-bar-fill.tone-warn-strong    { background: var(--vas-aging-warn-strong); }
+    .vas-aging-bar-fill.tone-danger         { background: var(--vas-aging-danger); }
+    .vas-aging-bar-fill.tone-danger-strong  { background: var(--vas-aging-danger-strong); }
+
+/* ---- Empty state ---- */
+.vas-aging-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vas-aging-text-muted);
+    font-size: 1em;
+}
+
+/* ---- Footer ---- */
+.vas-aging-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    margin-top: 1.1em;
+    padding-top: 0.9em;
+    border-top: 1px solid #EDF2F6;
+}
+
+.vas-aging-why-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--vas-aging-pill-bg);
+    color: var(--vas-aging-pill-text);
+    font-size: 0.72em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 0.35em 0.75em;
+    border-radius: 999px;
+    text-transform: uppercase;
+    flex: 0 0 auto;
+}
+
+.vas-aging-why-text {
+    font-size: 0.85em;
+    color: var(--vas-aging-text-muted);
+    line-height: 1.4;
+}
+
+/* ---- Responsive font scaling — keep proportions when widget shrinks ---- */
+@media screen and (max-width: 1366px) {
+    .vas-aging-root { --vas-aging-base: 13px; }
+}
+
+@media screen and (max-width: 1024px) {
+    .vas-aging-root { --vas-aging-base: 12px; }
+}
+
+@media screen and (max-width: 768px) {
+    .vas-aging-root { --vas-aging-base: 11px; }
+}
+
+@media screen and (max-width: 480px) {
+    .vas-aging-root { --vas-aging-base: 10px; }
+}
+
+.vis-editModeWidget .vas-aging-container {
+    font-size: 10px;
+}

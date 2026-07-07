@@ -216,6 +216,9 @@
     <Compile Include="Areas\VAS\Controllers\ProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_AgingReceivablesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_TimeSheetInvoicesController.cs" />
@@ -248,6 +251,9 @@
     <Content Include="Areas\VAS\Content\vasattachuser.css" />
     <Content Include="Areas\VAS\Content\style.css" />
     <Content Include="Areas\VAS\Content\VAS.all.min.css" />
+    <Content Include="Areas\VAS\Content\VAS_AgingReceivablesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
+    <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_BankBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
@@ -261,6 +267,7 @@
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\MatchPOTabPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\forms\VAS_AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_ARInvoiceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_BankBalanceWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\VAS_CashBalanceWidget.js" />
@@ -310,6 +317,8 @@
     <Content Include="Areas\VAS\Scripts\app\forms\UnAllocatedPaymentTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\vcreatefromrequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_LeadConversation.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\RequestWidget.js" />
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
