@@ -16,7 +16,6 @@
  *  #  | Current Text                       | Message Key
  * ----+------------------------------------+---------------------------
  *  1  | Receipt Aging                     | VAS_087_ReceiptAging
- *  2  | Time on dock awaiting put-away    | VAS_087_ReceiptAgingSubtitle
  *  3  | receipt awaiting                   | VAS_087_ReceiptAwaiting
  *  4  | receipts awaiting                  | VAS_087_ReceiptsAwaiting
  *  5  | oldest                             | VAS_087_Oldest
@@ -188,7 +187,6 @@
                 '<span class="vas-rag-ico">' + icon("clock") + '</span>' +
                 '<div class="vas-rag-titles">' +
                 '<div class="vas-rag-title">' + escapeHtml(lbl("VAS_087_ReceiptAging", "Receipt Aging")) + '</div>' +
-                '<div class="vas-rag-sub">' + escapeHtml(lbl("VAS_087_ReceiptAgingSubtitle", "Time on dock awaiting put-away")) + '</div>' +
                 '</div>' +
                 '</div>'
             );

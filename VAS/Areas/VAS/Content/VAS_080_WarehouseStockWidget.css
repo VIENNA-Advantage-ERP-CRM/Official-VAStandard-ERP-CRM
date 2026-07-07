@@ -75,6 +75,34 @@
     margin-inline-start: auto;
 }
 
+/* Review #15: per-user default-warehouse checkbox beside the selector. */
+.MPC-ws-default {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    margin: 0;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+
+.MPC-ws-default-check {
+    width: 1em;
+    height: 1em;
+    margin: 0;
+    accent-color: #0083da;
+    cursor: pointer;
+}
+
+.MPC-ws-default-check:disabled {
+    cursor: default;
+}
+
 .MPC-ws-select {
     width: 9em;
     max-width: 100%;

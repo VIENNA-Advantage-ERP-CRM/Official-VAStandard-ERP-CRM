@@ -19,10 +19,17 @@ namespace VAS.Controllers
     ///   VAI154      2026-06-21 Created
     ///   VAI154      2026-06-22 Updated for schema currency
     ///   VAI154      2026-06-24 Fixed ORA-12704: replaced 'Y'/'N' with 'Y'/'N' in Oracle CHAR comparisons
+    ///   VAI154      2026-07-06 Review #14: ageing now FIFO from inbound M_Transaction receipts only,
+    ///                          so issuing material no longer changes a product's age
+    ///   VAI154      2026-07-06 Review #15: per-user default warehouse (AD_Preference) with
+    ///                          GetWarehouses returning it and SetDefaultWarehouse saving it
     /// </summary>
     public class VAS_080_WarehouseStockWidgetController : Controller
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_080_WarehouseStockWidgetController).FullName);
+
+        // Review #15: AD_Preference attribute holding each user's own default warehouse.
+        private const string DefaultWarehousePreference = "VAS_080_DefaultWarehouse";
 
         /// <summary>Returns active warehouses available to the current role.</summary>
         [AjaxAuthorizeAttribute]
@@ -60,10 +67,106 @@ namespace VAS.Controllers
             }
         }
 
-        private List<WarehouseRow> GetWarehousesData(Ctx ctx)
+        /// <summary>
+        /// Saves or clears the current user's default warehouse (review #15).
+        /// Stored per user in AD_Preference, so every user can have their own.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [HttpPost]
+        public JsonResult SetDefaultWarehouse(int warehouseId, bool isDefault)
         {
-            List<WarehouseRow> warehouses = new List<WarehouseRow>();
-            if (ctx == null) { return warehouses; }
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                int preferenceId = GetDefaultWarehousePreferenceId(ctx);
+
+                if (isDefault && warehouseId > 0)
+                {
+                    MPreference preference = preferenceId > 0
+                        ? new MPreference(ctx, preferenceId, null)
+                        : new MPreference(ctx, DefaultWarehousePreference, warehouseId.ToString(), null);
+                    preference.SetValue(warehouseId.ToString());
+                    preference.SetAD_User_ID(ctx.GetAD_User_ID());
+                    // Org 0: the user's default follows them into every organization.
+                    preference.SetAD_Org_ID(0);
+                    if (!preference.Save())
+                    {
+                        return ErrorResult(ctx, "SetDefaultWarehouse", new Exception("AD_Preference save failed"));
+                    }
+                }
+                else if (preferenceId > 0)
+                {
+                    MPreference preference = new MPreference(ctx, preferenceId, null);
+                    preference.Delete(true);
+                }
+
+                return Json(JsonConvert.SerializeObject(new
+                {
+                    success = true,
+                    default_warehouse_id = isDefault ? warehouseId : 0
+                }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return ErrorResult(ctx, "SetDefaultWarehouse", ex);
+            }
+        }
+
+        /// <summary>AD_Preference_ID of this user's default-warehouse preference, or 0.</summary>
+        private int GetDefaultWarehousePreferenceId(Ctx ctx)
+        {
+            string sql = @"
+                SELECT Preference.AD_Preference_ID
+                FROM AD_Preference Preference
+                WHERE Preference.IsActive='Y'
+                  AND Preference.Attribute=@Pref_Attribute
+                  AND Preference.AD_User_ID=@Pref_User_ID
+                  AND Preference.AD_Client_ID=@Pref_Client_ID";
+
+            sql = AddAccessSql(ctx, sql, "Preference");
+            sql += " ORDER BY Preference.AD_Preference_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@Pref_Attribute", SqlDbType.NVarChar) { Value = DefaultWarehousePreference },
+                new SqlParameter("@Pref_User_ID", ctx.GetAD_User_ID()),
+                new SqlParameter("@Pref_Client_ID", ctx.GetAD_Client_ID())
+            }, null));
+        }
+
+        /// <summary>The warehouse id stored in this user's default-warehouse preference, or 0.</summary>
+        private int GetDefaultWarehouseId(Ctx ctx)
+        {
+            string sql = @"
+                SELECT Preference.Value
+                FROM AD_Preference Preference
+                WHERE Preference.IsActive='Y'
+                  AND Preference.Attribute=@Pref_Attribute
+                  AND Preference.AD_User_ID=@Pref_User_ID
+                  AND Preference.AD_Client_ID=@Pref_Client_ID";
+
+            sql = AddAccessSql(ctx, sql, "Preference");
+            sql += " ORDER BY Preference.AD_Preference_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@Pref_Attribute", SqlDbType.NVarChar) { Value = DefaultWarehousePreference },
+                new SqlParameter("@Pref_User_ID", ctx.GetAD_User_ID()),
+                new SqlParameter("@Pref_Client_ID", ctx.GetAD_Client_ID())
+            }, null));
+        }
+
+        private WarehousesResult GetWarehousesData(Ctx ctx)
+        {
+            WarehousesResult result = new WarehousesResult
+            {
+                warehouses = new List<WarehouseRow>()
+            };
+            List<WarehouseRow> warehouses = result.warehouses;
+            if (ctx == null) { return result; }
 
             string sql = @"
                 SELECT Warehouse.M_Warehouse_ID AS Warehouse_ID,
@@ -102,7 +205,19 @@ namespace VAS.Controllers
                 CloseReader(reader);
             }
 
-            return warehouses;
+            // Review #15: this user's saved default, only when it is still an
+            // accessible warehouse in the list above.
+            int defaultWarehouseId = GetDefaultWarehouseId(ctx);
+            foreach (WarehouseRow warehouse in warehouses)
+            {
+                if (warehouse.warehouse_id == defaultWarehouseId)
+                {
+                    result.default_warehouse_id = defaultWarehouseId;
+                    break;
+                }
+            }
+
+            return result;
         }
 
         private StockResult GetStockRowsData(Ctx ctx)
@@ -179,14 +294,21 @@ namespace VAS.Controllers
                       OR Cost.M_CostElement_ID=COALESCE(NULLIF(CostCategory.M_CostElement_ID,0),@M_CostElement_ID)
                   )";
 
+            // Review #14: only INBOUND transactions feed the ageing - issues must not
+            // move a product's age. Stock ages from the day it came in (FIFO: the
+            // oldest receipts are consumed first, so the on-hand quantity is made of
+            // the newest inbound layers).
             string movementSql = @"
-                SELECT Movement.M_Locator_ID,
+                SELECT Movement.M_Transaction_ID,
+                       Movement.M_Locator_ID,
                        Movement.M_Product_ID,
                        COALESCE(Movement.M_AttributeSetInstance_ID,0) AS M_AttributeSetInstance_ID,
-                       Movement.MovementDate
+                       Movement.MovementDate,
+                       Movement.MovementQty
                 FROM M_Transaction Movement
                 WHERE Movement.IsActive='Y'
                   AND COALESCE(CAST(Movement.IsReversed AS VARCHAR(1)),'N')='N'
+                  AND Movement.MovementQty>0
                   AND Movement.AD_Client_ID=@Movement_Client_ID
                   AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@Movement_Org_ID,0),Movement.AD_Org_ID))";
 
@@ -242,25 +364,40 @@ namespace VAS.Controllers
                              StorageRows.M_AttributeSetInstance_ID
                     HAVING SUM(COALESCE(StorageRows.QtyOnHand,0))<>0
                 ),
-                LastMove AS (
+                InboundLayers AS (
                     SELECT MovementRows.M_Locator_ID AS Locator_ID,
                            MovementRows.M_Product_ID AS Product_ID,
                            MovementRows.M_AttributeSetInstance_ID AS ASI_ID,
-                           MAX(MovementRows.MovementDate) AS Last_Movement_Date
+                           MovementRows.MovementDate,
+                           MovementRows.MovementQty,
+                           SUM(MovementRows.MovementQty) OVER (
+                               PARTITION BY MovementRows.M_Locator_ID, MovementRows.M_Product_ID, MovementRows.M_AttributeSetInstance_ID
+                               ORDER BY MovementRows.MovementDate DESC, MovementRows.M_Transaction_ID DESC
+                               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                           ) AS Running_In_Qty
+                    FROM MovementRows
+                ),
+                InboundTotals AS (
+                    SELECT MovementRows.M_Locator_ID AS Locator_ID,
+                           MovementRows.M_Product_ID AS Product_ID,
+                           MovementRows.M_AttributeSetInstance_ID AS ASI_ID,
+                           SUM(MovementRows.MovementQty) AS Total_In_Qty
                     FROM MovementRows
                     GROUP BY MovementRows.M_Locator_ID,
                              MovementRows.M_Product_ID,
                              MovementRows.M_AttributeSetInstance_ID
                 ),
-                LineValues AS (
+                LineCosts AS (
                     SELECT ProductStock.Warehouse_ID,
                            ProductStock.Warehouse_Code,
                            ProductStock.Warehouse_Name,
                            ProductStock.Locator_ID,
                            ProductStock.Locator_Code,
                            ProductStock.Locator_Name,
+                           ProductStock.Product_ID,
+                           ProductStock.ASI_ID,
                            ProductStock.Qty_On_Hand,
-                           ProductStock.Qty_On_Hand * COALESCE(
+                           COALESCE(
                                OrgExact.Unit_Cost,
                                OrgWarehouse.Unit_Cost,
                                OrgAttribute.Unit_Cost,
@@ -270,11 +407,7 @@ namespace VAS.Controllers
                                ClientAttribute.Unit_Cost,
                                ClientProduct.Unit_Cost,
                                0
-                           ) AS Stock_Value,
-                           COALESCE(
-                               CAST(CURRENT_DATE AS DATE)-CAST(LastMove.Last_Movement_Date AS DATE),
-                               99999
-                           ) AS Age_Days
+                           ) AS Unit_Cost
                     FROM ProductStock
                     LEFT OUTER JOIN CostRows OrgExact ON (OrgExact.AD_Org_ID=ProductStock.Org_ID AND OrgExact.M_Product_ID=ProductStock.Product_ID AND OrgExact.M_Warehouse_ID=ProductStock.Warehouse_ID AND OrgExact.M_AttributeSetInstance_ID=ProductStock.ASI_ID)
                     LEFT OUTER JOIN CostRows OrgWarehouse ON (OrgWarehouse.AD_Org_ID=ProductStock.Org_ID AND OrgWarehouse.M_Product_ID=ProductStock.Product_ID AND OrgWarehouse.M_Warehouse_ID=ProductStock.Warehouse_ID AND OrgWarehouse.M_AttributeSetInstance_ID=0)
@@ -284,29 +417,63 @@ namespace VAS.Controllers
                     LEFT OUTER JOIN CostRows ClientWarehouse ON (ClientWarehouse.AD_Org_ID=0 AND ClientWarehouse.M_Product_ID=ProductStock.Product_ID AND ClientWarehouse.M_Warehouse_ID=ProductStock.Warehouse_ID AND ClientWarehouse.M_AttributeSetInstance_ID=0)
                     LEFT OUTER JOIN CostRows ClientAttribute ON (ClientAttribute.AD_Org_ID=0 AND ClientAttribute.M_Product_ID=ProductStock.Product_ID AND ClientAttribute.M_Warehouse_ID=0 AND ClientAttribute.M_AttributeSetInstance_ID=ProductStock.ASI_ID)
                     LEFT OUTER JOIN CostRows ClientProduct ON (ClientProduct.AD_Org_ID=0 AND ClientProduct.M_Product_ID=ProductStock.Product_ID AND ClientProduct.M_Warehouse_ID=0 AND ClientProduct.M_AttributeSetInstance_ID=0)
-                    LEFT OUTER JOIN LastMove ON (LastMove.Locator_ID=ProductStock.Locator_ID AND LastMove.Product_ID=ProductStock.Product_ID AND LastMove.ASI_ID=ProductStock.ASI_ID)
+                ),
+                AgedSlices AS (
+                    SELECT LineCosts.Warehouse_ID,
+                           LineCosts.Warehouse_Code,
+                           LineCosts.Warehouse_Name,
+                           LineCosts.Locator_ID,
+                           LineCosts.Locator_Code,
+                           LineCosts.Locator_Name,
+                           CASE
+                               WHEN InboundLayers.Running_In_Qty-InboundLayers.MovementQty>=LineCosts.Qty_On_Hand THEN 0
+                               WHEN InboundLayers.Running_In_Qty<=LineCosts.Qty_On_Hand THEN InboundLayers.MovementQty
+                               ELSE LineCosts.Qty_On_Hand-(InboundLayers.Running_In_Qty-InboundLayers.MovementQty)
+                           END AS Slice_Qty,
+                           LineCosts.Unit_Cost,
+                           CAST(CURRENT_DATE AS DATE)-CAST(InboundLayers.MovementDate AS DATE) AS Age_Days
+                    FROM LineCosts
+                    INNER JOIN InboundLayers ON (InboundLayers.Locator_ID=LineCosts.Locator_ID AND InboundLayers.Product_ID=LineCosts.Product_ID AND InboundLayers.ASI_ID=LineCosts.ASI_ID)
+                    WHERE LineCosts.Qty_On_Hand>0
+                      AND InboundLayers.Running_In_Qty-InboundLayers.MovementQty<LineCosts.Qty_On_Hand
+                    UNION ALL
+                    SELECT LineCosts.Warehouse_ID,
+                           LineCosts.Warehouse_Code,
+                           LineCosts.Warehouse_Name,
+                           LineCosts.Locator_ID,
+                           LineCosts.Locator_Code,
+                           LineCosts.Locator_Name,
+                           CASE
+                               WHEN LineCosts.Qty_On_Hand<=0 THEN LineCosts.Qty_On_Hand
+                               WHEN COALESCE(InboundTotals.Total_In_Qty,0)>=LineCosts.Qty_On_Hand THEN 0
+                               ELSE LineCosts.Qty_On_Hand-COALESCE(InboundTotals.Total_In_Qty,0)
+                           END AS Slice_Qty,
+                           LineCosts.Unit_Cost,
+                           99999 AS Age_Days
+                    FROM LineCosts
+                    LEFT OUTER JOIN InboundTotals ON (InboundTotals.Locator_ID=LineCosts.Locator_ID AND InboundTotals.Product_ID=LineCosts.Product_ID AND InboundTotals.ASI_ID=LineCosts.ASI_ID)
                 )
-                SELECT LineValues.Warehouse_ID,
-                       LineValues.Warehouse_Code,
-                       LineValues.Warehouse_Name,
-                       LineValues.Locator_ID,
-                       LineValues.Locator_Code,
-                       LineValues.Locator_Name,
-                       SUM(LineValues.Qty_On_Hand) AS Total_Qty,
-                       SUM(LineValues.Stock_Value) AS Total_Value,
-                       SUM(CASE WHEN LineValues.Age_Days>=0 AND LineValues.Age_Days<=30 THEN LineValues.Stock_Value ELSE 0 END) AS Value_0_30,
-                       SUM(CASE WHEN LineValues.Age_Days>30 AND LineValues.Age_Days<=90 THEN LineValues.Stock_Value ELSE 0 END) AS Value_31_90,
-                       SUM(CASE WHEN LineValues.Age_Days>90 AND LineValues.Age_Days<=365 THEN LineValues.Stock_Value ELSE 0 END) AS Value_91_365,
-                       SUM(CASE WHEN LineValues.Age_Days>365 THEN LineValues.Stock_Value ELSE 0 END) AS Value_Over_365
-                FROM LineValues
-                GROUP BY LineValues.Warehouse_ID,
-                         LineValues.Warehouse_Code,
-                         LineValues.Warehouse_Name,
-                         LineValues.Locator_ID,
-                         LineValues.Locator_Code,
-                         LineValues.Locator_Name
-                ORDER BY LineValues.Warehouse_Name,
-                         LineValues.Locator_Code";
+                SELECT AgedSlices.Warehouse_ID,
+                       AgedSlices.Warehouse_Code,
+                       AgedSlices.Warehouse_Name,
+                       AgedSlices.Locator_ID,
+                       AgedSlices.Locator_Code,
+                       AgedSlices.Locator_Name,
+                       SUM(AgedSlices.Slice_Qty) AS Total_Qty,
+                       SUM(AgedSlices.Slice_Qty*AgedSlices.Unit_Cost) AS Total_Value,
+                       SUM(CASE WHEN AgedSlices.Age_Days>=0 AND AgedSlices.Age_Days<=30 THEN AgedSlices.Slice_Qty*AgedSlices.Unit_Cost ELSE 0 END) AS Value_0_30,
+                       SUM(CASE WHEN AgedSlices.Age_Days>30 AND AgedSlices.Age_Days<=90 THEN AgedSlices.Slice_Qty*AgedSlices.Unit_Cost ELSE 0 END) AS Value_31_90,
+                       SUM(CASE WHEN AgedSlices.Age_Days>90 AND AgedSlices.Age_Days<=365 THEN AgedSlices.Slice_Qty*AgedSlices.Unit_Cost ELSE 0 END) AS Value_91_365,
+                       SUM(CASE WHEN AgedSlices.Age_Days>365 THEN AgedSlices.Slice_Qty*AgedSlices.Unit_Cost ELSE 0 END) AS Value_Over_365
+                FROM AgedSlices
+                GROUP BY AgedSlices.Warehouse_ID,
+                         AgedSlices.Warehouse_Code,
+                         AgedSlices.Warehouse_Name,
+                         AgedSlices.Locator_ID,
+                         AgedSlices.Locator_Code,
+                         AgedSlices.Locator_Name
+                ORDER BY AgedSlices.Warehouse_Name,
+                         AgedSlices.Locator_Code";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
@@ -457,6 +624,12 @@ namespace VAS.Controllers
             public int warehouse_id { get; set; }
             public string warehouse_code { get; set; }
             public string warehouse_name { get; set; }
+        }
+
+        private class WarehousesResult
+        {
+            public List<WarehouseRow> warehouses { get; set; }
+            public int default_warehouse_id { get; set; }
         }
 
         private class StockResult

@@ -84,13 +84,17 @@ namespace VAS.Controllers
                 ORDER BY TargetForm.AD_Form_ID
                 FETCH FIRST 1 ROW ONLY";
 
+            // Parameters listed in the order their placeholders appear in the final
+            // SQL (TargetForm first, then the embedded FormLookup sub-select): the
+            // DB layer binds positionally, so a mismatch shifts every value
+            // (previously caused ORA-01722 and the widget could not navigate).
             SqlParameter[] parameters = new SqlParameter[]
             {
+                new SqlParameter("@Target_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Target_Org_ID", ctx.GetAD_Org_ID()),
                 new SqlParameter("@Form_Name", formName),
                 new SqlParameter("@Lookup_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Lookup_Org_ID", ctx.GetAD_Org_ID()),
-                new SqlParameter("@Target_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Target_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@Lookup_Org_ID", ctx.GetAD_Org_ID())
             };
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));

@@ -38,6 +38,10 @@
  * 20  | of                                    | VAS_081_Of
  * 21  | Previous                              | VAS_081_Previous
  * 22  | Next                                  | VAS_081_Next
+ * 23  | Warehouse                             | VAS_081_Warehouse
+ * 24  | Representative                        | VAS_081_Representative
+ * 25  | Month                                 | Month
+ * 26  | Year                                  | Year
  */
 ; VAS = window.VAS || {};
 
@@ -76,6 +80,12 @@
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
+
+        // Review #20: the register shows one calendar month (current by default);
+        // 0 lets the server resolve the current year/month on the first load.
+        var filterYear = 0;
+        var filterMonth = 0;
+        var $monthSelect, $yearSelect;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -146,7 +156,7 @@
                 url: VIS.Application.contextUrl + 'VAS_081_MaterialReceiptRegisterWidget/GetReceipts',
                 type: 'GET',
                 cache: false,
-                data: { pageNo: p, pageSize: pageSize },
+                data: { pageNo: p, pageSize: pageSize, year: filterYear, month: filterMonth },
                 success: function (res) {
                     var data = parseResponse(res);
                     loading = false;
@@ -161,6 +171,12 @@
                     totalPages = Number(data.totalPages || 0);
                     totalRecords = Number(data.totalRecords || 0);
 
+                    // Review #20: keep the filter in step with what the server used
+                    // (it resolves the current month on the first load).
+                    filterYear = Number(data.year || filterYear);
+                    filterMonth = Number(data.month || filterMonth);
+                    syncMonthFilter();
+
                     renderRows();
                     updatePager();
                 },
@@ -172,6 +188,36 @@
             ROWS = []; rowsById = {}; totalPages = 0; totalRecords = 0;
             renderRows();
             updatePager();
+        }
+
+        // Review #20: months use the browser's own month names; years cover the
+        // last six years including the current one.
+        function buildMonthFilter() {
+            if (!$monthSelect || !$yearSelect) { return; }
+            var currentYear = new Date().getFullYear();
+            var monthIndex;
+            $monthSelect.empty();
+            for (monthIndex = 1; monthIndex <= 12; monthIndex++) {
+                $('<option>')
+                    .val(monthIndex)
+                    .text(new Date(2000, monthIndex - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short' }))
+                    .appendTo($monthSelect);
+            }
+            $yearSelect.empty();
+            for (var year = currentYear; year >= currentYear - 5; year--) {
+                $('<option>').val(year).text(year).appendTo($yearSelect);
+            }
+        }
+
+        function syncMonthFilter() {
+            if (!$monthSelect || !$yearSelect) { return; }
+            if (filterMonth >= 1 && filterMonth <= 12) { $monthSelect.val(String(filterMonth)); }
+            if (filterYear > 0) {
+                if (!$yearSelect.find('option[value="' + filterYear + '"]').length) {
+                    $('<option>').val(filterYear).text(filterYear).appendTo($yearSelect);
+                }
+                $yearSelect.val(String(filterYear));
+            }
         }
 
         function createWidget() {
@@ -186,8 +232,25 @@
                 '<div class="vas-mrr-title">' + escapeHtml(lbl("VAS_081_MaterialReceiptRegister", "Material Receipt Register")) + '</div>' +
                 '<div class="vas-mrr-sub">' + escapeHtml(lbl("VAS_081_MRRSubtitle", "Received into stores - tap for detail")) + '</div>' +
                 '</div>' +
+                '<span class="vas-mrr-filter">' +
+                '<select class="vas-mrr-month" aria-label="' + escapeHtml(lbl("Month", "Month")) + '"></select>' +
+                '<select class="vas-mrr-year" aria-label="' + escapeHtml(lbl("Year", "Year")) + '"></select>' +
+                '</span>' +
                 '</div>'
             );
+
+            // Review #20: top-right month/year filter, defaulting to the current month.
+            $monthSelect = $header.find('.vas-mrr-month');
+            $yearSelect = $header.find('.vas-mrr-year');
+            buildMonthFilter();
+            $monthSelect.on('change', function () {
+                filterMonth = Number($(this).val());
+                if (!loading) { loadPage(1); }
+            });
+            $yearSelect.on('change', function () {
+                filterYear = Number($(this).val());
+                if (!loading) { loadPage(1); }
+            });
 
             $listBody = $('<div class="vas-mrr-list">');
 
@@ -286,6 +349,13 @@
 
             $dialog.find('.vas-mrr-modal-close').on('click', function () { closeDetail(); });
             $dialog.find('.vas-mrr-scrim').on('click', function () { closeDetail(); });
+            // Review #22: pager for the modal line table.
+            $dialog.on('click', '.vas-mrr-lprev', function () {
+                if (detailPage > 1) { detailPage--; renderLinesPage(); }
+            });
+            $dialog.on('click', '.vas-mrr-lnext', function () {
+                detailPage++; renderLinesPage();
+            });
             $(document).on('keydown.vas-mrr', function (e) {
                 if (e.key === 'Escape' && !$dialog.hasClass('vas-mrr-hidden')) { closeDetail(); }
             });
@@ -311,6 +381,9 @@
                 field("VAS_081_LinkedPO", "Linked PO", r.linkedPoNo || "—") +
                 field("VAS_081_Supplier", "Supplier", r.supplier) +
                 field("VAS_081_CustomerProject", "Customer / Project", r.customerProject || "—") +
+                // Review #24: Warehouse and Representative shown on the modal.
+                field("VAS_081_Warehouse", "Warehouse", r.warehouseName || "—") +
+                field("VAS_081_Representative", "Representative", r.salesRepName || "—") +
                 field("VAS_081_ReceivedOn", "Received on", formatFullDate(r.receivedOn)) +
                 field("VAS_081_PutAwayOn", "Put-away on", formatFullDate(r.putAwayOn)) +
                 '</div>' +
@@ -340,31 +413,64 @@
             });
         }
 
+        // Review #22: the modal line table is paginated client-side.
+        var detailLines = [];
+        var detailPage = 1;
+        var detailPageSize = 5;
+
         function renderLines(lines) {
+            detailLines = lines || [];
+            detailPage = 1;
+            renderLinesPage();
+        }
+
+        function renderLinesPage() {
             var $wrap = $dialog.find('.vas-mrr-lines-wrap');
-            if (!lines || lines.length === 0) {
+            if (!detailLines.length) {
                 $wrap.html('<div class="vas-mrr-empty">' + escapeHtml(lbl("VAS_081_NoDataAvailable", "No data available")) + '</div>');
                 return;
             }
+
+            var detailTotalPages = Math.max(1, Math.ceil(detailLines.length / detailPageSize));
+            if (detailPage > detailTotalPages) { detailPage = detailTotalPages; }
+            if (detailPage < 1) { detailPage = 1; }
+            var start = (detailPage - 1) * detailPageSize;
+            var pageLines = detailLines.slice(start, start + detailPageSize);
+
+            // Review #23: the PO Qty column was removed from the modal table.
             var body = '';
-            for (var i = 0; i < lines.length; i++) {
-                var ln = lines[i];
+            for (var i = 0; i < pageLines.length; i++) {
+                var ln = pageLines[i];
                 body +=
                     '<tr>' +
                     '<td class="vas-mrr-l-item" title="' + escapeHtml(ln.itemName) + '"><span class="vas-mrr-trunc">' + escapeHtml(ln.itemName) + '</span></td>' +
-                    '<td class="vas-mrr-l-num">' + escapeHtml(formatQty(ln.poQty)) + '</td>' +
                     '<td class="vas-mrr-l-num">' + escapeHtml(formatQty(ln.receivedQty)) + '</td>' +
                     '<td class="vas-mrr-l-uom" title="' + escapeHtml(ln.uom) + '">' + escapeHtml(ln.uom) + '</td>' +
                     '</tr>';
             }
+
+            var pager = '';
+            if (detailTotalPages > 1) {
+                var chevL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+                var chevR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+                pager =
+                    '<div class="vas-mrr-lines-foot">' +
+                    '<span>' + escapeHtml(lbl("VAS_081_Showing", "Showing")) + ' ' + (start + 1) + '–' + (start + pageLines.length) + ' ' + escapeHtml(lbl("VAS_081_Of", "of")) + ' ' + detailLines.length + '</span>' +
+                    '<span class="vas-mrr-pager">' +
+                    '<button type="button" class="vas-mrr-pgbtn vas-mrr-lprev" aria-label="' + escapeHtml(lbl("VAS_081_Previous", "Previous")) + '"' + (detailPage === 1 ? ' disabled' : '') + '>' + chevL + '</button>' +
+                    '<span class="vas-mrr-pgtext">' + detailPage + ' ' + escapeHtml(lbl("VAS_081_Of", "of")) + ' ' + detailTotalPages + '</span>' +
+                    '<button type="button" class="vas-mrr-pgbtn vas-mrr-lnext" aria-label="' + escapeHtml(lbl("VAS_081_Next", "Next")) + '"' + (detailPage === detailTotalPages ? ' disabled' : '') + '>' + chevR + '</button>' +
+                    '</span>' +
+                    '</div>';
+            }
+
             $wrap.html(
                 '<table class="vas-mrr-lines-table">' +
                 '<thead><tr>' +
                 '<th class="vas-mrr-l-item">' + escapeHtml(lbl("VAS_081_Product", "Item")) + '</th>' +
-                '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_081_POQty", "PO Qty")) + '</th>' +
                 '<th class="vas-mrr-l-num">' + escapeHtml(lbl("VAS_081_Received", "Received")) + '</th>' +
                 '<th class="vas-mrr-l-uom">' + escapeHtml(lbl("VAS_081_Uom", "UOM")) + '</th>' +
-                '</tr></thead><tbody>' + body + '</tbody></table>'
+                '</tr></thead><tbody>' + body + '</tbody></table>' + pager
             );
         }
 

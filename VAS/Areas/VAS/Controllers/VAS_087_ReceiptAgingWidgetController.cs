@@ -15,12 +15,14 @@ namespace VIS.Controllers
 {
     /// <summary>
     /// Module Name : Receipt Aging (Material Receipt / GRN dashboard)
-    /// Purpose     : 3x2 age-bar chart of completed vendor receipts that are
-    ///               still waiting because no completed/processed put-away
-    ///               confirmation exists. Age is calculated in JavaScript from
-    ///               MovementDate, as required by the widget documentation.
+    /// Purpose     : 3x2 age-bar chart of vendor receipts (GRNs) that are created
+    ///               but not yet completed (DocStatus Drafted / In Progress), per
+    ///               VA review #18. Age is calculated in JavaScript from
+    ///               MovementDate.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-20 Created
+    ///   VAI154      2026-07-06 Review #18: show only DR/IP receipts (was CO +
+    ///                          no completed put-away confirmation)
     /// </summary>
     public class VAS_087_ReceiptAgingWidgetController : Controller
     {
@@ -75,15 +77,8 @@ namespace VIS.Controllers
                 WHERE InOut.IsActive='Y'
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
-                  AND InOut.DocStatus='CO'
-                  AND InOut.AD_Client_ID=@AD_Client_ID
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM M_InOutConfirm Confirm
-                      WHERE Confirm.M_InOut_ID=InOut.M_InOut_ID
-                        AND Confirm.IsActive='Y'
-                        AND (Confirm.Processed='Y' OR Confirm.DocStatus='CO')
-                  )";
+                  AND InOut.DocStatus IN ('DR','IP')
+                  AND InOut.AD_Client_ID=@AD_Client_ID";
 
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(
                 headerSql,

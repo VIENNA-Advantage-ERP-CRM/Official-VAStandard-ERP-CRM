@@ -77,6 +77,37 @@
     margin-top: 2px;                    /* px — pairs the two header lines */
 }
 
+/* Review #20: top-right month/year filter. */
+.vas-mrr-filter {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    margin-inline-start: auto;
+}
+
+.vas-mrr-filter select {
+    min-height: 1.9em;
+    padding: 0.2em 0.45em;
+    color: #102c3f;
+    font-family: inherit;
+    font-size: 0.72em;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid #e4edf4;
+    border-radius: 7px;
+    cursor: pointer;
+}
+
+/* The year needs its own breathing room so all four digits stay visible
+   next to the native dropdown arrow. */
+.vas-mrr-filter .vas-mrr-month {
+    min-width: 4em;
+}
+
+.vas-mrr-filter .vas-mrr-year {
+    min-width: 5.2em;
+}
+
 /* ── List body (rows; no inner scroll — paginated) ── */
 .vas-mrr-list {
     flex: 1 1 auto;
@@ -259,6 +290,9 @@
 .vas-mrr-modal {
     position: relative;
     width: min(880px, 100%);
+    /* Fixed height: the popup size never changes with the number of lines
+       on the current page (max 5 lines per page). */
+    height: min(640px, 88vh);
     max-height: 88vh;
     background: #FFFFFF;
     border-radius: 14px;                /* px */
@@ -340,11 +374,30 @@
     }
 
 .vas-mrr-modal-body {
-    flex: 0 1 auto;
+    flex: 1 1 auto;                     /* fills the fixed modal height */
     min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: auto;                     /* modal body may scroll */
     padding: 22px 24px;
     position: relative;
+}
+
+/* The lines area takes the remaining space and keeps the pager pinned at the
+   bottom, so a page with 2 lines occupies the same room as a page with 5. */
+.vas-mrr-lines-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-mrr-lines-wrap .vas-mrr-lines-table {
+    flex: 0 0 auto;
+}
+
+.vas-mrr-lines-wrap .vas-mrr-lines-foot {
+    margin-top: auto;
 }
 
 /* Detail form (2-column label/value grid) */
@@ -385,6 +438,17 @@
     padding: 18px 0 8px;
 }
 
+/* Review #22: footer pager under the modal line table. */
+.vas-mrr-lines-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 8px;
+    font-size: 0.75rem;
+    color: #748494;
+}
+
 .vas-mrr-lines-table {
     width: 100%;
     border-collapse: collapse;
@@ -414,6 +478,14 @@
 
 .vas-mrr-l-num {
     width: 6em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Review #21: the numeric column HEADER is right-aligned exactly like its
+   values (design reference: .mini-table th.r / td.r), so "Received" sits
+   directly above the numbers instead of drifting left. */
+.vas-mrr-lines-table thead th.vas-mrr-l-num {
     text-align: right;
     font-variant-numeric: tabular-nums;
 }

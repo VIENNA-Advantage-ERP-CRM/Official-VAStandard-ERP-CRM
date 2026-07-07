@@ -30,6 +30,7 @@
  * 19  | Enter received quantity for at least one line.   | VAS_082_ReceivedQtyRequired
  * 20  | Received quantity cannot be greater than open... | VAS_082_ReceivedQtyTooHigh
  * 21  | GRN could not be created.                        | VAS_082_GRNCouldNotBeCreated
+ * 22  | Unable to open the GRN window.                   | VAS_082_CouldntOpenWindow
  */
 ; VAS = window.VAS || {};
 
@@ -68,6 +69,7 @@
         var purchaseOrdersById = {};
         var currentPO = null;
         var currentLines = [];
+        var grnWindowId = 0;
         var pageNo = 1;
         var pageSize = 20;
         var totalPages = 0;
@@ -123,7 +125,55 @@
         this.Initalize = function () {
             createWidget();
             createDialog();
+            loadGrnWindowId(null);
         };
+
+        // Review #17: clicking New GRN navigates straight to the Material Receipt
+        // (GRN) window - no modal is opened.
+        function loadGrnWindowId(onReady) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/GetGrnWindowId',
+                type: 'GET',
+                cache: false,
+                success: function (response) {
+                    var result = parseResponse(response);
+                    grnWindowId = Number((result && result.windowId) || 0);
+                    if (onReady) { onReady(grnWindowId); }
+                },
+                error: function () {
+                    if (onReady) { onReady(0); }
+                }
+            });
+        }
+
+        function startWindowById(windowId) {
+            if (VIS.viewManager && VIS.viewManager.startWindow) {
+                VIS.viewManager.startWindow(windowId, null);
+            }
+            else if (VIS.AEnv && VIS.AEnv.startWindow) {
+                VIS.AEnv.startWindow(windowId, null);
+            }
+        }
+
+        function openGrnWindow() {
+            if (grnWindowId > 0) {
+                startWindowById(grnWindowId);
+                return;
+            }
+            loadGrnWindowId(function (windowId) {
+                if (windowId > 0) {
+                    startWindowById(windowId);
+                }
+                else {
+                    VIS.ADialog.error(
+                        'VAS_082_CouldntOpenWindow',
+                        true,
+                        '',
+                        lbl('VAS_082_CouldntOpenWindow', 'Unable to open the GRN window.')
+                    );
+                }
+            });
+        }
 
         function createWidget() {
             var $card = $(
@@ -140,7 +190,8 @@
                 '</button>'
             );
 
-            $card.on('click', function () { openDialog(); });
+            // Review #17: navigate to the GRN window; the PO-pick modal stays unused.
+            $card.on('click', function () { openGrnWindow(); });
             $root.append($card);
         }
 

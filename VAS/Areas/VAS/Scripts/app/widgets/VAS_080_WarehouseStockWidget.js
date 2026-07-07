@@ -23,6 +23,8 @@
  * 18 | Next page                            | VAS_NextPage
  * 19 | Close                                | Close
  * 20 | Couldn't load                        | VAS_CouldntLoad
+ * 21 | Default                              | VAS_Default
+ * 22 | Use this warehouse as my default     | VAS_DefaultWarehouseHint
  */
 ; VAS = window.VAS || {};
 
@@ -37,6 +39,7 @@
         var $root = $('<div class="MPC-warehouse-stock-root">');
         var $card;
         var $warehouseSelect;
+        var $defaultCheck;
         var $summary;
         var $list;
         var $footer;
@@ -46,6 +49,7 @@
 
         var warehouseStockState = {
             warehouseId: null,
+            defaultWarehouseId: null,
             page: 1,
             pageSize: 4,
             rows: [],
@@ -189,6 +193,41 @@
             renderWarehouseStockRows();
         }
 
+        // Review #15: the checkbox reads checked only while the selected warehouse
+        // is this user's saved default.
+        function syncDefaultCheckbox() {
+            if (!$defaultCheck) { return; }
+            var current = warehouseStockState.warehouseId;
+            $defaultCheck.prop('checked', current != null && Number(current) === Number(warehouseStockState.defaultWarehouseId));
+            $defaultCheck.prop('disabled', current == null);
+        }
+
+        function saveDefaultWarehouse(makeDefault) {
+            var warehouseId = warehouseStockState.warehouseId;
+            if (warehouseId == null) { syncDefaultCheckbox(); return; }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_080_WarehouseStockWidget/SetDefaultWarehouse',
+                type: 'POST',
+                cache: false,
+                data: { warehouseId: warehouseId, isDefault: makeDefault },
+                success: function (response) {
+                    var result = parseResponse(response);
+                    if (hasErrorProp(result)) {
+                        console.error('[VAS_080] SetDefaultWarehouse error:', result.error, '|', result.detail || '');
+                        syncDefaultCheckbox();
+                        return;
+                    }
+                    warehouseStockState.defaultWarehouseId = makeDefault ? Number(warehouseId) : null;
+                    syncDefaultCheckbox();
+                },
+                error: function (xhr) {
+                    console.error('[VAS_080] SetDefaultWarehouse HTTP error:', xhr.status, xhr.responseText);
+                    syncDefaultCheckbox();
+                }
+            });
+        }
+
         function updatePageSize() {
             var listHeight = $list.innerHeight();
             var rowHeight = $list.find('.MPC-ws-row').first().outerHeight(true);
@@ -312,15 +351,27 @@
                 type: 'GET',
                 cache: false,
                 success: function (response) {
-                    var warehouses = parseResponse(response);
-                    if (hasErrorProp(warehouses)) {
-                        console.error('[VAS_080] GetWarehouses error:', warehouses.error, '|', warehouses.detail || '');
+                    var result = parseResponse(response);
+                    if (hasErrorProp(result)) {
+                        console.error('[VAS_080] GetWarehouses error:', result.error, '|', result.detail || '');
                         showError(); return;
                     }
 
-                    warehouseStockState.warehouses = Array.isArray(warehouses) ? warehouses : [];
-                    warehouseStockState.warehouseId = warehouseStockState.warehouses.length ? warehouseStockState.warehouses[0].warehouse_id : null;
+                    // Review #15: the endpoint returns { warehouses, default_warehouse_id };
+                    // a bare array (older payload) still renders with no default.
+                    var warehouses = Array.isArray(result) ? result : (result.warehouses || []);
+                    var defaultWarehouseId = !Array.isArray(result) && result.default_warehouse_id ? Number(result.default_warehouse_id) : null;
+                    var hasDefault = defaultWarehouseId != null && warehouses.some(function (warehouse) {
+                        return Number(warehouse.warehouse_id) === defaultWarehouseId;
+                    });
+
+                    warehouseStockState.warehouses = warehouses;
+                    warehouseStockState.defaultWarehouseId = hasDefault ? defaultWarehouseId : null;
+                    warehouseStockState.warehouseId = hasDefault
+                        ? defaultWarehouseId
+                        : (warehouses.length ? warehouses[0].warehouse_id : null);
                     renderWarehouseOptions();
+                    syncDefaultCheckbox();
 
                     $.ajax({
                         url: VIS.Application.contextUrl + 'VAS_080_WarehouseStockWidget/GetStockRows',
@@ -358,6 +409,10 @@
                         '<span class="MPC-ws-icon">' + warehouseIcon() + '</span>' +
                         '<span class="MPC-ws-title">' + escapeHtml(label('VAS_WarehouseStock', 'Warehouse Stock')) + '</span>' +
                         '<span class="MPC-ws-select-wrap"><select class="MPC-ws-select" aria-label="' + escapeHtml(label('Warehouse', 'Warehouse')) + '"></select></span>' +
+                        '<label class="MPC-ws-default" title="' + escapeHtml(label('VAS_DefaultWarehouseHint', 'Use this warehouse as my default')) + '">' +
+                            '<input type="checkbox" class="MPC-ws-default-check">' +
+                            '<span>' + escapeHtml(label('VAS_Default', 'Default')) + '</span>' +
+                        '</label>' +
                     '</div>' +
                     '<div class="MPC-ws-summary"></div>' +
                     '<div class="MPC-ws-table-head"><span>' + escapeHtml(label('VAS_Locator', 'Locator')) + '</span><span>' + escapeHtml(label('VAS_Qty', 'Qty')) + '</span><span>' + escapeHtml(label('VAS_Value', 'Value')) + '</span><span></span></div>' +
@@ -367,6 +422,7 @@
             );
 
             $warehouseSelect = $card.find('.MPC-ws-select');
+            $defaultCheck = $card.find('.MPC-ws-default-check');
             $summary = $card.find('.MPC-ws-summary');
             $list = $card.find('.MPC-ws-list');
             $footer = $card.find('.MPC-ws-footer');
@@ -394,6 +450,11 @@
                 warehouseStockState.warehouseId = Number($(this).val());
                 warehouseStockState.page = 1;
                 renderWarehouseStockRows();
+                syncDefaultCheckbox();
+            });
+
+            $defaultCheck.on('change', function () {
+                saveDefaultWarehouse($(this).prop('checked'));
             });
 
             $root.on('click', '[data-page]', function () {
