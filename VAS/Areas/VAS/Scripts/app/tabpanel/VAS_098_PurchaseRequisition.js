@@ -238,7 +238,8 @@
             $l.append($('<div class="MPC-vasrq-fLabel"></div>').text(msg("SourceWarehouse")));
             $l.append($('<div class="MPC-vasrq-srcName"></div>').text(
                 data.SourceWarehouseName || msg("ExternalProcurement")));
-
+            var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
+            if (cur.replace(/\s/g, "")) $l.append(headerField(msg("Currency"), cur));
             if (data.RequestWarehouseName) {
                 var $route = $('<div class="MPC-vasrq-srcRoute"></div>');
                 $route.append(svgIcon("arrow"));
@@ -257,8 +258,8 @@
             $r.append(headerField(msg("ProcurementType"), procurementType()));
             $r.append(headerField(msg("PriceList"), data.PriceListName || msg("NA")));
             $r.append(headerField(msg("RequestWarehouse"), data.RequestWarehouseName || msg("NA")));
-            var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
-            if (cur.replace(/\s/g, "")) $r.append(headerField(msg("Currency"), cur));
+           
+           
             $card.append($r);
 
             $body.append($card);

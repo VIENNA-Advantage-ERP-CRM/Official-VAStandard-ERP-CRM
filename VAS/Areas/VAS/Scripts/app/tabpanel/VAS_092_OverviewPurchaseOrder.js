@@ -259,6 +259,7 @@
             appendContactBit($contact, "phone", data.ContactPhone);
             appendContactBit($contact, "mail",  data.ContactEmail);
             if ($contact.children().length) $left.append($contact);
+            if (data.OrgName) $left.append(headerField(VIS.Msg.getMsg("VAS_092_BillTo"), data.OrgName));
             $card.append($left);
 
             // Right column: labelled term fields.
@@ -268,8 +269,7 @@
             }
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
             if (cur.trim()) $right.append(headerField(VIS.Msg.getMsg("VAS_092_Currency"), cur));
-            if (data.WarehouseName) $right.append(headerField(VIS.Msg.getMsg("VAS_092_ShipTo"), data.WarehouseName));
-            if (data.OrgName) $right.append(headerField(VIS.Msg.getMsg("VAS_092_BillTo"), data.OrgName));
+            if (data.WarehouseName) $right.append(headerField(VIS.Msg.getMsg("VAS_092_ShipTo"), data.WarehouseName));            
             if ($right.children().length) $card.append($right);
 
             $body.append($card);

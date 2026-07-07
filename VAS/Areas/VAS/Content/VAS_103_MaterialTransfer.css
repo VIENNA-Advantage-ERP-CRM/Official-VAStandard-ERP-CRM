@@ -1,0 +1,667 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Material Transfer Overview tab panel
+ *               (VAS.VAS_103_MaterialTransfer). All classes are MPC-prefixed
+ *               (MPC-vasmt-*) and scoped under the panel root to avoid global
+ *               collisions. Shares the Onfinity windows-and-panels em-anchored
+ *               body language with VAS_101 / VAS_102 — Roboto, white surfaces,
+ *               soft blue borders, KPI tiles with accent rails, pastel stepper,
+ *               status/source badges and a flat line table — and adds a From ->
+ *               To route strip and a "Generated from" origin-chip row.
+ * Chronological development:
+ *   VAI163   2026-07-07  Created
+ ***********************************************************/
+
+.MPC-vasmt-root {
+    /* Canonical palette */
+    --mt-text:        #102C3F;
+    --mt-muted:       #5F7283;
+    --mt-sub:         #41576A;
+    --mt-action:      #0083DA;
+    --mt-action-dk:   #005FA3;
+    --mt-link:        #106AB0;
+    --mt-card-bd:     #D9E2EB;
+    --mt-row-div:     #E2EAF1;
+    --mt-card-radius: 12px;
+    /* Semantic tones */
+    --mt-info-bg:     #EAF8FF;  --mt-info-tx:    #0083DA;
+    --mt-success-bg:  #E9F6EE;  --mt-success-tx: #0B6B45;
+    --mt-warning-bg:  #FFF6E2;  --mt-warning-tx: #9A6500;
+    --mt-risk-bg:     #FCEFEF;  --mt-risk-tx:    #D14545;
+    --mt-neutral-bg:  #EEF1F4;  --mt-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--mt-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasmt-root * { box-sizing: border-box; }
+
+.MPC-vasmt-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasmt-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--mt-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-sec { display: block; }
+
+.MPC-vasmt-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasmt-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--mt-text);
+    margin: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+}
+
+.MPC-vasmt-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--mt-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasmt-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
+}
+
+.MPC-vasmt-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasmt-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasmt-hdrEyebrow {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--mt-action);
+    margin-bottom: 0.1875em;
+}
+
+.MPC-vasmt-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--mt-text);
+    line-height: 1.2;
+}
+
+.MPC-vasmt-hdrSub {
+    font-size: 0.75em;
+    color: var(--mt-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasmt-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasmt-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasmt-hdrPill.tone-info    { background: var(--mt-info-bg);    color: var(--mt-info-tx); }
+.MPC-vasmt-hdrPill.tone-success { background: var(--mt-success-bg); color: var(--mt-success-tx); }
+.MPC-vasmt-hdrPill.tone-warning { background: var(--mt-warning-bg); color: var(--mt-warning-tx); }
+.MPC-vasmt-hdrPill.tone-risk    { background: var(--mt-risk-bg);    color: var(--mt-risk-tx); }
+.MPC-vasmt-hdrPill.tone-neutral { background: var(--mt-neutral-bg); color: var(--mt-neutral-tx); }
+
+.MPC-vasmt-hdrPill .MPC-vasmt-ic { color: currentColor; }
+
+.MPC-vasmt-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (transfer | document)                */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-hdrCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--mt-card-bd);
+    border-radius: var(--mt-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasmt-hdrColL { min-width: 0; }
+
+.MPC-vasmt-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasmt-hdrField { min-width: 0; }
+
+.MPC-vasmt-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--mt-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasmt-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--mt-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasmt-fVal.is-link { color: var(--mt-link); }
+
+@container (max-width: 460px) {
+    .MPC-vasmt-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasmt-hdrTop  { flex-direction: column; }
+    .MPC-vasmt-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Transfer identity                                           */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--mt-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasmt-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--mt-text);
+    margin-top: 0.375em;
+}
+.MPC-vasmt-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasmt-contactBit .MPC-vasmt-ic { color: var(--mt-action); }
+
+/* ----------------------------------------------------------- */
+/*  Route strip (From -> To)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-route {
+    display: flex;
+    align-items: stretch;
+    gap: 0.75em;
+    border: 1px solid var(--mt-card-bd);
+    border-radius: var(--mt-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasmt-routeNode {
+    flex: 1 1 0;
+    min-width: 0;
+    border-radius: 10px;
+    background: #F5F9FD;
+    border: 1px solid var(--mt-row-div);
+    padding: 0.625em 0.75em;
+}
+.MPC-vasmt-routeLbl {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--mt-muted);
+}
+.MPC-vasmt-routeWh {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--mt-text);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasmt-routeArrow {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25em;
+    color: var(--mt-action);
+    padding: 0 0.25em;
+}
+.MPC-vasmt-routeTag {
+    font-size: 0.625em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--mt-info-tx);
+    background: var(--mt-info-bg);
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    white-space: nowrap;
+}
+
+@container (max-width: 460px) {
+    .MPC-vasmt-route { flex-direction: column; }
+    .MPC-vasmt-routeArrow { flex-direction: row; }
+    .MPC-vasmt-routeArrow .MPC-vasmt-ic { transform: rotate(90deg); }
+}
+
+/* ----------------------------------------------------------- */
+/*  Generated from (origin chips)                               */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-origins {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+}
+
+.MPC-vasmt-originChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    border-radius: 999px;
+    padding: 0.375em 0.75em;
+    font-size: 0.75em;
+    border: 1px solid var(--mt-card-bd);
+}
+.MPC-vasmt-originChip.is-linked {
+    background: var(--mt-info-bg);
+    border-color: #BFE4FF;
+    color: var(--mt-info-tx);
+}
+.MPC-vasmt-originChip.is-muted {
+    background: #F4F6F8;
+    color: var(--mt-muted);
+}
+.MPC-vasmt-originChip .MPC-vasmt-ic { color: currentColor; }
+.MPC-vasmt-originLbl { font-weight: 700; }
+.MPC-vasmt-originState {
+    font-size: 0.8333em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    opacity: .85;
+}
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (KPI metric grid)                                  */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasmt-metric {
+    min-width: 0;
+    border: 1px solid var(--mt-card-bd);
+    border-left: 3px solid var(--mt-neutral-tx);
+    border-radius: var(--mt-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasmt-metric.tone-lines   { border-left-color: var(--mt-neutral-tx); }
+.MPC-vasmt-metric.tone-qty     { border-left-color: var(--mt-info-tx); }
+.MPC-vasmt-metric.tone-value   { border-left-color: #E08A1E; }
+.MPC-vasmt-metric.tone-confirm { border-left-color: var(--mt-success-tx); }
+
+.MPC-vasmt-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasmt-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--mt-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasmt-metric.tone-lines   .MPC-vasmt-mHead .MPC-vasmt-ic { color: var(--mt-neutral-tx); }
+.MPC-vasmt-metric.tone-qty     .MPC-vasmt-mHead .MPC-vasmt-ic { color: var(--mt-info-tx); }
+.MPC-vasmt-metric.tone-value   .MPC-vasmt-mHead .MPC-vasmt-ic { color: #E08A1E; }
+.MPC-vasmt-metric.tone-confirm .MPC-vasmt-mHead .MPC-vasmt-ic { color: var(--mt-success-tx); }
+
+.MPC-vasmt-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--mt-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasmt-metric.tone-value   .MPC-vasmt-mVal { color: #9A6500; }
+.MPC-vasmt-metric.tone-confirm .MPC-vasmt-mVal { color: var(--mt-success-tx); }
+
+.MPC-vasmt-mSub {
+    font-size: 0.6875em;
+    color: var(--mt-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 620px) {
+    .MPC-vasmt-snap { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasmt-snap { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Lifecycle stepper (5 nodes)                                 */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.MPC-vasmt-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.MPC-vasmt-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.MPC-vasmt-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.MPC-vasmt-step:first-child .MPC-vasmt-stepLine-l,
+.MPC-vasmt-step:last-child  .MPC-vasmt-stepLine-r { visibility: hidden; }
+
+.MPC-vasmt-step.is-done   .MPC-vasmt-stepLine-r,
+.MPC-vasmt-step.is-done   .MPC-vasmt-stepLine-l,
+.MPC-vasmt-step.is-active .MPC-vasmt-stepLine-l { background: #67B98A; }
+
+.MPC-vasmt-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.MPC-vasmt-stepDot .MPC-vasmt-ic { display: inline-flex; }
+
+.MPC-vasmt-step.is-done .MPC-vasmt-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.MPC-vasmt-step.is-active .MPC-vasmt-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.MPC-vasmt-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+.MPC-vasmt-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--mt-text);
+}
+
+.MPC-vasmt-stepMeta {
+    font-size: 0.6875em;
+    color: var(--mt-muted);
+    margin-top: 0.25em;
+}
+.MPC-vasmt-step.is-active .MPC-vasmt-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Transfer line table                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-table {
+    border: 1px solid var(--mt-card-bd);
+    border-radius: var(--mt-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.MPC-vasmt-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.2fr 1.1fr 1.1fr 0.7fr 0.9fr 1.1fr 1fr;
+}
+
+.MPC-vasmt-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--mt-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--mt-muted);
+}
+
+.MPC-vasmt-tBody {
+    border-bottom: 1px solid var(--mt-row-div);
+    font-size: 0.8125em;
+    color: var(--mt-text);
+}
+.MPC-vasmt-tBody:last-of-type { border-bottom: none; }
+.MPC-vasmt-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasmt-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasmt-table .ta-c { text-align: center; justify-content: center; }
+
+.MPC-vasmt-itItem { min-width: 0; }
+.MPC-vasmt-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--mt-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasmt-itSku {
+    font-size: 0.9231em;
+    color: var(--mt-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Source badge */
+.MPC-vasmt-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasmt-tag.s-req    { background: var(--mt-info-bg);    color: var(--mt-info-tx); }
+.MPC-vasmt-tag.s-prod   { background: var(--mt-warning-bg); color: var(--mt-warning-tx); }
+.MPC-vasmt-tag.s-manual { background: var(--mt-neutral-bg); color: var(--mt-neutral-tx); }
+
+.MPC-vasmt-tEmpty {
+    padding: 1.25em 0.875em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: var(--mt-muted);
+    border-bottom: 1px solid var(--mt-row-div);
+}
+
+/* Totals footer */
+.MPC-vasmt-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--mt-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasmt-tf { color: var(--mt-muted); margin-right: auto; }
+.MPC-vasmt-tf b { color: var(--mt-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasmt-tf.is-grand { color: var(--mt-text); font-weight: 700; margin-right: 0; }
+.MPC-vasmt-tf.is-grand b { color: var(--mt-action); margin-left: 0.5em; font-size: 1.15em; }
+
+@container (max-width: 720px) {
+    .MPC-vasmt-table { overflow-x: auto; }
+    .MPC-vasmt-tRow { min-width: 720px; }
+    .MPC-vasmt-tFoot { min-width: 720px; }
+    .MPC-vasmt-tf { margin-right: 0; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasmt-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.MPC-vasmt-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.MPC-vasmt-btn .MPC-vasmt-ic { color: currentColor; }
+
+.MPC-vasmt-btn.btn-pri {
+    background: var(--mt-action);
+    border: 1px solid var(--mt-action);
+    color: #fff;
+}
+.MPC-vasmt-btn.btn-pri:hover { background: var(--mt-action-dk); border-color: var(--mt-action-dk); }
+
+.MPC-vasmt-btn.btn-sec {
+    background: #fff;
+    border: 1px solid var(--mt-action);
+    color: var(--mt-action);
+}
+.MPC-vasmt-btn.btn-sec:hover { background: var(--mt-info-bg); }
+
+.MPC-vasmt-btn.is-disabled {
+    background: #F1F4F7;
+    border-color: #DCE5EE;
+    color: #A6B2BD;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasmt-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasmt-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasmt-tf { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .MPC-vasmt-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasmt-tf.is-grand { margin-left: 0; }
+[dir="rtl"] .MPC-vasmt-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .MPC-vasmt-actions { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasmt-routeArrow .MPC-vasmt-ic { transform: scaleX(-1); }
