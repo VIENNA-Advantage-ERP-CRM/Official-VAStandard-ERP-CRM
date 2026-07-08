@@ -174,6 +174,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_056_AutoAllocatedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_AttributeControlController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
@@ -265,7 +266,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_024_TotalOutstandingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_025_TotalPurchasesWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_026_VendorCreditUtilisationWidgetController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_045_GLJournalPendingWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_044_GLJournalRecentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_043_GLJournalTopMovementWidgetController.cs" />
@@ -285,6 +285,13 @@
     <Compile Include="Areas\VAS\Controllers\VAS_070_GLJournalSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_072_MatchSuggestionAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_092_OverviewPurchaseOrderController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_098_PurchaseRequisitionController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_099_OverviewGRNController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_100_OverviewDOController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_101_OverviewInventoryCountController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_102_OverviewInternalUseController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_103_MaterialTransferController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_104_OverviewShipGRNConfirmationController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_InvoiceOverviewController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentVoucherPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_010_CashGlCashInController.cs" />
@@ -307,7 +314,6 @@
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_037_GLJournalTotalDebitWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_041_GLJournalEntriesWidgetController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_073_LowStockCountWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_PendingGRNsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_075_TotalInventoryValueWidgetController.cs" />
@@ -319,7 +325,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_094_HighestSellingProductsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_095_QuickOperationsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_096_StockMovementTodayWidgetController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_081_MaterialReceiptRegisterWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_082_NewGRNWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_083_OpenGRNsWidgetController.cs" />
@@ -332,7 +337,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_090_ReceivingActionsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_091_MaterialReceiptSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_097_ExpectedGRNWidgetController.cs" />
-
     <Compile Include="Areas\VAS\Controllers\VAS_LeadController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_PaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_RequestController.cs" />
@@ -348,10 +352,26 @@
     <Content Include="Areas\VAS\Content\VAS_056_AutoAllocatedAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_072_MatchSuggestionAPPayment.css" />
     <Content Include="Areas\VAS\Content\VAS_092_OverviewPurchaseOrder.css" />
+    <Content Include="Areas\VAS\Content\VAS_098_PurchaseRequisition.css" />
+    <Content Include="Areas\VAS\Content\VAS_099_OverviewGRN.css" />
+    <Content Include="Areas\VAS\Content\VAS_100_OverviewDO.css" />
+    <Content Include="Areas\VAS\Content\VAS_101_OverviewInventoryCount.css" />
+    <Content Include="Areas\VAS\Content\VAS_102_OverviewInternalUse.css" />
+    <Content Include="Areas\VAS\Content\VAS_103_MaterialTransfer.css" />
+    <Content Include="Areas\VAS\Content\VAS_104_OverviewShipGRNConfirmation.css" />
+    <Content Include="Areas\VAS\Content\VAS_105_AccountRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
     <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_098_PurchaseRequisition.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_099_OverviewGRN.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_100_OverviewDO.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_101_OverviewInventoryCount.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_102_OverviewInternalUse.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_103_MaterialTransfer.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_104_OverviewShipGRNConfirmation.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_105_AccountRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />
@@ -448,7 +468,6 @@
     <Content Include="Areas\VAS\Content\VAS_PurchaseOrderTabPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_ReceiptSearch.css" />
     <Content Include="Areas\VAS\Content\VAS_RecentReceiptsWidget.css" />
-    
     <Content Include="Areas\VAS\Content\VAS_073_LowStockCountWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_074_PendingGRNsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_075_TotalInventoryValueWidget.css" />
@@ -460,7 +479,6 @@
     <Content Include="Areas\VAS\Content\VAS_094_HighestSellingProductsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_095_QuickOperationsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_096_StockMovementTodayWidget.css" />
-
     <Content Include="Areas\VAS\Content\VAS_081_MaterialReceiptRegisterWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_082_NewGRNWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_083_OpenGRNsWidget.css" />
@@ -472,7 +490,6 @@
     <Content Include="Areas\VAS\Content\VAS_089_ReceiptsMTDWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_090_ReceivingActionsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_097_ExpectedGRNWidget.css" />
-
     <Content Include="Areas\VAS\Content\VPaySelect.css" />
     <Content Include="Areas\VAS\Scripts\app\forms\InvoiceLineTabPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\forms\LineHistoryTabPanel.js" />
@@ -613,7 +630,6 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_094_HighestSellingProductsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_095_QuickOperationsWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_096_StockMovementTodayWidget.js" />
-
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_081_MaterialReceiptRegisterWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_082_NewGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_083_OpenGRNsWidget.js" />
@@ -627,7 +643,6 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_091_MaterialReceiptSearchWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_093_PendingGRNWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_097_ExpectedGRNWidget.js" />
-
     <Content Include="Areas\VAS\Scripts\model\CalloutAssignment.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbankstatement.js" />
     <Content Include="Areas\VAS\Scripts\model\calloutbpartner.js" />
