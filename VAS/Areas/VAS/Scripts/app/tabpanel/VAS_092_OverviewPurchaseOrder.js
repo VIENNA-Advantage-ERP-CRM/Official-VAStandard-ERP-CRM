@@ -44,6 +44,10 @@
  *                        (multi-paragraph) beside a typed Recent Activity feed
  *                        (note / grn / invoice / payment / approval / created),
  *                        each row a tag chip + title + timestamp.
+ *   VAI163   2026-07-08  Generated From now shows a single "Manual" chip when
+ *                        the PO has no origin document (no Sales Order,
+ *                        Requisition or Production Order link) instead of three
+ *                        "Not linked" chips.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -313,6 +317,21 @@
                 .text(VIS.Msg.getMsg("VAS_092_GeneratedFrom")));
 
             var $chips = $('<div class="MPC-vaspo-gfChips"></div>');
+
+            // VAI163 2026-07-08  When the PO is not generated from any origin
+            // document (no Sales Order, no Requisition and no Production Order),
+            // it was created manually — show a single "Manual" chip instead of
+            // three "Not linked" chips. Production Order is never carried in the
+            // overview payload, so it is always treated as not linked here.
+            var hasSalesOrder = !!data.RefOrderDocNo;
+            var hasRequisition = (data.RequisitionLineCount > 0);
+            if (!hasSalesOrder && !hasRequisition) {
+                $chips.append(originChip("pencil", VIS.Msg.getMsg("VAS_092_Manual"),
+                    null, null, "info"));
+                $strip.append($chips);
+                $body.append($strip);
+                return;
+            }
 
             // Sales Order (origin) — from Ref_Order_ID.
             if (data.RefOrderDocNo) {
@@ -893,6 +912,7 @@
             doc:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
             clipboardCheck: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
             factory:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7Z"/><path d="M2 20h20"/><path d="M7 20v-4"/><path d="M12 20v-4"/><path d="M17 20v-4"/></svg>',
+            pencil:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
             calendar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
             inbox:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/></svg>'
         };
