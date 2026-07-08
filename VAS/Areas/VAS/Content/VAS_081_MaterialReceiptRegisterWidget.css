@@ -63,18 +63,18 @@
 }
 
 .vas-mrr-title {
-    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 16px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     font-weight: 500;                   /* Roboto Medium */
     color: #102C3F;
     line-height: 1.3;
 }
 
 .vas-mrr-sub {
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     font-weight: 400;
     color: #717182;
     line-height: 1.25;
-    margin-top: 2px;                    /* px — pairs the two header lines */
+    margin-top: 0.167em;
 }
 
 /* Review #20: top-right month/year filter. */
@@ -158,7 +158,7 @@
     font-size: 0.6875em;                /* xs — secondary metadata */
     color: #748494;
     line-height: 1.3;
-    margin-top: 1px;
+    margin-top: 0.09em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -193,7 +193,7 @@
 }
 
 .vas-mrr-foot-info {
-    font-size: 0.8125rem;
+    font-size: 0.8125em;
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -209,8 +209,8 @@
 }
 
 .vas-mrr-pgbtn {
-    width: 24px;                        /* px — spec pager button */
-    height: 24px;
+    width: 1.5em;
+    height: 1.5em;
     border-radius: 7px;
     border: 1px solid #E4EDF4;
     background: rgba(255, 255, 255, 0.8);
@@ -222,8 +222,8 @@
 }
 
     .vas-mrr-pgbtn svg {
-        width: 14px;                    /* px — chevron */
-        height: 14px;
+        width: 0.875em;
+        height: 0.875em;
     }
 
     .vas-mrr-pgbtn:hover:not(:disabled) {
@@ -236,7 +236,7 @@
     }
 
 .vas-mrr-pgtext {
-    font-size: 0.875rem;
+    font-size: 0.875em;
     font-weight: 400;
     color: #102C3F;
     min-width: 3.2em;
@@ -265,14 +265,14 @@
 }
 
 .vas-mrr-dialog {
-    font-size: 16px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 2em;
 }
 
     .vas-mrr-dialog,
@@ -289,10 +289,10 @@
 
 .vas-mrr-modal {
     position: relative;
-    width: min(880px, 100%);
+    width: min(55em, calc(100vw - 2em));
     /* Fixed height: the popup size never changes with the number of lines
        on the current page (max 5 lines per page). */
-    height: min(640px, 88vh);
+    height: min(40em, 88vh);
     max-height: 88vh;
     background: #FFFFFF;
     border-radius: 14px;                /* px */
@@ -304,12 +304,12 @@
 
 .vas-mrr-modal-head {
     flex: 0 0 auto;
-    height: 56px;                       /* px — shared modal title bar */
+    height: 3.5em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 0 20px;
+    gap: 0.75em;
+    padding: 0 1.25em;
     border-bottom: 1px solid #1F83FF;
     background: rgba(255, 255, 255, 0.9);
 }
@@ -317,14 +317,14 @@
 .vas-mrr-modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75em;
     flex: 1 1 auto;
     min-width: 0;
 }
 
 .vas-mrr-modal-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     color: #141414;
     min-width: 0;
@@ -335,7 +335,7 @@
 
 .vas-mrr-modal-badge {
     flex: 0 0 auto;
-    font-size: 0.72rem;
+    font-size: 0.72em;
 }
 
 .vas-mrr-pill-ok {
@@ -350,8 +350,8 @@
 }
 
 .vas-mrr-modal-close {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
     border: 0;
     background: transparent;
     cursor: pointer;
@@ -364,8 +364,8 @@
 }
 
     .vas-mrr-modal-close svg {
-        width: 20px;
-        height: 20px;
+        width: 1.25em;
+        height: 1.25em;
     }
 
     .vas-mrr-modal-close:hover {
@@ -379,7 +379,7 @@
     display: flex;
     flex-direction: column;
     overflow: auto;                     /* modal body may scroll */
-    padding: 22px 24px;
+    padding: 1.375em 1.5em;
     position: relative;
 }
 
@@ -404,24 +404,24 @@
 .vas-mrr-form {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0 24px;
+    gap: 0 1.5em;
 }
 
 .vas-mrr-field {
-    padding: 8px 12px;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid #D7D7D7;
     min-width: 0;
 }
 
 .vas-mrr-field-lbl {
-    font-size: 0.75rem;
+    font-size: 0.75em;
     color: #5F7283;
 }
 
 .vas-mrr-field-val {
-    font-size: 1rem;
+    font-size: 1em;
     color: #102C3F;
-    margin-top: 6px;
+    margin-top: 0.375em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -432,10 +432,10 @@
 }
 
 .vas-mrr-lines-title {
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 500;
     color: #000000;
-    padding: 18px 0 8px;
+    padding: 1.125em 0 0.5em;
 }
 
 /* Review #22: footer pager under the modal line table. */
@@ -444,30 +444,30 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
-    padding-top: 8px;
-    font-size: 0.75rem;
+    padding-top: 0.667em;
+    font-size: 0.75em;
     color: #748494;
 }
 
 .vas-mrr-lines-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 6px;
+    margin-top: 0.375em;
 }
 
     .vas-mrr-lines-table thead th {
         text-align: left;
-        font-size: 0.75rem;
+        font-size: 0.75em;
         font-weight: 400;
         color: #748494;
-        padding: 6px 8px;
+        padding: 0.5em 0.667em;
         border-bottom: 1px solid #EDF2F6;
     }
 
     .vas-mrr-lines-table tbody td {
-        font-size: 0.875rem;
+        font-size: 0.875em;
         color: #5F7283;
-        padding: 8px;
+        padding: 0.5715em;
         border-bottom: 1px solid #EDF2F6;
         vertical-align: middle;
     }

@@ -63,7 +63,7 @@
     font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .011375), 20px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -100,8 +100,8 @@
 }
 
 .vas-egrn-row {
-    flex: 1 1 0;
-    min-height: 0;
+    flex: 0 0 auto;
+    min-height: 3.05em;
     display: flex;
     align-items: center;
     gap: .55em;
@@ -247,7 +247,7 @@
 }
 
 .vas-egrn-foot-info {
-    font-size: 0.8125rem;
+    font-size: 0.8125em;
     color: #748494;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -263,7 +263,7 @@
 }
 
 .vas-egrn-pgtext {
-    font-size: 0.875rem;
+    font-size: 0.875em;
     font-weight: 400;
     color: #102C3F;
     min-width: 3.2em;
@@ -273,8 +273,8 @@
 }
 
 .vas-egrn-pgbtn {
-    width: 24px;
-    height: 24px;
+    width: 1.5em;
+    height: 1.5em;
     border: 1px solid #E4EDF4;
     border-radius: 7px;
     background: #fff;
@@ -296,8 +296,8 @@
     }
 
     .vas-egrn-pgbtn svg {
-        width: 14px;
-        height: 14px;
+        width: 0.875em;
+        height: 0.875em;
     }
 
 /* ---- Busy ---- */
@@ -322,14 +322,14 @@
 
 .vas-egrn-dialog {
     font-family: Roboto, Arial, sans-serif;
-    font-size: 16px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 2em;
 }
 
     .vas-egrn-dialog,
@@ -346,7 +346,7 @@
 
 .vas-egrn-modal {
     position: relative;
-    width: min(820px, 100%);
+    width: min(51.25em, calc(100vw - 2em));
     max-height: 88vh;
     display: flex;
     flex-direction: column;
@@ -358,11 +358,11 @@
 
 .vas-egrn-modal-head {
     flex: 0 0 auto;
-    height: 56px;
+    height: 3.5em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 1.25em;
     background: rgba(255, 255, 255, .9);
     border-bottom: 1px solid #1F83FF;
 }
@@ -370,13 +370,13 @@
 .vas-egrn-modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75em;
     min-width: 0;
 }
 
 .vas-egrn-modal-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     color: #141414;
     white-space: nowrap;
@@ -385,7 +385,7 @@
 }
 
 .vas-egrn-modal-badge {
-    font-size: .72rem;
+    font-size: .72em;
     flex: 0 0 auto;
 }
 
@@ -410,8 +410,8 @@
 
 .vas-egrn-back,
 .vas-egrn-modal-close {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
     border: 0;
     background: transparent;
     cursor: pointer;
@@ -431,39 +431,39 @@
 
     .vas-egrn-back svg,
     .vas-egrn-modal-close svg {
-        width: 20px;
-        height: 20px;
+        width: 1.25em;
+        height: 1.25em;
     }
 
 .vas-egrn-modal-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 22px 24px;
+    padding: 1.375em 1.5em;
     position: relative;
 }
 
 .vas-egrn-form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0 24px;
+    gap: 0 1.5em;
 }
 
 .vas-egrn-field {
-    padding: 8px 12px;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid #D9E1E8;
     min-width: 0;
 }
 
 .vas-egrn-field-lbl {
-    font-size: .75rem;
+    font-size: .75em;
     color: #5F7283;
 }
 
 .vas-egrn-field-val {
-    font-size: 1rem;
+    font-size: 1em;
     color: #102C3F;
-    margin-top: 6px;
+    margin-top: 0.375em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -474,17 +474,17 @@
     }
 
 .vas-egrn-note {
-    font-size: .78rem;
+    font-size: .78em;
     color: #748494;
-    margin: 14px 0 10px;
+    margin: 1.12em 0 0.8em;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0.48em;
 }
 
     .vas-egrn-note svg {
-        width: 14px;
-        height: 14px;
+        width: 1.12em;
+        height: 1.12em;
         color: #0083DA;
         flex: 0 0 auto;
     }
@@ -492,15 +492,15 @@
 .vas-egrn-lines {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5em;
 }
 
 .vas-egrn-rcv-line {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 110px 120px 80px;
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 6.875em 7.5em 5em;
+    gap: 0.75em;
     align-items: center;
-    padding: 10px 14px;
+    padding: 0.625em 0.875em;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
     background: #fff;
@@ -509,10 +509,15 @@
 .vas-egrn-rcv-head {
     background: transparent;
     border: 0;
-    padding: 4px 14px;
+    padding: 0.25em 0.875em;
     color: #748494;
-    font-size: .72rem;
 }
+
+    /* Font size sits on the cells, not the grid container, so the em column
+       template resolves identically for the header and the data lines. */
+    .vas-egrn-rcv-head div {
+        font-size: .72em;
+    }
 
     .vas-egrn-rcv-head div:not(:first-child) {
         text-align: right;
@@ -520,7 +525,7 @@
 
 .vas-egrn-rcv-name {
     min-width: 0;
-    font-size: .9rem;
+    font-size: .9em;
     font-weight: 400;
     color: #102C3F;
     overflow: hidden;
@@ -530,7 +535,7 @@
 
 .vas-egrn-rcv-po,
 .vas-egrn-rcv-uom {
-    font-size: .9rem;
+    font-size: .9em;
     color: #5F7283;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -542,13 +547,13 @@
 .vas-egrn-rcv-in {
     width: 100%;
     font-family: inherit;
-    font-size: .9rem;
+    font-size: .9em;
     text-align: right;
     border: 0;
     border-bottom: 1px solid #D7D7D7;
     background: transparent;
     border-radius: 0;
-    padding: 7px 4px;
+    padding: 0.49em 0.28em;
     outline: none;
     box-shadow: none;
     color: #102C3F;
@@ -566,13 +571,13 @@
 }
 
 .vas-egrn-error {
-    margin-top: 10px;
+    margin-top: 0.76em;
     color: #D14545;
-    font-size: .82rem;
+    font-size: .82em;
 }
 
 .vas-egrn-action {
-    margin-top: 18px;
+    margin-top: 1.125em;
     display: flex;
     justify-content: flex-end;
 }
@@ -582,11 +587,11 @@
     color: #fff;
     border: 0;
     border-radius: 10px;
-    padding: 10px 18px;
+    padding: 0.695em 1.25em;
     font-weight: 600;
-    font-size: .9rem;
+    font-size: .9em;
     display: inline-flex;
-    gap: 8px;
+    gap: 0.556em;
     align-items: center;
     cursor: pointer;
 }
@@ -601,8 +606,8 @@
     }
 
     .vas-egrn-create-btn svg {
-        width: 16px;
-        height: 16px;
+        width: 1.11em;
+        height: 1.11em;
     }
 
 .vas-egrn-modal-busy {
@@ -617,7 +622,7 @@
 
 @media (max-width: 720px) {
     .vas-egrn-dialog {
-        padding: 16px;
+        padding: 1em;
     }
 
     .vas-egrn-form-grid {
@@ -625,8 +630,8 @@
     }
 
     .vas-egrn-rcv-line {
-        grid-template-columns: minmax(0, 1fr) 84px 96px 60px;
-        gap: 8px;
-        padding: 9px 10px;
+        grid-template-columns: minmax(0, 1fr) 5.25em 6em 3.75em;
+        gap: 0.5em;
+        padding: 0.5625em 0.625em;
     }
 }

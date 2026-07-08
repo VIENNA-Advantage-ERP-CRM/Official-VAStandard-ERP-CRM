@@ -79,9 +79,9 @@
 }
 
 .MPC-tv-titles small {
-    margin-top: 2px;
+    margin-top: 0.167em;
     color: #717182;
-    font-size: clamp(11px, 0.9625cqi, 13px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     line-height: 1.2;
 }
 
@@ -117,12 +117,12 @@
 
 .MPC-tv-row {
     width: 100%;
-    min-height: 0;
+    min-height: 2.7em;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75em;
-    flex: 1 1 0;
+    flex: 0 0 auto;
     padding: 0.35em 0;
     color: inherit;
     font-family: inherit;
@@ -202,12 +202,12 @@
 }
 
 .MPC-tv-pager button {
-    width: 24px;
-    height: 24px;
+    width: 2.745em;
+    height: 2.745em;
     padding: 0;
     color: #0083da;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 0.875em;
     background: transparent;
     border: 1px solid #e4edf4;
     border-radius: 6px;

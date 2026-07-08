@@ -97,7 +97,33 @@ namespace VAS.Controllers
                 new SqlParameter("@Lookup_Org_ID", ctx.GetAD_Org_ID())
             };
 
-            return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
+            int formId = Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
+            if (formId > 0) { return formId; }
+
+            // Review #16: deployments whose AD_Form rows carry no Export_ID
+            // (dictionaries loaded before export identifiers were stamped)
+            // resolved to 0 through the portable-ID path above, and the widget
+            // reported "Unable to open the form". Fall back to the fixed form
+            // name directly so navigation works on every deployment.
+            string nameSql = @"
+                SELECT NamedForm.AD_Form_ID
+                FROM AD_Form NamedForm
+                WHERE NamedForm.IsActive=N'Y'
+                  AND NamedForm.Name=@Named_Form_Name
+                  AND NamedForm.AD_Client_ID IN (0,@Named_Client_ID)
+                  AND NamedForm.AD_Org_ID IN (0,COALESCE(NULLIF(@Named_Org_ID,0),NamedForm.AD_Org_ID))";
+
+            nameSql = AddAccessSql(ctx, nameSql, "NamedForm");
+            nameSql += @"
+                ORDER BY NamedForm.AD_Client_ID DESC, NamedForm.AD_Form_ID
+                FETCH FIRST 1 ROW ONLY";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(nameSql, new SqlParameter[]
+            {
+                new SqlParameter("@Named_Form_Name", formName),
+                new SqlParameter("@Named_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Named_Org_ID", ctx.GetAD_Org_ID())
+            }, null));
         }
 
         /// <summary>

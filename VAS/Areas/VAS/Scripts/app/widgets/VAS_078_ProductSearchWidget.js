@@ -69,6 +69,10 @@
         var suggestions = [];
         var suggestionIndex = -1;
         var productDetail = null;
+        var currentProductId = 0;
+        var currentProductName = '';
+        var currentProductCode = '';
+        var detailLoading = false;
         var activeTab = 'overview';
         var searchCurrency = { symbol: '', iso: '', precision: 0 };
         var tabPages = {};
@@ -377,6 +381,7 @@
             $(window).on('scroll' + eventNamespace, closeSuggestions);
             $(window).on('resize' + eventNamespace, function () {
                 if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
+                syncTablePageSize();
             });
 
             $dashboardScroll = $root.closest('.vis-widget-container, [data-dashboard-container]');
@@ -517,29 +522,38 @@
             loadProductDetail(product.ProductId, product.ProductName, product.ProductCode);
         }
 
-        function loadProductDetail(productId, productName, productCode) {
-            openLoadingDialog(productName, productCode);
+        function loadProductDetail(productId, productName, productCode, keepDialog) {
+            currentProductId = productId;
+            currentProductName = productName || '';
+            currentProductCode = productCode || '';
+            var nextActiveTab = keepDialog ? activeTab : 'overview';
 
+            if (!keepDialog) { openLoadingDialog(productName, productCode); }
+
+            detailLoading = true;
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_078_ProductSearchWidget/GetProductDetail',
                 type: 'GET',
                 dataType: 'json',
                 data: {
-                    M_Product_ID: productId
+                    M_Product_ID: productId,
+                    pageSize: tablePageSize
                 },
                 success: function (response) {
                     var parsed = parseResponse(response);
+                    detailLoading = false;
                     if (!parsed || parsed.Error || !parsed.Overview) {
                         renderDialogError(parsed.Error || label('VAS_ProductDetailLoadError', 'Unable to load product detail.'));
                         return;
                     }
 
                     productDetail = parsed;
-                    activeTab = 'overview';
-                    tabPages = {};
+                    activeTab = nextActiveTab;
+                    if (!keepDialog) { tabPages = {}; }
                     renderProductDialog();
                 },
                 error: function () {
+                    detailLoading = false;
                     renderDialogError(label('VAS_ProductDetailLoadError', 'Unable to load product detail.'));
                 }
             });
@@ -657,6 +671,8 @@
             else if (activeTab === 'requisitions') {
                 $tabBody.html(renderRequisitions());
             }
+
+            window.setTimeout(syncTablePageSize, 0);
         }
 
         function renderOverview() {
@@ -774,7 +790,41 @@
         }
 
         function latestRecordsNote() {
-            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_ShowingLatest5Records', 'Showing latest 5 records.')) + '</span></div>';
+            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + tablePageSize + ' ' + label('VAS_LatestRecords', 'latest records')) + '</span></div>';
+        }
+
+        function measureTablePageSize() {
+            if (!$dialog || !$dialog.hasClass('is-open')) { return tablePageSize; }
+
+            var $tbody = $dialogBody.find('.MPC-product-search-table tbody');
+            if (!$tbody.length) { return tablePageSize; }
+
+            var bodyHeight = Math.floor($tbody.innerHeight());
+            if (bodyHeight <= 0) { return tablePageSize; }
+
+            var $row = $tbody.find('tr:first');
+            var rowHeight = $row.length ? Math.ceil($row.outerHeight(true)) : 34;
+            if (rowHeight <= 0) { rowHeight = 34; }
+
+            return Math.max(3, Math.floor(bodyHeight / rowHeight));
+        }
+
+        function syncTablePageSize() {
+            if (detailLoading || !productDetail) { return; }
+
+            var nextPageSize = measureTablePageSize();
+            if (nextPageSize === tablePageSize) { return; }
+
+            var currentPage = tabPages[activeTab] || 1;
+            var firstRecord = ((currentPage - 1) * tablePageSize) + 1;
+            tablePageSize = nextPageSize;
+            tabPages[activeTab] = Math.max(1, Math.ceil(firstRecord / tablePageSize));
+
+            if (currentProductId > 0) {
+                loadProductDetail(currentProductId, currentProductName, currentProductCode, true);
+            } else {
+                renderTab();
+            }
         }
 
         function renderTable(headers, rows, rightAlignedColumns, pageKey) {

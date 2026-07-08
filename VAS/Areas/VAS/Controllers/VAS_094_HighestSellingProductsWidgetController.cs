@@ -45,6 +45,40 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// Returns one product's performance detail for the Product Performance
+        /// modal: master flags, full UOM name, accounting-year sales totals,
+        /// attribute chips, and stock on hand per warehouse.
+        /// </summary>
+        /// <param name="productId">Selected product.</param>
+        /// <returns>Serialized product performance payload.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetProductPerformance(int productId)
+        {
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+
+            try
+            {
+                if (productId <= 0)
+                {
+                    return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" }), JsonRequestBehavior.AllowGet);
+                }
+
+                ProductPerformanceResult result = GetProductPerformanceData(ctx, productId);
+                if (result == null)
+                {
+                    return Json(JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "NotFound") ?? "Not found" }), JsonRequestBehavior.AllowGet);
+                }
+                return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return ErrorResult(ctx, ex);
+            }
+        }
+
+        /// <summary>
         /// Resolves accounting periods, schema currency, and secured sales totals.
         /// </summary>
         /// <param name="ctx">Current application context.</param>
@@ -273,6 +307,373 @@ namespace VAS.Controllers
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Loads the Product Performance modal payload for one product. The
+        /// sourcing flag uses IsBOM or an active M_Product_BOM row (this schema
+        /// has no M_Product.IsManufactured column). Attribute chips resolve as
+        /// list value name, then instance text, then instance number. Stock rows
+        /// are fetched only for stocked, non-service products.
+        /// </summary>
+        /// <param name="ctx">Current application context.</param>
+        /// <param name="productId">Selected product.</param>
+        /// <returns>Modal payload, or null when the product is not accessible.</returns>
+        private ProductPerformanceResult GetProductPerformanceData(Ctx ctx, int productId)
+        {
+            string productSql = @"
+                SELECT Product.M_Product_ID,
+                       Product.Value AS Product_Code,
+                       Product.Name AS Product_Name,
+                       COALESCE(Product.ProductType,N'I') AS Product_Type,
+                       COALESCE(Product.IsStocked,N'N') AS Is_Stocked,
+                       COALESCE(Product.IsPurchased,N'N') AS Is_Purchased,
+                       COALESCE(Product.IsBOM,N'N') AS Is_BOM,
+                       CASE
+                           WHEN COALESCE(Product.IsBOM,N'N')=N'Y'
+                             OR EXISTS (
+                                   SELECT 1
+                                   FROM M_Product_BOM ProductBOM
+                                   WHERE ProductBOM.M_Product_ID=Product.M_Product_ID
+                                     AND ProductBOM.IsActive=N'Y'
+                               )
+                           THEN N'Y' ELSE N'N'
+                       END AS Has_BOM,
+                       COALESCE(UnitOfMeasure.Name,N'Unit') AS UOM_Name
+                FROM M_Product Product
+                LEFT OUTER JOIN C_UOM UnitOfMeasure ON (UnitOfMeasure.C_UOM_ID=Product.C_UOM_ID AND UnitOfMeasure.IsActive=N'Y')
+                WHERE Product.IsActive=N'Y'
+                  AND Product.M_Product_ID=@Product_ID
+                  AND Product.AD_Client_ID=@Product_Client_ID";
+
+            productSql = AddAccessSql(ctx, productSql, "Product");
+
+            ProductPerformanceResult result = null;
+            IDataReader reader = null;
+            try
+            {
+                reader = DB.ExecuteReader(
+                    productSql,
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Product_ID", productId),
+                        new SqlParameter("@Product_Client_ID", ctx.GetAD_Client_ID())
+                    }
+                );
+                if (reader != null && reader.Read())
+                {
+                    result = new ProductPerformanceResult
+                    {
+                        product_id = Util.GetValueOfInt(reader["M_Product_ID"]),
+                        product_code = Util.GetValueOfString(reader["Product_Code"]),
+                        product_name = Util.GetValueOfString(reader["Product_Name"]),
+                        product_type = Util.GetValueOfString(reader["Product_Type"]),
+                        is_stocked = Util.GetValueOfString(reader["Is_Stocked"]),
+                        is_purchased = Util.GetValueOfString(reader["Is_Purchased"]),
+                        is_bom = Util.GetValueOfString(reader["Is_BOM"]),
+                        has_bom = Util.GetValueOfString(reader["Has_BOM"]),
+                        uom_name = Util.GetValueOfString(reader["UOM_Name"]),
+                        attributes = new List<ProductPerformanceAttribute>(),
+                        stock = new List<ProductPerformanceStock>()
+                    };
+                }
+            }
+            finally
+            {
+                CloseReader(reader);
+            }
+
+            if (result == null) { return null; }
+
+            SchemaCurrency currency = GetSchemaCurrency(ctx);
+            result.currency_symbol = currency.Symbol;
+            result.currency_iso = currency.IsoCode;
+            result.std_precision = currency.StdPrecision;
+
+            FinancialYearRange financialYears = GetFinancialYearRange(ctx);
+            if (currency.CurrencyId > 0 && financialYears.HasCurrentYear)
+            {
+                LoadProductPerformanceSales(ctx, productId, currency, financialYears, result);
+            }
+
+            LoadProductPerformanceAttributes(ctx, productId, result);
+
+            // Prompt rule: service / non-stock products show the non-stock line,
+            // so the warehouse query only runs for stocked physical items.
+            if (result.is_stocked == "Y" && result.product_type != "S")
+            {
+                LoadProductPerformanceStock(ctx, productId, result);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Sums current- and previous-accounting-year revenue and units for one
+        /// product with the same joins, currency conversion, and role security
+        /// as the widget ranking query, so the modal matches the tile figures.
+        /// </summary>
+        private void LoadProductPerformanceSales(Ctx ctx, int productId, SchemaCurrency currency, FinancialYearRange financialYears, ProductPerformanceResult result)
+        {
+            string invoiceLineSql = @"
+                SELECT InvoiceLine.C_InvoiceLine_ID,
+                       InvoiceLine.C_Invoice_ID,
+                       InvoiceLine.C_OrderLine_ID,
+                       InvoiceLine.LineNetAmt,
+                       InvoiceLine.QtyInvoiced,
+                       InvoiceLine.QtyEntered
+                FROM C_InvoiceLine InvoiceLine
+                WHERE InvoiceLine.IsActive=N'Y'
+                  AND InvoiceLine.M_Product_ID=@Line_Product_ID
+                  AND InvoiceLine.AD_Client_ID=@InvoiceLine_Client_ID
+                  AND InvoiceLine.AD_Org_ID IN (0,COALESCE(NULLIF(@InvoiceLine_Org_ID,0),InvoiceLine.AD_Org_ID))";
+
+            string invoiceSql = @"
+                SELECT Invoice.C_Invoice_ID,
+                       Invoice.C_Currency_ID,
+                       Invoice.C_ConversionType_ID,
+                       Invoice.AD_Client_ID,
+                       Invoice.AD_Org_ID,
+                       Invoice.DateInvoiced
+                FROM C_Invoice Invoice
+                WHERE Invoice.IsActive=N'Y'
+                  AND Invoice.IsSOTrx=N'Y'
+                  AND Invoice.DocStatus=N'CO'
+                  AND Invoice.AD_Client_ID=@Invoice_Client_ID
+                  AND Invoice.AD_Org_ID IN (0,COALESCE(NULLIF(@Invoice_Org_ID,0),Invoice.AD_Org_ID))
+                  AND Invoice.DateInvoiced>=@Previous_Year_Start1
+                  AND Invoice.DateInvoiced<@Current_Year_End1";
+
+            string orderLineSql = @"
+                SELECT OrderLine.C_OrderLine_ID,
+                       OrderLine.C_Order_ID
+                FROM C_OrderLine OrderLine
+                WHERE OrderLine.IsActive=N'Y'
+                  AND OrderLine.AD_Client_ID=@OrderLine_Client_ID
+                  AND OrderLine.AD_Org_ID IN (0,COALESCE(NULLIF(@OrderLine_Org_ID,0),OrderLine.AD_Org_ID))";
+
+            string orderSql = @"
+                SELECT SalesOrder.C_Order_ID
+                FROM C_Order SalesOrder
+                WHERE SalesOrder.IsActive=N'Y'
+                  AND SalesOrder.IsSOTrx=N'Y'
+                  AND SalesOrder.AD_Client_ID=@Order_Client_ID
+                  AND SalesOrder.AD_Org_ID IN (0,COALESCE(NULLIF(@Order_Org_ID,0),SalesOrder.AD_Org_ID))";
+
+            invoiceLineSql = AddAccessSql(ctx, invoiceLineSql, "InvoiceLine");
+            invoiceSql = AddAccessSql(ctx, invoiceSql, "Invoice");
+            orderLineSql = AddAccessSql(ctx, orderLineSql, "OrderLine");
+            orderSql = AddAccessSql(ctx, orderSql, "SalesOrder");
+
+            string sql = string.Format(@"
+                WITH InvoiceLines AS (
+                    {0}
+                ),
+                Invoices AS (
+                    {1}
+                ),
+                OrderLines AS (
+                    {2}
+                ),
+                SalesOrders AS (
+                    {3}
+                )
+                SELECT SUM(
+                           CASE
+                               WHEN Invoices.DateInvoiced>=@Current_Year_Start1 AND Invoices.DateInvoiced<@Current_Year_End2
+                               THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID1,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
+                               ELSE 0
+                           END
+                       ) AS Current_Year_Value,
+                       SUM(
+                           CASE
+                               WHEN Invoices.DateInvoiced>=@Current_Year_Start2 AND Invoices.DateInvoiced<@Current_Year_End3
+                               THEN COALESCE(InvoiceLines.QtyInvoiced,InvoiceLines.QtyEntered,0)
+                               ELSE 0
+                           END
+                       ) AS Current_Year_Units,
+                       SUM(
+                           CASE
+                               WHEN Invoices.DateInvoiced>=@Previous_Year_Start2 AND Invoices.DateInvoiced<@Previous_Year_End1
+                               THEN COALESCE(CURRENCYCONVERT(InvoiceLines.LineNetAmt,Invoices.C_Currency_ID,@Schema_Currency_ID2,Invoices.DateInvoiced,Invoices.C_ConversionType_ID,Invoices.AD_Client_ID,Invoices.AD_Org_ID),0)
+                               ELSE 0
+                           END
+                       ) AS Previous_Year_Value,
+                       SUM(
+                           CASE
+                               WHEN Invoices.DateInvoiced>=@Previous_Year_Start3 AND Invoices.DateInvoiced<@Previous_Year_End2
+                               THEN COALESCE(InvoiceLines.QtyInvoiced,InvoiceLines.QtyEntered,0)
+                               ELSE 0
+                           END
+                       ) AS Previous_Year_Units
+                FROM InvoiceLines
+                INNER JOIN Invoices ON (Invoices.C_Invoice_ID=InvoiceLines.C_Invoice_ID)
+                INNER JOIN OrderLines ON (OrderLines.C_OrderLine_ID=InvoiceLines.C_OrderLine_ID)
+                INNER JOIN SalesOrders ON (SalesOrders.C_Order_ID=OrderLines.C_Order_ID)",
+                invoiceLineSql,
+                invoiceSql,
+                orderLineSql,
+                orderSql
+            );
+
+            SqlParameter[] parameters = new SqlParameter[]
+            {
+                new SqlParameter("@Line_Product_ID", productId),
+                new SqlParameter("@InvoiceLine_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@InvoiceLine_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Invoice_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Invoice_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Previous_Year_Start1", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
+                new SqlParameter("@Current_Year_End1", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
+                new SqlParameter("@OrderLine_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@OrderLine_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Order_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Order_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Current_Year_Start1", SqlDbType.DateTime) { Value = financialYears.CurrentStart },
+                new SqlParameter("@Current_Year_End2", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
+                new SqlParameter("@Schema_Currency_ID1", currency.CurrencyId),
+                new SqlParameter("@Current_Year_Start2", SqlDbType.DateTime) { Value = financialYears.CurrentStart },
+                new SqlParameter("@Current_Year_End3", SqlDbType.DateTime) { Value = financialYears.CurrentEndExclusive },
+                new SqlParameter("@Previous_Year_Start2", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
+                new SqlParameter("@Previous_Year_End1", SqlDbType.DateTime) { Value = financialYears.PreviousEndExclusive },
+                new SqlParameter("@Schema_Currency_ID2", currency.CurrencyId),
+                new SqlParameter("@Previous_Year_Start3", SqlDbType.DateTime) { Value = financialYears.PreviousStart },
+                new SqlParameter("@Previous_Year_End2", SqlDbType.DateTime) { Value = financialYears.PreviousEndExclusive }
+            };
+
+            IDataReader reader = null;
+            try
+            {
+                reader = DB.ExecuteReader(sql, parameters);
+                if (reader != null && reader.Read())
+                {
+                    result.current_year_revenue = Util.GetValueOfDecimal(reader["Current_Year_Value"]);
+                    result.current_year_units = Util.GetValueOfDecimal(reader["Current_Year_Units"]);
+                    result.last_year_revenue = Util.GetValueOfDecimal(reader["Previous_Year_Value"]);
+                    result.last_year_units = Util.GetValueOfDecimal(reader["Previous_Year_Units"]);
+                }
+            }
+            finally
+            {
+                CloseReader(reader);
+            }
+
+            result.avg_selling_price = result.current_year_units != 0
+                ? result.current_year_revenue / result.current_year_units
+                : 0;
+        }
+
+        /// <summary>
+        /// Loads the attribute chips of the product's own attribute set instance.
+        /// Chip value resolves as list value name, then instance text, then
+        /// instance number; rows where all three are empty are skipped so the
+        /// client can hide the whole section when the list comes back empty.
+        /// </summary>
+        private void LoadProductPerformanceAttributes(Ctx ctx, int productId, ProductPerformanceResult result)
+        {
+            string sql = @"
+                SELECT Attribute.Name AS Attribute_Label,
+                       AttributeValue.Name AS Attribute_Value_Name,
+                       AttributeInstance.Value AS Attribute_Value_Text,
+                       AttributeInstance.ValueNumber AS Attribute_Value_Number
+                FROM M_Product Product
+                INNER JOIN M_AttributeInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=Product.M_AttributeSetInstance_ID AND AttributeInstance.IsActive=N'Y')
+                INNER JOIN M_Attribute Attribute ON (Attribute.M_Attribute_ID=AttributeInstance.M_Attribute_ID AND Attribute.IsActive=N'Y')
+                LEFT OUTER JOIN M_AttributeValue AttributeValue ON (AttributeValue.M_AttributeValue_ID=AttributeInstance.M_AttributeValue_ID AND AttributeValue.IsActive=N'Y')
+                WHERE Product.IsActive=N'Y'
+                  AND Product.M_Product_ID=@Attr_Product_ID
+                  AND Product.AD_Client_ID=@Attr_Client_ID";
+
+            sql = AddAccessSql(ctx, sql, "Product");
+            sql += @"
+                ORDER BY Attribute.Name";
+
+            IDataReader reader = null;
+            try
+            {
+                reader = DB.ExecuteReader(
+                    sql,
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Attr_Product_ID", productId),
+                        new SqlParameter("@Attr_Client_ID", ctx.GetAD_Client_ID())
+                    }
+                );
+                while (reader != null && reader.Read())
+                {
+                    string value = Util.GetValueOfString(reader["Attribute_Value_Name"]);
+                    if (string.IsNullOrEmpty(value)) { value = Util.GetValueOfString(reader["Attribute_Value_Text"]); }
+                    if (string.IsNullOrEmpty(value) && reader["Attribute_Value_Number"] != DBNull.Value)
+                    {
+                        value = Util.GetValueOfDecimal(reader["Attribute_Value_Number"]).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+                    }
+                    if (string.IsNullOrEmpty(value)) { continue; }
+
+                    result.attributes.Add(new ProductPerformanceAttribute
+                    {
+                        label = Util.GetValueOfString(reader["Attribute_Label"]),
+                        value = value
+                    });
+                }
+            }
+            finally
+            {
+                CloseReader(reader);
+            }
+        }
+
+        /// <summary>
+        /// Loads on-hand quantity per warehouse for a stocked product; zero-sum
+        /// warehouses are dropped so only locations actually holding stock show.
+        /// </summary>
+        private void LoadProductPerformanceStock(Ctx ctx, int productId, ProductPerformanceResult result)
+        {
+            string sql = @"
+                SELECT Warehouse.M_Warehouse_ID,
+                       Warehouse.Value AS Warehouse_Code,
+                       Warehouse.Name AS Warehouse_Name,
+                       SUM(COALESCE(Storage.QtyOnHand,0)) AS Qty_On_Hand
+                FROM M_Storage Storage
+                INNER JOIN M_Locator Locator ON (Locator.M_Locator_ID=Storage.M_Locator_ID AND Locator.IsActive=N'Y')
+                INNER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=Locator.M_Warehouse_ID AND Warehouse.IsActive=N'Y')
+                WHERE Storage.IsActive=N'Y'
+                  AND Storage.M_Product_ID=@Stock_Product_ID
+                  AND Storage.AD_Client_ID=@Stock_Client_ID";
+
+            sql = AddAccessSql(ctx, sql, "Storage");
+            sql += @"
+                GROUP BY Warehouse.M_Warehouse_ID,
+                         Warehouse.Value,
+                         Warehouse.Name
+                HAVING SUM(COALESCE(Storage.QtyOnHand,0))<>0
+                ORDER BY Warehouse.Name";
+
+            IDataReader reader = null;
+            try
+            {
+                reader = DB.ExecuteReader(
+                    sql,
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Stock_Product_ID", productId),
+                        new SqlParameter("@Stock_Client_ID", ctx.GetAD_Client_ID())
+                    }
+                );
+                while (reader != null && reader.Read())
+                {
+                    result.stock.Add(new ProductPerformanceStock
+                    {
+                        warehouse_id = Util.GetValueOfInt(reader["M_Warehouse_ID"]),
+                        warehouse_code = Util.GetValueOfString(reader["Warehouse_Code"]),
+                        warehouse_name = Util.GetValueOfString(reader["Warehouse_Name"]),
+                        qty_on_hand = Util.GetValueOfDecimal(reader["Qty_On_Hand"])
+                    });
+                }
+            }
+            finally
+            {
+                CloseReader(reader);
+            }
         }
 
         /// <summary>
@@ -711,6 +1112,46 @@ namespace VAS.Controllers
             public string currency_iso { get; set; }
             public int std_precision { get; set; }
             public List<HighestSellingProduct> rows { get; set; }
+        }
+
+        /// <summary>Product Performance modal payload.</summary>
+        private class ProductPerformanceResult
+        {
+            public int product_id { get; set; }
+            public string product_code { get; set; }
+            public string product_name { get; set; }
+            public string product_type { get; set; }
+            public string is_stocked { get; set; }
+            public string is_purchased { get; set; }
+            public string is_bom { get; set; }
+            public string has_bom { get; set; }
+            public string uom_name { get; set; }
+            public decimal current_year_revenue { get; set; }
+            public decimal current_year_units { get; set; }
+            public decimal last_year_revenue { get; set; }
+            public decimal last_year_units { get; set; }
+            public decimal avg_selling_price { get; set; }
+            public string currency_symbol { get; set; }
+            public string currency_iso { get; set; }
+            public int std_precision { get; set; }
+            public List<ProductPerformanceAttribute> attributes { get; set; }
+            public List<ProductPerformanceStock> stock { get; set; }
+        }
+
+        /// <summary>One attribute chip of the Product Performance modal.</summary>
+        private class ProductPerformanceAttribute
+        {
+            public string label { get; set; }
+            public string value { get; set; }
+        }
+
+        /// <summary>One warehouse's on-hand quantity for the modal stock list.</summary>
+        private class ProductPerformanceStock
+        {
+            public int warehouse_id { get; set; }
+            public string warehouse_code { get; set; }
+            public string warehouse_name { get; set; }
+            public decimal qty_on_hand { get; set; }
         }
 
         /// <summary>One ranked product's current and previous accounting-year totals.</summary>

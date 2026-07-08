@@ -46,6 +46,7 @@
         var $modal;
         var $modalBadge;
         var $modalBody;
+        var rowResizeObserver = null;
 
         var warehouseStockState = {
             warehouseId: null,
@@ -125,6 +126,33 @@
                 maximumFractionDigits: precision
             });
             return currency ? currency + ' ' + formatted : formatted;
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        // Compact currency for the narrow table Value column so a large amount
+        // stays under its header instead of overflowing sideways. Indian-family
+        // currencies use Cr/Lakh; others use K/M/B. Full value stays in the tooltip.
+        function formatCompactAmount(value) {
+            var iso = warehouseStockState.currencyIso;
+            var currency = warehouseStockState.currencySymbol || iso;
+            var number = Number(value || 0);
+            var abs = Math.abs(number);
+            var body;
+            if (usesIndianNumbering(iso)) {
+                if (abs >= 10000000) { body = trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                else if (abs >= 100000) { body = trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                else if (abs >= 1000) { body = trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+                else { body = number.toLocaleString(currencyLocale(iso), { maximumFractionDigits: 2 }); }
+            } else {
+                if (abs >= 1000000000) { body = trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                else if (abs >= 1000000) { body = trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                else if (abs >= 1000) { body = trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+                else { body = number.toLocaleString(currencyLocale(iso), { maximumFractionDigits: 2 }); }
+            }
+            return currency ? currency + ' ' + body : body;
         }
 
         function getSelectedWarehouseRows() {
@@ -241,6 +269,21 @@
             return true;
         }
 
+        /* Zoom / window resizes don't fire widgetSizeChange, so the list is
+           observed directly and re-renders with as many rows as fit. */
+        function syncPageSize() {
+            if (!$list || !$list.length) { return; }
+            if (updatePageSize()) { renderWarehouseStockRows(); }
+        }
+
+        function bindResizeObserver() {
+            if (!$list || !$list.length || typeof ResizeObserver === 'undefined') { return; }
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); }
+
+            rowResizeObserver = new ResizeObserver(syncPageSize);
+            rowResizeObserver.observe($list[0]);
+        }
+
         function renderWarehouseStockRows() {
             var rows = getSelectedWarehouseRows();
             var summary = getSummary(rows);
@@ -255,7 +298,7 @@
                 '<i></i>' +
                 '<span><strong>' + formatQty(summary.quantity) + '</strong> ' + escapeHtml(label('VAS_Qty', 'qty')) + '</span>' +
                 '<i></i>' +
-                '<span><strong class="MPC-ws-accent" title="' + escapeHtml(formatAmount(summary.value)) + '">' + escapeHtml(formatAmount(summary.value)) + '</strong> ' + escapeHtml(label('VAS_Value', 'value')) + '</span>'
+                '<span><strong class="MPC-ws-accent" title="' + escapeHtml(formatAmount(summary.value)) + '">' + escapeHtml(formatCompactAmount(summary.value)) + '</strong> ' + escapeHtml(label('VAS_Value', 'value')) + '</span>'
             );
 
             if (!pageRows.length) {
@@ -267,6 +310,7 @@
                     var spark = renderStackedBar(shares, 'MPC-ws-spark-svg');
                     var quantity = formatQty(row.total_qty);
                     var amount = formatAmount(row.total_value);
+                    var amountCompact = formatCompactAmount(row.total_value);
 
                     html +=
                         '<button type="button" class="MPC-ws-row" data-locator-id="' + Number(row.locator_id) + '">' +
@@ -275,7 +319,7 @@
                                 '<span class="MPC-ws-spark">' + spark + '</span>' +
                             '</span>' +
                             '<span class="MPC-ws-qty" title="' + escapeHtml(quantity) + '">' + escapeHtml(quantity) + '</span>' +
-                            '<span class="MPC-ws-value" title="' + escapeHtml(amount) + '">' + escapeHtml(amount) + '</span>' +
+                            '<span class="MPC-ws-value" title="' + escapeHtml(amount) + '">' + escapeHtml(amountCompact) + '</span>' +
                             '<span class="MPC-ws-chevron">' + chevronIcon('right') + '</span>' +
                         '</button>';
                 });
@@ -479,6 +523,7 @@
 
         this.Initalize = function () {
             createWidget();
+            bindResizeObserver();
             loadData();
         };
 
@@ -497,6 +542,10 @@
 
         this.disposeComponent = function () {
             closeAgeModal();
+            if (rowResizeObserver) {
+                rowResizeObserver.disconnect();
+                rowResizeObserver = null;
+            }
             $(document).off('keydown.MPCWarehouseStock-' + ($self.AD_UserHomeWidgetID || $self.windowNo || 'widget'));
             if ($modal) { $modal.remove(); $modal = null; }
             $root.remove();

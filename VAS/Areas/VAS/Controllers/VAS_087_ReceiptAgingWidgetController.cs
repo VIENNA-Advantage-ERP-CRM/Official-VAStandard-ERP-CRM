@@ -60,7 +60,7 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 4; }
-            if (pageSize > 4) { pageSize = 4; }
+            if (pageSize > 50) { pageSize = 50; }
 
             int offset = (pageNo - 1) * pageSize;
 

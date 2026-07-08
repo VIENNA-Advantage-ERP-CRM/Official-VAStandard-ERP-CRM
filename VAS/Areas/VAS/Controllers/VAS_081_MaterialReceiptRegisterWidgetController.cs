@@ -67,7 +67,7 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 5; }
-            if (pageSize > 5) { pageSize = 5; }
+            if (pageSize > 50) { pageSize = 50; }
             int offset = (pageNo - 1) * pageSize;
 
             // Review #20: resolve the month window (defaults to the current month).

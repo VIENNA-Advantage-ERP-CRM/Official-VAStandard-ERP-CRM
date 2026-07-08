@@ -21,6 +21,8 @@ namespace VAS.Controllers
     ///   VAI154      2026-06-24 Fixed ORA-12704: replaced 'Y'/'N' with 'Y'/'N' in Oracle CHAR comparisons
     ///   VAI154      2026-07-06 Review #14: ageing now FIFO from inbound M_Transaction receipts only,
     ///                          so issuing material no longer changes a product's age
+    ///   VAI154      2026-07-08 Review #14 (follow-up): layer consumption honours the product
+    ///                          category's MMPolicy - FIFO keeps the newest layers, LIFO the oldest
     ///   VAI154      2026-07-06 Review #15: per-user default warehouse (AD_Preference) with
     ///                          GetWarehouses returning it and SetDefaultWarehouse saving it
     /// </summary>
@@ -30,6 +32,30 @@ namespace VAS.Controllers
 
         // Review #15: AD_Preference attribute holding each user's own default warehouse.
         private const string DefaultWarehousePreference = "VAS_080_DefaultWarehouse";
+
+        // Review #36: M_Transaction.IsReversed exists on some deployments (the
+        // Oracle test DB) but not on others (the PostgreSQL one), and a query
+        // that references a missing column fails outright - the widget then
+        // shows no data. Cached per app lifetime; a dictionary sync that adds
+        // the column takes effect after the next app restart.
+        private static bool? _transactionHasIsReversed;
+
+        /// <summary>True when the application dictionary has M_Transaction.IsReversed.</summary>
+        private bool TransactionHasIsReversed()
+        {
+            if (_transactionHasIsReversed.HasValue) { return _transactionHasIsReversed.Value; }
+
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Column ColumnInfo
+                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
+                WHERE ColumnInfo.IsActive='Y'
+                  AND UPPER(TableInfo.TableName)='M_TRANSACTION'
+                  AND UPPER(ColumnInfo.ColumnName)='ISREVERSED'";
+
+            _transactionHasIsReversed = Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[0], null)) > 0;
+            return _transactionHasIsReversed.Value;
+        }
 
         /// <summary>Returns active warehouses available to the current role.</summary>
         [AjaxAuthorizeAttribute]
@@ -307,10 +333,31 @@ namespace VAS.Controllers
                        Movement.MovementQty
                 FROM M_Transaction Movement
                 WHERE Movement.IsActive='Y'
-                  AND COALESCE(CAST(Movement.IsReversed AS VARCHAR(1)),'N')='N'
                   AND Movement.MovementQty>0
                   AND Movement.AD_Client_ID=@Movement_Client_ID
                   AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@Movement_Org_ID,0),Movement.AD_Org_ID))";
+
+            // Review #36: only deployments whose dictionary has the column get
+            // the reversed-receipt filter; elsewhere the reversal's negative
+            // row is already excluded by MovementQty>0.
+            if (TransactionHasIsReversed())
+            {
+                movementSql += @"
+                  AND COALESCE(CAST(Movement.IsReversed AS VARCHAR(1)),'N')='N'";
+            }
+
+            // Review #14 (follow-up): the product category's material policy
+            // decides which receipt layers remain on hand (FIFO vs LIFO).
+            string policySql = @"
+                SELECT PolicyProduct.M_Product_ID,
+                       CAST(PolicyCategory.MMPolicy AS VARCHAR(10)) AS MMPolicy
+                FROM M_Product PolicyProduct
+                LEFT OUTER JOIN M_Product_Category PolicyCategory ON (PolicyCategory.M_Product_Category_ID=PolicyProduct.M_Product_Category_ID AND PolicyCategory.IsActive='Y')
+                WHERE PolicyProduct.IsActive='Y'
+                  AND PolicyProduct.AD_Client_ID=@Policy_Client_ID
+                  AND PolicyProduct.AD_Org_ID IN (0,COALESCE(NULLIF(@Policy_Org_ID,0),PolicyProduct.AD_Org_ID))";
+
+            policySql = AddAccessSql(ctx, policySql, "PolicyProduct");
 
             warehouseSql = AddAccessSql(ctx, warehouseSql, "Warehouse");
             locatorSql = AddAccessSql(ctx, locatorSql, "Locator");
@@ -339,6 +386,9 @@ namespace VAS.Controllers
                 MovementRows AS (
                     " + movementSql + @"
                 ),
+                PolicyRows AS (
+                    " + policySql + @"
+                ),
                 ProductStock AS (
                     SELECT StorageRows.AD_Org_ID AS Org_ID,
                            WarehouseRows.M_Warehouse_ID AS Warehouse_ID,
@@ -365,6 +415,12 @@ namespace VAS.Controllers
                     HAVING SUM(COALESCE(StorageRows.QtyOnHand,0))<>0
                 ),
                 InboundLayers AS (
+                    /* Review #14 (follow-up): the running sum walks the layers
+                       that REMAIN on hand under the category's material policy.
+                       FIFO (default): oldest consumed first, remaining = newest
+                       receipts, so the walk is newest-first (DESC).
+                       LIFO ('L'): newest consumed first, remaining = oldest
+                       receipts, so the walk is oldest-first (ASC). */
                     SELECT MovementRows.M_Locator_ID AS Locator_ID,
                            MovementRows.M_Product_ID AS Product_ID,
                            MovementRows.M_AttributeSetInstance_ID AS ASI_ID,
@@ -372,10 +428,15 @@ namespace VAS.Controllers
                            MovementRows.MovementQty,
                            SUM(MovementRows.MovementQty) OVER (
                                PARTITION BY MovementRows.M_Locator_ID, MovementRows.M_Product_ID, MovementRows.M_AttributeSetInstance_ID
-                               ORDER BY MovementRows.MovementDate DESC, MovementRows.M_Transaction_ID DESC
+                               ORDER BY
+                                   CASE WHEN PolicyRows.MMPolicy='L' THEN MovementRows.MovementDate END ASC,
+                                   CASE WHEN PolicyRows.MMPolicy='L' THEN MovementRows.M_Transaction_ID END ASC,
+                                   CASE WHEN PolicyRows.MMPolicy<>'L' OR PolicyRows.MMPolicy IS NULL THEN MovementRows.MovementDate END DESC,
+                                   CASE WHEN PolicyRows.MMPolicy<>'L' OR PolicyRows.MMPolicy IS NULL THEN MovementRows.M_Transaction_ID END DESC
                                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                            ) AS Running_In_Qty
                     FROM MovementRows
+                    LEFT OUTER JOIN PolicyRows ON (PolicyRows.M_Product_ID=MovementRows.M_Product_ID)
                 ),
                 InboundTotals AS (
                     SELECT MovementRows.M_Locator_ID AS Locator_ID,
@@ -491,7 +552,9 @@ namespace VAS.Controllers
                 new SqlParameter("@Costing_Method2", SqlDbType.VarChar) { Value = currency.CostingMethod },
                 new SqlParameter("@M_CostElement_ID", currency.CostElementId),
                 new SqlParameter("@Movement_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@Movement_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@Movement_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@Policy_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@Policy_Org_ID", ctx.GetAD_Org_ID())
             };
 
             IDataReader reader = null;

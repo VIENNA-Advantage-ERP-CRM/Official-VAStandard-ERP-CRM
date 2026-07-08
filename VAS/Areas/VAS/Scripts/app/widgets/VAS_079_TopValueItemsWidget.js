@@ -37,6 +37,8 @@
         var currencySymbol = '';
         var currencyIso = '';
         var stdPrecision = 0;
+        var loading = false;
+        var rowResizeObserver = null;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -173,11 +175,33 @@
             );
         }
 
+        function measurePageSize() {
+            if (!$list || !$list[0]) { return pageSize; }
+
+            var listHeight = $list.innerHeight();
+            var rowHeight = $list.find('.MPC-tv-row').first().outerHeight(true) || 50;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            return Math.max(3, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadItems(); }
+        }
+
         function showError() {
             $list.html('<div class="MPC-tv-empty">' + escapeHtml(label('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+            loading = false;
         }
 
         function loadItems() {
+            loading = true;
             $list.html('<div class="MPC-tv-empty">' + escapeHtml(label('VAS_Loading', 'Loading...')) + '</div>');
 
             var requestData = {
@@ -191,9 +215,11 @@
                 data: requestData,
                 cache: false,
                 success: function (response) {
+                    loading = false;
                     var items = parseResponse(response);
                     if (items.error) { showError(); return; }
                     renderItems(items);
+                    window.setTimeout(syncPageSize, 0);
                 },
                 error: showError
             });
@@ -256,6 +282,13 @@
                     ''
                 );
             });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($list[0]);
+            }
         }
 
         this.Initalize = function () {
@@ -273,6 +306,7 @@
         };
 
         this.disposeComponent = function () {
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             $root.remove();
         };
     };

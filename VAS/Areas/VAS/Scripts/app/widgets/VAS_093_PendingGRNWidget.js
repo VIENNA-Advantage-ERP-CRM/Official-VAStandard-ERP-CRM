@@ -23,6 +23,8 @@
         // Create a map to store child records by document number
         var childRecordsMap = {};
         var pageSize = 5;
+        var isLoading = false;
+        var rowResizeObserver = null;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
 
@@ -75,6 +77,7 @@
             createBusyIndicator();
 
             $root.append(orderContainer);
+            bindResizeObserver();
             //    buildPagination();
         };
 
@@ -82,6 +85,7 @@
         /* This function will load data in widget */
         this.intialLoad = function (pageNo) {
             // Show busy indicator
+            isLoading = true;
             $bsyDiv.css('visibility', 'visible');
             $root.find('#VAS_ProductContainer_' + widgetID).remove();
             $root.find('#VAS_DeliveryContainer_' + widgetID).show();
@@ -132,7 +136,7 @@
                             }
                         });
                         /* Add Pagination div on first tym data load*/
-                        if (pageNo == 1) {
+                        if (response.RecordCount != null) {
                             $root.find('#VAS_DeliveryCount_' + widgetID).text(response.RecordCount);
                             $self.recordCount = response.RecordCount;
                             buildPagination(response.RecordCount);
@@ -166,16 +170,55 @@
                     //    const message = $('<div class="VAS-data-message">' + VIS.Msg.getMsg("VAS_NoDataAvailable") + '</div>');
                     //    $root.find('.VAS-height-container').append(message);
                     //}
+                    window.setTimeout(syncPageSize, 0);
+                    isLoading = false;
                     $bsyDiv.css('visibility', 'hidden');
 
                 },
                 error: function (xhr, status, error) {
                     // Handle errors
                     console.log('Failed to fetch data:', status, error);
+                    isLoading = false;
                     $bsyDiv[0].style.visibility = "hidden";
                 }
             });
         };
+
+        function measurePageSize() {
+            var $list = $root.find('#VAS_DeliveryBox_' + widgetID);
+            if (!$list.length || !$list.is(':visible')) { return pageSize; }
+
+            var listHeight = Math.floor($list.innerHeight());
+            if (listHeight <= 0) { return pageSize; }
+
+            var $sample = $list.find('.vas-egrn-row:first');
+            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 58;
+            if (rowHeight <= 0) { rowHeight = 58; }
+
+            return Math.max(2, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = (($self.currentPage - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            $self.currentPage = Math.max(1, Math.ceil(firstRecord / pageSize));
+
+            if (!isLoading) {
+                $self.intialLoad($self.currentPage);
+            }
+        }
+
+        function bindResizeObserver() {
+            var $list = $root.find('#VAS_DeliveryBox_' + widgetID);
+            if (!$list.length || typeof ResizeObserver === 'undefined') { return; }
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); }
+
+            rowResizeObserver = new ResizeObserver(syncPageSize);
+            rowResizeObserver.observe($list[0]);
+        }
 
         function displayOrderDetails(docNo, customerName, orderid) {
             // Hide and remove existing elements
@@ -453,6 +496,15 @@
             $self.intialLoad($self.currentPage);
 
         };
+
+        this.disposeComponent = function () {
+            if (rowResizeObserver) {
+                rowResizeObserver.disconnect();
+                rowResizeObserver = null;
+            }
+            $root.off();
+            $root.remove();
+        };
     };
 
     VAS.VAS_093_PendingGRNWidget.prototype.widgetFirevalueChanged = function (value) {
@@ -485,12 +537,9 @@
     };
 
     VAS.VAS_093_PendingGRNWidget.prototype.dispose = function () {
+        this.disposeComponent();
         this.frame = null;
         this.windowNo = null;
-        $bsyDiv = null;
-        $self = null;
-        $root = null;
-        $contentContainer = null;
     };
 
 })(VAS, jQuery);

@@ -32,6 +32,28 @@ namespace VAS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_078_ProductSearchWidgetController).FullName);
 
+        // Review #36: M_Transaction.IsReversed exists on some deployments (the
+        // Oracle test DB) but not on others (the PostgreSQL one); referencing a
+        // missing column fails the movements query. Cached per app lifetime.
+        private static bool? _transactionHasIsReversed;
+
+        /// <summary>True when the application dictionary has M_Transaction.IsReversed.</summary>
+        private bool TransactionHasIsReversed()
+        {
+            if (_transactionHasIsReversed.HasValue) { return _transactionHasIsReversed.Value; }
+
+            string sql = @"
+                SELECT COUNT(1)
+                FROM AD_Column ColumnInfo
+                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
+                WHERE ColumnInfo.IsActive='Y'
+                  AND UPPER(TableInfo.TableName)='M_TRANSACTION'
+                  AND UPPER(ColumnInfo.ColumnName)='ISREVERSED'";
+
+            _transactionHasIsReversed = Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[0], null)) > 0;
+            return _transactionHasIsReversed.Value;
+        }
+
         /// <summary>
         /// Searches products for the type-ahead suggestion dropdown.
         /// </summary>
@@ -64,18 +86,21 @@ namespace VAS.Controllers
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetProductDetail(int M_Product_ID)
+        public JsonResult GetProductDetail(int M_Product_ID, int pageSize = 5)
         {
             if (Session["ctx"] == null)
             {
                 return Json("", JsonRequestBehavior.AllowGet);
             }
 
+            if (pageSize <= 0) { pageSize = 5; }
+            if (pageSize > 50) { pageSize = 50; }
+
             Ctx ctx = Session["ctx"] as Ctx;
 
             try
             {
-                string json = JsonConvert.SerializeObject(GetProductDetailData(ctx, M_Product_ID));
+                string json = JsonConvert.SerializeObject(GetProductDetailData(ctx, M_Product_ID, pageSize));
                 return Json(json, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -241,7 +266,7 @@ namespace VAS.Controllers
             return result;
         }
 
-        private ProductDetail GetProductDetailData(Ctx ctx, int productId)
+        private ProductDetail GetProductDetailData(Ctx ctx, int productId, int pageSize)
         {
             if (ctx == null || productId <= 0) { return null; }
 
@@ -254,10 +279,10 @@ namespace VAS.Controllers
             {
                 Overview = overview,
                 Stock = GetStockRows(ctx, productId, currency),
-                PurchaseOrders = GetOrders(ctx, productId, false),
-                SalesOrders = GetOrders(ctx, productId, true),
-                Movements = GetMovements(ctx, productId),
-                Requisitions = GetRequisitions(ctx, productId),
+                PurchaseOrders = GetOrders(ctx, productId, false, pageSize),
+                SalesOrders = GetOrders(ctx, productId, true, pageSize),
+                Movements = GetMovements(ctx, productId, pageSize),
+                Requisitions = GetRequisitions(ctx, productId, pageSize),
                 ReorderPoint = GetReorderPoint(ctx, productId),
                 PreferredSupplier = GetPreferredSupplier(ctx, productId),
                 // Review #6: every product reads Active unless it is flagged Discontinued.
@@ -681,7 +706,7 @@ namespace VAS.Controllers
             }
         }
 
-        private List<ProductOrderRow> GetOrders(Ctx ctx, int productId, bool isSales)
+        private List<ProductOrderRow> GetOrders(Ctx ctx, int productId, bool isSales, int pageSize)
         {
             string sql = @"
                 SELECT OrderHeader.DocumentNo,
@@ -712,14 +737,15 @@ namespace VAS.Controllers
             sql += @"
                 ORDER BY OrderHeader.DateOrdered DESC,
                          OrderLine.C_OrderLine_ID DESC
-                OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY";
+                OFFSET 0 ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@IsSOTrx", SqlDbType.VarChar) { Value = isSales ? "Y" : "N" },
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@PageSize", pageSize)
             };
 
             List<ProductOrderRow> rows = new List<ProductOrderRow>();
@@ -753,7 +779,7 @@ namespace VAS.Controllers
             return rows;
         }
 
-        private List<ProductMovementRow> GetMovements(Ctx ctx, int productId)
+        private List<ProductMovementRow> GetMovements(Ctx ctx, int productId, int pageSize)
         {
             string sql = @"
                 SELECT Movement.MovementDate,
@@ -768,21 +794,28 @@ namespace VAS.Controllers
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=Movement.M_AttributeSetInstance_ID)
                 WHERE Movement.M_Product_ID=@M_Product_ID
                   AND Movement.IsActive=N'Y'
-                  AND COALESCE(Movement.IsReversed,'N')='N'
                   AND Movement.AD_Client_ID=@AD_Client_ID
                   AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@AD_Org_ID,0),Movement.AD_Org_ID))";
+
+            // Review #36: filter reversed movements only where the column exists.
+            if (TransactionHasIsReversed())
+            {
+                sql += @"
+                  AND COALESCE(Movement.IsReversed,'N')='N'";
+            }
 
             sql = AddAccessSql(ctx, sql, "Movement");
             sql += @"
                 ORDER BY Movement.MovementDate DESC,
                          Movement.Created DESC
-                OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY";
+                OFFSET 0 ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@PageSize", pageSize)
             };
 
             List<ProductMovementRow> rows = new List<ProductMovementRow>();
@@ -811,7 +844,7 @@ namespace VAS.Controllers
             return rows;
         }
 
-        private List<ProductRequisitionRow> GetRequisitions(Ctx ctx, int productId)
+        private List<ProductRequisitionRow> GetRequisitions(Ctx ctx, int productId, int pageSize)
         {
             string sql = @"
                 SELECT Requisition.DocumentNo,
@@ -833,13 +866,14 @@ namespace VAS.Controllers
             sql += @"
                 ORDER BY Requisition.DateDoc DESC,
                          RequisitionLine.M_RequisitionLine_ID DESC
-                OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY";
+                OFFSET 0 ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             SqlParameter[] parameters = new SqlParameter[]
             {
                 new SqlParameter("@M_Product_ID", productId),
                 new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID())
+                new SqlParameter("@AD_Org_ID", ctx.GetAD_Org_ID()),
+                new SqlParameter("@PageSize", pageSize)
             };
 
             List<ProductRequisitionRow> rows = new List<ProductRequisitionRow>();

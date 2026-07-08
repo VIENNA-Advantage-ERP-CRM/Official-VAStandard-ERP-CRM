@@ -71,7 +71,7 @@
         var currentLines = [];
         var grnWindowId = 0;
         var pageNo = 1;
-        var pageSize = 20;
+        var pageSize = 8;
         var totalPages = 0;
         var loading = false;
 
@@ -242,6 +242,7 @@
             $(document).on('keydown.vas-ngrn', function (e) {
                 if (e.key === 'Escape' && !$dialog.hasClass('vas-ngrn-hidden')) { closeDialog(); }
             });
+            $(window).on('resize.vas-ngrn', syncPOPageSize);
 
             $('body').append($dialog);
         }
@@ -269,6 +270,35 @@
             $dialogTitle.text(lbl("VAS_082_NewGRN", "New GRN"));
             setBadge("", "");
             renderPOList();
+        }
+
+        function measurePOPageSize() {
+            if (!$dialog || $dialog.hasClass('vas-ngrn-hidden') || currentPO) { return pageSize; }
+
+            var $list = $dialogBody.find('.vas-ngrn-po-list');
+            if (!$list.length) { return pageSize; }
+
+            var available = Math.floor($dialogBody.innerHeight());
+            available -= Math.ceil($dialogBody.find('.vas-ngrn-step-hint:first').outerHeight(true) || 0);
+            available -= Math.ceil($dialogBody.find('.vas-ngrn-pager:first').outerHeight(true) || 0);
+            available -= 12;
+
+            var $sample = $list.find('.vas-ngrn-po-row:first');
+            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 56;
+            if (rowHeight <= 0) { rowHeight = 56; }
+
+            return Math.max(3, Math.floor(available / rowHeight));
+        }
+
+        function syncPOPageSize() {
+            if (loading || currentPO) { return; }
+
+            var nextPageSize = measurePOPageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            loadPOs(Math.max(1, Math.ceil(firstRecord / pageSize)));
         }
 
         function loadPOs(targetPage) {
@@ -351,6 +381,7 @@
                 '<div class="vas-ngrn-po-list">' + rows + '</div>' +
                 paging
             );
+            window.setTimeout(syncPOPageSize, 0);
         }
 
         function selectPO(poId) {
@@ -557,6 +588,7 @@
 
         this.disposeComponent = function () {
             $(document).off('keydown.vas-ngrn');
+            $(window).off('resize.vas-ngrn');
             $('body').removeClass('vas-ngrn-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

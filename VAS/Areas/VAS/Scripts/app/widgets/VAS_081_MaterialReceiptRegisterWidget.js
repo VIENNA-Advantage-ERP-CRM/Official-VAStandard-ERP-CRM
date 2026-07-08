@@ -80,6 +80,7 @@
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
+        var rowResizeObserver = null;
 
         // Review #20: the register shows one calendar month (current by default);
         // 0 lets the server resolve the current year/month on the first load.
@@ -179,6 +180,7 @@
 
                     renderRows();
                     updatePager();
+                    window.setTimeout(syncPageSize, 0);
                 },
                 error: function () { loading = false; showBusy(false); setEmpty(); }
             });
@@ -188,6 +190,7 @@
             ROWS = []; rowsById = {}; totalPages = 0; totalRecords = 0;
             renderRows();
             updatePager();
+            window.setTimeout(syncPageSize, 0);
         }
 
         // Review #20: months use the browser's own month names; years cover the
@@ -218,6 +221,26 @@
                 }
                 $yearSelect.val(String(filterYear));
             }
+        }
+
+        function measurePageSize() {
+            if (!$listBody || !$listBody[0]) { return pageSize; }
+
+            var listHeight = $listBody.innerHeight();
+            var rowHeight = $listBody.find('.vas-mrr-row').first().outerHeight(true) || 44;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            return Math.max(3, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadPage(pageNo); }
         }
 
         function createWidget() {
@@ -282,6 +305,13 @@
             });
             $prevBtn.on('click', function () { if (!loading && pageNo > 1) { loadPage(pageNo - 1); } });
             $nextBtn.on('click', function () { if (!loading && pageNo < totalPages) { loadPage(pageNo + 1); } });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($listBody[0]);
+            }
         }
 
         function renderRows() {
@@ -417,11 +447,13 @@
         var detailLines = [];
         var detailPage = 1;
         var detailPageSize = 5;
+        var detailResizeObserver = null;
 
         function renderLines(lines) {
             detailLines = lines || [];
             detailPage = 1;
             renderLinesPage();
+            bindDetailResizeObserver();
         }
 
         function renderLinesPage() {
@@ -472,12 +504,55 @@
                 '<th class="vas-mrr-l-uom">' + escapeHtml(lbl("VAS_081_Uom", "UOM")) + '</th>' +
                 '</tr></thead><tbody>' + body + '</tbody></table>' + pager
             );
+            window.setTimeout(syncDetailPageSize, 0);
+        }
+
+        function measureDetailPageSize() {
+            var $wrap = $dialog.find('.vas-mrr-lines-wrap');
+            if (!$wrap.length) { return detailPageSize; }
+
+            var $pager = $wrap.find('.vas-mrr-lines-foot');
+            var available = $wrap.innerHeight()
+                - ($wrap.find('thead').outerHeight(true) || 30)
+                - ($pager.length ? $pager.outerHeight(true) : 0)
+                - 8;
+            var rowHeight = $wrap.find('tbody tr').first().outerHeight(true) || 34;
+            if (!available || !rowHeight) { return detailPageSize; }
+
+            return Math.max(3, Math.floor(available / rowHeight));
+        }
+
+        function syncDetailPageSize() {
+            var nextPageSize = measureDetailPageSize();
+            if (nextPageSize === detailPageSize) { return; }
+
+            var firstLine = ((detailPage - 1) * detailPageSize) + 1;
+            detailPageSize = nextPageSize;
+            detailPage = Math.max(1, Math.ceil(firstLine / detailPageSize));
+            renderLinesPage();
+        }
+
+        function bindDetailResizeObserver() {
+            if (!window.ResizeObserver) { return; }
+            if (detailResizeObserver) { detailResizeObserver.disconnect(); }
+
+            var wrap = $dialog.find('.vas-mrr-lines-wrap')[0];
+            if (!wrap) { return; }
+
+            detailResizeObserver = new ResizeObserver(function () {
+                window.setTimeout(syncDetailPageSize, 0);
+            });
+            detailResizeObserver.observe(wrap);
         }
 
         function closeDetail() {
             if (!$dialog) { return; }
             $dialog.addClass('vas-mrr-hidden');
             $('body').removeClass('vas-mrr-body-lock');
+            if (detailResizeObserver) {
+                detailResizeObserver.disconnect();
+                detailResizeObserver = null;
+            }
         }
 
         this.refreshWidget = function () {
@@ -490,6 +565,8 @@
         this.disposeComponent = function () {
             $(document).off('keydown.vas-mrr');
             $('body').removeClass('vas-mrr-body-lock');
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
+            if (detailResizeObserver) { detailResizeObserver.disconnect(); detailResizeObserver = null; }
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();
         };

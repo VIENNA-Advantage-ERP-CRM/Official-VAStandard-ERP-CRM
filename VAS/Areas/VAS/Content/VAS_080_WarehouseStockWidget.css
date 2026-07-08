@@ -146,8 +146,8 @@
 }
 
 .MPC-ws-summary i {
-    width: 3px;
-    height: 3px;
+    width: 0.3em;
+    height: 0.3em;
     flex: 0 0 auto;
     background: #c3d0da;
     border-radius: 50%;
@@ -166,10 +166,17 @@
     margin-top: 0.5em;
     padding: 0 0.2em 0.3em;
     color: #748494;
-    font-size: 0.625em;
     text-transform: capitalize;
     letter-spacing: 0.04em;
     border-bottom: 1px solid #edf2f6;
+}
+
+/* The grid track widths are in em. Keep the header row at the same base
+   font-size as the data rows so the Qty / Value columns line up, and shrink
+   only the label TEXT - otherwise the small header font made its columns
+   narrower than the rows' and the labels shifted off their values. */
+.MPC-ws-table-head span {
+    font-size: 0.625em;
 }
 
 .MPC-ws-table-head span:nth-child(2),
@@ -272,6 +279,7 @@
 
 .MPC-ws-qty,
 .MPC-ws-value {
+    min-width: 0;
     overflow: hidden;
     font-size: 0.75em;
     font-variant-numeric: tabular-nums;
@@ -326,12 +334,12 @@
 }
 
 .MPC-ws-pager button {
-    width: 24px;
-    height: 24px;
+    width: 2.4em;
+    height: 2.4em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 5px;
+    padding: 0.5em;
     color: #0083da;
     background: rgba(255, 255, 255, 0.70);
     border: 1px solid #e4edf4;
@@ -362,6 +370,9 @@
     justify-content: center;
     padding: 1em;
     font-family: Roboto, sans-serif;
+    /* The modal lives on <body>, outside the widget root, so it needs its own
+       scaling lever for the em sizing inside to track the dashboard width. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
 }
 
 .MPC-ws-modal.MPC-ws-modal-open {
@@ -388,13 +399,13 @@
 }
 
 .MPC-ws-modal-header {
-    min-height: 56px;
+    min-height: 3.5em;
     display: flex;
     align-items: center;
     gap: 0.75em;
     padding: 0 1em;
     color: #102c3f;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 500;
     background: rgba(255, 255, 255, 0.92);
     border-bottom: 1px solid #1f83ff;
@@ -411,11 +422,11 @@
 }
 
 .MPC-ws-modal-close {
-    width: 32px;
-    height: 32px;
+    width: 1.3335em;
+    height: 1.3335em;
     padding: 0;
     color: #5f7283;
-    font-size: 1.5rem;
+    font-size: 1.5em;
     line-height: 1;
     background: transparent;
     border: 0;
@@ -443,14 +454,14 @@
 
 .MPC-ws-age-total strong {
     color: #102c3f;
-    font-size: 1.75rem;
+    font-size: 1.75em;
     font-weight: 400;
     line-height: 1.1;
 }
 
 .MPC-ws-age-total span {
     color: #748494;
-    font-size: 0.78rem;
+    font-size: 0.78em;
 }
 
 .MPC-ws-age-stack {
@@ -469,11 +480,15 @@
     gap: 0.8em;
 }
 
+/* Review #28: line the band label up with its amount value. The value is a
+   two-line stack (amount over percentage), so the row is top-aligned and the
+   label/bar get a small offset to sit on the amount line - otherwise the
+   single-line label floats to the vertical middle of the value block. */
 .MPC-ws-age-row {
     display: grid;
     grid-template-columns: 7em minmax(5em, 1fr) 6.5em;
     gap: 0.75em;
-    align-items: center;
+    align-items: start;
 }
 
 .MPC-ws-age-label {
@@ -481,8 +496,13 @@
     align-items: center;
     gap: 0.45em;
     color: #102c3f;
-    font-size: 0.8rem;
+    font-size: 0.8em;
     font-weight: 500;
+    line-height: 1.2;
+}
+
+.MPC-ws-age-row .MPC-ws-age-track {
+    margin-top: 0.3em;
 }
 
 .MPC-ws-age-label i {
@@ -518,13 +538,13 @@
 
 .MPC-ws-age-value strong {
     color: #102c3f;
-    font-size: 0.8rem;
+    font-size: 0.8em;
     font-weight: 400;
 }
 
 .MPC-ws-age-value small {
     color: #748494;
-    font-size: 0.68rem;
+    font-size: 0.68em;
 }
 
 [dir="rtl"] .MPC-ws-chevron,
