@@ -46,13 +46,13 @@ namespace VIS.Controllers
                    parses the SQL for its main FROM clause to anchor the access filter; the
                    FROM token inside EXTRACT(...) would be mistaken for that clause and break
                    MRole injection. date_part(...) carries no FROM keyword and avoids this. */
-                daysToPayCondition = " GREATEST(CAST(date_part('epoch', (CAST(COALESCE(pay.DateAcct, csh.DateAcct) AS TIMESTAMP) - CAST(ips.DueDate AS TIMESTAMP))) / 86400 AS NUMERIC), 0) ";
+                daysToPayCondition = " GREATEST(CAST(date_part('epoch', (CAST(COALESCE(pay.DateAcct, csh.DateAcct) AS TIMESTAMP) - CAST(i.DateInvoiced AS TIMESTAMP))) / 86400 AS NUMERIC), 0) ";
             }
             else
             {
                 currentPeriodDateCondition = " TRUNC(SYSDATE) BETWEEN TRUNC(p.StartDate) AND TRUNC(p.EndDate) ";
                 /* Oracle: DATE - DATE already returns the number of days. */
-                daysToPayCondition = " GREATEST(TRUNC(COALESCE(pay.DateAcct, csh.DateAcct)) - TRUNC(ips.DueDate), 0) ";
+                daysToPayCondition = " GREATEST(TRUNC(COALESCE(pay.DateAcct, csh.DateAcct)) - TRUNC(i.DateInvoiced), 0) ";
             }
 
             string currentPeriodSql = @"
@@ -88,7 +88,7 @@ namespace VIS.Controllers
                 LEFT JOIN C_Payment pay ON (pay.C_Payment_ID=al.C_Payment_ID AND pay.IsActive='Y')
                 LEFT JOIN C_CashLine cl ON (cl.C_CashLine_ID=al.C_CashLine_ID AND cl.IsActive='Y')
                 LEFT JOIN C_Cash csh ON (csh.C_Cash_ID=cl.C_Cash_ID AND csh.IsActive='Y' AND csh.DocStatus NOT IN ('VO'))
-                WHERE i.IsSoTrx='Y' 
+                WHERE i.IsSoTrx='Y' AND i.IsReturnTrx = 'N' 
                 AND i.DocStatus IN ('CO', 'CL')
                 AND (al.C_Payment_ID IS NOT NULL OR al.C_CashLine_ID IS NOT NULL)
                 AND i.IsActive='Y'

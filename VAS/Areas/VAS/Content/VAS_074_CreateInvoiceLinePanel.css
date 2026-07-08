@@ -355,6 +355,20 @@
     accent-color: var(--cil-action-blue);
     cursor: pointer;
 }
+/* Read-only invoice (.vas-cil-locked): the selection / select-all checkbox and the
+   "..." button are disabled -> not-allowed. A disabled control IGNORES its own `cursor`
+   in Chromium, so put the cursor on the (enabled) parent cell and let the disabled
+   control pass pointer events through to it (pointer-events:none). */
+.vas-cil-locked .vas-cil-cell--check,
+.vas-cil-locked .vas-cil-cell--more {
+    cursor: not-allowed;
+}
+
+    .vas-cil-locked .vas-cil-cell--check input[type="checkbox"]:disabled,
+    .vas-cil-locked .vas-cil-more-btn:disabled {
+        cursor: not-allowed;
+        pointer-events: none;
+    }
 
 .vas-cil-emptyrow {
     padding: 1.5em;
@@ -445,6 +459,15 @@
     font-style: italic;
     color: var(--cil-text-muted);
 }
+/* Read-only invoice: attribute is informational text, not an interactive link. */
+.vas-cil-attr-link--disabled {
+    color: var(--cil-text-secondary);
+    cursor: default;
+}
+
+    .vas-cil-attr-link--disabled:hover {
+        text-decoration: none;
+    }
 /* Editing / resting cell controls. These MUST out-specify the framework
    input[type=text] reset (which paints a filled, bordered, rounded, padded box):
    scope by wrapper + element tag so the control stays flush and TRANSPARENT,
@@ -492,13 +515,40 @@
 }
 
 .vas-cil-cell-disp {
-    cursor: pointer;
+    /* Resting cells are click-to-edit, never drag targets - block text selection so a
+       press-and-move doesn't start a drag. */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
-/* resting display input */
-.vas-cil-cell-disp--ro {
-    cursor: default;
+/* Cursor: the resting cell is a readonly <input>, so the framework's input reset forces
+   `cursor: not-allowed` on it (higher specificity than a bare class). Override with a
+   tag+class selector (scoped under .vas-cil-cell-edit) AND !important so it always wins:
+   an editable cell is click-to-edit -> pointer; a locked/read-only cell -> not-allowed. */
+.vas-cil-cell-edit input.vas-cil-cell-disp {
+    cursor: pointer !important;
 }
-/* read-only invoice */
+/* read-only invoice or read-only column */
+.vas-cil-cell-edit input.vas-cil-cell-disp--ro {
+    cursor: not-allowed !important;
+}
+/* Column read-only field rendered DISABLED (e.g. C_UOM_ID ReadOnlyLogic true): grey the
+   text but keep the borderless transparent look (override the browser's disabled styling).
+   Chromium ignores `cursor` on a disabled control, so pass pointer events through to the
+   cell wrapper, which shows the not-allowed cursor. */
+.vas-cil-cell-edit input.vas-cil-cell-disp:disabled {
+    color: var(--cil-text-disabled);
+    -webkit-text-fill-color: var(--cil-text-disabled);
+    background: transparent;
+    opacity: 1;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.vas-cil-cell-edit:has(input.vas-cil-cell-disp:disabled) {
+    cursor: not-allowed;
+}
 .vas-cil-cell-edit input.vas-cil-cell-disp--sub {
     font-size: 0.85em;
     font-weight: 400;
@@ -658,6 +708,16 @@
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
+    /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
+    .vas-cil-more-btn:disabled {
+        cursor: not-allowed !important;
+        color: var(--cil-text-disabled);
+    }
+
+        .vas-cil-more-btn:disabled:hover {
+            background: transparent;
+            color: var(--cil-text-disabled);
+        }
 /* Row Undo: only shown on a saved row with unsaved edits; reverts to last snapshot.
    Amber to read as "discard pending change" against the unsaved-row tint. */
 .vas-cil-undo-btn {
@@ -1030,6 +1090,41 @@
         color: var(--cil-text);
     }
 
+/* Attribute instance-list controls: search (left, grows) + "Show All" toggle (right)
+   share one row. */
+.vas-cil-attr-listctrls {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin-top: 0.75em;
+}
+
+    /* The search box provides its own top margin when standalone; inside the row the
+       wrapper owns the spacing, so zero it out and let the box take the free width. */
+    .vas-cil-attr-listctrls .vas-cil-search-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin-top: 0;
+    }
+
+/* "Show All (include zero and (-ve) qty)" toggle, pinned to the right of the row. */
+.vas-cil-attr-showall {
+    display: flex;
+    align-items: center;
+    gap: 0.4375em;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+    .vas-cil-attr-showall input {
+        cursor: pointer;
+        accent-color: var(--cil-action-blue);
+    }
+
 .vas-cil-scan-input {
     display: flex;
     align-items: center;
@@ -1132,6 +1227,31 @@
     align-items: center;
     gap: 0.5em;
 }
+
+/* Header close (✕) - dismisses the whole attribute picker (create/edit mode). */
+.vas-cil-dialog__close {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--cil-text-muted);
+    font-size: 1em;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .12s, color .12s;
+}
+
+    .vas-cil-dialog__close:hover {
+        background: var(--cil-divider);
+        color: var(--cil-text);
+    }
 
 .vas-cil-dialog__title {
     margin: 0;
@@ -1606,6 +1726,34 @@
         opacity: 0.4;
         cursor: default;
     }
+
+/* Server-side line pager (20/page) below the lines table:
+   "Showing X-Y of N" on the left, "‹ P of Q ›" nav on the right. */
+.vas-cil-linepager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+}
+
+.vas-cil-linepager__showing {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-linepager__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-cil-linepager__info {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
 
 .vas-cil-empty-message {
     padding: 1.25em;

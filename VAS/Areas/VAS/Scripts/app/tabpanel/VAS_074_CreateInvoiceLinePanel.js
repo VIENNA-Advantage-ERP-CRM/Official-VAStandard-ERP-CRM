@@ -33,11 +33,17 @@
         this.panelWidth = null;
 
         var $self = this;
-        var $root, $busy, $body, $emptyState, $linesBody, $totalsRow;
+        var $root, $busy, $body, $emptyState, $linesBody, $totalsRow, $pager;
         var $addBtn, $saveBtn, $deleteBtn, $selectAll;
 
         /* parent invoice context returned by GetPanelData */
         var parent = null;
+        /* server-side line paging (20/page): current 0-based page, total saved lines, size */
+        var linePage = 0, linesTotal = 0, linePageSize = 20;
+        /* saved totals of every line NOT on the current page (invoice grand total minus this
+           page). renderTotals adds the live current-page sum so the totals row reflects the
+           WHOLE invoice, not just the loaded page, while still updating during edits. */
+        var otherSub = 0, otherTax = 0, otherTcs = 0;
         /* dropdown catalogs */
         var uomList = [], taxList = [], taxRateById = {};
         /* AD_Column metadata cache (callout code + validation), keyed by column */
@@ -126,13 +132,56 @@
 
         /* ---------- per-line calculation (mirrors the prototype formulas) ---------- */
         function taxRate(id) { return taxRateById[id] || 0; }
-        function lineSubtotal(line) {
+        /* Entered line amount (qty x price less discount). On a tax-inclusive invoice this
+           is the GROSS (price already contains tax); otherwise it is the net. */
+        function lineGross(line) {
             var v = line.values;
             var disc = (+v.Discount || 0) / 100;
             return (+v.QtyEntered || 0) * (+v.PriceEntered || 0) * (1 - disc);
         }
-        function lineTaxAmount(line) { return lineSubtotal(line) * (taxRate(line.values.C_Tax_ID) / 100); }
-        function lineAmount(line) { return lineSubtotal(line) /*+ lineTaxAmount(line)*/; }
+        /* Line tax. Tax-inclusive: EXTRACT it from the gross (gross*r/(100+r)) - mirrors
+           the framework MTax.CalculateTax(amount, taxIncluded=true). Tax-exclusive: add
+           it on top of the net (net*r/100). */
+        function lineTaxAmount(line) {
+            var rate = taxRate(line.values.C_Tax_ID);
+            var gross = lineGross(line);
+            if (parent && parent.IsTaxIncluded) return rate ? gross * rate / (100 + rate) : 0;
+            return gross * rate / 100;
+        }
+        /* Surcharge amount (SurchargeAmt) - an extra tax the framework computes for a tax that
+           has a Surcharge_Tax_ID (MInvoiceLine.SetTaxAmt / CalloutTax). It's a stored value
+           (the client can't derive it from a rate), read case-insensitively. */
+        function lineSurcharge(line) { return +lineVal(line, "SurchargeAmt") || 0; }
+        /* Total line tax = base tax + surcharge (per request: totalTax = TaxAmt + SurchargeAmt). */
+        function lineTaxTotal(line) { return lineTaxAmount(line) + lineSurcharge(line); }
+        /* ---------- bottom-panel totals: use the SAVED line columns, not a live recompute ----------
+           The invoice totals row reflects the actual stored C_InvoiceLine amounts:
+             Subtotal = TaxBaseAmt, Tax = TaxAmt + SurchargeAmt, Total = TaxBaseAmt + TaxAmt + SurchargeAmt.
+           These are the values the framework writes on save (tax already accounted for whether the
+           price is tax-inclusive or exclusive), so the row updates after the record is saved and does
+           NOT need recomputing on every amount edit. Read case-insensitively (PG lowercases keys);
+           an unsaved/edited line contributes its last saved value (0 for a brand-new line). */
+        function lineTaxBaseSaved(line) { return +lineVal(line, "TaxBaseAmt") || 0; }
+        function lineTaxSaved(line) { return +lineVal(line, "TaxAmt") || 0; }
+        function lineTaxTotalSaved(line) { return lineTaxSaved(line) + lineSurcharge(line); }
+        /* Net (tax-excluded) line amount = the Subtotal contribution. Tax-inclusive: gross
+           minus the extracted tax (incl. surcharge); tax-exclusive: the gross IS the net. */
+        function lineSubtotal(line) {
+            var gross = lineGross(line);
+            return (parent && parent.IsTaxIncluded) ? gross - lineTaxTotal(line) : gross;
+        }
+        /* Per-row "Line Amount" = the line NET (tax base), so the column reconciles with the
+           Subtotal total (which sums TaxBaseAmt). A clean SAVED line uses the framework's stored
+           TaxBaseAmt - already correct for a tax-inclusive OR exclusive price, and exact (no
+           rate-extraction rounding). A new / edited line has no fresh stored base, so it falls
+           back to the live, tax-mode-aware calc (exclusive: gross; inclusive: gross - tax). */
+        function lineAmount(line) {
+            if (line.status === "saved" && !line.dirty) {
+                var base = lineVal(line, "TaxBaseAmt");
+                if (base != null && base !== "") return +base || 0;
+            }
+            return lineSubtotal(line);
+        }
 
         /* ---------- lifecycle ---------- */
         this.init = function () {
@@ -154,7 +203,18 @@
         }
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
 
-        this.fetchData = function (recordID) {
+        this.fetchData = function (recordID, page) {
+            // Framework calls fetchData(recordID) on record load -> reset to page 0; the
+            // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
+            var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
+            // record - including after a save - and a still-open dialog's position:fixed
+            // backdrop would otherwise be left orphaned over the page (morePopoverFor is
+            // cleared below but the DOM node isn't), swallowing clicks/scroll ("scroll stops
+            // working after save"). closeDialogs() removes #vasCilMore/#vasCilScan/#vasCilAttr;
+            // also reset the reusable AttributeControl's own state.
+            closeDialogs();
+            try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
             // NOTE: no showBusy() here. The framework already paints its own
             // vis-apanel-busy / vis_widgetloader over the tab while it loads a record;
             // adding ours (identical markup) stacked a SECOND spinner on line load. The
@@ -162,10 +222,16 @@
             // that the framework does not cover.
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetPanelData",
-                type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0 },
+                type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0, page: reqPage },
                 success: function (raw) {
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
+                    linesTotal = (parent && parent.LinesTotal) || 0;
+                    linePage = (parent && +parent.LinePage) || 0;
+                    linePageSize = (parent && +parent.LinePageSize) || 20;
+                    otherSub = (parent && +parent.OtherPagesSubtotal) || 0;
+                    otherTax = (parent && +parent.OtherPagesTax) || 0;
+                    otherTcs = (parent && +parent.OtherPagesTcs) || 0;
                     uomList = (parent && parent.UomList) || [];
                     taxList = (parent && parent.TaxList) || [];
                     taxRateById = {};
@@ -192,13 +258,25 @@
             });
         };
 
-        this.clear = function () { parent = null; lines = []; render(); };
+        this.clear = function () {
+            // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
+            closeDialogs();
+            try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
+            parent = null; lines = []; render();
+        };
 
         function fromServerRow(r) {
             // Start from the full column bag (every C_InvoiceLine column) so the
             // line VO carries all columns the callout may read / write.
             var vals = {};
-            if (r.Values) for (var k in r.Values) if (r.Values.hasOwnProperty(k)) vals[k] = r.Values[k];
+            // Canonicalize each DB-cased key (PostgreSQL lowercases, Oracle uppercases) to the
+            // dictionary ColumnName so the line bag holds exactly ONE key per column. Without
+            // this, an edit / callout writes a proper-cased key (e.g. "QtyInvoiced") ALONGSIDE
+            // the loaded DB-cased one ("qtyinvoiced"), and BOTH are sent on save.
+            if (r.Values) for (var k in r.Values) if (r.Values.hasOwnProperty(k)) {
+                var canon = columnNameByLc[String(k).toLowerCase()] || k;
+                vals[canon] = r.Values[k];
+            }
             vals.C_InvoiceLine_ID = r.C_InvoiceLine_ID;
             vals.Line = r.Line;
             vals.M_Product_ID = r.M_Product_ID || 0;
@@ -252,6 +330,18 @@
             render();
         }
 
+        /* Undo for a NEW (never-saved) line = remove it entirely. It was never persisted,
+           so this is a client-only discard (no DeleteLines call) and there is no pristine
+           snapshot to revert to - mirrors deleteSelected's localOnly splice. */
+        function discardNewLine(line) {
+            if (!line) return;
+            if (editing && editing.rowId === line.rowId) editing = null;
+            if (morePopoverFor === line.rowId) { morePopoverFor = null; closeDialogs(); }
+            var i = lines.indexOf(line);
+            if (i >= 0) lines.splice(i, 1);
+            render();
+        }
+
         /* Seed every C_InvoiceLine column (from the cached columnMeta) on a new
            line so the VO carries all columns; explicit defaults already set are
            preserved. */
@@ -293,6 +383,11 @@
             $totalsRow = $('<div class="vas-cil-row vas-cil-row--totals"></div>');
             $table.append($totalsRow);
             $panel.append($table);
+            // Server-side line pager (20/page): "X-Y of N" + prev/next.
+            $pager = $('<div class="vas-cil-linepager" style="display:none;"></div>');
+            $pager.on("click", "[data-act=lp-prev]", function () { gotoLinePage(linePage - 1); });
+            $pager.on("click", "[data-act=lp-next]", function () { gotoLinePage(linePage + 1); });
+            $panel.append($pager);
             $body.append($panel);
 
             $header.on("click", "[data-action=open-scan]", openScanDialog);
@@ -332,6 +427,10 @@
         function render() {
             if (!parent || !parent.C_Invoice_ID) { $body.hide(); $emptyState.show(); return; }
             $emptyState.hide(); $body.show();
+            // Read-only invoice: mark the panel so disabled controls (checkbox, "...")
+            // show a not-allowed cursor via their (enabled) parent cell - a disabled
+            // control ignores its own `cursor` in Chromium, so the cell shows it instead.
+            $body.toggleClass("vas-cil-locked", !panelEditable());
 
             $linesBody.empty();
             if (!lines.length) {
@@ -341,11 +440,62 @@
             }
             renderTotals();
             renderHeaderButtons();
+            renderPager();
+        }
+
+        /* Server-side line pager: "Showing X-Y of N" on the left, "‹ P of Q ›" on the
+           right. Shown whenever the invoice has saved lines (even a single page). */
+        function renderPager() {
+            if (!$pager) return;
+            var total = linesTotal || 0, size = linePageSize || 20;
+            if (!total) { $pager.hide().empty(); return; }
+            var pageCount = Math.max(1, Math.ceil(total / size));
+            var start = linePage * size + 1;
+            var end = Math.min(total, (linePage + 1) * size);
+            var showing = lbl("VAS_074_Showing", "Showing") + " " + start + "–" + end + " " + lbl("VAS_074_Of", "of") + " " + total;
+            var pageInfo = (linePage + 1) + " " + lbl("VAS_074_Of", "of") + " " + pageCount;
+            $pager.html(
+                '<span class="vas-cil-linepager__showing">' + esc(showing) + "</span>" +
+                '<div class="vas-cil-linepager__nav">' +
+                '<button type="button" class="vas-cil-attr-pagebtn" data-act="lp-prev"' + (linePage <= 0 ? " disabled" : "") +
+                ' aria-label="' + esc(lbl("VAS_074_Prev", "Previous")) + '">' + icon("chevron-left", "‹") + "</button>" +
+                '<span class="vas-cil-linepager__info">' + esc(pageInfo) + "</span>" +
+                '<button type="button" class="vas-cil-attr-pagebtn" data-act="lp-next"' + (linePage >= pageCount - 1 ? " disabled" : "") +
+                ' aria-label="' + esc(lbl("VAS_074_Next", "Next")) + '">' + icon("chevron-right", "›") + "</button>" +
+                "</div>"
+            ).show();
+        }
+
+        /* Sync the pager state from a save/delete response (which returns the refreshed page). */
+        function applyLinePaging(res) {
+            if (!res) return;
+            if (typeof res.LinesTotal === "number") linesTotal = res.LinesTotal;
+            if (typeof res.LinePage === "number") linePage = res.LinePage;
+            if (res.LinePageSize) linePageSize = +res.LinePageSize || linePageSize;
+            if (typeof res.OtherPagesSubtotal === "number") otherSub = res.OtherPagesSubtotal;
+            if (typeof res.OtherPagesTax === "number") otherTax = res.OtherPagesTax;
+            if (typeof res.OtherPagesTcs === "number") otherTcs = res.OtherPagesTcs;
+        }
+
+        /* Load another page of saved lines. Guards unsaved work so a page change never
+           silently discards a new/edited row. */
+        function gotoLinePage(p) {
+            if (!parent || !parent.C_Invoice_ID) return;
+            var pageCount = Math.max(1, Math.ceil((linesTotal || 0) / (linePageSize || 20)));
+            if (p < 0) p = 0; if (p > pageCount - 1) p = pageCount - 1;
+            if (p === linePage) return;
+            if (unsavedLines().length) { showToast(lbl("VAS_074_SavePageFirst", "Save or discard your changes before changing page")); return; }
+            $self.fetchData(parent.C_Invoice_ID, p);
         }
 
         function renderTotals() {
-            var sub = 0, tax = 0, tcs = 0;
-            for (var i = 0; i < lines.length; i++) { sub += lineSubtotal(lines[i]); tax += lineTaxAmount(lines[i]); tcs += lineTcs(lines[i]); }
+            // Base = saved totals of every OTHER page (server), plus the live sum of the
+            // current page below, so the row shows the WHOLE invoice's grand total.
+            var sub = otherSub, tax = otherTax, tcs = otherTcs;
+            // Subtotal = SUM(TaxBaseAmt), Tax = SUM(TaxAmt + SurchargeAmt) - both from the SAVED
+            // line columns (server supplies the other pages; these add the current page). No live
+            // recompute, so the row is exact and refreshes on save.
+            for (var i = 0; i < lines.length; i++) { sub += lineTaxBaseSaved(lines[i]); tax += lineTaxTotalSaved(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
             $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
             $totalsRow.append(totalItem(lbl("Tax", "Tax"), fmtMoney(tax), false));
@@ -384,7 +534,7 @@
             var sc = selectedCount();
             $deleteBtn.prop("disabled", sc === 0 || locked).toggleClass("vas-cil-is-disabled", sc === 0 || locked);
             $deleteBtn.find(".vas-cil-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
-            if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length);
+            if ($selectAll) $selectAll.prop("checked", lines.length > 0 && sc === lines.length).prop("disabled", locked);
         }
 
         function renderRow(line) {
@@ -393,14 +543,30 @@
             if (line._sel) $row.addClass("is-selected");
             if (line.status === "new" || line.dirty) $row.addClass("is-unsaved");
 
-            var cb = $('<input type="checkbox" />').prop("checked", !!line._sel);
+            // Read-only invoice (completed/void/reversed/closed): the row can't be
+            // deleted, so its selection checkbox is disabled too.
+            var cb = $('<input type="checkbox" />').prop("checked", !!line._sel).prop("disabled", !panelEditable());
             cb.on("change", function () { line._sel = this.checked; renderHeaderButtons(); $row.toggleClass("is-selected", this.checked); });
             $row.append($('<div class="vas-cil-cell vas-cil-cell--check" role="cell"></div>').append(cb));
 
+            // Clicking anywhere on the row toggles its selection checkbox, so the whole
+            // record is easy to pick (e.g. for delete). Clicks that land on an interactive
+            // control - the editable field inputs, the UOM / Tax selects, the "..." / attr
+            // buttons and links, or the checkbox itself - keep their own behaviour (enter
+            // edit / open control) and must NOT also toggle selection.
+            $row.on("click", function (e) {
+                if (!panelEditable()) return;   // checkbox is disabled on a locked invoice
+                if ($(e.target).closest("input, select, textarea, button, a, [role=button], .vas-cil-attr-link").length) return;
+                line._sel = !line._sel;
+                cb.prop("checked", line._sel);
+                $row.toggleClass("is-selected", line._sel);
+                renderHeaderButtons();
+            });
+
             $row.append(renderPrimaryCell(line));
-            $row.append(renderEditableCell(line, "description", v.Description, lbl("VAS_074_AddDescription", "Add description…"), {}));
+            $row.append(renderEditableCell(line, "description", v.Description, lbl("VAS_074_AddDescription", "Add description…"), { maxLength: colFieldLength("Description") }));
             $row.append(renderQtyUomCell(line));
-            $row.append(renderEditableCell(line, "price", v.PriceEntered, "0" + decSep + "00", { align: "right", amount: true }));
+            $row.append(renderEditableCell(line, "price", v.PriceEntered, "0" + decSep + "00", { align: "right", amount: true, maxLength: colFieldLength("PriceEntered") }));
             $row.append(renderTaxCell(line));
 
             var amt = lineAmount(line);
@@ -432,14 +598,24 @@
         function dispInput(line, field, text, opts) {
             opts = opts || {};
             var editable = parent && parent.IsEditable;
-            var $i = $('<input type="text" readonly tabindex="-1" class="vas-cil-cell-edit__input vas-cil-cell-disp" />');
+            // draggable=false stops the browser starting a text-drag on the readonly
+            // input (which flashes the "not-allowed" / no-drop cursor while dragging).
+            var $i = $('<input type="text" readonly tabindex="-1" draggable="false" class="vas-cil-cell-edit__input vas-cil-cell-disp" />');
             $i.val(text || "");
             if (opts.placeholder) $i.attr("placeholder", opts.placeholder);
             if (opts.align === "right") $i.css("text-align", "right");
             if (opts.cls) $i.addClass(opts.cls);
             $i.attr("title", text || "");
             if (editable && !opts.readOnly) $i.on("click", function () { startEdit(line, field); });
-            else $i.addClass("vas-cil-cell-disp--ro");
+            else {
+                $i.addClass("vas-cil-cell-disp--ro");
+                // A COLUMN-level read-only field (e.g. C_UOM_ID ReadOnlyLogic true) is rendered
+                // DISABLED, not just readonly: `readonly` has no effect on a <select> and a plain
+                // readonly text cell still looks editable, so disable + grey it so it's clearly
+                // locked and browser-enforced. (A whole-invoice lock keeps the lighter readonly
+                // look; that path leaves opts.readOnly unset.)
+                if (opts.readOnly) $i.prop("disabled", true);
+            }
             return $i;
         }
 
@@ -489,7 +665,14 @@
                     var attrTxt = hasAttr ? line.display.attrName : lbl("VAS_074_SetAttribute", "Set attribute…");
                     var $attr = $('<span class="vas-cil-attr-link"></span>').text(attrTxt).attr("title", attrTxt);
                     if (!hasAttr) $attr.addClass("vas-cil-attr-link--empty");
-                    $attr.on("click", function (e) { e.stopPropagation(); if (editable) openAttrDialog(line); });
+                    // Clickable only when the invoice is editable AND the product actually
+                    // carries an attribute set (M_AttributeSet_ID > 0). On a read-only invoice,
+                    // or on a saved line whose product has no attribute set defined (e.g. the
+                    // set was removed after the line was created but the old ASI description
+                    // still shows), the attribute is informational only - not a link (no click,
+                    // no pointer cursor / hover underline).
+                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    else $attr.addClass("vas-cil-attr-link--disabled");
                     wrap.append($attr);
                 }
             }
@@ -509,6 +692,7 @@
                 var $inp = $('<input type="text" class="vas-cil-cell-edit__input" />');
                 $inp.val(opts.amount ? fmtAmtInput(value, field === "quantity" ? 2 : precision()) : (value || ""));
                 $inp.attr("placeholder", placeholder || "");
+                if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
                 if (opts.amount) bindAmountInput($inp);
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
@@ -541,6 +725,7 @@
             // quantity (top)
             if (editQty) {
                 var $q = $('<input type="text" class="vas-cil-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
+                var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
                 bindAmountInput($q);
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
@@ -621,18 +806,23 @@
         function renderMoreCell(line) {
             var editable = parent && parent.IsEditable;
             var cell = $('<div class="vas-cil-cell vas-cil-cell--more" role="cell" style="position:relative"></div>');
-            // Undo: only on a SAVED row that currently has unsaved edits. Reverts the row
-            // to its last pristine snapshot. (New rows have no snapshot - use Delete.)
-            if (editable && line.status === "saved" && line.dirty && line._saved && !line._saving) {
-                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(lbl("VAS_074_UndoChanges", "Undo changes")) + '">' + icon("rotate-ccw", "↺") + "</button>");
+            // Undo affordance (↺). On a SAVED row with unsaved edits it reverts the row to
+            // its last pristine snapshot; on a NEW (never-saved) row it removes the row
+            // entirely (client-only discard - a new line has no snapshot to revert to).
+            var canUndoEdits = line.status === "saved" && line.dirty && line._saved;
+            var canDiscardNew = line.status === "new";
+            if (editable && !line._saving && (canUndoEdits || canDiscardNew)) {
+                var undoTitle = canDiscardNew ? lbl("VAS_074_UndoNewLine", "Undo (remove line)") : lbl("VAS_074_UndoChanges", "Undo changes");
+                var $undo = $('<button type="button" class="vas-cil-undo-btn" title="' + esc(undoTitle) + '">' + icon("rotate-ccw", "↺") + "</button>");
+                var undoAct = canDiscardNew ? discardNewLine : undoLine;
                 // Act on mousedown + preventDefault (like Save): a single click while a
                 // cell editor is focused would otherwise blur->commit->re-render and
                 // destroy this button before its click fired, needing a second click.
                 // preventDefault keeps the focused input from blurring; Undo discards the
-                // pending edit anyway by restoring the snapshot.
-                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoLine(line); });
+                // pending edit anyway (revert snapshot / remove the row).
+                $undo.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); undoAct(line); });
                 // Keyboard activation (Enter/Space) fires click with detail 0, no mousedown.
-                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoLine(line); } });
+                $undo.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); undoAct(line); } });
                 cell.append($undo);
             }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
@@ -740,6 +930,15 @@
             else if (field === "quantity") { var nq = value > 0 ? value : 0; if (!sameVal(v.QtyEntered, nq)) { v.QtyEntered = nq; changed = true; } }
             else if (field === "price") { if (!sameVal(v.PriceEntered, value)) { v.PriceEntered = value; line._priceOverride = true; changed = true; } }
             if (changed) markDirty(line);
+            // A quantity change re-runs the line callout (quantity price-breaks + amounts,
+            // attribute-aware) - same as UOM.
+            if (changed && field === "quantity" && v.M_Product_ID > 0) runCallout(line, "QtyEntered");
+            // A manual price change re-runs the line callout too (CalloutInvoice.amt) so the
+            // line net / tax amounts recompute from the entered price - same mechanism as a
+            // product change. The PriceEntered branch of `amt` keeps the entered price
+            // (PriceActual = PriceEntered) and only recomputes amounts, so the manual
+            // override is preserved (line._priceOverride stays set).
+            else if (changed && field === "price" && v.M_Product_ID > 0) runCallout(line, "PriceEntered");
         }
 
         function setUom(line, uomId, uomName) {
@@ -753,10 +952,13 @@
         }
 
         function setTax(line, taxId, taxName) {
-            if (sameVal(line.values.C_Tax_ID, taxId)) return;   // unchanged - no dirty
+            if (sameVal(line.values.C_Tax_ID, taxId)) return;   // unchanged - no dirty / callout
             line.values.C_Tax_ID = taxId;
             line.display.taxName = taxId > 0 ? taxName : "";
             markDirty(line);
+            // Re-run the line callout so tax amount / line total recompute server-side
+            // (honours the chosen C_Tax_ID; a manual price override is preserved).
+            runCallout(line, "C_Tax_ID");
         }
 
         /* ---------- per-row context-filtered lookups (AD_Val_Rule) ----------
@@ -1117,6 +1319,33 @@
             C_UOM_ID: 1, PriceEntered: 1, PriceActual: 1, PriceList: 1, PriceLimit: 1, C_Tax_ID: 1,
             C_Currency_ID: 1, Discount: 1, LineNetAmt: 1, Description: 1, PrintDescription: 1, C_Invoice_ID: 1
         };
+        // FALLBACK ONLY. The Compiere callout configured in the dictionary
+        // (AD_Column.Callout -> columnMeta[col].Callout) ALWAYS takes priority (see
+        // runCallout); this map is used ONLY when a pricing / amount column has NO callout
+        // configured, so Attribute / Qty / UOM / Tax still recompute the SAME way a Product
+        // change does (the real client CalloutInvoice). CalloutInvoice.Qty branches on the
+        // changed column (mField.getColumnName()) and re-fetches prices via MInvoice/GetPrices
+        // INCLUDING the M_AttributeSetInstance_ID, so attribute-level prices apply;
+        // CalloutInvoice.Amt recomputes the line/tax amounts for a chosen tax (Tax would
+        // RE-DETERMINE C_Tax_ID and overwrite the user's pick, so use Amt). To override any
+        // of these, just set AD_Column.Callout on the column - no code change needed.
+        var DEFAULT_CALLOUTS = {
+            M_AttributeSetInstance_ID: "ViennaAdvantage.Model.CalloutInvoice.Qty",
+            QtyEntered: "ViennaAdvantage.Model.CalloutInvoice.Qty; ViennaAdvantage.Model.CalloutInvoice.Amt",
+            C_UOM_ID: "VAdvantage.Model.CalloutInvoice.qty; VAdvantage.Model.CalloutInvoice.amt",
+            C_Tax_ID: "VAdvantage.Model.CalloutInvoice.amt;VAdvantage.Model.CalloutTax.SetTaxExemptReason",
+            PriceEntered: "VAdvantage.Model.CalloutInvoice.amt;"
+        };
+        /* The callout string to run for a column: the Compiere callout(s) configured in the
+           dictionary (AD_Column.Callout -> columnMeta[col].Callout) ALWAYS win; only when a
+           column has none do we fall back to DEFAULT_CALLOUTS. The value may be a single
+           callout or a ';'-separated chain across one or more classes (e.g. CalloutInvoice
+           + CalloutTax); resolveCallouts parses + resolves each in order. Returns null when
+           neither applies (runCallout then takes the server recompute path). */
+        function columnCalloutStr(column) {
+            var m = columnMeta[column];
+            return (m && m.Callout) || DEFAULT_CALLOUTS[column] || null;
+        }
 
         function runCallout(line, column, done) {
             if (!parent) { if (done) done(); return; }
@@ -1125,8 +1354,10 @@
             // Default qty so pricing / discount-break logic has a quantity.
             if (!(v.QtyEntered > 0)) { v.QtyEntered = 1; v.QtyInvoiced = 1; }
 
-            var meta = columnMeta[column];
-            var chain = (meta && meta.Callout) ? resolveCallouts(meta.Callout) : null;
+            // Resolve the callout(s) to run - dictionary AD_Column.Callout first, else the
+            // DEFAULT_CALLOUTS fallback (see columnCalloutStr).
+            var calloutStr = columnCalloutStr(column);
+            var chain = calloutStr ? resolveCallouts(calloutStr) : null;
             if (chain && chain.length) {
                 // The framework callout runs synchronously (blocking sync AJAX), so
                 // paint the row busy indicator first, then run on the next tick so
@@ -1213,7 +1444,18 @@
                 // CalloutInvoice reads mTab.getField(col).getDisplayType() / .value and
                 // may call field UI mutators - return a GridField shim (was missing,
                 // which crashed the callout with "mTab.getField is not a function").
-                getField: function (col) { return makeFieldShim(line, col); }
+                // Mirror a real GridTab: only ACTUAL tab fields (AD_Field on the window tab)
+                // have a GridField; a merged-only table column (e.g. SurchargeAmt, present in
+                // columnMeta via MergeAllColumns but not a field on this tab) returns null, so
+                // callouts that gate on `getField(col) != null` (e.g. CalloutInvoice's "reset
+                // SurchargeAmt to 0") skip it exactly as on the standard invoice window.
+                getField: function (col) {
+                    var fm = columnMeta[col];
+                    return (fm && fm.IsTabField) ? makeFieldShim(line, col) : null;
+                },
+                // The panel's grid is the C_InvoiceLine tab; CalloutTax.SetTaxExemptReason
+                // (and other callouts) branch on the tab's key column.
+                getKeyColumnName: function () { return "C_InvoiceLine_ID"; }
             };
         }
         function makeMField(column, line) { return makeFieldShim(line, column); }
@@ -1359,7 +1601,10 @@
             for (var col in vals) {
                 if (!vals.hasOwnProperty(col)) continue;
                 if (col === "PriceEntered" && line._priceOverride) continue;
-                if (Object.prototype.hasOwnProperty.call(v, col)) v[col] = vals[col];
+                // Case-insensitive write: a saved line keys columns in DB case (PG lowercases,
+                // e.g. "pricelist") which won't match the dictionary-cased "PriceList" the
+                // callout returns, so a direct v[col]= would silently drop PriceList etc.
+                setLineVal(line, col, vals[col]);
             }
             if (disp.uomName != null) d.uomName = disp.uomName;
             if (disp.taxName != null) d.taxName = disp.taxName;
@@ -1371,6 +1616,8 @@
          * AD_Column must hold a value before the line can be saved. Returns the
          * first violation (column + message) or null. */
         function isMandatory(col) { var m = columnMeta[col]; return !!(m && m.IsMandatory); }
+        /* AD_Column.FieldLength for a column (0 when unknown) - caps text input length. */
+        function colFieldLength(col) { var m = columnMeta[col]; return (m && +m.FieldLength) || 0; }
 
         /* ---------- AD_Column read-only logic ----------
          * A field is read-only when AD_Field.IsReadOnly is set or the column's
@@ -1379,6 +1626,10 @@
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the invoice header / document context. */
         function isColumnReadOnly(line, col) {
+            // C_UOM_ID is locked once the line is saved (C_InvoiceLine_ID > 0): the unit of
+            // measure must not change on an existing invoice line. Checked before the meta
+            // lookup so it holds even when column meta is absent.
+            if (col === "C_UOM_ID" && line && line.values && (line.values.C_InvoiceLine_ID || 0) > 0) return true;
             var m = columnMeta[col];
             if (!m) return false;
             if (m.IsReadOnly) return true;
@@ -1867,6 +2118,21 @@
             v[col] = value;
         }
 
+        /* True when the line's product actually carries an attribute set (M_AttributeSet_ID > 0).
+           Reads the raw server flag VASCILDISP_HasAttrSet (= COALESCE(p.M_AttributeSet_ID, 0))
+           off the line's value bag, case-insensitively via lineVal - a saved line's keys are
+           DB-cased (PostgreSQL lowercases the alias to "vascildisp_hasattrset", Oracle uppercases
+           it). This is authoritative: unlike line.display.hasAttributeSet it is NOT OR'd with an
+           existing ASI description, so a line whose product no longer has an attribute set (but
+           still carries an old ASI, so AttrName is set) correctly reports false. Falls back to the
+           display flag when the raw column isn't on the line - e.g. a brand-new (unsaved) line,
+           which has no server projection but carries the pure product flag in display. */
+        function productHasAttributeSet(line) {
+            var raw = lineVal(line, "VASCILDISP_HasAttrSet");
+            if (raw === undefined || raw === null || raw === "") return !!(line.display && line.display.hasAttributeSet);
+            return (parseInt(raw, 10) || 0) > 0;
+        }
+
         /* Lightweight fallback control (plain element, no custom class - the framework
            .vis-control-wrap styles it) for when the native Vienna control is unavailable. */
         function buildFallbackControl(line, m, kind, ro) {
@@ -2172,6 +2438,13 @@
         // (The control handles the pre-select + unchanged-OK no-op internally.)
         function openAttrDialog(line) {
             if (!line.values.M_Product_ID) return;
+            // The product must actually carry an attribute set (M_AttributeSet_ID > 0) for
+            // the attribute control to be meaningful. A saved line whose product has no
+            // attribute set defined must not open the control even if it's clicked - guard
+            // here as well as at the link's click binding so no caller can bypass it. Uses the
+            // raw VASCILDISP_HasAttrSet flag off the line (case-insensitive), not the AttrName-
+            // conflated display flag - see productHasAttributeSet.
+            if (!productHasAttributeSet(line)) return;
             closeDialogs();
             VIS.AttributeControl.open({
                 M_Product_ID: line.values.M_Product_ID,
@@ -2180,6 +2453,9 @@
                 // true -> open straight on the New-attribute form; false -> instance list.
                 // Set this per your own requirement.
                 newAttribute: true,
+                // Default state of the instance list's "Show All (include zero and (-ve) qty)"
+                // checkbox for THIS screen. true -> show all; false -> only QtyOnHand > 0.
+                showAll: true,
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
@@ -2813,11 +3089,11 @@
             renderHeaderButtons();   // the batch no longer counts as "unsaved" -> Save mutes
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveLines",
-                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Lines: rows }) },
+                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, Lines: rows }) },
                 success: function (raw) {
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
+                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                 },
                 error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
@@ -2886,6 +3162,31 @@
             render();
         }
 
+        /* Rebuild from the server rows after a DELETE while PRESERVING unsaved client work,
+           so deleting one existing record doesn't discard other rows the user is still
+           creating / editing. Brand-new client lines (id<=0) and dirty edits on existing
+           lines (id>0) are kept as-is; clean saved lines are refreshed from the server rows.
+           A deleted line is simply absent from serverRows (and any selected client-only new
+           line was already spliced out by the caller), so it drops out naturally. Because
+           page navigation is blocked while unsaved lines exist (gotoLinePage), all unsaved /
+           dirty rows are on the current page, so the returned page rows cover them. Mirrors
+           mergeSavedLines (the save path) - the delete is the only other full server reload. */
+        function reloadLinesKeepingUnsaved(serverRows) {
+            var dirtyById = {};
+            lines.forEach(function (l) {
+                var id = l.values.C_InvoiceLine_ID || 0;
+                if (id > 0 && l.dirty) dirtyById[id] = l;   // edited-but-unsaved existing line
+            });
+            var newKeep = lines.filter(function (l) { return (l.values.C_InvoiceLine_ID || 0) <= 0; });
+            var merged = (serverRows || []).map(function (r) {
+                return dirtyById[r.C_InvoiceLine_ID] || fromServerRow(r);
+            });
+            lines = newKeep.concat(merged);
+            morePopoverFor = null;
+            if (editing && !lineById(editing.rowId)) editing = null;   // clear edit target if it was deleted
+            render();
+        }
+
         function deleteSelected() {
             if (!panelEditable()) return;             // read-only when doc completed/void/reversed/closed
             var sel = selectedLines(); if (!sel.length) return;
@@ -2896,11 +3197,11 @@
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/DeleteLines",
-                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, LineIds: ids }) },
+                type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, LineIds: ids }) },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { reloadLines(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_074_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_074_DeleteFailed", "Delete failed")); }

@@ -1,0 +1,576 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Delivery Order (DO) Overview tab panel
+ *               (VAS.VAS_100_OverviewDO). All classes are MPC-prefixed
+ *               (MPC-vasdo-*) and scoped under the panel root to avoid global
+ *               collisions. Shares the Onfinity windows-and-panels em-anchored
+ *               body language with VAS_099_OverviewGRN / VAS_092 — Roboto,
+ *               white surfaces, soft blue borders, KPI tiles with accent rails,
+ *               pastel stepper and a flat line table.
+ * Chronological development:
+ *   VAI163   2026-07-06  Created
+ ***********************************************************/
+
+.MPC-vasdo-root {
+    /* Canonical palette */
+    --do-text:        #102C3F;
+    --do-muted:       #5F7283;
+    --do-sub:         #41576A;
+    --do-action:      #0083DA;
+    --do-action-dk:   #005FA3;
+    --do-link:        #106AB0;
+    --do-card-bd:     #D9E2EB;
+    --do-row-div:     #E2EAF1;
+    --do-card-radius: 12px;
+    /* Semantic tones */
+    --do-info-bg:     #EAF8FF;  --do-info-tx:    #0083DA;
+    --do-success-bg:  #E9F6EE;  --do-success-tx: #0B6B45;
+    --do-warning-bg:  #FFF6E2;  --do-warning-tx: #9A6500;
+    --do-risk-bg:     #FCEFEF;  --do-risk-tx:    #D14545;
+    --do-purple-bg:   #EFEEFF;  --do-purple-tx:  #5F4AA6;
+    --do-neutral-bg:  #EEF1F4;  --do-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--do-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasdo-root * { box-sizing: border-box; }
+
+.MPC-vasdo-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasdo-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--do-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-sec { display: block; }
+
+.MPC-vasdo-secHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasdo-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--do-text);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.MPC-vasdo-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--do-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasdo-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
+}
+
+.MPC-vasdo-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasdo-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasdo-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.2;
+}
+
+.MPC-vasdo-hdrSub {
+    font-size: 0.75em;
+    color: var(--do-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasdo-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasdo-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasdo-hdrPill.tone-info    { background: var(--do-info-bg);    color: var(--do-info-tx); }
+.MPC-vasdo-hdrPill.tone-success { background: var(--do-success-bg); color: var(--do-success-tx); }
+.MPC-vasdo-hdrPill.tone-warning { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.MPC-vasdo-hdrPill.tone-risk    { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+.MPC-vasdo-hdrPill.tone-purple  { background: var(--do-purple-bg);  color: var(--do-purple-tx); }
+.MPC-vasdo-hdrPill.tone-neutral { background: var(--do-neutral-bg); color: var(--do-neutral-tx); }
+
+.MPC-vasdo-hdrPill .MPC-vasdo-ic { color: currentColor; }
+
+.MPC-vasdo-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (customer | dispatch)                 */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-hdrCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasdo-hdrColL { min-width: 0; }
+
+.MPC-vasdo-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasdo-hdrField { min-width: 0; }
+
+.MPC-vasdo-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasdo-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasdo-fVal.is-link { color: var(--do-link); }
+
+@container (max-width: 460px) {
+    .MPC-vasdo-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasdo-hdrTop  { flex-direction: column; }
+    .MPC-vasdo-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Customer identity                                           */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--do-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasdo-vendAddr {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    font-size: 0.75em;
+    color: var(--do-muted);
+    line-height: 1.45;
+    margin-top: 0.25em;
+}
+.MPC-vasdo-vendAddr .MPC-vasdo-ic { color: var(--do-muted); margin-top: 0.15em; }
+
+.MPC-vasdo-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--do-text);
+    margin-top: 0.375em;
+}
+.MPC-vasdo-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasdo-contactBit .MPC-vasdo-ic { color: var(--do-action); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (metric grid)                                      */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasdo-metric {
+    min-width: 0;
+    border: 1px solid var(--do-card-bd);
+    border-left: 3px solid var(--do-neutral-tx);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasdo-metric.tone-total    { border-left-color: var(--do-info-tx); }
+.MPC-vasdo-metric.tone-lines    { border-left-color: var(--do-neutral-tx); }
+.MPC-vasdo-metric.tone-received { border-left-color: var(--do-success-tx); }
+.MPC-vasdo-metric.tone-order    { border-left-color: var(--do-purple-tx); }
+
+.MPC-vasdo-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasdo-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasdo-metric.tone-total    .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-info-tx); }
+.MPC-vasdo-metric.tone-lines    .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-neutral-tx); }
+.MPC-vasdo-metric.tone-received .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-success-tx); }
+.MPC-vasdo-metric.tone-order    .MPC-vasdo-mHead .MPC-vasdo-ic { color: var(--do-purple-tx); }
+
+.MPC-vasdo-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasdo-mSub {
+    font-size: 0.6875em;
+    color: var(--do-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 620px) {
+    .MPC-vasdo-snap { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasdo-snap { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Fulfilment lifecycle (horizontal stepper)                   */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.MPC-vasdo-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.MPC-vasdo-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.MPC-vasdo-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.MPC-vasdo-step:first-child .MPC-vasdo-stepLine-l,
+.MPC-vasdo-step:last-child  .MPC-vasdo-stepLine-r { visibility: hidden; }
+
+.MPC-vasdo-step.is-done   .MPC-vasdo-stepLine-r,
+.MPC-vasdo-step.is-done   .MPC-vasdo-stepLine-l,
+.MPC-vasdo-step.is-active .MPC-vasdo-stepLine-l { background: #67B98A; }
+
+.MPC-vasdo-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.MPC-vasdo-stepDot .MPC-vasdo-ic { display: inline-flex; }
+
+.MPC-vasdo-step.is-done .MPC-vasdo-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.MPC-vasdo-step.is-active .MPC-vasdo-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.MPC-vasdo-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+.MPC-vasdo-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--do-text);
+}
+
+.MPC-vasdo-stepMeta {
+    font-size: 0.6875em;
+    color: var(--do-muted);
+    margin-top: 0.25em;
+}
+.MPC-vasdo-step.is-active .MPC-vasdo-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Delivery line table                                         */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-table {
+    border: 1px solid var(--do-card-bd);
+    border-radius: var(--do-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.MPC-vasdo-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.6fr 0.7fr 0.9fr 1.1fr 1.1fr 0.9fr;
+}
+
+.MPC-vasdo-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--do-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--do-muted);
+}
+
+.MPC-vasdo-tBody {
+    border-bottom: 1px solid var(--do-row-div);
+    font-size: 0.8125em;
+    color: var(--do-text);
+}
+.MPC-vasdo-tBody:last-of-type { border-bottom: none; }
+.MPC-vasdo-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasdo-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasdo-table .ta-c { text-align: center; justify-content: center; }
+
+.MPC-vasdo-itItem { min-width: 0; }
+.MPC-vasdo-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--do-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasdo-itSku {
+    font-size: 0.9231em;
+    color: var(--do-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Delivered cell (mini bar + value) */
+.MPC-vasdo-recv {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    justify-content: flex-end;
+}
+.MPC-vasdo-recvBar {
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: #E7EEF4;
+    overflow: hidden;
+    flex: none;
+}
+.MPC-vasdo-recvBar i { display: block; height: 100%; border-radius: 999px; }
+.MPC-vasdo-recv.full i { background: var(--do-success-tx); }
+.MPC-vasdo-recv.part i { background: var(--do-warning-tx); }
+.MPC-vasdo-recv.none i { background: #CBD5DF; }
+.MPC-vasdo-recv.full { color: var(--do-success-tx); font-weight: 500; }
+.MPC-vasdo-recv.part { color: var(--do-warning-tx); font-weight: 500; }
+.MPC-vasdo-recv.none { color: var(--do-muted); }
+
+/* Status tag */
+.MPC-vasdo-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasdo-tag.s-full  { background: var(--do-success-bg); color: var(--do-success-tx); }
+.MPC-vasdo-tag.s-part  { background: var(--do-warning-bg); color: var(--do-warning-tx); }
+.MPC-vasdo-tag.s-short { background: var(--do-risk-bg);    color: var(--do-risk-tx); }
+
+/* Totals footer */
+.MPC-vasdo-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--do-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasdo-tf { color: var(--do-muted); }
+.MPC-vasdo-tf b { color: var(--do-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasdo-tf.is-grand { color: var(--do-text); font-weight: 700; }
+.MPC-vasdo-tf.is-grand b { color: var(--do-action); margin-left: 0.5em; font-size: 1.15em; }
+
+@container (max-width: 620px) {
+    .MPC-vasdo-table { overflow-x: auto; }
+    .MPC-vasdo-tRow { min-width: 560px; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasdo-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.MPC-vasdo-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.MPC-vasdo-btn .MPC-vasdo-ic { color: currentColor; }
+
+.MPC-vasdo-btn.btn-pri {
+    background: var(--do-action);
+    border: 1px solid var(--do-action);
+    color: #fff;
+}
+.MPC-vasdo-btn.btn-pri:hover { background: var(--do-action-dk); border-color: var(--do-action-dk); }
+
+.MPC-vasdo-btn.btn-sec {
+    background: #fff;
+    border: 1px solid var(--do-action);
+    color: var(--do-action);
+}
+.MPC-vasdo-btn.btn-sec:hover { background: var(--do-info-bg); }
+
+/* Disabled visual state (e.g. Raise Invoice before completion) */
+.MPC-vasdo-btn.is-disabled {
+    background: #F1F4F7;
+    border-color: #DCE5EE;
+    color: #A6B2BD;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasdo-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasdo-recv { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasdo-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasdo-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasdo-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .MPC-vasdo-actions { justify-content: flex-start; }

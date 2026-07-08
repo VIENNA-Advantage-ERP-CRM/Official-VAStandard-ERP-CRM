@@ -60,7 +60,7 @@
 /* Title label */
 .VAS-gljtd-root .w-title {
     font-size: 0.8125em;
-    font-weight: 400;
+    font-weight: 600;
     color: #5F7283;
     letter-spacing: 0.015em;
     white-space: nowrap;
@@ -108,50 +108,33 @@
     display: flex;
     align-items: baseline;
     gap: 0;
+    min-width: 0;
     line-height: 1;
-    color: #102C3F;
-}
-
-/* Currency prefix — small, muted */
-.VAS-gljtd-prefix {
-    font-size: 0.65em;
-    font-weight: 500;
-    color: #5F7283;
-    margin-right: 0.1em;
-    align-self: flex-start;
-    padding-top: 0.2em;
-}
-
-/* Main integer part — large and bold */
-.VAS-gljtd-main {
-    font-size: 2.25em;
+    font-size: 1.375em;
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
+    color: #019D89;
 }
 
-/* Decimal part — smaller and muted */
-.VAS-gljtd-decimal {
-    font-size: 1.125em;
-    font-weight: 400;
-    color: #748494;
+/* Currency prefix — same style as amount */
+.VAS-gljtd-prefix {
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    flex: 0 0 auto;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */
 .VAS-gljtd-root .kpi-why {
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
-    background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
-    padding: 0.45em 0.6em;
-    border: 1px solid rgba(1, 157, 137, 0.15);
 }
 
 .VAS-gljtd-root .kpi-why-label {
     font-size: 0.6875em;
     font-weight: 700;
     color: #019D89;
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
     flex-shrink: 0;
@@ -220,4 +203,54 @@ html[dir="rtl"] .VAS-gljtd-period-toggle {
 
 html[dir="rtl"] .VAS-gljtd-root .kpi-why {
     flex-direction: row-reverse;
+}
+
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-gljtd-root {
+    container-type: inline-size;
+}
+
+.VAS-gljtd-root .kpi {
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.VAS-gljtd-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS-gljtd-root .kpi-why-text {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-gljtd-root .kpi,
+.VAS-gljtd-root .kpi.kpi-green {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-gljtd-root .w-title {
+    color: #102C3F;
+}
+
+.VAS-gljtd-root .w-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #019D89;
+}
+
+.VAS-gljtd-root .kpi-why-label,
+.VAS-gljtd-period-active,
+.VAS-gljtd-period:hover {
+    color: #019D89;
+}
+
+.VAS-gljtd-root .kpi-why-text,
+.VAS-gljtd-period {
+    color: #748494;
 }
