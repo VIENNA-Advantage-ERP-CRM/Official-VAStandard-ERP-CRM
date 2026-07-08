@@ -67,7 +67,6 @@
     font-weight: 400;
     color: #748494;
     letter-spacing: 0.03em;
-    text-transform: uppercase;
     margin-left: auto;
     white-space: nowrap;
 }
@@ -111,6 +110,14 @@
     display: flex;
     flex-direction: column;
     gap: 0.2em;
+    cursor: pointer;
+    border-radius: 0.35em;
+    padding: 0.12em 0.2em;
+    transition: background 0.12s;
+}
+
+.VAS-gljtm-row:hover {
+    background: rgba(0, 131, 218, 0.06);
 }
 
 /* Row header: label + value */
@@ -124,7 +131,7 @@
 /* Account label (code + name) */
 .VAS-gljtm-label {
     font-size: 0.8em;
-    font-weight: 500;
+    font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
@@ -143,7 +150,7 @@
 /* Net movement value */
 .VAS-gljtm-val {
     font-size: 0.8em;
-    font-weight: 600;
+    font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
     flex-shrink: 0;
@@ -230,6 +237,80 @@ html[dir="rtl"] .VAS-gljtm-root .w-head {
     flex-direction: row-reverse;
 }
 
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-gljtm-root {
+    container-type: inline-size;
+}
+
+.VAS-gljtm-card {
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.VAS-gljtm-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.VAS-gljtm-sub,
+.VAS-gljtm-row,
+.VAS-gljtm-empty {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+}
+
+.VAS-gljtm-amt,
+.VAS-gljtm-name {
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-gljtm-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-gljtm-root .w-title,
+.VAS-gljtm-label,
+.VAS-gljtm-val {
+    color: #102C3F;
+}
+
+.VAS-gljtm-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #0083DA;
+}
+
+.VAS-gljtm-sub,
+.VAS-gljtm-acct {
+    color: #748494;
+}
+
+.VAS-gljtm-toggle {
+    color: #0083DA;
+    background: #EAF8FF;
+    border: 1px solid #BFE4FF;
+}
+
+.VAS-gljtm-toggle:hover,
+.VAS-gljtm-row:hover {
+    background: #EAF8FF;
+}
+
+.VAS-gljtm-track {
+    background: #EAF8FF;
+}
+
+.VAS-gljtm-fill {
+    background: #0083DA;
+}
+
+.VAS-gljtm-fill-cr {
+    background: #019D89;
+}
+
 html[dir="rtl"] .VAS-gljtm-sub {
     margin-left: unset;
     margin-right: auto;
@@ -237,4 +318,180 @@ html[dir="rtl"] .VAS-gljtm-sub {
 
 html[dir="rtl"] .VAS-gljtm-row-head {
     flex-direction: row-reverse;
+}
+
+.VAS-gljtm-val {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.86);
+    padding-left: 0.5em;
+}
+
+.VAS-gljtm-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625em;
+    flex-shrink: 0;
+    margin-top: 0.75em;
+    padding-top: 0.625em;
+    border-top: 1px solid #EDF2F6;
+}
+
+.VAS-gljtm-page-btn {
+    width: 2.25em;
+    height: 2.25em;
+    padding: 0;
+    border: 1px solid #CFE9FF;
+    border-radius: 0.5em;
+    background: rgba(255, 255, 255, 0.86);
+    color: #0083DA;
+    font-size: 1em;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.VAS-gljtm-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #9ED1FF;
+}
+
+.VAS-gljtm-page-btn:disabled {
+    background: rgba(255, 255, 255, 0.64);
+    color: #C7D3DF;
+    cursor: default;
+}
+
+.VAS-gljtm-page-text {
+    display: inline-block;
+    min-width: 4.25em;
+    text-align: center;
+    font-size: 1em;
+    font-weight: 700;
+    color: #141414;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Compact bottom pager and centered empty state */
+.VAS-gljtm-body.is-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.VAS-gljtm-body.is-empty .VAS-gljtm-empty,
+.VAS-gljtm-loading {
+    min-height: 100%;
+    width: 100%;
+}
+
+.VAS-gljtm-pager {
+    gap: 0.45em;
+    margin-top: auto;
+    padding-top: 0.45em;
+}
+
+.VAS-gljtm-page-btn {
+    width: 1.75em;
+    height: 1.75em;
+    font-size: 0.875em;
+}
+
+.VAS-gljtm-page-text {
+    min-width: 3.5em;
+    font-size: 0.8125em;
+}
+
+/* Unified GL Journal list placement */
+.VAS-gljtm-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    border: 0;
+    border-radius: 0;
+}
+
+.VAS-gljtm-list {
+    gap: 0;
+}
+
+.VAS-gljtm-row {
+    border-radius: 0;
+    border-bottom: 0.0625em solid #EDF2F6;
+    padding: 0.85em 0.75em;
+}
+
+.VAS-gljtm-row:hover {
+    background: #F8FBFE;
+}
+
+.VAS-gljtm-pager {
+    justify-content: flex-end;
+    margin-top: auto;
+    padding: 1.35em 0.625em 1em;
+    border-top: 1px solid #EDF2F6;
+}
+
+/* MD widget pager pattern */
+.VAS-gljtm-body {
+    overflow: hidden;
+}
+
+.VAS-gljtm-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+    flex-shrink: 0;
+    margin-top: auto;
+    padding: 8px 10px 0;
+    border-top: 1px solid #EDF2F6;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+.VAS-gljtm-page-btn {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.88);
+    color: #0083DA;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.VAS-gljtm-page-btn:hover:not(:disabled) {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+.VAS-gljtm-page-btn:disabled {
+    background: rgba(255, 255, 255, 0.72);
+    color: #B8C6D2;
+    cursor: default;
+    opacity: 1;
+}
+
+.VAS-gljtm-page-text {
+    min-width: 52px;
+    text-align: center;
+    color: #102C3F;
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }

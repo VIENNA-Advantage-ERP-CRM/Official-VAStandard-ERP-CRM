@@ -1,66 +1,97 @@
 /**
  * GL Journal Total Credit KPI Widget
- * Purpose  : Display the sum of AmtAcctCr from GL_JournalLine
- *            in the accounting schema base currency for month or YTD.
- * Tables   : GL_Journal, GL_JournalLine, C_AcctSchema, C_Currency
+ * Purpose - Display the sum of AmtAcctCr from GL_JournalLine
+ * in the accounting schema base currency for month or YTD.
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────
+ *  #  | Current Text                         | Message Key
+ * ----+--------------------------------------+--------------------------------
+ *  1  | Total Credit                         | VAS_038_TotalCredit
+ *  2  | YTD                                  | VAS_038_YTD
+ *  3  | Sum of credit lines across           | VAS_038_SumCreditLines
+ *  4  | journal entries this period.         | VAS_038_JournalEntriesPeriod
+ *  5  | No data available.                   | VIS_NoData
+ *  6  | Error loading data.                  | VIS_Error
+ * ─────────────────────────────────────────────────────────────────────
  */
+
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
 
-    // ─── Messages & Labels used in this file ───────────────────────────────────
-    // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_038_TotalCredit, VAS_038_Why, VAS_038_SumCreditLines,
-    //            VAS_038_JournalEntriesPeriod, VAS_038_YTD
-    // ───────────────────────────────────────────────────────────────────────────
-
-    function lbl(key, fallback) {
-        var t = VIS.Msg.getMsg(key);
-        return (t && t.charAt(0) !== '[') ? t : fallback;
-    }
-
-    // Precision is always dynamic from C_Currency.StdPrecision — never hardcoded.
-    function formatAmount(amount, precision) {
-        var stdPrecision = VIS.Env.getCtx().getStdPrecision();
-        var prec  = (typeof precision === 'number' && precision >= 0) ? precision : stdPrecision;
-        var val = parseFloat(amount || 0);
-        var formatted = val.toLocaleString(window.navigator.language, {
-            minimumFractionDigits: prec,
-            maximumFractionDigits: prec
-        });
-        if (prec > 0) {
-            return { main: formatted.slice(0, formatted.length - prec - 1), decimal: formatted.slice(-prec) };
-        }
-        return { main: formatted, decimal: '' };
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
     VAS.VAS_038_GLJournalTotalCreditWidget = function () {
 
-        this.frame;
-        this.windowNo;
-        var $self        = this;
-        var $root        = $('<div class="VAS-gljtc-root">');
-        var $mainNum;
-        var $decimalNum;
-        var $curPrefix;
-        var $whyText;
+        this.frame = null;
+        this.windowNo = 0;
+        this.AD_UserHomeWidgetID = 0;
+
+        var $self = this;
+        var $root = $('<div class="VAS-gljtc-root">');
+        var $kpiValue = null;
+        var $whyText = null;
+        var refreshTimer = null;
         var activePeriod = 'month';
-        var baseUrl      = VIS.Application.contextUrl;
+        var baseUrl = VIS.Application.contextUrl;
 
         this.Initalize = function () {
             createWidget();
             createBusyIndicator();
-            showBusy(true);
             loadData();
-            setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
+
+            refreshTimer = setInterval(function () {
+                $self.refreshWidget();
+            }, 1000 * 60 * 5);
         };
 
+        function lbl(key, fallback) {
+            var text = VIS.Msg.getMsg(key);
+            return text && text !== '[' + key + ']' ? text : fallback;
+        }
+
+        function esc(value) {
+            return String(value == null ? "" : value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function formatCurrencyAmount(value, currencySymbol, currencyISO) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = 2;
+
+            if (VIS && VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                stdPrecision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+
+            if (isNaN(stdPrecision) || stdPrecision < 0) {
+                stdPrecision = 2;
+            }
+
+            return numericValue.toLocaleString(window.navigator.language, {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+        }
+
+        function getCurrencyText(data) {
+            return data.currencySymbol ||
+                data.CurSymbol ||
+                data.currencyISO ||
+                data.ISOCode ||
+                "";
+        }
+
         function createBusyIndicator() {
-            var $bsy = $('<div id="VAS-gljtc-busy-' + $self.AD_UserHomeWidgetID
-                + '" class="vis-busyindicatorouterwrap">'
-                + '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
-                + '</div>');
+            var $bsy = $(
+                '<div id="VAS-gljtc-busy-' + $self.AD_UserHomeWidgetID + '" class="vis-busyindicatorouterwrap">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
+                '</div>' +
+                '</div>'
+            );
+
             $root.append($bsy);
         }
 
@@ -70,127 +101,206 @@
         }
 
         function createWidget() {
-            // Down-arrow SVG icon
-            var svgIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-                + ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-                + '<line x1="12" y1="5" x2="12" y2="19"></line>'
-                + '<polyline points="5 12 12 19 19 12"></polyline>'
-                + '</svg>';
-
             var id = $self.AD_UserHomeWidgetID;
 
-            var html = '<div class="kpi kpi-blue">'
+            var svgIcon =
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+                ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<line x1="12" y1="5" x2="12" y2="19"></line>' +
+                '<polyline points="5 12 12 19 19 12"></polyline>' +
+                '</svg>';
 
-                + '<div class="w-head">'
-                +   '<div class="w-icon">' + svgIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_038_TotalCredit', 'Total Credit') + '</div>'
-                +   '<div class="VAS-gljtc-period-toggle" id="VAS-gljtc-toggle-' + id + '">'
-                +     '<span class="VAS-gljtc-period VAS-gljtc-period-active" data-period="month"'
-                +       ' id="VAS-gljtc-mon-' + id + '">—</span>'
-                +     '<span class="VAS-gljtc-sep">&middot;</span>'
-                +     '<span class="VAS-gljtc-period" data-period="ytd">'
-                +       lbl('VAS_038_YTD', 'YTD')
-                +     '</span>'
-                +   '</div>'
-                + '</div>'
+            var html =
+                '<div class="kpi kpi-blue">' +
+                '<div class="w-head">' +
+                '<div class="w-icon">' + svgIcon + '</div>' +
+                '<div class="w-title">' + lbl('VAS_038_TotalCredit', 'Total Credit') + '</div>' +
+                '<div class="VAS-gljtc-period-toggle" id="VAS-gljtc-toggle-' + id + '">' +
+                '<span class="VAS-gljtc-period VAS-gljtc-period-active" data-period="month" id="VAS-gljtc-mon-' + id + '">—</span>' +
+                '<span class="VAS-gljtc-sep">&middot;</span>' +
+                '<span class="VAS-gljtc-period" data-period="ytd">' + lbl('VAS_038_YTD', 'YTD') + '</span>' +
+                '</div>' +
+                '</div>' +
 
-                + '<div class="kpi-value" id="VAS-gljtc-val-' + id + '">'
-                +   '<span class="VAS-gljtc-prefix"  id="VAS-gljtc-pfx-'  + id + '"></span>'
-                +   '<span class="VAS-gljtc-main"    id="VAS-gljtc-main-' + id + '">—</span>'
-                +   '<span class="VAS-gljtc-decimal" id="VAS-gljtc-dec-'  + id + '"></span>'
-                + '</div>'
+                '<div class="kpi-value" id="VAS-gljtc-val-' + id + '">&mdash;</div>' +
 
-                + '<div class="kpi-why">'
-                +   '<span class="kpi-why-label">' + lbl('VAS_038_Why', 'Why') + '</span>'
-                +   '<span class="kpi-why-text" id="VAS-gljtc-why-' + id + '">&mdash;</span>'
-                + '</div>'
-
-                + '</div>';
+                '<div class="kpi-why">' +
+                '<span class="kpi-why-text" id="VAS-gljtc-why-' + id + '">&mdash;</span>' +
+                '</div>' +
+                '</div>';
 
             $root.append(html);
 
-            $mainNum    = $root.find('#VAS-gljtc-main-' + id);
-            $decimalNum = $root.find('#VAS-gljtc-dec-'  + id);
-            $curPrefix  = $root.find('#VAS-gljtc-pfx-'  + id);
-            $whyText    = $root.find('#VAS-gljtc-why-'  + id);
+            $kpiValue = $root.find('#VAS-gljtc-val-' + id);
+            $whyText = $root.find('#VAS-gljtc-why-' + id);
 
             $root.find('#VAS-gljtc-toggle-' + id).on('click', '.VAS-gljtc-period', function () {
                 var $btn = $(this);
-                if ($btn.hasClass('VAS-gljtc-period-active')) { return; }
+
+                if ($btn.hasClass('VAS-gljtc-period-active')) {
+                    return;
+                }
+
                 $root.find('#VAS-gljtc-toggle-' + id)
-                     .find('.VAS-gljtc-period')
-                     .removeClass('VAS-gljtc-period-active');
+                    .find('.VAS-gljtc-period')
+                    .removeClass('VAS-gljtc-period-active');
+
                 $btn.addClass('VAS-gljtc-period-active');
-                activePeriod = $btn.data('period');
-                showBusy(true);
+
+                activePeriod = $btn.data('period') || 'month';
                 loadData();
             });
         }
 
+        function normalizeResponse(result) {
+            if (!result) {
+                return null;
+            }
+
+            if (typeof result === 'string') {
+                try {
+                    return JSON.parse(result);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            return result;
+        }
+
+        function renderEmpty(message) {
+            $kpiValue.text('—');
+            $whyText.text(message || lbl('VIS_NoData', 'No data available.'));
+        }
+
+        function renderData(data) {
+            var monthText = data.MonthAbbr || data.badgeText || '—';
+            var amountValue = data.Total;
+
+            if (amountValue === undefined || amountValue === null) {
+                amountValue = data.mainMetric || 0;
+            }
+
+            $root.find('#VAS-gljtc-mon-' + $self.AD_UserHomeWidgetID).text(monthText);
+
+            var amountText = formatCurrencyAmount(
+                amountValue,
+                data.currencySymbol || data.CurSymbol,
+                data.currencyISO || data.ISOCode
+            );
+
+            var currencyText = getCurrencyText(data);
+
+            $kpiValue.html(
+                (
+                    currencyText
+                        ? '<span class="VAS-gljtc-prefix">' +
+                        esc(currencyText) +
+                        '</span>'
+                        : ''
+                ) +
+                '<span>' +
+                esc(amountText) +
+                '</span>'
+            );
+
+            $whyText.text(
+                lbl('VAS_038_SumCreditLines', 'Sum of credit lines across') +
+                ' ' +
+                Number(data.JournalCount || 0).toLocaleString(window.navigator.language) +
+                ' ' +
+                lbl('VAS_038_JournalEntriesPeriod', 'journal entries this period.')
+            );
+        }
+
         function loadData() {
+            showBusy(true);
+
             $.ajax({
-                url      : baseUrl + 'VAS/VAS_037_GLJournalTotalDebitWidget/GetTotalCredit',
-                type     : 'GET',
-                dataType : 'json',
-                cache    : false,
-                data     : { period: activePeriod },
-                success  : function (result) {
-                    try {
-                        var data = JSON.parse(result);
-                        if (data) {
-                            $root.find('[data-period="month"]').text(data.MonthAbbr || '—');
-                            $curPrefix.text(data.CurSymbol || data.ISOCode || '');
-                            var fmt = formatAmount(data.Total, data.StdPrecision);
-                            $mainNum.text(fmt.main);
-                            $decimalNum.text('.' + fmt.decimal);
-                            $whyText.text(
-                                lbl('VAS_038_SumCreditLines', 'Sum of credit lines across the same')
-                                + ' ' + data.JournalCount + ' '
-                                + lbl('VAS_038_JournalEntriesPeriod', 'journal entries this period.')
-                            );
-                        } else {
-                            $mainNum.text('—');
-                            $decimalNum.text('');
-                            $whyText.text(lbl('VIS_NoData', 'No data available.'));
-                        }
-                    } catch (e) {
-                        $mainNum.text('—');
-                        $decimalNum.text('');
-                        $whyText.text(lbl('VIS_Error', 'Error loading data.'));
+                url: baseUrl + 'VAS/VAS_037_GLJournalTotalDebitWidget/GetTotalCredit',
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                data: {
+                    period: activePeriod
+                },
+                success: function (result) {
+                    var data = normalizeResponse(result);
+
+                    if (!data) {
+                        renderEmpty(lbl('VIS_Error', 'Error loading data.'));
+                        return;
                     }
-                    showBusy(false);
+
+                    if (data.success === false || data.error) {
+                        renderEmpty(data.error || lbl('VIS_Error', 'Error loading data.'));
+                        return;
+                    }
+
+                    if (data.hasData === false) {
+                        renderEmpty(lbl('VIS_NoData', 'No data available.'));
+                        return;
+                    }
+
+                    renderData(data);
                 },
                 error: function () {
-                    $mainNum.text('—');
-                    $decimalNum.text('');
-                    $whyText.text(lbl('VIS_Error', 'Error loading data.'));
+                    renderEmpty(lbl('VIS_Error', 'Error loading data.'));
+                },
+                complete: function () {
                     showBusy(false);
                 }
             });
         }
 
-        this.refreshWidget    = function () { $mainNum.text('—'); $decimalNum.text(''); loadData(); };
-        this.getRoot          = function () { return $root; };
-        this.disposeComponent = function () { $root.remove(); };
-    };
+        this.refreshWidget = function () {
+            if ($kpiValue) {
+                $kpiValue.text('—');
+            }
 
-    VAS.VAS_038_GLJournalTotalCreditWidget.prototype.refreshWidget = function () {
-        this.refreshWidget();
+            loadData();
+        };
+
+        this.getRoot = function () {
+            return $root;
+        };
+
+        this.disposeComponent = function () {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+
+            if ($root) {
+                $root.off();
+                $root.remove();
+            }
+
+            $kpiValue = null;
+            $whyText = null;
+            $root = null;
+            $self = null;
+        };
     };
 
     VAS.VAS_038_GLJournalTotalCreditWidget.prototype.init = function (windowNo, frame) {
-        this.frame               = frame;
+        this.frame = frame;
         this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
-        this.windowNo            = windowNo;
+        this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
     };
 
-    VAS.VAS_038_GLJournalTotalCreditWidget.prototype.widgetSizeChange = function (height, width) {};
+    VAS.VAS_038_GLJournalTotalCreditWidget.prototype.widgetSizeChange = function (height, width) {
+    };
 
     VAS.VAS_038_GLJournalTotalCreditWidget.prototype.dispose = function () {
         this.disposeComponent();
-        if (this.frame) { this.frame.dispose(); }
+
+        if (this.frame) {
+            this.frame.dispose();
+        }
+
         this.frame = null;
     };
 

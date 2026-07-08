@@ -310,6 +310,7 @@
     <Content Include="fonts\glyphicons-halflings-regular.ttf" />
     <Content Include="fonts\glyphicons-halflings-regular.woff" />
     <Content Include="Views\_ViewStart.cshtml" />
+    <Content Include="CReports\Reports\VARPT_JournalVoucherRpt.rpt" />
     <None Include="Oracle.DataAccess.Common.Configuration.Section.xsd">
       <SubType>Designer</SubType>
     </None>

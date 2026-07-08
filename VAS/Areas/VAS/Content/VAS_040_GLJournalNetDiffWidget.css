@@ -59,7 +59,7 @@
 /* Title label */
 .VAS-gljnd-root .w-title {
     font-size: 0.8125em;
-    font-weight: 400;
+    font-weight: 600;
     color: #5F7283;
     letter-spacing: 0.015em;
     white-space: nowrap;
@@ -118,6 +118,9 @@
     align-items: baseline;
     gap: 0;
     line-height: 1;
+    font-size: 1.375em;
+    font-weight: 700;
+    letter-spacing: -0.025em;
     color: #102C3F;
 }
 
@@ -131,47 +134,25 @@
     color: #8B5200;
 }
 
-/* Currency prefix */
+/* Currency prefix — same style as amount */
 .VAS-gljnd-prefix {
-    font-size: 0.65em;
-    font-weight: 500;
+    font-size: inherit;
+    font-weight: inherit;
     color: inherit;
-    opacity: 0.7;
-    margin-right: 0.1em;
-    align-self: flex-start;
-    padding-top: 0.2em;
-}
-
-/* Main integer part */
-.VAS-gljnd-main {
-    font-size: 2.25em;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-}
-
-/* Decimal part */
-.VAS-gljnd-decimal {
-    font-size: 1.125em;
-    font-weight: 400;
-    opacity: 0.6;
+    flex: 0 0 auto;
 }
 
 /* ── Status / Why section ────────────────────────────────────────────────── */
 .VAS-gljnd-root .kpi-why {
     display: flex;
     align-items: flex-start;
-    gap: 0.4em;
-    background: rgba(255, 255, 255, 0.55);
     border-radius: 0.5em;
-    padding: 0.45em 0.6em;
-    border: 1px solid rgba(0, 131, 218, 0.12);
 }
 
 .VAS-gljnd-root .kpi-why-label {
     font-size: 0.6875em;
     font-weight: 700;
     color: #0083DA;
-    text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
     flex-shrink: 0;
@@ -186,14 +167,14 @@
 }
 
 /* Balanced — green status text */
-.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
-    color: #0B6B45;
-    font-weight: 500;
-}
+    .VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
+        color: #748494;
+        font-weight: 500;
+    }
 
 /* Unbalanced — amber warning text */
 .VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-warn {
-    color: #8B5200;
+    color: #748494; 
     font-weight: 500;
 }
 
@@ -252,4 +233,62 @@ html[dir="rtl"] .VAS-gljnd-drcr {
 
 html[dir="rtl"] .VAS-gljnd-root .kpi-why {
     flex-direction: row-reverse;
+}
+
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-gljnd-root {
+    container-type: inline-size;
+}
+
+.VAS-gljnd-root .kpi {
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.VAS-gljnd-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #102C3F;
+}
+
+.VAS-gljnd-root .kpi-why-text {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-gljnd-root .kpi,
+.VAS-gljnd-root .kpi.kpi-teal {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-gljnd-root .w-title,
+.VAS-gljnd-root .kpi-value {
+    color: #102C3F;
+}
+
+.VAS-gljnd-root .w-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #0083DA;
+}
+
+.VAS-gljnd-root .kpi-value.VAS-gljnd-balanced,
+.VAS-gljnd-root .kpi-why-text.VAS-gljnd-status-ok {
+    color: #748494 !important;
+}
+
+.VAS-gljnd-root .kpi-value.VAS-gljnd-unbalanced,
+.VAS-gljnd-root {
+    color: #D78B10;
+}
+
+.VAS-gljnd-root .kpi-why-label {
+    color: #0083DA;
+}
+
+.VAS-gljnd-root .kpi-why-text {
+    color: #748494;
 }

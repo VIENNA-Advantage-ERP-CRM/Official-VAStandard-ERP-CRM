@@ -103,10 +103,11 @@
 
         /* ── Format a currency amount into a compact, locale-aware string ──
            Magnitude formatting (Indian vs international numbering by base currency,
-           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount;
-           the minus sign is prepended here. */
-        function formatCurrency(value, isoCode, precision) {
-            return (value < 0 ? '-' : '') + VIS.Util.formatCompactAmount(value, isoCode, precision);
+           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount
+           (which always returns a non-negative string). The sign goes FIRST, then the
+           currency symbol, then the magnitude, e.g. -$623.864 (not $-623.864). */
+        function formatCurrency(value, symbol, isoCode, precision) {
+            return (value < 0 ? '-' : '') + (symbol || '') + VIS.Util.formatCompactAmount(value, isoCode, precision);
         }
 
         /* ── Build the WHY explanatory copy from the optional count / top-customer data ── */
@@ -128,8 +129,9 @@
         /* ── Render metric values ── */
         function renderMetric(total, count, topCustomer, symbol, isoCode, precision) {
             if ($metricEl) {
-                /* Base-currency symbol (from the accounting schema) sits before the amount. */
-                $metricEl.text((symbol || '') + formatCurrency(total, isoCode, precision));
+                /* Sign, then base-currency symbol (from the accounting schema), then amount:
+                   a negative shows as -$623.864, not $-623.864. */
+                $metricEl.text(formatCurrency(total, symbol, isoCode, precision));
             }
             if ($whyText) {
                 $whyText.text(buildWhyText(count, topCustomer));
@@ -143,11 +145,11 @@
             /* Header: pale-blue icon well + title / subtitle */
             var $header = $(
                 '<div class="vas-oso-header">' +
-                    '<div class="vas-oso-icon">' + ICON_SVG + '</div>' +
-                    '<div class="vas-oso-labels">' +
-                        '<div class="vas-oso-title">' + lbl("VAS_057_Outstanding", 'Outstanding') + '</div>' +
-                        '<div class="vas-oso-subtitle">' + lbl("VAS_057_MoneyOwedToYou", 'Money owed to you') + '</div>' +
-                    '</div>' +
+                '<div class="vas-oso-icon">' + ICON_SVG + '</div>' +
+                '<div class="vas-oso-labels">' +
+                '<div class="vas-oso-title">' + lbl("VAS_057_Outstanding", 'Outstanding') + '</div>' +
+                '<div class="vas-oso-subtitle">' + lbl("VAS_057_MoneyOwedToYou", 'Money owed to you') + '</div>' +
+                '</div>' +
                 '</div>'
             );
 

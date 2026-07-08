@@ -29,9 +29,12 @@ namespace VIS.Controllers
 
             DateTime today = DateTime.Now.Date;
             DateTime monthStart = new DateTime(today.Year, today.Month, 1);
+            // Last day of the current month so the whole month's data is picked up
+            // (not just up to today).
+            DateTime monthEnd = monthStart.AddMonths(1).AddDays(-1);
 
             string monthStartDate = monthStart.ToString("yyyy-MM-dd");
-            string todayDate = today.ToString("yyyy-MM-dd");
+            string todayDate = monthEnd.ToString("yyyy-MM-dd");
 
             string schemaCurrencySql = @"
                 SELECT ci.AD_Client_ID,
@@ -47,12 +50,12 @@ namespace VIS.Controllers
                 SELECT i.C_BPartner_ID,
                        CurrencyConvert(
                            al.Amount,
-                           i.C_Currency_ID,
+                           ah.C_Currency_ID,
                            sc.Acct_Currency_ID,
                            ah.DateAcct,
-                           i.C_ConversionType_ID,
-                           i.AD_Client_ID,
-                           i.AD_Org_ID
+                           ah.C_ConversionType_ID,
+                           ah.AD_Client_ID,
+                           ah.AD_Org_ID
                        ) AS PaidAmount,
                        sc.StdPrecision,
                        sc.ISO_Code,
@@ -65,6 +68,7 @@ namespace VIS.Controllers
                 WHERE ips.VA009_IsPaid='Y'
                 AND i.DocStatus IN ('CO','CL')
                 AND i.IsSoTrx='Y'
+                AND NVL(al.GL_Journalline_ID , 0) = 0 
                 AND CAST(ah.DateAcct AS DATE) >= DATE '" + monthStartDate + @"'
                 AND CAST(ah.DateAcct AS DATE) <= DATE '" + todayDate + @"'";
 

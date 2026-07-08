@@ -1,0 +1,1812 @@
+/* ============================================================
+ * VAS_074_CreateInvoiceLinePanel — editable Invoice Lines grid
+ * Port of the Onfinity "Invoice Lines & Summary" prototype:
+ *   - editable lines table with selection + unsaved cue
+ *   - catalog autocomplete popover (keyboard nav)
+ *   - attribute picker dialog (list + create form)
+ *   - scan barcode dialog
+ *   - more-options popover (Discount + Notes, underline fields)
+ * All sizing in em (no px), classes namespaced vas-cil-* so nothing
+ * leaks into the host page. Tokens are shared with the body-level
+ * dialogs / toast (which mount outside .vas-cil-root).
+ * ============================================================ */
+
+.vas-cil-root,
+.vas-cil-dialog-backdrop,
+.vas-cil-toast {
+    --cil-action-blue: #0083da;
+    --cil-action-blue-hover: #0069ae;
+    --cil-link-deep: #005fa3;
+    --cil-blue-soft: #eaf8ff;
+    --cil-blue-border: #bfe4ff;
+    --cil-surface: #ffffff;
+    --cil-surface-muted: #fbfdff;
+    --cil-surface-amber: #fff6e0;
+    --cil-divider: #e2eaf1;
+    --cil-divider-strong: #c5d2dd;
+    --cil-divider-soft: #eef2f6;
+    --cil-border-default: #d9e2eb;
+    --cil-border-field: #d7d7d7;
+    --cil-text: #102c3f;
+    --cil-text-strong: #111827;
+    --cil-text-secondary: #41576a;
+    --cil-text-muted: #5f7283;
+    --cil-text-faint: #9f9f9f;
+    --cil-text-disabled: #9aa6b2;
+    --cil-success-text: #0b6b45;
+    --cil-warning: #d78b10;
+    --cil-danger: #d14545;
+    --cil-danger-bg: #fcefef;
+    --cil-danger-text: #a33f3f;
+    --cil-purple: #5f4aa6;
+    --cil-purple-bg: #efeeff;
+    --cil-r-sm: 0.375em;
+    --cil-r-md: 0.5em;
+    --cil-r-lg: 0.625em;
+    --cil-r-pill: 999em;
+    --cil-shadow-pop: 0 0.625em 1.5em rgba(15, 61, 97, 0.12);
+    --cil-shadow-dialog: 0 1.25em 3.125em rgba(15, 61, 97, 0.2);
+    --cil-font: "Roboto", "Helvetica Neue", Arial, sans-serif;
+}
+
+.vas-cil-root {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    /* When the framework mounts this as a flex item, the default min-width:auto
+       resolves to the grid's min-content (longest product/description word), so the
+       root refuses to shrink to its host and the whole panel spills past the viewport
+       with a horizontal scrollbar. min-width:0 lets it shrink so the fr table columns
+       fit the screen and ellipsis-truncate instead. */
+    min-width: 0;
+    max-width: 100%;
+    /* overflow-x:hidden (not auto) makes the root a hard horizontal clip boundary, so
+       its content can never push a shrink-to-fit framework host wider than the viewport
+       (the cause of the persistent horizontal scrollbar). Vertical stays scrollable for
+       long line lists. This mirrors the working sibling panels (VAS_PurchaseOrderTabPanel,
+       VAS_PaymentVoucherPanel), which all clip the root rather than overflow:auto. */
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 0.75em;
+    font-family: var(--cil-font);
+    font-size: 0.9em;
+    color: var(--cil-text);
+}
+/* Same guard down the wrapper chain in case the host stretches an inner block as the
+   flex item rather than the root itself. */
+.vas-cil-body, .vas-cil-panel, .vas-cil-table, .vas-cil-tbody {
+    min-width: 0;
+}
+
+.vas-cil-root * {
+    box-sizing: border-box;
+}
+
+.vas-cil-empty {
+    display: flex;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.875em;
+    height: 0.875em;
+}
+
+.vas-cil-is-hidden {
+    display: none !important;
+}
+
+/* ---------- panel ---------- */
+.vas-cil-panel {
+    background: var(--cil-surface);
+    border: 0.0625em solid var(--cil-border-default);
+    border-radius: 1em;
+    padding: 0.5em 0 0;
+    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.04);
+    border: 0px;
+}
+
+.vas-cil-panel__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    min-height: 3.5em;
+    padding: 0.625em 1.25em;
+}
+
+.vas-cil-panel__title {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--cil-text-strong);
+}
+
+.vas-cil-panel__subtitle {
+    margin: 0.125em 0 0;
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625em;
+}
+
+/* ---------- buttons ---------- */
+.vas-cil-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    padding: 0.5em 0.875em;
+    border: 0.0625em solid transparent;
+    border-radius: var(--cil-r-pill);
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.8125em;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+}
+
+.vas-cil-btn--outline {
+    background: var(--cil-surface);
+    border-color: var(--cil-action-blue);
+    color: var(--cil-action-blue);
+}
+
+    .vas-cil-btn--outline:hover {
+        background: var(--cil-blue-soft);
+    }
+
+.vas-cil-btn--outline-pill {
+    background: var(--cil-surface);
+    border-color: var(--cil-action-blue);
+    color: var(--cil-action-blue);
+    font-size: 0.75em;
+    font-weight: 600;
+    padding: 0.375em 0.75em;
+}
+
+    .vas-cil-btn--outline-pill:hover {
+        background: var(--cil-blue-soft);
+    }
+
+.vas-cil-btn--primary {
+    background: var(--cil-action-blue);
+    border-color: var(--cil-action-blue);
+    color: #fff;
+    font-weight: 700;
+    padding: 0.5em 1.125em;
+}
+
+    .vas-cil-btn--primary:hover {
+        background: var(--cil-action-blue-hover);
+    }
+
+    .vas-cil-btn--primary:disabled {
+        background: #9fcdec;
+        border-color: #9fcdec;
+        cursor: not-allowed;
+    }
+
+.vas-cil-btn--ghost {
+    background: var(--cil-surface);
+    border-color: var(--cil-border-default);
+    color: var(--cil-text-secondary);
+    font-weight: 600;
+    padding: 0.5em 1.125em;
+}
+
+    .vas-cil-btn--ghost:hover {
+        background: var(--cil-surface-muted);
+    }
+
+.vas-cil-btn--danger {
+    background: var(--cil-surface);
+    border-color: var(--cil-danger-text);
+    color: var(--cil-danger-text);
+}
+
+    .vas-cil-btn--danger:hover {
+        background: #fbe6e6;
+    }
+
+.vas-cil-btn.vas-cil-is-disabled, .vas-cil-btn:disabled {
+    cursor: not-allowed;
+    border-color: #dbe6ee;
+    color: var(--cil-text-disabled);
+    background: var(--cil-surface);
+}
+
+/* ---------- table ---------- */
+.vas-cil-table {
+    padding: 0.5em 1.25em 1.125em;
+}
+
+.vas-cil-row {
+    display: grid;
+    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0.75em 0;
+    border-bottom: 0.0625em solid var(--cil-divider);
+    transition: background .12s;
+}
+
+.vas-cil-row--head {
+    padding: 0.625em 0;
+    border-bottom-color: var(--cil-divider-strong);
+}
+
+    .vas-cil-row--head .vas-cil-cell {
+        font-size: 0.8125em;
+        font-weight: 700;
+        color: var(--cil-text);
+    }
+
+.vas-cil-row--line {
+    position: relative;
+}
+
+    .vas-cil-row--line.is-selected {
+        background: var(--cil-blue-soft);
+    }
+
+    .vas-cil-row--line.is-busy {
+        opacity: 0.55;
+        pointer-events: none;
+    }
+
+.vas-cil-row-spin {
+    position: absolute;
+    top: 50%;
+    right: 1.25em;
+    width: 1em;
+    height: 1em;
+    margin-top: -0.5em;
+    border: 0.14em solid var(--cil-border-default);
+    border-top-color: var(--cil-action-blue);
+    border-radius: 50%;
+    animation: vasCilSpin 0.7s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes vasCilSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.vas-cil-row--line.is-unsaved {
+    background: var(--cil-surface-amber);
+    box-shadow: inset 0.1875em 0 0 var(--cil-warning);
+}
+
+    .vas-cil-row--line.is-unsaved.is-selected {
+        background: var(--cil-blue-soft);
+    }
+
+.vas-cil-row--line.is-invalid {
+    background: var(--cil-danger-bg);
+    box-shadow: inset 0.1875em 0 0 var(--cil-danger);
+}
+
+/* Per-row inline validation message (replaces the global toast on Save). Spans the
+       whole grid row on its own line, red, under the offending line's cells. */
+.vas-cil-row--line .vas-cil-row-error {
+    grid-column: 1 / -1;
+    margin: 0.125em 0 0 2.5em;
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--cil-danger);
+}
+
+.vas-cil-row--totals {
+    border-top: 0.0625em solid var(--cil-divider-strong);
+    border-bottom: none;
+    padding: 0.875em 0 0.25em;
+    display: flex;
+    justify-content: flex-end;
+    align-items: baseline;
+    gap: 1.5em;
+}
+
+.vas-cil-cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 0.875em;
+    color: var(--cil-text);
+}
+
+.vas-cil-cell--check {
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-cil-cell--right {
+    text-align: right;
+    align-items: flex-end;
+}
+
+.vas-cil-cell--more {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25em;
+}
+
+.vas-cil-cell input[type="checkbox"] {
+    width: 1em;
+    height: 1em;
+    accent-color: var(--cil-action-blue);
+    cursor: pointer;
+}
+/* Read-only invoice (.vas-cil-locked): the selection / select-all checkbox and the
+   "..." button are disabled -> not-allowed. A disabled control IGNORES its own `cursor`
+   in Chromium, so put the cursor on the (enabled) parent cell and let the disabled
+   control pass pointer events through to it (pointer-events:none). */
+.vas-cil-locked .vas-cil-cell--check,
+.vas-cil-locked .vas-cil-cell--more {
+    cursor: not-allowed;
+}
+
+    .vas-cil-locked .vas-cil-cell--check input[type="checkbox"]:disabled,
+    .vas-cil-locked .vas-cil-more-btn:disabled {
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+.vas-cil-emptyrow {
+    padding: 1.5em;
+    text-align: center;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-total-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.5em;
+}
+
+.vas-cil-total-item__label {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-total-item__value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.vas-cil-total-item--grand .vas-cil-total-item__value {
+    font-weight: 700;
+    color: var(--cil-text-strong);
+    font-size: 1em;
+}
+
+/* ---------- editable cell (underline affordance, never a box-in-box) ---------- */
+.vas-cil-cell-edit {
+    min-height: 2.2em;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    cursor: text;
+    border-bottom: 0.0625em solid transparent;
+    transition: border-color .12s;
+}
+    /* The cell value is always an <input>; the wrapper never carries a border (the
+   input shows an underline only while focused), so a blurred cell shows none. */
+    .vas-cil-cell-edit.is-editing {
+        border-bottom-color: transparent;
+    }
+
+.vas-cil-cell-edit__primary {
+    font-weight: 700;
+    font-size: 0.875em;
+    color: var(--cil-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-cell-edit__sub {
+    margin-top: 0.125em;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+    .vas-cil-cell-edit__sub:hover {
+        color: var(--cil-action-blue);
+    }
+/* Attribute-set-instance description shown under the product, click to open the
+   attribute control. Coloured like a link (e.g. "ALMOND | IP | LARGE | 2023"). */
+.vas-cil-attr-link {
+    display: block;
+    margin-top: 0.125em;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--cil-action-blue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+    .vas-cil-attr-link:hover {
+        text-decoration: underline;
+    }
+
+.vas-cil-attr-link--empty {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--cil-text-muted);
+}
+/* Read-only invoice: attribute is informational text, not an interactive link. */
+.vas-cil-attr-link--disabled {
+    color: var(--cil-text-secondary);
+    cursor: default;
+}
+
+    .vas-cil-attr-link--disabled:hover {
+        text-decoration: none;
+    }
+/* Editing / resting cell controls. These MUST out-specify the framework
+   input[type=text] reset (which paints a filled, bordered, rounded, padded box):
+   scope by wrapper + element tag so the control stays flush and TRANSPARENT,
+   inheriting the row/div background (e.g. the cream tint of an unsaved row)
+   instead of showing a white box. Underline only on focus -> none when blurred. */
+.vas-cil-cell-edit input.vas-cil-cell-edit__input,
+.vas-cil-cell-edit select.vas-cil-cell-edit__select {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
+    background-color: transparent;
+    padding: 0.1em 0;
+    font-family: inherit;
+    font-size: 1em;
+    border-bottom: 0.0938em solid transparent;
+    transition: border-color .12s;
+    text-overflow: ellipsis;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+    .vas-cil-cell-edit input.vas-cil-cell-edit__input:not([readonly]):focus,
+    .vas-cil-cell-edit select.vas-cil-cell-edit__select:focus {
+        border-bottom-color: var(--cil-action-blue);
+    }
+
+.vas-cil-cell-edit input.vas-cil-cell-edit__input {
+    font-weight: 700;
+    color: var(--cil-text);
+}
+
+.vas-cil-cell-edit select.vas-cil-cell-edit__select {
+    color: var(--cil-text-secondary);
+}
+
+.vas-cil-cell-edit input.vas-cil-cell-edit__input::placeholder {
+    color: var(--cil-text-disabled);
+}
+
+.vas-cil-cell-disp {
+    /* Resting cells are click-to-edit, never drag targets - block text selection so a
+       press-and-move doesn't start a drag. */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+/* Cursor: the resting cell is a readonly <input>, so the framework's input reset forces
+   `cursor: not-allowed` on it (higher specificity than a bare class). Override with a
+   tag+class selector (scoped under .vas-cil-cell-edit) AND !important so it always wins:
+   an editable cell is click-to-edit -> pointer; a locked/read-only cell -> not-allowed. */
+.vas-cil-cell-edit input.vas-cil-cell-disp {
+    cursor: pointer !important;
+}
+/* read-only invoice or read-only column */
+.vas-cil-cell-edit input.vas-cil-cell-disp--ro {
+    cursor: not-allowed !important;
+}
+/* Column read-only field rendered DISABLED (e.g. C_UOM_ID ReadOnlyLogic true): grey the
+   text but keep the borderless transparent look (override the browser's disabled styling).
+   Chromium ignores `cursor` on a disabled control, so pass pointer events through to the
+   cell wrapper, which shows the not-allowed cursor. */
+.vas-cil-cell-edit input.vas-cil-cell-disp:disabled {
+    color: var(--cil-text-disabled);
+    -webkit-text-fill-color: var(--cil-text-disabled);
+    background: transparent;
+    opacity: 1;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.vas-cil-cell-edit:has(input.vas-cil-cell-disp:disabled) {
+    cursor: not-allowed;
+}
+.vas-cil-cell-edit input.vas-cil-cell-disp--sub {
+    font-size: 0.85em;
+    font-weight: 400;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-cell-edit input.vas-cil-qtyval {
+    text-align: right;
+    font-weight: 700;
+    font-size: 1em;
+}
+
+.vas-cil-cell-edit input.vas-cil-uomsub {
+    text-align: right;
+    margin-top: 0.125em;
+}
+
+.vas-cil-cell-edit input.vas-cil-taxval {
+    font-size: 0.975em;
+    font-weight: 400;
+    color: var(--cil-text-secondary);
+}
+
+.vas-cil-amt {
+    font-weight: 700;
+    font-size: 0.975em;
+    color: var(--cil-text);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- catalog popover ---------- */
+.vas-cil-catalog-popover {
+    /* Attaches flush under the input (no top gap / no top border) so the input underline
+       and the dropdown read as ONE element - not two stacked border lines. Opaque fill. */
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 0;
+    z-index: 30;
+    min-width: 22.5em;
+    background: #ffffff;
+    border: 0.0625em solid var(--cil-divider-strong);
+    border-top: none;
+    border-radius: 0 0 var(--cil-r-md) var(--cil-r-md);
+    box-shadow: var(--cil-shadow-pop);
+    max-height: 16.25em;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+
+/* Flipped state: not enough room below the input, so open UPWARD. Attaches flush ABOVE
+   the input (no bottom gap / no bottom border) so the two read as one element, mirroring
+   the default downward attachment. */
+.vas-cil-catalog-popover--above {
+    top: auto;
+    bottom: 100%;
+    margin-top: 0;
+    margin-bottom: 0;
+    border-top: 0.0625em solid var(--cil-divider-strong);
+    border-bottom: none;
+    border-radius: var(--cil-r-md) var(--cil-r-md) 0 0;
+}
+
+.vas-cil-catalog__hint {
+    padding: 0.55em 0.75em;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-catalog-popover__item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    border: none;
+    background: transparent;
+    text-align: left;
+    padding: 0.4em 0.625em;
+    border-bottom: 0.0625em solid var(--cil-divider-soft);
+    cursor: pointer;
+}
+
+    .vas-cil-catalog-popover__item:last-child {
+        border-bottom: none;
+    }
+
+    .vas-cil-catalog-popover__item:hover {
+        background: #f1f8ff;
+    }
+
+    .vas-cil-catalog-popover__item.is-highlighted {
+        background: var(--cil-blue-soft);
+    }
+
+.vas-cil-catalog-popover__name {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    font-size: 0.8125em;
+    color: var(--cil-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---------- badges ---------- */
+.vas-cil-badge {
+    display: inline-block;
+    border-radius: var(--cil-r-pill);
+    padding: 0.125em 0.5em;
+    font-weight: 600;
+    font-size: 0.625em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.vas-cil-badge--product {
+    background: var(--cil-blue-soft);
+    color: var(--cil-link-deep);
+}
+
+.vas-cil-badge--charge {
+    background: var(--cil-purple-bg);
+    color: var(--cil-purple);
+}
+
+.vas-cil-badge--danger {
+    background: var(--cil-danger-bg);
+    color: var(--cil-danger-text);
+}
+
+/* ---------- more popover ---------- */
+.vas-cil-more-btn {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--cil-r-sm);
+    color: var(--cil-text-muted);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+
+    .vas-cil-more-btn:hover {
+        background: #f1f8ff;
+        color: var(--cil-action-blue);
+    }
+
+    .vas-cil-more-btn.is-open {
+        background: var(--cil-blue-soft);
+        color: var(--cil-action-blue);
+    }
+    /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
+    .vas-cil-more-btn:disabled {
+        cursor: not-allowed !important;
+        color: var(--cil-text-disabled);
+    }
+
+        .vas-cil-more-btn:disabled:hover {
+            background: transparent;
+            color: var(--cil-text-disabled);
+        }
+/* Row Undo: only shown on a saved row with unsaved edits; reverts to last snapshot.
+   Amber to read as "discard pending change" against the unsaved-row tint. */
+.vas-cil-undo-btn {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--cil-r-sm);
+    color: var(--cil-warning);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+
+    .vas-cil-undo-btn:hover {
+        background: var(--cil-surface-amber);
+        color: var(--cil-danger-text);
+    }
+
+.vas-cil-more-popover {
+    position: absolute;
+    right: 0;
+    bottom: 100%;
+    margin-bottom: 0.375em;
+    z-index: 40;
+    width: 16.25em;
+    background: var(--cil-surface);
+    border: 0.0625em solid var(--cil-divider-strong);
+    border-radius: var(--cil-r-lg);
+    box-shadow: 0 -1.125em 2.25em rgba(15, 61, 97, 0.18);
+    overflow: hidden;
+}
+
+.vas-cil-more-popover__head {
+    padding: 0.5em 0.75em;
+    border-bottom: 0.0625em solid var(--cil-divider);
+}
+
+    .vas-cil-more-popover__head .vas-cil-label {
+        font-size: 0.75em;
+        color: var(--cil-text-muted);
+    }
+
+.vas-cil-more-popover__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+    padding: 0.625em 0.75em;
+}
+
+.vas-cil-more-popover__foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+    border-top: 0.0625em solid var(--cil-divider);
+}
+
+/* ---------- canonical underline form field ---------- */
+.vas-cil-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+}
+
+.vas-cil-field--full {
+    grid-column: 1 / -1;
+}
+/* Additional-Info modal: 2-column grid of FRAMEWORK fields (input-group vis-input-wrap).
+   The framework's vis-input-wrap CSS renders each field borderless (leading icon +
+   floating label + value + trailing button); we only lay them out 2-up + prevent
+   horizontal overflow - no control styling of our own. */
+/* Fixed body height so the modal does NOT resize between the loading spinner, the
+   loaded fields, and conditional show/hide of fields - content scrolls inside instead. */
+.vas-cil-more-body {
+    height: min(28em, 72vh);
+}
+
+.vas-cil-more-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25em 2em;
+    padding: 1em 1.25em;
+    align-items: start;
+}
+
+    .vas-cil-more-grid > .input-group,
+    .vas-cil-more-grid > .vis-control-wrap {
+        min-width: 0;
+    }
+
+    .vas-cil-more-grid > .input-group {
+        flex-wrap: nowrap;
+    }
+
+/* A curated "..." field hidden by its AD_Field.DisplayLogic. The field is still BUILT
+   (control + lookup preserved) and only toggled off, so it drops out of the grid layout
+   without being re-created when the logic flips back to visible. */
+.vas-cil-dyn-hidden {
+    display: none !important;
+}
+/* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
+.vas-cil-fk-popover {
+    min-width: 0;
+    left: 0;
+    right: 0;
+}
+/* AD_Field image: prepended INSIDE .vis-input-wrap as the framework-native
+   input-group-prepend (see buildDynField), so it's styled by the global .input-group-text
+   CSS - no custom image rule needed here.
+
+   Single-window edit-view look ported from the framework's .vis-ad-w-p-vc-editview rules
+   to our .vas-cil-dialog (we don't carry that class). Scoped to .vis-input-wrap
+   .vis-control-wrap so ONLY framework dictionary controls go borderless - our own scan /
+   search / attribute inputs keep their borders. */
+.vas-cil-dialog .vis-input-wrap .vis-control-wrap input:not([type=button]):not([type="checkbox"]):not([type="radio"]), .vas-cil-dialog .vis-input-wrap .vis-control-wrap select, .vas-cil-dialog .vis-input-wrap .vis-control-wrap textarea {
+    border: 0px solid rgba(var(--v-c-on-secondary), .2);
+    border-radius: 0;
+    color: rgba(var(--v-c-on-common), 1);
+    background-color: transparent;
+    transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
+.vas-cil-dialog .vis-input-wrap {
+    position: relative;
+    flex-wrap: nowrap;
+    border-bottom: 1px solid #d2d2d2;
+}
+
+    .vas-cil-dialog .vis-input-wrap .vis-ev-ctrlinfowrap {
+        display: none !important;
+    }
+
+    .vas-cil-dialog .vis-input-wrap:hover, .vas-cil-dialog .vis-input-wrap.focus, .vas-cil-dialog .vis-input-wrap.vis-ev-col-error, .vas-cil-dialog .vis-input-wrap:has(:focus) {
+        border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    }
+
+    .vas-cil-dialog .vis-input-wrap.vis-ev-col-error {
+        border-bottom: 1px solid #F5A0AD !important;
+    }
+
+    .vas-cil-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox):hover, .vas-cil-dialog .vis-input-wrap:has(label:first-child), .vas-cil-dialog .vis-input-wrap:has(label:first-child):hover, .vas-cil-dialog .vis-input-wrap:has(.vis-ec-col-lblchkbox), .vas-cil-dialog .vis-input-wrap:has(.vis-progressCtrlWrap) {
+        border-bottom: 1px solid transparent !important;
+    }
+
+    .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-handshake-o, .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-readonly) .input-group-text .fa-caret-down {
+        color: rgba(var(--v-c-on-secondary), .9);
+    }
+
+    .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
+        border-bottom: 1px solid #f3f3f3 !important;
+    }
+
+    .vas-cil-dialog .vis-input-wrap:has(input:focus), .vas-cil-dialog .vis-input-wrap:has(select:focus), .vas-cil-dialog .vis-input-wrap:has(textarea:focus) {
+        border-bottom: 1px solid rgba(var(--v-c-primary), 1);
+    }
+
+    .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-wrap-button) {
+        border-bottom: 1px solid transparent;
+    }
+
+    .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-mandatory) .vis-ev-col-msign {
+        display: none;
+    }
+
+    .vas-cil-dialog .vis-input-wrap.focus {
+        border-color: rgba(var(--v-c-primary), 1);
+    }
+
+    .vas-cil-dialog .vis-input-wrap .input-group-append {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .vas-cil-dialog .vis-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0
+    }
+
+    .vas-cil-dialog .vis-input-wrap:hover input[type="date"]::-webkit-calendar-picker-indicator, .vas-cil-dialog .vis-input-wrap.focus input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 1
+    }
+
+    .vas-cil-dialog .vis-input-wrap select {
+        background-image: none;
+    }
+
+    .vas-cil-dialog .vis-input-wrap:hover select, .vas-cil-dialog .vis-input-wrap.focus select {
+        background-image: linear-gradient(45deg, transparent 50%, rgba(var(--v-c-primary),1) 50%), linear-gradient(135deg, rgba(var(--v-c-primary),1) 50%, transparent 50%);
+    }
+
+    .vas-cil-dialog .vis-input-wrap:hover .input-group-append, .vas-cil-dialog .vis-input-wrap.focus .input-group-append, .vas-cil-dialog .vis-input-wrap:has(:focus) .input-group-append {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    /* Search-reference lookup button (getBtn(0) = button.input-group-text): no
+       border/outline/box-shadow in any state - the focus/hover cue is the field's own
+       underline, not a box on the button. !important + the :focus-within ancestor case
+       are needed to beat the framework's VIS.all.min.css rules
+       (.input-group:focus-within .input-group-append .input-group-text {border:primary}
+       and .vis-input-wrap .input-group-text:focus {border-left-color:...!important}). */
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:hover,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:focus,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:active,
+    .vas-cil-dialog .vis-input-wrap .input-group-append .input-group-text:focus-visible,
+    .vas-cil-dialog .input-group:focus-within .input-group-append .input-group-text {
+        border: 0 !important;
+        outline: 0 !important;
+        box-shadow: none !important;
+    }
+
+.vas-cil-dialog .input-group-prepend .input-group-text i {
+    color: rgba(var(--v-c-on-secondary),.7);
+    cursor: default;
+}
+
+/* (1) The prepended icon must NOT be a bordered box - its border/background drew a
+   second line over the field underline. Strip them so only the .vis-input-wrap
+   underline shows and the icon sits inline. */
+.vas-cil-dialog .vis-input-wrap .input-group-prepend .input-group-text {
+    border: 0;
+    background: none;
+}
+
+.vas-cil-dialog .vis-input-wrap .input-group-prepend .input-group-text {
+    background-color: transparent;
+    border: 1px solid #f0f0f0 !important;
+    border-radius: 0;
+    position: relative;
+    top: -8px;
+}
+
+.vas-cil-dialog .input-group-text i {
+    color: rgba(var(--v-c-primary),1);
+}
+
+.vas-cil-dialog .vis-input-wrap .input-group-text {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 0;
+    box-shadow: none
+}
+
+/* (3) "..." modal only: float the field label a touch higher (top: -11px). */
+.vas-cil-more-body .vis-input-wrap input:focus ~ label, .vas-cil-more-body .vis-input-wrap input:not(:placeholder-shown) ~ label, .vas-cil-more-body .vis-input-wrap textarea:not(:placeholder-shown) ~ label, .vas-cil-more-body .vis-input-wrap select:focus ~ label, .vas-cil-more-body .vis-input-wrap textarea:focus ~ label, .vas-cil-more-body .vis-input-wrap select ~ label {
+    top: -11px;
+}
+/* "..." modal only: the checkbox's own caption (the static first-child label, not a
+   floating label) stays at top: 0 so it sits inline with the checkbox. */
+.vas-cil-more-body .vis-control-wrap > label:first-child {
+    top: 0;
+}
+/* Keep the control borderless even on focus. The framework adds a 1px border (with
+   !important) to a focused input/select/textarea, which showed as a stray border on
+   click; here the focus cue is the .vis-input-wrap underline turning primary, so suppress
+   the per-control border. The .vis-ev-col variants out-specify the framework's !important
+   focus rule (.vis-ev-col .vis-input-wrap .vis-control-wrap input:focus). */
+.vas-cil-dialog .vis-input-wrap .vis-control-wrap input:focus,
+.vas-cil-dialog .vis-input-wrap .vis-control-wrap select:focus,
+.vas-cil-dialog .vis-input-wrap .vis-control-wrap textarea:focus,
+.vas-cil-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap input:focus,
+.vas-cil-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap select:focus,
+.vas-cil-dialog .vis-ev-col .vis-input-wrap .vis-control-wrap textarea:focus {
+    border: 0 !important;
+}
+
+
+.vas-cil-field__label {
+    font-size: 0.6875em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cil-text-muted);
+}
+
+    .vas-cil-field__label em {
+        font-style: normal;
+        color: var(--cil-danger);
+    }
+
+.vas-cil-field__input, .vas-cil-field__textarea {
+    display: block;
+    width: 100%;
+    border: none;
+    border-bottom: 0.0625em solid var(--cil-border-field);
+    background: transparent;
+    padding: 0.375em 0;
+    font-family: inherit;
+    font-size: 0.8125em;
+    color: var(--cil-text);
+    outline: none;
+    transition: border-color .12s;
+}
+
+    .vas-cil-field__input:hover, .vas-cil-field__textarea:hover, .vas-cil-field__input:focus, .vas-cil-field__textarea:focus {
+        border-bottom-color: var(--cil-action-blue);
+    }
+
+    .vas-cil-field__input::placeholder, .vas-cil-field__textarea::placeholder {
+        color: var(--cil-text-faint);
+    }
+
+.vas-cil-field__textarea {
+    resize: vertical;
+    min-height: 3.75em;
+}
+
+/* Attribute create form: reuses the framework vis-input-wrap fields (2-up via
+   .vas-cil-more-grid). Mandatory marker + the Lot/SerNo trailing utility action. */
+.vas-cil-req {
+    font-style: normal;
+    color: var(--cil-danger);
+}
+
+.vas-cil-attr-fieldbtn {
+    border: 0.0625em solid var(--cil-action-blue);
+    background: var(--cil-surface);
+    padding: 0.4em 0.85em;
+    border-radius: var(--cil-r-sm);
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: var(--cil-action-blue);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+    .vas-cil-attr-fieldbtn:hover {
+        background: var(--cil-blue-soft);
+    }
+/* Create-mode footer: keep a gap between Cancel and the primary action. */
+#vasCilAttrCreateFoot {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* ---------- search + scan inputs ---------- */
+.vas-cil-search-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    border: 0.0625em solid var(--cil-border-default);
+    background: var(--cil-surface);
+    border-radius: var(--cil-r-lg);
+    padding: 0.4375em 0.625em;
+    margin-top: 0.75em;
+    transition: border-color .12s;
+}
+
+    .vas-cil-search-input:focus-within {
+        border-color: var(--cil-action-blue);
+    }
+
+    .vas-cil-search-input .vas-cil-icon {
+        color: var(--cil-text-muted);
+        flex-shrink: 0;
+    }
+
+    .vas-cil-search-input input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: 0.8125em;
+        color: var(--cil-text);
+    }
+
+/* Attribute instance-list controls: search (left, grows) + "Show All" toggle (right)
+   share one row. */
+.vas-cil-attr-listctrls {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    margin-top: 0.75em;
+}
+
+    /* The search box provides its own top margin when standalone; inside the row the
+       wrapper owns the spacing, so zero it out and let the box take the free width. */
+    .vas-cil-attr-listctrls .vas-cil-search-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        margin-top: 0;
+    }
+
+/* "Show All (include zero and (-ve) qty)" toggle, pinned to the right of the row. */
+.vas-cil-attr-showall {
+    display: flex;
+    align-items: center;
+    gap: 0.4375em;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+
+    .vas-cil-attr-showall input {
+        cursor: pointer;
+        accent-color: var(--cil-action-blue);
+    }
+
+.vas-cil-scan-input {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    border: 0.125em solid var(--cil-action-blue);
+    background: #f7fbff;
+    border-radius: var(--cil-r-lg);
+    padding: 0.5em 0.75em;
+    margin-top: 0.75em;
+}
+
+    .vas-cil-scan-input:focus-within {
+        background: var(--cil-surface);
+    }
+
+.vas-cil-scan-input__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375em;
+    height: 1.375em;
+    border: none;
+    background: transparent;
+    border-radius: var(--cil-r-sm);
+    color: var(--cil-action-blue);
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+    .vas-cil-scan-input__icon:hover {
+        background: var(--cil-blue-soft);
+    }
+
+.vas-cil-scan-input input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 0.875em;
+    color: var(--cil-text);
+}
+
+/* ---------- dialog ---------- */
+.vas-cil-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 27, 45, 0.42);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1em;
+    z-index: 99;
+    font-family: var(--cil-font);
+    font-size: 0.9em;
+    color: var(--cil-text);
+}
+
+    .vas-cil-dialog-backdrop * {
+        box-sizing: border-box;
+    }
+/* The Additional-Info modal sits BELOW the framework window layer so a Search field's
+   lookup/info window (opened by its button) appears ON TOP, not behind the modal.
+   (It only needs to be above the invoice panel.) */
+#vasCilMore.vas-cil-dialog-backdrop {
+    z-index: 99;
+}
+
+.vas-cil-dialog {
+    background: var(--cil-surface);
+    border-radius: 0.875em;
+    box-shadow: var(--cil-shadow-dialog);
+    width: 45em;
+    max-width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-cil-dialog--wide {
+    width: 56em;
+    height: 30em;
+}
+
+.vas-cil-dialog__header {
+    padding: 0.875em 1.25em 0.75em;
+    border-bottom: 0.0625em solid var(--cil-divider);
+}
+
+.vas-cil-dialog__header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+.vas-cil-dialog__title-block {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+/* Header close (✕) - dismisses the whole attribute picker (create/edit mode). */
+.vas-cil-dialog__close {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75em;
+    height: 1.75em;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--cil-text-muted);
+    font-size: 1em;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color .12s, color .12s;
+}
+
+    .vas-cil-dialog__close:hover {
+        background: var(--cil-divider);
+        color: var(--cil-text);
+    }
+
+.vas-cil-dialog__title {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--cil-text);
+}
+
+.vas-cil-dialog__hint {
+    margin: 0;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-dialog__sub {
+    margin: 0.25em 0 0;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-dialog__type {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 0.375em;
+}
+
+.vas-cil-dialog__primary-name {
+    margin: 0;
+    font-size: 0.8125em;
+    font-weight: 600;
+    color: var(--cil-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-dialog__error {
+    margin: 0.5em 0 0;
+    font-size: 0.75em;
+    color: var(--cil-danger);
+}
+
+.vas-cil-dialog__body {
+    flex: 1;
+    overflow-y: auto;
+    margin-top: 1em;
+}
+
+.vas-cil-dialog__body--fixed {
+    display: flex;
+    flex-direction: column;
+    height: 22.5em;
+}
+
+.vas-cil-dialog__body--loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 8em;
+}
+
+.vas-cil-dialog-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+}
+
+.vas-cil-dialog-spin {
+    display: inline-block;
+    width: 2em;
+    height: 2em;
+    border: 0.2em solid var(--cil-border-default);
+    border-top-color: var(--cil-action-blue);
+    border-radius: 50%;
+    animation: vasCilSpin 0.7s linear infinite;
+}
+
+.vas-cil-dialog__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.75em 1.25em;
+    border-top: 0.0625em solid var(--cil-divider);
+}
+
+.vas-cil-dialog__footer--end {
+    justify-content: flex-end;
+}
+
+.vas-cil-dialog__summary {
+    margin: 0;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-dialog__actions {
+    display: flex;
+    gap: 0.5em;
+}
+
+/* ---------- scan dialog body ---------- */
+.vas-cil-scan-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1.25em;
+    text-align: center;
+}
+
+.vas-cil-scan-empty__badge {
+    width: 3.5em;
+    height: 3.5em;
+    border-radius: 50%;
+    background: var(--cil-blue-soft);
+    color: var(--cil-action-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-cil-scan-empty__title {
+    margin: 0.875em 0 0;
+    font-size: 0.875em;
+    font-weight: 600;
+    color: var(--cil-text);
+}
+
+.vas-cil-scan-empty__hint {
+    margin: 0.25em 0 0;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-scan-grid {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-cil-scan-grid__head, .vas-cil-scan-grid__row {
+    display: grid;
+    grid-template-columns: minmax(6.75em, auto) minmax(8.75em, 1.4fr) minmax(6em, auto) minmax(6em, auto) 1.75em;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0.5em 1.25em;
+}
+
+.vas-cil-scan-grid__head {
+    flex-shrink: 0;
+    background: var(--cil-surface-muted);
+    border-bottom: 0.0625em solid var(--cil-divider-strong);
+    font-size: 0.625em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-scan-grid__body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.vas-cil-scan-grid__row {
+    padding-top: 0.625em;
+    padding-bottom: 0.625em;
+    border-bottom: 0.0625em solid var(--cil-divider-soft);
+}
+
+    .vas-cil-scan-grid__row.is-unknown {
+        background: #fff7f7;
+    }
+
+.vas-cil-scan-grid__code {
+    font-weight: 600;
+    font-size: 0.8125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-scan-grid__name {
+    font-size: 0.8125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-qty-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.25em;
+}
+
+    .vas-cil-qty-stepper button {
+        width: 1.5em;
+        height: 1.5em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0.0625em solid var(--cil-border-default);
+        background: var(--cil-surface);
+        border-radius: var(--cil-r-sm);
+        color: var(--cil-text-secondary);
+        font-size: 0.875em;
+        cursor: pointer;
+    }
+
+        .vas-cil-qty-stepper button:hover {
+            background: #f7fbff;
+        }
+
+        .vas-cil-qty-stepper button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    .vas-cil-qty-stepper input {
+        width: 2.5em;
+        height: 1.5em;
+        text-align: center;
+        border: 0.0625em solid var(--cil-border-default);
+        border-radius: var(--cil-r-sm);
+        background: var(--cil-surface);
+        font-family: inherit;
+        font-weight: 600;
+        font-size: 0.75em;
+        color: var(--cil-text);
+        outline: none;
+    }
+
+        .vas-cil-qty-stepper input:focus {
+            border-color: var(--cil-action-blue);
+        }
+
+.vas-cil-icon-btn--danger {
+    width: 1.5em;
+    height: 1.5em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: var(--cil-r-sm);
+    color: var(--cil-danger-text);
+    cursor: pointer;
+}
+
+    .vas-cil-icon-btn--danger:hover {
+        background: #fbe6e6;
+    }
+
+/* ---------- attribute dialog ---------- */
+/* Header and each row are SEPARATE grid containers, so the column tracks must be
+   content-INDEPENDENT (fixed em / minmax(0,fr)) or they'd size per-container and the
+   header would not line up with the data. No `auto` upper bounds here. */
+/* The grid is a flex column that fills the fixed-height dialog body, so only the
+   rows (__body) scroll while the column header (__head, flex-shrink:0) stays pinned.
+   min-height:0 lets this flex item shrink below its content and hand the overflow to
+   __body; without it the whole list grows and the outer body scrolls the header away. */
+#vasCilAttrList {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.vas-cil-attr-grid__head, .vas-cil-attr-grid__row {
+    display: grid;
+    grid-template-columns: 1.25em 6.5em minmax(0, 2fr) 7em minmax(0, 1.3fr) 5.5em;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0.625em 1.25em;
+}
+/* IMPORTANT: do NOT set font-size on the head CONTAINER - the em column tracks resolve
+   against the container's font-size, so a smaller head font would make the header tracks
+   narrower than the rows' and they'd drift out of alignment. Keep the container font
+   equal to the rows (inherited) and shrink only the header TEXT via the cells. */
+.vas-cil-attr-grid__head {
+    flex-shrink: 0;
+    background: var(--cil-surface-muted);
+    border-bottom: 0.0625em solid var(--cil-divider-strong);
+    color: var(--cil-text-muted);
+}
+
+    .vas-cil-attr-grid__head > div {
+        font-size: 0.625em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+        .vas-cil-attr-grid__head > div.vas-cil-attr-h-right {
+            text-align: right;
+        }
+
+.vas-cil-attr-grid__body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.vas-cil-attr-grid__row {
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    border-bottom: 0.0625em solid var(--cil-divider-soft);
+    transition: background .12s;
+}
+
+    .vas-cil-attr-grid__row:hover {
+        background: #f7fbff;
+    }
+
+    .vas-cil-attr-grid__row.is-selected {
+        background: var(--cil-blue-soft);
+    }
+
+.vas-cil-attr-radio {
+    width: 1em;
+    height: 1em;
+    border-radius: 50%;
+    border: 0.125em solid var(--cil-divider-strong);
+    background: var(--cil-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-cil-attr-grid__row.is-selected .vas-cil-attr-radio {
+    border-color: var(--cil-action-blue);
+}
+
+.vas-cil-attr-radio__dot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: var(--cil-action-blue);
+}
+
+.vas-cil-attr-code {
+    font-weight: 600;
+    font-size: 0.8125em;
+    color: var(--cil-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-attr-label {
+    font-size: 0.8125em;
+    color: var(--cil-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-attr-spec {
+    font-size: 0.75em;
+    color: var(--cil-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-attr-delta {
+    font-weight: 600;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-cil-attr-avail {
+    font-size: 0.75em;
+    color: var(--cil-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: right;
+}
+/* Role-gated Edit column (added only when #vasCilAttrList has --editable). */
+#vasCilAttrList.vas-cil-attr-grid--editable .vas-cil-attr-grid__head,
+#vasCilAttrList.vas-cil-attr-grid--editable .vas-cil-attr-grid__row {
+    grid-template-columns: 1.25em 6.5em minmax(0, 2fr) 7em minmax(0, 1.3fr) 5.5em 2.5em;
+}
+
+.vas-cil-attr-edit {
+    display: flex;
+    justify-content: center;
+}
+
+.vas-cil-attr-editbtn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--cil-action-blue);
+    padding: 0.25em;
+    line-height: 1;
+    font-size: 0.875em;
+    border-radius: 0.25em;
+}
+
+    .vas-cil-attr-editbtn:hover {
+        background: var(--cil-blue-soft);
+    }
+/* List footer: pager on the left, OK on the right. */
+#vasCilAttrListFoot, #vasCilAttrCreateFoot {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.75em;
+}
+
+    /* Save/validation error: left side, red, fills the middle so the Cancel + OK /
+       Cancel + Add attribute buttons stay grouped together on the right (aligned). */
+    #vasCilAttrListFoot .vas-cil-foot-error,
+    #vasCilAttrCreateFoot .vas-cil-foot-error {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 0.75em;
+        line-height: 1.3;
+        color: var(--cil-danger);
+        text-align: left;
+        overflow-wrap: anywhere;
+    }
+
+    #vasCilAttrListFoot .vas-cil-dialog__actions,
+    #vasCilAttrCreateFoot .vas-cil-dialog__actions {
+        flex: 0 0 auto;
+    }
+
+.vas-cil-attr-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-cil-attr-pageinfo {
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-attr-pagebtn {
+    border: 0.0625em solid var(--cil-border-default);
+    background: var(--cil-surface);
+    color: var(--cil-text);
+    cursor: pointer;
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 0.375em;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .vas-cil-attr-pagebtn:hover:not(:disabled) {
+        border-color: var(--cil-action-blue);
+        color: var(--cil-action-blue);
+    }
+
+    .vas-cil-attr-pagebtn:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+/* Server-side line pager (20/page) below the lines table:
+   "Showing X-Y of N" on the left, "‹ P of Q ›" nav on the right. */
+.vas-cil-linepager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+}
+
+.vas-cil-linepager__showing {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-linepager__nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-cil-linepager__info {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-empty-message {
+    padding: 1.25em;
+    text-align: center;
+    font-size: 0.75em;
+    color: var(--cil-text-muted);
+}
+
+.vas-cil-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 0.75em;
+    row-gap: 0.75em;
+    padding: 1em 1.25em;
+}
+
+.vas-cil-form-error {
+    margin: 0 1.25em 0.75em;
+    font-size: 0.75em;
+    color: var(--cil-danger);
+}
+
+/* ---------- toast ---------- */
+.vas-cil-toast {
+    position: fixed;
+    bottom: 2em;
+    left: 50%;
+    transform: translateX(-50%) translateY(1em);
+    background: var(--cil-text);
+    color: #fff;
+    padding: 0.7em 1.2em;
+    border-radius: var(--cil-r-sm);
+    font-family: var(--cil-font);
+    font-size: 0.8em;
+    box-shadow: var(--cil-shadow-pop);
+    opacity: 0;
+    transition: opacity .25s, transform .25s;
+    z-index: 10002;
+}
+
+.vas-cil-toast--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 60em) {
+    .vas-cil-row {
+        grid-template-columns: 1.75em minmax(0, 1.6fr) 7em 6em 6em 3.5em;
+    }
+
+    .vas-cil-row--head .vas-cil-cell:nth-child(3), .vas-cil-row--line .vas-cil-cell:nth-child(3),
+    .vas-cil-row--head .vas-cil-cell:nth-child(6), .vas-cil-row--line .vas-cil-cell:nth-child(6) {
+        display: none;
+    }
+}
