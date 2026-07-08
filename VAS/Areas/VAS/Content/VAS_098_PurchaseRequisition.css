@@ -1,0 +1,228 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Purchase Requisition overview tab panel
+ *               (VAS.VAS_098_PurchaseRequisition). All classes are
+ *               MPC-prefixed (MPC-vasrq-*) and scoped under the panel root
+ *               to avoid global collisions. Ports the attached
+ *               requisition-window reference design (glass/white surfaces,
+ *               soft blue borders, chips with leading dots, stat cards with
+ *               accent rails, pastel stepper, tabbed Items/Activity/Notes).
+ * Chronological development:
+ *   VAI163   2026-07-01  Created.
+ ***********************************************************/
+
+.MPC-vasrq-root {
+    /* Palette (from the reference design) */
+    --rq-primary:#0083DA; --rq-action:#1F83FF; --rq-link:#106AB0;
+    --rq-faint-blue:#EEF6FF; --rq-divider:#EDF2F6; --rq-border:#E4EDF4;
+    --rq-text:#102C3F; --rq-text-2:#5F7283; --rq-text-muted:#748494;
+    --rq-success-bg:#CCEFDD; --rq-success-tx:#0C5D38;
+    --rq-sent-bg:#D9ECFF; --rq-sent-tx:#0E5DA8;
+    --rq-draft-bg:#E1E1E1; --rq-draft-tx:#505050;
+    --rq-warn-bg:#FCEFD2; --rq-warn-tx:#9A6500;
+    --rq-danger-bg:#FAD7D7; --rq-danger-tx:#8F2D2D; --rq-danger:#ED1C24;
+    --rq-widget-shadow:0 10px 24px rgba(15,61,97,0.06);
+    --rq-glass-grad:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.72));
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--rq-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    box-sizing: border-box;
+}
+.MPC-vasrq-root * { box-sizing: border-box; }
+
+.MPC-vasrq-body { padding: 16px 20px 18px; display: flex; flex-direction: column; }
+
+.MPC-vasrq-empty { padding: 40px 18px; text-align: center; color: var(--rq-text-muted); font-size: 14px; }
+.MPC-vasrq-na { color: var(--rq-text-muted); }
+
+/* ---------- Tags / pills ---------- */
+.MPC-vasrq-tag { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:4px 9px;
+    font-size:11px; font-weight:700; line-height:1; white-space:nowrap }
+.MPC-vasrq-tag .MPC-vasrq-dot { width:6px; height:6px; border-radius:50% }
+.MPC-vasrq-tag.sent{background:var(--rq-sent-bg);color:var(--rq-sent-tx)} .MPC-vasrq-tag.sent .MPC-vasrq-dot{background:var(--rq-sent-tx)}
+.MPC-vasrq-tag.approved{background:var(--rq-success-bg);color:var(--rq-success-tx)} .MPC-vasrq-tag.approved .MPC-vasrq-dot{background:var(--rq-success-tx)}
+.MPC-vasrq-tag.draft{background:var(--rq-draft-bg);color:var(--rq-draft-tx)} .MPC-vasrq-tag.draft .MPC-vasrq-dot{background:var(--rq-draft-tx)}
+.MPC-vasrq-tag.partial{background:var(--rq-warn-bg);color:var(--rq-warn-tx)} .MPC-vasrq-tag.partial .MPC-vasrq-dot{background:var(--rq-warn-tx)}
+.MPC-vasrq-tag.cancelled{background:var(--rq-danger-bg);color:var(--rq-danger-tx)} .MPC-vasrq-tag.cancelled .MPC-vasrq-dot{background:var(--rq-danger-tx)}
+.MPC-vasrq-tag.mwo{background:#EFEAFF;color:#5F4AA6} .MPC-vasrq-tag.mwo .MPC-vasrq-dot{background:#5F4AA6}
+
+.MPC-vasrq-ic { display:inline-flex; align-items:center; flex:none }
+.MPC-vasrq-ic svg { display:block }
+
+/* ---------- Priority pill ---------- */
+.MPC-vasrq-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
+.MPC-vasrq-prio.high{background:#FCE3D2;color:#A8430F}
+.MPC-vasrq-prio.med{background:#E4F0FF;color:#0E5DA8}
+.MPC-vasrq-prio.low{background:#E9EDF1;color:#5A6B79}
+
+/* ---------- Header — title strip ---------- */
+/* Soft-gradient banner carrying the title + subtitle and the priority / type /
+   status pills, per the attached reference. The banner tint is driven by
+   requisition progress (tone-* set in JS by headerTone()). */
+.MPC-vasrq-hdr { border-radius:14px; padding:14px 16px;
+    background:linear-gradient(100deg,#EFF2F5 0%,#F3F5F8 50%,#F6F8FA 100%) }
+.MPC-vasrq-hdr.tone-done      { background:linear-gradient(100deg,#ECF6EC 0%,#F4F7E3 50%,#FCF2DB 100%) }
+.MPC-vasrq-hdr.tone-sent      { background:linear-gradient(100deg,#E8F3FF 0%,#EEF6FF 50%,#F2F0FF 100%) }
+.MPC-vasrq-hdr.tone-progress  { background:linear-gradient(100deg,#FFF6E6 0%,#FFF3DC 50%,#FFEFD0 100%) }
+.MPC-vasrq-hdr.tone-draft     { background:linear-gradient(100deg,#EFF2F5 0%,#F3F5F8 50%,#F6F8FA 100%) }
+.MPC-vasrq-hdr.tone-cancelled { background:linear-gradient(100deg,#FDECEC 0%,#FCEFEF 50%,#FBF1F1 100%) }
+.MPC-vasrq-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
+.MPC-vasrq-hdrTitleWrap { min-width:0 }
+.MPC-vasrq-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.15 }
+.MPC-vasrq-hdrSub { font-size:12px; color:var(--rq-text-2); margin-top:4px }
+.MPC-vasrq-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
+
+/* ---------- Header — details card (Source Warehouse | fields) ---------- */
+.MPC-vasrq-hdrCard { display:grid; grid-template-columns:1fr 1fr; gap:14px 28px;
+    border:1px solid var(--rq-border); border-radius:14px; background:#fff;
+    padding:14px 16px; box-shadow:var(--rq-widget-shadow); margin:10px 0 12px }
+.MPC-vasrq-hdrColL { min-width:0 }
+.MPC-vasrq-hdrColR { min-width:0; display:flex; flex-direction:column; gap:10px }
+.MPC-vasrq-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
+.MPC-vasrq-fVal { font-size:13px; font-weight:600; color:var(--rq-text); line-height:1.35; margin-top:2px }
+.MPC-vasrq-srcName { font-size:16px; font-weight:700; color:var(--rq-text); margin-top:3px }
+.MPC-vasrq-srcRoute { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--rq-text-2); margin-top:5px }
+.MPC-vasrq-srcRoute .MPC-vasrq-ic { color:var(--rq-primary) }
+.MPC-vasrq-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:9px }
+.MPC-vasrq-personBit { display:inline-flex; align-items:center; gap:7px }
+.MPC-vasrq-personBit .MPC-vasrq-ic { color:var(--rq-primary) }
+.MPC-vasrq-hdrField { min-width:0 }
+
+/* ---------- Convert strip ---------- */
+.MPC-vasrq-convert { display:flex; align-items:center; justify-content:space-between; gap:14px;
+    background:linear-gradient(180deg,rgba(230,243,252,0.55),rgba(245,250,253,0.7));
+    border:1px solid var(--rq-border); border-radius:12px; padding:10px 14px; margin-bottom:13px }
+.MPC-vasrq-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px }
+.MPC-vasrq-cvnote .MPC-vasrq-ok { color:var(--rq-success-tx); display:flex }
+.MPC-vasrq-cvactions { display:flex; gap:9px; flex:none; flex-wrap:wrap }
+.MPC-vasrq-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
+    cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap }
+.MPC-vasrq-btn.primary { background:var(--rq-action); color:#fff; border:none }
+.MPC-vasrq-btn.primary:hover:not(:disabled) { background:#0069AE }
+.MPC-vasrq-btn.secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
+.MPC-vasrq-btn.secondary:hover:not(:disabled) { background:var(--rq-faint-blue) }
+.MPC-vasrq-btn:disabled { opacity:.45; cursor:not-allowed }
+
+/* ---------- Stat strip ---------- */
+.MPC-vasrq-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px }
+.MPC-vasrq-stat { position:relative; background:rgba(255,255,255,0.85); border:1px solid var(--rq-border);
+    border-radius:11px; padding:10px 13px 10px 15px; overflow:hidden; min-width:0 }
+.MPC-vasrq-stat::before { content:''; position:absolute; left:0; top:0; bottom:0; width:4px }
+.MPC-vasrq-stat.a-blue::before { background:var(--rq-action) }
+.MPC-vasrq-stat.a-violet::before { background:#8B7CFF }
+.MPC-vasrq-stat.a-green::before { background:#20A464 }
+.MPC-vasrq-stat.a-amber::before { background:#D78B10 }
+.MPC-vasrq-stat.breach { background:linear-gradient(180deg,#FFF1F0,#FFF9F9) }
+.MPC-vasrq-stat.breach::before { background:var(--rq-danger) }
+.MPC-vasrq-scap { font-size:10.5px; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted) }
+.MPC-vasrq-sval { font-size:19px; font-weight:700; color:var(--rq-text); margin-top:5px; line-height:1.1;
+    display:flex; align-items:center; gap:7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.MPC-vasrq-ssub { font-size:11.5px; color:var(--rq-text-2); margin-top:3px }
+.MPC-vasrq-ssub.breach { color:#A33F3F; font-weight:700 }
+.MPC-vasrq-breachic { color:var(--rq-danger); display:flex }
+
+/* ---------- Section head ---------- */
+.MPC-vasrq-sechead { display:flex; align-items:center; justify-content:space-between; margin:4px 0 8px }
+.MPC-vasrq-sechead h2 { font-size:15px; font-weight:700; color:var(--rq-text); margin:0 }
+.MPC-vasrq-secright { font-size:12.5px; color:var(--rq-text-2) }
+
+/* ---------- Stepper ---------- */
+.MPC-vasrq-stepper { display:flex; background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px;
+    padding:15px 12px 11px; box-shadow:var(--rq-widget-shadow); margin-bottom:14px }
+.MPC-vasrq-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:0 2px; --nb:#E7ECF1; --nf:#5A6B79; --ln:#E1EAF2 }
+.MPC-vasrq-step.c1{--nb:#E4E9EF;--nf:#5A6B79}
+.MPC-vasrq-step.c2{--nb:#D6F0E2;--nf:#0C5D38}
+.MPC-vasrq-step.c3{--nb:#D6EBFF;--nf:#0E5DA8}
+.MPC-vasrq-step.c4{--nb:#E8E1FF;--nf:#5F4AA6}
+.MPC-vasrq-step.c5{--nb:#FCE6C9;--nf:#9A6500}
+.MPC-vasrq-step.c6{--nb:#D4F1EC;--nf:#0B7A6B}
+.MPC-vasrq-step::before { content:''; position:absolute; top:11px; left:-50%; width:100%; height:3px; background:var(--ln); z-index:1 }
+.MPC-vasrq-step:first-child::before { display:none }
+.MPC-vasrq-step.done::before, .MPC-vasrq-step.active::before { background:#9ED1FF }
+.MPC-vasrq-node { width:24px; height:24px; border-radius:50%; z-index:2; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; background:var(--nb); color:var(--nf) }
+.MPC-vasrq-step.active .MPC-vasrq-node { border:2px solid var(--nf); box-shadow:0 0 0 4px rgba(15,61,97,0.06) }
+.MPC-vasrq-step.pending .MPC-vasrq-node { opacity:.8 }
+.MPC-vasrq-slabel { margin-top:9px; font-size:11.5px; font-weight:500; color:var(--rq-text-2); line-height:1.2 }
+.MPC-vasrq-step.done .MPC-vasrq-slabel, .MPC-vasrq-step.active .MPC-vasrq-slabel { color:var(--rq-text); font-weight:700 }
+.MPC-vasrq-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
+.MPC-vasrq-step.active .MPC-vasrq-ssub2 { color:var(--nf); font-weight:700 }
+
+/* ---------- Tabs ---------- */
+.MPC-vasrq-tabbar { display:flex; border-bottom:1px solid var(--rq-border); gap:0; flex-wrap:wrap }
+.MPC-vasrq-tab { display:flex; align-items:center; gap:8px; padding:12px 16px; cursor:pointer; background:none; border:none;
+    border-bottom:2px solid transparent; font-family:inherit; font-size:14px; letter-spacing:.25px; color:#141414 }
+.MPC-vasrq-tab .MPC-vasrq-tic { display:flex; color:#586575 }
+.MPC-vasrq-tab:hover { color:#0069AE } .MPC-vasrq-tab:hover .MPC-vasrq-tic { color:#0069AE }
+.MPC-vasrq-badge { height:20px; min-width:28px; padding:0 8px; border-radius:999px; background:var(--rq-primary); color:#fff;
+    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center }
+.MPC-vasrq-tab.active { border-bottom-color:#141414; font-weight:500 }
+.MPC-vasrq-tab.active .MPC-vasrq-tic { color:var(--rq-primary) }
+.MPC-vasrq-tabbody { padding-top:14px }
+.MPC-vasrq-tabpanel { display:none } .MPC-vasrq-tabpanel.show { display:block; animation:MPC-vasrq-fade .25s ease both }
+@keyframes MPC-vasrq-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+
+/* ---------- Items ---------- */
+.MPC-vasrq-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow:hidden; box-shadow:var(--rq-widget-shadow) }
+.MPC-vasrq-itrow { display:grid; grid-template-columns:2.2fr 1fr 0.6fr 1.2fr 1fr 1fr; align-items:center; padding:9px 14px; gap:10px }
+.MPC-vasrq-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
+.MPC-vasrq-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
+.MPC-vasrq-itbody:last-of-type { border-bottom:none }
+.MPC-vasrq-itbody:hover { background:#FAFCFE }
+.MPC-vasrq-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2 }
+.MPC-vasrq-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px }
+.MPC-vasrq-items .ta-r { text-align:right } .MPC-vasrq-items .ta-c { text-align:center }
+.MPC-vasrq-cat { display:inline-block; font-size:11px; padding:3px 8px; border-radius:6px; background:#EEF3F8; color:#5A6B79; font-weight:500 }
+.MPC-vasrq-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
+.MPC-vasrq-src .MPC-vasrq-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
+.MPC-vasrq-src .MPC-vasrq-bar i { display:block; height:100%; border-radius:99px }
+.MPC-vasrq-src.full i { background:var(--rq-success-tx) } .MPC-vasrq-src.short i { background:var(--rq-warn-tx) }
+.MPC-vasrq-src.full { color:var(--rq-success-tx); font-weight:500 } .MPC-vasrq-src.short { color:var(--rq-warn-tx); font-weight:500 }
+.MPC-vasrq-itfoot { display:flex; align-items:center; justify-content:flex-end; gap:22px; flex-wrap:wrap; padding:10px 16px;
+    background:var(--rq-faint-blue); border-top:1px solid var(--rq-border); font-size:13px }
+.MPC-vasrq-tf { color:var(--rq-text-2) } .MPC-vasrq-tf b { color:var(--rq-text); font-weight:600; margin-left:6px }
+.MPC-vasrq-grand { font-size:14px; color:var(--rq-text); font-weight:700 }
+.MPC-vasrq-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
+.MPC-vasrq-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
+
+/* ---------- Activity ---------- */
+.MPC-vasrq-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
+.MPC-vasrq-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
+.MPC-vasrq-actrow + .MPC-vasrq-actrow { border-top:1px solid var(--rq-divider) }
+.MPC-vasrq-actbadge { display:inline-flex; align-items:center; gap:5px; border-radius:8px; padding:4px 8px; font-size:10.5px; font-weight:700; flex:none }
+.MPC-vasrq-actbadge.create { background:#EEF3F8; color:#5A6B79 }
+.MPC-vasrq-actbadge.submit { background:#E8F2FC; color:#0E5DA8 }
+.MPC-vasrq-actbadge.status { background:#E4F5EC; color:#0C5D38 }
+.MPC-vasrq-actbadge.comment { background:#EFEAFF; color:#5F4AA6 }
+.MPC-vasrq-actbadge.link { background:#E0F2F1; color:#0B7A6B }
+.MPC-vasrq-actmain { flex:1; min-width:0 }
+.MPC-vasrq-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
+.MPC-vasrq-at { font-size:13.5px; color:var(--rq-text) }
+.MPC-vasrq-attime { font-size:11.5px; color:var(--rq-text-muted); white-space:nowrap }
+
+/* ---------- Notes ---------- */
+.MPC-vasrq-notescard { padding:16px 18px }
+.MPC-vasrq-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
+.MPC-vasrq-notesbody p { margin:0 } .MPC-vasrq-notesbody p + p { margin-top:9px }
+
+/* ---------- Reveal ---------- */
+.MPC-vasrq-hdr,.MPC-vasrq-hdrCard,.MPC-vasrq-convert,.MPC-vasrq-stats,.MPC-vasrq-stepper,.MPC-vasrq-tabbar { animation:MPC-vasrq-rise .4s ease both }
+@keyframes MPC-vasrq-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+    .MPC-vasrq-hdrCard { grid-template-columns:1fr }
+    .MPC-vasrq-stats { grid-template-columns:repeat(2,1fr) }
+    .MPC-vasrq-hdrTop { flex-direction:column }
+    .MPC-vasrq-hdrPills { justify-content:flex-start }
+    .MPC-vasrq-itrow { grid-template-columns:1.8fr 1fr 0.6fr 1.1fr; }
+    .MPC-vasrq-itrow > :nth-child(5), .MPC-vasrq-itrow > :nth-child(6) { display:none }
+}
+@media (max-width: 560px) {
+    .MPC-vasrq-stats { grid-template-columns:1fr }
+    .MPC-vasrq-convert { flex-direction:column; align-items:stretch }
+}

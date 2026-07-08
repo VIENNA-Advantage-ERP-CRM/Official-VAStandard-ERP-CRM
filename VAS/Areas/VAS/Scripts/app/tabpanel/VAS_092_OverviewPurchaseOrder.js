@@ -28,6 +28,26 @@
  *                        Compact List, Timeline (order progress + activity),
  *                        and Entity List (line items, landed cost) with
  *                        section summary rows. Glassmorphism surfaces removed.
+ *   VAI163   2026-07-01  Reworked the header to the reference design: a soft-
+ *                        gradient title strip (title + subtitle with priority +
+ *                        delivery-status pills) above a white two-column details
+ *                        card (vendor identity | payment / currency / ship-to /
+ *                        bill-to). Replaces the Hero Status Card (grand-total
+ *                        headline + metric grid) and the separate Vendor section.
+ *   VAI163   2026-07-01  Added a snapshot section above Order Progress: the
+ *                        Generated From row is now a horizontal chip strip
+ *                        (Sales Order / Requisition / Production Order chips)
+ *                        and is followed by a four-card metric grid — Order
+ *                        Total, Expected Delivery, Line Items and Received
+ *                        (with a receipt progress bar).
+ *   VAI163   2026-07-01  Bottom reworked into a two-column row: Terms & Notes
+ *                        (multi-paragraph) beside a typed Recent Activity feed
+ *                        (note / grn / invoice / payment / approval / created),
+ *                        each row a tag chip + title + timestamp.
+ *   VAI163   2026-07-08  Generated From now shows a single "Manual" chip when
+ *                        the PO has no origin document (no Sales Order,
+ *                        Requisition or Production Order link) instead of three
+ *                        "Not linked" chips.
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -113,14 +133,13 @@
             // Body is a flat stack of self-contained sections. Each section is a
             // Section Header + one content primitive (Compact List / Metric Grid /
             // Timeline / Entity List), per windows-and-panels.md.
-            renderHero();
-            renderVendor();
+            renderHeader();
             renderLinked();
+            renderSnapshot();
             renderProgress();
             renderLines();
             renderLandedCost();
-            renderTerms();
-            renderActivity();
+            renderBottom();
         }
 
         // ----------------------------------------------------------------- //
@@ -130,7 +149,7 @@
         // A headered section: Section Header (title + optional summary/action)
         // followed by a content node. Returns the section element so callers can
         // append additional bodies.
-        function section(title, opts) {
+        function section(title, opts, $parent) {
             opts = opts || {};
             var $sec = $('<section class="MPC-vaspo-sec"></section>');
             var $head = $('<div class="MPC-vaspo-secHead"></div>');
@@ -146,7 +165,7 @@
             if (opts.summary || opts.action) $head.append($right);
 
             $sec.append($head);
-            $body.append($sec);
+            ($parent || $body).append($sec);
             return $sec;
         }
 
@@ -157,7 +176,7 @@
                 .text(label);
         }
 
-        // ---------- Hero Status Card ---------- //
+        // ---------- Header (title strip + vendor / terms card) ---------- //
 
         // Maps the order's delivery / progress state to a semantic tone + label.
         function statusTone(d) {
@@ -172,80 +191,52 @@
             return { tone: "neutral", label: VIS.Msg.getMsg("VAS_092_Drafted") };
         }
 
-        function priorityLabel() {
+        // Priority pill descriptor: tone + optional leading chevron icon.
+        function priorityMeta() {
             var prio = (data.Priority || "low").toLowerCase();
-            if (prio === "high") return VIS.Msg.getMsg("VAS_092_HighPriority");
-            if (prio === "med")  return VIS.Msg.getMsg("VAS_092_MediumPriority");
-            return VIS.Msg.getMsg("VAS_092_LowPriority");
+            if (prio === "high") return { tone: "warning", icon: "chevUp", label: VIS.Msg.getMsg("VAS_092_HighPriority") };
+            if (prio === "med")  return { tone: "warning", icon: "chevUp", label: VIS.Msg.getMsg("VAS_092_MediumPriority") };
+            return { tone: "neutral", icon: null, label: VIS.Msg.getMsg("VAS_092_LowPriority") };
         }
 
-        function renderHero() {
+        // VAI163 2026-07-01  Header reworked to the reference design: a soft-gradient
+        // title strip (title + subtitle, with priority + delivery-status pills on the
+        // right) above a white two-column details card (vendor identity on the left,
+        // payment / currency / ship-to / bill-to fields on the right). Replaces the
+        // former Hero Status Card (grand-total headline + metric grid) and the
+        // separate Vendor section.
+        function renderHeader() {
             var st = statusTone(data);
+            var pm = priorityMeta();
 
-            var $hero = $('<section class="MPC-vaspo-hero"></section>')
-                .addClass("tone-" + st.tone);
+            // --- Title strip: title + subtitle (left), priority + status pills (right) ---
+            var $strip = $('<section class="MPC-vaspo-hdr"></section>');
+            var $top = $('<div class="MPC-vaspo-hdrTop"></div>');
 
-            // Top row: title + subtitle (left) and status pill (right).
-            var $top = $('<div class="MPC-vaspo-heroTop"></div>');
-            var $tl = $('<div class="MPC-vaspo-heroTitleWrap"></div>');
-            $tl.append($('<div class="MPC-vaspo-heroTitle"></div>').text(
+            var $tl = $('<div class="MPC-vaspo-hdrTitleWrap"></div>');
+            $tl.append($('<div class="MPC-vaspo-hdrTitle"></div>').text(
                 VIS.Msg.getMsg("VAS_092_PurchaseOrder") +
                 (data.DocumentNo ? " — " + data.DocumentNo : "")));
 
             var subBits = [];
-            var created = formatDate(data.DateOrdered);
+            var created = formatDate(data.Created || data.DateOrdered);
             if (created) subBits.push(VIS.Msg.getMsg("VAS_092_Created") + " " + created);
             if (data.BuyerName) subBits.push(VIS.Msg.getMsg("VAS_092_Buyer") + " " + data.BuyerName);
             if (subBits.length) {
-                $tl.append($('<div class="MPC-vaspo-heroSub"></div>').text(subBits.join(" · ")));
+                $tl.append($('<div class="MPC-vaspo-hdrSub"></div>').text(subBits.join(" · ")));
             }
             $top.append($tl);
-            $top.append($('<span class="MPC-vaspo-heroPill"></span>').text(st.label));
-            $hero.append($top);
 
-            // Emphasis row: grand total headline.
-            var $emph = $('<div class="MPC-vaspo-heroEmph"></div>');
-            $emph.append($('<span class="MPC-vaspo-heroEmphVal"></span>').text(
-                formatAmount(+data.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision)));
-            $emph.append($('<span class="MPC-vaspo-heroEmphQual"></span>').text(
-                (data.ISO_Code || "") + " · " + VIS.Msg.getMsg("VAS_092_InclTaxFreight")));
-            $hero.append($emph);
+            // Pills: priority (chevron) then delivery status (leading dot).
+            var $pills = $('<div class="MPC-vaspo-hdrPills"></div>');
+            $pills.append(headerPill(pm.label, pm.tone, pm.icon, false));
+            $pills.append(headerPill(st.label, st.tone, null, true));
+            $top.append($pills);
 
-            // Embedded Metric Grid (the one allowed nesting case).
-            var ordered  = +data.TotalQtyOrdered || 0;
-            var received = +data.TotalQtyDelivered || 0;
-            var pct = ordered > 0 ? Math.round((received / ordered) * 100) : 0;
+            $strip.append($top);
+            $body.append($strip);
 
-            var cells = [
-                [VIS.Msg.getMsg("VAS_092_ExpectedDelivery"), formatDate(data.DatePromised) || "—"],
-                [VIS.Msg.getMsg("VAS_092_LineItems"),
-                    (data.LineCount || 0) + " " + VIS.Msg.getMsg("VAS_092_Lines")],
-                [VIS.Msg.getMsg("VAS_092_Received"),
-                    formatNumber(received, 0) + " / " + formatNumber(ordered, 0) + " · " + pct + "%"],
-                [VIS.Msg.getMsg("Priority"), priorityLabel()]
-            ];
-            $hero.append(metricGrid(cells));
-
-            $body.append($hero);
-        }
-
-        // 2-col Metric Grid from an array of [label, value] pairs.
-        function metricGrid(cells) {
-            var $g = $('<div class="MPC-vaspo-mgrid"></div>');
-            for (var i = 0; i < cells.length; i++) {
-                if (!cells[i]) continue;
-                var $c = $('<div class="MPC-vaspo-mcell"></div>');
-                $c.append($('<div class="MPC-vaspo-mLabel"></div>').text(cells[i][0]));
-                $c.append($('<div class="MPC-vaspo-mVal"></div>').text(cells[i][1]));
-                $g.append($c);
-            }
-            return $g;
-        }
-
-        // ---------- Vendor ---------- //
-
-        function renderVendor() {
-            // Hide the whole section when no vendor data is present.
+            // --- Details card: vendor identity (left) + terms fields (right) ---
             if (!data.VendorName && !data.VendorAddress &&
                 !data.ContactName && !data.ContactPhone && !data.ContactEmail &&
                 !data.PaymentTermName && !data.WarehouseName && !data.OrgName &&
@@ -253,36 +244,58 @@
                 return;
             }
 
-            var $sec = section(VIS.Msg.getMsg("VAS_092_Vendor"));
+            var $card = $('<section class="MPC-vaspo-hdrCard"></section>');
 
-            // Identity block: name + address + contact bits.
-            var $id = $('<div class="MPC-vaspo-vendId"></div>');
-            $id.append($('<div class="MPC-vaspo-vendName"></div>').text(data.VendorName || ""));
+            // Left column: vendor name + address + contact bits.
+            var $left = $('<div class="MPC-vaspo-hdrColL"></div>');
+            $left.append($('<div class="MPC-vaspo-fLabel"></div>').text(VIS.Msg.getMsg("VAS_092_Vendor")));
+            $left.append($('<div class="MPC-vaspo-vendName"></div>').text(data.VendorName || ""));
 
             if (data.VendorAddress) {
                 var $addr = $('<div class="MPC-vaspo-vendAddr"></div>');
                 $addr.append(svgIcon("pin"));
                 $addr.append($('<span></span>').text(data.VendorAddress));
-                $id.append($addr);
+                $left.append($addr);
             }
 
             var $contact = $('<div class="MPC-vaspo-vendContact"></div>');
             appendContactBit($contact, "user",  data.ContactName);
             appendContactBit($contact, "phone", data.ContactPhone);
             appendContactBit($contact, "mail",  data.ContactEmail);
-            if ($contact.children().length) $id.append($contact);
-            $sec.append($id);
+            if ($contact.children().length) $left.append($contact);
+            if (data.OrgName) $left.append(headerField(VIS.Msg.getMsg("VAS_092_BillTo"), data.OrgName));
+            $card.append($left);
 
-            // Terms as a Metric Grid (2 or 4 cells — never odd).
-            var cells = [];
-            if (data.PaymentTermName) cells.push([VIS.Msg.getMsg("VAS_092_PaymentTerms"), data.PaymentTermName]);
+            // Right column: labelled term fields.
+            var $right = $('<div class="MPC-vaspo-hdrColR"></div>');
+            if (data.PaymentTermName) {
+                $right.append(headerField(VIS.Msg.getMsg("VAS_092_PaymentTerms"), data.PaymentTermName));
+            }
             var cur = (data.ISO_Code || "") + (data.CurSymbol ? " (" + data.CurSymbol + ")" : "");
-            if (cur.trim()) cells.push([VIS.Msg.getMsg("VAS_092_Currency"), cur]);
-            if (data.WarehouseName) cells.push([VIS.Msg.getMsg("VAS_092_ShipTo"), data.WarehouseName]);
-            if (data.OrgName) cells.push([VIS.Msg.getMsg("VAS_092_BillTo"), data.OrgName]);
-            // Keep the grid even (drop the trailing cell if odd) to avoid a broken row.
-            if (cells.length % 2 === 1) cells.pop();
-            if (cells.length) $sec.append(metricGrid(cells));
+            if (cur.trim()) $right.append(headerField(VIS.Msg.getMsg("VAS_092_Currency"), cur));
+            if (data.WarehouseName) $right.append(headerField(VIS.Msg.getMsg("VAS_092_ShipTo"), data.WarehouseName));            
+            if ($right.children().length) $card.append($right);
+
+            $body.append($card);
+        }
+
+        // Header pill: tinted chip with an optional leading chevron icon (priority)
+        // or a leading dot (delivery status).
+        function headerPill(label, tone, icon, withDot) {
+            var $p = $('<span class="MPC-vaspo-hdrPill"></span>')
+                .addClass("tone-" + (tone || "neutral"));
+            if (icon) $p.append(svgIcon(icon));
+            if (withDot) $p.append($('<span class="MPC-vaspo-hdrDot"></span>'));
+            $p.append($('<span></span>').text(label));
+            return $p;
+        }
+
+        // Labelled field block for the details card's right column.
+        function headerField(label, value) {
+            var $f = $('<div class="MPC-vaspo-hdrField"></div>');
+            $f.append($('<div class="MPC-vaspo-fLabel"></div>').text(label));
+            $f.append($('<div class="MPC-vaspo-fVal"></div>').text(value));
+            return $f;
         }
 
         function appendContactBit($container, icon, value) {
@@ -293,59 +306,130 @@
             $container.append($bit);
         }
 
-        // ---------- Generated From (Compact List) ---------- //
+        // ---------- Generated From (chip strip) ---------- //
 
+        // VAI163 2026-07-01  Reworked from a vertical Compact List into a
+        // horizontal chip strip (one chip per origin document) to match the
+        // reference design, sitting directly above the metric snapshot.
         function renderLinked() {
-            // Production Order is never linked in this payload, so the section
-            // only carries data when a sales order or requisition is linked.
-            var hasSales = !!data.RefOrderDocNo;
-            var hasReq = data.RequisitionLineCount > 0;
-            if (!hasSales && !hasReq) return;
+            var $strip = $('<section class="MPC-vaspo-genfrom"></section>');
+            $strip.append($('<span class="MPC-vaspo-gfLabel"></span>')
+                .text(VIS.Msg.getMsg("VAS_092_GeneratedFrom")));
 
-            var $sec = section(VIS.Msg.getMsg("VAS_092_GeneratedFrom"));
-            var $list = $('<div class="MPC-vaspo-clist"></div>');
+            var $chips = $('<div class="MPC-vaspo-gfChips"></div>');
+
+            // VAI163 2026-07-08  When the PO is not generated from any origin
+            // document (no Sales Order, no Requisition and no Production Order),
+            // it was created manually — show a single "Manual" chip instead of
+            // three "Not linked" chips. Production Order is never carried in the
+            // overview payload, so it is always treated as not linked here.
+            var hasSalesOrder = !!data.RefOrderDocNo;
+            var hasRequisition = (data.RequisitionLineCount > 0);
+            if (!hasSalesOrder && !hasRequisition) {
+                $chips.append(originChip("pencil", VIS.Msg.getMsg("VAS_092_Manual"),
+                    null, null, "info"));
+                $strip.append($chips);
+                $body.append($strip);
+                return;
+            }
 
             // Sales Order (origin) — from Ref_Order_ID.
             if (data.RefOrderDocNo) {
-                $list.append(compactRow(VIS.Msg.getMsg("VAS_092_SalesOrder"), null,
-                    data.RefOrderDocNo, pill(VIS.Msg.getMsg("VAS_092_Origin"), "info")));
+                $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_092_SalesOrder"),
+                    data.RefOrderDocNo, pill(VIS.Msg.getMsg("VAS_092_Origin"), "info"), "info"));
             } else {
-                $list.append(compactRow(VIS.Msg.getMsg("VAS_092_SalesOrder"), null,
-                    null, pill(VIS.Msg.getMsg("VAS_092_NotLinked"), "neutral")));
+                $chips.append(originChip("doc", VIS.Msg.getMsg("VAS_092_SalesOrder"),
+                    VIS.Msg.getMsg("VAS_092_NotLinked"), null, "muted"));
             }
 
             // Requisition — present when any requisition line points at this PO.
             if (data.RequisitionLineCount > 0) {
-                $list.append(compactRow(VIS.Msg.getMsg("VAS_092_Requisition"), null,
-                    null, pill(VIS.Msg.getMsg("VAS_092_Linked"), "success")));
+                $chips.append(originChip("clipboardCheck", VIS.Msg.getMsg("VAS_092_Requisition"),
+                    VIS.Msg.getMsg("VAS_092_Linked"), null, "success"));
             } else {
-                $list.append(compactRow(VIS.Msg.getMsg("VAS_092_Requisition"), null,
-                    null, pill(VIS.Msg.getMsg("VAS_092_NotLinked"), "neutral")));
+                $chips.append(originChip("clipboardCheck", VIS.Msg.getMsg("VAS_092_Requisition"),
+                    VIS.Msg.getMsg("VAS_092_NotLinked"), null, "muted"));
             }
 
             // Production Order — overview payload carries no production-order link.
-            $list.append(compactRow(VIS.Msg.getMsg("VAS_092_ProductionOrder"), null,
-                null, pill(VIS.Msg.getMsg("VAS_092_NotLinked"), "neutral")));
+            $chips.append(originChip("factory", VIS.Msg.getMsg("VAS_092_ProductionOrder"),
+                VIS.Msg.getMsg("VAS_092_NotLinked"), null, "muted"));
 
-            $sec.append($list);
+            $strip.append($chips);
+            $body.append($strip);
         }
 
-        // Compact List row: left (primary + optional meta), right (optional
-        // trailing value + optional status pill).
-        function compactRow(primary, meta, trailingValue, $statusPill) {
-            var $row = $('<div class="MPC-vaspo-crow"></div>');
+        // Origin chip: leading icon (tinted by iconTone) + grey label + dark
+        // value, with an optional trailing status pill.
+        function originChip(icon, label, value, $statusPill, iconTone) {
+            var $chip = $('<span class="MPC-vaspo-chip"></span>').addClass("ic-" + (iconTone || "muted"));
+            $chip.append(svgIcon(icon));
+            $chip.append($('<span class="MPC-vaspo-chipLabel"></span>').text(label));
+            if (value) $chip.append($('<span class="MPC-vaspo-chipVal"></span>').text(value));
+            if ($statusPill) $chip.append($statusPill);
+            return $chip;
+        }
 
-            var $left = $('<div class="MPC-vaspo-cLeft"></div>');
-            $left.append($('<div class="MPC-vaspo-cPri"></div>').text(primary));
-            if (meta) $left.append($('<div class="MPC-vaspo-cMeta"></div>').text(meta));
-            $row.append($left);
+        // ---------- Snapshot (metric grid) ---------- //
 
-            var $right = $('<div class="MPC-vaspo-cRight"></div>');
-            if ($statusPill) $right.append($statusPill);
-            if (trailingValue) $right.append($('<span class="MPC-vaspo-cVal"></span>').text(trailingValue));
-            $row.append($right);
+        // Four-card metric strip: Order Total, Expected Delivery, Line Items and
+        // Received (with a receipt progress bar). Sits directly above Order
+        // Progress per the reference design.
+        function renderSnapshot() {
+            var $snap = $('<section class="MPC-vaspo-snap"></section>');
 
-            return $row;
+            // Order Total — grand total (tax/freight inclusive).
+            var totalSub = (data.ISO_Code || "");
+            var incl = VIS.Msg.getMsg("VAS_092_InclTaxFreight");
+            totalSub = totalSub ? totalSub + " · " + incl : incl;
+            $snap.append(metricCard("total", "coins", VIS.Msg.getMsg("VAS_092_OrderTotal"),
+                formatAmount(+data.GrandTotal || 0, data.CurSymbol, data.ISO_Code, data.StdPrecision),
+                totalSub, null));
+
+            // Expected Delivery — promised date + delivery-status caption.
+            var st = statusTone(data);
+            $snap.append(metricCard("delivery", "calendar", VIS.Msg.getMsg("VAS_092_ExpectedDelivery"),
+                formatDate(data.DatePromised) || "—", st.label, null));
+
+            // Line Items — line count + total units ordered.
+            $snap.append(metricCard("lines", "box", VIS.Msg.getMsg("VAS_092_LineItems"),
+                (data.LineCount || 0) + " " + VIS.Msg.getMsg("VAS_092_Lines"),
+                formatNumber(+data.TotalQtyOrdered || 0, 0) + " " + VIS.Msg.getMsg("VAS_092_UnitsOrdered"),
+                null));
+
+            // Received — delivered/ordered + percent and fully-received line count.
+            var ordered = +data.TotalQtyOrdered || 0;
+            var delivered = +data.TotalQtyDelivered || 0;
+            var pct = ordered > 0 ? Math.round((delivered / ordered) * 100) : 0;
+            var recvSub = pct + "% · " + (data.FullyReceivedLineCount || 0) + " " +
+                VIS.Msg.getMsg("VAS_092_Of") + " " + (data.LineCount || 0) + " " +
+                VIS.Msg.getMsg("VAS_092_Lines");
+            $snap.append(metricCard("received", "inbox", VIS.Msg.getMsg("VAS_092_Received"),
+                formatNumber(delivered, 0) + " / " + formatNumber(ordered, 0), recvSub, pct));
+
+            $body.append($snap);
+        }
+
+        // Metric card: colour-accented left border (via tone class), a header
+        // (icon + label), a large value, a caption and an optional receipt
+        // progress bar (pct 0..100, or null for no bar).
+        function metricCard(tone, icon, label, value, sub, pct) {
+            var $c = $('<div class="MPC-vaspo-metric"></div>').addClass("tone-" + tone);
+
+            var $head = $('<div class="MPC-vaspo-mHead"></div>');
+            $head.append(svgIcon(icon));
+            $head.append($('<span class="MPC-vaspo-mLabel"></span>').text(label));
+            $c.append($head);
+
+            $c.append($('<div class="MPC-vaspo-mVal"></div>').text(value));
+            if (sub) $c.append($('<div class="MPC-vaspo-mSub"></div>').text(sub));
+
+            if (pct != null) {
+                var $bar = $('<div class="MPC-vaspo-mBar"><i></i></div>');
+                $bar.find("i").css("width", Math.max(0, Math.min(100, pct)) + "%");
+                $c.append($bar);
+            }
+            return $c;
         }
 
         // ---------- Order Progress (Timeline) ---------- //
@@ -711,61 +795,102 @@
             return $note;
         }
 
+        // ---------- Bottom row (Terms & Notes | Recent Activity) ---------- //
+
+        // Two-column footer, per the reference design: Terms & Notes on the left
+        // and the typed Recent Activity feed on the right. The grid auto-fits, so
+        // a single present section fills the row and both stack on narrow panels.
+        function renderBottom() {
+            var termsText = data.POReference || data.OrderDescription;
+            var activity = (data && data.Activity) || [];
+            if (!termsText && !activity.length) return;
+
+            var $row = $('<div class="MPC-vaspo-bottom"></div>');
+            $body.append($row);
+
+            if (termsText) renderTerms($row, termsText);
+            if (activity.length) renderActivity($row, activity);
+        }
+
         // ---------- Terms & Notes ---------- //
 
         // VAI163 2026-06-17  Terms & Notes description value sourced from
         // C_Order.POReference (was C_Order.Description) per design correction.
-        function renderTerms() {
-            if (!data.POReference) return;
-
-            var $sec = section(VIS.Msg.getMsg("VAS_092_TermsAndNotes"));
+        // VAI163 2026-07-01  Renders one paragraph per line break and lives in
+        // the left column of the bottom row.
+        function renderTerms($parent, text) {
+            var $sec = section(VIS.Msg.getMsg("VAS_092_TermsAndNotes"), null, $parent);
             var $card = $('<div class="MPC-vaspo-textCard"></div>');
-            $card.append($('<p></p>').text(data.POReference));
+
+            var paras = String(text).split(/\r?\n+/);
+            for (var i = 0; i < paras.length; i++) {
+                var t = paras[i].trim();
+                if (t) $card.append($('<p></p>').text(t));
+            }
+            if (!$card.children().length) $card.append($('<p></p>').text(text));
+
             $sec.append($card);
         }
 
-        // ---------- Recent Activity (Timeline) ---------- //
+        // ---------- Recent Activity (typed feed) ---------- //
 
-        function renderActivity() {
-            var activity = (data && data.Activity) || [];
-            if (!activity.length) return;
+        // Type -> tag descriptor. tone drives the tag colour; icon is the leading
+        // glyph; tagKey is the short chip label; titleKey is the sentence shown
+        // as the row title (notes carry their own free text instead).
+        var ACT_TYPES = {
+            note:     { tone: "info",    icon: "mail",  tagKey: "VAS_092_TagNote",     titleKey: null },
+            grn:      { tone: "success", icon: "inbox", tagKey: "VAS_092_TagGRN",      titleKey: "VAS_092_ActGRN" },
+            invoice:  { tone: "info",    icon: "doc",   tagKey: "VAS_092_TagInvoice",  titleKey: "VAS_092_ActInvoice" },
+            payment:  { tone: "success", icon: "coins", tagKey: "VAS_092_TagPayment",  titleKey: "VAS_092_ActPayment" },
+            approval: { tone: "purple",  icon: "check", tagKey: "VAS_092_TagApproval", titleKey: "VAS_092_ActApproval" },
+            created:  { tone: "neutral", icon: "doc",   tagKey: "VAS_092_TagCreated",  titleKey: "VAS_092_ActCreated" }
+        };
 
+        function renderActivity($parent, activity) {
             var $sec = section(VIS.Msg.getMsg("VAS_092_RecentActivity"), {
                 summary: activity.length + " " + VIS.Msg.getMsg("VAS_092_Updates")
-            });
+            }, $parent);
 
-            var $tl = $('<div class="MPC-vaspo-tl"></div>');
+            var $card = $('<div class="MPC-vaspo-actList"></div>');
             for (var i = 0; i < activity.length; i++) {
-                var a = activity[i];
-                // Activity rows come from CM_ChatEntry (notes/log) — a single
-                // neutral "Note" tag rather than inferring a type.
-                var meta = formatDateTime(a.Created);
-                if (a.UserName) meta += " · " + a.UserName;
-                $tl.append(timelineEntry(a.Text || VIS.Msg.getMsg("VAS_092_Note"),
-                    pill(VIS.Msg.getMsg("VAS_092_Note"), "neutral"), meta, "is-done"));
+                $card.append(activityRow(activity[i]));
             }
-            $sec.append($tl);
+            $sec.append($card);
         }
 
-        // Vertical timeline entry (used by Recent Activity): rail (dot + trail)
-        // + card (title + tag pill + meta).
-        function timelineEntry(title, $tagPill, meta, stateCls) {
-            var $entry = $('<div class="MPC-vaspo-tlEntry"></div>').addClass(stateCls || "");
+        // Activity row: tag chip (icon + short label) + title + right-aligned
+        // timestamp (with actor when present).
+        function activityRow(a) {
+            var meta = ACT_TYPES[a.Type] || ACT_TYPES.note;
 
-            var $rail = $('<div class="MPC-vaspo-tlRail"></div>');
-            $rail.append($('<span class="MPC-vaspo-tlDot"></span>'));
-            $rail.append($('<span class="MPC-vaspo-tlTrail"></span>'));
-            $entry.append($rail);
+            var $row = $('<div class="MPC-vaspo-actRow"></div>');
+            $row.append(activityTag(meta));
+            $row.append($('<span class="MPC-vaspo-actTitle"></span>').text(activityTitle(a, meta)));
 
-            var $card = $('<div class="MPC-vaspo-tlCard"></div>');
-            var $tcTop = $('<div class="MPC-vaspo-tlTop"></div>');
-            $tcTop.append($('<span class="MPC-vaspo-tlTitle"></span>').text(title));
-            if ($tagPill) $tcTop.append($tagPill);
-            $card.append($tcTop);
-            if (meta) $card.append($('<div class="MPC-vaspo-tlMeta"></div>').text(meta));
-            $entry.append($card);
+            var when = formatDateTime(a.Created);
+            if (a.UserName) when += " · " + a.UserName;
+            $row.append($('<span class="MPC-vaspo-actWhen"></span>').text(when));
+            return $row;
+        }
 
-            return $entry;
+        function activityTag(meta) {
+            var $t = $('<span class="MPC-vaspo-actTag"></span>').addClass("tone-" + meta.tone);
+            if (meta.icon) $t.append(svgIcon(meta.icon));
+            $t.append($('<span></span>').text(VIS.Msg.getMsg(meta.tagKey)));
+            return $t;
+        }
+
+        // Notes show their own text; event rows build a sentence from the type's
+        // title message, appending the GRN line count and any related document no.
+        function activityTitle(a, meta) {
+            if (!meta.titleKey) return a.Text || VIS.Msg.getMsg("VAS_092_TagNote");
+
+            var s = VIS.Msg.getMsg(meta.titleKey);
+            if (a.Type === "grn" && a.Count > 0) {
+                s += " · " + a.Count + " " + VIS.Msg.getMsg("VAS_092_Lines");
+            }
+            if (a.DocumentNo) s += " (" + a.DocumentNo + ")";
+            return s;
         }
 
         // ----------------------------------------------------------------- //
@@ -782,7 +907,14 @@
             box:      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg>',
             coins:    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5"/><path d="M14.5 4.2a5 5 0 0 1 0 15.6"/><path d="M7 18.7a5 5 0 0 0 6 0"/></svg>',
             info:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
-            check:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>'
+            check:    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+            chevUp:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
+            doc:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>',
+            clipboardCheck: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>',
+            factory:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20V9l6 4V9l6 4V9l6 4v7Z"/><path d="M2 20h20"/><path d="M7 20v-4"/><path d="M12 20v-4"/><path d="M17 20v-4"/></svg>',
+            pencil:   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+            calendar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
+            inbox:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/></svg>'
         };
 
         // Returns a span wrapping the named inline SVG. innerHTML is used so the

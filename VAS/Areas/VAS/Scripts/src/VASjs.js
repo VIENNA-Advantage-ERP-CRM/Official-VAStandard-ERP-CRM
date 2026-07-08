@@ -112,6 +112,13 @@ import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 import "../app/tabpanel/VAS_092_OverviewPurchaseOrder.js";
+import "../app/tabpanel/VAS_098_PurchaseRequisition.js";
+import "../app/tabpanel/VAS_099_OverviewGRN.js";
+import "../app/tabpanel/VAS_100_OverviewDO.js";
+import "../app/tabpanel/VAS_101_OverviewInventoryCount.js";
+import "../app/tabpanel/VAS_102_OverviewInternalUse.js";
+import "../app/tabpanel/VAS_103_MaterialTransfer.js";
+import "../app/tabpanel/VAS_104_OverviewShipGRNConfirmation.js";
 
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/VAS_025_TotalPurchasesWidget.js";

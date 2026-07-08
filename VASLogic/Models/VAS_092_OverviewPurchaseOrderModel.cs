@@ -19,6 +19,12 @@
 ///                        roll-ups. Fixed the expected-amount column name
 ///                        (C_ExpectedCost.Amt / C_ExpectedCostDistribution.Amt,
 ///                        was Amount).
+///   VAI163   2026-07-01  Recent Activity now a real typed event feed: chat
+///                        notes (CM_ChatEntry) merged with goods receipts
+///                        (M_InOut), vendor invoices (C_Invoice), allocated
+///                        payments (C_Payment) and the order create / approve
+///                        milestones (C_Order), newest-first. ActivityData gains
+///                        Type / DocumentNo / Count.
 /// </summary>
 
 using System;
@@ -413,53 +419,251 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Loads CM_ChatEntry rows logged against this purchase order (via
-        /// CM_Chat where AD_Table_ID = C_Order's table id and Record_ID = the
-        /// order id), newest first, for the Recent Activity panel.
+        /// Builds the Recent Activity feed from real purchase-order events —
+        /// chat notes (CM_ChatEntry), goods receipts (M_InOut), vendor invoices
+        /// (C_Invoice), allocated payments (C_Payment) and the order's own
+        /// create / approve milestones (C_Order) — merged and ordered
+        /// newest-first (capped at the most recent entries). Each source is
+        /// loaded under its own guard so a DB-level issue with one degrades to a
+        /// partial feed (logged via _log.Severe) rather than breaking the
+        /// overview. The resulting rows carry a <see cref="ActivityData.Type"/>
+        /// (note | grn | invoice | payment | approval | created) that the client
+        /// maps to a tag + icon.
         /// </summary>
         /// <param name="C_Order_ID">Owning purchase order id.</param>
         /// <returns>Activity rows ordered newest-first (may be empty).</returns>
         private List<ActivityData> LoadActivity(int C_Order_ID)
         {
+            const int MAX_ENTRIES = 12;
+
             List<ActivityData> activity = new List<ActivityData>();
+            LoadNoteActivity(C_Order_ID, activity);
+            LoadReceiptActivity(C_Order_ID, activity);
+            LoadInvoiceActivity(C_Order_ID, activity);
+            LoadPaymentActivity(C_Order_ID, activity);
+            LoadOrderMilestoneActivity(C_Order_ID, activity);
 
-            string sql = @"SELECT
-                              ce.CM_ChatEntry_ID,
-                              ce.AD_User_ID,
-                              ce.CharacterData,
-                              ce.Created,
-                              u.Name              AS UserName
-                           FROM CM_ChatEntry ce
-                           INNER JOIN CM_Chat ch    ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
-                           LEFT OUTER JOIN AD_User u ON (ce.AD_User_ID = u.AD_User_ID)
-                           WHERE ch.AD_Table_ID =
-                                 (SELECT t.AD_Table_ID
-                                    FROM AD_Table t
-                                   WHERE t.TableName = 'C_Order')
-                             AND ch.Record_ID = @C_Order_ID
-                             AND ce.IsActive  = 'Y'
-                           ORDER BY ce.Created DESC";
+            // Newest first; entries with no timestamp sink to the bottom.
+            activity.Sort((a, b) =>
+                b.Created.GetValueOrDefault(DateTime.MinValue)
+                 .CompareTo(a.Created.GetValueOrDefault(DateTime.MinValue)));
 
-            SqlParameter[] param = new SqlParameter[]
-            {
-                new SqlParameter("@C_Order_ID", C_Order_ID)
-            };
-
-            DataSet ds = DB.ExecuteDataset(sql, param, null);
-            if (ds == null || ds.Tables.Count == 0)
-                return activity;
-
-            foreach (DataRow r in ds.Tables[0].Rows)
-            {
-                ActivityData a = new ActivityData();
-                a.CM_ChatEntry_ID = Util.GetValueOfInt(r["CM_ChatEntry_ID"]);
-                a.AD_User_ID      = Util.GetValueOfInt(r["AD_User_ID"]);
-                a.UserName        = Util.GetValueOfString(r["UserName"]);
-                a.Text            = Util.GetValueOfString(r["CharacterData"]);
-                a.Created         = Util.GetValueOfDateTime(r["Created"]);
-                activity.Add(a);
-            }
+            if (activity.Count > MAX_ENTRIES)
+                activity = activity.GetRange(0, MAX_ENTRIES);
             return activity;
+        }
+
+        /// <summary>
+        /// Loads free-text chat notes (CM_ChatEntry) logged against this order
+        /// (via CM_Chat where AD_Table_ID = C_Order's table id and Record_ID =
+        /// the order id) as "note" activity rows.
+        /// </summary>
+        private void LoadNoteActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT ce.CM_ChatEntry_ID,
+                                      ce.AD_User_ID,
+                                      ce.CharacterData,
+                                      ce.Created,
+                                      u.Name AS UserName
+                                 FROM CM_ChatEntry ce
+                                 INNER JOIN CM_Chat ch     ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
+                                 LEFT OUTER JOIN AD_User u ON (ce.AD_User_ID = u.AD_User_ID)
+                                WHERE ch.AD_Table_ID =
+                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
+                                  AND ch.Record_ID = @C_Order_ID
+                                  AND ce.IsActive  = 'Y'";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type            = "note",
+                        CM_ChatEntry_ID = Util.GetValueOfInt(r["CM_ChatEntry_ID"]),
+                        AD_User_ID      = Util.GetValueOfInt(r["AD_User_ID"]),
+                        UserName        = Util.GetValueOfString(r["UserName"]),
+                        Text            = Util.GetValueOfString(r["CharacterData"]),
+                        Created         = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadNoteActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Loads completed goods receipts (M_InOut, IsSoTrx = 'N') for this order
+        /// as "grn" activity rows, carrying the receipt document number and its
+        /// active line count.
+        /// </summary>
+        private void LoadReceiptActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT io.DocumentNo,
+                                      io.Created,
+                                      u.Name AS UserName,
+                                      (SELECT COUNT(*)
+                                         FROM M_InOutLine iol
+                                        WHERE iol.M_InOut_ID = io.M_InOut_ID
+                                          AND iol.IsActive   = 'Y') AS LineCnt
+                                 FROM M_InOut io
+                                 LEFT OUTER JOIN AD_User u ON (io.CreatedBy = u.AD_User_ID)
+                                WHERE io.C_Order_ID = @C_Order_ID
+                                  AND io.IsActive   = 'Y'
+                                  AND io.IsSoTrx    = 'N'
+                                  AND io.DocStatus IN ('CO', 'CL')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type       = "grn",
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        Count      = Util.GetValueOfInt(r["LineCnt"]),
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadReceiptActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Loads completed vendor invoices (C_Invoice, IsSoTrx = 'N') for this
+        /// order as "invoice" activity rows.
+        /// </summary>
+        private void LoadInvoiceActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT ci.DocumentNo,
+                                      ci.Created,
+                                      u.Name AS UserName
+                                 FROM C_Invoice ci
+                                 LEFT OUTER JOIN AD_User u ON (ci.CreatedBy = u.AD_User_ID)
+                                WHERE ci.C_Order_ID = @C_Order_ID
+                                  AND ci.IsActive   = 'Y'
+                                  AND ci.IsSoTrx    = 'N'
+                                  AND ci.DocStatus IN ('CO', 'CL')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type       = "invoice",
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadInvoiceActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Loads completed payments allocated to this order's invoices
+        /// (C_Payment via C_AllocationLine -> C_Invoice) as "payment" activity
+        /// rows. DISTINCT so a payment allocated across several of the order's
+        /// invoices is reported once.
+        /// </summary>
+        private void LoadPaymentActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT DISTINCT p.C_Payment_ID,
+                                               p.DocumentNo,
+                                               p.Created,
+                                               u.Name AS UserName
+                                 FROM C_Payment p
+                                 INNER JOIN C_AllocationLine al ON (al.C_Payment_ID = p.C_Payment_ID)
+                                 INNER JOIN C_Invoice ci        ON (al.C_Invoice_ID = ci.C_Invoice_ID)
+                                 LEFT OUTER JOIN AD_User u      ON (p.CreatedBy = u.AD_User_ID)
+                                WHERE ci.C_Order_ID = @C_Order_ID
+                                  AND p.IsActive    = 'Y'
+                                  AND p.DocStatus IN ('CO', 'CL')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type       = "payment",
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        UserName   = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadPaymentActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Adds the order's own milestones as activity rows: a "created" entry
+        /// (C_Order.Created / CreatedBy) and, when the order is completed /
+        /// closed, an "approval" entry (approximated by C_Order.Updated /
+        /// UpdatedBy — the latest change that carried it to CO/CL).
+        /// </summary>
+        private void LoadOrderMilestoneActivity(int C_Order_ID, List<ActivityData> list)
+        {
+            try
+            {
+                string sql = @"SELECT o.Created,
+                                      o.Updated,
+                                      o.DocStatus,
+                                      cu.Name AS CreatedByName,
+                                      uu.Name AS UpdatedByName
+                                 FROM C_Order o
+                                 LEFT OUTER JOIN AD_User cu ON (o.CreatedBy = cu.AD_User_ID)
+                                 LEFT OUTER JOIN AD_User uu ON (o.UpdatedBy = uu.AD_User_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+
+                DataRow r = ds.Tables[0].Rows[0];
+                list.Add(new ActivityData
+                {
+                    Type     = "created",
+                    UserName = Util.GetValueOfString(r["CreatedByName"]),
+                    Created  = Util.GetValueOfDateTime(r["Created"])
+                });
+
+                string docStatus = Util.GetValueOfString(r["DocStatus"]);
+                if (docStatus == "CO" || docStatus == "CL")
+                {
+                    list.Add(new ActivityData
+                    {
+                        Type     = "approval",
+                        UserName = Util.GetValueOfString(r["UpdatedByName"]),
+                        Created  = Util.GetValueOfDateTime(r["Updated"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadOrderMilestoneActivity (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>Single-parameter helper for the C_Order-scoped activity queries.</summary>
+        private SqlParameter[] OrderParam(int C_Order_ID)
+        {
+            return new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) };
         }
 
         // ----------------------------------------------------------------- //
@@ -757,10 +961,13 @@ namespace VASLogic.Models
 
         public class ActivityData
         {
+            public string    Type            { get; set; }   // note | grn | invoice | payment | approval | created
             public int       CM_ChatEntry_ID { get; set; }
             public int       AD_User_ID      { get; set; }
-            public string    UserName        { get; set; }
-            public string    Text            { get; set; }
+            public string    UserName        { get; set; }   // actor
+            public string    Text            { get; set; }   // free text (notes only)
+            public string    DocumentNo      { get; set; }   // related document (grn / invoice / payment)
+            public int       Count           { get; set; }   // grn line count (0 otherwise)
             public DateTime? Created         { get; set; }
         }
 

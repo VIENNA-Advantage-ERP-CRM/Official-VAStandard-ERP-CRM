@@ -1,0 +1,603 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Internal Use / Material Issue Overview tab panel
+ *               (VAS.VAS_102_OverviewInternalUse). All classes are MPC-prefixed
+ *               (MPC-vasiu-*) and scoped under the panel root to avoid global
+ *               collisions. Shares the Onfinity windows-and-panels em-anchored
+ *               body language with VAS_100 / VAS_101 — Roboto, white surfaces,
+ *               soft blue borders, KPI tiles with accent rails, pastel stepper,
+ *               segmented filter, status-summary cards and a flat issue-lines
+ *               table with Full / Partial / Short status tags.
+ * Chronological development:
+ *   VAI163   2026-07-07  Created
+ ***********************************************************/
+
+.MPC-vasiu-root {
+    /* Canonical palette */
+    --iu-text:        #102C3F;
+    --iu-muted:       #5F7283;
+    --iu-sub:         #41576A;
+    --iu-action:      #0083DA;
+    --iu-action-dk:   #005FA3;
+    --iu-link:        #106AB0;
+    --iu-card-bd:     #D9E2EB;
+    --iu-row-div:     #E2EAF1;
+    --iu-card-radius: 12px;
+    /* Semantic tones */
+    --iu-info-bg:     #EAF8FF;  --iu-info-tx:    #0083DA;
+    --iu-success-bg:  #E9F6EE;  --iu-success-tx: #0B6B45;
+    --iu-warning-bg:  #FFF6E2;  --iu-warning-tx: #9A6500;
+    --iu-risk-bg:     #FCEFEF;  --iu-risk-tx:    #D14545;
+    --iu-neutral-bg:  #EEF1F4;  --iu-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--iu-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasiu-root * { box-sizing: border-box; }
+
+.MPC-vasiu-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasiu-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--iu-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-sec { display: block; }
+
+.MPC-vasiu-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasiu-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--iu-text);
+    margin: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+}
+
+.MPC-vasiu-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--iu-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasiu-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
+}
+
+.MPC-vasiu-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasiu-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasiu-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.2;
+}
+
+.MPC-vasiu-hdrSub {
+    font-size: 0.75em;
+    color: var(--iu-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasiu-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasiu-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-hdrPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.MPC-vasiu-hdrPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.MPC-vasiu-hdrPill.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.MPC-vasiu-hdrPill.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.MPC-vasiu-hdrPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+
+.MPC-vasiu-hdrPill .MPC-vasiu-ic { color: currentColor; }
+
+.MPC-vasiu-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (warehouse | document)               */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-hdrCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasiu-hdrColL { min-width: 0; }
+
+.MPC-vasiu-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasiu-hdrField { min-width: 0; }
+
+.MPC-vasiu-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasiu-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasiu-fVal.is-link { color: var(--iu-link); }
+
+@container (max-width: 460px) {
+    .MPC-vasiu-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasiu-hdrTop  { flex-direction: column; }
+    .MPC-vasiu-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Warehouse identity                                          */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--iu-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasiu-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--iu-text);
+    margin-top: 0.375em;
+}
+.MPC-vasiu-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasiu-contactBit .MPC-vasiu-ic { color: var(--iu-action); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (KPI metric grid)                                  */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasiu-metric {
+    min-width: 0;
+    border: 1px solid var(--iu-card-bd);
+    border-left: 3px solid var(--iu-neutral-tx);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasiu-metric.tone-total   { border-left-color: var(--iu-info-tx); }
+.MPC-vasiu-metric.tone-issued  { border-left-color: var(--iu-success-tx); }
+.MPC-vasiu-metric.tone-lines   { border-left-color: var(--iu-neutral-tx); }
+.MPC-vasiu-metric.tone-pending { border-left-color: #E08A1E; }
+
+.MPC-vasiu-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasiu-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-metric.tone-total   .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-info-tx); }
+.MPC-vasiu-metric.tone-issued  .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-success-tx); }
+.MPC-vasiu-metric.tone-lines   .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-neutral-tx); }
+.MPC-vasiu-metric.tone-pending .MPC-vasiu-mHead .MPC-vasiu-ic { color: #E08A1E; }
+
+.MPC-vasiu-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasiu-metric.tone-issued  .MPC-vasiu-mVal { color: var(--iu-success-tx); }
+.MPC-vasiu-metric.tone-pending .MPC-vasiu-mVal { color: #9A6500; }
+
+.MPC-vasiu-mSub {
+    font-size: 0.6875em;
+    color: var(--iu-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 620px) {
+    .MPC-vasiu-snap { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasiu-snap { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Status summary cards (Full / Partial / Short / Lines)       */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-status {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasiu-statCard {
+    min-width: 0;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #FBFDFF;
+    padding: 0.625em 0.75em;
+    text-align: center;
+}
+.MPC-vasiu-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--iu-text); }
+.MPC-vasiu-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--iu-muted); margin-top: 0.25em; }
+
+.MPC-vasiu-statCard.tone-full    .MPC-vasiu-statVal { color: var(--iu-success-tx); }
+.MPC-vasiu-statCard.tone-partial .MPC-vasiu-statVal { color: #9A6500; }
+.MPC-vasiu-statCard.tone-short   .MPC-vasiu-statVal { color: var(--iu-risk-tx); }
+
+@container (max-width: 620px) {
+    .MPC-vasiu-status { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasiu-status { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Issue timeline (3-node stepper)                             */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.MPC-vasiu-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.MPC-vasiu-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.MPC-vasiu-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.MPC-vasiu-step:first-child .MPC-vasiu-stepLine-l,
+.MPC-vasiu-step:last-child  .MPC-vasiu-stepLine-r { visibility: hidden; }
+
+.MPC-vasiu-step.is-done   .MPC-vasiu-stepLine-r,
+.MPC-vasiu-step.is-done   .MPC-vasiu-stepLine-l,
+.MPC-vasiu-step.is-active .MPC-vasiu-stepLine-l { background: #67B98A; }
+
+.MPC-vasiu-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.MPC-vasiu-stepDot .MPC-vasiu-ic { display: inline-flex; }
+
+.MPC-vasiu-step.is-done .MPC-vasiu-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.MPC-vasiu-step.is-active .MPC-vasiu-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.MPC-vasiu-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+.MPC-vasiu-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--iu-text);
+}
+
+.MPC-vasiu-stepMeta {
+    font-size: 0.6875em;
+    color: var(--iu-muted);
+    margin-top: 0.25em;
+}
+.MPC-vasiu-step.is-active .MPC-vasiu-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Segmented filter (All lines / Pending only)                */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-seg {
+    flex: none;
+    display: inline-flex;
+    border: 1px solid #BFE4FF;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.MPC-vasiu-seg button {
+    border: none;
+    background: #fff;
+    color: var(--iu-link);
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 700;
+    padding: 0.4375em 0.875em;
+    cursor: pointer;
+}
+.MPC-vasiu-seg button.on { background: var(--iu-info-bg); color: var(--iu-info-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Issue line table                                           */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-table {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.MPC-vasiu-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.2fr 1fr 0.7fr 0.9fr 0.9fr 0.9fr 1.1fr 0.9fr;
+}
+
+.MPC-vasiu-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--iu-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+}
+
+.MPC-vasiu-tBody {
+    border-bottom: 1px solid var(--iu-row-div);
+    font-size: 0.8125em;
+    color: var(--iu-text);
+}
+.MPC-vasiu-tBody:last-of-type { border-bottom: none; }
+.MPC-vasiu-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasiu-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasiu-table .ta-c { text-align: center; justify-content: center; }
+
+.MPC-vasiu-itItem { min-width: 0; }
+.MPC-vasiu-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasiu-itSku {
+    font-size: 0.9231em;
+    color: var(--iu-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Status tag */
+.MPC-vasiu-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasiu-tag.s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.MPC-vasiu-tag.s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.MPC-vasiu-tag.s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+
+.MPC-vasiu-tEmpty {
+    padding: 1.25em 0.875em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: var(--iu-muted);
+    border-bottom: 1px solid var(--iu-row-div);
+}
+
+/* Totals footer */
+.MPC-vasiu-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--iu-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasiu-tf { color: var(--iu-muted); }
+.MPC-vasiu-tf b { color: var(--iu-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasiu-tf.is-grand { color: var(--iu-text); font-weight: 700; }
+.MPC-vasiu-tf.is-grand b { color: var(--iu-action); margin-left: 0.5em; font-size: 1.15em; }
+
+@container (max-width: 720px) {
+    .MPC-vasiu-table { overflow-x: auto; }
+    .MPC-vasiu-tRow { min-width: 720px; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.MPC-vasiu-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.MPC-vasiu-btn .MPC-vasiu-ic { color: currentColor; }
+
+.MPC-vasiu-btn.btn-pri {
+    background: var(--iu-action);
+    border: 1px solid var(--iu-action);
+    color: #fff;
+}
+.MPC-vasiu-btn.btn-pri:hover { background: var(--iu-action-dk); border-color: var(--iu-action-dk); }
+
+.MPC-vasiu-btn.btn-sec {
+    background: #fff;
+    border: 1px solid var(--iu-action);
+    color: var(--iu-action);
+}
+.MPC-vasiu-btn.btn-sec:hover { background: var(--iu-info-bg); }
+
+.MPC-vasiu-btn.is-disabled {
+    background: #F1F4F7;
+    border-color: #DCE5EE;
+    color: #A6B2BD;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasiu-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasiu-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasiu-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasiu-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .MPC-vasiu-actions { justify-content: flex-start; }

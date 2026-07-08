@@ -148,6 +148,13 @@
     <Compile Include="Models\VAS_065_APInvoicePanelModel.cs" />
     <Compile Include="Models\VAS_074_CreateInvoiceLinePanelModel.cs" />
     <Compile Include="Models\VAS_092_OverviewPurchaseOrderModel.cs" />
+    <Compile Include="Models\VAS_098_PurchaseRequisitionModel.cs" />
+    <Compile Include="Models\VAS_099_OverviewGRNModel.cs" />
+    <Compile Include="Models\VAS_100_OverviewDOModel.cs" />
+    <Compile Include="Models\VAS_101_OverviewInventoryCountModel.cs" />
+    <Compile Include="Models\VAS_102_OverviewInternalUseModel.cs" />
+    <Compile Include="Models\VAS_103_MaterialTransferModel.cs" />
+    <Compile Include="Models\VAS_104_OverviewShipGRNConfirmationModel.cs" />
     <Compile Include="Models\VAS_105_AccountRightPanelModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
