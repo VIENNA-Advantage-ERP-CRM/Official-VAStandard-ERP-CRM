@@ -52,9 +52,7 @@
 ; (function (VAS, $) {
     "use strict";
 
-    function lbl(key, fallback) {
-        var text =
-            VIS.Msg.getMsg(key);
+    VAS.VAS_031_UpcomingAPRunsWidget = function () {
 
         var $self = this;
 
@@ -3458,6 +3456,88 @@
             $self.frame = null;
         }
     };
+
+
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.init =
+        function (windowNo, frame) {
+            this.frame = frame;
+            this.windowNo = windowNo;
+
+            if (
+                frame &&
+                frame.widgetInfo
+            ) {
+                this.AD_UserHomeWidgetID =
+                    frame.widgetInfo
+                        .AD_UserHomeWidgetID;
+            }
+
+            this.Initalize();
+
+            if (
+                this.frame &&
+                this.frame.getContentGrid
+            ) {
+                this.frame
+                    .getContentGrid()
+                    .append(
+                        this.getRoot()
+                    );
+            }
+        };
+
+    /**
+     * Handles widget size changes.
+     */
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype
+        .widgetSizeChange =
+        function (height, width) {
+            var $root =
+                this.getRoot();
+
+            if (!$root) {
+                return;
+            }
+
+            $root.toggleClass(
+                'vas-upcoming-ap-runs-compact',
+                (
+                    width &&
+                    width < 240
+                ) ||
+                (
+                    height &&
+                    height < 160
+                )
+            );
+        };
+
+    /**
+     * Refreshes widget.
+     */
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype
+        .refreshWidget =
+        function () {
+            loadData();
+
+        };
+
+    /**
+     * Disposes widget.
+     */
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.dispose =
+        function () {
+            this.disposeComponent();
+
+            if (
+                this.frame &&
+                this.frame.dispose
+            ) {
+                this.frame.dispose();
+            }
+
+            this.frame = null;
+        };
 
 })(VAS, jQuery);
 

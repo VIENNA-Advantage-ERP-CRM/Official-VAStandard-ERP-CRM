@@ -353,14 +353,14 @@
 
 .vas-recent-ap-payments-amount {
     width: 24%;
-    text-align: right;
+    text-align: right !important;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
 .vas-recent-ap-payments-table th.vas-recent-ap-payments-amount {
-    text-align: right;
+    text-align: right !important;
 }
 
 .vas-recent-ap-payments-row {

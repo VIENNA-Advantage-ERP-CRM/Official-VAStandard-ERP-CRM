@@ -1013,7 +1013,7 @@ INNER JOIN C_BPartner BusinessPartner ON
 INNER JOIN UnpaidSchedule UnpaidSchedule ON
 (
     UnpaidSchedule.C_Invoice_ID =
-        Invoice.C_Invoice_ID
+        Invoice.C_Invoice_ID 
 
     AND UnpaidSchedule.ScheduleOpenAmount > 0
 )
