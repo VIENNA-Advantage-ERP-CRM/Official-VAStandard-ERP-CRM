@@ -230,3 +230,4 @@ import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
+import "../app/tabpanel/VAS_105_AccountRightPanel.js";
