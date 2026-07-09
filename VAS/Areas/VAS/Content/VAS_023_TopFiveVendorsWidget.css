@@ -5,6 +5,13 @@
 .vas-t5vwdg-root {
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
+    /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
+       widget root so it never depends on the shared .vas-widget-bg being loaded. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -17,13 +24,12 @@
 }
 
 .vas-t5vwdg-container {
-    font-size: 14px;
+    /* Widget root anchor: every internal value below is em against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 1em 1.14em 0.86em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
-    border-radius: 12px;
+    padding: 0.875em;
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -41,11 +47,11 @@
 .vas-t5vwdg-title {
     display: flex;
     align-items: center;
-    gap: 0.4em;
-    font-size: 0.86em;
-    font-weight: 600;
+    gap: 0.625em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
     color: #102C3F;
-    line-height: 1.2;
+    line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -56,19 +62,7 @@
     width: 1em;
     height: 1em;
     flex-shrink: 0;
-    color: #5F7283;
-}
-
-.vas-t5vwdg-fy-chip {
-    flex-shrink: 0;
-    font-size: 0.72em;
-    font-weight: 600;
-    color: #0E5DA8;
-    background: #DFF1FF;
-    border-radius: 999px;
-    padding: 0.15em 0.65em;
-    white-space: nowrap;
-    border: 1px solid #BFE4FF;
+    color: #41576A;
 }
 
 /* ---- Vendor list ---- */
@@ -83,22 +77,13 @@
 .vas-t5vwdg-row {
     display: flex;
     align-items: center;
-    gap: 0.5em;
-    padding: 0.28em 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    gap: 0.75em;
+    padding: 0.325em 0.5em;
+    border-bottom: 1px solid #E2EAF1;
 }
 
 .vas-t5vwdg-row:last-child {
     border-bottom: none;
-}
-
-.vas-t5vwdg-rank {
-    flex-shrink: 0;
-    width: 1.1em;
-    font-size: 0.72em;
-    font-weight: 700;
-    color: #9FB3C8;
-    text-align: right;
 }
 
 .vas-t5vwdg-avatar {
@@ -126,8 +111,8 @@
 }
 
 .vas-t5vwdg-name {
-    font-size: 0.80em;
-    font-weight: 600;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px); /*0.75em;*/
+    font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
@@ -135,8 +120,8 @@
 }
 
 .vas-t5vwdg-cat {
-    font-size: 0.68em;
-    color: #748494;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 22px);
+    color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -148,25 +133,16 @@
 }
 
 .vas-t5vwdg-amt {
-    font-size: 0.80em;
+    font-size: clamp(12px,calc(var(--dash-inline-size, 100vw)*.0088),24px);
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
 }
 
-.vas-t5vwdg-yoy {
-    font-size: 0.68em;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.vas-t5vwdg-yoy-pos { color: #019D89; }
-.vas-t5vwdg-yoy-neg { color: #ED1C24; }
-
-/* ---- Divider ---- */
+/* ---- Divider (section boundary: list -> chart) ---- */
 .vas-t5vwdg-divider {
     height: 1px;
-    background: rgba(0, 0, 0, 0.09);
+    background: #D9E2EB;
     flex-shrink: 0;
     margin-bottom: 0.38em;
 }
@@ -176,9 +152,9 @@
     display: flex;
     align-items: center;
     gap: 0.35em;
-    font-size: 0.75em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
     font-weight: 600;
-    color: #5F7283;
+    color: #41576A;
     flex-shrink: 0;
     margin-bottom: 0.25em;
 }
@@ -187,14 +163,29 @@
     width: 0.95em;
     height: 0.95em;
     flex-shrink: 0;
-    color: #5F7283;
+    color: #41576A;
 }
 
-/* ---- Canvas ---- */
+/* ---- Chart area: donut (left) + custom HTML legend (right) ---- */
 .vas-t5vwdg-chart-wrap {
     flex: 1;
-    position: relative;
     min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+/* Donut auto-fits its box (square, capped) and centers — same rule as VAS_019.
+   Sized by the AVAILABLE HEIGHT (not width) so it can never overflow the chart
+   section vertically on zoom-out; the square width then follows via aspect-ratio. */
+.vas-t5vwdg-donut {
+    position: relative;
+    flex: 0 0 auto;
+    height: 100%;
+    max-height: 8.5em;
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+    align-self: center;
 }
 
 .vas-t5vwdg-canvas {
@@ -206,12 +197,51 @@
     display: block;
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 1920px) { .vas-t5vwdg-container { font-size: 14px; } }
-@media (max-width: 1366px) { .vas-t5vwdg-container { font-size: 13px; } }
-@media (max-width: 1024px) { .vas-t5vwdg-container { font-size: 12px; } }
-@media (max-width: 900px)  { .vas-t5vwdg-container { font-size: 11.5px; } }
-@media (max-width: 768px)  { .vas-t5vwdg-container { font-size: 11px; } }
-@media (max-width: 680px)  { .vas-t5vwdg-container { font-size: 10.5px; } }
-@media (max-width: 480px)  { .vas-t5vwdg-container { font-size: 10px; } }
-@media (max-width: 320px)  { .vas-t5vwdg-container { font-size: 9px; } }
+/* ---- Custom legend (replaces the Chart.js right legend that used to clip) ---- */
+.vas-t5vwdg-legend {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35em;
+    overflow: hidden;
+}
+
+.vas-t5vwdg-lg-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
+}
+
+.vas-t5vwdg-lg-dot {
+    flex-shrink: 0;
+    width: 0.7em;
+    height: 0.7em;
+    border-radius: 0.15em;
+}
+
+.vas-t5vwdg-lg-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 22px);
+    font-weight: 400;
+    color: #41576A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-t5vwdg-lg-val {
+    flex-shrink: 0;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 22px);
+    font-weight: 600;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+/* ---- Responsive ----
+   Widget interior scales via the em anchor clamp on .vas-t5vwdg-container, so no
+   per-breakpoint font-size stepping is needed. */

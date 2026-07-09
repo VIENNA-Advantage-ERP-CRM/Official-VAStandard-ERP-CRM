@@ -1394,8 +1394,11 @@
         }
 
         /* Parse "Ns.Class.Method;Ns2.Class2.Method2" into resolvable callout
-           instances + methods from the VIS.Model registry. Method match is
-           case-insensitive (AD_Column may store product / Product). */
+           instances + methods. Each token's namespace decides WHERE its class is
+           resolved (see resolveCalloutCtor): ViennaAdvantage / VAdvantage map to the
+           client VIS runtime, every OTHER Area prefix (VAS, VAFAM, VA###, ...) resolves
+           in that module's own global registry. Method match is case-insensitive
+           (AD_Column may store product / Product). */
         function resolveCallouts(calloutStr) {
             var out = [];
             var parts = String(calloutStr).split(";");
@@ -1406,7 +1409,7 @@
                 if (seg.length < 2) continue;
                 var method = seg.pop();
                 var cls = seg.pop();
-                var ctor = (VIS && VIS.Model) ? VIS.Model[cls] : null;
+                var ctor = resolveCalloutCtor(seg, cls);   // seg = the namespace before the class
                 if (typeof ctor !== "function") continue;
                 var inst;
                 try { inst = new ctor(); } catch (e) { continue; }
@@ -1417,6 +1420,26 @@
                 if (typeof fn === "function") out.push({ inst: inst, fn: fn });
             }
             return out;
+        }
+
+        /* Resolve a callout class constructor HONOURING its declared namespace, mirroring
+           the framework GridTab.processCallout / Utility.getFunctionByName.
+           ns = the dotted segments before the class name (e.g. ["VAFAM","Model"]).
+           ViennaAdvantage / VAdvantage are the .NET names for the client VIS runtime, so
+           their first segment is remapped to VIS (-> VIS.Model.*). Any OTHER prefix is a
+           separate module Area whose callout classes live under its OWN global - e.g. VAS
+           registers VAS.Model.* (VAS_CalloutOpportunity.js), VAFAM registers
+           VAFAM.Model.VAFAM_CalloutAsset - so we must look THERE, not in VIS.Model. A bare
+           "Class.Method" (no namespace) defaults to the VIS.Model registry. */
+        function resolveCalloutCtor(ns, cls) {
+            if (!ns || ns.length === 0) {
+                return (VIS && VIS.Model && typeof VIS.Model[cls] === "function") ? VIS.Model[cls] : null;
+            }
+            var path = ns.slice();
+            if (path[0] === "VAdvantage" || path[0] === "ViennaAdvantage") path[0] = "VIS";
+            var scope = (typeof window !== "undefined") ? window : null;
+            for (var j = 0; j < path.length && scope; j++) scope = scope[path[j]];
+            return (scope && typeof scope[cls] === "function") ? scope[cls] : null;
         }
 
         function runRealCallout(line, column, chain) {

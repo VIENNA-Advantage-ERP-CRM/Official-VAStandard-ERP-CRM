@@ -27,9 +27,13 @@ namespace VAS.Areas.VAS.Controllers
             return View();
         }
 
+        // Server-side paging for the category drill-down: bounds for the client-supplied size.
+        private const int MinPageSize = 1;
+        private const int MaxPageSize = 50;
+
         /// <summary>
-        /// Returns MTD/YTD purchase totals, invoice count, trend vs last month,
-        /// currency info from accounting schema, and 7-month sparkline data.
+        /// Returns MTD/YTD purchase totals, invoice count, trend vs last month, and
+        /// currency info (symbol + ISO code + precision) from the accounting schema.
         /// </summary>
         public JsonResult GetTotalPurchasesKpi()
         {
@@ -44,15 +48,18 @@ namespace VAS.Areas.VAS.Controllers
         }
 
         /// <summary>
-        /// Returns MTD material spend grouped by product category for the drill-down popup.
+        /// Returns one page of MTD material spend grouped by product category for the
+        /// drill-down popup. Amounts are raw (with the base-currency ISO code) so the
+        /// client formats them via VIS.Util.formatCompactAmount; paging is server-side
+        /// (the requested <paramref name="pageNo"/> slice + page metadata are returned).
         /// </summary>
-        public JsonResult GetPurchaseCategoryDrilldown()
+        public JsonResult GetPurchaseCategoryDrilldown(int pageNo = 1, int pageSize = 6)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                PurchaseCategoryDrilldownResult result = BuildCategoryDrilldown(ctx);
+                PurchaseCategoryDrilldownResult result = BuildCategoryDrilldown(ctx, pageNo, pageSize);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
@@ -80,7 +87,6 @@ namespace VAS.Areas.VAS.Controllers
         private PurchasesKpiResult BuildKpiResult(Ctx ctx)
         {
             PurchasesKpiResult result = new PurchasesKpiResult();
-            result.SparklineData = new List<decimal>();
 
             int clientId = ctx.GetAD_Client_ID();
             SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
@@ -96,7 +102,7 @@ namespace VAS.Areas.VAS.Controllers
             // ensuring the widget always uses the correct base currency for this client.
             int schemaCurrencyId = 0;
 
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, c.StdPrecision
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -112,6 +118,7 @@ namespace VAS.Areas.VAS.Controllers
             {
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
+                result.CurIso = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
             }
 
@@ -157,54 +164,29 @@ namespace VAS.Areas.VAS.Controllers
                 result.LastMonthTotal = Util.GetValueOfDecimal(row["LastMonthTotal"]);
             }
 
-            // Step 3 — Sparkline: monthly totals for last 7 months.
-            // Arithmetic on EXTRACT avoids date literals (Oracle + Postgres safe).
-            DateTime sevenMonthsAgo = now.AddMonths(-6);
-            int sparkYear = sevenMonthsAgo.Year;
-            int sparkMonth = sevenMonthsAgo.Month;
-
-            strQuery = @"SELECT EXTRACT(YEAR FROM i.DateInvoiced) AS InvYear,
-                         EXTRACT(MONTH FROM i.DateInvoiced) AS InvMonth,
-                         SUM(COALESCE(currencyConvert(i.GrandTotal, i.C_Currency_ID, " + schemaCurrencyId + @", i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID), 0)
-                             * CASE WHEN i.IsReturnTrx = 'Y' THEN -1 ELSE 1 END) AS MonthlyTotal
-                    FROM C_Invoice i
-                   WHERE i.IsSOTrx = 'N'
-                     AND i.IsExpenseInvoice = 'N'
-                     AND i.DocStatus IN ('CO', 'CL')
-                     AND i.IsActive = 'Y'
-                     AND i.AD_Client_ID = @ClientID
-                     AND (EXTRACT(YEAR FROM i.DateInvoiced) * 12 + EXTRACT(MONTH FROM i.DateInvoiced))
-                         >= (" + sparkYear + " * 12 + " + sparkMonth + @") ";
-
-            strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-            strQuery += @" GROUP BY EXTRACT(YEAR FROM i.DateInvoiced), EXTRACT(MONTH FROM i.DateInvoiced)
-                           ORDER BY EXTRACT(YEAR FROM i.DateInvoiced), EXTRACT(MONTH FROM i.DateInvoiced)";
-
-            DataSet sparkDs = DB.ExecuteDataset(strQuery, dataParams, null);
-            if (sparkDs != null && sparkDs.Tables.Count > 0 && sparkDs.Tables[0].Rows.Count > 0)
-            {
-                for (int i = 0; i < sparkDs.Tables[0].Rows.Count; i++)
-                {
-                    result.SparklineData.Add(Util.GetValueOfDecimal(sparkDs.Tables[0].Rows[i]["MonthlyTotal"]));
-                }
-            }
-
             return result;
         }
 
-        private PurchaseCategoryDrilldownResult BuildCategoryDrilldown(Ctx ctx)
+        private PurchaseCategoryDrilldownResult BuildCategoryDrilldown(Ctx ctx, int pageNo, int pageSize)
         {
+            if (pageSize < MinPageSize) { pageSize = MinPageSize; }
+            if (pageSize > MaxPageSize) { pageSize = MaxPageSize; }
+
             var result = new PurchaseCategoryDrilldownResult
             {
-                Categories = new List<PurchaseCategoryDrilldownRow>()
+                Categories = new List<PurchaseCategoryDrilldownRow>(),
+                PageNo     = 1,
+                PageSize   = pageSize
             };
+            // Full (unpaged) category set — the page slice is taken from this at the end.
+            var allCategories = new List<PurchaseCategoryDrilldownRow>();
 
             int clientId = ctx.GetAD_Client_ID();
             SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId) };
             ReportWindows w = GetReportWindows(ctx);
 
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, c.StdPrecision
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -220,6 +202,7 @@ namespace VAS.Areas.VAS.Controllers
             {
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
+                result.CurIso = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
             }
 
@@ -277,7 +260,6 @@ namespace VAS.Areas.VAS.Controllers
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
             if (ds != null && ds.Tables.Count > 0)
             {
-                int rowCount = 0;
                 foreach (DataRow row in ds.Tables[0].Rows)
                 {
                     decimal amount = Util.GetValueOfDecimal(row["TotalAmount"]);
@@ -289,28 +271,23 @@ namespace VAS.Areas.VAS.Controllers
                     result.LineCount += lineCount;
                     result.CategoryCount++;
 
-                    if (rowCount >= 12) { continue; }
-
-                    var category = new PurchaseCategoryDrilldownRow
+                    allCategories.Add(new PurchaseCategoryDrilldownRow
                     {
                         Name = Util.GetValueOfString(row["CategoryName"]),
                         Amount = amount,
                         Qty = qty,
                         LineCount = lineCount,
                         InvoiceCount = Util.GetValueOfInt(row["InvoiceCount"])
-                    };
-
-                    result.Categories.Add(category);
-                    rowCount++;
+                    });
                 }
             }
 
             // Top spender = highest real product category (captured before the
             // reconciliation bucket is added, so the summary line never points at "Other").
-            if (result.Categories.Count > 0)
+            if (allCategories.Count > 0)
             {
-                result.TopName = result.Categories[0].Name;
-                result.TopAmount = result.Categories[0].Amount;
+                result.TopName = allCategories[0].Name;
+                result.TopAmount = allCategories[0].Amount;
             }
 
             decimal categorizedTotal = result.TotalAmount;
@@ -347,7 +324,7 @@ namespace VAS.Areas.VAS.Controllers
             decimal otherAmount = grandTotalMtd - categorizedTotal;
             if (otherAmount > 0)
             {
-                result.Categories.Add(new PurchaseCategoryDrilldownRow
+                allCategories.Add(new PurchaseCategoryDrilldownRow
                 {
                     Name = "Other",
                     Amount = otherAmount,
@@ -358,14 +335,31 @@ namespace VAS.Areas.VAS.Controllers
             // Total now equals the card's MTD purchases; order the bars by amount and
             // recompute each share against that reconciled total.
             result.TotalAmount = grandTotalMtd > 0 ? grandTotalMtd : categorizedTotal;
-            result.Categories.Sort((a, b) => b.Amount.CompareTo(a.Amount));
+            allCategories.Sort((a, b) => b.Amount.CompareTo(a.Amount));
 
             if (result.TotalAmount > 0)
             {
-                foreach (PurchaseCategoryDrilldownRow category in result.Categories)
+                foreach (PurchaseCategoryDrilldownRow category in allCategories)
                 {
                     category.Percent = Math.Round((category.Amount / result.TotalAmount) * 100, 1);
                 }
+            }
+
+            // Largest bar across the whole set — sent so bar widths scale consistently
+            // across pages (the client only receives one page's rows).
+            result.MaxAmount = allCategories.Count > 0 ? allCategories[0].Amount : 0;
+
+            // Server-side paging — return only the requested page slice + page metadata.
+            result.TotalCount = allCategories.Count;
+            result.TotalPages = (result.TotalCount + pageSize - 1) / pageSize;
+            if (pageNo < 1) { pageNo = 1; }
+            if (result.TotalPages > 0 && pageNo > result.TotalPages) { pageNo = result.TotalPages; }
+            result.PageNo = pageNo;
+
+            int skip = (pageNo - 1) * pageSize;
+            for (int i = skip; i < allCategories.Count && i < skip + pageSize; i++)
+            {
+                result.Categories.Add(allCategories[i]);
             }
 
             return result;
@@ -378,8 +372,8 @@ namespace VAS.Areas.VAS.Controllers
             public int InvoiceCount { get; set; }
             public decimal LastMonthTotal { get; set; }
             public string CurSymbol { get; set; }
+            public string CurIso { get; set; }
             public int StdPrecision { get; set; }
-            public List<decimal> SparklineData { get; set; }
         }
         public class PurchaseCategoryDrilldownResult
         {
@@ -388,10 +382,16 @@ namespace VAS.Areas.VAS.Controllers
             public int InvoiceCount { get; set; }
             public int LineCount { get; set; }
             public decimal TotalQty { get; set; }
+            public decimal MaxAmount { get; set; }
             public string CurSymbol { get; set; }
+            public string CurIso { get; set; }
             public int StdPrecision { get; set; }
             public string TopName { get; set; }
             public decimal TopAmount { get; set; }
+            public int PageNo { get; set; }
+            public int PageSize { get; set; }
+            public int TotalPages { get; set; }
+            public int TotalCount { get; set; }
             public List<PurchaseCategoryDrilldownRow> Categories { get; set; }
         }
 
