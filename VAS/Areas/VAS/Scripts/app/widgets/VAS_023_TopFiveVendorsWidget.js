@@ -19,6 +19,27 @@
         return value && value !== key && value !== '[' + key + ']' ? value : fallback;
     }
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the em-anchor clamps resolve against the dashboard's visible
+       width, not the viewport. One document-level ResizeObserver serves every widget;
+       without a marked container — or without ResizeObserver — the CSS falls back to
+       100vw. (Mirrors VAS_024_TotalOutstandingWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     /* Per-rank avatar palette */
     var AVATAR_COLORS = [
         { bg: '#EAF8FF', text: '#0E5DA8' },
@@ -83,7 +104,9 @@
 
             var vendors = (data && data.Vendors)   ? data.Vendors   : [];
             var sym     = (data && data.CurSymbol) ? data.CurSymbol : '';
-            var fyLabel = (data && data.FyLabel)   ? data.FyLabel   : '';
+
+            var total = 0;
+            for (var ti = 0; ti < vendors.length; ti++) { total += (vendors[ti].CurrAmt || 0); }
 
             var html =
                 '<div class="vas-t5vwdg-header">' +
@@ -95,29 +118,23 @@
                         '</svg>' +
                         t5vEsc(msg('VAS_023_Top5VendorsBySpend', 'Top 5 Vendors by Spend')) +
                     '</div>' +
-                    '<span class="vas-t5vwdg-fy-chip">' + t5vEsc(fyLabel) + '</span>' +
                 '</div>' +
                 '<div class="vas-t5vwdg-list">';
 
             for (var i = 0; i < vendors.length; i++) {
                 var v   = vendors[i];
-                var pos = v.YoyPct >= 0;
                 var rankCls = 'vas-t5vwdg-avatar--r' + Math.min(v.Rank, 5);
                 html +=
                     '<div class="vas-t5vwdg-row">' +
-                        '<span class="vas-t5vwdg-rank">' + v.Rank + '</span>' +
                         '<span class="vas-t5vwdg-avatar ' + rankCls + '">' +
                             t5vEsc(v.Initials) +
                         '</span>' +
                         '<div class="vas-t5vwdg-info">' +
-                            '<div class="vas-t5vwdg-name">' + t5vEsc(v.Name)     + '</div>' +
-                            '<div class="vas-t5vwdg-cat">'  + t5vEsc(v.Category) + '</div>' +
+                            '<div class="vas-t5vwdg-name" title="' + t5vEsc(v.Name)     + '">' + t5vEsc(v.Name)     + '</div>' +
+                            '<div class="vas-t5vwdg-cat" title="'  + t5vEsc(v.Category) + '">' + t5vEsc(v.Category) + '</div>' +
                         '</div>' +
                         '<div class="vas-t5vwdg-metrics">' +
                             '<div class="vas-t5vwdg-amt">' + t5vFmt(v.CurrAmt, sym, data.StdPrecision) + '</div>' +
-                            '<div class="vas-t5vwdg-yoy ' + (pos ? 'vas-t5vwdg-yoy-pos' : 'vas-t5vwdg-yoy-neg') + '">' +
-                                t5vEsc((pos ? '+' : '') + v.YoyPct + '%') +
-                            '</div>' +
                         '</div>' +
                     '</div>';
             }
@@ -133,11 +150,34 @@
                     t5vEsc(msg('VAS_023_VendorSpendDist', 'Vendor Spend Distribution')) +
                 '</div>' +
                 '<div class="vas-t5vwdg-chart-wrap">' +
-                    '<canvas class="vas-t5vwdg-canvas" id="vas_t5vwdg_cv_' + widgetID + '"></canvas>' +
+                    '<div class="vas-t5vwdg-donut">' +
+                        '<canvas class="vas-t5vwdg-canvas" id="vas_t5vwdg_cv_' + widgetID + '"></canvas>' +
+                    '</div>' +
+                    '<div class="vas-t5vwdg-legend">' +
+                        buildLegend(vendors, total, sym, data.StdPrecision) +
+                    '</div>' +
                 '</div>';
 
             $container.html(html);
             window.setTimeout(function () { drawDonut(data); }, 80);
+        }
+
+        /* ---- Custom HTML legend (full CSS control: name is regular weight and
+             ellipsis-truncated so it never clips off the widget edge). ---- */
+        function buildLegend(vendors, total, sym, precision) {
+            var out = '';
+            for (var i = 0; i < vendors.length; i++) {
+                var v     = vendors[i];
+                var pct   = total > 0 ? Math.round((v.CurrAmt / total) * 100) : 0;
+                var color = DONUT_COLORS[i % DONUT_COLORS.length];
+                out +=
+                    '<div class="vas-t5vwdg-lg-row">' +
+                        '<span class="vas-t5vwdg-lg-dot" style="background:' + color + ';"></span>' +
+                        '<span class="vas-t5vwdg-lg-name" title="' + t5vEsc(v.Name) + '">' + t5vEsc(v.Name) + '</span>' +
+                        '<span class="vas-t5vwdg-lg-val">' + t5vEsc(sym + t5vShort(v.CurrAmt) + ' · ' + pct + '%') + '</span>' +
+                    '</div>';
+            }
+            return out;
         }
 
         /* ---- Chart.js Donut ---- */
@@ -174,15 +214,18 @@
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right)  / 2;
                     var cy  = (chart.chartArea.top  + chart.chartArea.bottom) / 2;
-                    var fs  = Math.max(9, Math.min(11, chart.width / 120));
+                    /* Scale with the rendered donut size so the center text keeps its
+                       proportion on zoom/resize (fs = "Total" label; amount is larger). */
+                    var fs    = Math.max(10, Math.min(16, chart.width / 12));
+                    var amtFs = fs + 2;
                     ctx.save();
                     ctx.textAlign    = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle    = '#102C3F';
-                    ctx.font         = 'bold ' + (fs + 1) + 'px Roboto, sans-serif';
-                    ctx.fillText(centerText, cx, cy - fs * 0.65);
+                    ctx.font         = 'bold ' + amtFs + 'px Roboto, sans-serif';
+                    ctx.fillText(centerText, cx, cy - fs * 0.55);
                     ctx.font      = fs + 'px Roboto, sans-serif';
-                    ctx.fillStyle = '#748494';
+                    ctx.fillStyle = '#5F7283';
                     ctx.fillText(totalLabel, cx, cy + fs * 0.85);
                     ctx.restore();
                 }
@@ -206,36 +249,13 @@
                     cutout: '55%',
                     layout: { padding: 4 },
                     plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: {
-                                font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#5F7283',
-                                boxWidth: 10,
-                                boxHeight: 10,
-                                padding: 8,
-                                generateLabels: function () {
-                                    return labels.map(function (name, i) {
-                                        var pct  = Math.round((amounts[i] / total) * 100);
-                                        var trunc = name.length > 14 ? name.slice(0, 14) + '…' : name;
-                                        return {
-                                            text: trunc + '  ' + sym + t5vShort(amounts[i]) + '  ' + pct + '%',
-                                            fillStyle:   bgColors[i],
-                                            strokeStyle: bgColors[i],
-                                            hidden: false,
-                                            index: i,
-                                            datasetIndex: 0
-                                        };
-                                    });
-                                }
-                            }
-                        },
+                        legend: { display: false },
                         tooltip: {
                             callbacks: {
                                 label: function (ctx) {
                                     var i   = ctx.dataIndex;
                                     var pct = Math.round((amounts[i] / total) * 100);
-                                    return ' ' + sym + t5vFmt(amounts[i], sym, data.StdPrecision) + '  (' + pct + '%)';
+                                    return ' ' + t5vFmt(amounts[i], sym, data.StdPrecision) + '  (' + pct + '%)';
                                 }
                             }
                         }
@@ -254,27 +274,18 @@
                 .replace(/"/g, '&quot;');
         }
 
-        function t5vFmt(amount, sym, precision) {
-            if (!amount || amount === 0) { return sym + '0'; }
-            var abs   = Math.abs(amount);
-            var loc   = window.navigator.language;
-            var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            var prec  = VIS.Env.getCtx().getStdPrecision() || precision || 2;
-            if (abs >= 10000000) { return sym + (abs / 10000000).toLocaleString(loc, opts1) + 'Cr'; }
-            if (abs >= 100000)   { return sym + (abs / 100000).toLocaleString(loc, opts1)   + 'L';  }
-            if (abs >= 1000)     { return sym + (abs / 1000).toLocaleString(loc, opts1)     + 'K';  }
-            return sym + abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+        /* Compact magnitude via the shared CurrencyFormat util (Indian vs international
+           per base-currency ISO), exactly like VAS_019/VAS_024. Returns the unsigned
+           magnitude only — callers prepend the sign/symbol. */
+        function t5vShort(val) {
+            var d = $self._kpiData || {};
+            return VIS.Util.formatCompactAmount(val, d.CurIso || '', d.StdPrecision);
         }
 
-        function t5vShort(val) {
-            if (!val || val === 0) { return '0'; }
-            var abs   = Math.abs(val);
-            var loc   = window.navigator.language;
-            var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + 'Cr'; }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + 'L';  }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + 'K';  }
-            return abs.toLocaleString(loc, { maximumFractionDigits: 0 });
+        function t5vFmt(amount, sym, precision) {
+            amount = Number(amount || 0);
+            var sign = amount < 0 ? '-' : '';
+            return sign + sym + t5vShort(amount);
         }
 
         /* ---- Busy indicator ---- */
@@ -305,6 +316,8 @@
         this.windowNo   = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };

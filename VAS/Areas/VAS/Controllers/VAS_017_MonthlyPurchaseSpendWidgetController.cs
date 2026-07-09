@@ -27,9 +27,11 @@ namespace VAS.Areas.VAS.Controllers
 
         /// <summary>
         /// Returns monthly GrandTotal totals for purchase invoices for the current and previous
-        /// fiscal year (April–March cycle). Uses 2 DB round-trips: currency + CTE aggregation.
-        /// MRole is applied only to the join-free C_Invoice base query inside the CTE.
-        /// FY month mapping: Apr=1, May=2, … Dec=9, Jan=10, Feb=11, Mar=12.
+        /// fiscal year, with the fiscal year taken from the client's configured accounting
+        /// calendar (not a hardcoded Apr–Mar cycle). Uses 3 DB round-trips: currency +
+        /// fiscal-year bounds + CTE aggregation. MRole is applied only to the join-free
+        /// C_Invoice base query inside the CTE. FyMonth = 1..12 counted from the FY's first
+        /// month; FyStartYear/FyStartMonth let the client render calendar-correct axis labels.
         /// </summary>
         public JsonResult GetMonthlyPurchaseSpend()
         {
@@ -53,15 +55,10 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
-            DateTime now = DateTime.Now;
-
-            // Fiscal year start year: if current month >= April the FY started this calendar year.
-            int fyStartYear = now.Month >= 4 ? now.Year : now.Year - 1;
-            result.FyLabel = "FY " + fyStartYear + "–" + (fyStartYear + 1).ToString().Substring(2);
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision, c.ISO_Code
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -78,11 +75,81 @@ namespace VAS.Areas.VAS.Controllers
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol    = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+                result.CurIso       = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
             }
 
             if (schemaCurrencyId == 0) { return result; }
 
-            // Round-trip 2 — CTE aggregation for current and previous FY monthly totals.
+            // Round-trip 2 — current & previous FISCAL YEAR start dates from the client's
+            // configured accounting calendar (AD_ClientInfo -> C_Calendar -> C_Year ->
+            // C_Period), same logic as VAS_023. The FY whose span contains today is current;
+            // the one before it is previous. Falls back to Apr–Mar if no calendar/periods.
+            DateTime today = DateTime.Today;
+            DateTime curStart = today, prevStart = today;
+            bool fyResolved = false;
+
+            strQuery = @"SELECT yr.FiscalYear AS FiscalYear,
+                        MIN(p.StartDate) AS YrStart,
+                        MAX(p.EndDate)   AS YrEnd
+                   FROM AD_ClientInfo ci
+                  INNER JOIN C_Calendar cal ON (ci.C_Calendar_ID = cal.C_Calendar_ID)
+                  INNER JOIN C_Year yr      ON (yr.C_Calendar_ID = cal.C_Calendar_ID)
+                  INNER JOIN C_Period p     ON (p.C_Year_ID = yr.C_Year_ID)
+                  WHERE ci.AD_Client_ID = @ClientID
+                    AND ci.IsActive = 'Y'
+                    AND yr.IsActive = 'Y'
+                    AND p.IsActive = 'Y'
+                    AND p.PeriodType = 'S'
+                  GROUP BY yr.C_Year_ID, yr.FiscalYear
+                  ORDER BY MIN(p.StartDate)";
+
+            DataSet fyDs = DB.ExecuteDataset(strQuery, dataParams, null);
+            if (fyDs != null && fyDs.Tables.Count > 0 && fyDs.Tables[0].Rows.Count > 0)
+            {
+                DataRowCollection rows = fyDs.Tables[0].Rows;
+                int curIdx = -1;
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    DateTime s = Util.GetValueOfDateTime(rows[i]["YrStart"]).Value.Date;
+                    DateTime e = Util.GetValueOfDateTime(rows[i]["YrEnd"]).Value.Date;
+                    if (today >= s && today <= e) { curIdx = i; break; }
+                }
+                if (curIdx < 0)
+                {
+                    for (int i = rows.Count - 1; i >= 0; i--)
+                    {
+                        if (today >= Util.GetValueOfDateTime(rows[i]["YrStart"]).Value.Date) { curIdx = i; break; }
+                    }
+                }
+                if (curIdx >= 0)
+                {
+                    curStart = Util.GetValueOfDateTime(rows[curIdx]["YrStart"]).Value.Date;
+                    result.FyLabel = "FY " + Util.GetValueOfString(rows[curIdx]["FiscalYear"]);
+                    prevStart = (curIdx > 0)
+                        ? Util.GetValueOfDateTime(rows[curIdx - 1]["YrStart"]).Value.Date
+                        : curStart.AddYears(-1);
+                    fyResolved = true;
+                }
+            }
+
+            if (!fyResolved)
+            {
+                // Fallback — Apr 1 Indian fiscal year.
+                int fbStartYear = today.Month >= 4 ? today.Year : today.Year - 1;
+                curStart  = new DateTime(fbStartYear, 4, 1);
+                prevStart = new DateTime(fbStartYear - 1, 4, 1);
+                result.FyLabel = "FY " + fbStartYear + "–" + (fbStartYear + 1).ToString().Substring(2);
+            }
+
+            result.FyStartYear  = curStart.Year;
+            result.FyStartMonth = curStart.Month;
+
+            // Absolute month index (year*12+month) of each FY's first month; FyMonth 1..12 is
+            // the offset from it. A standard 12-period calendar makes prevStartAbs = curStartAbs-12.
+            int curStartAbs  = curStart.Year * 12 + curStart.Month;
+            int prevStartAbs = prevStart.Year * 12 + prevStart.Month;
+
+            // Round-trip 3 — CTE aggregation for current and previous FY monthly totals.
             // MRole applied to C_Invoice base query only (join-free to prevent AccessSqlParser OOM).
             // CTE alias MonthlyData is NOT a physical table — MRole is NOT applied to it.
             string baseQuery = @"SELECT i.C_Invoice_ID,
@@ -100,29 +167,25 @@ namespace VAS.Areas.VAS.Controllers
 
             baseQuery = MRole.GetDefault(ctx).AddAccessSQL(baseQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            int fyPrev = fyStartYear - 1;
-            int fyNext = fyStartYear + 1;
-
-            // WHERE covers both FYs:
-            //   Previous FY: Apr(fyPrev)–Mar(fyStartYear)
-            //   Current  FY: Apr(fyStartYear)–Mar(fyNext)
-            // FyType 'C' = current FY, 'P' = previous FY.
-            // FyMonth = calendar month mapped to fiscal month (Apr=1 … Mar=12).
+            // Bucket each invoice by absolute month index (year*12+month), then classify as
+            // current ('C') or previous ('P') FY and compute FyMonth = 1..12 offset from that
+            // FY's first month. Works for any calendar start (Apr, Jan, Jul, …).
             strQuery = @"WITH MonthlyData AS (
                     SELECT inv.GrandTotal,
-                           CASE WHEN (EXTRACT(YEAR FROM inv.DateAcct) = " + fyStartYear + @" AND EXTRACT(MONTH FROM inv.DateAcct) >= 4)
-                                  OR (EXTRACT(YEAR FROM inv.DateAcct) = " + fyNext + @" AND EXTRACT(MONTH FROM inv.DateAcct) <= 3)
-                                THEN 'C' ELSE 'P' END AS FyType,
-                           CASE WHEN EXTRACT(MONTH FROM inv.DateAcct) >= 4
-                                THEN EXTRACT(MONTH FROM inv.DateAcct) - 3
-                                ELSE EXTRACT(MONTH FROM inv.DateAcct) + 9 END AS FyMonth
+                           (EXTRACT(YEAR FROM inv.DateAcct) * 12 + EXTRACT(MONTH FROM inv.DateAcct)) AS MonAbs
                       FROM (" + baseQuery + @") inv
-                     WHERE ((EXTRACT(YEAR FROM inv.DateAcct) = " + fyPrev + @" AND EXTRACT(MONTH FROM inv.DateAcct) >= 4)
-                         OR (EXTRACT(YEAR FROM inv.DateAcct) = " + fyStartYear + @")
-                         OR (EXTRACT(YEAR FROM inv.DateAcct) = " + fyNext + @" AND EXTRACT(MONTH FROM inv.DateAcct) <= 3))
+                     WHERE (EXTRACT(YEAR FROM inv.DateAcct) * 12 + EXTRACT(MONTH FROM inv.DateAcct))
+                           BETWEEN " + prevStartAbs + @" AND " + (curStartAbs + 11) + @"
+                ),
+                Classified AS (
+                    SELECT GrandTotal,
+                           CASE WHEN MonAbs >= " + curStartAbs + @" THEN 'C' ELSE 'P' END AS FyType,
+                           CASE WHEN MonAbs >= " + curStartAbs + @" THEN MonAbs - " + curStartAbs + @" + 1
+                                ELSE MonAbs - " + prevStartAbs + @" + 1 END AS FyMonth
+                      FROM MonthlyData
                 )
                 SELECT FyType, FyMonth, SUM(GrandTotal) AS TotalAmount
-                  FROM MonthlyData
+                  FROM Classified
                  GROUP BY FyType, FyMonth
                  ORDER BY FyType, FyMonth";
 
@@ -149,7 +212,10 @@ namespace VAS.Areas.VAS.Controllers
         {
             public string    CurSymbol    { get; set; }
             public int       StdPrecision { get; set; }
+            public string    CurIso       { get; set; }
             public string    FyLabel      { get; set; }
+            public int       FyStartYear  { get; set; }
+            public int       FyStartMonth { get; set; }
             public decimal[] CurrentYear  { get; set; }
             public decimal[] LastYear     { get; set; }
         }

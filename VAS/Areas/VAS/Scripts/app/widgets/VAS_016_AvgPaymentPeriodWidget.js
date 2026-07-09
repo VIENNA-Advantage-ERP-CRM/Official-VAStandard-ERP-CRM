@@ -40,18 +40,37 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the title / metric / why clamps resolve against the
+       dashboard's visible width, not the viewport. One document-level ResizeObserver
+       serves every widget; without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. (Mirrors VIS.OutstandingSalesOrderWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_016_AvgPaymentPeriodWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-apwdg-root">');
+        var $root = $('<div class="h-100 w-100 vas-apwdg-root">');
         var $container;
         var $dpoDialog = null;
         var widgetID = null;
-        var drillData = null;          // cached drill-down payload for client-side paging
-        var drillPage = 0;             // current 0-based page in the drill-down popup
-        var DRILL_PAGE_SIZE = 6;       // category rows shown per page (rule 18 - paging)
+        var drillData = null;          // cached drill-down payload
 
         /* ---- Initialise ---- */
         this.initalize = function () {
@@ -90,6 +109,15 @@
                 e.stopPropagation();
                 openDpoDialog();
             });
+            // The clickable overlay is a <div role="button">, so it has no native
+            // keyboard activation — wire Enter / Space up manually.
+            $container.on('keydown', '.vas-apwdg-open', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openDpoDialog();
+                }
+            });
             $root.append($container);
         }
 
@@ -100,46 +128,41 @@
             var daySuffix = msg('VAS_016_DaySuffix', 'd');
             var days = msg('VAS_016_Days', 'days');
 
-            // Trend: difference in days (absolute, not percentage)
+            // Trend: difference in days vs last month (absolute, not percentage)
             var daysDiff = (data.CurrentMonthDpo || 0) - (data.LastMonthDpo || 0);
-            var isIncreasing = daysDiff >= 0;
-            var trendClass = isIncreasing ? 'vas-apwdg-trend-warn' : 'vas-apwdg-trend-good';
-            var trendSign = isIncreasing ? '+' : '';
-            var arrowPoints = isIncreasing ? '18 15 12 9 6 15' : '6 9 12 15 18 9';
+            var trendSignWord = daysDiff >= 0 ? '+' : '-';
 
-            // Gap pill: amber when over target, green when at or under
+            // Gap vs target: days over target (positive) or within target (<= 0)
             var gapDays = data.GapDays || 0;
-            var gapSign = gapDays > 0 ? '+' : '';
-            var gapClass = gapDays > 0 ? 'vas-apwdg-pill-value-warn' : 'vas-apwdg-pill-value-good';
 
-            var sparkSvg = buildSparklineSvg(data.SparklineData || []);
+            // WHY line: DPO vs target, then the vs-last-month movement.
+            var whyText = (gapDays > 0
+                ? gapDays + ' ' + days + ' ' + msg('VAS_016_OverTargetShort', 'over target')
+                : msg('VAS_016_WithinTargetShort', 'within target'))
+                + ' · ' + trendSignWord + Math.abs(daysDiff) + ' ' + days + ' '
+                + msg('VAS_016_VsLastMonth', 'vs last month');
 
-            var html = '<div class="vas-apwdg-label">' + msg('VAS_016_AvgPaymentPeriodDpo', 'Avg Payment Period (DPO)') + '</div>'
-                + '<div class="vas-apwdg-value" id="vas_apwdg_val_' + widgetID + '">'
-                +   (data.CurrentMonthDpo || 0) + ' ' + days
-                + '</div>'
-                + '<div class="vas-apwdg-pills-row">'
-                +   '<div class="vas-apwdg-pill">'
-                +     '<span class="vas-apwdg-pill-label">' + msg('VAS_016_Target', 'Target') + '</span>'
-                +     '<span class="vas-apwdg-pill-value">' + (data.TargetDpo || 0) + daySuffix + '</span>'
-                +   '</div>'
-                +   '<div class="vas-apwdg-pill">'
-                +     '<span class="vas-apwdg-pill-label">' + msg('VAS_016_Gap', 'Gap') + '</span>'
-                +     '<span class="vas-apwdg-pill-value ' + gapClass + '">' + gapSign + gapDays + daySuffix + '</span>'
-                +   '</div>'
-                + '</div>'
-                + '<div class="vas-apwdg-trend-row ' + trendClass + '">'
-                +   '<svg class="vas-apwdg-trend-icon" viewBox="0 0 24 24" fill="none"'
-                +       ' stroke="currentColor" stroke-width="2.5"'
+            // Structure mirrors AvgDaysToPayWidget: header (violet-tinted target icon +
+            // title only), big metric + muted day suffix, and a WHY explanatory line.
+            var html = '<div class="vas-apwdg-header">'
+                +   '<div class="vas-apwdg-icon">'
+                +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
                 +       ' stroke-linecap="round" stroke-linejoin="round">'
-                +     '<polyline points="' + arrowPoints + '"/>'
-                +   '</svg>'
-                +   trendSign + Math.abs(daysDiff) + ' ' + days + ' ' + msg('VAS_016_VsLastMonth', 'vs last month')
+                +       '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
+                +     '</svg>'
+                +   '</div>'
+                +   '<div class="vas-apwdg-title">' + msg('VAS_016_AvgPaymentPeriodDpo', 'Avg Payment Period (DPO)') + '</div>'
                 + '</div>'
-                + sparkSvg
-                + '<button type="button" class="vas-apwdg-open" aria-label="'
+                + '<div class="vas-apwdg-value" id="vas_apwdg_val_' + widgetID + '">'
+                +   '<span class="vas-apwdg-metric-val">' + (data.CurrentMonthDpo || 0) + '</span>'
+                +   '<span class="vas-apwdg-metric-suffix">' + daySuffix + '</span>'
+                + '</div>'
+                + '<div class="vas-apwdg-why-wrap">'
+                +   '<span class="vas-apwdg-why-text">' + apEsc(whyText) + '</span>'
+                + '</div>'
+                + '<div class="vas-apwdg-open" role="button" tabindex="0" aria-label="'
                 +   apEsc(msg('VAS_016_OpenDrilldown', 'Open DPO analysis'))
-                + '"></button>';
+                + '"></div>';
 
             $container.append(html);
         }
@@ -166,7 +189,6 @@
                     $dpoDialog.remove();
                     $dpoDialog = null;
                     drillData = null;
-                    drillPage = 0;
                 }
             });
 
@@ -181,7 +203,15 @@
         }
 
         function loadDpoDrilldown() {
-            $dpoDialog.html('<div class="vas-apwdg-drill-state">' + apEsc(msg('VAS_016_Loading', 'Loading...')) + '</div>');
+            // Show a busy spinner AND open the modal immediately, so clicking gives
+            // instant feedback while the drill-down loads. (Previously the dialog was
+            // only opened via showDpoDialog() inside the AJAX callbacks, so nothing —
+            // no busy indicator — appeared during the request.)
+            $dpoDialog.html('<div class="vas-apwdg-drill-state" role="status" aria-label="'
+                + apEsc(msg('VAS_016_Loading', 'Loading...')) + '">'
+                + '<div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div>'
+                + '</div>');
+            showDpoDialog();
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS/VAS_016_AvgPaymentPeriodWidget/GetDpoDrilldown',
@@ -217,24 +247,20 @@
             }
 
             drillData = data;
-            drillPage = 0;
             paintDpoDrilldown();
         }
 
-        /* Renders the current drill-down page. Rule 18: client-side paging over
-           the DPO-by-category rows (the stats cards / narrative stay fixed). */
+        /* Renders the drill-down: the three stat cards + the narrative. */
         function paintDpoDrilldown() {
             if (!$dpoDialog || !drillData) { return; }
 
             var data = drillData;
-            var categories = data.Categories || [];
             var current = data.CurrentDpo || 0;
             var target = data.TargetDpo || 0;
             var lastMonth = data.LastMonthDpo || 0;
             var gap = (data.GapDays != null) ? data.GapDays : (current - target);
 
             var days = msg('VAS_016_Days', 'days');
-            var daySuffix = msg('VAS_016_DaySuffix', 'd');
 
             var html = '<div class="vas-apwdg-drill-stats">'
                 + miniCard(msg('VAS_016_CurrentDpo', 'Current DPO'), current + ' ' + days, 'vas-apwdg-drill-mini--vio')
@@ -261,83 +287,8 @@
                 html += '<div class="vas-apwdg-drill-warn">' + apEsc(warnText) + '</div>';
             }
 
-            var pageCount = 0;
-            if (categories.length) {
-                pageCount = Math.ceil(categories.length / DRILL_PAGE_SIZE);
-                if (drillPage >= pageCount) { drillPage = pageCount - 1; }
-                if (drillPage < 0) { drillPage = 0; }
-                var start = drillPage * DRILL_PAGE_SIZE;
-                var end = Math.min(start + DRILL_PAGE_SIZE, categories.length);
-
-                html += '<div class="vas-apwdg-drill-title">' + apEsc(msg('VAS_016_DpoByCategory', 'DPO by Category')) + '</div>'
-                    + '<div class="vas-apwdg-drill-rows">';
-
-                for (var i = start; i < end; i++) {
-                    var cat = categories[i];
-                    var dpoDays = Number(cat.DpoDays || 0);
-                    var valClass = dpoDays > target ? 'vas-apwdg-drill-row-val--bad' : 'vas-apwdg-drill-row-val--good';
-
-                    html += '<div class="vas-apwdg-drill-row">'
-                        + '<span class="vas-apwdg-drill-row-name">' + apEsc(cat.Name || '-') + '</span>'
-                        + '<span class="vas-apwdg-drill-row-val ' + valClass + '">' + apEsc(formatQty(dpoDays) + daySuffix) + '</span>'
-                        + '</div>';
-                }
-
-                // Keep every popup the same (max) height: always pad the page up to
-                // DRILL_PAGE_SIZE with invisible placeholder rows, so a short page or a
-                // single-page popup is the same size as a full 6-row page.
-                if (pageCount >= 1) {
-                    for (var pad = end - start; pad < DRILL_PAGE_SIZE; pad++) {
-                        html += '<div class="vas-apwdg-drill-row vas-apwdg-drill-row--ph" aria-hidden="true">'
-                            + '<span class="vas-apwdg-drill-row-name">&nbsp;</span>'
-                            + '<span class="vas-apwdg-drill-row-val">&nbsp;</span>'
-                            + '</div>';
-                    }
-                }
-
-                html += '</div>';
-                html += buildDrillPager(drillPage, pageCount, categories.length);
-            }
-
             $dpoDialog.html(html);
-
-            $dpoDialog.find('.vas-apwdg-drill-pager-prev').on('click', function () {
-                if (drillPage > 0) { drillPage--; paintDpoDrilldown(); }
-            });
-            $dpoDialog.find('.vas-apwdg-drill-pager-next').on('click', function () {
-                if (drillPage < pageCount - 1) { drillPage++; paintDpoDrilldown(); }
-            });
-
             showDpoDialog();
-        }
-
-        /* Footer pager (rule 18): "Showing X-Y of Z" on the left, "<  n of m  >" on
-           the right (24px buttons / 14px chevrons per the design spec). */
-        function buildDrillPager(page, pageCount, total) {
-            // Always render the pager so the popup keeps a uniform height; on a single
-            // page both nav buttons simply stay disabled ("1 of 1").
-            if (pageCount < 1) { return ''; }
-            var start = page * DRILL_PAGE_SIZE + 1;
-            var end = Math.min((page + 1) * DRILL_PAGE_SIZE, total);
-            var prevDis = page <= 0 ? ' disabled' : '';
-            var nextDis = page >= pageCount - 1 ? ' disabled' : '';
-            var showing = msg('VAS_016_Showing', 'Showing') + ' ' + start + '–' + end
-                + ' ' + msg('VAS_016_Of', 'of') + ' ' + total;
-            var ofLabel = (page + 1) + ' ' + msg('VAS_016_Of', 'of') + ' ' + pageCount;
-            return '<div class="vas-apwdg-drill-pager">'
-                + '<span class="vas-apwdg-drill-pager-info">' + apEsc(showing) + '</span>'
-                + '<div class="vas-apwdg-drill-pager-nav">'
-                +   '<button type="button" class="vas-apwdg-drill-pager-btn vas-apwdg-drill-pager-prev"' + prevDis
-                +     ' aria-label="' + apEsc(msg('VAS_016_PrevPage', 'Previous page')) + '">'
-                +     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>'
-                +   '</button>'
-                +   '<span class="vas-apwdg-drill-pager-label">' + apEsc(ofLabel) + '</span>'
-                +   '<button type="button" class="vas-apwdg-drill-pager-btn vas-apwdg-drill-pager-next"' + nextDis
-                +     ' aria-label="' + apEsc(msg('VAS_016_NextPage', 'Next page')) + '">'
-                +     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>'
-                +   '</button>'
-                + '</div>'
-                + '</div>';
         }
 
         function miniCard(label, value, modClass) {
@@ -345,12 +296,6 @@
                 + '<div class="vas-apwdg-drill-mini-label">' + apEsc(label) + '</div>'
                 + '<div class="vas-apwdg-drill-mini-value">' + apEsc(value) + '</div>'
                 + '</div>';
-        }
-
-        function formatQty(value) {
-            return Number(value || 0).toLocaleString(window.navigator.language, {
-                maximumFractionDigits: 2
-            });
         }
 
         function msg(key, fallback) {
@@ -377,31 +322,9 @@
                     $dpoDialog.remove();
                     $dpoDialog = null;
                     drillData = null;
-                    drillPage = 0;
                 }
             }
         };
-
-        /* ---- Build sparkline SVG ---- */
-        function buildSparklineSvg(data) {
-            if (!data || data.length < 2) { return ''; }
-            var W = 90, H = 48, pad = 3;
-            var maxVal = Math.max.apply(null, data);
-            var minVal = Math.min.apply(null, data);
-            if (maxVal === minVal) { maxVal = minVal + 1; }
-            var xStep = (W - pad * 2) / (data.length - 1);
-            var pts = [];
-            for (var i = 0; i < data.length; i++) {
-                var x = pad + i * xStep;
-                var y = H - pad - ((data[i] - minVal) / (maxVal - minVal)) * (H - pad * 2);
-                pts.push(x.toFixed(1) + ',' + y.toFixed(1));
-            }
-            return '<svg class="vas-apwdg-sparkline" width="' + W + '" height="' + H
-                + '" viewBox="0 0 ' + W + ' ' + H + '">'
-                + '<polyline points="' + pts.join(' ') + '" fill="none"'
-                + ' stroke="#8B7CFF" stroke-width="2.2" stroke-linecap="round"/>'
-                + '</svg>';
-        }
 
         /* ---- Busy indicator ---- */
         function createBusyIndicator() {
@@ -429,6 +352,8 @@
         this.windowNo = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () {
             self.intialLoad();

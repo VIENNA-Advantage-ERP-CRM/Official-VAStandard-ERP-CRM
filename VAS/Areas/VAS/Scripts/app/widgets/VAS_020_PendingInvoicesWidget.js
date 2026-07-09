@@ -1,4 +1,4 @@
-﻿/************************************************************
+/************************************************************
  * Module Name    : VAS
  * Purpose        : Pending Invoices Widget
  * Created Date   : 14 May 2026
@@ -14,6 +14,10 @@
  *   VAS_020_Pending             => "pending"
  *   VAS_020_NoDuePayments       => "No payments due in the next 14 days"
  *   VAS_020_Value               => "value"
+ *   VAS_020_Showing             => "Showing"
+ *   VAS_020_Of                  => "of"
+ *   VAS_020_Prev                => "Previous"
+ *   VAS_020_Next                => "Next"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -25,13 +29,21 @@
         return value && value !== key && value !== '[' + key + ']' ? value : fallback;
     }
 
-    /* KPI colour palette */
-    var KPI_COLORS = {
-        aa:  '#D78B10',   // Awaiting Approval — amber
-        grn: '#D14545',   // GRN Mismatch — red
-        pnr: '#5F4AA6',   // PO Not Raised — violet
-        rtp: '#019D89'    // Ready to Pay — green
-    };
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the widget's em-anchor clamps resolve against the dashboard's
+       visible width, not the viewport. (Mirrors VAS_018.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VAS.VAS_020_PendingInvoicesWidget = function () {
         this.frame;
@@ -41,13 +53,40 @@
         var $root    = $('<div class="h-100 w-100 vas-widget-bg vas-piawdg-root">');
         var $container;
         var widgetID = null;
-        var $catDialog = null;
-        var _catCurPrec = 2;
-        var _catCat = '';
-        var _catLoaded = 0;
-        var _catHasMore = false;
-        var _catLoading = false;
-        var CAT_PAGE = 25;
+
+        /* Base-currency (from KPI payload), reused for compact amount formatting. */
+        var _curSym  = '';
+        var _curIso  = '';
+        var _curPrec = 2;
+
+        /* Upcoming-due server-side paging state. The page size is ADAPTIVE — derived from
+           the list's available height at runtime (mirrors VAS_021) so the visible rows always
+           fit the card (no clipped last row); a ResizeObserver re-pages on resize. */
+        var _dueItems     = [];
+        var _duePage      = 1;
+        var _dueTotal     = 0;
+        var _duePageSize  = 4;      // initial guess; replaced by the adaptive measure + server echo
+        var _dueLoading   = false;
+        var _dueRowH      = 0;      // last measured due-row height (px)
+        var _dueNeedsSync = true;   // measure capacity on first paint only; resize handled by observer
+        var _dueObserver  = null;
+        var DUE_MIN_ROWS      = 1;  // never force more rows than physically fit
+        var DUE_ROW_FALLBACK  = 40; // px, used only before a real row is measured
+
+        /* Category drill-down modal server-side paging state. Page size is ADAPTIVE —
+           measured from the popup list's available height (mirrors VAS_021 / the due list). */
+        var $catDialog    = null;
+        var _catCat       = '';
+        var _catPage      = 1;
+        var _catTotal     = 0;
+        var _catTotalPgs  = 0;
+        var _catPageSize  = 20;     // initial guess; replaced by the adaptive measure + server echo
+        var _catLoading   = false;
+        var _catRowH      = 0;      // last measured row height (px)
+        var _catNeedsSync = true;   // measure capacity on first render only; resize handled by observer
+        var _catObserver  = null;
+        var CAT_MIN_ROWS      = 1;
+        var CAT_ROW_FALLBACK  = 48; // px, used only before a real row is measured
 
         $self._kpiData = null;
 
@@ -87,8 +126,9 @@
         function renderWidget(data) {
             $container.empty();
 
-            var sym  = data.CurSymbol    || '';
-            var prec = VIS.Env.getCtx().getStdPrecision() || data.StdPrecision || 2;
+            _curSym  = data.CurSymbol || '';
+            _curIso  = data.CurIso    || '';
+            _curPrec = (data.StdPrecision != null ? data.StdPrecision : (VIS.Env.getCtx().getStdPrecision() || 2));
             var tot  = data.TotalPending || 0;
 
             /* Header */
@@ -112,63 +152,182 @@
                 '<div class="vas-piawdg-kpi-grid">' +
                     piKpiBox('approval',
                         msg('VAS_020_NeedsAttention', 'Needs Attention'),
-                        data.AwaitingApprovalCount, data.AwaitingApprovalAmt, sym, prec, 'vas-piawdg-kpi-val--aa') +
+                        data.AwaitingApprovalCount, data.AwaitingApprovalAmt, 'vas-piawdg-kpi-val--aa') +
                     piKpiBox('grn',
                         msg('VAS_020_GRNMismatch', 'GRN Mismatch'),
-                        data.GrnMismatchCount, data.GrnMismatchAmt, sym, prec, 'vas-piawdg-kpi-val--grn') +
+                        data.GrnMismatchCount, data.GrnMismatchAmt, 'vas-piawdg-kpi-val--grn') +
                     piKpiBox('po',
                         msg('VAS_020_PONotRaised', 'PO Not Raised'),
-                        data.PoNotRaisedCount, data.PoNotRaisedAmt, sym, prec, 'vas-piawdg-kpi-val--pnr') +
+                        data.PoNotRaisedCount, data.PoNotRaisedAmt, 'vas-piawdg-kpi-val--pnr') +
                     piKpiBox('ready',
                         msg('VAS_020_ReadyToPay', 'Ready to Pay'),
-                        data.ReadyToPayCount, data.ReadyToPayAmt, sym, prec, 'vas-piawdg-kpi-val--rtp') +
+                        data.ReadyToPayCount, data.ReadyToPayAmt, 'vas-piawdg-kpi-val--rtp') +
                 '</div>' +
 
                 '<div class="vas-piawdg-divider"></div>' +
 
-                /* Upcoming due section */
+                /* Upcoming due section (server-side paged, footer pager) */
                 '<div class="vas-piawdg-due-header">' +
                     (msg('VAS_020_UpcomingPaymentsDue', 'Upcoming Payments Due')) +
                 '</div>' +
-                '<div class="vas-piawdg-due-list">';
+                '<div class="vas-piawdg-due-list"></div>' +
+                '<div class="vas-piawdg-due-pager"></div>';
 
-            var dueItems = data.DueItems || [];
-            if (dueItems.length === 0) {
-                html += '<div class="vas-piawdg-due-empty">' + (msg('VAS_020_NoDuePayments', 'No payments due in the next 14 days')) + '</div>';
-            } else {
-                for (var i = 0; i < dueItems.length; i++) {
-                    var item       = dueItems[i];
-                    var urgentCls  = item.DaysUntilDue <= 3 ? 'vas-piawdg-urgent' : 'vas-piawdg-warning';
-                    html +=
-                        '<div class="vas-piawdg-due-item">' +
-                            '<span class="vas-piawdg-due-dot ' + urgentCls + '"></span>' +
-                            '<div class="vas-piawdg-due-info">' +
-                                '<div class="vas-piawdg-due-name">' + piEsc(item.VendorName) + '</div>' +
-                                '<div class="vas-piawdg-due-date">Due ' + piEsc(item.DueDateStr) + '</div>' +
-                            '</div>' +
-                            '<div class="vas-piawdg-due-amt ' + urgentCls + '">' +
-                                piFmt(item.OpenAmt, sym, prec) +
-                            '</div>' +
-                        '</div>';
-                }
-            }
-
-            html += '</div>';
             $container.html(html);
 
-            _catCurPrec = prec;
             $container.find('.vas-piawdg-kpi-click').on('click', function () {
                 openCategoryPopup($(this).attr('data-cat'), $(this).attr('data-label'));
             });
+            $container.find('.vas-piawdg-kpi-click').on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    openCategoryPopup($(this).attr('data-cat'), $(this).attr('data-label'));
+                }
+            });
+
+            /* Seed due paging from the KPI payload's first page, then adapt the page size to
+               the card's available height (VAS_021 pattern). */
+            _dueItems     = data.DueItems || [];
+            _duePage      = 1;
+            _dueTotal     = data.DueTotalCount != null ? data.DueTotalCount : _dueItems.length;
+            _duePageSize  = data.DuePageSize || _duePageSize;
+            _dueNeedsSync = true;
+            paintDue();
+            observeDue();
+        }
+
+        /* ---- Upcoming due list (one server page + footer pager) ---- */
+        function paintDue() {
+            if (!$container) { return; }
+            var $list = $container.find('.vas-piawdg-due-list');
+            var totalPages = _duePageSize > 0 ? Math.ceil(_dueTotal / _duePageSize) : 0;
+
+            if (!_dueItems || _dueItems.length === 0) {
+                $list.html('<div class="vas-piawdg-due-empty">' + (msg('VAS_020_NoDuePayments', 'No payments due in the next 14 days')) + '</div>');
+                $container.find('.vas-piawdg-due-pager').empty();
+                return;
+            }
+
+            var rows = '';
+            for (var i = 0; i < _dueItems.length; i++) {
+                var item      = _dueItems[i];
+                var urgentCls = item.DaysUntilDue <= 3 ? 'vas-piawdg-urgent' : 'vas-piawdg-warning';
+                rows +=
+                    '<div class="vas-piawdg-due-item">' +
+                        '<span class="vas-piawdg-due-dot ' + urgentCls + '"></span>' +
+                        '<div class="vas-piawdg-due-info">' +
+                            '<div class="vas-piawdg-due-name">' + piEsc(item.VendorName) + '</div>' +
+                            '<div class="vas-piawdg-due-date">Due ' + piEsc(item.DueDateStr) + '</div>' +
+                        '</div>' +
+                        '<div class="vas-piawdg-due-amt ' + urgentCls + '">' +
+                            piMetric(item.OpenAmt) +
+                        '</div>' +
+                    '</div>';
+            }
+            $list.html(rows);
+
+            var from = (_duePage - 1) * _duePageSize + 1;
+            var to   = Math.min(_duePage * _duePageSize, _dueTotal);
+            $container.find('.vas-piawdg-due-pager').html(
+                pagerHtml(_duePage, totalPages, from, to, _dueTotal, 'vas-piawdg-due')
+            );
+            $container.find('.vas-piawdg-due-pager .vas-piawdg-pg-prev').on('click', function () {
+                if (!_dueLoading && _duePage > 1) { fetchDuePage(_duePage - 1); }
+            });
+            $container.find('.vas-piawdg-due-pager .vas-piawdg-pg-next').on('click', function () {
+                if (!_dueLoading && _duePage < totalPages) { fetchDuePage(_duePage + 1); }
+            });
+
+            // Adapt the page size to the list height ONLY on the first paint / after a resize —
+            // never on manual navigation (that would flip pageSize and re-clamp the page).
+            if (_dueNeedsSync) { scheduleDueSync(); }
+        }
+
+        /* ---- Adaptive due-row capacity (mirrors VAS_021) ---- */
+        function scheduleDueSync() {
+            var raf = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
+            raf(function () { syncDueCapacity(); });
+        }
+
+        function syncDueCapacity() {
+            if (_dueLoading || !$container) { return; }
+            var el = $container.find('.vas-piawdg-due-list')[0];
+            if (!el) { return; }
+            if (_dueTotal <= 0) { return; }
+            var avail = el.clientHeight;
+            if (avail <= 0) {
+                if (_dueNeedsSync) { scheduleDueSync(); }   // layout not settled — retry
+                return;
+            }
+            // Size off the tallest rendered row so a wrapped vendor name never clips.
+            var rows = el.querySelectorAll('.vas-piawdg-due-item');
+            var maxH = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > maxH) { maxH = rows[i].offsetHeight; }
+            }
+            if (maxH > 0) { _dueRowH = maxH; }
+            var rowH = _dueRowH > 0 ? _dueRowH : DUE_ROW_FALLBACK;
+
+            _dueNeedsSync = false;
+            var capacity = Math.max(DUE_MIN_ROWS, Math.floor(avail / rowH));
+            if (capacity !== _duePageSize) {
+                _duePageSize = capacity;
+                fetchDuePage(_duePage);   // server re-clamps the page to the new total
+            }
+        }
+
+        function observeDue() {
+            if (typeof ResizeObserver === 'undefined' || !$container) { return; }
+            var el = $container.find('.vas-piawdg-due-list')[0];
+            if (!el) { return; }
+            if (_dueObserver) { _dueObserver.disconnect(); }
+            _dueObserver = new ResizeObserver(function () {
+                if (!_dueLoading) { syncDueCapacity(); }
+            });
+            _dueObserver.observe(el);
+        }
+
+        function fetchDuePage(pageNo) {
+            if (_dueLoading) { return; }
+            _dueLoading = true;
+            showDueBusy();
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS/VAS_020_PendingInvoicesWidget/GetDuePayments',
+                data: { pageNo: pageNo, pageSize: _duePageSize },
+                dataType: 'json',
+                async: true,
+                success: function (res) {
+                    var d = null;
+                    try { d = (typeof res === 'string') ? JSON.parse(res) : res; } catch (e) { }
+                    _dueLoading = false;
+                    if (d) {
+                        _dueItems    = d.DueItems || [];
+                        _duePage     = d.PageNo || pageNo;
+                        _dueTotal    = d.TotalCount != null ? d.TotalCount : _dueTotal;
+                        _duePageSize = d.PageSize || _duePageSize;
+                    }
+                    paintDue();
+                },
+                error: function () { _dueLoading = false; paintDue(); }
+            });
+        }
+
+        // Localised busy indicator inside the due list while a page is fetched
+        // (uses the framework loader, like the widget's own busy overlay).
+        function showDueBusy() {
+            if (!$container) { return; }
+            $container.find('.vas-piawdg-due-list').html('<div class="vas-piawdg-due-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
         }
 
         /* ---- Category drill-down popup (invoice headers behind a clicked tile) ---- */
         function openCategoryPopup(cat, label) {
             if ($catDialog) { return; }
-            _catCat = cat;
-            _catLoaded = 0;
-            _catHasMore = false;
-            _catLoading = false;
+            _catCat       = cat;
+            _catPage      = 1;
+            _catTotal     = 0;
+            _catTotalPgs  = 0;
+            _catLoading   = false;
+            _catNeedsSync = true;
 
             $catDialog = $('<div class="vas-piawdg-cat-dialog">');
             $('body').append($catDialog);
@@ -180,10 +339,11 @@
                 title: label,
                 width: Math.min(780, Math.max(320, $(window).width() - 40)),
                 // Fixed height so the popup size never changes with the number of rows;
-                // the list inside scrolls when there are more invoices than fit.
+                // rows are server-side paged (footer pager) rather than scrolled.
                 height: Math.min(520, Math.max(320, $(window).height() - 80)),
                 dialogClass: 'vas-piawdg-dialog-shell',
                 close: function () {
+                    if (_catObserver) { _catObserver.disconnect(); _catObserver = null; }
                     $catDialog.dialog('destroy');
                     $catDialog.remove();
                     $catDialog = null;
@@ -197,55 +357,123 @@
             $close.on('click', function () { if ($catDialog) { $catDialog.dialog('close'); } });
             $widget.find('.ui-dialog-titlebar').append($close);
 
-            $catDialog.html('<div class="vas-piawdg-pop-state">' + piEsc(msg('VAS_020_Loading', 'Loading...')) + '</div>');
             $catDialog.dialog('open');
             $catDialog.dialog('option', 'position', { my: 'center', at: 'center', of: window });
 
-            // Load only the first page; more pages load as the user scrolls.
-            fetchCatPage(0, function (items) {
-                if (!$catDialog) { return; }
-                _catLoaded = items.length;
-                _catHasMore = items.length === CAT_PAGE;
-                renderCatFresh(items);
-            }, function () {
-                if (!$catDialog) { return; }
-                $catDialog.html('<div class="vas-piawdg-pop-state vas-piawdg-pop-error">' + piEsc(msg('VAS_020_LoadError', 'Unable to load invoices.')) + '</div>');
-            });
+            loadCatPage(1);
         }
 
-        function fetchCatPage(offset, onOk, onErr) {
+        // Fetch one server page of invoices for the current category and render it.
+        function loadCatPage(pageNo) {
+            if (!$catDialog || _catLoading) { return; }
+            _catLoading = true;
+            var atCat = _catCat;
+
+            $catDialog.html('<div class="vas-piawdg-pop-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS/VAS_020_PendingInvoicesWidget/GetCategoryInvoices',
-                data: { category: _catCat, maxRows: CAT_PAGE, offset: offset },
+                data: { category: _catCat, pageNo: pageNo, pageSize: _catPageSize },
                 dataType: 'json',
                 async: true,
                 success: function (res) {
-                    var data = null;
-                    try { data = (typeof res === 'string') ? JSON.parse(res) : res; } catch (e) { }
-                    onOk(data ? (data.Items || []) : []);
+                    if (!$catDialog || atCat !== _catCat) { _catLoading = false; return; }
+                    var d = null;
+                    try { d = (typeof res === 'string') ? JSON.parse(res) : res; } catch (e) { }
+                    _catLoading = false;
+                    renderCatPage(d || {});
                 },
-                error: function () { onErr(); }
+                error: function () {
+                    _catLoading = false;
+                    if ($catDialog) {
+                        $catDialog.html('<div class="vas-piawdg-pop-state vas-piawdg-pop-error">' + piEsc(msg('VAS_020_LoadError', 'Unable to load invoices.')) + '</div>');
+                    }
+                }
             });
         }
 
-        function renderCatFresh(items) {
+        function renderCatPage(data) {
             if (!$catDialog) { return; }
-            if (!items || items.length === 0) {
+
+            var items = data.Items || [];
+            _catTotal    = data.TotalCount != null ? data.TotalCount : items.length;
+            _catPage     = data.PageNo || 1;
+            _catPageSize = data.PageSize || _catPageSize;
+            _catTotalPgs = data.TotalPages || (_catPageSize > 0 ? Math.ceil(_catTotal / _catPageSize) : 0);
+
+            if (_catTotal === 0) {
                 $catDialog.html('<div class="vas-piawdg-pop-state">' + piEsc(msg('VAS_020_NoInvoices', 'No invoices found.')) + '</div>');
                 return;
             }
 
+            var rows = '';
+            for (var i = 0; i < items.length; i++) { rows += buildCatRow(items[i]); }
+
+            var from = (_catPage - 1) * _catPageSize + 1;
+            var to   = Math.min(_catPage * _catPageSize, _catTotal);
+
             var html = '<div class="vas-piawdg-pop">' +
-                '<div class="vas-piawdg-pop-count"></div>' +
-                '<div class="vas-piawdg-pop-list">' +
-                    '<div class="vas-piawdg-pop-rows">';
-            for (var i = 0; i < items.length; i++) { html += buildCatRow(items[i]); }
-            html += '</div>' +
-                    '<div class="vas-piawdg-pop-more"><span class="vas-piawdg-pop-more-spin"></span></div>' +
-                '</div></div>';
+                '<div class="vas-piawdg-pop-list"><div class="vas-piawdg-pop-rows">' + rows + '</div></div>' +
+                '<div class="vas-piawdg-pop-pager">' +
+                    pagerHtml(_catPage, _catTotalPgs, from, to, _catTotal, 'vas-piawdg-pop') +
+                '</div>' +
+            '</div>';
             $catDialog.html(html);
-            updateCatCount();
-            $catDialog.find('.vas-piawdg-pop-list').on('scroll', onCatScroll);
+
+            $catDialog.find('.vas-piawdg-pop-pager .vas-piawdg-pg-prev').on('click', function () {
+                if (!_catLoading && _catPage > 1) { loadCatPage(_catPage - 1); }
+            });
+            $catDialog.find('.vas-piawdg-pop-pager .vas-piawdg-pg-next').on('click', function () {
+                if (!_catLoading && _catPage < _catTotalPgs) { loadCatPage(_catPage + 1); }
+            });
+
+            // Adapt the page size to the popup list height on first render (and on resize) —
+            // not on manual navigation, which would flip pageSize and re-clamp the page.
+            observeCatList();
+            if (_catNeedsSync) { scheduleCatSync(); }
+        }
+
+        /* ---- Adaptive modal-row capacity (mirrors VAS_021 / the due list) ---- */
+        function scheduleCatSync() {
+            var raf = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
+            raf(function () { syncCatCapacity(); });
+        }
+
+        function syncCatCapacity() {
+            if (_catLoading || !$catDialog) { return; }
+            var el = $catDialog.find('.vas-piawdg-pop-list')[0];
+            if (!el) { return; }
+            if (_catTotal <= 0) { return; }
+            var avail = el.clientHeight;
+            if (avail <= 0) {
+                if (_catNeedsSync) { scheduleCatSync(); }   // layout not settled — retry
+                return;
+            }
+            var rows = el.querySelectorAll('.vas-piawdg-pop-row');
+            var maxH = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > maxH) { maxH = rows[i].offsetHeight; }
+            }
+            if (maxH > 0) { _catRowH = maxH; }
+            var rowH = _catRowH > 0 ? _catRowH : CAT_ROW_FALLBACK;
+
+            _catNeedsSync = false;
+            var capacity = Math.max(CAT_MIN_ROWS, Math.floor(avail / rowH));
+            if (capacity !== _catPageSize) {
+                _catPageSize = capacity;
+                loadCatPage(_catPage);   // server re-clamps the page to the new total
+            }
+        }
+
+        function observeCatList() {
+            if (typeof ResizeObserver === 'undefined' || !$catDialog) { return; }
+            var el = $catDialog.find('.vas-piawdg-pop-list')[0];
+            if (!el) { return; }
+            if (_catObserver) { _catObserver.disconnect(); }
+            _catObserver = new ResizeObserver(function () {
+                if (!_catLoading) { syncCatCapacity(); }
+            });
+            _catObserver.observe(el);
         }
 
         // Row layout matches the AP / GL search popup: kind chip, then DocNo + status
@@ -268,43 +496,25 @@
             '</div>';
         }
 
-        function appendCatRows(items) {
-            if (!items || items.length === 0 || !$catDialog) { return; }
-            var html = '';
-            for (var i = 0; i < items.length; i++) { html += buildCatRow(items[i]); }
-            $catDialog.find('.vas-piawdg-pop-rows').append(html);
-        }
-
-        function updateCatCount() {
-            if (!$catDialog) { return; }
-            var text = _catLoaded + (_catHasMore ? '+' : '') + ' ' + msg('VAS_020_Invoices', 'invoices');
-            $catDialog.find('.vas-piawdg-pop-count').text(text);
-        }
-
-        function onCatScroll() {
-            if (!_catHasMore || _catLoading || !$catDialog) { return; }
-            var el = $catDialog.find('.vas-piawdg-pop-list')[0];
-            if (!el) { return; }
-            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 48) { loadMoreCat(); }
-        }
-
-        function loadMoreCat() {
-            if (_catLoading || !_catHasMore || !$catDialog) { return; }
-            _catLoading = true;
-            var atCat = _catCat;
-            $catDialog.find('.vas-piawdg-pop-more').addClass('vas-piawdg-pop-more-active');
-            fetchCatPage(_catLoaded, function (items) {
-                if (!$catDialog || atCat !== _catCat) { _catLoading = false; return; }
-                appendCatRows(items);
-                _catLoaded += items.length;
-                _catHasMore = items.length === CAT_PAGE;
-                _catLoading = false;
-                $catDialog.find('.vas-piawdg-pop-more').removeClass('vas-piawdg-pop-more-active');
-                updateCatCount();
-            }, function () {
-                _catLoading = false;
-                if ($catDialog) { $catDialog.find('.vas-piawdg-pop-more').removeClass('vas-piawdg-pop-more-active'); }
-            });
+        /* ---- Canonical Widget Footer Pager (design.md): "Showing a–b of N" left,
+             compact prev / "n of m" / next control right. Hidden on a single page. ---- */
+        function pagerHtml(pageNo, totalPages, from, to, total, cls) {
+            if (totalPages <= 1) { return ''; }
+            var prevDis = pageNo <= 1 ? ' disabled' : '';
+            var nextDis = pageNo >= totalPages ? ' disabled' : '';
+            var showing = msg('VAS_020_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + msg('VAS_020_Of', 'of') + ' ' + total;
+            return '<div class="vas-piawdg-pager ' + cls + '-pager-row">' +
+                '<span class="vas-piawdg-pager-info">' + piEsc(showing) + '</span>' +
+                '<div class="vas-piawdg-pager-nav">' +
+                    '<button type="button" class="vas-piawdg-pgbtn vas-piawdg-pg-prev" aria-label="' + piEsc(msg('VAS_020_Prev', 'Previous')) + '"' + prevDis + '>' +
+                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>' +
+                    '</button>' +
+                    '<span class="vas-piawdg-pager-label">' + pageNo + ' ' + msg('VAS_020_Of', 'of') + ' ' + totalPages + '</span>' +
+                    '<button type="button" class="vas-piawdg-pgbtn vas-piawdg-pg-next" aria-label="' + piEsc(msg('VAS_020_Next', 'Next')) + '"' + nextDis + '>' +
+                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
         }
 
         function piDate(iso) {
@@ -316,10 +526,11 @@
             return d.toLocaleDateString(window.navigator.language, { year: 'numeric', month: 'short', day: '2-digit' });
         }
 
+        // Full (thousand-separated) transaction-currency amount for the drill-down rows.
         function piCatAmt(amount, curCode) {
             var n = (typeof amount === 'number') ? amount : parseFloat(amount);
             if (isNaN(n)) { n = 0; }
-            var prec = _catCurPrec || 2;
+            var prec = _curPrec || 2;
             var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
             return (curCode ? curCode + ' ' : '') + formatted;
         }
@@ -337,12 +548,12 @@
         }
 
         /* ---- Build a KPI box (clickable: opens the invoice drill-down popup) ---- */
-        function piKpiBox(cat, label, count, amount, sym, prec, colorClass) {
+        function piKpiBox(cat, label, count, amount, colorClass) {
             return (
                 '<div class="vas-piawdg-kpi-box vas-piawdg-kpi-click" data-cat="' + cat + '" data-label="' + piEsc(label) + '" role="button" tabindex="0">' +
                     '<div class="vas-piawdg-kpi-lbl">' + piEsc(label) + '</div>' +
                     '<div class="vas-piawdg-kpi-val ' + colorClass + '">' + (count || 0) + '</div>' +
-                    '<div class="vas-piawdg-kpi-sub">' + piFmt(amount || 0, sym, prec) + ' ' + (msg('VAS_020_Value', 'value')) + '</div>' +
+                    '<div class="vas-piawdg-kpi-sub">' + piMetric(amount || 0) + ' ' + (msg('VAS_020_Value', 'value')) + '</div>' +
                 '</div>'
             );
         }
@@ -356,16 +567,13 @@
                 .replace(/"/g, '&quot;');
         }
 
-        function piFmt(amount, sym, precision) {
-            if (!amount || amount === 0) { return sym + '0'; }
-            var abs  = Math.abs(amount);
-            var loc  = window.navigator.language;
-            var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            var prec  = VIS.Env.getCtx().getStdPrecision() || precision || 2;
-            if (abs >= 10000000) { return sym + (abs / 10000000).toLocaleString(loc, opts1) + 'Cr'; }
-            if (abs >= 100000)   { return sym + (abs / 100000).toLocaleString(loc, opts1)   + 'L';  }
-            if (abs >= 1000)     { return sym + (abs / 1000).toLocaleString(loc, opts1)     + 'K';  }
-            return sym + abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+        /* Compact base-currency amount via the shared CurrencyFormat util
+           (Indian vs international scale per the base-currency ISO). Sign, then
+           symbol, then the compact magnitude. */
+        function piMetric(amount) {
+            var v = Number(amount || 0);
+            var sign = v < 0 ? '-' : '';
+            return sign + _curSym + VIS.Util.formatCompactAmount(v, _curIso, _curPrec);
         }
 
         /* ---- Busy indicator ---- */
@@ -386,6 +594,7 @@
 
         this._teardown = function () {
             if ($catDialog) { try { $catDialog.dialog('close'); } catch (e) { } }
+            if (_dueObserver) { _dueObserver.disconnect(); _dueObserver = null; }
         };
 
         this.getRoot = function () { return $root; };
@@ -398,6 +607,8 @@
         this.windowNo   = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
