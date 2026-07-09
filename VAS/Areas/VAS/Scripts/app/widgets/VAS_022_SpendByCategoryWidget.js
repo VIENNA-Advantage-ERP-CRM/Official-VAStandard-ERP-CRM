@@ -23,6 +23,27 @@
         return value && value !== key && value !== '[' + key + ']' ? value : fallback;
     }
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the em-anchor clamps resolve against the dashboard's visible
+       width, not the viewport. One document-level ResizeObserver serves every widget;
+       without a marked container — or without ResizeObserver — the CSS falls back to
+       100vw. (Mirrors VAS_024_TotalOutstandingWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     /* Category colour palette (12 distinct colours) */
     var CAT_COLORS = [
         '#1976D2', '#6A1B9A', '#2E7D32', '#E65100',
@@ -172,7 +193,7 @@
                             grid: { color: 'rgba(0,0,0,0.06)' },
                             ticks: {
                                 font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#748494',
+                                color: '#5F7283',
                                 maxTicksLimit: 6,
                                 callback: function (v) { return sym + fmtShort(v, data.StdPrecision); }
                             },
@@ -182,7 +203,7 @@
                             grid: { display: false },
                             ticks: {
                                 font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#5F7283'
+                                color: '#41576A'
                             },
                             border: { display: false }
                         }
@@ -215,21 +236,28 @@
             var totalLabel = msg('VAS_022_Total', 'Total');
             var centerText = sym + fmtShort(total, data.StdPrecision);
 
+            // Legend font scales with the chart width so it's larger and stays responsive to
+            // widget resize / zoom (redrawn via widgetSizeChange; canvas scales on browser zoom).
+            var legFs = Math.max(11, Math.min(15, Math.round((el.parentNode ? el.parentNode.clientWidth : 300) * 0.03)));
+
             var centerPlugin = {
                 id: 'VAS_022_sbc_center_' + widgetID,
                 afterDraw: function (chart) {
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right)  / 2;
                     var cy  = (chart.chartArea.top  + chart.chartArea.bottom) / 2;
-                    var fs  = Math.max(9, Math.min(11, chart.width / 120));
+                    /* Scale with the rendered donut size so the center text is larger and keeps
+                       its proportion on zoom/resize (fs = "Total" label; amount is larger). */
+                    var fs    = Math.max(11, Math.min(18, chart.width / 11));
+                    var amtFs = fs + 2;
                     ctx.save();
                     ctx.textAlign    = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle    = '#102C3F';
-                    ctx.font         = 'bold ' + (fs + 1) + 'px Roboto, sans-serif';
-                    ctx.fillText(centerText, cx, cy - fs * 0.65);
+                    ctx.font         = 'bold ' + amtFs + 'px Roboto, sans-serif';
+                    ctx.fillText(centerText, cx, cy - fs * 0.55);
                     ctx.font      = fs + 'px Roboto, sans-serif';
-                    ctx.fillStyle = '#748494';
+                    ctx.fillStyle = '#5F7283';
                     ctx.fillText(totalLabel, cx, cy + fs * 0.85);
                     ctx.restore();
                 }
@@ -251,22 +279,24 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '55%',
+                    // Shrink the ring within its area so the donut isn't as tall as the
+                    // full chart height — leaves a little breathing room top/bottom.
+                    radius: '82%',
                     layout: { padding: 4 },
                     plugins: {
                         legend: {
                             position: 'right',
                             labels: {
-                                font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#5F7283',
-                                boxWidth: 10,
-                                boxHeight: 10,
+                                font: { family: 'Roboto, sans-serif', size: legFs },
+                                color: '#41576A',
+                                boxWidth: legFs,
+                                boxHeight: legFs,
                                 padding: 8,
                                 generateLabels: function () {
                                     return catNames.map(function (name, i) {
-                                        var pct   = Math.round((catAmounts[i] / total) * 100);
-                                        var trunc = name.length > 14 ? name.slice(0, 14) + '…' : name;
                                         return {
-                                            text: trunc + '  ' + sym + fmtShort(catAmounts[i], data.StdPrecision) + '  ' + pct + '%',
+                                            /* Category name only (amount / % are shown on hover). */
+                                            text: name,
                                             fillStyle:   catColors[i],
                                             strokeStyle: catColors[i],
                                             hidden: false,
@@ -292,17 +322,13 @@
             });
         }
 
-        /* ---- Compact amount formatter ---- */
+        /* ---- Compact amount formatter ----
+             Delegates the compact scaling (Indian vs international, per base-currency ISO) to
+             the shared CurrencyFormat util VIS.Util.formatCompactAmount, exactly like
+             VAS_019/VAS_023. Returns the unsigned magnitude; callers prepend the symbol. */
         function fmtShort(val, stdPrecision) {
-            if (val === 0 || !val) { return '0'; }
-            var abs   = Math.abs(val);
-            var loc   = window.navigator.language;
-            var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + msg('VAS_022_Crore', 'Cr'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + msg('VAS_022_Lakh', 'L'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + msg('VAS_022_Thousand', 'K'); }
-            return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var d = $self._kpiData || {};
+            return VIS.Util.formatCompactAmount(val, d.CurIso || '', (d.StdPrecision != null ? d.StdPrecision : stdPrecision));
         }
 
         /* ---- Busy indicator ---- */
@@ -333,6 +359,8 @@
         this.windowNo   = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };

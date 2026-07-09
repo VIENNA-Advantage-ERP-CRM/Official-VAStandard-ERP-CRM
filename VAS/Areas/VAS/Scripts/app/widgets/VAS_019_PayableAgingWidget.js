@@ -35,6 +35,27 @@
         return value && value !== key && value !== '[' + key + ']' ? value : fallback;
     }
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the em-anchor clamps resolve against the dashboard's visible
+       width, not the viewport. One document-level ResizeObserver serves every widget;
+       without a marked container — or without ResizeObserver — the CSS falls back to
+       100vw. (Mirrors VAS_024_TotalOutstandingWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_019_PayableAgingWidget = function () {
         this.frame;
         this.windowNo;
@@ -176,16 +197,20 @@
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right) / 2;
                     var cy  = (chart.chartArea.top  + chart.chartArea.bottom) / 2;
-                    var fs  = Math.max(9, Math.min(12, chart.width / 110));
+                    /* Font scales with the rendered donut size (chart.width, in CSS px),
+                       so the center text auto-maintains its proportion on zoom / resize.
+                       'fs' is the "Paid" label base; the percentage is drawn larger. */
+                    var fs    = Math.max(12, Math.min(18, chart.width / 11));
+                    var pctFs = fs + 8;
                     ctx.save();
                     ctx.textAlign    = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle    = '#102C3F';
-                    ctx.font         = 'bold ' + (fs + 2) + 'px Roboto, sans-serif';
-                    ctx.fillText(pct + '%', cx, cy - fs * 0.6);
+                    ctx.font         = 'bold ' + pctFs + 'px Roboto, sans-serif';
+                    ctx.fillText(pct + '%', cx, cy - fs * 0.5);
                     ctx.font      = fs + 'px Roboto, sans-serif';
-                    ctx.fillStyle = '#748494';
-                    ctx.fillText(msg('VAS_019_Paid', 'Paid'), cx, cy + fs * 0.9);
+                    ctx.fillStyle = '#5F7283';
+                    ctx.fillText(msg('VAS_019_Paid', 'Paid'), cx, cy + fs * 0.85);
                     ctx.restore();
                 }
             };
@@ -253,33 +278,17 @@
                 + '</div>';
         }
 
-        /* ---- Number formatter ---- */
+        /* ---- Number formatter ----
+             Delegates the compact scaling (Indian vs international, chosen from the
+             base-currency ISO) to the shared CurrencyFormat util
+             VIS.Util.formatCompactAmount, exactly like VAS_024. That util returns the
+             unsigned magnitude; the sign is composed here and callers prepend the
+             currency symbol. */
         function formatAmount(number, stdPrecision) {
-            var prec      = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var isNegative = number < 0;
-            var absNumber  = Math.abs(number);
-            var formatted, unit = '';
-            var opts2   = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-            var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
-            if (absNumber >= 1000000000000) {
-                unit      = msg('VAS_019_Trillion', 'T');
-                formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000000000) {
-                unit      = msg('VAS_019_Billion', 'B');
-                formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 10000000) {
-                unit      = msg('VAS_019_Crore', 'Cr');
-                formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 100000) {
-                unit      = msg('VAS_019_Lakh', 'L');
-                formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000) {
-                unit      = msg('VAS_019_Thousand', 'K');
-                formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
-            } else {
-                formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
-            }
-            return (isNegative ? '-' : '') + formatted + unit;
+            number = Number(number || 0);
+            var sign = number < 0 ? '-' : '';
+            var iso  = ($self._kpiData && $self._kpiData.CurIso) || '';
+            return sign + VIS.Util.formatCompactAmount(number, iso, stdPrecision);
         }
 
         /* ---- Busy indicator ---- */
@@ -315,6 +324,8 @@
         this.windowNo   = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
