@@ -69,6 +69,7 @@ namespace VIS.Controllers
                        TRIM(COALESCE(loc.Address1, '') || ' ' || COALESCE(loc.City, '')) AS Address_Line,
                        wh.Name AS Warehouse_Name,
                        cur.CurSymbol AS Cur_Symbol,
+                       cur.ISO_Code AS Currency_ISO,
                        cur.StdPrecision AS Std_Precision,
                        COALESCE(ol.DatePromised, o.DatePromised) AS Line_Promise_Date,
                        ol.C_OrderLine_ID AS PO_Line_ID,
@@ -85,8 +86,7 @@ namespace VIS.Controllers
                   AND o.IsSOTrx='N'
                   AND o.DocStatus='CO'
                   AND o.AD_Client_ID=@AD_Client_ID
-                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                  AND COALESCE(ol.DatePromised, o.DatePromised) >= @Today";
+                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)";
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
@@ -102,6 +102,7 @@ namespace VIS.Controllers
                        ExpectedPO.Address_Line,
                        ExpectedPO.Warehouse_Name,
                        ExpectedPO.Cur_Symbol,
+                       ExpectedPO.Currency_ISO,
                        ExpectedPO.Std_Precision,
                        ExpectedPO.Promise_Date,
                        ExpectedPO.Line_Count,
@@ -114,6 +115,7 @@ namespace VIS.Controllers
                            RawData.Address_Line,
                            RawData.Warehouse_Name,
                            RawData.Cur_Symbol,
+                           RawData.Currency_ISO,
                            RawData.Std_Precision,
                            MIN(RawData.Line_Promise_Date) AS Promise_Date,
                            COUNT(RawData.PO_Line_ID) AS Line_Count,
@@ -127,14 +129,19 @@ namespace VIS.Controllers
                              RawData.Address_Line,
                              RawData.Warehouse_Name,
                              RawData.Cur_Symbol,
+                             RawData.Currency_ISO,
                              RawData.Std_Precision
                 ) ExpectedPO
                 ORDER BY ExpectedPO.Promise_Date, ExpectedPO.PO_NO
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
+            // Review #26: data was not showing because every completed PO's promised
+            // date is in the past in this data set, and the old "promised >= today"
+            // filter hid them all. Aligned with the existing VAS.VAS_ExpectedGRNWidget
+            // behaviour - list all completed vendor POs that still have open (un-received)
+            // quantity, soonest promised first - so the widget shows real data.
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
-            parameters.Add(new SqlParameter("@Today", DateTime.Today));
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
 
@@ -159,6 +166,7 @@ namespace VIS.Controllers
                         addressLine = Util.GetValueOfString(dr["Address_Line"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
                         curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
+                        currencyIso = Util.GetValueOfString(dr["Currency_ISO"]),
                         stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]),
                         promiseDate = promiseDate.HasValue ? promiseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         lineCount = Util.GetValueOfInt(dr["Line_Count"]),

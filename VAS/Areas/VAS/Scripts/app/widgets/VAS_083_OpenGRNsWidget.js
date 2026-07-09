@@ -49,8 +49,9 @@
     }
 
     /* Open-GRN DocStatus set — mirrors the backend count predicate so the
-       drill-through filter is identical to what was counted. */
-    var OPEN_STATUS_LIST = "'AP', 'IN', 'IP', 'NA', 'WC', 'WP'";
+       drill-through filter is identical to what was counted.
+       Review #40: open = In Progress, Waiting Confirmation, or Drafted only. */
+    var OPEN_STATUS_LIST = "'IP', 'WC', 'DR'";
 
     VAS.VAS_083_OpenGRNsWidget = function () {
 

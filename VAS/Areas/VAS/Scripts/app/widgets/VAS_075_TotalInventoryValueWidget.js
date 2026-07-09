@@ -34,12 +34,45 @@
             return !isNaN(precision) && precision >= 0 ? precision : 0;
         }
 
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping and Lakh/Crore compact notation; all others get
+        // international grouping and K/M/B. The symbol always comes from the DB.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        function formatCompactNumber(value, isoCode) {
+            var number = Number(value || 0);
+            if (!isFinite(number)) { number = 0; }
+            var abs = Math.abs(number);
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { return trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            } else {
+                if (abs >= 1000000000) { return trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                if (abs >= 1000000) { return trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            }
+            return number.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 });
+        }
+
         function formatAmount(value, symbol, isoCode, precision) {
             var number = Number(value || 0);
             if (!isFinite(number)) { number = 0; }
             var currency = symbol || isoCode || '';
             var stdPrecision = getPrecision(precision);
-            var formatted = number.toLocaleString(window.navigator.language, {
+            var formatted = number.toLocaleString(currencyLocale(isoCode), {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
@@ -66,7 +99,11 @@
                             result.currency_iso,
                             result.std_precision
                         );
-                        $value.text(formatted).attr('title', formatted);
+                        // KPI tile shows the compact form (₹3.42 Cr / $34.2M);
+                        // the tooltip keeps the exact amount.
+                        var compact = (result.currency_symbol || result.currency_iso || '')
+                            + formatCompactNumber(result.total_inventory_value, result.currency_iso);
+                        $value.text(compact).attr('title', formatted);
                         return;
                     }
 

@@ -24,6 +24,10 @@ namespace VAS.Controllers
     {
         private static readonly VLogger Log = VLogger.GetVLogger(typeof(VAS_079_TopValueItemsWidgetController).FullName);
 
+        // Review #9: the widget lists only the top 10 items by carrying value,
+        // both for a selected warehouse and for "All warehouses".
+        private const int TopRecordsLimit = 10;
+
         /// <summary>Returns active warehouses available to the current role.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -242,14 +246,24 @@ namespace VAS.Controllers
                 WHERE (@Filter_Warehouse_ID IS NULL OR WarehouseRows.M_Warehouse_ID=@Selected_Warehouse_ID)
                  GROUP BY ProductRows.M_Product_ID,
                           ProductRows.Name
-                )
+                ),
+                TopItems AS (
                 SELECT AggregatedItems.M_Product_ID,
                        AggregatedItems.Product_Name,
                        AggregatedItems.Warehouse_Name,
                        AggregatedItems.Qty_On_Hand,
-                       AggregatedItems.Carrying_Value,
-                       COUNT(*) OVER() AS Total_Rows
+                       AggregatedItems.Carrying_Value
                 FROM AggregatedItems
+                ORDER BY AggregatedItems.Carrying_Value DESC
+                OFFSET 0 ROWS FETCH NEXT @Top_Limit ROWS ONLY
+                )
+                SELECT TopItems.M_Product_ID,
+                       TopItems.Product_Name,
+                       TopItems.Warehouse_Name,
+                       TopItems.Qty_On_Hand,
+                       TopItems.Carrying_Value,
+                       COUNT(*) OVER() AS Total_Rows
+                FROM TopItems
                 ORDER BY Carrying_Value DESC
                 OFFSET @Offset ROWS FETCH NEXT @Page_Size ROWS ONLY";
 
@@ -274,6 +288,7 @@ namespace VAS.Controllers
                 new SqlParameter("@Name_Warehouse_ID", SqlDbType.Int) { Value = warehouseValue },
                 new SqlParameter("@Filter_Warehouse_ID", SqlDbType.Int) { Value = warehouseValue },
                 new SqlParameter("@Selected_Warehouse_ID", SqlDbType.Int) { Value = warehouseValue },
+                new SqlParameter("@Top_Limit", TopRecordsLimit),
                 new SqlParameter("@Offset", (pageNo - 1) * pageSize),
                 new SqlParameter("@Page_Size", pageSize)
             };

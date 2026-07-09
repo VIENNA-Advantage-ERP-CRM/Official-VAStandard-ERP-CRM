@@ -16,7 +16,6 @@
  *  #  | Current Text                       | Message Key
  * ----+------------------------------------+---------------------------
  *  1  | Receipt Aging                     | VAS_087_ReceiptAging
- *  2  | Time on dock awaiting put-away    | VAS_087_ReceiptAgingSubtitle
  *  3  | receipt awaiting                   | VAS_087_ReceiptAwaiting
  *  4  | receipts awaiting                  | VAS_087_ReceiptsAwaiting
  *  5  | oldest                             | VAS_087_Oldest
@@ -63,6 +62,7 @@
         var totalRecords = 0;
         var oldestReceivedOn = "";
         var loading = false;
+        var rowResizeObserver = null;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -175,6 +175,26 @@
             return row && row.statusCode ? row.statusCode : "-";
         }
 
+        function measurePageSize() {
+            if (!$listBody || !$listBody[0]) { return pageSize; }
+
+            var listHeight = $listBody.innerHeight();
+            var rowHeight = $listBody.find('.vas-rag-row').first().outerHeight(true) || 46;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            return Math.max(3, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadPage(pageNo); }
+        }
+
         this.Initalize = function () {
             createWidget();
             createDialog();
@@ -188,7 +208,6 @@
                 '<span class="vas-rag-ico">' + icon("clock") + '</span>' +
                 '<div class="vas-rag-titles">' +
                 '<div class="vas-rag-title">' + escapeHtml(lbl("VAS_087_ReceiptAging", "Receipt Aging")) + '</div>' +
-                '<div class="vas-rag-sub">' + escapeHtml(lbl("VAS_087_ReceiptAgingSubtitle", "Time on dock awaiting put-away")) + '</div>' +
                 '</div>' +
                 '</div>'
             );
@@ -222,6 +241,13 @@
             });
             $prevBtn.on('click', function () { if (!loading && pageNo > 1) { loadPage(pageNo - 1); } });
             $nextBtn.on('click', function () { if (!loading && pageNo < totalPages) { loadPage(pageNo + 1); } });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($listBody[0]);
+            }
         }
 
         function loadPage(page) {
@@ -257,6 +283,7 @@
                     oldestReceivedOn = data.oldestReceivedOn || "";
                     renderRows();
                     updatePager();
+                    window.setTimeout(syncPageSize, 0);
                 },
                 error: function () {
                     loading = false;
@@ -274,6 +301,7 @@
             oldestReceivedOn = "";
             renderRows();
             updatePager();
+            window.setTimeout(syncPageSize, 0);
         }
 
         function renderRows() {
@@ -482,6 +510,7 @@
         this.disposeComponent = function () {
             $(document).off('keydown.vas-rag');
             $('body').removeClass('vas-rag-body-lock');
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();
         };
