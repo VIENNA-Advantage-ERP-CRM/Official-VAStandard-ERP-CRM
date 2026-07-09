@@ -39,14 +39,16 @@ namespace VIS.Controllers
         }
 
         /// <summary>
-        /// One page of the live receipt queue, newest first.
+        /// One page of the live receipt queue, sorted by movement date - oldest first.
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page.</param>
-        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
+        /// <param name="year">Selected year (0 = current).</param>
+        /// <param name="month">Selected month 1-12 (0 = current).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages, year, month }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetReceiptQueue(int pageNo = 1, int pageSize = 5)
+        public JsonResult GetReceiptQueue(int pageNo = 1, int pageSize = 5, int year = 0, int month = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -60,9 +62,14 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 5; }
-            if (pageSize > 5) { pageSize = 5; }
+            if (pageSize > 50) { pageSize = 50; }
 
             int offset = (pageNo - 1) * pageSize;
+            DateTime today = DateTime.Today;
+            if (year < 2000 || year > 2100) { year = today.Year; }
+            if (month < 1 || month > 12) { month = today.Month; }
+            DateTime monthStart = new DateTime(year, month, 1);
+            DateTime monthEndExclusive = monthStart.AddMonths(1);
 
             string headerSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
@@ -71,14 +78,17 @@ namespace VIS.Controllers
                        COALESCE(PurchaseOrder.DocumentNo, " + NLiteral("-") + @") AS PO_No,
                        InOut.DocStatus AS Doc_Status,
                        COALESCE(UserInfo.Name, " + NLiteral("-") + @") AS Received_By,
-                       COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Received_Time
+                       COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Received_Time,
+                       COALESCE(InOut.MovementDate, InOut.DateReceived, InOut.Created) AS Movement_Date
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN C_Order PurchaseOrder ON (PurchaseOrder.C_Order_ID=InOut.C_Order_ID AND PurchaseOrder.IsActive='Y')
                 LEFT OUTER JOIN AD_User UserInfo ON (UserInfo.AD_User_ID=InOut.CreatedBy AND UserInfo.IsActive='Y')
                 WHERE InOut.IsActive='Y'
                   AND InOut.MovementType='V+'
-                  AND InOut.AD_Client_ID=@AD_Client_ID";
+                  AND InOut.AD_Client_ID=@AD_Client_ID
+                  AND COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created)>=@Month_From
+                  AND COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created)<@Month_To";
 
             headerSql = MRole.GetDefault(ctx).AddAccessSQL(
                 headerSql,
@@ -106,6 +116,7 @@ namespace VIS.Controllers
                            HeaderData.Doc_Status,
                            HeaderData.Received_By,
                            HeaderData.Received_Time,
+                           HeaderData.Movement_Date,
                            COUNT(1) OVER () AS TotalRecords
                     FROM (
                         " + headerSql + @"
@@ -117,13 +128,16 @@ namespace VIS.Controllers
                              HeaderData.PO_No,
                              HeaderData.Doc_Status,
                              HeaderData.Received_By,
-                             HeaderData.Received_Time
+                             HeaderData.Received_Time,
+                             HeaderData.Movement_Date
                 ) QueueData
-                ORDER BY QueueData.Received_Time DESC, QueueData.GRN_No DESC
+                ORDER BY QueueData.Movement_Date ASC, QueueData.GRN_No ASC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@Month_From", SqlDbType.DateTime) { Value = monthStart });
+            parameters.Add(new SqlParameter("@Month_To", SqlDbType.DateTime) { Value = monthEndExclusive });
             parameters.Add(new SqlParameter("@Line_AD_Client_ID", ctx.GetAD_Client_ID()));
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
@@ -162,7 +176,9 @@ namespace VIS.Controllers
                     pageNo = pageNo,
                     pageSize = pageSize,
                     totalRecords = totalRecords,
-                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize))
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize)),
+                    year = year,
+                    month = month
                 };
 
                 return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

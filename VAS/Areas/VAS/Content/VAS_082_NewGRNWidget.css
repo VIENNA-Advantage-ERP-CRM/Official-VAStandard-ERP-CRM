@@ -83,14 +83,14 @@
 
 .vas-ngrn-dialog {
     font-family: Roboto, Arial, sans-serif;
-    font-size: 16px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 2em;
 }
 
     .vas-ngrn-dialog,
@@ -107,7 +107,7 @@
 
 .vas-ngrn-card-modal {
     position: relative;
-    width: min(880px, 100%);
+    width: min(55em, calc(100vw - 2em));
     max-height: 88vh;
     display: flex;
     flex-direction: column;
@@ -119,11 +119,11 @@
 
 .vas-ngrn-header {
     flex: 0 0 auto;
-    height: 56px;
+    height: 3.5em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 1.25em;
     background: rgba(255, 255, 255, .9);
     border-bottom: 1px solid #1F83FF;
 }
@@ -131,13 +131,13 @@
 .vas-ngrn-title-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75em;
     min-width: 0;
 }
 
 .vas-ngrn-modal-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     color: #141414;
     white-space: nowrap;
@@ -146,7 +146,7 @@
 }
 
 .vas-ngrn-modal-badge {
-    font-size: .72rem;
+    font-size: .72em;
     flex: 0 0 auto;
 }
 
@@ -176,8 +176,8 @@
 
 .vas-ngrn-back,
 .vas-ngrn-close {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
     border: 0;
     background: transparent;
     cursor: pointer;
@@ -197,38 +197,38 @@
 
     .vas-ngrn-back svg,
     .vas-ngrn-close svg {
-        width: 20px;
-        height: 20px;
+        width: 1.25em;
+        height: 1.25em;
     }
 
 .vas-ngrn-body {
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 22px 24px;
+    padding: 1.375em 1.5em;
     position: relative;
 }
 
 .vas-ngrn-step-hint {
-    font-size: .85rem;
+    font-size: .85em;
     color: #748494;
-    margin-bottom: 12px;
+    margin-bottom: 0.88em;
 }
 
 .vas-ngrn-po-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5em;
 }
 
 .vas-ngrn-po-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.75em;
     width: 100%;
     text-align: left;
-    padding: 11px 14px;
+    padding: 0.6875em 0.875em;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
     background: #fff;
@@ -244,11 +244,11 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 0.19em;
 }
 
 .vas-ngrn-po-no {
-    font-size: .9rem;
+    font-size: .9em;
     font-weight: 400;
     color: #102C3F;
     overflow: hidden;
@@ -258,7 +258,7 @@
 
 .vas-ngrn-po-vendor,
 .vas-ngrn-po-wh {
-    font-size: .78rem;
+    font-size: .78em;
     color: #5F7283;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -268,22 +268,22 @@
 .vas-ngrn-po-side {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.625em;
     flex: 0 0 auto;
 }
 
 .vas-ngrn-po-wh {
-    max-width: 180px;
+    max-width: 14.42em;
 }
 
 .vas-ngrn-po-badge {
-    font-size: .75rem;
+    font-size: .75em;
     font-weight: 400;
     color: #fff;
     background: #0083DA;
     border-radius: 999px;
-    padding: 2px 10px;
-    min-width: 28px;
+    padding: 0.167em 0.833em;
+    min-width: 2.333em;
     text-align: center;
 }
 
@@ -291,15 +291,15 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
-    margin-top: 14px;
+    gap: 0.59em;
+    margin-top: 1.03em;
     color: #5F7283;
-    font-size: .85rem;
+    font-size: .85em;
 }
 
 .vas-ngrn-page-btn {
-    width: 26px;
-    height: 26px;
+    width: 1.912em;
+    height: 1.912em;
     border: 1px solid #D8E4EE;
     border-radius: 7px;
     background: #fff;
@@ -315,23 +315,23 @@
 .vas-ngrn-form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 0 24px;
+    gap: 0 1.5em;
 }
 
 .vas-ngrn-field {
-    padding: 8px 12px;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid #D9E1E8;
 }
 
 .vas-ngrn-field-label {
-    font-size: .75rem;
+    font-size: .75em;
     color: #5F7283;
 }
 
 .vas-ngrn-field-value {
-    font-size: 1rem;
+    font-size: 1em;
     color: #102C3F;
-    margin-top: 6px;
+    margin-top: 0.375em;
 }
 
     .vas-ngrn-field-value.strong {
@@ -339,17 +339,17 @@
     }
 
 .vas-ngrn-note {
-    font-size: .78rem;
+    font-size: .78em;
     color: #748494;
-    margin: 14px 0 10px;
+    margin: 1.12em 0 0.8em;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0.48em;
 }
 
     .vas-ngrn-note svg {
-        width: 14px;
-        height: 14px;
+        width: 1.12em;
+        height: 1.12em;
         color: #0083DA;
         flex: 0 0 auto;
     }
@@ -357,15 +357,15 @@
 .vas-ngrn-lines {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5em;
 }
 
 .vas-ngrn-rcv-line {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 90px 126px 110px 70px;
-    gap: 12px;
+    grid-template-columns: minmax(0, 1fr) 5.625em 7.875em 6.875em 4.375em;
+    gap: 0.75em;
     align-items: center;
-    padding: 10px 14px;
+    padding: 0.625em 0.875em;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
     background: #fff;
@@ -374,11 +374,16 @@
 .vas-ngrn-rcv-head {
     background: transparent;
     border: 0;
-    padding: 4px 14px;
+    padding: 0.25em 0.875em;
     color: #748494;
-    font-size: .72rem;
     letter-spacing: 0;
 }
+
+    /* Font size sits on the cells, not the grid container, so the em column
+       template resolves identically for the header and the data lines. */
+    .vas-ngrn-rcv-head div {
+        font-size: .72em;
+    }
 
     .vas-ngrn-rcv-head div:not(:first-child) {
         text-align: right;
@@ -386,7 +391,7 @@
 
 .vas-ngrn-rcv-name {
     min-width: 0;
-    font-size: .9rem;
+    font-size: .9em;
     font-weight: 400;
     color: #102C3F;
     overflow: hidden;
@@ -396,7 +401,7 @@
 
 .vas-ngrn-rcv-po,
 .vas-ngrn-rcv-uom {
-    font-size: .9rem;
+    font-size: .9em;
     color: #5F7283;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -405,13 +410,13 @@
 .vas-ngrn-rcv-in {
     width: 100%;
     font-family: inherit;
-    font-size: .9rem;
+    font-size: .9em;
     text-align: right;
     border: 0;
     border-bottom: 1px solid #D7D7D7;
     background: transparent;
     border-radius: 0;
-    padding: 7px 4px;
+    padding: 0.49em 0.28em;
     outline: none;
     box-shadow: none;
     color: #102C3F;
@@ -429,13 +434,13 @@
 }
 
 .vas-ngrn-error {
-    margin-top: 10px;
+    margin-top: 0.76em;
     color: #D14545;
-    font-size: .82rem;
+    font-size: .82em;
 }
 
 .vas-ngrn-action {
-    margin-top: 18px;
+    margin-top: 1.125em;
     display: flex;
     justify-content: flex-end;
 }
@@ -445,11 +450,11 @@
     color: #fff;
     border: 0;
     border-radius: 10px;
-    padding: 10px 18px;
+    padding: 0.695em 1.25em;
     font-weight: 600;
-    font-size: .9rem;
+    font-size: .9em;
     display: inline-flex;
-    gap: 8px;
+    gap: 0.556em;
     align-items: center;
     cursor: pointer;
 }
@@ -464,15 +469,15 @@
     }
 
     .vas-ngrn-create-btn svg {
-        width: 16px;
-        height: 16px;
+        width: 1.11em;
+        height: 1.11em;
     }
 
 .vas-ngrn-empty {
-    padding: 36px 16px;
+    padding: 2.65em 1.18em;
     text-align: center;
     color: #748494;
-    font-size: .85rem;
+    font-size: .85em;
 }
 
 .vas-ngrn-busy {
@@ -491,7 +496,7 @@
 
 @media (max-width: 720px) {
     .vas-ngrn-dialog {
-        padding: 16px;
+        padding: 1em;
     }
 
     .vas-ngrn-form-grid {
@@ -499,8 +504,8 @@
     }
 
     .vas-ngrn-rcv-line {
-        grid-template-columns: minmax(0, 1fr) 72px 96px 90px 54px;
-        gap: 8px;
-        padding: 9px 10px;
+        grid-template-columns: minmax(0, 1fr) 4.5em 6em 5.625em 3.375em;
+        gap: 0.5em;
+        padding: 0.5625em 0.625em;
     }
 }

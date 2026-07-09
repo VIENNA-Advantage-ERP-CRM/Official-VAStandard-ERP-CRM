@@ -15,19 +15,19 @@ namespace VIS.Controllers
     /// Module Name : Open GRNs till Today (Material Receipt / GRN dashboard KPI)
     /// Purpose     : KPI = COUNT(DISTINCT M_InOut.M_InOut_ID) of vendor Goods
     ///               Receipt Notes that are still OPEN as of the server date.
-    ///               "Open" = a non-terminal, non-draft DocStatus
-    ///               (AP, IN, IP, NA, WC, WP). Terminal (CO, CL, RE, VO) and
-    ///               draft (DR) GRNs are excluded. The header count never joins
-    ///               M_InOutLine. Tenant/organization scope comes from MRole,
+    ///               "Open" = DocStatus IN (IP, WC, DR) per review #40 -
+    ///               In Progress, Waiting Confirmation, and Drafted GRNs only.
+    ///               The header count never joins M_InOutLine.
+    ///               Tenant/organization scope comes from MRole,
     ///               applied to the single physical table M_InOut.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-17 Created
     /// </summary>
     public class VAS_083_OpenGRNsWidgetController : Controller
     {
-        /* Open-GRN DocStatus set (non-terminal, non-draft). These are ASCII
-           literals, so plain quoted values are portable across Oracle/PostgreSQL. */
-        private const string OpenStatusInList = "'AP', 'IN', 'IP', 'NA', 'WC', 'WP'";
+        /* Review #40: open = In Progress, Waiting Confirmation, or Drafted only.
+           ASCII literals, so plain quoted values are portable across Oracle/PostgreSQL. */
+        private const string OpenStatusInList = "'IP', 'WC', 'DR'";
 
         /// <summary>
         /// KPI tile data: the count of open vendor GRNs whose MovementDate is on

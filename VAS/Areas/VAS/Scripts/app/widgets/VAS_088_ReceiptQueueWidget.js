@@ -22,6 +22,8 @@
  *  5  | Qty                | VAS_088_Qty
  *  6  | Status             | VAS_088_Status
  *  7  | Received Lines     | VAS_088_ReceivedLines
+ *  8  | Month              | Month
+ *  9  | Year               | Year
  */
 ; VAS = window.VAS || {};
 
@@ -59,6 +61,10 @@
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
+        var filterYear = 0;
+        var filterMonth = 0;
+        var $monthSelect, $yearSelect;
+        var rowResizeObserver = null;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -151,6 +157,56 @@
             return formatQty(diff) + " " + lbl("VAS_088_Over", "over");
         }
 
+        function buildMonthFilter() {
+            if (!$monthSelect || !$yearSelect) { return; }
+
+            var currentYear = new Date().getFullYear();
+            $monthSelect.empty();
+            for (var monthIndex = 1; monthIndex <= 12; monthIndex++) {
+                $('<option>')
+                    .val(monthIndex)
+                    .text(new Date(2000, monthIndex - 1, 1).toLocaleDateString(window.navigator.language, { month: 'short' }))
+                    .appendTo($monthSelect);
+            }
+
+            $yearSelect.empty();
+            for (var year = currentYear; year >= currentYear - 5; year--) {
+                $('<option>').val(year).text(year).appendTo($yearSelect);
+            }
+        }
+
+        function syncMonthFilter() {
+            if (!$monthSelect || !$yearSelect) { return; }
+            if (filterMonth >= 1 && filterMonth <= 12) { $monthSelect.val(String(filterMonth)); }
+            if (filterYear > 0) {
+                if (!$yearSelect.find('option[value="' + filterYear + '"]').length) {
+                    $('<option>').val(filterYear).text(filterYear).appendTo($yearSelect);
+                }
+                $yearSelect.val(String(filterYear));
+            }
+        }
+
+        function measurePageSize() {
+            if (!$body || !$body[0]) { return pageSize; }
+
+            var $rows = $body.find('.vas-rq-rows');
+            var listHeight = $rows.innerHeight();
+            var rowHeight = $rows.find('.vas-rq-row').first().outerHeight(true) || 36;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            return Math.max(3, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadReceiptQueue(pageNo); }
+        }
+
         this.Initalize = function () {
             createWidget();
             createDialog();
@@ -170,8 +226,24 @@
                 '<div class="vas-rq-titles">' +
                 '<div class="vas-rq-title">' + escapeHtml(lbl("VAS_088_ReceiptQueue", "Receipt Queue")) + '</div>' +
                 '</div>' +
+                '<span class="vas-rq-filter">' +
+                '<select class="vas-rq-month" aria-label="' + escapeHtml(lbl("Month", "Month")) + '"></select>' +
+                '<select class="vas-rq-year" aria-label="' + escapeHtml(lbl("Year", "Year")) + '"></select>' +
+                '</span>' +
                 '</div>'
             );
+
+            $monthSelect = $header.find('.vas-rq-month');
+            $yearSelect = $header.find('.vas-rq-year');
+            buildMonthFilter();
+            $monthSelect.on('change', function () {
+                filterMonth = Number($(this).val());
+                if (!loading) { loadReceiptQueue(1); }
+            });
+            $yearSelect.on('change', function () {
+                filterYear = Number($(this).val());
+                if (!loading) { loadReceiptQueue(1); }
+            });
 
             $body = $(
                 '<div class="vas-rq-body">' +
@@ -217,6 +289,13 @@
             $nextBtn.on('click', function () {
                 if (!loading && pageNo < totalPages) { loadReceiptQueue(pageNo + 1); }
             });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($body.find('.vas-rq-rows')[0]);
+            }
         }
 
         function loadReceiptQueue(page) {
@@ -229,7 +308,7 @@
                 url: VIS.Application.contextUrl + 'VAS_088_ReceiptQueueWidget/GetReceiptQueue',
                 type: 'GET',
                 cache: false,
-                data: { pageNo: page, pageSize: pageSize },
+                data: { pageNo: page, pageSize: pageSize, year: filterYear, month: filterMonth },
                 success: function (res) {
                     var data = parseResponse(res);
                     loading = false;
@@ -242,7 +321,11 @@
 
                     pageNo = Number(data.pageNo || page);
                     totalPages = Number(data.totalPages || 0);
+                    filterYear = Number(data.year || filterYear);
+                    filterMonth = Number(data.month || filterMonth);
+                    syncMonthFilter();
                     renderReceiptQueue(data.rows || [], Number(data.totalRecords || 0));
+                    window.setTimeout(syncPageSize, 0);
                 },
                 error: function () {
                     loading = false;
@@ -446,6 +529,7 @@
             $(document).off('keydown.vas-rq');
             $('body').removeClass('vas-rq-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             $root.remove();
         };
     };
