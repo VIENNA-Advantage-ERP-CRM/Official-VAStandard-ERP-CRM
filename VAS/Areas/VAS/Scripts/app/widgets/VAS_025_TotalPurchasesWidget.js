@@ -8,7 +8,7 @@
  * Created by     : Humam Yousif
  *
  * AD_Message keys used in this file (add via System Messages):
- *   VAS_025_TotalPurchasesMTD  => "Total Purchases (MTD)"
+ *   VAS_025_TotalPurchasesMTD  => "Total Purchases"
  *   VAS_025_MonthToDate        => "Month to date"
  *   VAS_025_YTD                => "YTD"
  *   VAS_025_INV                => "INV"
@@ -21,8 +21,8 @@
  *   VAS_025_Trillion           => "T"
  *   VAS_025_OpenDrilldown      => "Open material category breakdown"
  *   VAS_025_MaterialCategoryBreakdown => "Material Category Breakdown"
- *   VAS_025_MaterialSpendMTD   => "Material Spend (MTD)"
- *   VAS_025_TotalPurchasesMTD  => "Total Purchases (MTD)"
+ *   VAS_025_MaterialSpendMTD   => "Material Spend"
+ *   VAS_025_TotalPurchasesMTD  => "Total Purchases"
  *   VAS_025_ProcessedIntro     => "This month you have processed"
  *   VAS_025_PurchaseInvoicesLower => "purchase invoices"
  *   VAS_025_AcrossLower        => "across"
@@ -165,7 +165,7 @@
             var html = '<div class="vas-tpwidg-header">'
                 +   '<div class="vas-tpwidg-icon">' + iconSvg + '</div>'
                 +   '<div class="vas-tpwidg-head-text">'
-                +     '<div class="vas-tpwidg-label">' + msg('VAS_025_TotalPurchasesMTD', 'Total Purchases (MTD)') + '</div>'
+                +     '<div class="vas-tpwidg-label">' + msg('VAS_025_TotalPurchasesMTD', 'Total Purchases') + '</div>'
                 +     '<div class="vas-tpwidg-subtitle">' + msg('VAS_025_MonthToDate', 'Month to date') + '</div>'
                 +   '</div>'
                 + '</div>'
@@ -323,7 +323,7 @@
             var totalTip = sym + ' ' + formatFull(total, precision);
             var html = '<div class="vas-tpwidg-drill">'
                 + '<div class="vas-tpwidg-drill-card">'
-                +   '<span class="vas-tpwidg-drill-card-label">' + tpEsc(msg('VAS_025_TotalPurchasesMTD', 'Total Purchases (MTD)')) + '</span>'
+                +   '<span class="vas-tpwidg-drill-card-label">' + tpEsc(msg('VAS_025_TotalPurchasesMTD', 'Total Purchases')) + '</span>'
                 +   '<strong class="vas-tpwidg-drill-card-value" title="' + tpEsc(totalTip) + '">' + tpEsc(sym + VIS.Util.formatCompactAmount(total, iso, precision)) + '</strong>'
                 +   '<em class="vas-tpwidg-drill-card-trend">' + tpEsc(subtitle) + '</em>'
                 + '</div>'

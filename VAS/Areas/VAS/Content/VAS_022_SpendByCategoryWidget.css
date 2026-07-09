@@ -96,6 +96,12 @@
     background: rgba(0, 0, 0, 0.02);
 }
 
+/* Don't keep the browser focus ring after a mouse click (looks like a stray blue
+   edge on the clicked tab); keyboard focus (:focus-visible) still shows a ring. */
+.vas-sbcwdg-tab:focus:not(:focus-visible) {
+    outline: none;
+}
+
 /* ---- Chart area ---- */
 .vas-sbcwdg-chart-wrap {
     flex: 1;

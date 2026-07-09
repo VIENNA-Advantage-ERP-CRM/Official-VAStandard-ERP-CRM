@@ -57,6 +57,7 @@
     color: #D78B10;
     line-height: 1.05;
     letter-spacing: -0.01em;
+    margin-bottom: 0.5em;   /* mirror VAS_025 value: sit in the space-between stack */
     padding-left: 0.3125em;
 }
 
@@ -112,7 +113,9 @@
     display: flex;
     align-items: flex-start;
     gap: 0.375em;
-    margin-top: auto;
+    /* Was margin-top:auto (pinned the value to the top); mirror VAS_025 so the value
+       distributes via the container's justify-content:space-between (centers on zoom-out). */
+    margin-top: 0.125em;
 }
 
 .vas-opwdg-why-text {
