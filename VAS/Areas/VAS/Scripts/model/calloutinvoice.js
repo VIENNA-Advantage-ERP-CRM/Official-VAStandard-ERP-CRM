@@ -1005,7 +1005,7 @@
             if ((mField.getColumnName() == "QtyInvoiced"
                 || mField.getColumnName() == "QtyEntered"
                 || mField.getColumnName() == "M_Product_ID")
-                && !"N" == ctx.getContext("DiscountSchema")) {
+                && !("N" == ctx.getContext("DiscountSchema"))) {
                 var C_BPartner_ID = ctx.getContextAsInt(windowNo, "C_BPartner_ID");
                 //if (mField.getColumnName() == "QtyEntered") {
                 //    var paramStr = M_Product_ID.toString().concat(",", C_UOM_To_ID.toString(), ",", //2

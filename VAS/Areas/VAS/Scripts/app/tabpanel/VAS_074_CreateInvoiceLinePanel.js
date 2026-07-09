@@ -827,7 +827,12 @@
             }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
-            $btn.prop("disabled", !editable);
+            // Blue "..." when the line already has additional-info values (visual cue).
+            if (hasAdditionalInfo(line)) $btn.addClass("has-values");
+            // Keep the "..." enabled even on a read-only invoice so the blue "has values" cue
+            // shows and the user can still OPEN the modal to VIEW the additional info (its
+            // fields render read-only per the framework's column read-only logic).
+            $btn.prop("disabled", false);
             // Open the additional-fields MODAL.
             $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain (forward -> save,
@@ -856,7 +861,9 @@
             var dialog = $('<div class="vas-cil-dialog"></div>');
             dialog.html(
                 '<header class="vas-cil-dialog__header"><div class="vas-cil-dialog__header-row">' +
-                '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3></div></header>" +
+                '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3>" +
+                '<button type="button" class="vas-cil-dialog__close" data-act="close-more" aria-label="' + esc(lbl("VAS_074_Close", "Close")) + '" title="' + esc(lbl("VAS_074_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
+                "</div></header>" +
                 '<div class="vas-cil-dialog__body vas-cil-more-body vas-cil-more-grid" id="vasCilMoreBody"></div>' +
                 '<footer class="vas-cil-dialog__footer vas-cil-dialog__footer--end">' +
                 '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="close-more">' + esc(lbl("VAS_074_Done", "Done")) + "</button></footer>");
@@ -881,6 +888,11 @@
                     e.preventDefault(); e.stopPropagation(); done();
                 }
             });
+            // Field-group Show More/Less: collapse/expand the fields under a section header.
+            dialog.on("click", "[data-act=fldgrp-toggle]", function (e) {
+                e.preventDefault(); e.stopPropagation();
+                toggleFieldGroup($(this).closest(".vas-cil-fldgrp"));
+            });
 
             // Building the curated fields is heavy (each FK builds a native Vienna
             // control + lookup, synchronously). Paint the dialog with a spinner FIRST,
@@ -898,6 +910,7 @@
                 // Curated "Additional Info" fields (callout / read-only / validation / val-rule
                 // honoured per control); shown 2-up via the .vas-cil-more-grid layout.
                 appendDynFields(line, $body);
+                applyFieldGroups($body);   // inject the collapsible section headers
                 if (!$body.children("[data-col]:not(.vas-cil-dyn-hidden)").length)
                     $body.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
                 $body.find("[data-col]:not(.vas-cil-dyn-hidden)").find("input,select,textarea").first().focus();
@@ -1824,6 +1837,26 @@
             return out;
         }
 
+        /* Does any curated "Additional Info" field carry a value? Used to tint the row's
+           "..." button blue so the user can see a line has extra data without opening the
+           modal. Empty FK/number = 0, blank text/date, No checkbox all count as "no value". */
+        function hasAdditionalInfo(line) {
+            var cols = additionalInfoColumns(line);
+            for (var i = 0; i < cols.length; i++) {
+                var m = cols[i], v = lineVal(line, m.ColumnName);
+                if (v == null) continue;
+                var s = String(v).trim();
+                if (!s) continue;
+                switch (dynFieldKind(m)) {
+                    case "fk": case "int": if (parseInt(s, 10) > 0) return true; break;
+                    case "number":         if (parseFloat(s) !== 0) return true; break;
+                    case "yesno":          if (s === "Y" || s === "true" || s === "1") return true; break;
+                    default:               return true;   // string / memo / date / list with any text
+                }
+            }
+            return false;
+        }
+
         /* Whether a built field is visible per its AD_Field.DisplayLogic. Default SHOW when
            the logic is empty or a token can't be resolved ($Element_record tokens). */
         function dynFieldVisible(line, m) {
@@ -1867,6 +1900,62 @@
             for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i]));
             applyDynDisplay(line, $body);
             // No overflow clip on the body - an FK dropdown would be cut off.
+        }
+
+        /* ---------- collapsible field groups (Additional Info modal) ----------
+           Reusable full-row section headers injected before an anchor field. A group owns
+           the sibling fields between its header and the next header; the header's
+           Show More/Less toggle collapses/expands them. Add an object here to place another
+           group anywhere in the modal: `anchor` = the ColumnName of the group's first field
+           (the header is inserted before its [data-col] wrapper), `key`/`def` = the group
+           title (AD_Message key + English fallback), `collapsed` = initial state. */
+        var MORE_FIELD_GROUPS = [
+            { anchor: "AD_OrgTrx_ID",     key: "VAS_074_GrpDimension",  def: "Dimension",  collapsed: false },
+            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false }
+        ];
+        // Per-anchor collapsed state; persists across refreshMoreDialog and re-opens so a
+        // user's expand/collapse choice survives value-change reconciles within the session.
+        var moreGroupCollapsed = {};
+
+        // Idempotently (re)insert every group header before its anchor field, then apply the
+        // collapse state. Safe to call after any (re)build of #vasCilMoreBody.
+        function applyFieldGroups($body) {
+            if (!$body || !$body.length) return;
+            $body.children(".vas-cil-fldgrp").remove();   // drop prior headers first
+            for (var g = 0; g < MORE_FIELD_GROUPS.length; g++) {
+                var grp = MORE_FIELD_GROUPS[g];
+                var $anchor = $body.children('[data-col="' + grp.anchor + '"]');
+                if (!$anchor.length) continue;            // group's lead field absent -> skip
+                var collapsed = (grp.anchor in moreGroupCollapsed) ? moreGroupCollapsed[grp.anchor] : !!grp.collapsed;
+                $anchor.before(
+                    '<div class="vas-cil-fldgrp" data-grp="' + grp.anchor + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
+                    '<span class="vas-cil-fldgrp-name">' + esc(lbl(grp.key, grp.def)) + "</span>" +
+                    '<button type="button" class="vas-cil-fldgrp-toggle" data-act="fldgrp-toggle">' +
+                    '<span class="vas-cil-fldgrp-txt">' + esc(collapsed ? lbl("VAS_074_ShowMore", "Show More") : lbl("VAS_074_ShowLess", "Show Less")) + "</span>" +
+                    '<svg class="vas-cil-fldgrp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg>' +
+                    "</button></div>");
+            }
+            applyGroupCollapse($body);
+        }
+
+        // Hide/show each group's members (the wrappers between its header and the next
+        // header) per the header's collapsed state. Never force-shows a DisplayLogic-hidden
+        // field - .vas-cil-dyn-hidden stays authoritative; we only add/remove our own class.
+        function applyGroupCollapse($body) {
+            $body.children(".vas-cil-fldgrp").each(function () {
+                var $hdr = $(this);
+                $hdr.nextUntil(".vas-cil-fldgrp").toggleClass("vas-cil-grp-collapsed", $hdr.attr("data-collapsed") === "1");
+            });
+        }
+
+        // Flip one group's collapsed state (from its Show More/Less button).
+        function toggleFieldGroup($hdr) {
+            if (!$hdr || !$hdr.length) return;
+            var collapsed = $hdr.attr("data-collapsed") !== "1";
+            $hdr.attr("data-collapsed", collapsed ? "1" : "0");
+            moreGroupCollapsed[$hdr.attr("data-grp")] = collapsed;
+            $hdr.find(".vas-cil-fldgrp-txt").text(collapsed ? lbl("VAS_074_ShowMore", "Show More") : lbl("VAS_074_ShowLess", "Show Less"));
+            applyGroupCollapse($hdr.closest("#vasCilMoreBody"));
         }
 
         function buildDynField(line, m) {
@@ -2321,6 +2410,7 @@
             $b.children(".vas-cil-empty-message").remove();
             if (!visible)
                 $b.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
+            applyFieldGroups($b);   // re-place headers after the nodes were reordered
         }
 
         /* Resolve and cache an FK value's display label (existing value caption). */
@@ -2490,6 +2580,13 @@
                     editing = { rowId: line.rowId, field: "description" };
                     if (asi > 0) runCallout(line, "M_AttributeSetInstance_ID");
                     else render();
+                },
+                // Picker dismissed without choosing an attribute -> don't leave focus stranded
+                // on the removed dialog; continue the row's tab chain on the next column (the
+                // description field - the same landing spot as a product with no attribute set).
+                onClose: function () {
+                    editing = { rowId: line.rowId, field: "description" };
+                    render();
                 }
             });
         }

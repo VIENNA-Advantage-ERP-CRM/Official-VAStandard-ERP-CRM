@@ -708,6 +708,13 @@
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
+
+    /* Line already has additional-info values -> show the "..." focused/highlighted
+       (blue-soft fill + blue dots, like the open state) so it's identifiable at a glance. */
+    .vas-cil-more-btn.has-values {
+        background: var(--cil-blue-soft);
+        color: var(--cil-action-blue);
+    }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
     .vas-cil-more-btn:disabled {
         cursor: not-allowed !important;
@@ -792,18 +799,34 @@
    The framework's vis-input-wrap CSS renders each field borderless (leading icon +
    floating label + value + trailing button); we only lay them out 2-up + prevent
    horizontal overflow - no control styling of our own. */
-/* Fixed body height so the modal does NOT resize between the loading spinner, the
-   loaded fields, and conditional show/hide of fields - content scrolls inside instead. */
-.vas-cil-more-body {
-    height: min(28em, 72vh);
+/* Fixed body height so the modal does NOT resize with content (collapsing a field group,
+   loading spinner vs loaded fields, DisplayLogic show/hide) - the fields scroll inside a
+   constant-height body instead.
+   The compound .vas-cil-dialog__body.vas-cil-more-body selector (0,2,0) is REQUIRED: the
+   base .vas-cil-dialog__body { flex:1 } rule is declared later in this file, so a plain
+   .vas-cil-more-body { flex:0 0 auto } (0,1,0) loses on source order and flex:1's
+   flex-basis:0% collapses the height. flex:0 0 auto pins the height; min-height:0 +
+   overflow-y:auto give the internal scroller. */
+.vas-cil-dialog__body.vas-cil-more-body {
+    height: min(34em, 72vh);
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .vas-cil-more-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.25em 2em;
-    padding: 1em 1.25em;
+    padding: 0.5em 1.25em;
     align-items: start;
+    /* Pack rows to the top at their natural height. Without this, a grid's default
+       align-content (normal = stretch) grows the rows to fill the fixed body height, so
+       collapsing a field group spreads the remaining controls apart (and leaves empty
+       space in the last track). align-content:start keeps inter-control spacing constant
+       and lets the leftover space sit as empty space at the bottom instead. */
+    align-content: start;
 }
 
     .vas-cil-more-grid > .input-group,
@@ -819,6 +842,69 @@
    (control + lookup preserved) and only toggled off, so it drops out of the grid layout
    without being re-created when the logic flips back to visible. */
 .vas-cil-dyn-hidden {
+    display: none !important;
+}
+
+/* ---------- collapsible field group (Additional Info modal) ----------
+   A reusable full-row section header injected before an anchor field (see
+   MORE_FIELD_GROUPS in VAS_074_CreateInvoiceLinePanel.js). Its Show More/Less toggle
+   collapses the group's member fields (the wrappers up to the next header). */
+.vas-cil-more-grid > .vas-cil-fldgrp {
+    grid-column: 1 / -1;              /* span both columns, break the 2-up flow */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    /* Tight above the bar; roomy below so the next row's floated field labels
+       (which sit ~11px above their input) clear the bar instead of overlapping it. */
+    margin: 0.25em 0 1em;
+    padding: 0.5em 0.875em;
+    border-radius: var(--cil-r-sm);
+    background: linear-gradient(90deg, #cfe8ff 0%, #eaf6ff 55%, var(--cil-surface) 100%);
+}
+
+    /* First group sits directly under the modal header padding - no extra top gap. */
+    .vas-cil-more-grid > .vas-cil-fldgrp:first-child {
+        margin-top: 0;
+    }
+
+.vas-cil-fldgrp-name {
+    font-size: 0.875em;
+    font-weight: 600;
+    color: var(--cil-text);
+}
+
+.vas-cil-fldgrp-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    border: 0;
+    background: transparent;
+    color: var(--cil-action-blue);
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.125em 0.25em;
+}
+
+    .vas-cil-fldgrp-toggle:hover {
+        text-decoration: underline;
+    }
+
+.vas-cil-fldgrp-chev {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+/* Expanded (default) -> chevron points up; collapsed -> flip to point down. */
+.vas-cil-fldgrp[data-collapsed="1"] .vas-cil-fldgrp-chev {
+    transform: rotate(180deg);
+}
+
+/* Member field hidden while its group is collapsed (independent of DisplayLogic). */
+.vas-cil-more-grid > .vas-cil-grp-collapsed {
     display: none !important;
 }
 /* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
@@ -871,6 +957,13 @@
 
     .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
         border-bottom: 1px solid #f3f3f3 !important;
+    }
+
+    /* Readonly control: no tinted fill inside the dialog. Overrides the framework's
+       .vis-ev-col-readonly { background: rgba(var(--v-c-on-secondary), .04) !important }
+       via a higher-specificity + !important rule so the field reads transparent. */
+    .vas-cil-dialog .vis-ev-col-readonly {
+        background-color: transparent !important;
     }
 
     .vas-cil-dialog .vis-input-wrap:has(input:focus), .vas-cil-dialog .vis-input-wrap:has(select:focus), .vas-cil-dialog .vis-input-wrap:has(textarea:focus) {
@@ -1197,7 +1290,7 @@
     background: var(--cil-surface);
     border-radius: 0.875em;
     box-shadow: var(--cil-shadow-dialog);
-    width: 45em;
+    width: 55em;
     max-width: 100%;
     max-height: 90vh;
     overflow: hidden;
