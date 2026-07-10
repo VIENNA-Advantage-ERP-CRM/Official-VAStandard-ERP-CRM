@@ -192,6 +192,9 @@
             $root.append($body).append($emptyState);
             createBusyIndicator();
             buildShell();
+            // Start hidden: the tab only appears once refreshPanelData loads a real invoice
+            // (record_ID > 0). A new/unsaved parent never flashes the empty box.
+            applyTabVisibility(false);
             $(document).on("mousedown.vascil", onDocMouseDown);
         };
 
@@ -202,6 +205,31 @@
             $root.append($busy);
         }
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
+
+        /* Hide/show the WHOLE tab (framework "Invoice Lines" title bar + our root) when no
+           invoice is selected. The live framework build appends
+           <div class="vis-ad-w-p-ap-tp-body-head"> immediately BEFORE getRoot() into a
+           shared content div, so the title bar is our root's IMMEDIATE PREVIOUS sibling -
+           target only ours (other panels append their own head+root pairs in the same div).
+           Toggling a class (display:none !important, not inline display) so the framework's
+           own setSize()/.show() on resize / panel switch can't override it and flash the
+           empty tab back. In the VIS2_0 tab path refreshPanelData fires on every record
+           change (no :visible guard), so the tab reappears when a real record loads. */
+        function applyTabVisibility(show) {
+            if (!$root || !$root.length) return;
+            $root.toggleClass("vas-cil-tab-hidden", !show);
+            // The framework "Invoice Lines" title bar (our root's previous sibling) is
+            // redundant with the panel's own header - hide it PERMANENTLY, regardless of
+            // record/lines (never re-shown). The CSS :has() rule covers this too; this is
+            // the fallback for browsers without :has support. Re-asserted on every render.
+            var $head = $root.prev(".vis-ad-w-p-ap-tp-body-head");
+            if (!$head.length) {
+                // Older build fallback: head lives under .vis-ad-w-p-ap-tp-outerwrap.
+                var $host = $root.closest(".vis-ad-w-p-ap-tp-outerwrap");
+                if ($host.length) $head = $host.find(".vis-ad-w-p-ap-tp-o-b-head");
+            }
+            $head.addClass("vas-cil-tab-hidden");
+        }
 
         this.fetchData = function (recordID, page) {
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
@@ -427,7 +455,14 @@
 
         /* ---------- render ---------- */
         function render() {
-            if (!parent || !parent.C_Invoice_ID) { $body.hide(); $emptyState.show(); return; }
+            if (!parent || !parent.C_Invoice_ID) {
+                // No invoice selected (record_ID <= 0): hide the whole tab - title bar and
+                // content box - so there's no empty prompt or stray scrollbar.
+                $emptyState.show(); $body.hide();
+                applyTabVisibility(false);
+                return;
+            }
+            applyTabVisibility(true);
             $emptyState.hide(); $body.show();
             // Read-only invoice: mark the panel so disabled controls (checkbox, "...")
             // show a not-allowed cursor via their (enabled) parent cell - a disabled
