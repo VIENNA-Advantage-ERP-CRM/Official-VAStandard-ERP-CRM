@@ -22,6 +22,9 @@
 /ViennaAdvantageWeb/TempDownload
 /ViennaAdvantageWeb/Dll
 
+# Local-only message-code export (not tracked)
+/VAS_Overview_MessageCodes.xlsx
+
 
 
 ## Ignore Visual Studio temporary files, build results, and
