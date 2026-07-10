@@ -224,7 +224,7 @@
             '<div class="vas-cil-dialog__header-row">' +
             // Title text is set per mode in renderAttr: "Select attribute" in the list,
             // "Product Attribute" in create/edit. No header Back button — the create form's
-            // footer "Show Attribute Details" pill is the way back to the list.
+            // footer "Select Existing Record" pill is the way back to the list.
             '<div class="vas-cil-dialog__title-block">' +
             '<h3 class="vas-cil-dialog__title" id="vasCilAttrTitle">' + E(L("VAS_074_SelectAttribute", "Select attribute")) + "</h3>" +
             "</div>" +
@@ -259,12 +259,28 @@
             // No Cancel in create mode - the header "Back" button already returns to the list.
             '<div id="vasCilAttrCreateFoot" class="vas-cil-is-hidden">' +
             // Pill styled like the header Back button; returns to the attribute-details list.
-            '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-back">' + IC("arrow-left", "←") + "<span>" + E(L("VAS_074_ShowAttributeDetails", "Show Attribute Details")) + "</span></button>" +
+            '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-back">' + IC("arrow-left", "←") + "<span>" + E(L("VAS_074_ShowAttributeDetails", "Select Existing Record")) + "</span></button>" +
             '<span class="vas-cil-foot-error"></span>' +
             '<div class="vas-cil-dialog__actions">' +
             '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-submit" disabled>' + E(L("VAS_074_AddAttribute", "Add attribute")) + "</button></div></div></footer>");
         backdrop.append(dialog);
         $("body").append(backdrop);
+
+        // Keyboard shielding: the modal lives on <body> inside the framework window, whose
+        // global keydown handler (grid / field navigation, Enter = default action, custom Tab)
+        // was CANCELLING the browser's native behaviour - so Enter/Space didn't activate the
+        // focused button and Tab didn't move focus to the next control. stopPropagation (NOT
+        // preventDefault) keeps those key events from reaching the framework while letting the
+        // browser perform its native defaults INSIDE the dialog. Escape dismisses the picker
+        // (the event no longer reaches an outer Escape handler). Inner handlers (grid row
+        // Enter/Space at renderAttrRows, the search input) are bound on descendants, so they
+        // bubble up to here and run FIRST - unaffected. keypress/keyup shielded too so button
+        // activation (Space fires on keyup) and framework key-repeat handling stay clean.
+        backdrop.on("keydown", function (e) {
+            if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); e.stopPropagation(); dismiss(); return; }
+            e.stopPropagation();
+        });
+        backdrop.on("keypress keyup", function (e) { e.stopPropagation(); });
 
         // Do NOT close on outside/backdrop click; only OK / Cancel close.
         dialog.on("click", "[data-act=attr-create]", function () { openCreateForm(null); });

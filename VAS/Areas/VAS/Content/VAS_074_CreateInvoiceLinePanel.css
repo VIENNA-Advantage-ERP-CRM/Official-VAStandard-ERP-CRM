@@ -71,7 +71,15 @@
     overscroll-behavior: contain;
     /*padding: 0.75em;*/
     font-family: var(--cil-font);
-    font-size: 0.9em;
+    /* Canonical panel anchor (windows-and-panels.md > Panel Foundation, Rules 1 + 3): a
+       VIEWPORT-stable font-size so the panel renders at the SAME physical size on every
+       screen resolution. The old `font-size: 0.9em` resolved against the framework host's
+       baseline (unknown, varies by resolution) -> inconsistent sizing. Every internal token
+       is em against this anchor; container-type lets inner primitives use cqi if needed.
+       Rendered range 16-18px: <=1600px vw -> 16px, 1600-1800px ramps 16->18px, >=1800px -> 18px. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
     color: var(--cil-text);
 }
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
@@ -82,6 +90,23 @@
 
 .vas-cil-root * {
     box-sizing: border-box;
+}
+
+/* Panel Foundation Rule 4: force nested form controls to inherit the anchor. Without this,
+   any em inside a <button>/<input>/<select>/<textarea>/<optgroup> resolves against the UA
+   default (~13.33px in Chrome), NOT the panel anchor, so byte-identical tokens render at two
+   sizes. Wrapped in :where() so the reset has ZERO specificity - it's a pure baseline that
+   controls setting their OWN font-size (buttons, search/scan/cell/dialog inputs) always
+   win over. Scoped to the panel + body-level dialogs (not *) so host chrome stays its own. */
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) button,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) input,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) select,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) textarea,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
 }
 
 .vas-cil-empty {
@@ -143,7 +168,7 @@
 
 .vas-cil-panel__title {
     margin: 0;
-    font-size: 1em;
+    font-size: 1.1em;
     font-weight: 700;
     color: var(--cil-text-strong);
 }
@@ -152,6 +177,7 @@
     margin: 0.125em 0 0;
     font-size: 0.8125em;
     color: var(--cil-text-muted);
+    display: none;
 }
 
 .vas-cil-panel__actions {
@@ -191,7 +217,7 @@
     background: var(--cil-surface);
     border-color: var(--cil-action-blue);
     color: var(--cil-action-blue);
-    font-size: 0.75em;
+    font-size: 0.8125em;
     font-weight: 600;
     padding: 0.375em 0.75em;
 }
@@ -254,7 +280,7 @@
 
 .vas-cil-row {
     display: grid;
-    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
+    grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
     gap: 0.75em;
     align-items: center;
     padding: 0.75em 0;
@@ -268,8 +294,8 @@
 }
 
     .vas-cil-row--head .vas-cil-cell {
-        font-size: 0.8125em;
-        font-weight: 700;
+        font-size: 0.9125em;
+        font-weight: 400;
         color: var(--cil-text);
     }
 
@@ -507,7 +533,7 @@
     display: block;
     margin-top: 0.125em;
     font-size: 0.85em;
-    font-weight: 600;
+    font-weight: 400;
     color: var(--cil-action-blue);
     white-space: nowrap;
     overflow: hidden;
@@ -567,7 +593,7 @@
     }
 
 .vas-cil-cell-edit input.vas-cil-cell-edit__input {
-    font-weight: 700;
+    font-weight: 500;
     color: var(--cil-text);
 }
 
@@ -622,7 +648,7 @@
 
 .vas-cil-cell-edit input.vas-cil-qtyval {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     font-size: 1em;
 }
 
@@ -638,7 +664,7 @@
 }
 
 .vas-cil-amt {
-    font-weight: 700;
+    font-weight: 400;
     font-size: 0.975em;
     color: var(--cil-text);
     font-variant-numeric: tabular-nums;
@@ -873,7 +899,7 @@
    flex-basis:0% collapses the height. flex:0 0 auto pins the height; min-height:0 +
    overflow-y:auto give the internal scroller. */
 .vas-cil-dialog__body.vas-cil-more-body {
-    height: min(34em, 72vh);
+    height: min(29em, 72vh);
     flex: 0 0 auto;
     min-height: 0;
     overflow-y: auto;
@@ -1188,6 +1214,29 @@
 
 /* Attribute create form: reuses the framework vis-input-wrap fields (2-up via
    .vas-cil-more-grid). Mandatory marker + the Lot/SerNo trailing utility action. */
+
+/* Float the field label higher/left (design), and nudge the select's text in. Scoped to
+   .vas-cil-attr-form (the AttributeControl create/edit form) so it doesn't affect other
+   vis-input-wrap usages - the "..." modal has its own float rule (.vas-cil-more-body). The
+   select variant has no :placeholder-shown, so its label stays floated (always-on). */
+.vas-cil-attr-form .vis-input-wrap input:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap input:not(:placeholder-shown) ~ label,
+.vas-cil-attr-form .vis-input-wrap select:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap select ~ label,
+.vas-cil-attr-form .vis-input-wrap textarea:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap textarea:not(:placeholder-shown) ~ label {
+    top: -10px;
+    left: -3px;
+}
+
+.vas-cil-attr-form .vis-input-wrap select {
+    padding-left: 4px;
+}
+
+.vas-cil-attr-form .vis-input-wrap label {
+    left: 4px;
+}
+
 .vas-cil-req {
     font-style: normal;
     color: var(--cil-danger);
@@ -1337,7 +1386,10 @@
     padding: 1em;
     z-index: 99;
     font-family: var(--cil-font);
-    font-size: 0.9em;
+    /* Same canonical anchor as .vas-cil-root - dialogs mount on <body> (outside the root),
+       so they need their own viewport-stable anchor to render at the SAME physical size as
+       the panel on every resolution (was 0.9em of the host baseline). */
+    font-size: clamp(16px, 1vw, 18px);
     color: var(--cil-text);
 }
 
@@ -1945,7 +1997,8 @@
     padding: 0.7em 1.2em;
     border-radius: var(--cil-r-sm);
     font-family: var(--cil-font);
-    font-size: 0.8em;
+    /* Body-mounted (outside .vas-cil-root): stable small anchor, not host-relative 0.8em. */
+    font-size: clamp(12px, 0.8vw, 14px);
     box-shadow: var(--cil-shadow-pop);
     opacity: 0;
     transition: opacity .25s, transform .25s;

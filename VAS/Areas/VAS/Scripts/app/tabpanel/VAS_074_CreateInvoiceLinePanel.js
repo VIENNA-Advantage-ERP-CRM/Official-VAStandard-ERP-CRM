@@ -372,6 +372,23 @@
             render();
         }
 
+        /* Panel-level Undo (Ctrl+Alt+Z): revert the "active" line - the row being edited,
+           else the first selected unsaved row, else the newest unsaved row. Saved+dirty ->
+           revert to the pristine snapshot; new (never-saved) -> remove the row. Same rule as
+           the per-row ↺ affordance (renderMoreCell). */
+        function undoActive() {
+            if (!panelEditable()) return;
+            var target = (editing && lineById(editing.rowId)) || null;
+            if (!target || !(target.status === "new" || target.dirty)) {
+                target = selectedLines().filter(function (l) { return l.status === "new" || l.dirty; })[0] || null;
+            }
+            if (!target) {
+                for (var i = 0; i < lines.length; i++) if (lines[i].status === "new" || lines[i].dirty) { target = lines[i]; break; }
+            }
+            if (!target) { showToast(lbl("VAS_074_NothingToUndo", "Nothing to undo")); return; }
+            if (target.status === "saved" && target._saved) undoLine(target); else discardNewLine(target);
+        }
+
         /* Seed every C_InvoiceLine column (from the cached columnMeta) on a new
            line so the VO carries all columns; explicit defaults already set are
            preserved. */
@@ -397,10 +414,12 @@
             // dropping the vas-cil-is-hidden class).
             var $scanBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline vas-cil-is-hidden" data-action="open-scan">' + icon("scan-line", "▭") +
                 "<span>" + esc(lbl("VAS_074_Scan", "Scan")) + "</span></button>");
-            $addBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="add-line">' + icon("plus", "+") +
+            $addBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="add-line" title="' + esc(lbl("VAS_074_AddLine", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") +
                 "<span>" + esc(lbl("VAS_074_AddLine", "Add line")) + "</span></button>");
-            $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows"></button>');
-            $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" disabled>' +
+            // Icon + label span built ONCE here; renderHeaderButtons only updates the label
+            // span's TEXT (never rebuilds innerHTML) so the label can't momentarily blank out.
+            $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-cil-save-lbl"></span></button>');
+            $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" title="' + esc(lbl("Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("Delete", "Delete")) + ' <span class="vas-cil-sel-count"></span></span></button>');
             $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn);
             $header.append($actions);
@@ -600,9 +619,14 @@
             // fully disabled (native `disabled` blocks the mousedown/click handlers).
             $addBtn.removeClass("vas-cil-is-hidden").prop("disabled", locked).toggleClass("vas-cil-is-disabled", locked);
             $saveBtn.removeClass("vas-cil-is-hidden").prop("disabled", locked).toggleClass("vas-cil-is-disabled", locked || n === 0);
-            var plural = n > 1 ? lbl("VAS_074_PluralS", "s") : "";
-            var countTxt = n > 0 ? " (" + n + ")" : "";
-            $saveBtn.html(icon("hard-drive", "💾") + "<span>" + esc(lbl("VAS_074_SaveRow", "Save row")) + plural + countTxt + "</span>");
+            // Update ONLY the label text (icon span stays put). Guard against a blank/space
+            // message so the label never renders empty (the "Save button text disappears" bug -
+            // VIS.Msg.getMsg can return a blank string once the message cache loads).
+            var saveLbl = lbl("VAS_074_SaveRow", "Save row");
+            if (!saveLbl || !saveLbl.trim()) saveLbl = "Save row";
+            if (n > 1) saveLbl += lbl("VAS_074_PluralS", "s");
+            if (n > 0) saveLbl += " (" + n + ")";
+            $saveBtn.find(".vas-cil-save-lbl").text(saveLbl);
             var sc = selectedCount();
             $deleteBtn.prop("disabled", sc === 0 || locked).toggleClass("vas-cil-is-disabled", sc === 0 || locked);
             $deleteBtn.find(".vas-cil-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
@@ -743,7 +767,16 @@
                     // set was removed after the line was created but the old ASI description
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline).
-                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && productHasAttributeSet(line)) {
+                        // Open on mousedown + preventDefault (like Undo/Save): a plain click
+                        // while a cell editor is focused blurs -> commits -> re-renders the row,
+                        // destroying this element before mouseup so the FIRST click is eaten
+                        // (the two-clicks-to-open bug). preventDefault keeps focus so the row
+                        // isn't rebuilt; the click(detail===0) branch preserves keyboard/synthetic
+                        // activation without double-firing on a real mouse click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); openAttrDialog(line); } });
+                    }
                     else $attr.addClass("vas-cil-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -905,8 +938,11 @@
             // shows and the user can still OPEN the modal to VIEW the additional info (its
             // fields render read-only per the framework's column read-only logic).
             $btn.prop("disabled", false);
-            // Open the additional-fields MODAL.
-            $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
+            // Open the additional-fields MODAL. mousedown + preventDefault (like Undo/Save): a
+            // plain click while a cell editor is focused blurs -> commits -> re-renders the row
+            // and destroys this button before mouseup, eating the first click (two-clicks bug).
+            // Keyboard is handled by the keydown below (Enter/Space), so no click branch here.
+            $btn.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain (forward -> save,
             // Shift+Tab -> Tax). Enter / Space open the modal explicitly - relying on the
             // button's native click-on-Enter was unreliable inside the grid (the keypress
@@ -2394,7 +2430,15 @@
             // Keep the window context current so a dependent FK's val rule (and any control
             // built by a following refreshMoreDialog) resolves against the new value.
             primeLineContext(line);
-            if (!sameVal(prev, value)) markDirty(line);   // genuine change only
+            if (!sameVal(prev, value)) {
+                markDirty(line);   // genuine change only
+                // Remember every modal field the user actually edited so a CLEAR (null / 0 /
+                // empty) persists on save. The save bag carries the whole column set, so the
+                // server can't tell a user-cleared FK/dimension from a naturally-empty column;
+                // TouchedCols tells it which nulls/zeros are intentional (see ApplyExtraColumns).
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[col] = true;
+            }
             var m = columnMeta[col];
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
@@ -3262,7 +3306,7 @@
             return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                 M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
-                Values: v };
+                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : [] };
         }
 
         /* Save the currently-unsaved lines as a non-blocking batch. Each saved row shows
@@ -3416,13 +3460,43 @@
             // inline popover to dismiss here anymore.
         }
 
-        // Escape closes the top-most open dialog / popover.
+        // Escape closes the top-most open dialog / popover (bubble phase).
         $(document).on("keydown.vascil", function (e) {
             if (e.key !== "Escape") return;
             if (scanState) { closeDialogs(); return; }
             if (attrState) { closeDialogs(); return; }
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
+
+        // Ctrl+Alt+ N/S/D/Z action shortcuts. Bound in the CAPTURE phase (3rd arg true) so they
+        // fire BEFORE the grid cell editors' own keydown handlers, which stopPropagation() to
+        // keep keys from the framework - otherwise the shortcut is swallowed while a product /
+        // qty / price / UOM / tax control has focus (e.g. right after Add line focuses the
+        // product cell). Matching is case-INSENSITIVE (e.key lowered, e.code fallback) so Caps
+        // Lock / Shift / keyboard layout don't matter. Fires only while this panel is the
+        // visible/active tab, an invoice is loaded, and no dialog is open (finish it first).
+        function panelShortcutKeydown(e) {
+            if (!e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey) return;
+            if (!parent || !$root || !$root.is(":visible")) return;
+            if (attrState || scanState || morePopoverFor) return;
+            // Also bail while any vas-cil dialog is open in the DOM - covers VIS.AttributeControl
+            // (#vasCilAttr), which keeps its own state, not the panel's attrState.
+            if (document.getElementById("vasCilAttr") || document.getElementById("vasCilScan") || document.getElementById("vasCilMore")) return;
+            var k = (e.key || "").toLowerCase(), code = e.code, act = null;
+            if (k === "n" || code === "KeyN") act = function () { addLine(); };
+            else if (k === "s" || code === "KeyS") act = function () { flushActiveEdit(); saveRows(); };
+            else if (k === "d" || code === "KeyD") act = function () {
+                if (!selectedCount()) { showToast(lbl("VAS_074_SelectRowToDelete", "Select a row to delete")); return; }
+                deleteSelected();
+            };
+            else if (k === "z" || code === "KeyZ") act = function () { undoActive(); };
+            else return;   // not one of ours - let it through
+            e.preventDefault();
+            e.stopPropagation();
+            act();
+        }
+        this._shortcutFn = panelShortcutKeydown;
+        document.addEventListener("keydown", panelShortcutKeydown, true);
 
         this.getRoot = function () { return $root; };
     };
@@ -3446,6 +3520,7 @@
 
     VAS.VAS_074_CreateInvoiceLinePanel.prototype.dispose = function () {
         $(document).off("mousedown.vascil").off("keydown.vascil");
+        if (this._shortcutFn) { document.removeEventListener("keydown", this._shortcutFn, true); this._shortcutFn = null; }
         $("#vasCilAttr, #vasCilScan, .vas-cil-toast").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null; this.panelWidth = null;
