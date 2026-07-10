@@ -1241,7 +1241,11 @@ namespace VASLogic.Models
                 new SqlParameter("@kwP", like),
                 new SqlParameter("@kwC", like)
             }, null);
-            if (ds == null || ds.Tables.Count == 0) return items;
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                log.Severe($"Create Invoice Line Bottom Panel -> Prodict/Charge SQL: {DB.ConvertSqlQuery(combined)}, Parameter are : {like}");
+                return items;
+            }
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {

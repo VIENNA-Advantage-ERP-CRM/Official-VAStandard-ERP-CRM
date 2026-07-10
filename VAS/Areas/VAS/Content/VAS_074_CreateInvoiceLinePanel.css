@@ -69,7 +69,7 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding: 0.75em;
+    /*padding: 0.75em;*/
     font-family: var(--cil-font);
     font-size: 0.9em;
     color: var(--cil-text);
@@ -90,6 +90,23 @@
     align-items: center;
     justify-content: center;
     color: var(--cil-text-muted);
+}
+
+/* Applied to the framework tab title bar + content box (and our root as a fallback)
+   when no invoice is selected, so the whole tab is hidden. !important beats the
+   framework's inline .show()/setSize() display so it can't flash the empty tab back. */
+.vas-cil-tab-hidden {
+    display: none !important;
+}
+
+/* Permanently hide the framework "Invoice Lines" title bar. The framework appends
+   <div class="vis-ad-w-p-ap-tp-body-head"> immediately BEFORE our getRoot(), so this
+   adjacency selector targets ONLY this panel's head (scoped by + .vas-cil-root) and
+   never sibling panels'. It's redundant with the panel's own "Invoice Lines & Summary"
+   header. Timing-free (no JS needed for the head), unlike .vas-cil-tab-hidden which is
+   toggled after the head exists. */
+.vis-ad-w-p-ap-tp-body-head:has(+ .vas-cil-root) {
+    display: none !important;
 }
 
 .vas-cil-icon {
