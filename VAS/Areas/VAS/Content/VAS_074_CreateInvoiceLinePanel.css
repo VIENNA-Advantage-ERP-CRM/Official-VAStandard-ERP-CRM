@@ -1188,6 +1188,29 @@
 
 /* Attribute create form: reuses the framework vis-input-wrap fields (2-up via
    .vas-cil-more-grid). Mandatory marker + the Lot/SerNo trailing utility action. */
+
+/* Float the field label higher/left (design), and nudge the select's text in. Scoped to
+   .vas-cil-attr-form (the AttributeControl create/edit form) so it doesn't affect other
+   vis-input-wrap usages - the "..." modal has its own float rule (.vas-cil-more-body). The
+   select variant has no :placeholder-shown, so its label stays floated (always-on). */
+.vas-cil-attr-form .vis-input-wrap input:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap input:not(:placeholder-shown) ~ label,
+.vas-cil-attr-form .vis-input-wrap select:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap select ~ label,
+.vas-cil-attr-form .vis-input-wrap textarea:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap textarea:not(:placeholder-shown) ~ label {
+    top: -10px;
+    left: -3px;
+}
+
+.vas-cil-attr-form .vis-input-wrap select {
+    padding-left: 4px;
+}
+
+.vas-cil-attr-form .vis-input-wrap label {
+    left: 4px;
+}
+
 .vas-cil-req {
     font-style: normal;
     color: var(--cil-danger);

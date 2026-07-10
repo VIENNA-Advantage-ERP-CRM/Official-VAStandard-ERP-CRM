@@ -946,7 +946,7 @@ namespace VASLogic.Models
                   COALESCE(t.Name, N'')        AS VASCILDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
-                  COALESCE(p.ProductType, N'') AS VASCILDISP_ProductType
+                  COALESCE(p.ProductType, '') AS VASCILDISP_ProductType
                FROM C_InvoiceLine il
                LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
                LEFT JOIN C_Charge ch ON (il.C_Charge_ID = ch.C_Charge_ID)
@@ -1199,14 +1199,14 @@ namespace VASLogic.Models
                                       p.Value AS SearchKey, p.Name AS DisplayName,
                                       COALESCE(p.Description, N'') AS Description,
                                       p.M_AttributeSet_ID AS AttributeSetId,
-                                      COALESCE(p.ProductType, N'') AS ProductType
+                                      COALESCE(p.ProductType, '') AS ProductType
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.IsSummary = 'N'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                 AND (LOWER(p.Value) LIKE @kwP
-                                   OR LOWER(p.Name) LIKE @kwP
-                                   OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwP)";
+                                 AND (LOWER(p.Value) LIKE @kwPV
+                                   OR LOWER(p.Name) LIKE @kwPN
+                                   OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwPU)";
             // Enforce the M_Product_ID column's AD_Val_Rule (if any) in line context.
             string prodPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Invoice_ID, rowVars);
             if (prodPred.Length > 0) prodSql += " AND (" + prodPred + ")";
@@ -1218,12 +1218,12 @@ namespace VASLogic.Models
                                         COALESCE(ch.Name, N'') AS SearchKey, ch.Name AS DisplayName,
                                         COALESCE(ch.Description, N'') AS Description,
                                         0 AS AttributeSetId,
-                                        N'' AS ProductType
+                                        '' AS ProductType
                                  FROM C_Charge ch
                                  WHERE ch.IsActive = 'Y'
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                   AND (LOWER(ch.Name) LIKE @kwC
-                                     OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwC)";
+                                   AND (LOWER(ch.Name) LIKE @kwCN
+                                     OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwCD)";
             // Enforce the C_Charge_ID column's AD_Val_Rule (if any) in line context.
             string chargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", C_Invoice_ID, rowVars);
             if (chargePred.Length > 0) chargeSql += " AND (" + chargePred + ")";
@@ -1238,8 +1238,11 @@ namespace VASLogic.Models
                 + " ORDER BY x.Kind, x.DisplayName" + PagingSuffix(pageSize, offset);
 
             DataSet ds = DB.ExecuteDataset(combined, new SqlParameter[] {
-                new SqlParameter("@kwP", like),
-                new SqlParameter("@kwC", like)
+                new SqlParameter("@kwPV", like),
+                new SqlParameter("@kwPN", like),
+                new SqlParameter("@kwPU", like),
+                new SqlParameter("@kwCN", like),
+                new SqlParameter("@kwCD", like)
             }, null);
             if (ds == null || ds.Tables.Count == 0)
             {
