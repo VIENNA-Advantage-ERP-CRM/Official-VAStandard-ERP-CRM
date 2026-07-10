@@ -251,8 +251,10 @@
                     lines = [];
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
                     editing = null; morePopoverFor = null;
+                    taxSummary = null;   // drop the prior record's breakdown -> fallback shows first
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
+                    refreshSummary();    // then load this invoice's server tax breakdown
                 },
                 error: function (err) { console.log(err); }
             });
@@ -488,29 +490,64 @@
             $self.fetchData(parent.C_Invoice_ID, p);
         }
 
+        // Cached server tax breakdown for the CURRENT invoice (from VAS/PoReceipt/GetTaxData,
+        // the same contract VAS_InvoiceSummary uses). null until loaded / on a fresh record;
+        // renderTotals() then falls back to a client-computed subtotal+tax so an unsaved
+        // invoice still shows live totals. Refreshed on load, save and delete (refreshSummary).
+        var taxSummary = null;
+
+        /* Vertical invoice summary (Sub Total / per-tax lines / [TCS] / Grand Total), mirroring
+           the VAS_InvoiceSummary design, right-aligned in the totals row. */
         function renderTotals() {
-            // Base = saved totals of every OTHER page (server), plus the live sum of the
-            // current page below, so the row shows the WHOLE invoice's grand total.
-            var sub = otherSub, tax = otherTax, tcs = otherTcs;
-            // Subtotal = SUM(TaxBaseAmt), Tax = SUM(TaxAmt + SurchargeAmt) - both from the SAVED
-            // line columns (server supplies the other pages; these add the current page). No live
-            // recompute, so the row is exact and refreshes on save.
-            for (var i = 0; i < lines.length; i++) { sub += lineTaxBaseSaved(lines[i]); tax += lineTaxTotalSaved(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
-            $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
-            $totalsRow.append(totalItem(lbl("Tax", "Tax"), fmtMoney(tax), false));
-            // TCS (Tax Collected at Source, VA106) - shown only when the module is in use
-            // and a line carries an amount; it must roll into the grand total.
-            if (tcs) $totalsRow.append(totalItem(lbl("VA106_TaxCollectedAtSource", "TCS"), fmtMoney(tcs), false));
-            $totalsRow.append(totalItem(lbl("VAS_074_Total", "Total"), fmtMoney(sub + tax + tcs), true));
+            var html = '<div class="vas-cil-summary">';
+            if (taxSummary && taxSummary.length) {
+                var h = taxSummary[0];
+                var sym = h.CurSymbol || "";
+                var prec = (h.stdPrecision != null && h.stdPrecision >= 0) ? h.stdPrecision : precision();
+                html += summaryRow(lbl("VAS_SubTotal", "Sub Total"), sym, h.TotalLines, prec, false);
+                for (var i = 0; i < taxSummary.length; i++) {
+                    if (!taxSummary[i].TaxName) continue;
+                    html += summaryRow(taxSummary[i].TaxName, sym, taxSummary[i].TaxAmt, prec, false);
+                }
+                if (+h.TCSAmount) html += summaryRow(lbl("VAS_TCSTotal", "TCS Total"), sym, h.TCSAmount, prec, false);
+                html += summaryRow(lbl("GrandTotal", "Grand Total"), sym, h.GrandTotal, prec, true);
+            } else {
+                // Fallback (no server breakdown yet): saved totals of the OTHER pages + the live
+                // sum of this page, so a new/unsaved invoice still shows a grand total.
+                var sub = otherSub, tax = otherTax, tcs = otherTcs, p = precision();
+                for (var j = 0; j < lines.length; j++) { sub += lineTaxBaseSaved(lines[j]); tax += lineTaxTotalSaved(lines[j]); tcs += lineTcs(lines[j]); }
+                html += summaryRow(lbl("VAS_SubTotal", "Sub Total"), "", sub, p, false);
+                html += summaryRow(lbl("Tax", "Tax"), "", tax, p, false);
+                if (tcs) html += summaryRow(lbl("VA106_TaxCollectedAtSource", "TCS"), "", tcs, p, false);
+                html += summaryRow(lbl("GrandTotal", "Grand Total"), "", sub + tax + tcs, p, true);
+            }
+            $totalsRow.html(html + "</div>");
+        }
+        // One "Label: value" line of the summary. sym is the currency symbol ("" -> none).
+        function summaryRow(label, sym, amount, prec, grand) {
+            var val = (sym ? sym + " " : "") + (+amount || 0).toLocaleString(window.navigator.language,
+                { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return '<div class="vas-cil-summary-row' + (grand ? " vas-cil-summary-row--grand" : "") + '">' +
+                '<span class="vas-cil-summary-label">' + esc(label) + ":</span>" +
+                '<span class="vas-cil-summary-val">' + esc(val) + "</span></div>";
+        }
+        /* (Re)load the server tax breakdown for the current invoice and repaint the summary.
+           Same endpoint/contract as VAS_InvoiceSummary; called on load, save and delete. */
+        function refreshSummary() {
+            var id = parent && parent.C_Invoice_ID;
+            if (!(id > 0)) { taxSummary = null; renderTotals(); return; }
+            try {
+                VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetTaxData",
+                    { InvoiceID: id }, function (data) {
+                        taxSummary = (data && data.length) ? data : null;
+                        renderTotals();
+                    });
+            } catch (e) { if (window.console) console.log(e); }
         }
         /* Per-line TCS amount (VA106_TCSAmount) - 0 when the module isn't installed or
            the column isn't set; read case-insensitively (PG lowercases the key). */
         function lineTcs(line) { return +lineVal(line, "VA106_TCSAmount") || 0; }
-        function totalItem(label, value, grand) {
-            return '<span class="vas-cil-total-item' + (grand ? " vas-cil-total-item--grand" : "") + '">' +
-                '<span class="vas-cil-total-item__label">' + esc(label) + '</span><span class="vas-cil-total-item__value">' + esc(value) + "</span></span>";
-        }
 
         /* The panel is editable only while the invoice can still take line changes -
            server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
@@ -3213,7 +3250,7 @@
                 success: function (raw) {
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
+                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                 },
                 error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
@@ -3321,7 +3358,7 @@
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); refreshSummary(); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_074_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_074_DeleteFailed", "Delete failed")); }

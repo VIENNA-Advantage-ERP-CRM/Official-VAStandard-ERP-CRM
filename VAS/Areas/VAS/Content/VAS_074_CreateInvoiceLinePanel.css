@@ -324,6 +324,54 @@
     gap: 1.5em;
 }
 
+/* Vertical invoice summary (Sub Total / per-tax lines / Grand Total) rendered inside the
+   totals row, right-aligned - mirrors the VAS_InvoiceSummary design. */
+.vas-cil-summary {
+    min-width: 15em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+}
+
+.vas-cil-summary-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2.5em;
+    font-size: 1.1em;
+}
+
+.vas-cil-summary-label {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-summary-val {
+    min-width: 7em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.vas-cil-summary-row--grand {
+    margin-top: 0.125em;
+}
+
+    .vas-cil-summary-row--grand .vas-cil-summary-label {
+        font-weight: 700;
+        color: var(--cil-text);
+    }
+
+    .vas-cil-summary-row--grand .vas-cil-summary-val {
+        font-weight: 700;
+        font-size: 1.05em;
+        color: var(--cil-text-strong);
+        border-top: 0.0625em solid var(--cil-divider-strong);
+        padding-top: 0.25em;
+    }
+
 .vas-cil-cell {
     display: flex;
     flex-direction: column;
