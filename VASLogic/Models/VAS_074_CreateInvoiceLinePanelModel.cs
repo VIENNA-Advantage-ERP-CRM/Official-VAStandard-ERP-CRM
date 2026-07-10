@@ -940,10 +940,10 @@ namespace VASLogic.Models
                 cols.Append("il.C_InvoiceLine_ID, il.Line, il.M_Product_ID, il.C_Charge_ID, il.QtyEntered, il.C_UOM_ID, il.PriceEntered, il.C_Tax_ID, il.TaxAmt, il.LineNetAmt, il.LineTotalAmt, il.M_AttributeSetInstance_ID, il.Description, ");
 
             string sql = "SELECT " + cols.ToString() +
-                @"COALESCE(p.Name, N'')        AS VASCILDISP_ProductName,
-                  COALESCE(ch.Name, N'')       AS VASCILDISP_ChargeName,
+                @"COALESCE(p.Name, N'') AS VASCILDISP_ProductName,
+                  COALESCE(ch.Name, N'') AS VASCILDISP_ChargeName,
                   COALESCE(uom.UOMSymbol, uom.Name, N'') AS VASCILDISP_UOMName,
-                  COALESCE(t.Name, N'')        AS VASCILDISP_TaxName,
+                  COALESCE(t.Name, N'') AS VASCILDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
                   COALESCE(p.ProductType, '') AS VASCILDISP_ProductType
