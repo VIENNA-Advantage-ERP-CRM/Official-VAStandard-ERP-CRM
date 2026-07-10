@@ -111,6 +111,8 @@ namespace VIS.Controllers
                 INNER JOIN PrimarySchema PrimarySchema ON (PrimarySchema.AD_Client_ID=Invoice.AD_Client_ID)
                 WHERE AllocationHdr.DocStatus IN ('CO', 'CL')
                   AND Invoice.IsSOTrx='Y'
+                  AND Invoice.IsReturnTrx= 'N' 
+                  AND (NVL(AllocationLine.C_Payment_ID, 0) != 0 OR NVL(AllocationLine.C_CashLine_ID, 0) != 0)
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND " + TruncColumn("AllocationHdr.DateAcct") + @" >= " + ToSqlDate(windowStart) + @"
                   AND " + TruncColumn("AllocationHdr.DateAcct") + @" <= " + ToSqlDate(todayDate) + @"
@@ -124,21 +126,22 @@ namespace VIS.Controllers
             string receiptInvoicesSql = @"
                 SELECT Invoice.C_Invoice_ID AS C_Invoice_ID,
                        Invoice.DateInvoiced AS DateInvoiced,
-                       MAX(" + DateValueSql("AllocationHdr.DateAcct") + @") AS AllocationDate
+                       (" + DateValueSql("AllocationHdr.DateAcct") + @") AS AllocationDate,
+                allocationline.C_InvoicePaySchedule_ID
                 FROM C_Invoice Invoice
                 INNER JOIN C_AllocationLine AllocationLine ON (AllocationLine.C_Invoice_ID=Invoice.C_Invoice_ID)
                 INNER JOIN C_AllocationHdr AllocationHdr ON (AllocationHdr.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID)
+                INNER JOIN C_InvoicePaySchedule ci on (ci.C_Invoice_ID = invoice.C_Invoice_ID 
+                and ci.C_InvoicePaySchedule_ID = allocationline.C_InvoicePaySchedule_ID)
                 WHERE AllocationHdr.DocStatus IN ('CO', 'CL')
                   AND " + DateValueSql("AllocationHdr.DateAcct") + @" >= " + ToSqlDate(windowStart) + @"
                   AND " + DateValueSql("AllocationHdr.DateAcct") + @" <= " + ToSqlDate(todayDate) + @"
                   AND Invoice.IsSOTrx='Y'
+                  AND Invoice.IsReturnTrx = 'N' 
                   AND Invoice.IsActive='Y'
                   AND Invoice.DocStatus IN ('CO', 'CL')";
 
             receiptInvoicesSql = MRole.GetDefault(ctx).AddAccessSQL(receiptInvoicesSql, "Invoice", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
-
-            receiptInvoicesSql += @"
-                GROUP BY Invoice.C_Invoice_ID, Invoice.DateInvoiced";
 
             /* Overdue total + count — all unpaid sales schedules past due,
                converted to schema currency (signed by IsReturnTrx), primary
@@ -156,6 +159,7 @@ namespace VIS.Controllers
                 INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Invoice.AD_Client_ID)
                 WHERE InvoicePaySchedule.VA009_IsPaid='N'
                   AND Invoice.IsSOTrx='Y'
+                  AND Invoice.IsReturnTrx= 'N' 
                   AND Invoice.IsActive='Y'
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND " + TruncColumn("InvoicePaySchedule.DueDate") + @" >= " + ToSqlDate(windowStart) + @"
@@ -203,7 +207,8 @@ namespace VIS.Controllers
                            InvoicePaySchedule.DueDate AS DueDate,
                            InvoicePaySchedule.DueAmt AS DueAmt
                     FROM ReceiptInvoices ReceiptInvoices
-                    INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON (InvoicePaySchedule.C_Invoice_ID=ReceiptInvoices.C_Invoice_ID)
+                    INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON (InvoicePaySchedule.C_Invoice_ID=ReceiptInvoices.C_Invoice_ID 
+                                                        AND InvoicePaySchedule.C_InvoicePaySchedule_ID = ReceiptInvoices.C_InvoicePaySchedule_ID)
                     WHERE InvoicePaySchedule.IsActive='Y'
                 ),
                 DsoCalc AS (
