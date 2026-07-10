@@ -2394,7 +2394,15 @@
             // Keep the window context current so a dependent FK's val rule (and any control
             // built by a following refreshMoreDialog) resolves against the new value.
             primeLineContext(line);
-            if (!sameVal(prev, value)) markDirty(line);   // genuine change only
+            if (!sameVal(prev, value)) {
+                markDirty(line);   // genuine change only
+                // Remember every modal field the user actually edited so a CLEAR (null / 0 /
+                // empty) persists on save. The save bag carries the whole column set, so the
+                // server can't tell a user-cleared FK/dimension from a naturally-empty column;
+                // TouchedCols tells it which nulls/zeros are intentional (see ApplyExtraColumns).
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[col] = true;
+            }
             var m = columnMeta[col];
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
@@ -3262,7 +3270,7 @@
             return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                 M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
-                Values: v };
+                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : [] };
         }
 
         /* Save the currently-unsaved lines as a non-blocking batch. Each saved row shows

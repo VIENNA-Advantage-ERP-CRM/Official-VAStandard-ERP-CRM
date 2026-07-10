@@ -1820,14 +1820,19 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="line">invoice line being saved</param>
         /// <param name="values">full column bag from the client</param>
-        private void ApplyExtraColumns(MInvoiceLine line, Dictionary<string, object> values)
+        private void ApplyExtraColumns(MInvoiceLine line, Dictionary<string, object> values, HashSet<string> touched)
         {
             if (values == null || values.Count == 0) return;
             HashSet<string> updateable = GetUpdateableColumns();
             foreach (KeyValuePair<string, object> kv in values)
             {
                 string col = kv.Key;
-                if (kv.Value == null) continue;
+                // A column the user explicitly edited in the "..." modal (including a clear).
+                // Its null / 0 is INTENTIONAL and must persist, so it bypasses the no-clobber
+                // skips below. An untouched null stays skipped (the bag carries every column,
+                // most naturally empty - we must not wipe them or re-touch every field).
+                bool isTouched = touched != null && touched.Contains(col);
+                if (kv.Value == null && !isTouched) continue;
                 if (CORE_OR_SYSTEM_COLUMNS.Contains(col)) continue;
                 if (updateable.Count > 0 && !updateable.Contains(col)) continue;
                 try
@@ -1838,11 +1843,13 @@ namespace VASLogic.Models
                         ? (object)CoerceYesNo(kv.Value)
                         : CoerceJsonValue(kv.Value);
                     // Table / TableDirect / Search (FK) columns hold a record ID; a null or
-                    // <= 0 value means "no selection" - leave the column untouched rather
-                    // than clobbering it with an invalid foreign key.
+                    // <= 0 value means "no selection". Leave it untouched (don't clobber a valid
+                    // FK with 0/null from the bag) UNLESS the user explicitly cleared the field -
+                    // then persist NULL so the dimension/reference is actually removed.
                     if (GetReferenceColumns().Contains(col) &&
                         (val == null || (decimal.TryParse(val.ToString(), out decimal number) && number == 0)))
                     {
+                        if (isTouched) line.Set_Value(col, null);
                         continue;
                     }
                     line.Set_Value(col, val);
@@ -2191,8 +2198,12 @@ namespace VASLogic.Models
                     // the callout / panel set (e.g. PriceList, PriceLimit, C_Currency_ID,
                     // PrintDescription, HSN, TCS, revenue recognition) is applied through
                     // PO.Set_Value so the full VO is saved - the core financial columns
-                    // above keep their business-rule values (denylist below).
-                    ApplyExtraColumns(line, input.Values);
+                    // above keep their business-rule values (denylist below). TouchedCols
+                    // carries the modal fields the user explicitly cleared so those persist as null.
+                    HashSet<string> touchedCols = (input.TouchedCols != null && input.TouchedCols.Count > 0)
+                        ? new HashSet<string>(input.TouchedCols, StringComparer.OrdinalIgnoreCase)
+                        : null;
+                    ApplyExtraColumns(line, input.Values, touchedCols);
 
                     // QtyInvoiced (base UOM). SetQty() set QtyInvoiced = QtyEntered (raw); the
                     // framework only converts it to the product base UOM in MInvoiceLine.beforeSave
@@ -2717,7 +2728,15 @@ namespace VASLogic.Models
         /// / panel touched). Non-core updateable columns are persisted generically.
         /// </summary>
         public Dictionary<string, object> Values { get; set; }
-        public InvoiceLineInput() { Values = new Dictionary<string, object>(); }
+        /// <summary>
+        /// Column names the user explicitly edited in the "..." modal (including clears).
+        /// The Values bag carries EVERY column, so the server can't tell a user-cleared
+        /// FK / reference / list from a naturally-empty one; TouchedCols marks the nulls /
+        /// zeros that are intentional so ApplyExtraColumns force-applies them (bypassing the
+        /// no-clobber skips) instead of leaving the old value in place.
+        /// </summary>
+        public List<string> TouchedCols { get; set; }
+        public InvoiceLineInput() { Values = new Dictionary<string, object>(); TouchedCols = new List<string>(); }
     }
 
     /// <summary>POST body for the batch line save.</summary>

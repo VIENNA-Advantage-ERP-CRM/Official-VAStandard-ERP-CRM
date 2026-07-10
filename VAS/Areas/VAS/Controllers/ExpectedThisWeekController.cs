@@ -53,9 +53,9 @@ namespace VIS.Controllers
                        SUM(
                            CASE
                                WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID
-                               THEN COALESCE(InvoicePaySchedule.DueAmt, 0)
+                               THEN CASE WHEN Invoice.IsReturnTrx = 'N' THEN COALESCE(InvoicePaySchedule.DueAmt, 0) ELSE -1 * COALESCE(InvoicePaySchedule.DueAmt, 0) END
                                ELSE CurrencyConvert(
-                                   COALESCE(InvoicePaySchedule.DueAmt, 0),
+                                   CASE WHEN Invoice.IsReturnTrx = 'N' THEN COALESCE(InvoicePaySchedule.DueAmt, 0) ELSE -1 * COALESCE(InvoicePaySchedule.DueAmt, 0) END,
                                    Invoice.C_Currency_ID,
                                    SchemaCurrency.C_Currency_ID,
                                    Invoice.DateAcct,
@@ -196,7 +196,7 @@ namespace VIS.Controllers
                        Invoice.DocumentNo AS Document_No,
                        Invoice.DateInvoiced AS Invoice_Date,
                        InvoicePaySchedule.DueDate AS Due_Date,
-                       InvoicePaySchedule.DueAmt AS Due_Amount,
+                       CASE WHEN Invoice.IsReturnTrx = 'N' THEN InvoicePaySchedule.DueAmt ELSE -1*InvoicePaySchedule.DueAmt END AS Due_Amount,
                        BPartner.Name AS Customer_Name,
                        Currency.ISO_Code AS Invoice_Currency,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Invoice_Currency_Symbol
