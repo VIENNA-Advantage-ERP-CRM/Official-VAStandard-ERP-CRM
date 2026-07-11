@@ -35,6 +35,7 @@
         var $pagerPrev;
         var $pagerNext;
         var $pagerText;
+        var $showingText;
         var $busy;
         var $state;
         var isDisposed = false;
@@ -94,7 +95,9 @@
           
             var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'Upi is cheapest - shift small payments where possible'));
 
-            $foot.append($whyText).append($pager);
+            $showingText = $('<span class="vas-payment-methods-showing">');
+
+            $foot.append($whyText).append($showingText).append($pager);
             $busy = $('<div class="vas-payment-methods-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-payment-methods-state-message">');
 
@@ -264,6 +267,20 @@
         function updatePager() {
             if (!$pager) {
                 return;
+            }
+
+            if ($showingText) {
+                var count = methodsData.length;
+                var startIndex = count > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
+                var endIndex = count > 0 ? Math.min(pageNo * pageSize, count) : 0;
+
+                $showingText.text(
+                    count > 0
+                        ? lbl('VAS_Showing', 'Showing') + ' ' +
+                          startIndex + '–' + endIndex + ' ' +
+                          lbl('VAS_Of', 'of') + ' ' + count
+                        : ''
+                );
             }
 
             if ($pagerText) {

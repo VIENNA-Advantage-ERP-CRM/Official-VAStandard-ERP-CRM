@@ -94,6 +94,7 @@
         var $stateText = null;
         var $applyHigh = null;
         var $footerSummary = null;
+        var $showingText = null;
         var $pagerPrev = null;
         var $pagerNext = null;
         var $pagerText = null;
@@ -904,6 +905,26 @@
         }
 
         function updatePager() {
+            if ($showingText) {
+                var startIndex =
+                    totalRecords > 0
+                        ? ((pageNo - 1) * pageSize) + 1
+                        : 0;
+
+                var endIndex =
+                    totalRecords > 0
+                        ? Math.min(pageNo * pageSize, totalRecords)
+                        : 0;
+
+                $showingText.text(
+                    totalRecords > 0
+                        ? lbl("VAS_Showing", "Showing") + " " +
+                          startIndex + "–" + endIndex + " " +
+                          lbl("VAS_Of", "of") + " " + totalRecords
+                        : ""
+                );
+            }
+
             if ($pagerText) {
                 $pagerText.text(
                     totalPages > 0
@@ -2621,6 +2642,10 @@
                 classPrefix +
                 'footer-right">' +
 
+                '<span class="' +
+                classPrefix +
+                'showing"></span>' +
+
                 '<div class="' +
                 classPrefix +
                 'pager">' +
@@ -2718,6 +2743,13 @@
                     "." +
                     classPrefix +
                     "pager-text"
+                );
+
+            $showingText =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "showing"
                 );
 
             $openForm =

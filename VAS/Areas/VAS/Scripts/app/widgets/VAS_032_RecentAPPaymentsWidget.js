@@ -53,6 +53,7 @@
         var $pagerPrev;
         var $pagerNext;
         var $pagerText;
+        var $showingText;
         var $busy;
         var $state;
         var $dialog;
@@ -128,10 +129,11 @@
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
             var $foot = $('<div class="vas-recent-ap-payments-footer">');
+            $showingText = $('<div class="vas-recent-ap-payments-showing">');
             $busy = $('<div class="vas-recent-ap-payments-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-recent-ap-payments-state-message">');
 
-            $foot.append($pager);
+            $foot.append($showingText).append($pager);
             $card.append($head).append($tableWrap).append($foot).append($busy).append($state);
             $root.empty().append($card);
             createDialog();
@@ -322,6 +324,20 @@
         function updatePager() {
             if (!$pager) {
                 return;
+            }
+
+            if ($showingText) {
+                var count = paymentsData.length;
+                var startIndex = count > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
+                var endIndex = count > 0 ? Math.min(pageNo * pageSize, count) : 0;
+
+                $showingText.text(
+                    count > 0
+                        ? lbl('VAS_Showing', 'Showing') + ' ' +
+                          startIndex + '–' + endIndex + ' ' +
+                          lbl('VAS_Of', 'of') + ' ' + count
+                        : ''
+                );
             }
 
             if ($pagerText) {
