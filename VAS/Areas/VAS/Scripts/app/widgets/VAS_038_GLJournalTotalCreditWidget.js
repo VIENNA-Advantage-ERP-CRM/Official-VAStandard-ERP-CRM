@@ -237,11 +237,6 @@
                         return;
                     }
 
-                    if (data.hasData === false) {
-                        renderEmpty(lbl('VIS_NoData', 'No data available.'));
-                        return;
-                    }
-
                     renderData(data);
                 },
                 error: function () {

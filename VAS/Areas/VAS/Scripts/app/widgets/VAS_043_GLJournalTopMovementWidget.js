@@ -6,7 +6,6 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Top Ledger Movement                  | VAS_043_TopLedgerMovement
- *  2  | by value                             | VAS_043_ByValue
  *  3  | Month                                | VAS_043_Month
  *  4  | YTD                                  | VAS_043_YTD
  *  5  | Loading                              | VIS_Loading
@@ -24,7 +23,7 @@
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_043_TopLedgerMovement, VAS_043_ByValue, VAS_043_Month, VAS_043_YTD
+    // Labels   : VAS_043_TopLedgerMovement, VAS_043_Month, VAS_043_YTD
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -145,10 +144,14 @@
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljtm-icon">' + listIcon + '</div>'
                 +   '<div class="w-title">' + lbl('VAS_043_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
-                +   '<span class="VAS-gljtm-sub">' + lbl('VAS_043_ByValue', 'by value') + '</span>'
-                +   '<button class="VAS-gljtm-toggle" id="VAS-gljtm-toggle-' + id + '">'
-                +     lbl('VAS_043_Month', 'Month')
-                +   '</button>'
+                +   '<div class="VAS-gljtm-period-group" role="group" aria-label="Period">'
+                +     '<button type="button" class="VAS-gljtm-period-btn" data-period="ytd">'
+                +       lbl('VAS_043_YTD', 'YTD')
+                +     '</button>'
+                +     '<button type="button" class="VAS-gljtm-period-btn is-active" data-period="month">'
+                +       lbl('VAS_043_Month', 'Month')
+                +     '</button>'
+                +   '</div>'
                 + '</div>'
 
                 + '<div class="VAS-gljtm-body" id="VAS-gljtm-body-' + id + '"></div>'
@@ -158,12 +161,17 @@
 
             $root.append(html);
 
-            $root.find('#VAS-gljtm-toggle-' + id).on('click', function () {
-                activePeriod = (activePeriod === 'month') ? 'ytd' : 'month';
+            $root.on('click', '.VAS-gljtm-period-btn', function () {
+                var nextPeriod = String($(this).data('period') || 'month');
+
+                if (nextPeriod === activePeriod) {
+                    return;
+                }
+
+                activePeriod = nextPeriod;
                 pageNo = 1;
-                $(this).text(activePeriod === 'month'
-                    ? lbl('VAS_043_Month', 'Month')
-                    : lbl('VAS_043_YTD', 'YTD'));
+                $root.find('.VAS-gljtm-period-btn').removeClass('is-active');
+                $(this).addClass('is-active');
                 showBusy(true);
                 loadData();
             });

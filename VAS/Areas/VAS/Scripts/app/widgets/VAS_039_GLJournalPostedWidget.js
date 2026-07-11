@@ -88,16 +88,23 @@
                 dataType : 'json',
                 cache    : false,
                 success  : function (result) {
-                    try {
-                        var data = JSON.parse(result);
-                        if (data) {
-                            $kpiValue.text(typeof data.Percentage === 'number' ? data.Percentage + '%' : '—');
-                        } else {
-                            $kpiValue.text('—');
+                    var data = result;
+
+                    if (typeof data === 'string') {
+                        try {
+                            data = JSON.parse(data);
+                        } catch (e) {
+                            data = null;
                         }
-                    } catch (e) {
-                        $kpiValue.text('—');
                     }
+
+                    var percentage = data ? Number(data.Percentage) : 0;
+
+                    if (isNaN(percentage)) {
+                        percentage = 0;
+                    }
+
+                    $kpiValue.text(percentage + '%');
                     showBusy(false);
                 },
                 error: function () {
