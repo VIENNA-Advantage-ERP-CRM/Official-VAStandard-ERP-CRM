@@ -283,7 +283,7 @@
     grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
     gap: 0.75em;
     align-items: center;
-    padding: 0.75em 0;
+    padding: 0.5em 0;
     border-bottom: 0.0625em solid var(--cil-divider);
     transition: background .12s;
 }

@@ -38,6 +38,13 @@
 
         /* parent invoice context returned by GetPanelData */
         var parent = null;
+        /* Monotonic token for GetPanelData (fetchData) requests. Bumped on every fetchData AND
+           on clear(), and each fetch captures its value; a fetch's async success is IGNORED when
+           the token has moved on. Guards the record-switch race: opening the AR Invoice window
+           in NEW mode (e.g. from the VAS_064 widget) first positions the grid on an existing
+           invoice (fetchData(existingId) in flight) then clears for the new record - without the
+           token the stale response would repaint the previous invoice's lines on the new record. */
+        var fetchSeq = 0;
         /* server-side line paging (20/page): current 0-based page, total saved lines, size */
         var linePage = 0, linesTotal = 0, linePageSize = 20;
         /* saved totals of every line NOT on the current page (invoice grand total minus this
@@ -251,6 +258,9 @@
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // Claim the latest request token so a stale/out-of-order response (e.g. a prior
+            // invoice's load that lands AFTER a clear() for a new record) is discarded below.
+            var mySeq = ++fetchSeq;
             // A pager page change (explicit page arg) is OUR own AJAX, NOT a framework record
             // load - the framework paints no spinner for it, so show the per-panel busy overlay
             // ourselves. A framework record load (no page arg) already gets the framework's own
@@ -274,6 +284,9 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetPanelData",
                 type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0, page: reqPage },
                 success: function (raw) {
+                    // Superseded by a newer fetchData / clear() (record switched, or new-record
+                    // mode) - drop this stale response so it can't repaint the previous invoice.
+                    if (mySeq !== fetchSeq) { if (isPageChange) showBusy(false); return; }
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
@@ -307,11 +320,14 @@
                     refreshSummary();    // then load this invoice's server tax breakdown
                     if (isPageChange) showBusy(false);
                 },
-                error: function (err) { console.log(err); if (isPageChange) showBusy(false); }
+                error: function (err) { console.log(err); if (isPageChange && mySeq === fetchSeq) showBusy(false); }
             });
         };
 
         this.clear = function () {
+            // Invalidate any in-flight fetchData so its response can't repaint stale data over
+            // the cleared (new-record) panel - the record-switch race described on fetchSeq.
+            fetchSeq++;
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
@@ -613,16 +629,17 @@
             $self.fetchData(parent.C_Invoice_ID, p);
         }
 
-        /* Reload the CURRENT invoice's panel data (staying on the current page) from the server -
+        /* Reload the CURRENT invoice's panel data from the server, RESETTING to the first page -
            the Refresh button / Ctrl+Alt+Q. Flushes any pending cell edit first so it counts
            toward the unsaved-work guard, then blocks (like a page change) when unsaved lines
-           exist so a reload never silently discards a new/edited row. fetchData(id, page) shows
-           the per-panel busy overlay (explicit page = our own AJAX, not a framework load). */
+           exist so a reload never silently discards a new/edited row. Passing page 0 (an explicit
+           number) both jumps to page 1 AND makes fetchData show the per-panel busy overlay
+           (explicit page = our own AJAX, not a framework load). */
         function refreshPanel() {
             if (!parent || !parent.C_Invoice_ID) return;
             flushActiveEdit();
             if (unsavedLines().length) { showToast(lbl("VAS_074_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
-            $self.fetchData(parent.C_Invoice_ID, linePage);
+            $self.fetchData(parent.C_Invoice_ID, 0);   // 0 = first page + triggers the busy overlay
         }
 
         // Cached server tax breakdown for the CURRENT invoice (from VAS/PoReceipt/GetTaxData,
