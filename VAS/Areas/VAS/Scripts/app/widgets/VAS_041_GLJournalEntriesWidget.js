@@ -552,7 +552,7 @@
                 1;
 
             var dialogPageSize =
-                5;
+                8;
 
             var dialogTotalPages =
                 1;

@@ -184,7 +184,7 @@
             var detailLoaded = false;
 
             var dialogPageNo = 1;
-            var dialogPageSize = 5;
+            var dialogPageSize = 8;
             var dialogTotalPages = 1;
             var dialogTotalCount = 0;
 
