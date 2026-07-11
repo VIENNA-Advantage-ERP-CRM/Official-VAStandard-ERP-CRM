@@ -34,7 +34,7 @@
 
         var $self = this;
         var $root, $busy, $body, $emptyState, $linesBody, $totalsRow, $pager;
-        var $addBtn, $saveBtn, $deleteBtn, $selectAll;
+        var $addBtn, $saveBtn, $deleteBtn, $refreshBtn, $selectAll;
 
         /* parent invoice context returned by GetPanelData */
         var parent = null;
@@ -59,6 +59,13 @@
         var rowCounter = 0;
         var editing = null;            // { rowId, field }
         var morePopoverFor = null;     // rowId
+        // True only WHILE render() detaches/re-attaches the row whose catalog dropdown is
+        // open (see the preserve block in render). Detaching a focused input fires a native
+        // blur, whose handler (commitPrimary) would otherwise clear `editing` + rebuild the
+        // row - discarding the in-progress product/charge search and tearing down the open
+        // dropdown. This flag makes the primary blur handler ignore that transient blur so a
+        // background save completing mid-search never wipes the loaded dropdown results.
+        var suppressPrimaryBlur = false;
         /* catalog popover working state (for the row currently editing a primary) */
         var catalog = { results: [], highlight: 0, seq: 0, offset: 0, hasMore: true, loading: false, term: "", debounce: null };
         /* attribute picker + scan working state */
@@ -235,6 +242,12 @@
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // A pager page change (explicit page arg) is OUR own AJAX, NOT a framework record
+            // load - the framework paints no spinner for it, so show the per-panel busy overlay
+            // ourselves. A framework record load (no page arg) already gets the framework's own
+            // vis-apanel-busy, so we skip ours there to avoid a stacked double spinner.
+            var isPageChange = (typeof page === "number");
+            if (isPageChange) showBusy(true);
             // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
             // record - including after a save - and a still-open dialog's position:fixed
             // backdrop would otherwise be left orphaned over the page (morePopoverFor is
@@ -283,8 +296,9 @@
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
                     refreshSummary();    // then load this invoice's server tax breakdown
+                    if (isPageChange) showBusy(false);
                 },
-                error: function (err) { console.log(err); }
+                error: function (err) { console.log(err); if (isPageChange) showBusy(false); }
             });
         };
 
@@ -421,7 +435,12 @@
             $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-cil-save-lbl"></span></button>');
             $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" title="' + esc(lbl("Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("Delete", "Delete")) + ' <span class="vas-cil-sel-count"></span></span></button>');
-            $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn);
+            // Refresh re-loads the current invoice's panel data (current page) from the server.
+            // A read action - stays enabled even on a completed/void/read-only invoice, so it is
+            // NOT touched by renderHeaderButtons' lock logic.
+            $refreshBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="refresh-panel" title="' + esc(lbl("VAS_074_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "⟳") +
+                "<span>" + esc(lbl("VAS_074_Refresh", "Refresh")) + "</span></button>");
+            $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn, $refreshBtn);
             $header.append($actions);
             $panel.append($header);
 
@@ -441,6 +460,7 @@
 
             $header.on("click", "[data-action=open-scan]", openScanDialog);
             $header.on("click", "[data-action=add-line]", function () { addLine(); });
+            $header.on("click", "[data-action=refresh-panel]", function () { refreshPanel(); });
             // Save on mousedown (not click): mousedown fires BEFORE the focused cell
             // editor blurs, so we can flush that pending edit ourselves and the action
             // never gets lost to a blur/commit re-render happening between mousedown and
@@ -488,15 +508,55 @@
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
             $body.toggleClass("vas-cil-locked", !panelEditable());
 
+            // Preserve the LIVE DOM of the row whose product/charge catalog is OPEN (the user is
+            // mid-search). An EXTERNAL render - a background save completing, a callout, the
+            // summary refresh - would otherwise rebuild that row -> resetCatalog -> tear down and
+            // RELOAD the dropdown (flicker; a render/keystroke seq race sometimes left it empty).
+            // detach() keeps the node's handlers, input value and open popover; we re-insert it
+            // in place and restore focus + caret (detach blurs the input).
+            var keepId = null, $keep = null, refocusEl = null, caretPos = null;
+            if (editing && catalog.$pop && catalog.$pop.closest("body").length && lineById(editing.rowId)) {
+                var $existing = $linesBody.find('[data-rowid="' + editing.rowId + '"]').first();
+                if ($existing.length) {
+                    var ae = document.activeElement;
+                    if (ae && $.contains($existing[0], ae)) {
+                        refocusEl = ae;
+                        try { caretPos = ae.selectionStart; } catch (e) { }
+                    }
+                    keepId = editing.rowId;
+                    // Detaching a focused input fires blur; suppress the primary blur handler
+                    // so it doesn't commitPrimary() -> clear editing -> destroy the search. The
+                    // flag is cleared after focus is restored below (async, to also cover
+                    // browsers that dispatch the detach blur on a later tick).
+                    suppressPrimaryBlur = true;
+                    $keep = $existing.detach();
+                }
+            }
+
             $linesBody.empty();
             if (!lines.length) {
                 $linesBody.append('<div class="vas-cil-emptyrow">' + esc(lbl("VAS_074_NoLines", "No lines yet - use Add line or Scan")) + "</div>");
             } else {
-                for (var i = 0; i < lines.length; i++) $linesBody.append(renderRow(lines[i]));
+                for (var i = 0; i < lines.length; i++) {
+                    if ($keep && lines[i].rowId === keepId) $linesBody.append($keep);
+                    else $linesBody.append(renderRow(lines[i]));
+                }
             }
             renderTotals();
             renderHeaderButtons();
             renderPager();
+
+            // Restore focus + caret to the preserved input (detach blurred it).
+            if (refocusEl) {
+                try {
+                    refocusEl.focus();
+                    if (caretPos != null && refocusEl.setSelectionRange) refocusEl.setSelectionRange(caretPos, caretPos);
+                } catch (e) { }
+            }
+            // Clear the blur-suppression after the current tick so any detach blur dispatched
+            // synchronously (during detach) OR asynchronously (queued to a later tick) is
+            // ignored; a genuine later user blur still commits normally.
+            if (suppressPrimaryBlur) setTimeout(function () { suppressPrimaryBlur = false; }, 0);
         }
 
         /* Server-side line pager: "Showing X-Y of N" on the left, "‹ P of Q ›" on the
@@ -542,6 +602,18 @@
             if (p === linePage) return;
             if (unsavedLines().length) { showToast(lbl("VAS_074_SavePageFirst", "Save or discard your changes before changing page")); return; }
             $self.fetchData(parent.C_Invoice_ID, p);
+        }
+
+        /* Reload the CURRENT invoice's panel data (staying on the current page) from the server -
+           the Refresh button / Ctrl+Alt+Q. Flushes any pending cell edit first so it counts
+           toward the unsaved-work guard, then blocks (like a page change) when unsaved lines
+           exist so a reload never silently discards a new/edited row. fetchData(id, page) shows
+           the per-panel busy overlay (explicit page = our own AJAX, not a framework load). */
+        function refreshPanel() {
+            if (!parent || !parent.C_Invoice_ID) return;
+            flushActiveEdit();
+            if (unsavedLines().length) { showToast(lbl("VAS_074_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.C_Invoice_ID, linePage);
         }
 
         // Cached server tax breakdown for the CURRENT invoice (from VAS/PoReceipt/GetTaxData,
@@ -728,10 +800,22 @@
                 var inner = $('<div style="position:relative"></div>');
                 wrap.append(inner);
                 var $inp = $('<input type="text" class="vas-cil-cell-edit__input" />');
-                $inp.val(editing.field === "product" ? line.display.productName : line.display.chargeName);
+                // Seed from the committed display name; but if nothing is committed yet (a new /
+                // cleared line) keep any IN-PROGRESS typed keyword. The keyword lives in
+                // catalog.term (set on every keystroke), NOT in line.display, so a render()
+                // triggered mid-typing - e.g. a background save completing while the user types a
+                // product keyword on a new line - would otherwise blank the input and drop the
+                // search (the "entered keyword gets rolled back" bug).
+                var primaryInit = editing.field === "product" ? line.display.productName : line.display.chargeName;
+                if (!primaryInit && catalog.term) primaryInit = catalog.term;
+                $inp.val(primaryInit);
                 $inp.attr("placeholder", editing.field === "product" ? lbl("VAS_074_SearchProduct", "Search product…") : lbl("VAS_074_SearchCharge", "Search charge…"));
                 $inp.on("input", function () { scheduleCatalog($(this).val(), inner, line, $inp); });
                 $inp.on("blur", function (e) {
+                    // Ignore the transient blur fired when render() detaches this row to
+                    // preserve its open dropdown (e.g. a background save completing mid-search)
+                    // - committing here would clear `editing` and destroy the loaded results.
+                    if (suppressPrimaryBlur) return;
                     if (e.relatedTarget && $(e.relatedTarget).attr("data-catalog-item") === "true") return;
                     commitPrimary(line, editing && editing.field, $inp.val());
                 });
@@ -3468,7 +3552,8 @@
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
 
-        // Ctrl+Alt+ N/S/D/Z action shortcuts. Bound in the CAPTURE phase (3rd arg true) so they
+        // Ctrl+Alt+ N/S/D/Z/Q action shortcuts (N=add, S=save, D=delete, Z=undo, Q=refresh).
+        // Bound in the CAPTURE phase (3rd arg true) so they
         // fire BEFORE the grid cell editors' own keydown handlers, which stopPropagation() to
         // keep keys from the framework - otherwise the shortcut is swallowed while a product /
         // qty / price / UOM / tax control has focus (e.g. right after Add line focuses the
@@ -3490,6 +3575,7 @@
                 deleteSelected();
             };
             else if (k === "z" || code === "KeyZ") act = function () { undoActive(); };
+            else if (k === "q" || code === "KeyQ") act = function () { refreshPanel(); };
             else return;   // not one of ours - let it through
             e.preventDefault();
             e.stopPropagation();
