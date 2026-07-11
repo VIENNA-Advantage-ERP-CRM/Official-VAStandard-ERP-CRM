@@ -1659,3 +1659,71 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
+
+/* ==========================================================================
+   Popup spacing normalized to VAS_044_GLJournalRecentWidget (reference popup)
+   ========================================================================== */
+
+/* Overlay + card box */
+.VAS-glje-dialog,
+.VAS-glje-detail-dialog {
+    padding: 1.25em;
+}
+
+.VAS-glje-dialog-card,
+.VAS-glje-detail-card {
+    width: min(62em, 100%);
+    height: min(34em, 100%);
+    border-radius: 1em;
+}
+
+/* Header */
+.VAS-glje-dialog-head,
+.VAS-glje-detail-head {
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    margin-bottom: 0;
+}
+
+/* Body + content stack */
+.VAS-glje-dialog-body,
+.VAS-glje-detail-body {
+    padding: 1.125em;
+}
+
+.VAS-glje-detail-content {
+    gap: 1.25em;
+    padding-bottom: 0.25em;
+}
+
+/* Summary block */
+.VAS-glje-detail-summary {
+    gap: 0.6em;
+    padding: 1.125em 1.25em;
+    border-radius: 0.75em;
+}
+
+/* Line table cells */
+.VAS-glje-detail-lines th,
+.VAS-glje-detail-lines td {
+    padding: 0.875em 0.75em;
+}
+
+/* Created-by strip */
+.VAS-glje-created-strip {
+    gap: 0.8em;
+    padding: 0.9em 1.125em;
+    border-radius: 0.75em;
+}
+
+/* Footer */
+.VAS-glje-dialog-footer,
+.VAS-glje-detail-footer {
+    gap: 1em;
+    padding: 0.75em 1.125em;
+}
+
+.VAS-glje-dialog-actions,
+.VAS-glje-detail-actions {
+    gap: 0.5em;
+}

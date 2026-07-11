@@ -487,7 +487,7 @@ html[dir="rtl"] .VAS-gljpq-item {
 .VAS-gljpq-detail-summary {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1.15em 1.75em;
+    gap: 0.6em;
     border: 0.0625em solid #E4EDF4;
     border-radius: 0.75em;
     padding: 1.125em 1.25em;
@@ -511,7 +511,6 @@ html[dir="rtl"] .VAS-gljpq-item {
 
 .VAS-gljpq-detail-summary > div > strong {
     display: block;
-    margin-top: 0.45em;
     color: #000000;
     font-size: 0.95em;
     font-weight: 600;
@@ -1108,4 +1107,72 @@ html[dir="rtl"] .VAS-gljpq-item {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+/* ==========================================================================
+   Popup spacing normalized to VAS_044_GLJournalRecentWidget (reference popup)
+   ========================================================================== */
+
+/* Overlay + card box */
+.VAS-gljpq-dialog,
+.VAS-gljpq-detail-dialog {
+    padding: 1.25em;
+}
+
+.VAS-gljpq-dialog-card,
+.VAS-gljpq-detail-card {
+    width: min(62em, 100%);
+    height: min(34em, 100%);
+    border-radius: 1em;
+}
+
+/* Header */
+.VAS-gljpq-dialog-head,
+.VAS-gljpq-detail-head {
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    margin-bottom: 0;
+}
+
+/* Body + content stack */
+.VAS-gljpq-dialog-body,
+.VAS-gljpq-detail-body {
+    padding: 1.125em;
+}
+
+.VAS-gljpq-detail-content {
+    gap: 1.25em;
+    padding-bottom: 0.25em;
+}
+
+/* Summary block */
+.VAS-gljpq-detail-summary {
+    gap: 0.6em;
+    padding: 1.125em 1.25em;
+    border-radius: 0.75em;
+}
+
+/* Line table cells */
+.VAS-gljpq-detail-lines th,
+.VAS-gljpq-detail-lines td {
+    padding: 0.875em 0.75em;
+}
+
+/* Created-by strip */
+.VAS-gljpq-created-strip {
+    gap: 0.8em;
+    padding: 0.9em 1.125em;
+    border-radius: 0.75em;
+}
+
+/* Footer */
+.VAS-gljpq-dialog-footer,
+.VAS-gljpq-detail-footer {
+    gap: 1em;
+    padding: 0.75em 1.125em;
+}
+
+.VAS-gljpq-dialog-actions,
+.VAS-gljpq-detail-actions {
+    gap: 0.5em;
 }
