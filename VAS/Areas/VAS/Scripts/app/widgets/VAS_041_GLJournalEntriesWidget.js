@@ -292,6 +292,114 @@
             );
     }
 
+    function resolveTotalCount(totalCount, visibleCount, pageNo, pageSize, totalPages) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            !isNaN(total) &&
+            total > 0
+        ) {
+            return total;
+        }
+
+        var rows =
+            Number(
+                visibleCount || 0
+            );
+
+        if (
+            isNaN(rows) ||
+            rows <= 0
+        ) {
+            return 0;
+        }
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || rows || 1,
+                    10
+                ),
+                1
+            );
+
+        var pages =
+            Math.max(
+                parseInt(
+                    totalPages || 1,
+                    10
+                ),
+                1
+            );
+
+        if (pages > 1) {
+            return Math.max(
+                ((pages - 1) * size) + rows,
+                rows
+            );
+        }
+
+        return rows;
+    }
+
+    function formatRangeText(pageNo, pageSize, totalCount) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            isNaN(total) ||
+            total <= 0
+        ) {
+            return "";
+        }
+
+        var page =
+            Math.max(
+                parseInt(
+                    pageNo || 1,
+                    10
+                ),
+                1
+            );
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || total,
+                    10
+                ),
+                1
+            );
+
+        var start =
+            ((page - 1) * size) + 1;
+
+        if (start > total) {
+            start =
+                total;
+        }
+
+        var end =
+            Math.min(
+                start + size - 1,
+                total
+            );
+
+        return (
+            "Showing " +
+            start +
+            "-" +
+            end +
+            " of " +
+            total
+        );
+    }
+
     function isPosted(value) {
         if (
             value === true ||
@@ -448,6 +556,9 @@
 
             var dialogTotalPages =
                 1;
+
+            var dialogTotalCount =
+                0;
 
             var detailLinePageNo =
                 1;
@@ -633,22 +744,6 @@
                     " &middot; &mdash;" +
 
                     "</div>" +
-
-                    '<span class="VAS-glje-zoom" ' +
-                    'aria-hidden="true">' +
-
-                    '<svg viewBox="0 0 24 24" ' +
-                    'fill="none" ' +
-                    'stroke="currentColor" ' +
-                    'stroke-width="2.6" ' +
-                    'stroke-linecap="round" ' +
-                    'stroke-linejoin="round">' +
-
-                    '<path d="M9 18l6-6-6-6"></path>' +
-
-                    "</svg>" +
-
-                    "</span>" +
 
                     "</div>" +
 
@@ -1717,6 +1812,15 @@
                         )
                     );
 
+                dialogTotalCount =
+                    resolveTotalCount(
+                        data.TotalCount,
+                        rows.length,
+                        dialogPageNo,
+                        dialogPageSize,
+                        dialogTotalPages
+                    );
+
                 $dialog.find(
                     "#VAS-glje-dialog-sub-" +
                     $self.AD_UserHomeWidgetID
@@ -1744,6 +1848,12 @@
                     $dialogFooterText.text(
                         ""
                     );
+
+                    $dialogBody
+                        .siblings(
+                            ".VAS-glje-dialog-pager"
+                        )
+                        .remove();
 
                     return;
                 }
@@ -1975,6 +2085,16 @@
                     '<div class="VAS-glje-line-pager VAS-glje-dialog-pager">';
 
                 html +=
+                    '<span class="VAS-glje-page-text">' +
+                    esc(
+                        formatRangeText(
+                            dialogPageNo,
+                            dialogPageSize,
+                            dialogTotalCount
+                        )
+                    ) +
+                    "</span>" +
+
                     '<button type="button" ' +
                     'class="VAS-glje-page-btn VAS-glje-dialog-page VAS-glje-dialog-prev" ' +
                     (
@@ -1987,7 +2107,7 @@
                     esc(lbl("VIS_Previous", "Previous")) +
                     '">&#8249;</button>' +
 
-                    '<span class="VAS-glje-page-text">' +
+                    '<span class="VAS-glje-page-count">' +
                     esc(
                         dialogPageNo +
                         " " +
@@ -2610,6 +2730,18 @@
 
                     '<div class="VAS-glje-line-pager">' +
 
+                    '<span class="VAS-glje-page-text">' +
+                    esc(
+                        detailLineCount
+                            ? formatRangeText(
+                                detailLinePageNo,
+                                detailLinePageSize,
+                                detailLineCount
+                            )
+                            : ""
+                    ) +
+                    "</span>" +
+
                     '<button type="button" ' +
                     'class="VAS-glje-page-btn VAS-glje-line-prev" ' +
                     (
@@ -2620,7 +2752,7 @@
                     ) +
                     'aria-label="Previous">&#8249;</button>' +
 
-                    '<span class="VAS-glje-page-text">' +
+                    '<span class="VAS-glje-page-count">' +
                     esc(
                         detailLineCount
                             ? (

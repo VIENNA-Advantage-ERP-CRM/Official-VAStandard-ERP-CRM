@@ -186,6 +186,7 @@
             var dialogPageNo = 1;
             var dialogPageSize = 10;
             var dialogTotalPages = 1;
+            var dialogTotalCount = 0;
 
             var detailLinePageNo = 1;
             var detailLinePageSize = 3;
@@ -244,6 +245,49 @@
 
                     "</svg>"
                 );
+            }
+
+            function resolveTotalCount(totalCount, visibleCount, pageNo, pageSize, totalPages) {
+                var total = Number(totalCount || 0);
+
+                if (!isNaN(total) && total > 0) {
+                    return total;
+                }
+
+                var rows = Number(visibleCount || 0);
+
+                if (isNaN(rows) || rows <= 0) {
+                    return 0;
+                }
+
+                var size = Math.max(parseInt(pageSize || rows || 1, 10), 1);
+                var pages = Math.max(parseInt(totalPages || 1, 10), 1);
+
+                if (pages > 1) {
+                    return Math.max(((pages - 1) * size) + rows, rows);
+                }
+
+                return rows;
+            }
+
+            function formatRangeText(pageNo, pageSize, totalCount) {
+                var total = Number(totalCount || 0);
+
+                if (isNaN(total) || total <= 0) {
+                    return "";
+                }
+
+                var page = Math.max(parseInt(pageNo || 1, 10), 1);
+                var size = Math.max(parseInt(pageSize || total, 10), 1);
+                var start = ((page - 1) * size) + 1;
+
+                if (start > total) {
+                    start = total;
+                }
+
+                var end = Math.min(start + size - 1, total);
+
+                return "Showing " + start + "-" + end + " of " + total;
             }
 
             function createBusyIndicator() {
@@ -324,13 +368,6 @@
                         )
                     ) +
                     "</div>" +
-
-                    '<span class="VAS-glju-zoom">' +
-                    '<svg viewBox="0 0 24 24" fill="none" ' +
-                    'stroke="currentColor" stroke-width="2.6">' +
-                    '<path d="M9 18l6-6-6-6"></path>' +
-                    "</svg>" +
-                    "</span>" +
 
                     "</div>" +
 
@@ -1068,6 +1105,15 @@
                         )
                     );
 
+                dialogTotalCount =
+                    resolveTotalCount(
+                        data.TotalCount,
+                        rows.length,
+                        dialogPageNo,
+                        dialogPageSize,
+                        dialogTotalPages
+                    );
+
                 if (!rows.length) {
                     $dialogBody.html(
                         '<div class="VAS-glju-dialog-empty">' +
@@ -1079,6 +1125,12 @@
                         ) +
                         "</div>"
                     );
+
+                    $dialogBody
+                        .siblings(
+                            ".VAS-glju-dialog-pager"
+                        )
+                        .remove();
 
                     $dialogFooterText.text("");
                     return;
@@ -1180,10 +1232,13 @@
 
             function renderDialogPager() {
                 return '<div class="VAS-glju-line-pager VAS-glju-dialog-pager">' +
+                    '<span class="VAS-glju-page-text">' +
+                    esc(formatRangeText(dialogPageNo, dialogPageSize, dialogTotalCount)) +
+                    '</span>' +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-dialog-page VAS-glju-dialog-prev" ' +
                     (dialogPageNo <= 1 || dialogTotalPages <= 1 ? "disabled " : "") +
                     'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
-                    '<span class="VAS-glju-page-text">' +
+                    '<span class="VAS-glju-page-count">' +
                     esc(dialogPageNo + " " + lbl("VIS_Of", "of") + " " + dialogTotalPages) +
                     '</span>' +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-dialog-page VAS-glju-dialog-next" ' +
@@ -1572,10 +1627,13 @@
                     "</div>" +
 
                     '<div class="VAS-glju-line-pager">' +
+                    '<span class="VAS-glju-page-text">' +
+                    esc(detailLineCount ? formatRangeText(detailLinePageNo, detailLinePageSize, detailLineCount) : "") +
+                    "</span>" +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-line-prev" ' +
                     (detailLinePageNo <= 1 || detailLineTotalPages <= 1 ? "disabled " : "") +
                     'aria-label="Previous">&#8249;</button>' +
-                    '<span class="VAS-glju-page-text">' +
+                    '<span class="VAS-glju-page-count">' +
                     esc(detailLineCount ? (detailLinePageNo + " of " + detailLineTotalPages) : "") +
                     "</span>" +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-line-next" ' +

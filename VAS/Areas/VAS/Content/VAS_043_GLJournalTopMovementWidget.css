@@ -6,6 +6,7 @@
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
 .VAS-gljtm-root {
+    --on-text-muted: #748494;
     height: 100%;
     width: 100%;
 }
@@ -487,11 +488,26 @@ html[dir="rtl"] .VAS-gljtm-row-head {
 }
 
 .VAS-gljtm-page-text {
-    min-width: 52px;
-    text-align: center;
-    color: #102C3F;
-    font-size: 0.85rem;
+    min-width: 116px;
+    margin-right: auto;
+    text-align: left;
+    font-size: 11.5px;
+    font-family: 'Roboto Mono', monospace;
+    color: var(--on-text-muted);
+    letter-spacing: 0.02em;
     font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.VAS-gljtm-page-count {
+    min-width: 48px;
+    text-align: center;
+    font-size: 11.5px;
+    font-family: 'Roboto Mono', monospace;
+    color: var(--on-text-muted);
+    letter-spacing: 0.02em;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }

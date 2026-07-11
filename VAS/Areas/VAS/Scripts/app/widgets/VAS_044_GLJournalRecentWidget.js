@@ -219,6 +219,114 @@
         );
     }
 
+    function resolveTotalCount(totalCount, visibleCount, pageSize, totalPages) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            !isNaN(total) &&
+            total > 0
+        ) {
+            return total;
+        }
+
+        var rows =
+            Number(
+                visibleCount || 0
+            );
+
+        if (
+            isNaN(rows) ||
+            rows <= 0
+        ) {
+            return 0;
+        }
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || rows || 1,
+                    10
+                ),
+                1
+            );
+
+        var pages =
+            Math.max(
+                parseInt(
+                    totalPages || 1,
+                    10
+                ),
+                1
+            );
+
+        if (pages > 1) {
+            return Math.max(
+                ((pages - 1) * size) + rows,
+                rows
+            );
+        }
+
+        return rows;
+    }
+
+    function formatRangeText(pageNo, pageSize, totalCount) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            isNaN(total) ||
+            total <= 0
+        ) {
+            return "";
+        }
+
+        var page =
+            Math.max(
+                parseInt(
+                    pageNo || 1,
+                    10
+                ),
+                1
+            );
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || total,
+                    10
+                ),
+                1
+            );
+
+        var start =
+            ((page - 1) * size) + 1;
+
+        if (start > total) {
+            start =
+                total;
+        }
+
+        var end =
+            Math.min(
+                start + size - 1,
+                total
+            );
+
+        return (
+            "Showing " +
+            start +
+            "-" +
+            end +
+            " of " +
+            total
+        );
+    }
+
     function isPosted(value) {
         if (
             value === true ||
@@ -401,6 +509,9 @@
                 3;
 
             var totalPages =
+                0;
+
+            var totalCount =
                 0;
 
             var selectedJournalId =
@@ -653,6 +764,8 @@
 
                     '<div class="VAS-gljr-pager">' +
 
+                    '<span class="VAS-gljr-page-text"></span>' +
+
                     '<button type="button" ' +
 
                     'class="VAS-gljr-page-btn VAS-gljr-prev" ' +
@@ -672,7 +785,7 @@
 
                     "</button>" +
 
-                    '<span class="VAS-gljr-page-text"></span>' +
+                    '<span class="VAS-gljr-page-count"></span>' +
 
                     '<button type="button" ' +
 
@@ -968,6 +1081,9 @@
                     totalPages =
                         0;
 
+                    totalCount =
+                        0;
+
                     updatePager();
 
                     return;
@@ -1005,6 +1121,14 @@
                         data.PageNo ||
                         pageNo ||
                         1
+                    );
+
+                totalCount =
+                    resolveTotalCount(
+                        data.TotalCount,
+                        entries.length,
+                        pageSize,
+                        totalPages
                     );
 
                 var html =
@@ -1202,6 +1326,11 @@
                         ".VAS-gljr-page-text"
                     );
 
+                var $pageCount =
+                    $root.find(
+                        ".VAS-gljr-page-count"
+                    );
+
                 var $previousButton =
                     $root.find(
                         ".VAS-gljr-prev"
@@ -1212,24 +1341,32 @@
                         ".VAS-gljr-next"
                     );
 
-                if (totalPages > 1) {
+                if (totalCount > 0) {
                     $pageText.text(
+                        formatRangeText(
+                            pageNo,
+                            pageSize,
+                            totalCount
+                        )
+                    );
+
+                    $pageCount.text(
                         pageNo +
-
                         " " +
-
                         lbl(
                             "VIS_Of",
                             "of"
                         ) +
-
                         " " +
-
                         totalPages
                     );
                 }
                 else {
                     $pageText.text(
+                        ""
+                    );
+
+                    $pageCount.text(
                         ""
                     );
                 }
@@ -2385,6 +2522,18 @@
 
                     '<div class="VAS-gljr-line-pager">' +
 
+                    '<span class="VAS-gljr-page-text">' +
+                    esc(
+                        detailLineCount
+                            ? formatRangeText(
+                                detailLinePageNo,
+                                detailLinePageSize,
+                                detailLineCount
+                            )
+                            : ""
+                    ) +
+                    "</span>" +
+
                     '<button type="button" ' +
                     'class="VAS-gljr-page-btn VAS-gljr-line-prev" ' +
                     (
@@ -2395,7 +2544,7 @@
                     ) +
                     'aria-label="Previous">&#8249;</button>' +
 
-                    '<span class="VAS-gljr-page-text">' +
+                    '<span class="VAS-gljr-page-count">' +
                     esc(
                         detailLineCount
                             ? (
@@ -2986,6 +3135,12 @@
 
                     "</tr>"
                 );
+
+                totalPages =
+                    0;
+
+                totalCount =
+                    0;
 
                 updatePager();
             }
