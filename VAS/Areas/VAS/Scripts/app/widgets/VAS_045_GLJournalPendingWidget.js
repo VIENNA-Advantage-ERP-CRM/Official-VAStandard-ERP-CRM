@@ -2299,17 +2299,6 @@
 
                 "</div>" +
 
-                '<div class="VAS-gljpq-detail-section-title">' +
-
-                esc(
-                    lbl(
-                        "VAS_045_JournalLines",
-                        "Journal Lines"
-                    )
-                ) +
-
-                "</div>" +
-
                 '<div class="VAS-gljpq-detail-lines-wrap">' +
 
                 '<table class="VAS-gljpq-detail-lines">' +

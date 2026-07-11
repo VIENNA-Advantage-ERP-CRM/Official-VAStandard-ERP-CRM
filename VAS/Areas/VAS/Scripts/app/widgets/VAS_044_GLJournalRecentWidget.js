@@ -2302,17 +2302,6 @@
 
                     "</div>" +
 
-                    '<div class="VAS-gljr-detail-section-title">' +
-
-                    esc(
-                        lbl(
-                            "VAS_044_JournalLines",
-                            "Journal Lines"
-                        )
-                    ) +
-
-                    "</div>" +
-
                     '<div class="VAS-gljr-detail-lines-wrap">' +
 
                     '<table class="VAS-gljr-detail-lines">' +

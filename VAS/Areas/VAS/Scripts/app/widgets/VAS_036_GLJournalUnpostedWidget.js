@@ -1508,10 +1508,6 @@
 
                     "</div>" +
 
-                    '<div class="VAS-glju-detail-section-title">' +
-                    "Journal Lines" +
-                    "</div>" +
-
                     '<div class="VAS-glju-detail-lines-wrap">' +
                     '<table class="VAS-glju-detail-lines">' +
 

@@ -2582,12 +2582,6 @@
 
                     "</div>" +
 
-                    '<div class="VAS-glje-detail-section-title">' +
-
-                    "Journal Lines" +
-
-                    "</div>" +
-
                     '<div class="VAS-glje-detail-lines-wrap">' +
 
                     '<table class="VAS-glje-detail-lines">' +
