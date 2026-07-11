@@ -95,41 +95,44 @@
 
 .VAS-gljv-period-group {
     display: inline-flex;
-    align-items: center;
-    gap: 2px;
+    align-items: stretch;
+    gap: 0;
     flex-shrink: 0;
-    min-height: 30px;
-    padding: 2px;
+    padding: 0;
+    overflow: hidden;
     border: 1px solid #BFE4FF;
     border-radius: 8px;
-    background: #F4FBFF;
+    background: #FFFFFF;
 }
 
 .VAS-gljv-period-btn {
     min-width: 54px;
-    height: 24px;
-    padding: 0 9px;
+    height: 26px;
+    padding: 0 12px;
     border: 0;
-    border-radius: 6px;
-    background: transparent;
+    border-radius: 0;
+    background: #FFFFFF;
     color: #748494;
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
     line-height: 1;
     white-space: nowrap;
-    transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.VAS-gljv-period-btn + .VAS-gljv-period-btn {
+    border-left: 1px solid #BFE4FF;
 }
 
 .VAS-gljv-period-btn:hover {
-    background: rgba(255, 255, 255, 0.72);
+    background: #F4FBFF;
     color: #0083DA;
 }
 
 .VAS-gljv-period-btn.is-active {
-    background: #FFFFFF;
+    background: #EAF8FF;
     color: #0083DA;
-    box-shadow: inset 0 0 0 1px #9ED1FF;
 }
 
 /* ── Chart area ──────────────────────────────────────────────────────────── */
