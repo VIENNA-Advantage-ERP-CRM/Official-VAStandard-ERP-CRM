@@ -255,3 +255,10 @@ html[dir="rtl"] .VAS-gljtc-root .kpi-why {
 .VAS-gljtc-period {
     color: #748494;
 }
+
+/* Selected period must win over the muted .VAS-gljtc-period rule above
+   (same specificity, so it has to come last) — matches VAS_040 behaviour. */
+.VAS-gljtc-period-active {
+    color: #0083DA;
+    font-weight: 700;
+}
