@@ -584,13 +584,14 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 }
 
 .VAS-gljr-detail-summary {
+
+    background: #fff;
+    border: .0625em solid #e4edf4;
+    border-radius: .75em;
     display: grid;
+    gap: 0.6em;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1.15em 1.75em;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
     padding: 1.125em 1.25em;
-    background: #FFFFFF;
 }
 
 .VAS-gljr-detail-summary div {
@@ -610,7 +611,6 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 
 .VAS-gljr-detail-summary > div > strong {
     display: block;
-    margin-top: 0.45em;
     color: #000000;
     font-size: 0.95em;
     font-weight: 600;
