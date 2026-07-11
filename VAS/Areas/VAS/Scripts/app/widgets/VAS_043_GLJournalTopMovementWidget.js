@@ -102,7 +102,7 @@
         var activePeriod = 'month';
         var currentData  = null;
         var pageNo       = 1;
-        var pageSize     = 5;
+        var pageSize     = 4;
         var totalPages   = 0;
         var totalCount   = 0;
         var refreshTimer = null;
@@ -177,15 +177,15 @@
             });
 
             $root.on('click', '.VAS-gljtm-page-prev', function () {
-                if (pageNo <= 1) { return; }
+                if (pageNo <= 1 || !currentData) { return; }
                 pageNo -= 1;
-                loadData();
+                renderBars(currentData);
             });
 
             $root.on('click', '.VAS-gljtm-page-next', function () {
-                if (totalPages <= 1 || pageNo >= totalPages) { return; }
+                if (totalPages <= 1 || pageNo >= totalPages || !currentData) { return; }
                 pageNo += 1;
-                loadData();
+                renderBars(currentData);
             });
         }
 
@@ -261,11 +261,6 @@
             var sym      = esc(data.currencySymbol || data.CurSymbol || data.currencyISO || data.ISOCode || '');
             var prec     = data.stdPrecision || data.StdPrecision;
             var $body    = $root.find('#VAS-gljtm-body-' + id);
-            var serverPageSize = parseInt(data.PageSize || data.pageSize || pageSize, 10);
-
-            if (!isNaN(serverPageSize) && serverPageSize > 0) {
-                pageSize = serverPageSize;
-            }
 
             if (accounts.length === 0) {
                 $body.addClass('is-empty');
@@ -278,26 +273,22 @@
 
             $body.removeClass('is-empty');
 
-            totalPages = parseInt(data.TotalPages || data.totalPages || 1, 10);
-
-            if (isNaN(totalPages) || totalPages < 1) {
-                totalPages = 1;
-            }
-
-            pageNo = parseInt(data.PageNo || data.pageNo || pageNo || 1, 10);
+            /* The service returns the full top-N set, so page it here. */
+            totalCount = accounts.length;
+            totalPages = Math.max(Math.ceil(totalCount / pageSize), 1);
 
             if (isNaN(pageNo) || pageNo < 1) {
                 pageNo = 1;
             }
 
-            totalCount = resolveTotalCount(
-                data.TotalCount || data.totalCount,
-                accounts.length,
-                pageSize,
-                totalPages
-            );
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
+            }
 
-            var pageAccounts = accounts;
+            var pageAccounts = accounts.slice(
+                (pageNo - 1) * pageSize,
+                pageNo * pageSize
+            );
             var html = '<div class="VAS-gljtm-list">';
             for (var i = 0; i < pageAccounts.length; i++) {
                 var a       = pageAccounts[i];

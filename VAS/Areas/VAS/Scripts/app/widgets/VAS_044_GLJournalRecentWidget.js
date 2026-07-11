@@ -506,7 +506,7 @@
                 1;
 
             var pageSize =
-                3;
+                4;
 
             var totalPages =
                 0;
@@ -530,7 +530,7 @@
                 1;
 
             var detailLinePageSize =
-                3;
+                5;
 
             var detailLineTotalPages =
                 1;

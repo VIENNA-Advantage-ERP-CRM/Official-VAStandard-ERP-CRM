@@ -552,7 +552,7 @@
                 1;
 
             var dialogPageSize =
-                10;
+                5;
 
             var dialogTotalPages =
                 1;
@@ -564,7 +564,7 @@
                 1;
 
             var detailLinePageSize =
-                3;
+                5;
 
             var detailLineTotalPages =
                 1;

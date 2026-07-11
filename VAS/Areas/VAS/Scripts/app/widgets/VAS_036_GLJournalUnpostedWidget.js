@@ -184,12 +184,12 @@
             var detailLoaded = false;
 
             var dialogPageNo = 1;
-            var dialogPageSize = 10;
+            var dialogPageSize = 5;
             var dialogTotalPages = 1;
             var dialogTotalCount = 0;
 
             var detailLinePageNo = 1;
-            var detailLinePageSize = 3;
+            var detailLinePageSize = 5;
             var detailLineTotalPages = 1;
 
             var selectedJournalId = 0;
