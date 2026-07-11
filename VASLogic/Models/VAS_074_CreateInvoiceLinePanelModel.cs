@@ -2129,7 +2129,11 @@ namespace VASLogic.Models
                 return res;
             }
 
-            Trx trx = Trx.Get("VAS074_SaveLines_" + C_Invoice_ID, true);
+            // Unique trx name per request (CreateTrxName appends a counter) so two concurrent
+            // saves of the SAME invoice never share one named transaction - a fixed name let the
+            // first request's finally{ trx.Close() } close the transaction the second was still
+            // using, failing the second save. (Matches the VAS_065 pattern.)
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS074Save_" + C_Invoice_ID));
             try
             {
                 MInvoice inv = new MInvoice(ctx, C_Invoice_ID, trx);
@@ -2313,7 +2317,9 @@ namespace VASLogic.Models
             if (ctxData.C_Invoice_ID <= 0) { res.ErrorKey = "VAS_074_NoAccess"; return res; }
             if (!ctxData.IsEditable) { res.ErrorKey = "VAS_074_InvoiceNotEditable"; return res; }
 
-            Trx trx = Trx.Get("VAS074_DeleteLines_" + C_Invoice_ID, true);
+            // Unique trx name per request (see SaveLines) so a concurrent save/delete or a
+            // second delete of the same invoice never collides on one shared named transaction.
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS074Delete_" + C_Invoice_ID));
             try
             {
                 foreach (int id in lineIds)

@@ -70,6 +70,15 @@
         var catalog = { results: [], highlight: 0, seq: 0, offset: 0, hasMore: true, loading: false, term: "", debounce: null };
         /* attribute picker + scan working state */
         var attrState = null, scanState = null;
+        // Save serialization: only ONE SaveLines POST may be in flight for this invoice at a
+        // time. Two concurrent saves would share a single server-side named DB transaction (and
+        // race on the invoice's shared tax/total rows), so the second one failed. `saveInFlight`
+        // guards the request; a Save issued while one is running SNAPSHOTS exactly the rows the
+        // user asked to save into `pendingSaveIds` (a rowId set) and the in-flight save's
+        // completion flushes THOSE rows - NOT any line the user added afterwards but never
+        // Save-clicked. So the user can keep adding / editing / saving and each Save-clicked
+        // batch persists back-to-back, while an in-progress unsaved line is left untouched.
+        var saveInFlight = false, pendingSaveIds = {};
 
         var CATALOG_PAGE_SIZE = 50;
         var SEARCH_DEBOUNCE = 260;
@@ -2727,8 +2736,10 @@
            row renders its own red message - instead of a single toast that only named the
            first failure. Repaints so every offending record in a multi-row save is flagged
            in place; returns false when any line is invalid. */
-        function validateUnsaved() {
-            var dirty = unsavedLines();
+        function validateUnsaved(batch) {
+            // Validate only the rows about to be saved (batch) - a deferred flush must not be
+            // blocked by an unrelated, still-being-entered line that wasn't Save-clicked.
+            var dirty = batch || unsavedLines();
             var anyBad = false;
             for (var i = 0; i < dirty.length; i++) {
                 var err = validateLine(dirty[i]);
@@ -3397,12 +3408,21 @@
            its OWN per-row spinner (like a callout) instead of a panel-wide overlay, and
            is locked from editing until the save returns - so the user can keep working
            (Add line, edit other rows) while the save is in flight. */
-        function saveRows(done) {
+        function saveRows(done, restrictIds) {
             commitMorePopover();
             if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
             var batch = unsavedLines();
+            // A DEFERRED flush saves ONLY the rows the user had actually Save-clicked (snapshotted
+            // in restrictIds), never a line added afterwards while the prior save was running.
+            if (restrictIds) batch = batch.filter(function (l) { return restrictIds[l.rowId]; });
             if (!batch.length || !parent) { if (done) done(false); return; }
-            if (!validateUnsaved()) { if (done) done(false); return; }   // AD_Column mandatory validation
+            if (!validateUnsaved(batch)) { if (done) done(false); return; }   // AD_Column mandatory validation (only the rows being saved)
+            // Serialize: never run a second SaveLines while one is in flight (they'd share a
+            // server transaction and race on the invoice tax/totals). Defer instead - snapshot
+            // exactly THESE rows so the in-flight save's completion flushes them; a line the user
+            // adds later but never Save-clicks is not swept in. Rows stay editable until flushed.
+            if (saveInFlight) { batch.forEach(function (l) { pendingSaveIds[l.rowId] = true; }); if (done) done(false); return; }
+            saveInFlight = true;
             var rows = batch.map(buildRowPayload);
             // Lock + show a per-row spinner on each saving row.
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_074_Saving", "Saving…")); });
@@ -3411,13 +3431,25 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveLines",
                 type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, Lines: rows }) },
                 success: function (raw) {
+                    saveInFlight = false;
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
+                    flushPendingSave();   // save any line(s) queued while this was in flight
                 },
-                error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
+                error: function (err) { saveInFlight = false; console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); flushPendingSave(); }
             });
+        }
+
+        /* Flush the rows the user Save-clicked while a prior save was in flight (snapshotted in
+           pendingSaveIds). Called from the in-flight save's success AND error handlers, so those
+           rows persist after the current save settles - restricted to the snapshotted rowIds so a
+           line added afterwards but never Save-clicked is NOT saved. */
+        function flushPendingSave() {
+            var ids = pendingSaveIds;
+            pendingSaveIds = {};
+            for (var k in ids) { if (ids.hasOwnProperty(k)) { saveRows(null, ids); return; } }
         }
 
         /* Paint server-side save failures on their record rows (line._error) instead of a
