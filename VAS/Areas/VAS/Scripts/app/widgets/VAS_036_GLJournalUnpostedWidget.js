@@ -1423,16 +1423,8 @@
                     symbol + totalCreditAmt;
 
                 var currencyText =
+                    data.ISOCode ||
                     symbol;
-
-                if (
-                    data.ISOCode &&
-                    data.ISOCode !== symbol
-                ) {
-                    currencyText +=
-                        " \u00B7 " +
-                        data.ISOCode;
-                }
 
                 var id =
                     $self.AD_UserHomeWidgetID;

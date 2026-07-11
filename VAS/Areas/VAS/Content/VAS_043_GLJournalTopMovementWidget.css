@@ -83,45 +83,44 @@
 
 .VAS-gljtm-period-group {
     display: inline-flex;
-    align-items: stretch;
-    gap: 0;
+    align-items: center;
+    gap: 2px;
     flex-shrink: 0;
+    min-height: 30px;
     margin-left: auto;
-    padding: 0;
-    overflow: hidden;
+    padding: 2px;
     border: 1px solid #BFE4FF;
     border-radius: 8px;
-    background: #FFFFFF;
+    background: #F4FBFF;
 }
 
 .VAS-gljtm-period-btn {
-    background: #FFFFFF;
+
+    background: transparent;
     border: 0;
-    border-radius: 0;
+    border-radius: 6px;
     color: #748494;
     cursor: pointer;
     font-size: 12px;
     font-weight: 600;
-    height: 26px;
+    height: 22px;
     line-height: 1;
     min-width: 54px;
-    padding: 0 12px;
-    transition: background .14s ease, color .14s ease;
+    padding: 0 9px;
+    transition: background .14s ease, color .14s ease, box-shadow .14s ease;
     white-space: nowrap;
-}
 
-.VAS-gljtm-period-btn + .VAS-gljtm-period-btn {
-    border-left: 1px solid #BFE4FF;
 }
 
 .VAS-gljtm-period-btn:hover {
-    background: #F4FBFF;
+    background: rgba(255, 255, 255, 0.72);
     color: #0083DA;
 }
 
 .VAS-gljtm-period-btn.is-active {
-    background: #EAF8FF;
+    background: #FFFFFF;
     color: #0083DA;
+    box-shadow: inset 0 0 0 1px #9ED1FF;
 }
 
 /* ── Scrollable body ─────────────────────────────────────────────────────── */

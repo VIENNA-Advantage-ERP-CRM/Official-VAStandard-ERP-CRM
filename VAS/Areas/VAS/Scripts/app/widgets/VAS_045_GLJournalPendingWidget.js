@@ -2052,24 +2052,11 @@
                 "Primary";
 
             var currencyText =
-                data.CurSymbol ||
-                data.currencySymbol ||
                 data.ISOCode ||
                 data.currencyISO ||
+                data.CurSymbol ||
+                data.currencySymbol ||
                 "";
-
-            if (
-                data.ISOCode &&
-                data.ISOCode !== currencyText
-            ) {
-                currencyText +=
-                    (
-                        currencyText
-                            ? " \u00B7 "
-                            : ""
-                    ) +
-                    data.ISOCode;
-            }
 
             $detailDialog.find(
                 "#VAS-gljpq-dialog-title-" +

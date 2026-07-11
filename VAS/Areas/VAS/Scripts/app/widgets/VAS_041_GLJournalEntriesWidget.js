@@ -2495,20 +2495,8 @@
                     "Primary";
 
                 var currencyText =
+                    data.ISOCode ||
                     symbol;
-
-                if (
-                    data.ISOCode &&
-                    data.ISOCode !== symbol
-                ) {
-                    currencyText +=
-                        (
-                            currencyText
-                                ? " \u00B7 "
-                                : ""
-                        ) +
-                        data.ISOCode;
-                }
 
                 var html =
                     '<div class="VAS-glje-detail-summary">' +

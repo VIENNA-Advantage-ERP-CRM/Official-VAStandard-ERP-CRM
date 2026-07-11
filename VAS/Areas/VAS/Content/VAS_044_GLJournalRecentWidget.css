@@ -612,7 +612,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
 .VAS-gljr-detail-summary > div > strong {
     display: block;
     color: #000000;
-    font-size: 0.95em;
+    font-size: 0.8em;
     font-weight: 600;
     line-height: 1.25;
     overflow: hidden;
@@ -1256,4 +1256,32 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+/* ==========================================================================
+   Summary block above the table uses the same type as the table below:
+   label = table header cell, value = table body cell.
+   ========================================================================== */
+
+.VAS-gljr-detail-summary > div > span,
+.VAS-gljr-created-strip > div > span,
+.VAS-gljr-detail-section-title {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #748494;
+    letter-spacing: 0;
+    line-height: 1.3;
+    text-transform: none;
+}
+
+.VAS-gljr-detail-summary > div > strong,
+.VAS-gljr-created-strip strong {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: #102C3F;
+    letter-spacing: 0;
+    line-height: 1.3;
+    margin-top: 4px;
 }
