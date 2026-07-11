@@ -68,7 +68,12 @@
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
+    /* overscroll-behavior:auto (NOT contain) so the wheel/trackpad CHAINS to the page once
+       this inner scroller hits its top/bottom. `contain` trapped the scroll here - when the
+       pointer was over the panel and it had reached its boundary, the page would not scroll,
+       so it felt stuck / dead ("not moving when it reaches the bottom panel"). Chaining lets
+       the page keep scrolling smoothly past the panel. */
+    overscroll-behavior: auto;
     /*padding: 0.75em;*/
     font-family: var(--cil-font);
     /* Canonical panel anchor (windows-and-panels.md > Panel Foundation, Rules 1 + 3): a
