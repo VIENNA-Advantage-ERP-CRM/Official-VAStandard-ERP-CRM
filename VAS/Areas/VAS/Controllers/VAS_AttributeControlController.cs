@@ -20,6 +20,7 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Web.Mvc;
+using System.Web.SessionState;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VASLogic.Models;
@@ -32,6 +33,15 @@ namespace VAS.Controllers
     /// Shared backend for <c>VIS.AttributeControl</c>. Stateless: each action reads the
     /// session Ctx and returns the serialized result. Reads use GET; SaveAttribute is POST.
     /// </summary>
+    /// <remarks>
+    /// ReadOnly session state: every action only READS Session["ctx"] (never writes it), so
+    /// the controller takes a shared reader lock instead of ASP.NET's default exclusive writer
+    /// lock. Without it, an in-flight line save (or any other ReadWrite request in the session)
+    /// serializes behind the exclusive lock and blocks the picker's GetProductAttributes /
+    /// GetInstanceValues while it runs. Same pattern as VAS_074_CreateInvoiceLinePanelController
+    /// and CalloutJsonDataController; SaveAttribute's DB writes stay protected by their own Trx.
+    /// </remarks>
+    [SessionState(SessionStateBehavior.ReadOnly)]
     public class VAS_AttributeControlController : Controller
     {
         /// <summary>Returns a product's attribute-set definition (instance attributes + values).</summary>

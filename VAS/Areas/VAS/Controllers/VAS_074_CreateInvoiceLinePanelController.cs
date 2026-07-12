@@ -12,6 +12,7 @@
 using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.Web.Mvc;
+using System.Web.SessionState;
 using VAdvantage.Model;
 using VAdvantage.Utility;
 using VASLogic.Models;
@@ -26,6 +27,16 @@ namespace VAS.Controllers
     /// <see cref="VAS_074_CreateInvoiceLinePanelModel"/> and returns the
     /// serialized result. Reads use GET; write actions use HttpPost + payload.
     /// </summary>
+    /// <remarks>
+    /// ReadOnly session state: every action only READS Session["ctx"] (never writes it),
+    /// so the whole controller takes a shared reader lock instead of ASP.NET's default
+    /// exclusive writer lock. Without this, ASP.NET serializes all requests in a session,
+    /// so an in-flight SaveLines POST would BLOCK a concurrent SearchCatalog / lookup GET
+    /// until the save returns - the "Add line" product/charge dropdown stayed empty while a
+    /// save was running. A reader lock lets those searches run concurrently with the save.
+    /// (Same pattern as CalloutJsonDataController; DB writes stay protected by their own Trx.)
+    /// </remarks>
+    [SessionState(SessionStateBehavior.ReadOnly)]
     public class VAS_074_CreateInvoiceLinePanelController : Controller
     {
         /// <summary>Returns the parent-invoice context and its saved lines.</summary>
