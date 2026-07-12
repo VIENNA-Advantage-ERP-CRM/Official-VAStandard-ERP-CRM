@@ -835,6 +835,16 @@ UnpaidSchedule AS
             0
         ) AS DiscountAmt,
 
+        InvoicePaySchedule.DiscountDate,
+
+        InvoicePaySchedule.DiscountDays2,
+
+        COALESCE
+        (
+            InvoicePaySchedule.Discount2,
+            0
+        ) AS Discount2,
+
         0 AS WriteOffAmt,
 
         COALESCE
@@ -956,6 +966,12 @@ SELECT
     UnpaidSchedule.DueAmt AS ScheduleDueAmount,
 
     UnpaidSchedule.DiscountAmt AS DiscountAmt,
+
+    UnpaidSchedule.DiscountDate,
+
+    UnpaidSchedule.DiscountDays2,
+
+    UnpaidSchedule.Discount2,
 
     UnpaidSchedule.WriteOffAmt AS WriteOffAmt,
 
@@ -1127,6 +1143,18 @@ ORDER BY
                             "DateInvoiced"
                         );
 
+                    DateTime? discountDate =
+                        GetNullableDateTime(
+                            reader,
+                            "DiscountDate"
+                        );
+
+                    DateTime? discountDays2 =
+                        GetNullableDateTime(
+                            reader,
+                            "DiscountDays2"
+                        );
+
                     if (!periodDateFrom.HasValue)
                     {
                         periodDateFrom =
@@ -1209,6 +1237,12 @@ ORDER BY
                             "DiscountAmt"
                         );
 
+                    decimal discountAmt2 =
+                        GetDecimal(
+                            reader,
+                            "Discount2"
+                        );
+
                     decimal writeOffAmt =
                         GetDecimal(
                             reader,
@@ -1220,6 +1254,53 @@ ORDER BY
                             reader,
                             "ScheduleOpenAmount"
                         );
+
+                    DateTime effectiveTransactionDate =
+                        dueDate ?? DateTime.Today;
+
+                    decimal appliedDiscountAmt = 0;
+
+                    if (
+                        discountDate.HasValue &&
+                        discountDate.Value.Date >=
+                            effectiveTransactionDate.Date
+                    )
+                    {
+                        appliedDiscountAmt =
+                            discountAmt;
+                    }
+                    else if (
+                        discountDays2.HasValue &&
+                        discountDays2.Value.Date >=
+                            effectiveTransactionDate.Date
+                    )
+                    {
+                        appliedDiscountAmt =
+                            discountAmt2;
+                    }
+
+                    if (appliedDiscountAmt < 0)
+                    {
+                        appliedDiscountAmt = 0;
+                    }
+
+                    if (
+                        appliedDiscountAmt >
+                        scheduleOpenAmount
+                    )
+                    {
+                        appliedDiscountAmt =
+                            scheduleOpenAmount;
+                    }
+
+                    decimal schedulePayAmt =
+                        scheduleOpenAmount -
+                        appliedDiscountAmt;
+
+                    if (schedulePayAmt < 0)
+                    {
+                        schedulePayAmt = 0;
+                    }
 
                     if (
                         invoicePayScheduleId <= 0 ||
@@ -1391,10 +1472,10 @@ ORDER BY
                             scheduleAllocatedAmount,
 
                         discountAmt =
-                            discountAmt,
+                            appliedDiscountAmt,
 
                         discountAmount =
-                            discountAmt,
+                            appliedDiscountAmt,
 
                         writeOffAmt =
                             writeOffAmt,
@@ -1409,10 +1490,10 @@ ORDER BY
                             scheduleOpenAmount,
 
                         amount =
-                            scheduleOpenAmount,
+                            schedulePayAmt,
 
                         payAmt =
-                            scheduleOpenAmount,
+                            schedulePayAmt,
 
                         paymentMethodId =
                             GetInt(
@@ -1496,7 +1577,8 @@ ORDER BY
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPaymentPopupLookups()
+        public JsonResult GetPaymentPopupLookups(
+            int currencyId = 0)
         {
             Ctx ctx = GetContext();
 
@@ -1537,7 +1619,8 @@ ORDER BY
 
                 List<object> bankAccounts =
                     ReadBankAccountLookupRows(
-                        clientId
+                        clientId,
+                        currencyId
                     );
 
                 currentLookup = "vendors";
@@ -1704,7 +1787,8 @@ ORDER BY
         }
 
         private List<object> ReadBankAccountLookupRows(
-            int clientId)
+            int clientId,
+            int currencyId = 0)
         {
             List<object> rows = new List<object>();
 
@@ -1733,6 +1817,16 @@ WHERE BankAccount.IsActive = 'Y'
 AND BankAccount.AD_Client_ID = " +
                 clientId.ToString(
                     CultureInfo.InvariantCulture
+                ) + @"
+" +
+                (
+                    currencyId > 0
+                        ? @"
+AND BankAccount.C_Currency_ID = " +
+                          currencyId.ToString(
+                              CultureInfo.InvariantCulture
+                          )
+                        : string.Empty
                 ) + @"
 
 ORDER BY
@@ -2068,6 +2162,7 @@ ORDER BY
             string checkDate,
             string transactionDate,
             string documentNo,
+            decimal discountAmt,
             decimal payAmt)
         {
             Ctx ctx = GetContext();
@@ -2307,16 +2402,30 @@ ORDER BY
                     );
                 }
 
+                if (discountAmt < 0)
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageDiscountInvalid",
+                            "Discount amount must be zero or greater."
+                        )
+                    );
+                }
+
                 if (
                     invoice.GetC_Currency_ID() == currencyId &&
-                    payAmt > openAmountBeforePayment
+                    (
+                        payAmt > openAmountBeforePayment ||
+                        (payAmt + discountAmt) > openAmountBeforePayment
+                    )
                 )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
                             "VAS_031_MessagePaymentExceedsOpenAmount",
-                            "Payment amount exceeds the invoice open amount."
+                            "Payment amount and discount exceed the invoice open amount."
                         )
                     );
                 }
@@ -2560,6 +2669,49 @@ AND PaymentMethod.AD_Client_ID IN
                     }
                 }
 
+                decimal scheduleOpenAmountInPaymentCurrency =
+                    openAmountBeforePayment;
+
+                if (invoice.GetC_Currency_ID() != currencyId)
+                {
+                    scheduleOpenAmountInPaymentCurrency =
+                        MConversionRate.Convert(
+                            ctx,
+                            openAmountBeforePayment,
+                            invoice.GetC_Currency_ID(),
+                            currencyId,
+                            dateTrx,
+                            conversionTypeId,
+                            invoice.GetAD_Client_ID(),
+                            invoice.GetAD_Org_ID()
+                        );
+
+                    if (scheduleOpenAmountInPaymentCurrency <= 0)
+                    {
+                        throw new InvalidOperationException(
+                            GetMsg(
+                                ctx,
+                                "VAS_031_MessageNoCurrencyConversion",
+                                "No currency conversion found for the selected currency."
+                            )
+                        );
+                    }
+                }
+
+                if (
+                    payAmt + discountAmt >
+                    scheduleOpenAmountInPaymentCurrency
+                )
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessagePaymentExceedsOpenAmount",
+                            "Payment amount and discount exceed the invoice open amount."
+                        )
+                    );
+                }
+
                 /*
                  * Create AP payment.
                  */
@@ -2638,6 +2790,21 @@ AND PaymentMethod.AD_Client_ID IN
                 }
 
                 payment.SetPayAmt(payAmt);
+
+                if (discountAmt > 0)
+                {
+                    payment.SetDiscountAmt(discountAmt);
+                }
+
+                decimal overUnderAmt =
+                    scheduleOpenAmountInPaymentCurrency -
+                    payAmt -
+                    discountAmt;
+
+                payment.SetOverUnderAmt(overUnderAmt);
+                payment.SetIsOverUnderPayment(
+                    overUnderAmt != 0
+                );
 
                 /*
                  * Initially save as Draft.

@@ -92,6 +92,7 @@
         var runsData = [];
         var invoiceRows = [];
         var popupLookups = null;
+        var popupOriginalValues = null;
 
         var selectedRun = null;
         var selectedInvoiceRow = null;
@@ -420,6 +421,19 @@
             return isNaN(numericValue)
                 ? '0'
                 : String(numericValue);
+        }
+
+        function normalizePrecision(value) {
+            var precision = Number(value);
+
+            if (
+                isNaN(precision) ||
+                precision < 0
+            ) {
+                precision = 2;
+            }
+
+            return precision;
         }
 
         function getInvoiceLabel(count) {
@@ -1577,6 +1591,122 @@
             });
         }
 
+        function refreshPopupBankAccounts(
+            currencyId,
+            callback
+        ) {
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_031_UpcomingAPRunsWidget/GetPaymentPopupLookups',
+
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                data: {
+                    currencyId:
+                        Number(currencyId || 0)
+                },
+
+                success: function (response) {
+                    var data = normalizeResponse(
+                        response
+                    );
+
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
+                        showPayError(
+                            (
+                                data &&
+                                (
+                                    data.errorText ||
+                                    data.error
+                                )
+                            ) ||
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load lookup data.'
+                            )
+                        );
+
+                        callback(false);
+                        return;
+                    }
+
+                    popupLookups =
+                        popupLookups || {};
+
+                    popupLookups.bankAccounts =
+                        $.isArray(
+                            data.bankAccounts
+                        )
+                            ? data.bankAccounts
+                            : [];
+
+                    callback(true);
+                },
+
+                error: function (xhr) {
+                    showPayError(
+                        getAjaxErrorMessage(
+                            xhr,
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load lookup data.'
+                            )
+                        )
+                    );
+
+                    callback(false);
+                }
+            });
+        }
+
+        function updatePopupBankAccountField() {
+            var bankAccounts;
+            var selectedBankAccountId;
+            var validBankAccountId;
+
+            if (
+                !$payDialogGrid ||
+                !getPayField('bankAccountId').length
+            ) {
+                return;
+            }
+
+            bankAccounts =
+                getLookup('bankAccounts');
+
+            selectedBankAccountId = Number(
+                getPayField('bankAccountId').val() || 0
+            );
+
+            validBankAccountId =
+                getValidLookupValue(
+                    bankAccounts,
+                    selectedBankAccountId
+                );
+
+            if (!validBankAccountId) {
+                validBankAccountId =
+                    getFirstPositiveLookupValue(
+                        bankAccounts
+                    );
+            }
+
+            getPayField('bankAccountId').replaceWith(
+                selectHtml(
+                    'bankAccountId',
+                    bankAccounts,
+                    validBankAccountId,
+                    false
+                )
+            );
+        }
+
         function renderInvoiceRows(rows) {
             var html = '';
             var index;
@@ -1805,11 +1935,20 @@
         }
 
         function getPopupBasePaymentAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'payAmt'
+                )
+            ) {
+                return popupOriginalValues.payAmt;
+            }
+
             var amount = Number(
                 firstValue(
+                    row && row.payAmt,
                     row && row.openAmount,
                     row && row.amount,
-                    row && row.payAmt,
                     0
                 )
             );
@@ -1819,31 +1958,187 @@
                 : amount;
         }
 
-        function updatePopupConvertedPaymentAmount() {
-            var sourceCurrencyId;
+        function getPopupBaseDiscountAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'discountAmt'
+                )
+            ) {
+                return popupOriginalValues.discountAmt;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.discountAmt,
+                    row && row.discountAmount,
+                    0
+                )
+            );
+
+            return isNaN(amount) || amount < 0
+                ? 0
+                : amount;
+        }
+
+        function getPopupBaseOpenAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'openAmount'
+                )
+            ) {
+                return popupOriginalValues.openAmount;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.openAmount,
+                    row && row.scheduleOpenAmount,
+                    row && row.amount,
+                    0
+                )
+            );
+
+            return isNaN(amount) || amount < 0
+                ? 0
+                : amount;
+        }
+
+        function getPopupOriginalCurrencyId(
+            row
+        ) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'currencyId'
+                )
+            ) {
+                return popupOriginalValues.currencyId;
+            }
+
+            return Number(
+                firstPositiveValue(
+                    row && row.currencyId,
+                    row && row.cCurrencyId
+                )
+            );
+        }
+
+        function setPopupOriginalValues(row) {
+            row = row || {};
+
+            popupOriginalValues = {
+                payAmt: Number(
+                    firstValue(
+                        row.payAmt,
+                        row.openAmount,
+                        row.amount,
+                        0
+                    )
+                ) || 0,
+                discountAmt: Number(
+                    firstValue(
+                        row.discountAmt,
+                        row.discountAmount,
+                        0
+                    )
+                ) || 0,
+                openAmount: Number(
+                    firstValue(
+                        row.openAmount,
+                        row.scheduleOpenAmount,
+                        row.amount,
+                        0
+                    )
+                ) || 0,
+                currencyId:
+                    Number(
+                        firstPositiveValue(
+                            row.currencyId,
+                            row.cCurrencyId
+                        )
+                    )
+            };
+        }
+
+        function getPopupAmountPrecision() {
+            var currencyId;
+            var currencies;
+            var index;
+            var item;
+
+            currencyId = Number(
+                getPayField('currencyId').val() || 0
+            );
+
+            currencies = getLookup('currencies');
+
+            for (index = 0; index < currencies.length; index++) {
+                item = currencies[index] || {};
+
+                if (
+                    Number(getLookupItemValue(item)) ===
+                    currencyId
+                ) {
+                    return normalizePrecision(
+                        firstValue(
+                            item.stdPrecision,
+                            item.StdPrecision,
+                            selectedInvoiceRow &&
+                            selectedInvoiceRow.stdPrecision,
+                            2
+                        )
+                    );
+                }
+            }
+
+            return normalizePrecision(
+                firstValue(
+                    selectedInvoiceRow &&
+                    selectedInvoiceRow.stdPrecision,
+                    2
+                )
+            );
+        }
+
+        function roundPopupAmount(value) {
+            var numericValue = Number(value || 0);
+            var precision = getPopupAmountPrecision();
+            var factor;
+
+            if (isNaN(numericValue)) {
+                return 0;
+            }
+
+            factor = Math.pow(10, precision);
+
+            return Math.round(numericValue * factor) / factor;
+        }
+
+        function getPopupConversionContext(
+            sourceCurrencyId
+        ) {
             var targetCurrencyId;
             var conversionTypeId;
             var transactionDate;
             var adOrgId;
             var adClientId;
-            var baseAmount;
-            var convertedAmount;
-            var paramString;
 
-            if (
-                !selectedInvoiceRow ||
-                !$payDialogGrid ||
-                !getPayField('payAmt').length
-            ) {
-                return;
+            if (!selectedInvoiceRow) {
+                return null;
             }
 
             sourceCurrencyId = Number(
-                firstPositiveValue(
-                    selectedInvoiceRow.currencyId,
-                    selectedInvoiceRow.cCurrencyId
-                )
+                sourceCurrencyId || 0
             );
+
+            if (sourceCurrencyId <= 0) {
+                sourceCurrencyId =
+                    getPopupOriginalCurrencyId(
+                        selectedInvoiceRow
+                    );
+            }
 
             targetCurrencyId = Number(
                 getPayField('currencyId').val() || 0
@@ -1881,64 +2176,117 @@
                     )
                     : 0;
 
-            baseAmount =
-                getPopupBasePaymentAmount(
-                    selectedInvoiceRow
-                );
+            return {
+                sourceCurrencyId:
+                    sourceCurrencyId,
+                targetCurrencyId:
+                    targetCurrencyId,
+                conversionTypeId:
+                    conversionTypeId,
+                transactionDate:
+                    transactionDate,
+                adOrgId: adOrgId,
+                adClientId: adClientId
+            };
+        }
+
+        function convertPopupAmount(
+            amount,
+            sourceCurrencyId
+        ) {
+            var context;
+            var paramString;
+            var convertedAmount;
+
+            context = getPopupConversionContext(
+                sourceCurrencyId
+            );
 
             if (
-                sourceCurrencyId <= 0 ||
-                targetCurrencyId <= 0
+                !context ||
+                context.sourceCurrencyId <= 0 ||
+                context.targetCurrencyId <= 0
             ) {
-                return;
+                return null;
             }
 
             if (
-                !transactionDate ||
-                conversionTypeId <= 0 ||
-                adClientId <= 0 ||
-                adOrgId < 0
+                !context.transactionDate ||
+                context.conversionTypeId <= 0 ||
+                context.adClientId <= 0 ||
+                context.adOrgId < 0
             ) {
-                getPayField('payAmt').val(
-                    normalizeNumber(baseAmount)
-                );
-                return;
+                return roundPopupAmount(amount);
             }
 
             if (
-                sourceCurrencyId ===
-                targetCurrencyId
+                context.sourceCurrencyId ===
+                context.targetCurrencyId
             ) {
-                getPayField('payAmt').val(
-                    normalizeNumber(baseAmount)
-                );
-                return;
+                return roundPopupAmount(amount);
             }
 
             paramString =
-                baseAmount.toString() + "," +
-                sourceCurrencyId.toString() + "," +
-                targetCurrencyId.toString() + "," +
-                transactionDate + "," +
-                conversionTypeId.toString() + "," +
-                adClientId.toString() + "," +
-                adOrgId.toString();
+                amount.toString() + "," +
+                context.sourceCurrencyId.toString() + "," +
+                context.targetCurrencyId.toString() + "," +
+                context.transactionDate + "," +
+                context.conversionTypeId.toString() + "," +
+                context.adClientId.toString() + "," +
+                context.adOrgId.toString();
 
-            convertedAmount =
-                Number(
-                    VIS.dataContext.getJSONRecord(
-                        "MConversionRate/CurrencyConvert",
-                        paramString
+            convertedAmount = Number(
+                VIS.dataContext.getJSONRecord(
+                    "MConversionRate/CurrencyConvert",
+                    paramString
+                )
+            );
+
+            if (isNaN(convertedAmount)) {
+                return null;
+            }
+
+            return roundPopupAmount(convertedAmount);
+        }
+
+        function convertPopupBaseAmount(baseAmount) {
+            return convertPopupAmount(
+                baseAmount,
+                getPopupOriginalCurrencyId(
+                    selectedInvoiceRow
+                )
+            );
+        }
+
+        function getPopupCurrentOpenAmount() {
+            return convertPopupBaseAmount(
+                getPopupBaseOpenAmount(
+                    selectedInvoiceRow
+                )
+            );
+        }
+
+        function syncPopupAmountsFromBase() {
+            var convertedPayAmount;
+            var convertedDiscountAmount;
+
+            convertedPayAmount =
+                convertPopupBaseAmount(
+                    getPopupBasePaymentAmount(
+                        selectedInvoiceRow
                     )
                 );
 
-            if (isNaN(convertedAmount)) {
-                convertedAmount = 0;
-            }
+            convertedDiscountAmount =
+                convertPopupBaseAmount(
+                    getPopupBaseDiscountAmount(
+                        selectedInvoiceRow
+                    )
+                );
 
             if (
-                baseAmount !== 0 &&
-                convertedAmount === 0
+                convertedPayAmount == null ||
+                convertedDiscountAmount == null
             ) {
                 showPayError(
                     lbl(
@@ -1947,16 +2295,130 @@
                     )
                 );
 
-                return;
+                getPayField('discountAmt').val('0');
+                getPayField('payAmt').val('0');
+                return false;
             }
+
+            getPayField('discountAmt').val(
+                normalizeNumber(
+                    convertedDiscountAmount
+                )
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(
+                    convertedPayAmount
+                )
+            );
 
             $payDialogNotice.removeClass(
                 'vas-upcoming-ap-runs-pay-error'
             );
 
-            getPayField('payAmt').val(
-                normalizeNumber(convertedAmount)
+            return true;
+        }
+
+        function recalculatePopupFromDiscount() {
+            var openAmount;
+            var discountAmt;
+            var payAmt;
+
+            openAmount =
+                getPopupCurrentOpenAmount();
+
+            if (openAmount == null) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+                return;
+            }
+
+            discountAmt = Number(
+                getPayField('discountAmt').val() || 0
             );
+
+            if (isNaN(discountAmt) || discountAmt < 0) {
+                discountAmt = 0;
+            }
+
+            if (discountAmt > openAmount) {
+                discountAmt = openAmount;
+            }
+
+            payAmt = roundPopupAmount(
+                openAmount - discountAmt
+            );
+
+            getPayField('discountAmt').val(
+                normalizeNumber(
+                    roundPopupAmount(discountAmt)
+                )
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(payAmt)
+            );
+        }
+
+        function recalculatePopupFromPayAmt() {
+            var openAmount;
+            var payAmt;
+            var discountAmt;
+
+            openAmount =
+                getPopupCurrentOpenAmount();
+
+            if (openAmount == null) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+                return;
+            }
+
+            payAmt = Number(
+                getPayField('payAmt').val() || 0
+            );
+
+            if (isNaN(payAmt) || payAmt < 0) {
+                payAmt = 0;
+            }
+
+            if (payAmt > openAmount) {
+                payAmt = openAmount;
+            }
+
+            discountAmt = roundPopupAmount(
+                openAmount - payAmt
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(
+                    roundPopupAmount(payAmt)
+                )
+            );
+
+            getPayField('discountAmt').val(
+                normalizeNumber(discountAmt)
+            );
+        }
+
+        function updatePopupConvertedPaymentAmount() {
+            if (
+                !selectedInvoiceRow ||
+                !$payDialogGrid ||
+                !getPayField('payAmt').length
+            ) {
+                return;
+            }
+
+            syncPopupAmountsFromBase();
         }
 
         function renderPayDialogGrid(row) {
@@ -1985,6 +2447,8 @@
             ) {
                 return;
             }
+
+            setPopupOriginalValues(row);
 
             organizations =
                 getLookup('organizations');
@@ -2256,19 +2720,16 @@
 
                     inputHtml(
                         'discountAmt',
-                        'text',
-                        formatCurrencyAmount(
+                        'number',
+                        normalizeNumber(
                             firstValue(
                                 row.discountAmt,
                                 row.discountAmount,
                                 0
-                            ),
-                            row.currencySymbol,
-                            row.currencyISO,
-                            row.stdPrecision
+                            )
                         ),
-                        null,
-                        true
+                        '0.01',
+                        false
                     ),
 
                     true
@@ -2282,18 +2743,15 @@
 
                     inputHtml(
                         'writeOffAmt',
-                        'text',
-                        formatCurrencyAmount(
+                        'number',
+                        normalizeNumber(
                             firstValue(
                                 row.writeOffAmt,
                                 row.writeOffAmount,
                                 0
-                            ),
-                            row.currencySymbol,
-                            row.currencyISO,
-                            row.stdPrecision
+                            )
                         ),
-                        null,
+                        '0.01',
                         true
                     ),
 
@@ -2349,9 +2807,9 @@
                         'number',
                         normalizeNumber(
                             firstValue(
+                                row.payAmt,
                                 row.openAmount,
                                 row.amount,
-                                row.payAmt,
                                 0
                             )
                         ),
@@ -2422,7 +2880,21 @@
                 .on(
                     'change.vasCurrencyConvert',
                     function () {
-                        updatePopupConvertedPaymentAmount();
+                        var selectedCurrencyId = Number(
+                            $(this).val() || 0
+                        );
+
+                        refreshPopupBankAccounts(
+                            selectedCurrencyId,
+                            function (loaded) {
+                                if (!loaded) {
+                                    return;
+                                }
+
+                                updatePopupBankAccountField();
+                                updatePopupConvertedPaymentAmount();
+                            }
+                        );
                     }
                 );
 
@@ -2431,7 +2903,7 @@
                 .on(
                     'change.vasCurrencyConvert',
                     function () {
-                        updatePopupConvertedPaymentAmount();
+                        syncPopupAmountsFromBase();
                     }
                 );
 
@@ -2440,11 +2912,42 @@
                 .on(
                     'change.vasCurrencyConvert',
                     function () {
-                        updatePopupConvertedPaymentAmount();
+                        syncPopupAmountsFromBase();
+                    }
+                );
+
+            getPayField('discountAmt')
+                .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
+                .on(
+                    'input.vasRecalculate change.vasRecalculate',
+                    function () {
+                        recalculatePopupFromDiscount();
+                    }
+                )
+                .on(
+                    'blur.vasRecalculate',
+                    function () {
+                        recalculatePopupFromDiscount();
+                    }
+                );
+
+            getPayField('payAmt')
+                .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
+                .on(
+                    'input.vasRecalculate change.vasRecalculate',
+                    function () {
+                        recalculatePopupFromPayAmt();
+                    }
+                )
+                .on(
+                    'blur.vasRecalculate',
+                    function () {
+                        recalculatePopupFromPayAmt();
                     }
                 );
 
             updateCheckFieldsVisibility();
+            syncPopupAmountsFromBase();
         }
 
         function updatePayNotice(row) {
@@ -2709,6 +3212,7 @@
 
             selectedRun = null;
             selectedInvoiceRow = null;
+            popupOriginalValues = null;
             invoiceRows = [];
 
             getPayField('checkNo').val('');
@@ -2858,6 +3362,18 @@
                 ).trim(),
 
                 documentNo: '',
+
+                discountAmt: Number(
+                    getPayField(
+                        'discountAmt'
+                    ).val() || 0
+                ),
+
+                writeOffAmt: Number(
+                    getPayField(
+                        'writeOffAmt'
+                    ).val() || 0
+                ),
 
                 payAmt: Number(
                     getPayField(
@@ -3011,6 +3527,20 @@
             }
 
             if (
+                isNaN(payload.discountAmt) ||
+                payload.discountAmt < 0
+            ) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageDiscountInvalid',
+                        'Discount amount must be zero or greater.'
+                    )
+                );
+
+                return null;
+            }
+
+            if (
                 isNaN(payload.payAmt) ||
                 payload.payAmt <= 0
             ) {
@@ -3024,30 +3554,26 @@
                 return null;
             }
 
-            maximumAmount = Number(
-                firstValue(
-                    selectedInvoiceRow.openAmount,
-                    selectedInvoiceRow.amount,
-                    selectedInvoiceRow.payAmt,
-                    0
-                )
-            );
+            maximumAmount =
+                getPopupCurrentOpenAmount();
 
             if (
-                Number(payload.currencyId) === Number(
-                    firstPositiveValue(
-                        selectedInvoiceRow.currencyId,
-                        selectedInvoiceRow.cCurrencyId
-                    )
-                ) &&
                 !isNaN(maximumAmount) &&
                 maximumAmount > 0 &&
-                payload.payAmt > maximumAmount
+                (
+                    payload.payAmt >
+                    maximumAmount ||
+                    (
+                        payload.payAmt +
+                        payload.discountAmt +
+                        payload.writeOffAmt
+                    ) > maximumAmount
+                )
             ) {
                 showPayError(
                     lbl(
                         'VAS_031_MessagePaymentExceedsOpenAmount',
-                        'Payment amount exceeds invoice open amount.'
+                        'Payment amount and discount exceed invoice open amount.'
                     )
                 );
 
