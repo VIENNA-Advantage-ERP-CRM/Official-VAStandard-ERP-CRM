@@ -2005,6 +2005,29 @@
                 : amount;
         }
 
+        function getPopupBaseWriteOffAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'writeOffAmt'
+                )
+            ) {
+                return popupOriginalValues.writeOffAmt;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.writeOffAmt,
+                    row && row.writeOffAmount,
+                    0
+                )
+            );
+
+            return isNaN(amount) || amount < 0
+                ? 0
+                : amount;
+        }
+
         function getPopupOriginalCurrencyId(
             row
         ) {
@@ -2049,6 +2072,13 @@
                         row.openAmount,
                         row.scheduleOpenAmount,
                         row.amount,
+                        0
+                    )
+                ) || 0,
+                writeOffAmt: Number(
+                    firstValue(
+                        row.writeOffAmt,
+                        row.writeOffAmount,
                         0
                     )
                 ) || 0,
@@ -2269,6 +2299,7 @@
         function syncPopupAmountsFromBase() {
             var convertedPayAmount;
             var convertedDiscountAmount;
+            var convertedWriteOffAmount;
 
             convertedPayAmount =
                 convertPopupBaseAmount(
@@ -2284,9 +2315,17 @@
                     )
                 );
 
+            convertedWriteOffAmount =
+                convertPopupBaseAmount(
+                    getPopupBaseWriteOffAmount(
+                        selectedInvoiceRow
+                    )
+                );
+
             if (
                 convertedPayAmount == null ||
-                convertedDiscountAmount == null
+                convertedDiscountAmount == null ||
+                convertedWriteOffAmount == null
             ) {
                 showPayError(
                     lbl(
@@ -2306,6 +2345,12 @@
                 )
             );
 
+            getPayField('writeOffAmt').val(
+                normalizeNumber(
+                    convertedWriteOffAmount
+                )
+            );
+
             getPayField('payAmt').val(
                 normalizeNumber(
                     convertedPayAmount
@@ -2322,6 +2367,7 @@
         function recalculatePopupFromDiscount() {
             var openAmount;
             var discountAmt;
+            var writeOffAmt;
             var payAmt;
 
             openAmount =
@@ -2349,8 +2395,29 @@
                 discountAmt = openAmount;
             }
 
+            writeOffAmt = Number(
+                getPayField('writeOffAmt').val() || 0
+            );
+
+            if (isNaN(writeOffAmt) || writeOffAmt < 0) {
+                writeOffAmt = 0;
+            }
+
+            if (
+                writeOffAmt >
+                (openAmount - discountAmt)
+            ) {
+                writeOffAmt =
+                    Math.max(
+                        0,
+                        openAmount - discountAmt
+                    );
+            }
+
             payAmt = roundPopupAmount(
-                openAmount - discountAmt
+                openAmount -
+                discountAmt -
+                writeOffAmt
             );
 
             getPayField('discountAmt').val(
@@ -2362,12 +2429,19 @@
             getPayField('payAmt').val(
                 normalizeNumber(payAmt)
             );
+
+            getPayField('writeOffAmt').val(
+                normalizeNumber(
+                    roundPopupAmount(writeOffAmt)
+                )
+            );
         }
 
         function recalculatePopupFromPayAmt() {
             var openAmount;
             var payAmt;
             var discountAmt;
+            var writeOffAmt;
 
             openAmount =
                 getPopupCurrentOpenAmount();
@@ -2394,9 +2468,30 @@
                 payAmt = openAmount;
             }
 
-            discountAmt = roundPopupAmount(
-                openAmount - payAmt
+            writeOffAmt = Number(
+                getPayField('writeOffAmt').val() || 0
             );
+
+            if (isNaN(writeOffAmt) || writeOffAmt < 0) {
+                writeOffAmt = 0;
+            }
+
+            if (writeOffAmt > openAmount) {
+                writeOffAmt = openAmount;
+            }
+
+            discountAmt = roundPopupAmount(
+                openAmount -
+                payAmt -
+                writeOffAmt
+            );
+
+            if (discountAmt < 0) {
+                discountAmt = 0;
+                writeOffAmt = roundPopupAmount(
+                    openAmount - payAmt
+                );
+            }
 
             getPayField('payAmt').val(
                 normalizeNumber(
@@ -2406,6 +2501,79 @@
 
             getPayField('discountAmt').val(
                 normalizeNumber(discountAmt)
+            );
+
+            getPayField('writeOffAmt').val(
+                normalizeNumber(
+                    roundPopupAmount(writeOffAmt)
+                )
+            );
+        }
+
+        function recalculatePopupFromWriteOff() {
+            var openAmount;
+            var discountAmt;
+            var writeOffAmt;
+            var payAmt;
+
+            openAmount =
+                getPopupCurrentOpenAmount();
+
+            if (openAmount == null) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+                return;
+            }
+
+            discountAmt = Number(
+                getPayField('discountAmt').val() || 0
+            );
+
+            writeOffAmt = Number(
+                getPayField('writeOffAmt').val() || 0
+            );
+
+            if (isNaN(discountAmt) || discountAmt < 0) {
+                discountAmt = 0;
+            }
+
+            if (isNaN(writeOffAmt) || writeOffAmt < 0) {
+                writeOffAmt = 0;
+            }
+
+            if (discountAmt > openAmount) {
+                discountAmt = openAmount;
+            }
+
+            if (
+                writeOffAmt >
+                (openAmount - discountAmt)
+            ) {
+                writeOffAmt =
+                    Math.max(
+                        0,
+                        openAmount - discountAmt
+                    );
+            }
+
+            payAmt = roundPopupAmount(
+                openAmount -
+                discountAmt -
+                writeOffAmt
+            );
+
+            getPayField('writeOffAmt').val(
+                normalizeNumber(
+                    roundPopupAmount(writeOffAmt)
+                )
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(payAmt)
             );
         }
 
@@ -2752,7 +2920,7 @@
                             )
                         ),
                         '0.01',
-                        true
+                        false
                     ),
 
                     true
@@ -2943,6 +3111,21 @@
                     'blur.vasRecalculate',
                     function () {
                         recalculatePopupFromPayAmt();
+                    }
+                );
+
+            getPayField('writeOffAmt')
+                .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
+                .on(
+                    'input.vasRecalculate change.vasRecalculate',
+                    function () {
+                        recalculatePopupFromWriteOff();
+                    }
+                )
+                .on(
+                    'blur.vasRecalculate',
+                    function () {
+                        recalculatePopupFromWriteOff();
                     }
                 );
 
