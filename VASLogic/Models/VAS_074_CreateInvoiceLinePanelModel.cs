@@ -273,14 +273,14 @@ namespace VASLogic.Models
                 sb.Append("NULLIF(f.ReadOnlyLogic, N''), ");
             if (fieldCol)
                 sb.Append(@"NULLIF((SELECT MAX(f2.ReadOnlyLogic)
-                                    FROM AD_Field f2
-                                    INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
-                                    INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
-                                    WHERE f2.AD_Column_ID = c.AD_Column_ID
-                                      AND f2.IsActive = 'Y'
-                                      AND tt2.TableName = 'C_InvoiceLine'
-                                      AND f2.ReadOnlyLogic IS NOT NULL
-                                      AND f2.ReadOnlyLogic <> ''), N''), ");
+                                FROM AD_Field f2
+                                INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
+                                INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
+                                WHERE f2.AD_Column_ID = c.AD_Column_ID
+                                  AND f2.IsActive = 'Y'
+                                  AND tt2.TableName = 'C_InvoiceLine'
+                                  AND f2.ReadOnlyLogic IS NOT NULL
+                                  AND f2.ReadOnlyLogic <> ''), N''), ");
             sb.Append("c.ReadOnlyLogic, N'')");
             return sb.ToString();
         }
@@ -312,7 +312,7 @@ namespace VASLogic.Models
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
                                   " + roLogicExpr + @"  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
-                                  COALESCE(vr.Type, N'')          AS ValRuleType,
+                                  COALESCE(vr.Type, '')          AS ValRuleType,
                                   COALESCE(vr.Code, N'')          AS ValRuleCode,
                                   COALESCE(f.IsDisplayed, 'Y')    AS IsDisplayed,
                                   COALESCE(f.IsReadOnly, 'N')     AS IsReadOnly,
@@ -375,21 +375,16 @@ namespace VASLogic.Models
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
                                   " + roLogicExpr + @"  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
-                                  COALESCE(vr.Type, N'')          AS ValRuleType,
+                                  COALESCE(vr.Type, '')          AS ValRuleType,
                                   COALESCE(vr.Code, N'')          AS ValRuleCode,
-                                  -- DisplayLogic lives on AD_Field, not AD_Column: pick a
-                                  -- representative non-empty expression from any active
-                                  -- C_InvoiceLine field for this column, so a curated modal
-                                  -- field that isn't on the resolved window tab still has its
-                                  -- show/hide logic applied (uniform per column in practice).
                                   COALESCE((SELECT MAX(f2.DisplayLogic)
-                                            FROM AD_Field f2
-                                            INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
-                                            INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
-                                            WHERE f2.AD_Column_ID = c.AD_Column_ID
-                                              AND f2.IsActive = 'Y'
-                                              AND tt2.TableName = 'C_InvoiceLine'
-                                              AND f2.DisplayLogic IS NOT NULL
+                                                FROM AD_Field f2
+                                                INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
+                                                INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
+                                                WHERE f2.AD_Column_ID = c.AD_Column_ID
+                                                  AND f2.IsActive = 'Y'
+                                                  AND tt2.TableName = 'C_InvoiceLine'
+                                                  AND f2.DisplayLogic IS NOT NULL
                                               AND f2.DisplayLogic <> ''), N'') AS DisplayLogic
                            FROM AD_Column c
                            INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
@@ -1282,7 +1277,7 @@ namespace VASLogic.Models
             string prodSql = @"SELECT p.M_Product_ID AS RecordId, 'P' AS Kind, p.Value AS SearchKey,
                                       p.Name AS DisplayName, COALESCE(p.Description, N'') AS Description,
                                       p.M_AttributeSet_ID AS AttributeSetId,
-                                      COALESCE(p.ProductType, N'') AS ProductType
+                                      COALESCE(p.ProductType, '') AS ProductType
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
