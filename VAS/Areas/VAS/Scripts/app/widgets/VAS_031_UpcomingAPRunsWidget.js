@@ -1804,6 +1804,161 @@
             }
         }
 
+        function getPopupBasePaymentAmount(row) {
+            var amount = Number(
+                firstValue(
+                    row && row.openAmount,
+                    row && row.amount,
+                    row && row.payAmt,
+                    0
+                )
+            );
+
+            return isNaN(amount)
+                ? 0
+                : amount;
+        }
+
+        function updatePopupConvertedPaymentAmount() {
+            var sourceCurrencyId;
+            var targetCurrencyId;
+            var conversionTypeId;
+            var transactionDate;
+            var adOrgId;
+            var adClientId;
+            var baseAmount;
+            var convertedAmount;
+            var paramString;
+
+            if (
+                !selectedInvoiceRow ||
+                !$payDialogGrid ||
+                !getPayField('payAmt').length
+            ) {
+                return;
+            }
+
+            sourceCurrencyId = Number(
+                firstPositiveValue(
+                    selectedInvoiceRow.currencyId,
+                    selectedInvoiceRow.cCurrencyId
+                )
+            );
+
+            targetCurrencyId = Number(
+                getPayField('currencyId').val() || 0
+            );
+
+            conversionTypeId = Number(
+                getPayField('conversionTypeId').val() || 0
+            );
+
+            transactionDate = String(
+                getPayField('transactionDate').val() || ''
+            ).trim();
+
+            adOrgId = Number(
+                getPayField('adOrgId').val() ||
+                firstPositiveValue(
+                    selectedInvoiceRow.adOrgId,
+                    selectedInvoiceRow.organizationId
+                ) ||
+                (VIS.Env &&
+                    VIS.Env.getCtx &&
+                    VIS.Env.getCtx() &&
+                    VIS.Env.getCtx().getAD_Org_ID
+                    ? VIS.Env.getCtx().getAD_Org_ID()
+                    : 0)
+            );
+
+            adClientId =
+                VIS.Env &&
+                VIS.Env.getCtx &&
+                VIS.Env.getCtx() &&
+                VIS.Env.getCtx().getAD_Client_ID
+                    ? Number(
+                        VIS.Env.getCtx().getAD_Client_ID()
+                    )
+                    : 0;
+
+            baseAmount =
+                getPopupBasePaymentAmount(
+                    selectedInvoiceRow
+                );
+
+            if (
+                sourceCurrencyId <= 0 ||
+                targetCurrencyId <= 0
+            ) {
+                return;
+            }
+
+            if (
+                !transactionDate ||
+                conversionTypeId <= 0 ||
+                adClientId <= 0 ||
+                adOrgId < 0
+            ) {
+                getPayField('payAmt').val(
+                    normalizeNumber(baseAmount)
+                );
+                return;
+            }
+
+            if (
+                sourceCurrencyId ===
+                targetCurrencyId
+            ) {
+                getPayField('payAmt').val(
+                    normalizeNumber(baseAmount)
+                );
+                return;
+            }
+
+            paramString =
+                baseAmount.toString() + "," +
+                sourceCurrencyId.toString() + "," +
+                targetCurrencyId.toString() + "," +
+                transactionDate + "," +
+                conversionTypeId.toString() + "," +
+                adClientId.toString() + "," +
+                adOrgId.toString();
+
+            convertedAmount =
+                Number(
+                    VIS.dataContext.getJSONRecord(
+                        "MConversionRate/CurrencyConvert",
+                        paramString
+                    )
+                );
+
+            if (isNaN(convertedAmount)) {
+                convertedAmount = 0;
+            }
+
+            if (
+                baseAmount !== 0 &&
+                convertedAmount === 0
+            ) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+
+                return;
+            }
+
+            $payDialogNotice.removeClass(
+                'vas-upcoming-ap-runs-pay-error'
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(convertedAmount)
+            );
+        }
+
         function renderPayDialogGrid(row) {
             var organizations;
             var bankAccounts;
@@ -1960,27 +2115,6 @@
             html =
                 fieldHtml(
                     lbl(
-                        'VAS_031_MessageInvoice',
-                        'Invoice'
-                    ),
-
-                    inputHtml(
-                        'invoiceDocumentNo',
-                        'text',
-                        firstValue(
-                            row.invoiceDocumentNo,
-                            row.documentNo,
-                            ''
-                        ),
-                        null,
-                        true
-                    ),
-
-                    true
-                ) +
-
-                fieldHtml(
-                    lbl(
                         'VAS_031_MessageOrganization',
                         'Organization'
                     ),
@@ -2116,6 +2250,58 @@
 
                 fieldHtml(
                     lbl(
+                        'DiscountAmt',
+                        'Discount'
+                    ),
+
+                    inputHtml(
+                        'discountAmt',
+                        'text',
+                        formatCurrencyAmount(
+                            firstValue(
+                                row.discountAmt,
+                                row.discountAmount,
+                                0
+                            ),
+                            row.currencySymbol,
+                            row.currencyISO,
+                            row.stdPrecision
+                        ),
+                        null,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'WriteOffAmt',
+                        'Write Off Amount'
+                    ),
+
+                    inputHtml(
+                        'writeOffAmt',
+                        'text',
+                        formatCurrencyAmount(
+                            firstValue(
+                                row.writeOffAmt,
+                                row.writeOffAmount,
+                                0
+                            ),
+                            row.currencySymbol,
+                            row.currencyISO,
+                            row.stdPrecision
+                        ),
+                        null,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
                         'VAS_031_MessageCheckNo',
                         'Check No.'
                     ),
@@ -2171,9 +2357,52 @@
                         ),
                         '0.01',
                         false
+                    ), 
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageInvoice',
+                        'Invoice'
+                    ),
+
+                    inputHtml(
+                        'invoiceDocumentNo',
+                        'text',
+                        firstValue(
+                            row.invoiceDocumentNo,
+                            row.documentNo,
+                            ''
+                        ),
+                        null,
+                        true
                     ),
 
                     true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'Description',
+                        'Description'
+                    ),
+
+                    inputHtml(
+                        'invoiceDescription',
+                        'text',
+                        firstValue(
+                            row.description,
+                            row.invoiceDescription,
+                            ''
+                        ),
+                        null,
+                        true
+                    ),
+
+                    true,
+                    'data-full-span="true"'
                 );
 
             $payDialogGrid.html(html);
@@ -2185,6 +2414,33 @@
                     'change.vasPaymentMethod',
                     function () {
                         updateCheckFieldsVisibility();
+                    }
+                );
+
+            getPayField('currencyId')
+                .off('change.vasCurrencyConvert')
+                .on(
+                    'change.vasCurrencyConvert',
+                    function () {
+                        updatePopupConvertedPaymentAmount();
+                    }
+                );
+
+            getPayField('conversionTypeId')
+                .off('change.vasCurrencyConvert')
+                .on(
+                    'change.vasCurrencyConvert',
+                    function () {
+                        updatePopupConvertedPaymentAmount();
+                    }
+                );
+
+            getPayField('transactionDate')
+                .off('change.vasCurrencyConvert')
+                .on(
+                    'change.vasCurrencyConvert',
+                    function () {
+                        updatePopupConvertedPaymentAmount();
                     }
                 );
 

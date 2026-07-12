@@ -699,6 +699,10 @@
     transition: border-color 0.15s ease;
 }
 
+    .vas-upcoming-ap-runs-field[data-full-span="true"] {
+        grid-column: 1 / -1;
+    }
+
     .vas-upcoming-ap-runs-field:hover,
     .vas-upcoming-ap-runs-field:focus-within {
         border-bottom-color: #0083da;

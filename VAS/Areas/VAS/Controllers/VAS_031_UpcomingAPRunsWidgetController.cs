@@ -240,6 +240,7 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.C_ConversionType_ID,
     Invoice.DocumentNo,
+    Invoice.Description,
     Invoice.DateInvoiced,
     Invoice.DateAcct,
     Invoice.GrandTotal,
@@ -572,6 +573,7 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.C_ConversionType_ID,
     Invoice.DocumentNo,
+    Invoice.Description,
     Invoice.DateInvoiced,
     Invoice.DateAcct,
     Invoice.GrandTotal,
@@ -829,6 +831,14 @@ UnpaidSchedule AS
 
         COALESCE
         (
+            InvoicePaySchedule.DiscountAmt,
+            0
+        ) AS DiscountAmt,
+
+        0 AS WriteOffAmt,
+
+        COALESCE
+        (
             ScheduleAllocation.AllocatedAmt,
             0
         ) AS AllocatedAmt,
@@ -933,6 +943,7 @@ UnpaidSchedule AS
 SELECT
     Invoice.C_Invoice_ID,
     Invoice.DocumentNo,
+    Invoice.Description,
     Invoice.AD_Org_ID,
 
     Organization.Name AS OrganizationName,
@@ -943,6 +954,10 @@ SELECT
     UnpaidSchedule.C_InvoicePaySchedule_ID,
 
     UnpaidSchedule.DueAmt AS ScheduleDueAmount,
+
+    UnpaidSchedule.DiscountAmt AS DiscountAmt,
+
+    UnpaidSchedule.WriteOffAmt AS WriteOffAmt,
 
     UnpaidSchedule.AllocatedAmt AS ScheduleAllocatedAmount,
 
@@ -1188,6 +1203,18 @@ ORDER BY
                             "ScheduleAllocatedAmount"
                         );
 
+                    decimal discountAmt =
+                        GetDecimal(
+                            reader,
+                            "DiscountAmt"
+                        );
+
+                    decimal writeOffAmt =
+                        GetDecimal(
+                            reader,
+                            "WriteOffAmt"
+                        );
+
                     decimal scheduleOpenAmount =
                         GetDecimal(
                             reader,
@@ -1224,6 +1251,18 @@ ORDER BY
                             GetString(
                                 reader,
                                 "DocumentNo"
+                            ),
+
+                        description =
+                            GetString(
+                                reader,
+                                "Description"
+                            ),
+
+                        invoiceDescription =
+                            GetString(
+                                reader,
+                                "Description"
                             ),
 
                         organizationId =
@@ -1350,6 +1389,18 @@ ORDER BY
 
                         scheduleAllocatedAmount =
                             scheduleAllocatedAmount,
+
+                        discountAmt =
+                            discountAmt,
+
+                        discountAmount =
+                            discountAmt,
+
+                        writeOffAmt =
+                            writeOffAmt,
+
+                        writeOffAmount =
+                            writeOffAmt,
 
                         scheduleOpenAmount =
                             scheduleOpenAmount,
@@ -1518,7 +1569,7 @@ SELECT
 
 FROM C_Currency Currency
 
-WHERE Currency.IsActive = 'Y'
+WHERE Currency.IsActive = 'Y' and Currency.IsMyCurrency = 'Y'
 
 ORDER BY
     Currency.ISO_Code");
