@@ -34,10 +34,17 @@
 
         var $self = this;
         var $root, $busy, $body, $emptyState, $linesBody, $totalsRow, $pager;
-        var $addBtn, $saveBtn, $deleteBtn, $selectAll;
+        var $addBtn, $saveBtn, $deleteBtn, $refreshBtn, $selectAll;
 
         /* parent invoice context returned by GetPanelData */
         var parent = null;
+        /* Monotonic token for GetPanelData (fetchData) requests. Bumped on every fetchData AND
+           on clear(), and each fetch captures its value; a fetch's async success is IGNORED when
+           the token has moved on. Guards the record-switch race: opening the AR Invoice window
+           in NEW mode (e.g. from the VAS_064 widget) first positions the grid on an existing
+           invoice (fetchData(existingId) in flight) then clears for the new record - without the
+           token the stale response would repaint the previous invoice's lines on the new record. */
+        var fetchSeq = 0;
         /* server-side line paging (20/page): current 0-based page, total saved lines, size */
         var linePage = 0, linesTotal = 0, linePageSize = 20;
         /* saved totals of every line NOT on the current page (invoice grand total minus this
@@ -59,10 +66,26 @@
         var rowCounter = 0;
         var editing = null;            // { rowId, field }
         var morePopoverFor = null;     // rowId
+        // True only WHILE render() detaches/re-attaches the row whose catalog dropdown is
+        // open (see the preserve block in render). Detaching a focused input fires a native
+        // blur, whose handler (commitPrimary) would otherwise clear `editing` + rebuild the
+        // row - discarding the in-progress product/charge search and tearing down the open
+        // dropdown. This flag makes the primary blur handler ignore that transient blur so a
+        // background save completing mid-search never wipes the loaded dropdown results.
+        var suppressPrimaryBlur = false;
         /* catalog popover working state (for the row currently editing a primary) */
         var catalog = { results: [], highlight: 0, seq: 0, offset: 0, hasMore: true, loading: false, term: "", debounce: null };
         /* attribute picker + scan working state */
         var attrState = null, scanState = null;
+        // Save serialization: only ONE SaveLines POST may be in flight for this invoice at a
+        // time. Two concurrent saves would share a single server-side named DB transaction (and
+        // race on the invoice's shared tax/total rows), so the second one failed. `saveInFlight`
+        // guards the request; a Save issued while one is running SNAPSHOTS exactly the rows the
+        // user asked to save into `pendingSaveIds` (a rowId set) and the in-flight save's
+        // completion flushes THOSE rows - NOT any line the user added afterwards but never
+        // Save-clicked. So the user can keep adding / editing / saving and each Save-clicked
+        // batch persists back-to-back, while an in-progress unsaved line is left untouched.
+        var saveInFlight = false, pendingSaveIds = {};
 
         var CATALOG_PAGE_SIZE = 50;
         var SEARCH_DEBOUNCE = 260;
@@ -235,6 +258,15 @@
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // Claim the latest request token so a stale/out-of-order response (e.g. a prior
+            // invoice's load that lands AFTER a clear() for a new record) is discarded below.
+            var mySeq = ++fetchSeq;
+            // A pager page change (explicit page arg) is OUR own AJAX, NOT a framework record
+            // load - the framework paints no spinner for it, so show the per-panel busy overlay
+            // ourselves. A framework record load (no page arg) already gets the framework's own
+            // vis-apanel-busy, so we skip ours there to avoid a stacked double spinner.
+            var isPageChange = (typeof page === "number");
+            if (isPageChange) showBusy(true);
             // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
             // record - including after a save - and a still-open dialog's position:fixed
             // backdrop would otherwise be left orphaned over the page (morePopoverFor is
@@ -252,6 +284,9 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetPanelData",
                 type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0, page: reqPage },
                 success: function (raw) {
+                    // Superseded by a newer fetchData / clear() (record switched, or new-record
+                    // mode) - drop this stale response so it can't repaint the previous invoice.
+                    if (mySeq !== fetchSeq) { if (isPageChange) showBusy(false); return; }
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
@@ -283,12 +318,16 @@
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
                     refreshSummary();    // then load this invoice's server tax breakdown
+                    if (isPageChange) showBusy(false);
                 },
-                error: function (err) { console.log(err); }
+                error: function (err) { console.log(err); if (isPageChange && mySeq === fetchSeq) showBusy(false); }
             });
         };
 
         this.clear = function () {
+            // Invalidate any in-flight fetchData so its response can't repaint stale data over
+            // the cleared (new-record) panel - the record-switch race described on fetchSeq.
+            fetchSeq++;
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
@@ -421,7 +460,12 @@
             $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-cil-save-lbl"></span></button>');
             $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" title="' + esc(lbl("Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("Delete", "Delete")) + ' <span class="vas-cil-sel-count"></span></span></button>');
-            $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn);
+            // Refresh re-loads the current invoice's panel data (current page) from the server.
+            // A read action - stays enabled even on a completed/void/read-only invoice, so it is
+            // NOT touched by renderHeaderButtons' lock logic.
+            $refreshBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="refresh-panel" title="' + esc(lbl("VAS_074_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "⟳") +
+                "<span>" + esc(lbl("VAS_074_Refresh", "Refresh")) + "</span></button>");
+            $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn, $refreshBtn);
             $header.append($actions);
             $panel.append($header);
 
@@ -441,6 +485,7 @@
 
             $header.on("click", "[data-action=open-scan]", openScanDialog);
             $header.on("click", "[data-action=add-line]", function () { addLine(); });
+            $header.on("click", "[data-action=refresh-panel]", function () { refreshPanel(); });
             // Save on mousedown (not click): mousedown fires BEFORE the focused cell
             // editor blurs, so we can flush that pending edit ourselves and the action
             // never gets lost to a blur/commit re-render happening between mousedown and
@@ -488,15 +533,55 @@
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
             $body.toggleClass("vas-cil-locked", !panelEditable());
 
+            // Preserve the LIVE DOM of the row whose product/charge catalog is OPEN (the user is
+            // mid-search). An EXTERNAL render - a background save completing, a callout, the
+            // summary refresh - would otherwise rebuild that row -> resetCatalog -> tear down and
+            // RELOAD the dropdown (flicker; a render/keystroke seq race sometimes left it empty).
+            // detach() keeps the node's handlers, input value and open popover; we re-insert it
+            // in place and restore focus + caret (detach blurs the input).
+            var keepId = null, $keep = null, refocusEl = null, caretPos = null;
+            if (editing && catalog.$pop && catalog.$pop.closest("body").length && lineById(editing.rowId)) {
+                var $existing = $linesBody.find('[data-rowid="' + editing.rowId + '"]').first();
+                if ($existing.length) {
+                    var ae = document.activeElement;
+                    if (ae && $.contains($existing[0], ae)) {
+                        refocusEl = ae;
+                        try { caretPos = ae.selectionStart; } catch (e) { }
+                    }
+                    keepId = editing.rowId;
+                    // Detaching a focused input fires blur; suppress the primary blur handler
+                    // so it doesn't commitPrimary() -> clear editing -> destroy the search. The
+                    // flag is cleared after focus is restored below (async, to also cover
+                    // browsers that dispatch the detach blur on a later tick).
+                    suppressPrimaryBlur = true;
+                    $keep = $existing.detach();
+                }
+            }
+
             $linesBody.empty();
             if (!lines.length) {
                 $linesBody.append('<div class="vas-cil-emptyrow">' + esc(lbl("VAS_074_NoLines", "No lines yet - use Add line or Scan")) + "</div>");
             } else {
-                for (var i = 0; i < lines.length; i++) $linesBody.append(renderRow(lines[i]));
+                for (var i = 0; i < lines.length; i++) {
+                    if ($keep && lines[i].rowId === keepId) $linesBody.append($keep);
+                    else $linesBody.append(renderRow(lines[i]));
+                }
             }
             renderTotals();
             renderHeaderButtons();
             renderPager();
+
+            // Restore focus + caret to the preserved input (detach blurred it).
+            if (refocusEl) {
+                try {
+                    refocusEl.focus();
+                    if (caretPos != null && refocusEl.setSelectionRange) refocusEl.setSelectionRange(caretPos, caretPos);
+                } catch (e) { }
+            }
+            // Clear the blur-suppression after the current tick so any detach blur dispatched
+            // synchronously (during detach) OR asynchronously (queued to a later tick) is
+            // ignored; a genuine later user blur still commits normally.
+            if (suppressPrimaryBlur) setTimeout(function () { suppressPrimaryBlur = false; }, 0);
         }
 
         /* Server-side line pager: "Showing X-Y of N" on the left, "‹ P of Q ›" on the
@@ -542,6 +627,19 @@
             if (p === linePage) return;
             if (unsavedLines().length) { showToast(lbl("VAS_074_SavePageFirst", "Save or discard your changes before changing page")); return; }
             $self.fetchData(parent.C_Invoice_ID, p);
+        }
+
+        /* Reload the CURRENT invoice's panel data from the server, RESETTING to the first page -
+           the Refresh button / Ctrl+Alt+Q. Flushes any pending cell edit first so it counts
+           toward the unsaved-work guard, then blocks (like a page change) when unsaved lines
+           exist so a reload never silently discards a new/edited row. Passing page 0 (an explicit
+           number) both jumps to page 1 AND makes fetchData show the per-panel busy overlay
+           (explicit page = our own AJAX, not a framework load). */
+        function refreshPanel() {
+            if (!parent || !parent.C_Invoice_ID) return;
+            flushActiveEdit();
+            if (unsavedLines().length) { showToast(lbl("VAS_074_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.C_Invoice_ID, 0);   // 0 = first page + triggers the busy overlay
         }
 
         // Cached server tax breakdown for the CURRENT invoice (from VAS/PoReceipt/GetTaxData,
@@ -728,10 +826,22 @@
                 var inner = $('<div style="position:relative"></div>');
                 wrap.append(inner);
                 var $inp = $('<input type="text" class="vas-cil-cell-edit__input" />');
-                $inp.val(editing.field === "product" ? line.display.productName : line.display.chargeName);
+                // Seed from the committed display name; but if nothing is committed yet (a new /
+                // cleared line) keep any IN-PROGRESS typed keyword. The keyword lives in
+                // catalog.term (set on every keystroke), NOT in line.display, so a render()
+                // triggered mid-typing - e.g. a background save completing while the user types a
+                // product keyword on a new line - would otherwise blank the input and drop the
+                // search (the "entered keyword gets rolled back" bug).
+                var primaryInit = editing.field === "product" ? line.display.productName : line.display.chargeName;
+                if (!primaryInit && catalog.term) primaryInit = catalog.term;
+                $inp.val(primaryInit);
                 $inp.attr("placeholder", editing.field === "product" ? lbl("VAS_074_SearchProduct", "Search product…") : lbl("VAS_074_SearchCharge", "Search charge…"));
                 $inp.on("input", function () { scheduleCatalog($(this).val(), inner, line, $inp); });
                 $inp.on("blur", function (e) {
+                    // Ignore the transient blur fired when render() detaches this row to
+                    // preserve its open dropdown (e.g. a background save completing mid-search)
+                    // - committing here would clear `editing` and destroy the loaded results.
+                    if (suppressPrimaryBlur) return;
                     if (e.relatedTarget && $(e.relatedTarget).attr("data-catalog-item") === "true") return;
                     commitPrimary(line, editing && editing.field, $inp.val());
                 });
@@ -2643,8 +2753,10 @@
            row renders its own red message - instead of a single toast that only named the
            first failure. Repaints so every offending record in a multi-row save is flagged
            in place; returns false when any line is invalid. */
-        function validateUnsaved() {
-            var dirty = unsavedLines();
+        function validateUnsaved(batch) {
+            // Validate only the rows about to be saved (batch) - a deferred flush must not be
+            // blocked by an unrelated, still-being-entered line that wasn't Save-clicked.
+            var dirty = batch || unsavedLines();
             var anyBad = false;
             for (var i = 0; i < dirty.length; i++) {
                 var err = validateLine(dirty[i]);
@@ -3313,12 +3425,21 @@
            its OWN per-row spinner (like a callout) instead of a panel-wide overlay, and
            is locked from editing until the save returns - so the user can keep working
            (Add line, edit other rows) while the save is in flight. */
-        function saveRows(done) {
+        function saveRows(done, restrictIds) {
             commitMorePopover();
             if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
             var batch = unsavedLines();
+            // A DEFERRED flush saves ONLY the rows the user had actually Save-clicked (snapshotted
+            // in restrictIds), never a line added afterwards while the prior save was running.
+            if (restrictIds) batch = batch.filter(function (l) { return restrictIds[l.rowId]; });
             if (!batch.length || !parent) { if (done) done(false); return; }
-            if (!validateUnsaved()) { if (done) done(false); return; }   // AD_Column mandatory validation
+            if (!validateUnsaved(batch)) { if (done) done(false); return; }   // AD_Column mandatory validation (only the rows being saved)
+            // Serialize: never run a second SaveLines while one is in flight (they'd share a
+            // server transaction and race on the invoice tax/totals). Defer instead - snapshot
+            // exactly THESE rows so the in-flight save's completion flushes them; a line the user
+            // adds later but never Save-clicks is not swept in. Rows stay editable until flushed.
+            if (saveInFlight) { batch.forEach(function (l) { pendingSaveIds[l.rowId] = true; }); if (done) done(false); return; }
+            saveInFlight = true;
             var rows = batch.map(buildRowPayload);
             // Lock + show a per-row spinner on each saving row.
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_074_Saving", "Saving…")); });
@@ -3327,13 +3448,25 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveLines",
                 type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, Lines: rows }) },
                 success: function (raw) {
+                    saveInFlight = false;
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
+                    flushPendingSave();   // save any line(s) queued while this was in flight
                 },
-                error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
+                error: function (err) { saveInFlight = false; console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); flushPendingSave(); }
             });
+        }
+
+        /* Flush the rows the user Save-clicked while a prior save was in flight (snapshotted in
+           pendingSaveIds). Called from the in-flight save's success AND error handlers, so those
+           rows persist after the current save settles - restricted to the snapshotted rowIds so a
+           line added afterwards but never Save-clicked is NOT saved. */
+        function flushPendingSave() {
+            var ids = pendingSaveIds;
+            pendingSaveIds = {};
+            for (var k in ids) { if (ids.hasOwnProperty(k)) { saveRows(null, ids); return; } }
         }
 
         /* Paint server-side save failures on their record rows (line._error) instead of a
@@ -3468,7 +3601,8 @@
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
 
-        // Ctrl+Alt+ N/S/D/Z action shortcuts. Bound in the CAPTURE phase (3rd arg true) so they
+        // Ctrl+Alt+ N/S/D/Z/Q action shortcuts (N=add, S=save, D=delete, Z=undo, Q=refresh).
+        // Bound in the CAPTURE phase (3rd arg true) so they
         // fire BEFORE the grid cell editors' own keydown handlers, which stopPropagation() to
         // keep keys from the framework - otherwise the shortcut is swallowed while a product /
         // qty / price / UOM / tax control has focus (e.g. right after Add line focuses the
@@ -3490,6 +3624,7 @@
                 deleteSelected();
             };
             else if (k === "z" || code === "KeyZ") act = function () { undoActive(); };
+            else if (k === "q" || code === "KeyQ") act = function () { refreshPanel(); };
             else return;   // not one of ours - let it through
             e.preventDefault();
             e.stopPropagation();
