@@ -134,20 +134,11 @@
                 )
             );
 
-            var $arrow = $(
-                '<span class="vas-bounced-ap-payment-arrow" aria-hidden="true">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M9 18l6-6-6-6"></path>' +
-                '</svg>' +
-                '</span>'
-            );
-
             $iconBox.append($icon);
 
             $header
                 .append($iconBox)
-                .append($title)
-                .append($arrow);
+                .append($title);
 
             $body = $(
                 '<div class="vas-bounced-ap-payment-body">'

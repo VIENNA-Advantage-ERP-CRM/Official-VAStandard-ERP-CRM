@@ -3119,7 +3119,6 @@
             var $iconBox;
             var $icon;
             var $title;
-            var $arrow;
             var $sub;
 
             $card = $(
@@ -3169,26 +3168,6 @@
                 )
             );
 
-            $arrow = $(
-                '<span ' +
-                'class="vas-upcoming-ap-runs-arrow" ' +
-                'aria-hidden="true">' +
-
-                '<svg ' +
-                'viewBox="0 0 24 24" ' +
-                'fill="none" ' +
-                'stroke="currentColor" ' +
-                'stroke-width="2.4" ' +
-                'stroke-linecap="round" ' +
-                'stroke-linejoin="round">' +
-
-                '<path d="M9 18l6-6-6-6"></path>' +
-
-                '</svg>' +
-
-                '</span>'
-            );
-
             $sub = $(
                 '<div class="vas-upcoming-ap-runs-sub">'
             ).text(
@@ -3202,8 +3181,7 @@
 
             $titleRow
                 .append($iconBox)
-                .append($title)
-                .append($arrow);
+                .append($title);
 
             $headLeft
                 .append($titleRow)
