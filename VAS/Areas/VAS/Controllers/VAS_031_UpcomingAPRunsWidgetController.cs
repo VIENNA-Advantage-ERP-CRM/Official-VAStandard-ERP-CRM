@@ -2826,8 +2826,8 @@ AND PaymentMethod.AD_Client_ID IN
                     validatedInvoicePayScheduleId
                 );
 
-                payment.SetDateTrx(dateTrx);
-                payment.SetDateAcct(dateTrx);
+                payment.SetDateTrx(DateTime.Now);
+                payment.SetDateAcct(DateTime.Now);
 
                 payment.SetTenderType(
                     normalizedTenderType
