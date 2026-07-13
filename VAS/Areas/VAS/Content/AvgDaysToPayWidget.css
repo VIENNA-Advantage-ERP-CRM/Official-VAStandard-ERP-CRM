@@ -29,8 +29,10 @@
 }
 
 .vas-adtp-card {
-    /* Base unit: every inner size below is expressed in em of this value. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    /* Base unit: every inner size below is expressed in em of this value.
+       Widget root anchor (dashboard-widgets.md §"Widget Root Anchor"):
+       floor 16px, ceiling 20px (2K calibration — was 32px). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     box-sizing: border-box;
     width: 100%;
     height: 100%;
@@ -38,12 +40,12 @@
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5em;                     /* spec stack gap between label/value/meta */
-    /* Glass widget surface (design.md §8) */
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;          /* 14px */
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    /* Glass widget surface (foundations.md §"Standard Gradients", canonical 1.00/0.60) */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
 }
 
@@ -56,13 +58,13 @@
 }
 
 .vas-adtp-icon {
-    width: 2em;                      /* family glass icon well */
-    height: 2em;
-    min-width: 2em;
+    /* Icon well scales with the title lever (dashboard-widgets.md §"Widget Header"). */
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
     flex-shrink: 0;
-    border-radius: 0.5625em;
+    border-radius: 12px;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #106AB0;                  /* drives the currentColor SVG stroke */
     display: flex;
     align-items: center;
@@ -70,8 +72,8 @@
 }
 
 .vas-adtp-icon svg {
-    width: 1.125em;
-    height: 1.125em;
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
 }
 
 /* Label column: lets long text wrap/ellipsis instead of pushing the card wider. */
@@ -81,21 +83,21 @@
 
 .vas-adtp-title {
     /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
-       Header"): same resolved px in every widget at any screen size. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+       Header"): floor 16px, ceiling 17px. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
-    line-height: 1.3;
+    line-height: 1.2;
 }
 
-/* Header subtitle under the title (design.md §"Widget Header"): xs token, muted,
-   one step below the title so it reads as secondary. */
+/* Header subtitle under the title (dashboard-widgets.md §"Widget Header" subtitle):
+   muted, one step below the title so it reads as secondary. */
 .vas-adtp-header-subtitle {
-    margin-top: 1px;
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    letter-spacing: 0.3px;
-    color: #748494;
-    line-height: 1.2;
+    margin-top: 2px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
 }
 
 /* ── Metric: large number + muted 'd' suffix (block keeps RTL number order) ── */
@@ -107,10 +109,12 @@
 }
 
 .vas-adtp-metric-val {
-    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
-    font-weight: 700;
+    /* KPI value on the widget-root em lever (dashboard-widgets.md §"Widget Stat
+       Values"): 1.75em SemiBold, tight line-height, neutral primary color. */
+    font-size: 1.75em;
+    font-weight: 600;
     color: #102C3F;
-    line-height: 1.1;
+    line-height: 1.05;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
     padding-left: 0.3125em;
@@ -121,17 +125,17 @@
 }
 
 .vas-adtp-metric-suffix {
-    font-size: 1.25em;               /* 20px */
-    color: #748494;
+    font-size: 0.65em;               /* muted 'd' sized relative to the value */
+    color: #5F7283;
     margin-inline-start: 0.1em;
 }
 
 /* ── Subtitle: comparison vs last quarter ── */
 .vas-adtp-subtitle {
-    /* Reference detail-text (TotalAmountReceivedThisMonthWidget): xs token,
-       muted, one step below the label so the explanation reads as secondary. */
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    color: #717182;
+    /* KPI meta (dashboard-widgets.md §"KPI And Summary Widget"): xs token, muted,
+       one step below the value so the explanation reads as secondary. */
+    font-size: 0.6875em;
+    color: #5F7283;
     /*margin-top: auto;*/
     line-height: 1.3;
 }

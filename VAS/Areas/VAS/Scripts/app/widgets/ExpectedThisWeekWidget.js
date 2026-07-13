@@ -82,6 +82,8 @@
         /* Latest KPI snapshot (kept so the dialog header can re-use the base
            currency symbol and the period string without a refetch). */
         var lastSymbol = "";
+        var lastIso = "";
+        var lastPrecision;              /* undefined until the KPI response supplies stdPrecision */
         var lastTotal = 0;
         var rowsLoaded = false;
         var rowsLoading = false;
@@ -219,67 +221,35 @@
             lastTotal = 0;
 
             if ($metricEl) {
-                $metricEl.html(formatMetric(0, lastSymbol));
+                $metricEl.html(formatMetric(0, lastSymbol, lastIso, lastPrecision));
             }
         }
 
-        function formatCompactAmount(value) {
-            value = Number(value || 0);
-
-            if (value >= 10000000) {
-                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
-            }
-
-            if (value >= 100000) {
-                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
-
-            if (value >= 1000) {
-                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
-
-            var stdPrecision = 2;
-
+        /* Safe accounting-schema precision fallback used when the response does
+           not carry an explicit precision (e.g. the per-row invoice amounts). */
+        function safeStdPrecision() {
             try {
                 if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                    return VIS.Env.getCtx().getStdPrecision();
                 }
             }
-            catch (e) {
-                stdPrecision = 2;
-            }
+            catch (e) { /* fall through */ }
 
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-        }
-
-        function formatExactAmount(value) {
-            var num = Number(value || 0);
-            var stdPrecision = 2;
-
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                }
-            }
-            catch (e) {
-                stdPrecision = 2;
-            }
-
-            return num.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
+            return 2;
         }
 
         /* Currency symbol leads the amount (sign before symbol; nothing for zero
-           and positive, - for negative). */
-        function formatMetric(value, symbol) {
+           and positive, - for negative). Compact magnitude comes from the shared
+           VIS.Util.formatCompactAmount (Indian vs international numbering by
+           isoCode, kept to the base-currency precision). */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var compact = formatCompactAmount(Math.abs(value));
+            var compact = VIS.Util.formatCompactAmount(
+                value,
+                isoCode,
+                (precision == null ? safeStdPrecision() : precision)
+            );
             var sym = symbol ? '<span class="vas-etw-cur">' + escapeHtml(symbol) + '</span>' : '';
             return sign + sym + compact;
         }
@@ -290,9 +260,13 @@
 
             lastTotal = Number(total);
             lastSymbol = sym;
+            lastIso = (data && data.isoCode) || "";
+            lastPrecision = (data && data.stdPrecision != null)
+                ? Number(data.stdPrecision)
+                : undefined;
 
             if ($metricEl) {
-                $metricEl.html(formatMetric(lastTotal, lastSymbol));
+                $metricEl.html(formatMetric(lastTotal, lastSymbol, lastIso, lastPrecision));
             }
 
             if ($dialog && $dialog.is(':visible')) {
@@ -368,7 +342,9 @@
                 var sym = row.invoiceCurrencySymbol || invoiceCurrency || "";
                 var rawAmount = Number(row.amount || 0);
                 var amountSign = rawAmount < 0 ? '-' : '';
-                var amountText = formatExactAmount(Math.abs(rawAmount));
+                /* Modal shows the full, exact per-row amount (no compact
+                   magnitude): locale-formatted number at the row's precision. */
+                var amountText = Math.abs(rawAmount).toLocaleString(window.navigator.language, { minimumFractionDigits: safeStdPrecision(), maximumFractionDigits: safeStdPrecision() });
                 /* Amount keeps its invoice-currency symbol inline — no
                    conversion to base currency, per spec.  Sign leads the
                    symbol: e.g. "$1,000.00" (positive) or "-$1,000.00" (negative). */

@@ -130,31 +130,31 @@
         /* Attention-status chips (keyed by the backend attention_status text), per design.md §8.
            These are distinct from the document-status codes in STATUS_CONFIG below. */
         var ATTENTION_STATUS = {
-            'Overdue': { key: 'VAS_062_Overdue', fallback: 'Overdue', bg: '#FAD7D7', color: '#8F2D2D' },
-            'Due soon': { key: 'VAS_DueSoon', fallback: 'Due soon', bg: '#FCEFC7', color: '#9A6500' },
-            'Sent': { key: 'VAS_062_Sent', fallback: 'Sent', bg: '#D9ECFF', color: '#0E5DA8' }
+            'Overdue': { key: 'VAS_062_Overdue', fallback: 'Overdue', bg: '#FFE4E4', color: '#A33F3F' },
+            'Due soon': { key: 'VAS_DueSoon', fallback: 'Due soon', bg: '#FFF6E2', color: '#9A6500' },
+            'Sent': { key: 'VAS_062_Sent', fallback: 'Sent', bg: '#EEF6FF', color: '#0F69AC' }
         };
 
         /* Email-state chips for the 'Sent' category: completed invoices now appear whether or not the
            invoice e-mail has gone out. 'Y' = already e-mailed (done, green); otherwise the e-mail is
            still pending (amber, needs action). */
         var SENT_EMAIL_STATUS = {
-            'Y': { key: 'VAS_062_EmailSent', fallback: 'Email sent', bg: '#CCEFDD', color: '#0C5D38' },
-            'N': { key: 'VAS_062_EmailNotSent', fallback: 'Not sent', bg: '#FCEFC7', color: '#9A6500' }
+            'Y': { key: 'VAS_062_EmailSent', fallback: 'Email sent', bg: '#DDF4E8', color: '#0B6B45' },
+            'N': { key: 'VAS_062_EmailNotSent', fallback: 'Not sent', bg: '#FFF6E2', color: '#9A6500' }
         };
 
         var STATUS_CONFIG = {
-            DR: { label: lbl("VAS_062_StatusDraft", 'Draft'), bg: '#EDEDED', color: '#505050' },
-            IP: { label: lbl("VAS_062_StatusInProgress", 'In Progress'), bg: '#FFF3CD', color: '#9A6500' },
-            CO: { label: lbl("VAS_062_StatusCompleted", 'Completed'), bg: '#CCEFDD', color: '#0C5D38' },
-            CL: { label: lbl("VAS_062_StatusClosed", 'Closed'), bg: '#DFF1FF', color: '#0E5DA8' },
-            AP: { label: lbl("VAS_062_StatusApproved", 'Approved'), bg: '#CCEFDD', color: '#0C5D38' },
-            NA: { label: lbl("VAS_062_StatusNotApproved", 'Not Approved'), bg: '#FFE8E8', color: '#C0392B' },
-            WP: { label: lbl("VAS_062_StatusWaitingPayment", 'Waiting Payment'), bg: '#FFF3CD', color: '#9A6500' },
-            WC: { label: lbl("VAS_062_StatusWaitingConfirm", 'Waiting Confirm'), bg: '#FFF3CD', color: '#9A6500' },
-            RE: { label: lbl("VAS_062_StatusReversed", 'Reversed'), bg: '#FFE8E8', color: '#C0392B' },
-            VO: { label: lbl("VAS_062_StatusVoided", 'Voided'), bg: '#FFE8E8', color: '#C0392B' },
-            IN: { label: lbl("VAS_062_StatusInvalid", 'Invalid'), bg: '#FFE8E8', color: '#C0392B' }
+            DR: { label: lbl("VAS_062_StatusDraft", 'Draft'), bg: '#F1F4F8', color: '#41576A' },
+            IP: { label: lbl("VAS_062_StatusInProgress", 'In Progress'), bg: '#FFF6E2', color: '#9A6500' },
+            CO: { label: lbl("VAS_062_StatusCompleted", 'Completed'), bg: '#E7F7EF', color: '#0B6B45' },
+            CL: { label: lbl("VAS_062_StatusClosed", 'Closed'), bg: '#EEF6FF', color: '#0F69AC' },
+            AP: { label: lbl("VAS_062_StatusApproved", 'Approved'), bg: '#E7F7EF', color: '#0B6B45' },
+            NA: { label: lbl("VAS_062_StatusNotApproved", 'Not Approved'), bg: '#FCEFEF', color: '#A33F3F' },
+            WP: { label: lbl("VAS_062_StatusWaitingPayment", 'Waiting Payment'), bg: '#FFF6E2', color: '#9A6500' },
+            WC: { label: lbl("VAS_062_StatusWaitingConfirm", 'Waiting Confirm'), bg: '#FFF6E2', color: '#9A6500' },
+            RE: { label: lbl("VAS_062_StatusReversed", 'Reversed'), bg: '#FCEFEF', color: '#A33F3F' },
+            VO: { label: lbl("VAS_062_StatusVoided", 'Voided'), bg: '#FCEFEF', color: '#A33F3F' },
+            IN: { label: lbl("VAS_062_StatusInvalid", 'Invalid'), bg: '#FCEFEF', color: '#A33F3F' }
         };
 
         /* ── Initialize ── */
@@ -242,8 +242,11 @@
                     var pairs = (data && data.pairs) ? data.pairs : (Array.isArray(data) ? data : []);
                     if (pairs.length > 0) {
                         /* Group the pairs into duplicate sets (one per customer) for the
-                           Review dialog, and headline the banner with the set count. */
-                        reviewSets = buildSets(pairs);
+                           Review dialog, and headline the banner with the set count. The
+                           dialog tabs (vas-dup-tabs) are ordered by customer name. */
+                        reviewSets = buildSets(pairs).sort(function (a, b) {
+                            return String(a.customer || '').localeCompare(String(b.customer || ''), undefined, { sensitivity: 'base' });
+                        });
                         var title = reviewSets.length + ' ' + lbl("VAS_062_DuplicateSuspectedBased", 'duplicate suspected based on Amount and Customer');
                         var sub = lbl("VAS_062_DupBannerSub", 'Same customer and amount — open Review to compare.');
                         $alertBanner.find('.vis-inv-dup-title').text(title);
@@ -333,8 +336,8 @@
             /* Footer pager (design.md "Widget Footer Pager"): two zones — left result-range helper
                ("Showing X–Y of Z") and a right-aligned compact pager (prev · "X of N" · next) with
                rounded-square buttons. Hidden while there is only a single page. */
-            var chevL = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
-            var chevR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            var chevL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+            var chevR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
             $footer = $(
                 '<div class="vas-inv-footer" style="display:none;">' +
                 '<span class="vas-inv-footer-info"></span>' +

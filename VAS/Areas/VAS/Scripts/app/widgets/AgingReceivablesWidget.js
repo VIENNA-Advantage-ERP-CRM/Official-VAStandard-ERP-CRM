@@ -47,13 +47,15 @@
         write();
     }
 
-    /* Bucket bar colours (green → red as overdue age increases). */
+    /* Bucket bar colours — aligned to the Onfinity semantic palette
+       (foundations.md > Semantic Colors), progressing success → warning →
+       danger as overdue age (collection risk) increases. */
     var BUCKET_COLORS = {
-        notDue:    'oklch(0.6 0.16 155)',
-        days1_30:  'oklch(0.6 0.16 70)',
-        days31_60: 'oklch(0.6 0.16 40)',
-        days61_90: 'oklch(0.6 0.16 25)',
-        days90Plus:'oklch(0.6 0.16 20)'
+        notDue:    '#019D89', // success (not yet due)
+        days1_30:  '#D78B10', // warning
+        days31_60: '#9A6500', // warning (deep)
+        days61_90: '#D14545', // danger (mid)
+        days90Plus:'#ED1C24'  // danger
     };
 
     VIS.AgingReceivablesWidget = function () {
@@ -64,6 +66,8 @@
         var $root = $('<div class="vas-ar-root">');
 
         var $contentArea;
+        /* WHY caption — a sibling of the content area (not nested inside it). */
+        var $whyBlock;
         /* Base-currency symbol from the backend; prefixed before every amount. */
         var currencySymbol = '';
         /* Base-currency ISO code (drives Indian vs international abbreviation) and precision. */
@@ -142,6 +146,7 @@
 
             if (!data || (Array.isArray(data) && data.length === 0) || Object.keys(data).length === 0) {
                 $contentArea.append('<div class="vas-ar-nodata">' + lbl("VAS_060_NoData", 'No data') + '</div>');
+                if ($whyBlock) { $whyBlock.empty().css('display', 'none'); }
                 return;
             }
 
@@ -167,13 +172,13 @@
             html += buildBucket(lbl("VAS_060_Days61_90", '61–90 days'), days61_90, BUCKET_COLORS.days61_90, maxVal);
             html += buildBucket(lbl("VAS_060_Days90Plus", '90+ days'), days90Plus, BUCKET_COLORS.days90Plus, maxVal);
 
-            // WHY block
-            html += '<div class="vas-ar-why-block">' +
-               /* '<span class="vas-ar-why-pill">' + lbl("VAS_060_Why", "WHY") + '</span>' +*/
-                lbl("VAS_060_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets.") +
-                '</div>';
-
             $contentArea.append(html);
+
+            /* WHY caption lives OUTSIDE the content area (as its sibling). */
+            if ($whyBlock) {
+                $whyBlock.text(lbl("VAS_060_AgingWhyText", "Older invoices are harder to collect. Focus on the 61+ buckets."));
+                $whyBlock.css('display', '');
+            }
         }
 
         /* ── Build DOM ── */
@@ -203,7 +208,11 @@
             /* Empty until data loads; the busy overlay covers the wait. */
             $contentArea = $('<div class="vas-ar-content-area">');
 
-            $card.append($header).append($contentArea);
+            /* WHY caption — sibling of the content area (not nested inside it),
+               populated/toggled by renderRows. Hidden until data loads. */
+            $whyBlock = $('<div class="vas-ar-why-block" style="display:none;">');
+
+            $card.append($header).append($contentArea).append($whyBlock);
             $root.append($card);
 
             /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until

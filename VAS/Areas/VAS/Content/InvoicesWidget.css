@@ -16,25 +16,25 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
 .vas-inv-card {
     /* Card base unit: dashboard-width-anchored so the widget scales with the
        dashboard's visible content area (design.md §Measurement Setup), with px bounds. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     box-sizing: border-box;
-    background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.58) 100%);
-    border: 0.125em solid #fff;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15,61,97,0.06);
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15,61,97,0.06);
     overflow: hidden;
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: .875em;
+    padding: 0.85em;
 }
 
 .vas-inv-header {
@@ -70,9 +70,10 @@
 .vas-inv-title {
     /* Dashboard-width-anchored title clamp (dashboard-widgets.md §"Widget
        Header"): resolves against --dash-inline-size, falling back to 100vw. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
+    line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -146,30 +147,32 @@
 .vas-inv-table-head {
     display: grid;
     align-items: center;
-    padding: 0.375em 1em;
-    border-bottom: 0.0625em solid #EDF2F6;
-    /* Freeze the header at the top of the scrolling body. Opaque background so rows
-       do not show through while scrolling underneath. */
+    padding: 0.5em 1em;
+    /* Rail-variant header divider (dashboard-widgets.md §Row And Header Separators):
+       header boundary is the darkest tone (#C5D2DD > footer #D9E2EB > body #E2EAF1). */
+    border-bottom: 1px solid #C5D2DD;
+    /* Freeze the header at the top of the scrolling body. Header background stays
+       transparent per the rail spec — the card top is opaque white, so it reads clean. */
     position: sticky;
     top: 0;
     z-index: 1;
-    background: #FFFFFF;
+    background: transparent;
 }
 
 .vas-inv-th {
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    font-weight: 600;
-    color: #748494;
-    letter-spacing: 0.0375em;
-    /*text-transform: uppercase;*/
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    /* Capitalize is applied here, not in JS, so the backend header label flows
+       through other displays unchanged (dashboard-widgets.md §Header Row). */
+    text-transform: capitalize;
 }
 
 .vas-inv-th-customer {
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    font-weight: 600;
-    color: #748494;
-    letter-spacing: 0.0375em;
-    /*text-transform: uppercase;*/
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #41576A;
+    text-transform: capitalize;
     padding-left: 1em;
 }
 
@@ -181,8 +184,8 @@
 }
 
 .vas-inv-cell-id {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    font-weight: 400;
+    font-size: 0.75em;
+    font-weight: 700;
     color: #102C3F;
 }
 
@@ -197,8 +200,8 @@
 }
 
 .vas-inv-cell-customer {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    color: #3D5166;
+    font-size: 0.75em;
+    color: #5F7283;
     padding-left: 1em;
     /* Allow the cell to shrink inside the grid track instead of pushing other columns. */
     min-width: 0;
@@ -214,21 +217,21 @@
 }
 
 .vas-inv-cell-due {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-size: 0.75em;
     color: #5F7283;
 }
 
 .vas-inv-status-chip {
     display: inline-block;
-    padding: 0.25em 0.75em;
-    border-radius: 999em;
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    font-weight: 600;
+    padding: 0.3125em 0.625em;
+    border-radius: 999px;
+    font-size: 0.6875em;
+    font-weight: 700;
     white-space: nowrap;
 }
 
 .vas-inv-cell-amount {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-size: 0.75em;
     font-weight: 400;
     color: #102C3F;
     text-align: right;
@@ -264,7 +267,7 @@
 
 /* Row dividers are driven by a class, not inline styles. */
 .vas-inv-row-divided {
-    border-bottom: 0.0625em solid #EDF2F6;
+    border-bottom: 1px solid #E2EAF1;
 }
 
 .vas-inv-row:hover {
@@ -275,8 +278,8 @@
 .vas-inv-nodata {
     padding: 1.375em 1em;
     text-align: center;
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    color: #748494;
+    font-size: 0.75em;
+    color: #5F7283;
 }
 
 /* ── Footer pager (design.md "Widget Footer Pager"): left "Showing X–Y of Z" helper +
@@ -288,15 +291,16 @@
     justify-content: space-between;
     gap: 0.75em;
     /*padding: 0.625em 1em 0.875em;*/
-    border-top: 0.0625em solid #EDF2F6;
+    border-top: 0.0625em solid #D9E2EB;
+    padding-top: .3em;
 }
 
 /* Left helper text — result range, muted. */
 .vas-inv-footer-info {
     /*font-family: Roboto, sans-serif;*/
     font-weight: 400;
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    color: #748494;
+    font-size: 0.75em;
+    color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -312,10 +316,10 @@
 
 /* Rounded-square pager buttons (not circular): soft white surface, light border, blue icon. */
 .vas-inv-page-btn {
-    width: 2em;
-    height: 2em;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.5em;
+    width: 1.5em;
+    height: 1.5em;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
     background: #FBFDFF;
     color: #0083DA;
     line-height: 1;
@@ -340,7 +344,7 @@
     min-width: 3em;
     text-align: center;
     /*font-family: Roboto, sans-serif;*/
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-size: 0.8125em;
     font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -359,18 +363,19 @@
     --vdup-text: #102C3F;
     --vdup-text-strong: #141414;
     --vdup-text-secondary: #5F7283;
-    --vdup-text-muted: #748494;
+    --vdup-text-muted: #5F7283;
     --vdup-surface-2: #FBFDFF;
     --vdup-surface-faint: #EEF6FF;
-    --vdup-divider: #EDF2F6;
-    --vdup-border: #E4EDF4;
+    /* Divider tone hierarchy (foundations): section boundary #D9E2EB > intra-card rows #E2EAF1. */
+    --vdup-divider: #E2EAF1;
+    --vdup-border: #D9E2EB;
     --vdup-active-bg: #EAF8FF;
     --vdup-pale-border: #BFE4FF;
     --vdup-sec-enabled: #E5F3FB;
     --vdup-warn-text: #9A6500;
     --vdup-danger: #D14545;
-    --vdup-danger-bg: #FAD7D7;
-    --vdup-danger-text: #8F2D2D;
+    --vdup-danger-bg: #FFE4E4;
+    --vdup-danger-text: #A33F3F;
     --vdup-radius-sm: 0.5em;
     --vdup-radius-md: 0.875em;
     --vdup-radius-lg: 1.125em;
@@ -511,11 +516,11 @@
     min-width: 1.75em;
     height: 1.25em;
     padding: 0 0.5em;
-    border-radius: 999em;
+    border-radius: 999px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.625em;
+    font-size: 0.6875em;
     font-weight: 700;
     background: var(--vdup-active-bg);
     color: var(--vdup-primary);
@@ -593,12 +598,12 @@
 .vas-dup-card-date { font-size: 0.6875em; color: var(--vdup-text-secondary); margin-top: 0.125em; }
 
 .vas-dup-pill {
-    font-size: 0.625em;
+    font-size: 0.6875em;
     font-weight: 700;
     /*text-transform: uppercase;*/
     letter-spacing: 0.025em;
     padding: 0.3125em 0.625em;
-    border-radius: 999em;
+    border-radius: 999px;
     white-space: nowrap;
 }
 
@@ -617,7 +622,7 @@
 .vas-dup-field:last-child { border-bottom: none; }
 /* Label and value each stay on one line and trim with an ellipsis when the text is too long. */
 .vas-dup-field-label {
-    font-size: 0.6875em;
+    font-size: 0.75em;
     color: var(--vdup-text-muted);
     line-height: 1.3;
     white-space: nowrap;
@@ -686,7 +691,7 @@
     background: var(--vdup-surface-2);
 }
 
-.vas-dup-card-total .lbl { font-size: 0.6875em; color: var(--vdup-text-muted); /*text-transform: uppercase;*/ letter-spacing: 0.025em; }
+.vas-dup-card-total .lbl { font-size: 0.75em; color: var(--vdup-text-muted); /*text-transform: uppercase;*/ letter-spacing: 0.025em; }
 .vas-dup-card-total .val { font-size: 0.96875em; font-weight: 700; color: var(--vdup-text); }
 
 /* Footer */

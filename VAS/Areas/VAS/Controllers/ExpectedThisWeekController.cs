@@ -41,16 +41,19 @@ namespace VIS.Controllers
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision,
+                       Currency.ISO_Code AS ISO_Code,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
+                INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)
+                WHERE ClientInfo.AD_Client_ID=" + ctx.GetAD_Client_ID();
 
+            /* Aggregate-only (no GROUP BY): an aggregate with no grouping always
+               yields exactly one row (SUM=0 via COALESCE, COUNT=0 when nothing is
+               due), so the CROSS JOIN with the single-row SchemaCurrency CTE below
+               always carries the base-currency symbol — even at zero expected. */
             string expectedSql = @"
-                SELECT SchemaCurrency.C_Currency_ID,
-                       SchemaCurrency.StdPrecision,
-                       SchemaCurrency.Cur_Symbol,
-                       SUM(
+                SELECT COALESCE(SUM(
                            CASE
                                WHEN Invoice.C_Currency_ID = SchemaCurrency.C_Currency_ID
                                THEN CASE WHEN Invoice.IsReturnTrx = 'N' THEN COALESCE(InvoicePaySchedule.DueAmt, 0) ELSE -1 * COALESCE(InvoicePaySchedule.DueAmt, 0) END
@@ -64,7 +67,7 @@ namespace VIS.Controllers
                                    Invoice.AD_Org_ID
                                )
                            END
-                       ) AS Expected_Amount,
+                       ), 0) AS Expected_Amount,
                        COUNT(1) AS Schedule_Count
                 FROM C_InvoicePaySchedule InvoicePaySchedule
                 INNER JOIN C_Invoice Invoice ON (InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
@@ -87,10 +90,7 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            expectedSql += @"
-                GROUP BY SchemaCurrency.C_Currency_ID,
-                         SchemaCurrency.StdPrecision,
-                         SchemaCurrency.Cur_Symbol";
+            /* No GROUP BY — expectedSql is aggregate-only (see note above). */
 
             string sql = @"
                 WITH SchemaCurrency AS (
@@ -99,21 +99,28 @@ namespace VIS.Controllers
                 ExpectedData AS (
                     " + expectedSql + @"
                 )
-                SELECT ExpectedData.C_Currency_ID,
-                       ExpectedData.Cur_Symbol,
+                SELECT SchemaCurrency.C_Currency_ID,
+                       SchemaCurrency.Cur_Symbol,
+                       SchemaCurrency.ISO_Code,
+                       SchemaCurrency.StdPrecision AS Std_Precision,
                        ExpectedData.Schedule_Count,
                        ROUND(
                            COALESCE(ExpectedData.Expected_Amount, 0),
-                           ExpectedData.StdPrecision
+                           SchemaCurrency.StdPrecision
                        ) AS Expected_Amount
-                FROM ExpectedData";
+                FROM SchemaCurrency
+                CROSS JOIN ExpectedData";
 
             decimal expectedAmount = 0;
             int currencyId = 0;
             int scheduleCount = 0;
             /* Base-currency symbol (accounting schema currency); the KPI amount
-               above is already converted to this currency via CurrencyConvert. */
+               above is already converted to this currency via CurrencyConvert.
+               The CROSS JOIN with the single-row SchemaCurrency CTE keeps the
+               symbol/ISO/precision populated even when nothing is due (zero). */
             string currencySymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
 
             IDataReader dr = null;
 
@@ -127,6 +134,11 @@ namespace VIS.Controllers
                     expectedAmount = Util.GetValueOfDecimal(dr["Expected_Amount"]);
                     scheduleCount = Util.GetValueOfInt(dr["Schedule_Count"]);
                     currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    isoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                    if (dr["Std_Precision"] != null && dr["Std_Precision"] != System.DBNull.Value)
+                    {
+                        stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]);
+                    }
                 }
 
                 var result = new
@@ -135,6 +147,8 @@ namespace VIS.Controllers
                     cCurrencyId = currencyId,
                     scheduleCount = scheduleCount,
                     symbol = currencySymbol,
+                    isoCode = isoCode,
+                    stdPrecision = stdPrecision,
                     fromDate = startDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     toDate = endDate.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
                 };

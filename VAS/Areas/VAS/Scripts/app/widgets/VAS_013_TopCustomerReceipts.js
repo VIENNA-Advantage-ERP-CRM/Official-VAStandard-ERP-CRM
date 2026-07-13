@@ -113,28 +113,6 @@
             return 2;
         }
 
-        /* Compact-amount formatter: 10M→Cr (Indian crore), 100K→L (lakh),
-           1K→K; below 1000 falls back to locale formatting at std precision. */
-        function formatCompactAmount(value, stdPrecision) {
-            value = Number(value || 0);
-
-            if (value >= 10000000) {
-                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
-            }
-            if (value >= 100000) {
-                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
-            if (value >= 1000) {
-                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
-
-            var prec = (typeof stdPrecision === "number") ? stdPrecision : getStdPrecision();
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: prec,
-                maximumFractionDigits: prec
-            });
-        }
-
         function formatExactAmount(value, stdPrecision) {
             var num = Number(value || 0);
             var prec = (typeof stdPrecision === "number") ? stdPrecision : getStdPrecision();
@@ -144,12 +122,16 @@
             });
         }
 
-        /* Symbol *before* the amount, explicit sign before symbol (+ for zero or
-           positive, - for negative). */
-        function formatAmount(value, symbol, stdPrecision) {
+        /* Symbol *before* the amount, explicit sign before the symbol (none for
+           zero/positive, '-' for negative). The compact magnitude comes from the
+           shared VIS.Util.formatCompactAmount (Indian vs international numbering
+           chosen by the base-currency ISO, kept to the currency precision) — the
+           same sign + symbol + magnitude composition as OverdueWidget. The symbol
+           is never gated on the value, so it renders even when the amount is 0. */
+        function formatAmount(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var compact = formatCompactAmount(Math.abs(value), stdPrecision);
+            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
             var sym = symbol ? '<span class="vas-tcr-cur">' + escapeHtml(symbol) + '</span>' : '';
             return sign + sym + compact;
         }
@@ -175,7 +157,13 @@
             $listEl.toggleClass('vas-tcr-list--fill', rows.length >= topN);
 
             var symbol = (data && data.CurrencySymbol) || "";
-            var stdPrecision = Number((data && data.StdPrecision) || getStdPrecision());
+            /* ISO of the base/accounting currency — drives the compact numbering
+               system (INR → lakh/crore, else K/M/B) in VIS.Util.formatCompactAmount. */
+            var isoCode = (data && data.CurrencyIso) || "";
+            /* Precision from the backend response when present; otherwise fall back
+               to the context standard precision. */
+            var stdPrecision = (data && (data.StdPrecision || data.StdPrecision === 0))
+                ? Number(data.StdPrecision) : getStdPrecision();
 
             /* Rows arrive sorted highest-first, so the first row is the maximum
                and anchors the proportion bars. Guard against a zero / negative
@@ -190,7 +178,7 @@
                 var row = rows[i];
                 var name = row.CustomerName || "";
                 var amount = Number(row.Amount || 0);
-                var amtHtml = formatAmount(amount, symbol, stdPrecision);
+                var amtHtml = formatAmount(amount, symbol, isoCode, stdPrecision);
                 var exactSign = amount < 0 ? '-' : '';
                 var exactTitle = exactSign + (symbol ? symbol + ' ' : '') + formatExactAmount(Math.abs(amount), stdPrecision);
 
