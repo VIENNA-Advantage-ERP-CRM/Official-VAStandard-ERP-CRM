@@ -39,8 +39,10 @@ namespace VIS.Controllers
     public class VAS_097_ExpectedGRNWidgetController : Controller
     {
         /// <summary>
-        /// One page of completed vendor purchase orders whose expected (promised)
-        /// date is today or later and that still have open quantity, soonest first.
+        /// One page of completed vendor purchase orders whose promised date is
+        /// today or later and that still have open (un-received, not already on
+        /// an unposted GRN) quantity - same rules as the existing
+        /// VAS.VAS_ExpectedGRNWidget, newest promise date first (review #26).
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page (default 5, max 50).</param>
@@ -62,31 +64,45 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
 
+            // Review #26 (follow-up): same SQL semantics as the existing
+            // VAS.VAS_ExpectedGRNWidget (Product/GetExpectedDelivery, Type 'EG'):
+            // completed vendor POs promised TODAY OR LATER, no returns /
+            // quotations / blanket orders, open qty also nets off quantities
+            // already sitting on unposted GRNs, item products only unless the
+            // tenant allows non-item lines, newest promise date first.
+            bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
+
             string rawSql = @"
                 SELECT o.C_Order_ID AS PO_ID,
                        o.DocumentNo AS PO_NO,
-                       bp.Name AS Supplier,
-                       TRIM(COALESCE(loc.Address1, '') || ' ' || COALESCE(loc.City, '')) AS Address_Line,
-                       wh.Name AS Warehouse_Name,
-                       cur.CurSymbol AS Cur_Symbol,
-                       cur.StdPrecision AS Std_Precision,
-                       COALESCE(ol.DatePromised, o.DatePromised) AS Line_Promise_Date,
-                       ol.C_OrderLine_ID AS PO_Line_ID,
-                       COALESCE(ol.LineNetAmt, 0) AS Line_Net_Amt
+                       cb.Name AS Supplier,
+                       l.Name AS Address_Line,
+                       w.Name AS Warehouse_Name,
+                       o.DatePromised AS Promise_Date,
+                       COALESCE(CURRENCYCONVERT(o.GrandTotal, o.C_Currency_ID, @Base_Currency_ID, o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS PO_Value,
+                       ol.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order o
-                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID AND ol.IsActive='Y')
-                INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID AND bp.IsActive='Y')
-                LEFT OUTER JOIN C_BPartner_Location bpl ON (bpl.C_BPartner_Location_ID=o.C_BPartner_Location_ID AND bpl.IsActive='Y')
-                LEFT OUTER JOIN C_Location loc ON (loc.C_Location_ID=bpl.C_Location_ID)
-                LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AND wh.IsActive='Y')
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=o.C_Currency_ID AND cur.IsActive='Y')
-                WHERE o.IsActive='Y'
-                  AND ol.IsActive='Y'
-                  AND o.IsSOTrx='N'
+                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)"
+                + (!allowNonItem ? @"
+                INNER JOIN M_Product ItemProduct ON (ItemProduct.M_Product_ID=ol.M_Product_ID AND ItemProduct.ProductType='I')" : "") + @"
+                INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID=o.M_Warehouse_ID)
+                INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID=o.C_BPartner_ID)
+                INNER JOIN C_BPartner_Location l ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)
+                WHERE o.AD_Client_ID=@AD_Client_ID
                   AND o.DocStatus='CO'
-                  AND o.AD_Client_ID=@AD_Client_ID
-                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)
-                  AND COALESCE(ol.DatePromised, o.DatePromised) >= @Today";
+                  AND o.DatePromised>=@Promised_From
+                  AND o.IsSOTrx='N'
+                  AND o.IsReturnTrx='N'
+                  AND o.IsSalesQuotation='N'
+                  AND o.IsBlanketTrx='N'
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - (
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )) > 0";
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
@@ -101,8 +117,6 @@ namespace VIS.Controllers
                        ExpectedPO.Supplier,
                        ExpectedPO.Address_Line,
                        ExpectedPO.Warehouse_Name,
-                       ExpectedPO.Cur_Symbol,
-                       ExpectedPO.Std_Precision,
                        ExpectedPO.Promise_Date,
                        ExpectedPO.Line_Count,
                        ExpectedPO.PO_Value,
@@ -113,11 +127,9 @@ namespace VIS.Controllers
                            RawData.Supplier,
                            RawData.Address_Line,
                            RawData.Warehouse_Name,
-                           RawData.Cur_Symbol,
-                           RawData.Std_Precision,
-                           MIN(RawData.Line_Promise_Date) AS Promise_Date,
-                           COUNT(RawData.PO_Line_ID) AS Line_Count,
-                           SUM(RawData.Line_Net_Amt) AS PO_Value
+                           RawData.Promise_Date,
+                           RawData.PO_Value,
+                           COUNT(RawData.PO_Line_ID) AS Line_Count
                     FROM (
                         " + rawSql + @"
                     ) RawData
@@ -126,17 +138,45 @@ namespace VIS.Controllers
                              RawData.Supplier,
                              RawData.Address_Line,
                              RawData.Warehouse_Name,
-                             RawData.Cur_Symbol,
-                             RawData.Std_Precision
+                             RawData.Promise_Date,
+                             RawData.PO_Value
                 ) ExpectedPO
-                ORDER BY ExpectedPO.Promise_Date, ExpectedPO.PO_NO
+                ORDER BY ExpectedPO.Promise_Date DESC, ExpectedPO.PO_NO
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
+            // Parameters in order of appearance (the DB layer binds positionally).
             List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@Base_Currency_ID", ctx.GetContextAsInt("$C_Currency_ID")));
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
-            parameters.Add(new SqlParameter("@Today", DateTime.Today));
+            parameters.Add(new SqlParameter("@Promised_From", SqlDbType.DateTime) { Value = DateTime.Today });
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
+
+            // Legacy behaviour: the value is shown in the session/base currency,
+            // so every row carries that one currency's symbol and precision.
+            string baseCurSymbol = "";
+            string baseCurIso = "";
+            int baseStdPrecision = 2;
+            IDataReader curReader = null;
+            try
+            {
+                curReader = DB.ExecuteReader(
+                    @"SELECT CurSymbol, ISO_Code, StdPrecision
+                      FROM C_Currency
+                      WHERE C_Currency_ID=@Cur_ID",
+                    new SqlParameter[] { new SqlParameter("@Cur_ID", ctx.GetContextAsInt("$C_Currency_ID")) });
+                if (curReader != null && curReader.Read())
+                {
+                    baseCurSymbol = Util.GetValueOfString(curReader["CurSymbol"]);
+                    baseCurIso = Util.GetValueOfString(curReader["ISO_Code"]);
+                    baseStdPrecision = Util.GetValueOfInt(curReader["StdPrecision"]);
+                    if (String.IsNullOrEmpty(baseCurSymbol)) { baseCurSymbol = baseCurIso; }
+                }
+            }
+            finally
+            {
+                if (curReader != null) { curReader.Close(); curReader.Dispose(); }
+            }
 
             List<object> rows = new List<object>();
             int totalRecords = 0;
@@ -158,8 +198,9 @@ namespace VIS.Controllers
                         supplier = Util.GetValueOfString(dr["Supplier"]),
                         addressLine = Util.GetValueOfString(dr["Address_Line"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
-                        curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
-                        stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]),
+                        curSymbol = baseCurSymbol,
+                        currencyIso = baseCurIso,
+                        stdPrecision = baseStdPrecision,
                         promiseDate = promiseDate.HasValue ? promiseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         lineCount = Util.GetValueOfInt(dr["Line_Count"]),
                         poValue = Util.GetValueOfDecimal(dr["PO_Value"])
@@ -206,24 +247,40 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            // Review #26 (follow-up): open quantity nets off quantities already on
+            // unposted GRNs, exactly like the existing VAS.VAS_ExpectedGRNWidget.
+            bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
+
             string lineSql = @"
                 SELECT ol.C_OrderLine_ID AS PO_Line_ID,
                        p.Name AS Item_Name,
                        COALESCE(ol.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(ol.QtyDelivered, 0) AS Already_Received_Qty,
-                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Default_Received_Qty,
-                       COALESCE(u.UOMSymbol, u.Name) AS UOM
+                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - (
+                           SELECT COALESCE(SUM(il.MovementQty), 0)
+                           FROM M_InOut i
+                           INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                           WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
+                             AND il.IsActive='Y'
+                             AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                       ) AS Default_Received_Qty,
+                       u.Name AS UOM
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
-                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')
-                LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID=ol.C_UOM_ID AND u.IsActive='Y')
-                WHERE o.IsActive='Y'
-                  AND ol.IsActive='Y'
-                  AND o.IsSOTrx='N'
+                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID" + (!allowNonItem ? " AND p.ProductType='I'" : "") + @")
+                LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID=ol.C_UOM_ID)
+                WHERE o.IsSOTrx='N'
                   AND o.DocStatus='CO'
                   AND o.AD_Client_ID=@AD_Client_ID
                   AND ol.C_Order_ID=@PO_ID
-                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)";
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - (
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )) > 0";
 
             lineSql = MRole.GetDefault(ctx).AddAccessSQL(
                 lineSql,

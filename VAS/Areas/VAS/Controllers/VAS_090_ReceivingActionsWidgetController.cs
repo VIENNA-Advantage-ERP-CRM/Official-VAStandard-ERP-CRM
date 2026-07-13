@@ -45,7 +45,7 @@ namespace VIS.Controllers
         /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 8)
+        public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 8, string searchText = "")
         {
             if (Session["ctx"] == null)
             {
@@ -56,7 +56,7 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 8; }
-            if (pageSize > 20) { pageSize = 20; }
+            if (pageSize > 50) { pageSize = 50; }
 
             int offset = (pageNo - 1) * pageSize;
             string dockSql = HasColumn("M_Locator", "LocatorCombination")
@@ -71,6 +71,7 @@ namespace VIS.Controllers
                        " + dockSql + @" AS Dock_Name,
                        COALESCE(PurchaseOrder.POReference, " + NLiteral("-") + @") AS Supplier_Reference,
                        COALESCE(OrderLine.DatePromised, PurchaseOrder.DatePromised) AS Line_Promise_Date,
+                       PurchaseOrder.DateOrdered AS PO_Date,
                        OrderLine.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
@@ -82,6 +83,15 @@ namespace VIS.Controllers
                   AND PurchaseOrder.DocStatus='CO'
                   AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
                   AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
+
+            // Search over the PO number or supplier name (parameterized;
+            // appended before role security so it stays inside the WHERE).
+            string trimmedSearch = (searchText ?? "").Trim();
+            if (trimmedSearch.Length > 0)
+            {
+                rawSql += @"
+                  AND (UPPER(PurchaseOrder.DocumentNo) LIKE @PO_Search1 OR UPPER(BPartner.Name) LIKE @PO_Search2)";
+            }
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
@@ -108,6 +118,7 @@ namespace VIS.Controllers
                            RawData.Dock_Name,
                            RawData.Supplier_Reference,
                            MIN(RawData.Line_Promise_Date) AS Promise_Date,
+                           MIN(RawData.PO_Date) AS PO_Date,
                            COUNT(RawData.PO_Line_ID) AS Open_Line_Count
                     FROM (
                         " + rawSql + @"
@@ -119,11 +130,21 @@ namespace VIS.Controllers
                              RawData.Dock_Name,
                              RawData.Supplier_Reference
                 ) OpenPO
-                ORDER BY OpenPO.Promise_Date, OpenPO.PO_No
+                -- Review #48: PO date (DateOrdered), oldest first; document
+                -- number as the deterministic tiebreak for stable paging.
+                ORDER BY OpenPO.PO_Date, OpenPO.PO_No
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
+            // Positional binding: parameters ordered exactly as they appear in
+            // the final SQL (@AD_Client_ID, search params, then paging).
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            if (trimmedSearch.Length > 0)
+            {
+                string like = "%" + trimmedSearch.ToUpperInvariant() + "%";
+                parameters.Add(new SqlParameter("@PO_Search1", like));
+                parameters.Add(new SqlParameter("@PO_Search2", like));
+            }
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
 
@@ -250,6 +271,155 @@ namespace VIS.Controllers
                     });
                 }
 
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                // Review #49: header data for the receive form - the PO's
+                // document type and the warehouses of the org the PO was
+                // created in (line locators follow the selected warehouse).
+                int poOrgId = 0;
+                int defaultWarehouseId = 0;
+                string docTypeName = "";
+
+                string headerSql = @"
+                    SELECT PurchaseOrder.AD_Org_ID AS PO_Org_ID,
+                           COALESCE(PurchaseOrder.M_Warehouse_ID, 0) AS PO_Warehouse_ID,
+                           DocType.Name AS DocType_Name
+                    FROM C_Order PurchaseOrder
+                    LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=PurchaseOrder.C_DocType_ID AND DocType.IsActive='Y')
+                    WHERE PurchaseOrder.C_Order_ID=@Header_PO_ID
+                      AND PurchaseOrder.AD_Client_ID=@Header_Client_ID";
+
+                dr = DB.ExecuteReader(headerSql, new SqlParameter[]
+                {
+                    new SqlParameter("@Header_PO_ID", poId),
+                    new SqlParameter("@Header_Client_ID", ctx.GetAD_Client_ID())
+                });
+                if (dr != null && dr.Read())
+                {
+                    poOrgId = Util.GetValueOfInt(dr["PO_Org_ID"]);
+                    defaultWarehouseId = Util.GetValueOfInt(dr["PO_Warehouse_ID"]);
+                    docTypeName = Util.GetValueOfString(dr["DocType_Name"]);
+                }
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                List<object> warehouses = new List<object>();
+                bool defaultInList = false;
+                string warehouseSql = @"
+                    SELECT Warehouse.M_Warehouse_ID AS Warehouse_ID,
+                           Warehouse.Name AS Warehouse_Name
+                    FROM M_Warehouse Warehouse
+                    WHERE Warehouse.IsActive='Y'
+                      AND Warehouse.AD_Client_ID=@WH_Client_ID
+                      AND Warehouse.AD_Org_ID=@WH_Org_ID
+                    ORDER BY Warehouse.Name";
+
+                dr = DB.ExecuteReader(warehouseSql, new SqlParameter[]
+                {
+                    new SqlParameter("@WH_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@WH_Org_ID", poOrgId)
+                });
+                while (dr != null && dr.Read())
+                {
+                    int warehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]);
+                    if (warehouseId == defaultWarehouseId) { defaultInList = true; }
+                    warehouses.Add(new
+                    {
+                        warehouseId = warehouseId,
+                        warehouseName = Util.GetValueOfString(dr["Warehouse_Name"])
+                    });
+                }
+
+                // The PO's own warehouse always stays selectable even when it
+                // belongs to another org (legacy data).
+                if (defaultWarehouseId > 0 && !defaultInList)
+                {
+                    string poWarehouseName = Util.GetValueOfString(DB.ExecuteScalar(
+                        "SELECT Name FROM M_Warehouse WHERE M_Warehouse_ID=@PO_WH_ID",
+                        new SqlParameter[] { new SqlParameter("@PO_WH_ID", defaultWarehouseId) },
+                        null));
+                    warehouses.Insert(0, new { warehouseId = defaultWarehouseId, warehouseName = poWarehouseName });
+                }
+
+                return Ok(new
+                {
+                    rows = rows,
+                    docTypeName = docTypeName,
+                    poOrgId = poOrgId,
+                    defaultWarehouseId = defaultWarehouseId,
+                    warehouses = warehouses
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Active locators of one warehouse for the line-level locator choice
+        /// (review #49). The warehouse default locator is flagged so the client
+        /// can preselect it.
+        /// </summary>
+        /// <param name="warehouseId">M_Warehouse_ID selected on the form.</param>
+        /// <returns>JSON { rows[] } of locatorId / locatorName / isDefault.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetWarehouseLocators(int warehouseId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (warehouseId <= 0) { return Ok(new { rows = new List<object>() }); }
+
+            string locatorNameSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(Locator.LocatorCombination, Locator.Value)"
+                : "Locator.Value";
+
+            string sql = @"
+                SELECT Locator.M_Locator_ID AS Locator_ID,
+                       " + locatorNameSql + @" AS Locator_Name,
+                       Locator.IsDefault AS Is_Default
+                FROM M_Locator Locator
+                WHERE Locator.IsActive='Y'
+                  AND Locator.AD_Client_ID=@AD_Client_ID
+                  AND Locator.M_Warehouse_ID=@Warehouse_ID
+                ORDER BY Locator.IsDefault DESC, " + locatorNameSql;
+
+            List<object> rows = new List<object>();
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Warehouse_ID", warehouseId)
+                });
+                while (dr != null && dr.Read())
+                {
+                    rows.Add(new
+                    {
+                        locatorId = Util.GetValueOfInt(dr["Locator_ID"]),
+                        locatorName = Util.GetValueOfString(dr["Locator_Name"]),
+                        isDefault = Util.GetValueOfString(dr["Is_Default"]) == "Y"
+                    });
+                }
+
                 return Ok(new { rows = rows });
             }
             catch (Exception ex)
@@ -287,7 +457,7 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 5; }
-            if (pageSize > 10) { pageSize = 10; }
+            if (pageSize > 50) { pageSize = 50; }
 
             int offset = (pageNo - 1) * pageSize;
             string trimmedSearch = (searchText ?? "").Trim();
@@ -526,6 +696,462 @@ namespace VIS.Controllers
                     dr.Close();
                     dr.Dispose();
                 }
+            }
+        }
+
+        /* ────────────────────────────────────────────────────────────────────
+         * Review #30: Complete GRN Confirmation flow (list → detail → line).
+         * Confirmation status: Completed = DocStatus CO/CL, In Dispute =
+         * IsInDispute 'Y', otherwise Pending. Completion runs the standard
+         * document engine (MInOutConfirm.ProcessIt), never a direct update.
+         * ──────────────────────────────────────────────────────────────────── */
+
+        /// <summary>Maps a confirmation's DocStatus + dispute flag to the flow status.</summary>
+        private static string ConfirmationStatus(string docStatus, string inDispute)
+        {
+            if (docStatus == "CO" || docStatus == "CL") { return "completed"; }
+            if (inDispute == "Y") { return "dispute"; }
+            return "pending";
+        }
+
+        /// <summary>
+        /// One page of vendor GRN confirmations (newest first, open ones before
+        /// completed ones kept for traceability).
+        /// </summary>
+        /// <param name="pageNo">1-based page number.</param>
+        /// <param name="pageSize">Rows per page.</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages, pendingCount }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetGRNConfirmations(int pageNo = 1, int pageSize = 6)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (pageNo <= 0) { pageNo = 1; }
+            if (pageSize <= 0) { pageSize = 6; }
+            if (pageSize > 50) { pageSize = 50; }
+
+            int offset = (pageNo - 1) * pageSize;
+
+            string rawSql = @"
+                SELECT Confirm.M_InOutConfirm_ID AS Confirm_ID,
+                       Confirm.DocumentNo AS Confirm_No,
+                       Confirm.DocStatus AS Doc_Status,
+                       COALESCE(CAST(Confirm.IsInDispute AS VARCHAR(1)),'N') AS In_Dispute,
+                       Confirm.Created AS Created_Date,
+                       InOut.DocumentNo AS GRN_No,
+                       BPartner.Name AS Supplier_Name,
+                       LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID
+                FROM M_InOutConfirm Confirm
+                INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=Confirm.M_InOut_ID AND InOut.IsActive='Y')
+                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
+                LEFT OUTER JOIN M_InOutLineConfirm LineConfirm ON (LineConfirm.M_InOutConfirm_ID=Confirm.M_InOutConfirm_ID AND LineConfirm.IsActive='Y')
+                WHERE Confirm.IsActive='Y'
+                  AND InOut.IsSOTrx='N'
+                  AND InOut.MovementType='V+'
+                  AND Confirm.AD_Client_ID=@AD_Client_ID
+                  AND Confirm.DocStatus IN ('DR','IP')";
+
+            rawSql = MRole.GetDefault(ctx).AddAccessSQL(
+                rawSql,
+                "Confirm",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string sql = @"
+                SELECT ConfirmData.Confirm_ID,
+                       ConfirmData.Confirm_No,
+                       ConfirmData.Doc_Status,
+                       ConfirmData.In_Dispute,
+                       ConfirmData.GRN_No,
+                       ConfirmData.Supplier_Name,
+                       ConfirmData.Line_Count,
+                       COUNT(1) OVER () AS TotalRecords,
+                       SUM(CASE WHEN ConfirmData.Doc_Status IN ('CO','CL') THEN 0 ELSE 1 END) OVER () AS PendingCount
+                FROM (
+                    SELECT RawData.Confirm_ID,
+                           RawData.Confirm_No,
+                           RawData.Doc_Status,
+                           RawData.In_Dispute,
+                           RawData.Created_Date,
+                           RawData.GRN_No,
+                           RawData.Supplier_Name,
+                           COUNT(RawData.Line_Confirm_ID) AS Line_Count
+                    FROM (
+                        " + rawSql + @"
+                    ) RawData
+                    GROUP BY RawData.Confirm_ID,
+                             RawData.Confirm_No,
+                             RawData.Doc_Status,
+                             RawData.In_Dispute,
+                             RawData.Created_Date,
+                             RawData.GRN_No,
+                             RawData.Supplier_Name
+                ) ConfirmData
+                ORDER BY CASE WHEN ConfirmData.Doc_Status IN ('CO','CL') THEN 1 ELSE 0 END,
+                         ConfirmData.Created_Date DESC,
+                         ConfirmData.Confirm_ID DESC
+                OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@Offset", offset));
+            parameters.Add(new SqlParameter("@PageSize", pageSize));
+
+            List<object> rows = new List<object>();
+            int totalRecords = 0;
+            int pendingCount = 0;
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+
+                while (dr != null && dr.Read())
+                {
+                    totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
+                    pendingCount = Util.GetValueOfInt(dr["PendingCount"]);
+
+                    rows.Add(new
+                    {
+                        confirmId = Util.GetValueOfInt(dr["Confirm_ID"]),
+                        confirmNo = Util.GetValueOfString(dr["Confirm_No"]),
+                        grnNo = Util.GetValueOfString(dr["GRN_No"]),
+                        supplier = Util.GetValueOfString(dr["Supplier_Name"]),
+                        lineCount = Util.GetValueOfInt(dr["Line_Count"]),
+                        status = ConfirmationStatus(Util.GetValueOfString(dr["Doc_Status"]), Util.GetValueOfString(dr["In_Dispute"]))
+                    });
+                }
+
+                return Ok(new
+                {
+                    rows = rows,
+                    pageNo = pageNo,
+                    pageSize = pageSize,
+                    totalRecords = totalRecords,
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize)),
+                    pendingCount = pendingCount
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// One GRN confirmation's header context and its lines for the detail state.
+        /// </summary>
+        /// <param name="confirmId">M_InOutConfirm_ID.</param>
+        /// <returns>JSON { header, lines[] }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetGRNConfirmationDetail(int confirmId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (confirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+
+            string headerSql = @"
+                SELECT Confirm.M_InOutConfirm_ID AS Confirm_ID,
+                       Confirm.DocumentNo AS Confirm_No,
+                       Confirm.DocStatus AS Doc_Status,
+                       COALESCE(CAST(Confirm.IsInDispute AS VARCHAR(1)),'N') AS In_Dispute,
+                       InOut.DocumentNo AS GRN_No,
+                       BPartner.Name AS Supplier_Name,
+                       Warehouse.Name AS Warehouse_Name,
+                       COALESCE(InOut.MovementDate, Confirm.Created) AS Doc_Date
+                FROM M_InOutConfirm Confirm
+                INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=Confirm.M_InOut_ID AND InOut.IsActive='Y')
+                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
+                LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=InOut.M_Warehouse_ID AND Warehouse.IsActive='Y')
+                WHERE Confirm.IsActive='Y'
+                  AND Confirm.M_InOutConfirm_ID=@Confirm_ID
+                  AND Confirm.AD_Client_ID=@AD_Client_ID";
+
+            headerSql = MRole.GetDefault(ctx).AddAccessSQL(
+                headerSql,
+                "Confirm",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string linesSql = @"
+                SELECT LineConfirm.M_InOutLineConfirm_ID AS Line_Confirm_ID,
+                       InOutLine.Line AS Line_No,
+                       Product.Name AS Product_Name,
+                       UomInfo.Name AS UOM_Name,
+                       AttributeInstance.Description AS Attribute_Description,
+                       Locator.Value AS Locator_Value,
+                       LineConfirm.TargetQty AS Target_Qty,
+                       LineConfirm.ConfirmedQty AS Confirmed_Qty,
+                       LineConfirm.ScrappedQty AS Scrapped_Qty,
+                       LineConfirm.DifferenceQty AS Difference_Qty,
+                       LineConfirm.Description AS Line_Description,
+                       COALESCE(CAST(LineConfirm.Processed AS VARCHAR(1)),'N') AS Line_Processed
+                FROM M_InOutLineConfirm LineConfirm
+                INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID AND InOutLine.IsActive='Y')
+                LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
+                LEFT OUTER JOIN C_UOM UomInfo ON (UomInfo.C_UOM_ID=InOutLine.C_UOM_ID AND UomInfo.IsActive='Y')
+                LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=InOutLine.M_AttributeSetInstance_ID)
+                LEFT OUTER JOIN M_Locator Locator ON (Locator.M_Locator_ID=InOutLine.M_Locator_ID AND Locator.IsActive='Y')
+                WHERE LineConfirm.IsActive='Y'
+                  AND LineConfirm.M_InOutConfirm_ID=@Line_Confirm_Parent_ID
+                  AND LineConfirm.AD_Client_ID=@Line_AD_Client_ID";
+
+            linesSql = MRole.GetDefault(ctx).AddAccessSQL(
+                linesSql,
+                "LineConfirm",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+            linesSql += @"
+                ORDER BY InOutLine.Line, LineConfirm.M_InOutLineConfirm_ID";
+
+            IDataReader dr = null;
+
+            try
+            {
+                object header = null;
+                dr = DB.ExecuteReader(headerSql, new SqlParameter[]
+                {
+                    new SqlParameter("@Confirm_ID", confirmId),
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                });
+
+                if (dr != null && dr.Read())
+                {
+                    DateTime? docDate = Util.GetValueOfDateTime(dr["Doc_Date"]);
+                    header = new
+                    {
+                        confirmId = Util.GetValueOfInt(dr["Confirm_ID"]),
+                        confirmNo = Util.GetValueOfString(dr["Confirm_No"]),
+                        grnNo = Util.GetValueOfString(dr["GRN_No"]),
+                        supplier = Util.GetValueOfString(dr["Supplier_Name"]),
+                        warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
+                        docDate = docDate.HasValue ? docDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
+                        status = ConfirmationStatus(Util.GetValueOfString(dr["Doc_Status"]), Util.GetValueOfString(dr["In_Dispute"]))
+                    };
+                }
+
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                if (header == null) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+
+                List<object> lines = new List<object>();
+                dr = DB.ExecuteReader(linesSql, new SqlParameter[]
+                {
+                    new SqlParameter("@Line_Confirm_Parent_ID", confirmId),
+                    new SqlParameter("@Line_AD_Client_ID", ctx.GetAD_Client_ID())
+                });
+
+                while (dr != null && dr.Read())
+                {
+                    lines.Add(new
+                    {
+                        lineConfirmId = Util.GetValueOfInt(dr["Line_Confirm_ID"]),
+                        lineNo = Util.GetValueOfInt(dr["Line_No"]),
+                        productName = Util.GetValueOfString(dr["Product_Name"]),
+                        uomName = Util.GetValueOfString(dr["UOM_Name"]),
+                        attributeSetInstance = Util.GetValueOfString(dr["Attribute_Description"]),
+                        locatorValue = Util.GetValueOfString(dr["Locator_Value"]),
+                        targetQty = Util.GetValueOfDecimal(dr["Target_Qty"]),
+                        confirmedQty = Util.GetValueOfDecimal(dr["Confirmed_Qty"]),
+                        scrappedQty = Util.GetValueOfDecimal(dr["Scrapped_Qty"]),
+                        differenceQty = Util.GetValueOfDecimal(dr["Difference_Qty"]),
+                        description = Util.GetValueOfString(dr["Line_Description"]),
+                        processed = Util.GetValueOfString(dr["Line_Processed"]) == "Y"
+                    });
+                }
+
+                return Ok(new { header = header, lines = lines });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Saves one confirmation line's entry fields. DifferenceQty is computed
+        /// by the model (Target - Confirmed - Scrapped) on save.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [HttpPost]
+        public JsonResult SaveGRNConfirmationLine(int lineConfirmId = 0, string targetQty = "", string confirmedQty = "", string scrappedQty = "", string description = "")
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (lineConfirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+
+            decimal target, confirmed, scrapped;
+            if (!decimal.TryParse(targetQty, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out target)
+                || !decimal.TryParse(confirmedQty, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out confirmed)
+                || !decimal.TryParse(String.IsNullOrEmpty(scrappedQty) ? "0" : scrappedQty, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out scrapped)
+                || target < 0 || confirmed < 0 || scrapped < 0)
+            {
+                return Fail(Msg.GetMsg(ctx, "VAS_090_InvalidQuantity") ?? "Quantities must be zero or positive numbers.");
+            }
+
+            try
+            {
+                MInOutLineConfirm line = new MInOutLineConfirm(ctx, lineConfirmId, null);
+                if (line.Get_ID() <= 0 || line.GetAD_Client_ID() != ctx.GetAD_Client_ID())
+                {
+                    return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
+                }
+
+                MInOutConfirm parent = new MInOutConfirm(ctx, line.GetM_InOutConfirm_ID(), null);
+                if (parent.IsProcessed() || parent.GetDocStatus() == "CO" || parent.GetDocStatus() == "CL")
+                {
+                    return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                }
+
+                line.SetTargetQty(target);
+                line.SetConfirmedQty(confirmed);
+                line.SetScrappedQty(scrapped);
+                line.SetDescription(description ?? "");
+
+                if (!line.Save())
+                {
+                    return Fail(Msg.GetMsg(ctx, "SaveError") ?? "Save failed.");
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    lineConfirmId = lineConfirmId,
+                    differenceQty = line.GetDifferenceQty()
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Completes the whole GRN confirmation through the document engine.
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [HttpPost]
+        public JsonResult CompleteGRNConfirmation(int confirmId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (confirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+
+            try
+            {
+                MInOutConfirm confirm = new MInOutConfirm(ctx, confirmId, null);
+                if (confirm.Get_ID() <= 0 || confirm.GetAD_Client_ID() != ctx.GetAD_Client_ID())
+                {
+                    return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
+                }
+
+                if (confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL")
+                {
+                    return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                }
+
+                bool processed = confirm.ProcessIt(X_M_InOutConfirm.DOCACTION_Complete);
+                confirm.Save();
+
+                if (!processed || !(confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL"))
+                {
+                    string processMsg = confirm.GetProcessMsg();
+                    return Fail(!String.IsNullOrEmpty(processMsg)
+                        ? processMsg
+                        : (Msg.GetMsg(ctx, "VAS_090_CompleteFailed") ?? "GRN confirmation could not be completed."));
+                }
+
+                return Ok(new { success = true, status = "completed" });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Marks the whole GRN confirmation as In Dispute (status only; lines
+        /// stay open for review per the flow spec).
+        /// </summary>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        [HttpPost]
+        public JsonResult DisputeGRNConfirmation(int confirmId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (confirmId <= 0) { return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found"); }
+
+            try
+            {
+                MInOutConfirm confirm = new MInOutConfirm(ctx, confirmId, null);
+                if (confirm.Get_ID() <= 0 || confirm.GetAD_Client_ID() != ctx.GetAD_Client_ID())
+                {
+                    return Fail(Msg.GetMsg(ctx, "NotFound") ?? "Not found");
+                }
+
+                if (confirm.GetDocStatus() == "CO" || confirm.GetDocStatus() == "CL")
+                {
+                    return Fail(Msg.GetMsg(ctx, "VAS_090_ConfirmationCompleted") ?? "This GRN confirmation is already completed.");
+                }
+
+                confirm.SetIsInDispute(true);
+                if (!confirm.Save())
+                {
+                    return Fail(Msg.GetMsg(ctx, "SaveError") ?? "Save failed.");
+                }
+
+                return Ok(new { success = true, status = "dispute" });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
             }
         }
 

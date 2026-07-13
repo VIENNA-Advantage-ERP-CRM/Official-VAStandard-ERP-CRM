@@ -60,10 +60,14 @@
 }
 
 .vas-ra-title {
-    font-size: clamp(13px, 1.1375cqi, 16px);
+    min-width: 0;
+    overflow: hidden;
+    font-size: 1em;
     font-weight: 500;
     color: #102C3F;
     line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-ra-actions {
@@ -163,14 +167,14 @@
 }
 
 .vas-ra-dialog {
-    font-size: 16px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 2em;
 }
 
     .vas-ra-dialog,
@@ -187,7 +191,7 @@
 
 .vas-ra-modal {
     position: relative;
-    width: min(880px, 100%);
+    width: min(55em, calc(100vw - 2em));
     max-height: 88vh;
     background: #FFFFFF;
     border-radius: 14px;
@@ -199,12 +203,12 @@
 
 .vas-ra-modal-head {
     flex: 0 0 auto;
-    height: 56px;
+    height: 3.5em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 0 20px;
+    gap: 0.75em;
+    padding: 0 1.25em;
     border-bottom: 1px solid #1F83FF;
     background: rgba(255, 255, 255, 0.9);
 }
@@ -212,14 +216,14 @@
 .vas-ra-modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75em;
     flex: 1 1 auto;
     min-width: 0;
 }
 
 .vas-ra-modal-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     color: #141414;
     min-width: 0;
@@ -230,7 +234,7 @@
 
 .vas-ra-modal-status {
     flex: 0 0 auto;
-    font-size: 0.72rem;
+    font-size: 0.72em;
 }
 
 .vas-ra-pill {
@@ -268,8 +272,8 @@
     }
 
 .vas-ra-modal-close {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
     border: 0;
     background: transparent;
     cursor: pointer;
@@ -282,8 +286,8 @@
 }
 
     .vas-ra-modal-close svg {
-        width: 20px;
-        height: 20px;
+        width: 1.25em;
+        height: 1.25em;
     }
 
     .vas-ra-modal-close:hover {
@@ -295,7 +299,7 @@
     flex: 0 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 22px 24px;
+    padding: 1.375em 1.5em;
     position: relative;
 }
 
@@ -311,10 +315,10 @@
 
 .vas-ra-empty,
 .vas-ra-error {
-    padding: 24px 12px;
+    padding: 1.714em 0.857em;
     text-align: center;
     color: #748494;
-    font-size: 0.875rem;
+    font-size: 0.875em;
 }
 
 .vas-ra-error {
@@ -324,16 +328,16 @@
 .vas-ra-note {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.61em;
     color: #5F7283;
-    font-size: 0.82rem;
+    font-size: 0.82em;
     line-height: 1.35;
-    margin-bottom: 14px;
+    margin-bottom: 1.067em;
 }
 
     .vas-ra-note svg {
-        width: 17px;
-        height: 17px;
+        width: 1.296em;
+        height: 1.296em;
         flex: 0 0 auto;
         color: #0083DA;
     }
@@ -341,24 +345,24 @@
 .vas-ra-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 24px;
+    gap: 0 1.5em;
 }
 
 .vas-ra-field {
-    padding: 8px 12px;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid #D7D7D7;
     min-width: 0;
 }
 
 .vas-ra-field-label {
-    font-size: 0.75rem;
+    font-size: 0.75em;
     color: #5F7283;
 }
 
 .vas-ra-field-value {
-    font-size: 1rem;
+    font-size: 1em;
     color: #102C3F;
-    margin-top: 6px;
+    margin-top: 0.375em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -371,20 +375,20 @@
 .vas-ra-po-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5em;
 }
 
 .vas-ra-po-row {
     width: 100%;
-    min-height: 46px;
+    min-height: 2.875em;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
     background: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 8px 12px;
+    gap: 0.75em;
+    padding: 0.5em 0.75em;
     text-align: left;
     cursor: pointer;
 }
@@ -398,11 +402,11 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 0.19em;
 }
 
 .vas-ra-po-no {
-    font-size: 0.92rem;
+    font-size: 0.92em;
     font-weight: 400;
     color: #102C3F;
     overflow: hidden;
@@ -412,7 +416,7 @@
 
 .vas-ra-po-supplier,
 .vas-ra-po-meta {
-    font-size: 0.78rem;
+    font-size: 0.78em;
     color: #748494;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -426,10 +430,10 @@
 }
 
 .vas-ra-lines-title {
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 700;
     color: #000000;
-    padding: 18px 0 8px;
+    padding: 1.125em 0 0.5em;
 }
 
 .vas-ra-receive-table {
@@ -439,19 +443,20 @@
 
 .vas-ra-receive-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 7.2em 8.6em 7.2em 7.2em;
-    gap: 8px;
+    /* Review #49: sixth column carries the line-level Locator choice. */
+    grid-template-columns: minmax(0, 1fr) 6.4em 7.6em 6.4em 9em 6.8em;
+    gap: 0.571em;
     align-items: center;
-    min-height: 42px;
+    min-height: 3em;
     border-bottom: 1px solid #EDF2F6;
     color: #5F7283;
-    font-size: 0.875rem;
+    font-size: 0.875em;
 }
 
     .vas-ra-receive-row.head {
-        min-height: 32px;
+        min-height: 2.667em;
         color: #748494;
-        font-size: 0.75rem;
+        font-size: 0.75em;
         font-weight: 400;
     }
 
@@ -471,14 +476,14 @@
 
 .vas-ra-rcv-input {
     width: 100%;
-    height: 30px;
+    height: 2.143em;
     border: 0;
     border-bottom: 1px solid #D7D7D7;
     border-radius: 0;
     color: #102C3F;
-    padding: 0 4px;
+    padding: 0 0.286em;
     text-align: right;
-    font-size: 0.875rem;
+    font-size: 0.875em;
     font-variant-numeric: tabular-nums;
 }
 
@@ -491,8 +496,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-top: 18px;
+    gap: 0.75em;
+    margin-top: 1.125em;
 }
 
     .vas-ra-action-footer.right {
@@ -501,23 +506,23 @@
 
 .vas-ra-primary,
 .vas-ra-secondary {
-    min-height: 36px;
+    min-height: 2.571em;
     border-radius: 9px;
     border: 1px solid transparent;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 0 14px;
-    font-size: 0.875rem;
+    gap: 0.571em;
+    padding: 0 1em;
+    font-size: 0.875em;
     font-weight: 500;
     cursor: pointer;
 }
 
     .vas-ra-primary svg,
     .vas-ra-secondary svg {
-        width: 16px;
-        height: 16px;
+        width: 1.143em;
+        height: 1.143em;
     }
 
 .vas-ra-primary {
@@ -549,22 +554,22 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 8px;
-    padding-top: 14px;
+    gap: 0.667em;
+    padding-top: 1.167em;
     color: #748494;
-    font-size: 0.75rem;
+    font-size: 0.75em;
 }
 
     .vas-ra-modal-pager.top {
         padding-top: 0;
-        padding-bottom: 12px;
+        padding-bottom: 1em;
         border-bottom: 1px solid #EDF2F6;
-        margin-bottom: 12px;
+        margin-bottom: 1em;
     }
 
 .vas-ra-pgbtn {
-    width: 26px;
-    height: 26px;
+    width: 2.167em;
+    height: 2.167em;
     border-radius: 7px;
     border: 1px solid #E4EDF4;
     background: rgba(255, 255, 255, 0.8);
@@ -576,8 +581,8 @@
 }
 
     .vas-ra-pgbtn svg {
-        width: 15px;
-        height: 15px;
+        width: 1.25em;
+        height: 1.25em;
     }
 
     .vas-ra-pgbtn:hover:not(:disabled) {
@@ -597,34 +602,34 @@
 }
 
 .vas-ra-qc-headline {
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 700;
     color: #000000;
-    margin-bottom: 12px;
+    margin-bottom: 0.75em;
 }
 
 .vas-ra-qc-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
+    gap: 1.125em;
 }
 
 .vas-ra-qc-col {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0.625em;
     min-width: 0;
 }
 
 .vas-ra-qc-field {
-    min-height: 54px;
+    min-height: 3.375em;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.625em;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
     background: #FFFFFF;
-    padding: 8px 10px;
+    padding: 0.5em 0.625em;
     color: #102C3F;
     min-width: 0;
 }
@@ -649,13 +654,13 @@
 
     .vas-ra-qc-field.note {
         align-items: flex-start;
-        min-height: 94px;
+        min-height: 5.875em;
     }
 
 .vas-ra-qc-ico {
-    width: 32px;
-    height: 32px;
-    flex: 0 0 32px;
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
     border-radius: 9px;
     display: flex;
     align-items: center;
@@ -665,8 +670,8 @@
 }
 
     .vas-ra-qc-ico svg {
-        width: 17px;
-        height: 17px;
+        width: 1.0625em;
+        height: 1.0625em;
     }
 
 .vas-ra-qc-main {
@@ -675,7 +680,7 @@
 }
 
 .vas-ra-qc-label {
-    font-size: 0.72rem;
+    font-size: 0.72em;
     color: #5F7283;
 }
 
@@ -685,9 +690,9 @@
     }
 
 .vas-ra-qc-value {
-    margin-top: 4px;
+    margin-top: 0.27em;
     color: #102C3F;
-    font-size: 0.92rem;
+    font-size: 0.92em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -700,27 +705,27 @@
 
 .vas-ra-select-wrap {
     position: relative;
-    margin-top: 4px;
+    margin-top: 0.25em;
 }
 
 .vas-ra-actual {
     width: 100%;
-    height: 30px;
+    height: 2.143em;
     border: 0;
     border-bottom: 1px solid #D7D7D7;
     border-radius: 0;
     background: #FFFFFF;
     color: #102C3F;
-    padding: 0 30px 0 4px;
+    padding: 0 2.143em 0 0.286em;
     appearance: none;
-    font-size: 0.875rem;
+    font-size: 0.875em;
 }
 
 .vas-ra-select-arr {
     position: absolute;
     top: 0;
-    right: 8px;
-    height: 30px;
+    right: 0.5em;
+    height: 1.875em;
     display: flex;
     align-items: center;
     color: #748494;
@@ -728,8 +733,8 @@
 }
 
     .vas-ra-select-arr svg {
-        width: 15px;
-        height: 15px;
+        width: 0.9375em;
+        height: 0.9375em;
     }
 
 .vas-ra-date,
@@ -740,19 +745,19 @@
     border-radius: 0;
     background: #FFFFFF;
     color: #102C3F;
-    font-size: 0.875rem;
-    margin-top: 4px;
+    font-size: 0.875em;
+    margin-top: 0.286em;
 }
 
 .vas-ra-date {
-    height: 30px;
-    padding: 0 4px;
+    height: 2.143em;
+    padding: 0 0.286em;
 }
 
 .vas-ra-desc {
-    min-height: 56px;
+    min-height: 4em;
     resize: vertical;
-    padding: 7px 4px;
+    padding: 0.5em 0.286em;
 }
 
     .vas-ra-date:focus,
@@ -762,8 +767,8 @@
     }
 
 .vas-ra-kebab {
-    width: 26px;
-    height: 26px;
+    width: 1.625em;
+    height: 1.625em;
     border: 0;
     background: transparent;
     color: #748494;
@@ -771,49 +776,123 @@
 }
 
     .vas-ra-kebab svg {
-        width: 18px;
-        height: 18px;
+        width: 1.125em;
+        height: 1.125em;
     }
 
 .vas-ra-search {
-    margin-bottom: 12px;
+    margin-bottom: 0.75em;
 }
 
-.vas-ra-label-search {
+/* Review #49: warehouse (header) and locator (line) dropdowns on the
+   Receive Against PO form. */
+.vas-ra-field-select,
+.vas-ra-line-select {
     width: 100%;
-    height: 38px;
-    border: 0;
-    border-bottom: 1px solid #D7D7D7;
-    border-radius: 0;
+    min-width: 0;
+    height: 2em;
+    padding: 0 0.4em;
     color: #102C3F;
-    padding: 0 4px;
-    font-size: 0.92rem;
+    background: #FFFFFF;
+    border: 1px solid #D7D7D7;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.92em;
+    cursor: pointer;
 }
 
-    .vas-ra-label-search:focus {
-        outline: none;
-        border-bottom-color: #1F83FF;
-    }
+.vas-ra-line-select {
+    font-size: 0.85em;
+}
+
+.vas-ra-field-select:focus,
+.vas-ra-line-select:focus {
+    outline: none;
+    border-color: #1F83FF;
+}
+
+/* Search pill for the Receive Against PO and Print GRN Label popups - same
+   design language as the Product Search widget's search bar (glass gradient,
+   white border, rounded pill, leading icon, soft focus glow). */
+.vas-ra-search-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    margin-bottom: 0.75em;
+    padding: 0.75em 1.125em;
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.vas-ra-search-pill:focus-within {
+    border-color: #BFE4FF;
+    box-shadow: 0 10px 24px rgba(0, 131, 218, 0.12);
+}
+
+.vas-ra-search-pill-ic {
+    width: 1.125em;
+    height: 1.125em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    color: #0083DA;
+}
+
+.vas-ra-search-pill-ic svg {
+    width: 100%;
+    height: 100%;
+}
+
+.vas-ra-search-pill .vas-ra-label-search,
+.vas-ra-search-pill .vas-ra-po-search,
+.vas-ra-search-pill .vas-ra-label-search:focus,
+.vas-ra-search-pill .vas-ra-po-search:focus {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0 none;
+    border-radius: 0;
+    outline: none;
+    box-shadow: none;
+    background: transparent;
+    color: #102C3F;
+    font-family: inherit;
+    font-size: 0.875em;
+    line-height: 1.3;
+}
+
+.vas-ra-search-pill .vas-ra-label-search::placeholder,
+.vas-ra-search-pill .vas-ra-po-search::placeholder {
+    color: #9F9F9F;
+}
 
 .vas-ra-label-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 6px;
+    margin-top: 0.375em;
 }
 
     .vas-ra-label-table th {
         text-align: left;
-        font-size: 0.75rem;
+        font-size: 0.75em;
         font-weight: 400;
         color: #748494;
-        padding: 7px 8px;
+        padding: 0.583em 0.667em;
         border-bottom: 1px solid #EDF2F6;
     }
 
     .vas-ra-label-table td {
-        font-size: 0.875rem;
+        font-size: 0.875em;
         color: #5F7283;
-        padding: 9px 8px;
+        padding: 0.643em 0.571em;
         border-bottom: 1px solid #EDF2F6;
         vertical-align: middle;
     }
@@ -847,7 +926,7 @@
 
 @media (max-width: 40em) {
     .vas-ra-dialog {
-        padding: 14px;
+        padding: 0.875em;
     }
 
     .vas-ra-form,
@@ -867,6 +946,180 @@
 
     .vas-ra-receive-row {
         grid-template-columns: minmax(0, 1fr) 5.8em 6.4em 5.8em 5.8em;
-        font-size: 0.75rem;
+        font-size: 0.75em;
     }
+}
+
+/* ── Review #30: Complete GRN Confirmation flow (list → detail → line) ────── */
+
+.vas-ra-modal-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    margin-bottom: 0.75em;
+    color: #0083DA;
+    font-size: 0.8em;
+    cursor: pointer;
+    user-select: none;
+}
+
+    .vas-ra-modal-back:hover {
+        text-decoration: underline;
+    }
+
+    .vas-ra-modal-back svg {
+        width: 1.1em;
+        height: 1.1em;
+        flex: 0 0 auto;
+    }
+
+.vas-ra-gc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+}
+
+.vas-ra-gc-row {
+    width: 100%;
+    min-height: 2.875em;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.5em 0.75em;
+    text-align: left;
+    color: #102C3F;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+    .vas-ra-gc-row:hover {
+        background: #EEF6FF;
+        border-color: #BFE4FF;
+    }
+
+.vas-ra-gc-ic {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    background: rgba(0, 131, 218, 0.10);
+    border-radius: 8px;
+}
+
+    .vas-ra-gc-ic svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas-ra-gc-main {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.vas-ra-gc-ref {
+    overflow: hidden;
+    color: #102C3F;
+    font-size: 0.92em;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ra-gc-meta {
+    overflow: hidden;
+    color: #748494;
+    font-size: 0.78em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas-ra-gc-side {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.2em;
+}
+
+.vas-ra-gc-lines {
+    color: #102C3F;
+    font-size: 0.78em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.vas-ra-gc-chev {
+    flex: 0 0 auto;
+    color: #B8C6D2;
+}
+
+    .vas-ra-gc-chev svg {
+        width: 1em;
+        height: 1em;
+    }
+
+/* Cautionary secondary action — visually distinct from the primary per the
+   flow spec, styled with the shared warn palette. */
+.vas-ra-warn {
+    min-height: 2.571em;
+    border-radius: 9px;
+    border: 1px solid #F0DDB8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.571em;
+    padding: 0 1em;
+    font-size: 0.875em;
+    font-weight: 500;
+    background: #FCF1DD;
+    color: #9A6500;
+    cursor: pointer;
+}
+
+    .vas-ra-warn svg {
+        width: 1.143em;
+        height: 1.143em;
+    }
+
+    .vas-ra-warn:hover:not(:disabled) {
+        background: #F8E6C2;
+    }
+
+    .vas-ra-warn:disabled {
+        opacity: 0.55;
+        cursor: default;
+    }
+
+/* Entry fields of the line state (target / confirmed / scrapped). */
+.vas-ra-gc-inp {
+    width: 100%;
+    height: 2.143em;
+    border: 0;
+    border-bottom: 1px solid #D7D7D7;
+    border-radius: 0;
+    background: #FFFFFF;
+    color: #102C3F;
+    padding: 0 0.286em;
+    text-align: right;
+    font-size: 0.875em;
+    font-variant-numeric: tabular-nums;
+}
+
+    .vas-ra-gc-inp:focus {
+        outline: none;
+        border-bottom-color: #1F83FF;
+    }
+
+.vas-ra-gc-done {
+    margin: 0;
+    color: #0B6B45;
 }

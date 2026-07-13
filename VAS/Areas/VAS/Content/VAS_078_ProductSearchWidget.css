@@ -93,7 +93,7 @@
     position: fixed;
     z-index: 10050;
     display: none;
-    padding: 6px;
+    padding: 0.43em;
     overflow: hidden;
     background: #FFFFFF;
     border: 1px solid #E4EDF4;
@@ -200,8 +200,9 @@
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 2em;
     font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
 }
 
 .MPC-product-search-dialog-wrap.is-open {
@@ -228,12 +229,12 @@
 }
 
 .MPC-product-search-dialog-titlebar {
-    min-height: 56px;
+    min-height: 3.5em;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex: 0 0 auto;
-    padding-inline: 20px;
+    padding-inline: 1.25em;
     background: rgba(255, 255, 255, 0.94);
     border-bottom: 1px solid #1F83FF;
 }
@@ -242,7 +243,7 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75em;
 }
 
 .MPC-product-search-dialog-title-left h2 {
@@ -250,7 +251,7 @@
     margin: 0;
     overflow: hidden;
     color: #141414;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -259,19 +260,19 @@
 .MPC-product-search-dialog-badge {
     display: inline-flex;
     align-items: center;
-    min-height: 24px;
-    padding-inline: 10px;
+    min-height: 2em;
+    padding-inline: 0.833em;
     flex: 0 0 auto;
     color: #0F69AC;
     background: #EEF6FF;
     border-radius: 999px;
-    font-size: 0.75rem;
+    font-size: 0.75em;
     font-weight: 400;
 }
 
 .MPC-product-search-dialog-close {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -290,14 +291,14 @@
 }
 
 .MPC-product-search-dialog-close svg {
-    width: 20px;
-    height: 20px;
+    width: 1.25em;
+    height: 1.25em;
 }
 
 .MPC-product-search-dialog-body {
     flex: 1 1 auto;
     min-height: 0;
-    padding: 22px 24px 24px;
+    padding: 1.375em 1.5em 1.5em;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -309,9 +310,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px 12px;
+    padding: 2.286em 0.857em;
     color: #748494;
-    font-size: 0.875rem;
+    font-size: 0.875em;
     text-align: center;
 }
 
@@ -323,9 +324,9 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 18px;
-    margin-block-end: 18px;
-    padding: 18px;
+    gap: 1.125em;
+    margin-block-end: 1.125em;
+    padding: 1.125em;
     flex-wrap: wrap;
     background: linear-gradient(135deg, #EAF8FF, #F4FBFF);
     border: 1px solid #BFE4FF;
@@ -333,8 +334,8 @@
 }
 
 .MPC-product-search-hero-icon {
-    width: 64px;
-    height: 64px;
+    width: 4em;
+    height: 4em;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -347,19 +348,32 @@
 }
 
 .MPC-product-search-hero-icon svg {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
+}
+
+.MPC-product-search-hero-icon.has-image {
+    padding: 0;
+    overflow: hidden;
+}
+
+.MPC-product-search-hero-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 15px;
 }
 
 .MPC-product-search-hero-main {
-    min-width: 180px;
-    flex: 1 1 220px;
+    min-width: 11.25em;
+    flex: 1 1 13.75em;
 }
 
 .MPC-product-search-hero-name {
     overflow: hidden;
     color: #102C3F;
-    font-size: 1.15rem;
+    font-size: 1.15em;
     font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -367,32 +381,32 @@
 
 .MPC-product-search-chips {
     display: flex;
-    gap: 8px;
-    margin-block-start: 8px;
+    gap: 0.5em;
+    margin-block-start: 0.5em;
     flex-wrap: wrap;
 }
 
 .MPC-product-search-chip {
-    padding: 3px 10px;
+    padding: 0.26em 0.868em;
     color: #5F7283;
     background: rgba(16, 44, 63, 0.05);
     border-radius: 999px;
-    font-size: 0.72rem;
+    font-size: 0.72em;
     font-weight: 500;
 }
 
 .MPC-product-search-stats {
     display: flex;
-    gap: 10px;
+    gap: 0.625em;
     flex: 1 1 auto;
     justify-content: flex-end;
     flex-wrap: wrap;
 }
 
 .MPC-product-search-stat {
-    min-width: 92px;
-    max-width: 138px;
-    padding: 8px 12px;
+    min-width: 5.75em;
+    max-width: 8.625em;
+    padding: 0.5em 0.75em;
     background: #FFFFFF;
     border: 1px solid #E4EDF4;
     border-radius: 10px;
@@ -400,14 +414,14 @@
 
 .MPC-product-search-stat-label {
     color: #748494;
-    font-size: 0.6875rem;
+    font-size: 0.6875em;
 }
 
 .MPC-product-search-stat-value {
-    margin-block-start: 2px;
+    margin-block-start: 0.125em;
     overflow: hidden;
     color: #102C3F;
-    font-size: 1rem;
+    font-size: 1em;
     font-variant-numeric: tabular-nums;
     font-weight: 400;
     text-overflow: ellipsis;
@@ -425,10 +439,10 @@
 .MPC-product-search-tabs {
     flex: 0 0 auto;
     display: inline-flex;
-    gap: 4px;
+    gap: 0.25em;
     max-width: 100%;
-    margin-block-end: 16px;
-    padding: 4px;
+    margin-block-end: 1em;
+    padding: 0.25em;
     overflow-x: auto;
     background: #EEF6FF;
     border: 1px solid #E4EDF4;
@@ -436,13 +450,13 @@
 }
 
 .MPC-product-search-tab {
-    padding: 7px 14px;
+    padding: 0.538em 1.077em;
     flex: 0 0 auto;
     color: #5F7283;
     background: transparent;
     border: 0;
     border-radius: 9px;
-    font-size: 0.8125rem;
+    font-size: 0.8125em;
     font-weight: 500;
     cursor: pointer;
 }
@@ -458,28 +472,44 @@
     font-weight: 700;
 }
 
+/* Review #44: three fields per row so the whole overview fits the dialog
+   with no scrolling; the last field stretches over the leftover cells so
+   the final row carries no dead space. Sizes stay in em so the grid keeps
+   scaling with the dialog's clamp() font-size lever. */
 .MPC-product-search-form-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 24px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 1.5em;
+    align-content: start;
+}
+
+/* Fill a trailing gap only when the LAST field really lands mid-row; with
+   the full 12-field set (4 exact rows of 3, Discontinued From beside
+   Status) neither selector matches and every field keeps its normal size. */
+.MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n-1):last-child {
+    grid-column: span 2;
+}
+
+.MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n+1):last-child {
+    grid-column: 1 / -1;
 }
 
 .MPC-product-search-field {
     min-width: 0;
-    padding: 8px 12px;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid #D7D7D7;
 }
 
 .MPC-product-search-field-label {
     color: #5F7283;
-    font-size: 0.75rem;
+    font-size: 0.75em;
 }
 
 .MPC-product-search-field-value {
-    margin-block-start: 6px;
+    margin-block-start: 0.375em;
     overflow: hidden;
     color: #102C3F;
-    font-size: 1rem;
+    font-size: 1em;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -501,7 +531,7 @@
     min-height: 0;
     width: 100%;
     overflow: auto;
-    margin-top: 6px;
+    margin-top: 0.375em;
 }
 
 .MPC-product-search-table {
@@ -523,9 +553,9 @@
 .MPC-product-search-table th {
     flex: 1 1 0;
     min-width: 0;
-    padding: 6px 8px;
+    padding: 0.5em 0.667em;
     color: #748494;
-    font-size: 0.75rem;
+    font-size: 0.75em;
     font-weight: 400;
     text-align: start;
     overflow: hidden;
@@ -541,8 +571,8 @@
 }
 
 .MPC-product-search-table tbody tr {
-    flex: 0 0 20%;
-    min-height: 0;
+    flex: 0 0 auto;
+    min-height: 2.15em;
     display: flex;
     align-items: center;
     border-bottom: 1px solid #EDF2F6;
@@ -555,9 +585,9 @@
 .MPC-product-search-table td {
     flex: 1 1 0;
     min-width: 0;
-    padding: 4px 8px;
+    padding: 0.286em 0.5715em;
     color: #5F7283;
-    font-size: 0.875rem;
+    font-size: 0.875em;
     text-align: start;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -579,15 +609,15 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin: 0 0 10px;
+    gap: 0.48em;
+    margin: 0 0 0.8em;
     color: #748494;
-    font-size: 0.78rem;
+    font-size: 0.78em;
 }
 
 .MPC-product-search-note svg {
-    width: 14px;
-    height: 14px;
+    width: 1.12em;
+    height: 1.12em;
     flex: 0 0 auto;
     color: #0083DA;
 }
@@ -597,9 +627,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
-    padding-top: 10px;
+    padding-top: 0.833em;
     color: #748494;
-    font-size: 0.75rem;
+    font-size: 0.75em;
 }
 
 .MPC-product-search-table-pager {
@@ -609,8 +639,8 @@
 }
 
 .MPC-product-search-table-page {
-    width: 24px;
-    height: 24px;
+    width: 2.286em;
+    height: 2.286em;
     padding: 0;
     display: inline-flex;
     align-items: center;
@@ -620,7 +650,7 @@
     border: 1px solid #E4EDF4;
     border-radius: 7px;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 0.875em;
     cursor: pointer;
 }
 
@@ -645,15 +675,20 @@
 
 @media (max-width: 760px) {
     .MPC-product-search-dialog-wrap {
-        padding: 12px;
+        padding: 0.75em;
     }
 
     .MPC-product-search-dialog-body {
-        padding: 16px;
+        padding: 1em;
     }
 
     .MPC-product-search-form-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n-1):last-child,
+    .MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n+1):last-child {
+        grid-column: auto;
     }
 
     .MPC-product-search-stats {

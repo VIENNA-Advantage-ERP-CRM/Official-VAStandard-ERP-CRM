@@ -43,13 +43,17 @@ namespace VIS.Controllers
 
         /// <summary>
         /// One page of the receipt register (header-level), newest first.
+        /// Review #20: limited to one calendar month - the current month by
+        /// default, or the year/month picked in the widget's top-right filter.
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page (default 5).</param>
-        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
+        /// <param name="year">Selected year (0 = current).</param>
+        /// <param name="month">Selected month 1-12 (0 = current).</param>
+        /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages, year, month }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetReceipts(int pageNo = 1, int pageSize = 5)
+        public JsonResult GetReceipts(int pageNo = 1, int pageSize = 5, int year = 0, int month = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -63,8 +67,15 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 5; }
-            if (pageSize > 5) { pageSize = 5; }
+            if (pageSize > 50) { pageSize = 50; }
             int offset = (pageNo - 1) * pageSize;
+
+            // Review #20: resolve the month window (defaults to the current month).
+            DateTime today = DateTime.Today;
+            if (year < 2000 || year > 2100) { year = today.Year; }
+            if (month < 1 || month > 12) { month = today.Month; }
+            DateTime monthStart = new DateTime(year, month, 1);
+            DateTime monthEndExclusive = monthStart.AddMonths(1);
 
             string rawSql = @"
                 SELECT InOut.M_InOut_ID,
@@ -72,6 +83,8 @@ namespace VIS.Controllers
                        PurchaseOrder.DocumentNo AS PO_DocumentNo,
                        BPartner.Name AS BPartner_Name,
                        COALESCE(Project.Name, " + NLiteral("-") + @") AS Project_Name,
+                       Warehouse.Name AS Warehouse_Name,
+                       SalesRep.Name AS SalesRep_Name,
                        InOut.MovementDate,
                        ConfirmationData.Put_Away_On,
                        InOutLine.M_InOutLine_ID,
@@ -81,6 +94,8 @@ namespace VIS.Controllers
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN C_Order PurchaseOrder ON (PurchaseOrder.C_Order_ID=InOut.C_Order_ID AND PurchaseOrder.IsActive='Y')
                 LEFT OUTER JOIN C_Project Project ON (Project.C_Project_ID=InOut.C_Project_ID AND Project.IsActive='Y')
+                LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=InOut.M_Warehouse_ID AND Warehouse.IsActive='Y')
+                LEFT OUTER JOIN AD_User SalesRep ON (SalesRep.AD_User_ID=InOut.SalesRep_ID AND SalesRep.IsActive='Y')
                 LEFT OUTER JOIN (
                     SELECT Confirm.M_InOut_ID,
                            MAX(Confirm.Updated) AS Put_Away_On
@@ -93,7 +108,9 @@ namespace VIS.Controllers
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
                   AND InOut.DocStatus NOT IN ('RE', 'VO')
-                  AND InOut.AD_Client_ID=@AD_Client_ID";
+                  AND InOut.AD_Client_ID=@AD_Client_ID
+                  AND InOut.MovementDate>=@Month_From
+                  AND InOut.MovementDate<@Month_To";
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
@@ -108,6 +125,8 @@ namespace VIS.Controllers
                        RegisterData.Linked_PO_No,
                        RegisterData.Supplier,
                        RegisterData.Customer_Project,
+                       RegisterData.Warehouse_Name,
+                       RegisterData.SalesRep_Name,
                        RegisterData.Received_On,
                        RegisterData.Put_Away_On,
                        RegisterData.Item_Count,
@@ -119,6 +138,8 @@ namespace VIS.Controllers
                            RawData.PO_DocumentNo AS Linked_PO_No,
                            RawData.BPartner_Name AS Supplier,
                            RawData.Project_Name AS Customer_Project,
+                           RawData.Warehouse_Name,
+                           RawData.SalesRep_Name,
                            RawData.MovementDate AS Received_On,
                            RawData.Put_Away_On,
                            COUNT(RawData.M_InOutLine_ID) AS Item_Count,
@@ -131,14 +152,19 @@ namespace VIS.Controllers
                              RawData.PO_DocumentNo,
                              RawData.BPartner_Name,
                              RawData.Project_Name,
+                             RawData.Warehouse_Name,
+                             RawData.SalesRep_Name,
                              RawData.MovementDate,
                              RawData.Put_Away_On
                 ) RegisterData
                 ORDER BY RegisterData.Received_On DESC, RegisterData.Receipt_No DESC
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
+            // Parameter order matches placeholder appearance (positional binding).
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@Month_From", SqlDbType.DateTime) { Value = monthStart });
+            parameters.Add(new SqlParameter("@Month_To", SqlDbType.DateTime) { Value = monthEndExclusive });
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
 
@@ -164,6 +190,8 @@ namespace VIS.Controllers
                         linkedPoNo = Util.GetValueOfString(dr["Linked_PO_No"]),
                         supplier = Util.GetValueOfString(dr["Supplier"]),
                         customerProject = Util.GetValueOfString(dr["Customer_Project"]),
+                        warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
+                        salesRepName = Util.GetValueOfString(dr["SalesRep_Name"]),
                         receivedOn = receivedOn.HasValue ? receivedOn.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         putAwayOn = putAwayOn.HasValue ? putAwayOn.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         itemCount = Util.GetValueOfInt(dr["Item_Count"]),
@@ -177,7 +205,9 @@ namespace VIS.Controllers
                     pageNo = pageNo,
                     pageSize = pageSize,
                     totalRecords = totalRecords,
-                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize))
+                    totalPages = pageSize == 0 ? 0 : Convert.ToInt32(Math.Ceiling((decimal)totalRecords / pageSize)),
+                    year = year,
+                    month = month
                 };
 
                 return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);
