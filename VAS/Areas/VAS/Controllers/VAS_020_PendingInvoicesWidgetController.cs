@@ -20,6 +20,12 @@ namespace VAS.Areas.VAS.Controllers
     {
         string strQuery = "";
 
+        // Server-side paging bounds shared by the due-list and category drill-down endpoints.
+        private const int MinPageSize = 1;
+        private const int MaxPageSize = 50;
+        private const int DuePageSize = 4;   // "Upcoming Payments Due" rows per page in the card
+        private const int CatPageSize = 20;   // invoice rows per page in the drill-down modal
+
         [Authorize]
         public ActionResult Index()
         {
@@ -59,7 +65,7 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, c.StdPrecision
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -74,12 +80,11 @@ namespace VAS.Areas.VAS.Controllers
             {
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol    = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
+                result.CurIso       = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
             }
 
             if (schemaCurrencyId == 0) { return result; }
-
-            string sym = result.CurSymbol;
 
             // Round-trip 2 — Needs Attention: invoices not yet completed/closed (DR, IP, WC, NA).
             // MRole on join-free C_Invoice base.
@@ -192,8 +197,95 @@ namespace VAS.Areas.VAS.Controllers
             result.TotalPending = result.AwaitingApprovalCount + result.GrnMismatchCount
                                 + result.PoNotRaisedCount      + result.ReadyToPayCount;
 
-            // Round-trip 6 — Upcoming due payments (next 14 days), sorted by DueDate ascending.
-            // MRole on join-free C_Invoice base; C_BPartner join and date filter in outer query.
+            // Round-trip 6 — Upcoming due payments (next 14 days). Server-side paged: return the
+            // first page and the total count so the widget can render a footer pager (design.md).
+            int dueTotal;
+            result.DueItems      = LoadDuePage(ctx, schemaCurrencyId, dataParams, todayInt, plus14Int, now, 1, DuePageSize, out dueTotal);
+            result.DueTotalCount = dueTotal;
+            result.DuePageSize   = DuePageSize;
+
+            return result;
+        }
+
+        /// <summary>
+        /// Returns one page of the "Upcoming Payments Due" list (server-side paging) so the widget
+        /// can page through it via a footer pager without loading every row.
+        /// </summary>
+        public JsonResult GetDuePayments(int pageNo = 1, int pageSize = DuePageSize)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                DuePageResult result = BuildDuePage(ctx, pageNo, pageSize);
+                retJSON = JsonConvert.SerializeObject(result);
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        private DuePageResult BuildDuePage(Ctx ctx, int pageNo, int pageSize)
+        {
+            if (pageSize < MinPageSize) { pageSize = MinPageSize; }
+            if (pageSize > MaxPageSize) { pageSize = MaxPageSize; }
+
+            var result = new DuePageResult
+            {
+                DueItems = new List<DueItem>(),
+                PageNo   = 1,
+                PageSize = pageSize
+            };
+
+            int clientId = ctx.GetAD_Client_ID();
+            SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId) };
+            DateTime now = DateTime.Now;
+            int todayInt  = (now.Year * 12 + now.Month) * 31 + now.Day;
+            int plus14Int = (now.AddDays(14).Year * 12 + now.AddDays(14).Month) * 31 + now.AddDays(14).Day;
+
+            int schemaCurrencyId = 0;
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.ISO_Code, c.StdPrecision
+                    FROM C_AcctSchema cs
+                    INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
+                    INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
+                   WHERE ci.AD_Client_ID = @ClientID
+                     AND ci.IsActive = 'Y'
+                     AND cs.IsActive = 'Y'
+                     AND c.IsActive = 'Y'";
+            strQuery = MRole.GetDefault(ctx).AddAccessSQL(strQuery, "cs", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            DataSet cDs = DB.ExecuteDataset(strQuery, dataParams, null);
+            if (cDs != null && cDs.Tables.Count > 0 && cDs.Tables[0].Rows.Count > 0)
+            {
+                schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
+                result.CurSymbol    = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
+                result.CurIso       = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
+                result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+            }
+
+            if (schemaCurrencyId == 0) { return result; }
+
+            int total;
+            result.DueItems   = LoadDuePage(ctx, schemaCurrencyId, dataParams, todayInt, plus14Int, now, pageNo, pageSize, out total);
+            result.TotalCount = total;
+            result.TotalPages = (total + pageSize - 1) / pageSize;
+            if (pageNo < 1) { pageNo = 1; }
+            if (result.TotalPages > 0 && pageNo > result.TotalPages) { pageNo = result.TotalPages; }
+            result.PageNo = pageNo;
+            return result;
+        }
+
+        /// <summary>
+        /// Builds the "upcoming due (next 14 days)" list for a single page, plus the total row
+        /// count (via a COUNT of the same set). MRole on the join-free C_Invoice base; the
+        /// C_InvoicePaySchedule / C_BPartner joins, date window and paging are in the outer query.
+        /// </summary>
+        private List<DueItem> LoadDuePage(Ctx ctx, int schemaCurrencyId, SqlParameter[] dataParams,
+                                          int todayInt, int plus14Int, DateTime now,
+                                          int pageNo, int pageSize, out int totalCount)
+        {
+            var items = new List<DueItem>();
+            totalCount = 0;
+            if (pageNo < 1) { pageNo = 1; }
+
             string baseDue = @"SELECT i.C_Invoice_ID, i.C_BPartner_ID, i.C_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID, i.IsReturnTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
@@ -203,12 +295,15 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.AD_Client_ID = @ClientID";
             baseDue = MRole.GetDefault(ctx).AddAccessSQL(baseDue, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            strQuery = @"SELECT bp.Name AS VendorName,
+            string dueInt = "((EXTRACT(YEAR FROM ips.DueDate) * 12 + EXTRACT(MONTH FROM ips.DueDate)) * 31 + EXTRACT(DAY FROM ips.DueDate))";
+            string dueCore = @"SELECT bp.Name AS VendorName,
                        CASE WHEN d.IsReturnTrx = 'N'
                             THEN COALESCE(currencyConvert(ips.DueAmt, d.C_Currency_ID, " + schemaCurrencyId + @", d.DateAcct, d.C_ConversionType_ID, d.AD_Client_ID, d.AD_Org_ID), 0)
                             ELSE -COALESCE(currencyConvert(ips.DueAmt, d.C_Currency_ID, " + schemaCurrencyId + @", d.DateAcct, d.C_ConversionType_ID, d.AD_Client_ID, d.AD_Org_ID), 0)
                             END AS OpenAmt,
-                       ips.DueDate
+                       ips.DueDate AS DueDate,
+                       " + dueInt + @" AS DueInt,
+                       d.C_Invoice_ID AS InvID
                   FROM (" + baseDue + @") d
                  INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID = d.C_Invoice_ID)
                  INNER JOIN C_BPartner bp ON (d.C_BPartner_ID = bp.C_BPartner_ID)
@@ -216,62 +311,83 @@ namespace VAS.Areas.VAS.Controllers
                    AND ips.VA009_IsPaid = 'N'
                    AND ips.DueAmt > 0
                    AND ips.DueDate IS NOT NULL
-                   AND ((EXTRACT(YEAR FROM ips.DueDate) * 12 + EXTRACT(MONTH FROM ips.DueDate)) * 31 + EXTRACT(DAY FROM ips.DueDate)) >= " + todayInt + @"
-                   AND ((EXTRACT(YEAR FROM ips.DueDate) * 12 + EXTRACT(MONTH FROM ips.DueDate)) * 31 + EXTRACT(DAY FROM ips.DueDate)) <= " + plus14Int + @"
-                   AND bp.IsActive = 'Y'
-                 ORDER BY ((EXTRACT(YEAR FROM ips.DueDate) * 12 + EXTRACT(MONTH FROM ips.DueDate)) * 31 + EXTRACT(DAY FROM ips.DueDate)) ASC";
+                   AND " + dueInt + " >= " + todayInt + @"
+                   AND " + dueInt + " <= " + plus14Int + @"
+                   AND bp.IsActive = 'Y'";
+
+            // Total count for the pager.
+            DataSet cntDs = DB.ExecuteDataset("SELECT COUNT(1) AS Cnt FROM (" + dueCore + ") dc", dataParams, null);
+            if (cntDs != null && cntDs.Tables.Count > 0 && cntDs.Tables[0].Rows.Count > 0)
+            {
+                totalCount = Util.GetValueOfInt(cntDs.Tables[0].Rows[0]["Cnt"]);
+            }
+
+            // Clamp the requested page to the count BEFORE building the offset — otherwise a
+            // page beyond the end (e.g. after a zoom-out grows the page size and shrinks the
+            // page count) would query past the data and return an empty page.
+            int totalPages = (totalCount + pageSize - 1) / pageSize;
+            if (totalPages > 0 && pageNo > totalPages) { pageNo = totalPages; }
+            if (pageNo < 1) { pageNo = 1; }
+
+            int offset = (pageNo - 1) * pageSize;
+            string ordered = dueCore + " ORDER BY DueInt ASC, InvID ASC";
+            if (DB.IsPostgreSQL())
+            {
+                strQuery = ordered + " LIMIT " + pageSize + " OFFSET " + offset;
+            }
+            else
+            {
+                strQuery = "SELECT * FROM (SELECT t.*, ROWNUM rn FROM (" + ordered + ") t WHERE ROWNUM <= " + (offset + pageSize) + ") WHERE rn > " + offset;
+            }
 
             DataSet dsDue = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsDue != null && dsDue.Tables.Count > 0)
             {
-                int rowCount = 0;
                 foreach (DataRow row in dsDue.Tables[0].Rows)
                 {
-                    if (rowCount >= 5) { break; }
                     DateTime? dueDateNullable = Util.GetValueOfDateTime(row["DueDate"]);
                     if (dueDateNullable == null) { continue; }
-                    DateTime dueDate   = dueDateNullable.Value;
-                    int      daysUntil = (dueDate.Date - now.Date).Days;
-                    result.DueItems.Add(new DueItem
+                    DateTime dueDate = dueDateNullable.Value;
+                    items.Add(new DueItem
                     {
                         VendorName   = Util.GetValueOfString(row["VendorName"]),
                         DueDateStr   = dueDate.ToString("MMM d, yyyy"),
                         OpenAmt      = Util.GetValueOfDecimal(row["OpenAmt"]),
-                        DaysUntilDue = daysUntil
+                        DaysUntilDue = (dueDate.Date - now.Date).Days
                     });
-                    rowCount++;
                 }
             }
-
-            return result;
+            return items;
         }
 
         /// <summary>
         /// Returns invoice headers behind a clicked KPI tile. The category filters mirror
         /// the KPI queries above, but amounts stay in the invoice transaction currency.
         /// </summary>
-        public JsonResult GetCategoryInvoices(string category, int maxRows = 25, int offset = 0)
+        public JsonResult GetCategoryInvoices(string category, int pageNo = 1, int pageSize = CatPageSize)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
-                CategoryInvoicesResult result = BuildCategoryInvoices(ctx, category, maxRows, offset);
+                CategoryInvoicesResult result = BuildCategoryInvoices(ctx, category, pageNo, pageSize);
                 retJSON = JsonConvert.SerializeObject(result);
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
-        private CategoryInvoicesResult BuildCategoryInvoices(Ctx ctx, string category, int maxRows, int offset)
+        private CategoryInvoicesResult BuildCategoryInvoices(Ctx ctx, string category, int pageNo, int pageSize)
         {
+            if (pageSize < MinPageSize) { pageSize = MinPageSize; }
+            if (pageSize > MaxPageSize) { pageSize = MaxPageSize; }
+            if (pageNo < 1) { pageNo = 1; }
+
             var result = new CategoryInvoicesResult
             {
-                Items = new List<CategoryInvoiceRow>()
+                Items    = new List<CategoryInvoiceRow>(),
+                PageNo   = 1,
+                PageSize = pageSize
             };
-
-            if (maxRows < 1) { maxRows = 1; }
-            if (maxRows > 50) { maxRows = 50; }
-            if (offset < 0) { offset = 0; }
 
             string baseWhere;
             string outerWhere = "";
@@ -328,13 +444,24 @@ namespace VAS.Areas.VAS.Controllers
                  LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID = b.C_Currency_ID)
                  WHERE bp.IsActive = 'Y'" + outerWhere;
 
+            // Total count for the pager, then clamp the requested page to it.
+            DataSet cntDs = DB.ExecuteDataset("SELECT COUNT(1) AS Cnt FROM (" + core + ") cc", dataParams, null);
+            if (cntDs != null && cntDs.Tables.Count > 0 && cntDs.Tables[0].Rows.Count > 0)
+            {
+                result.TotalCount = Util.GetValueOfInt(cntDs.Tables[0].Rows[0]["Cnt"]);
+            }
+            result.TotalPages = (result.TotalCount + pageSize - 1) / pageSize;
+            if (result.TotalPages > 0 && pageNo > result.TotalPages) { pageNo = result.TotalPages; }
+            result.PageNo = pageNo;
+
+            int offset = (pageNo - 1) * pageSize;
             if (DB.IsPostgreSQL())
             {
-                strQuery = core + " ORDER BY DocDate DESC, DocumentNo DESC, InvID DESC LIMIT " + maxRows + " OFFSET " + offset;
+                strQuery = core + " ORDER BY DocDate DESC, DocumentNo DESC, InvID DESC LIMIT " + pageSize + " OFFSET " + offset;
             }
             else
             {
-                strQuery = "SELECT * FROM (SELECT t.*, ROWNUM rn FROM (" + core + " ORDER BY DocDate DESC, DocumentNo DESC, InvID DESC) t WHERE ROWNUM <= " + (offset + maxRows) + ") WHERE rn > " + offset;
+                strQuery = "SELECT * FROM (SELECT t.*, ROWNUM rn FROM (" + core + " ORDER BY DocDate DESC, DocumentNo DESC, InvID DESC) t WHERE ROWNUM <= " + (offset + pageSize) + ") WHERE rn > " + offset;
             }
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
@@ -360,17 +487,10 @@ namespace VAS.Areas.VAS.Controllers
             return result;
         }
 
-        private static string FormatAmount(decimal amount, string sym, int precision)
-        {
-            if (amount >= 10000000m) { return sym + Math.Round(amount / 10000000m, 1) + "Cr"; }
-            if (amount >= 100000m)   { return sym + Math.Round(amount / 100000m,   1) + "L";  }
-            if (amount >= 1000m)     { return sym + Math.Round(amount / 1000m,      1) + "K";  }
-            return sym + Math.Round(amount, precision);
-        }
-
         public class PendingInvoicesResult
         {
             public string        CurSymbol              { get; set; }
+            public string        CurIso                 { get; set; }
             public int           StdPrecision           { get; set; }
             public int           TotalPending           { get; set; }
             public int           AwaitingApprovalCount  { get; set; }
@@ -382,6 +502,8 @@ namespace VAS.Areas.VAS.Controllers
             public int           ReadyToPayCount        { get; set; }
             public decimal       ReadyToPayAmt          { get; set; }
             public List<DueItem> DueItems               { get; set; }
+            public int           DueTotalCount          { get; set; }
+            public int           DuePageSize            { get; set; }
         }
 
         public class DueItem
@@ -392,9 +514,25 @@ namespace VAS.Areas.VAS.Controllers
             public int     DaysUntilDue { get; set; }
         }
 
+        public class DuePageResult
+        {
+            public string        CurSymbol    { get; set; }
+            public string        CurIso       { get; set; }
+            public int           StdPrecision { get; set; }
+            public int           PageNo       { get; set; }
+            public int           PageSize     { get; set; }
+            public int           TotalPages   { get; set; }
+            public int           TotalCount   { get; set; }
+            public List<DueItem> DueItems     { get; set; }
+        }
+
         public class CategoryInvoicesResult
         {
-            public List<CategoryInvoiceRow> Items { get; set; }
+            public List<CategoryInvoiceRow> Items      { get; set; }
+            public int                      PageNo     { get; set; }
+            public int                      PageSize   { get; set; }
+            public int                      TotalPages { get; set; }
+            public int                      TotalCount { get; set; }
         }
 
         public class CategoryInvoiceRow

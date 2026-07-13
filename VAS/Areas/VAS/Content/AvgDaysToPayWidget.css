@@ -11,6 +11,21 @@
     height: 100%;
     container-type: inline-size;
     font-family: Roboto, sans-serif;
+    /* Positioning context for the absolute busy overlay below. */
+    position: relative;
+}
+
+/* Busy/loading overlay over the card while data is fetched (initial load + refresh);
+   the inner spinner uses the core busy-indicator classes. */
+.vas-adtp-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 0.875em;
+    z-index: 999;
 }
 
 .vas-adtp-card {
@@ -59,6 +74,11 @@
     height: 1.125em;
 }
 
+/* Label column: lets long text wrap/ellipsis instead of pushing the card wider. */
+.vas-adtp-labels {
+    min-width: 0;
+}
+
 .vas-adtp-title {
     /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
        Header"): same resolved px in every widget at any screen size. */
@@ -66,6 +86,16 @@
     font-weight: 400;
     color: #102C3F;
     line-height: 1.3;
+}
+
+/* Header subtitle under the title (design.md §"Widget Header"): xs token, muted,
+   one step below the title so it reads as secondary. */
+.vas-adtp-header-subtitle {
+    margin-top: 1px;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    letter-spacing: 0.3px;
+    color: #748494;
+    line-height: 1.2;
 }
 
 /* ── Metric: large number + muted 'd' suffix (block keeps RTL number order) ── */
@@ -102,7 +132,7 @@
        muted, one step below the label so the explanation reads as secondary. */
     font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
     color: #717182;
-    margin-top: auto;
+    /*margin-top: auto;*/
     line-height: 1.3;
 }
 

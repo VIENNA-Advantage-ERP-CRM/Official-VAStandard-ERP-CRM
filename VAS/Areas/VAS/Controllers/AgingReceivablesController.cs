@@ -33,7 +33,8 @@ namespace VIS.Controllers
                        CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
-                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)";
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)
+                WHERE ci.AD_Client_ID=" + ctx.GetAD_Client_ID();
 
             /* Days overdue = today − DueDate, built per database.
                PostgreSQL: CAST(CURRENT_DATE AS DATE) − CAST(ips.DueDate AS DATE) was resolving
@@ -117,17 +118,22 @@ namespace VIS.Controllers
                 bucketed AS (
                     " + bucketedSql + @"
                 )
-                SELECT ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Not_Due' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Not_Due_Amount,
-                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_1_30' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_1_30_Amount,
-                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_31_60' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_31_60_Amount,
-                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_61_90' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_61_90_Amount,
-                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_91_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_91_120_Amount,
-                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_Over_120' THEN b.Amt END), 0), MAX(sc.StdPrecision)) AS Days_Over_120_Amount,
-                       MAX(sc.Cur_Symbol) AS Currency_Symbol,
-                       MAX(sc.ISO_Code) AS ISO_Code,
-                       MAX(sc.StdPrecision) AS Std_Precision
-                FROM bucketed b
-                INNER JOIN schema_currency sc ON (sc.AD_Client_ID=b.AD_Client_ID)";
+                SELECT ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Not_Due' THEN b.Amt END), 0), sc.StdPrecision) AS Not_Due_Amount,
+                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_1_30' THEN b.Amt END), 0), sc.StdPrecision) AS Days_1_30_Amount,
+                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_31_60' THEN b.Amt END), 0), sc.StdPrecision) AS Days_31_60_Amount,
+                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_61_90' THEN b.Amt END), 0), sc.StdPrecision) AS Days_61_90_Amount,
+                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_91_120' THEN b.Amt END), 0), sc.StdPrecision) AS Days_91_120_Amount,
+                       ROUND(COALESCE(SUM(CASE WHEN b.Bucket='Days_Over_120' THEN b.Amt END), 0), sc.StdPrecision) AS Days_Over_120_Amount,
+                       sc.Cur_Symbol AS Currency_Symbol,
+                       sc.ISO_Code AS ISO_Code,
+                       sc.StdPrecision AS Std_Precision
+                /* Drive FROM the single-row schema_currency CTE and LEFT JOIN the buckets so the
+                   base-currency symbol/precision are always returned - even with zero unpaid
+                   invoices (the buckets are empty but the currency row survives). Mirrors
+                   OutstandingSalesOrderController. */
+                FROM schema_currency sc
+                LEFT OUTER JOIN bucketed b ON (b.AD_Client_ID=sc.AD_Client_ID)
+                GROUP BY sc.Cur_Symbol, sc.ISO_Code, sc.StdPrecision";
 
             object result = null;
             IDataReader dr = null;

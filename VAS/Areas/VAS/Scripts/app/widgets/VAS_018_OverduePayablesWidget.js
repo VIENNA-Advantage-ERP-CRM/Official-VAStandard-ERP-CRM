@@ -39,12 +39,33 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the title / subtitle / metric / why clamps resolve against the
+       dashboard's visible width, not the viewport. One document-level ResizeObserver
+       serves every widget; without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. (Mirrors VIS.OverdueWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_018_OverduePayablesWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-opwdg-root">');
+        var $root = $('<div class="h-100 w-100 vas-opwdg-root">');
         var $container;
         var $overdueDialog = null;
         var widgetID = null;
@@ -89,6 +110,15 @@
                 e.stopPropagation();
                 openOverdueDialog();
             });
+            // The clickable overlay is a <div role="button">, so it has no native
+            // keyboard activation — wire Enter / Space up manually.
+            $container.on('keydown', '.vas-opwdg-open', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openOverdueDialog();
+                }
+            });
             $root.append($container);
         }
 
@@ -96,53 +126,38 @@
         function renderKpi(data) {
             $container.empty();
 
-            var sym = data.CurSymbol || '';
-            var overdueFormatted = formatAmount(data.OverdueTotal, data.StdPrecision);
+            var count = data.InvoiceCount || 0;
+            var invoiceLabel = count !== 1
+                ? msg('VAS_018_InvoicesLower', 'invoices')
+                : msg('VAS_018_InvoiceLower', 'invoice');
+            var whyText = count > 0
+                ? msg('VAS_018_PastDueDatePrefix', 'Past due date ·') + ' ' + count + ' ' + invoiceLabel
+                    + ' · ' + msg('VAS_018_ChaseFirst', 'chase these first.')
+                : msg('VAS_018_NoOverdue', 'No overdue payables.');
 
-            var trendPct = 0;
-            if (data.LastMonthOverdue && data.LastMonthOverdue !== 0) {
-                trendPct = ((data.CurrentMonthOverdue - data.LastMonthOverdue) / Math.abs(data.LastMonthOverdue)) * 100;
-            } else if (data.CurrentMonthOverdue > 0) {
-                trendPct = 100;
-            }
-
-            // For overdue: positive (more overdue) = critical (bad), negative (less) = improving.
-            // Arrow direction reflects financial health: worsening = down arrow.
-            var isCritical = trendPct >= 0;
-            var trendClass = isCritical ? 'vas-opwdg-trend-down' : 'vas-opwdg-trend-up';
-            var trendSign = trendPct >= 0 ? '+' : '';
-            var trendWord = isCritical ? msg('VAS_018_Critical', 'critical') : msg('VAS_018_Improving', 'improving');
-            var arrowPoints = isCritical ? '6 9 12 15 18 9' : '18 15 12 9 6 15';
-
-            var avgDpdDisplay = data.AvgDpd + msg('VAS_018_DaySuffix', 'd');
-            var sparkSvg = buildSparklineSvg(data.SparklineData || []);
-
-            var html = '<div class="vas-opwdg-label">' + msg('VAS_018_OverduePayables', 'Overdue Payables') + '</div>'
-                + '<div class="vas-opwdg-value" id="vas_opwdg_val_' + widgetID + '">'
-                +   sym + overdueFormatted
-                + '</div>'
-                + '<div class="vas-opwdg-pills-row">'
-                +   '<div class="vas-opwdg-pill">'
-                +     '<span class="vas-opwdg-pill-label">' + msg('VAS_018_Invoices', 'Invoices') + '</span>'
-                +     '<span class="vas-opwdg-pill-value">' + data.InvoiceCount + '</span>'
-                +   '</div>'
-                +   '<div class="vas-opwdg-pill">'
-                +     '<span class="vas-opwdg-pill-label">' + msg('VAS_018_AvgDpd', 'Avg DPD') + '</span>'
-                +     '<span class="vas-opwdg-pill-value">' + avgDpdDisplay + '</span>'
-                +   '</div>'
-                + '</div>'
-                + '<div class="vas-opwdg-trend-row ' + trendClass + '">'
-                +   '<svg class="vas-opwdg-trend-icon" viewBox="0 0 24 24" fill="none"'
-                +       ' stroke="currentColor" stroke-width="2.5"'
+            // Structure mirrors VIS.OverdueWidget: header (tinted icon + title + subtitle),
+            // large metric, and a WHY explanatory line. No pills row / trend row.
+            var html = '<div class="vas-opwdg-header">'
+                +   '<div class="vas-opwdg-icon">'
+                +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
                 +       ' stroke-linecap="round" stroke-linejoin="round">'
-                +     '<polyline points="' + arrowPoints + '"/>'
-                +   '</svg>'
-                +   trendSign + Math.abs(trendPct).toFixed(1) + '% ' + trendWord
+                +       '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'
+                +     '</svg>'
+                +   '</div>'
+                +   '<div class="vas-opwdg-head-text">'
+                +     '<div class="vas-opwdg-label">' + msg('VAS_018_OverduePayables', 'Overdue Payables') + '</div>'
+                +     '<div class="vas-opwdg-subtitle">' + msg('VAS_018_PastDueDate', 'Past due date') + '</div>'
+                +   '</div>'
                 + '</div>'
-                + sparkSvg
-                + '<button type="button" class="vas-opwdg-open" aria-label="'
+                + '<div class="vas-opwdg-value" id="vas_opwdg_val_' + widgetID + '">'
+                +   formatMetric(data.OverdueTotal, data.CurSymbol, data.CurIso, data.StdPrecision)
+                + '</div>'
+                + '<div class="vas-opwdg-why-wrap">'
+                +   '<span class="vas-opwdg-why-text">' + opEsc(whyText) + '</span>'
+                + '</div>'
+                + '<div class="vas-opwdg-open" role="button" tabindex="0" aria-label="'
                 +   opEsc(msg('VAS_018_OpenDrilldown', 'Open overdue payables breakdown'))
-                + '"></button>';
+                + '"></div>';
 
             $container.append(html);
         }
@@ -184,7 +199,10 @@
         }
 
         function loadOverdueDrilldown() {
-            $overdueDialog.html('<div class="vas-opwdg-drill-state">' + opEsc(msg('VAS_018_Loading', 'Loading...')) + '</div>');
+            // Open the dialog immediately with the core busy spinner so the user sees
+            // a loading state while the drill-down data is fetched.
+            $overdueDialog.html('<div class="vas-opwdg-drill-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            showOverdueDialog();
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS/VAS_018_OverduePayablesWidget/GetOverdueDrilldown',
@@ -233,16 +251,6 @@
             var precision = data.StdPrecision != null ? data.StdPrecision : 2;
             var total = data.OverdueTotal ? data.OverdueTotal : 0;
 
-            var trendPct = 0;
-            if (data.LastMonthOverdue && data.LastMonthOverdue !== 0) {
-                trendPct = ((data.CurrentMonthOverdue - data.LastMonthOverdue) / Math.abs(data.LastMonthOverdue)) * 100;
-            } else if (data.CurrentMonthOverdue > 0) {
-                trendPct = 100;
-            }
-            var isCritical = trendPct >= 0;
-            var trendWord = isCritical ? msg('VAS_018_Critical', 'critical') : msg('VAS_018_Improving', 'improving');
-            var trendClass = isCritical ? 'vas-opwdg-drill-trend-bad' : 'vas-opwdg-drill-trend-good';
-
             var summaryText = formatQty(data.InvoiceCount || 0) + ' ' + msg('VAS_018_InvoicesAreOverdue', 'invoices are overdue.')
                 + ' ' + msg('VAS_018_AvgDaysPastDue', 'Average days past due:') + ' '
                 + formatQty(data.AvgDpd || 0) + msg('VAS_018_DaySuffix', 'd') + '. '
@@ -263,9 +271,7 @@
             var html = '<div class="vas-opwdg-drill">'
                 + '<div class="vas-opwdg-drill-card">'
                 +   '<span class="vas-opwdg-drill-card-label">' + opEsc(msg('VAS_018_OverdueAmount', 'Overdue Amount')) + '</span>'
-                +   '<strong class="vas-opwdg-drill-card-value" title="' + opEsc(totalTip) + '">' + opEsc(sym + formatAmount(total, precision)) + '</strong>'
-                +   '<em class="vas-opwdg-drill-card-trend ' + trendClass + '">' + (trendPct >= 0 ? '+' : '')
-                +     Math.abs(trendPct).toFixed(1) + '% ' + opEsc(trendWord) + '</em>'
+                +   '<strong class="vas-opwdg-drill-card-value" title="' + opEsc(totalTip) + '">' + opEsc(sym + VIS.Util.formatCompactAmount(total, data.CurIso, precision)) + '</strong>'
                 + '</div>'
                 + '<div class="vas-opwdg-drill-copy">'
                 +   '<p class="vas-opwdg-drill-desc">' + opEsc(summaryText) + '</p>'
@@ -278,7 +284,7 @@
                 var width = maxAmount > 0 ? (amount / maxAmount) * 100 : 0;
                 width = Math.max(0, Math.min(100, width));
                 var barWidth = width > 0 ? Math.max(2, width) : 0;
-                var rowValue = sym + formatAmount(amount, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
+                var rowValue = sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
                 var rowTip = sym + ' ' + formatFull(amount, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
 
                 html += '<div class="vas-opwdg-drill-row">'
@@ -394,57 +400,16 @@
             }
         };
 
-        /* ---- Number formatter: Trillion / Billion / Crore / Lakh / Thousand / raw ---- */
-        function formatAmount(number, stdPrecision) {
-            var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var isNegative = number < 0;
-            var absNumber = Math.abs(number);
-            var formatted;
-            var unit = '';
-            var opts2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-            var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
-
-            if (absNumber >= 1000000000000) {
-                unit = msg('VAS_018_Trillion', 'T');
-                formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000000000) {
-                unit = msg('VAS_018_Billion', 'B');
-                formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 10000000) {
-                unit = msg('VAS_018_Crore', 'Cr');
-                formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 100000) {
-                unit = msg('VAS_018_Lakh', 'L');
-                formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000) {
-                unit = msg('VAS_018_Thousand', 'K');
-                formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
-            } else {
-                formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
-            }
-
-            return (isNegative ? '-' : '') + formatted + unit;
-        }
-
-        /* ---- Build sparkline SVG from monthly data array ---- */
-        function buildSparklineSvg(data) {
-            if (!data || data.length < 2) { return ''; }
-            var W = 90, H = 48, pad = 3;
-            var maxVal = Math.max.apply(null, data);
-            var minVal = Math.min.apply(null, data);
-            if (maxVal === minVal) { maxVal = minVal + 1; }
-            var xStep = (W - pad * 2) / (data.length - 1);
-            var pts = [];
-            for (var i = 0; i < data.length; i++) {
-                var x = pad + i * xStep;
-                var y = H - pad - ((data[i] - minVal) / (maxVal - minVal)) * (H - pad * 2);
-                pts.push(x.toFixed(1) + ',' + y.toFixed(1));
-            }
-            return '<svg class="vas-opwdg-sparkline" width="' + W + '" height="' + H
-                + '" viewBox="0 0 ' + W + ' ' + H + '">'
-                + '<polyline points="' + pts.join(' ') + '" fill="none"'
-                + ' stroke="#D78B10" stroke-width="2.2" stroke-linecap="round"/>'
-                + '</svg>';
+        /* Compose the KPI metric via the shared CurrencyFormat util
+           (VIS.Util.formatCompactAmount): sign, then the currency-symbol span, then
+           the compact magnitude (Indian vs international per the base-currency ISO).
+           Mirrors VIS.OverdueWidget.formatMetric. */
+        function formatMetric(value, symbol, isoCode, precision) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
+            var symHtml = symbol ? '<span class="vas-opwdg-cur">' + opEsc(symbol) + '</span>' : '';
+            return sign + symHtml + absStr;
         }
 
         /* ---- Busy indicator ---- */
@@ -473,6 +438,8 @@
         this.windowNo = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () {
             self.intialLoad();

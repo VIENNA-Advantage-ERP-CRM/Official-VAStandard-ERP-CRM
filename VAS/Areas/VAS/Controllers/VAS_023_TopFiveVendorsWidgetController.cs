@@ -27,9 +27,9 @@ namespace VAS.Areas.VAS.Controllers
         }
 
         /// <summary>
-        /// Returns top 5 vendors by purchase spend for the current Indian fiscal year (April–March),
-        /// with prior-year amounts for YoY comparison.
-        /// Uses 2 DB round-trips: 1 currency + 1 vendor aggregation.
+        /// Returns top 5 vendors by purchase spend for the current fiscal year (taken from the
+        /// client's configured accounting calendar), with prior fiscal-year amounts for YoY.
+        /// Uses 3 DB round-trips: 1 currency + 1 fiscal-year bounds + 1 vendor aggregation.
         /// MRole applied only to the join-free C_Invoice base query.
         /// C_BPartner and C_BP_Group joins are in the outer query outside MRole scope.
         /// </summary>
@@ -54,19 +54,10 @@ namespace VAS.Areas.VAS.Controllers
 
             int clientId = ctx.GetAD_Client_ID();
             SqlParameter[] dataParams   = { new SqlParameter("@ClientID", clientId) };
-            DateTime now = DateTime.Now;
-
-            // Indian fiscal year: April 1 – March 31
-            int fyStartYear = now.Month >= 4 ? now.Year : now.Year - 1;
-            int fyStart     = (fyStartYear       * 12 + 4) * 31 + 1;
-            int fyEnd       = ((fyStartYear + 1)  * 12 + 3) * 31 + 31;
-            int prevFyStart = ((fyStartYear - 1)  * 12 + 4) * 31 + 1;
-            int prevFyEnd   = (fyStartYear         * 12 + 3) * 31 + 31;
-            result.FyLabel  = "FY " + fyStartYear + "–" + (fyStartYear + 1).ToString().Substring(2);
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision, c.ISO_Code
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -82,11 +73,94 @@ namespace VAS.Areas.VAS.Controllers
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol    = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+                result.CurIso       = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
             }
 
             if (schemaCurrencyId == 0) { return result; }
 
-            // Round-trip 2 — vendor spend aggregation for current FY and prior FY.
+            // Round-trip 2 — current & previous FISCAL YEAR date ranges from the client's
+            // configured accounting calendar (AD_ClientInfo -> C_Calendar -> C_Year ->
+            // C_Period). Each fiscal year's span is MIN(StartDate)..MAX(EndDate) over its
+            // standard periods; the year whose span contains today is the current FY and the
+            // one immediately before it is the prior FY. This honours whatever calendar the
+            // client uses (Apr–Mar, Jan–Dec, Jul–Jun, …) instead of assuming Apr–Mar.
+            // Not MRole-wrapped: setup/reference tables, already scoped by AD_Client_ID
+            // (mirrors AvgDaysToPayController's fiscal-period query).
+            DateTime today = DateTime.Today;
+            DateTime curStart = today, curEnd = today, prevStart = today, prevEnd = today;
+            bool fyResolved = false;
+
+            strQuery = @"SELECT yr.FiscalYear AS FiscalYear,
+                        MIN(p.StartDate) AS YrStart,
+                        MAX(p.EndDate)   AS YrEnd
+                   FROM AD_ClientInfo ci
+                  INNER JOIN C_Calendar cal ON (ci.C_Calendar_ID = cal.C_Calendar_ID)
+                  INNER JOIN C_Year yr      ON (yr.C_Calendar_ID = cal.C_Calendar_ID)
+                  INNER JOIN C_Period p     ON (p.C_Year_ID = yr.C_Year_ID)
+                  WHERE ci.AD_Client_ID = @ClientID
+                    AND ci.IsActive = 'Y'
+                    AND yr.IsActive = 'Y'
+                    AND p.IsActive = 'Y'
+                    AND p.PeriodType = 'S'
+                  GROUP BY yr.C_Year_ID, yr.FiscalYear
+                  ORDER BY MIN(p.StartDate)";
+
+            DataSet fyDs = DB.ExecuteDataset(strQuery, dataParams, null);
+            if (fyDs != null && fyDs.Tables.Count > 0 && fyDs.Tables[0].Rows.Count > 0)
+            {
+                DataRowCollection rows = fyDs.Tables[0].Rows;
+                int curIdx = -1;
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    DateTime s = Util.GetValueOfDateTime(rows[i]["YrStart"]).Value.Date;
+                    DateTime e = Util.GetValueOfDateTime(rows[i]["YrEnd"]).Value.Date;
+                    if (today >= s && today <= e) { curIdx = i; break; }
+                }
+                // If today is outside every defined year (gap/future), use the latest started year.
+                if (curIdx < 0)
+                {
+                    for (int i = rows.Count - 1; i >= 0; i--)
+                    {
+                        if (today >= Util.GetValueOfDateTime(rows[i]["YrStart"]).Value.Date) { curIdx = i; break; }
+                    }
+                }
+                if (curIdx >= 0)
+                {
+                    curStart = Util.GetValueOfDateTime(rows[curIdx]["YrStart"]).Value.Date;
+                    curEnd   = Util.GetValueOfDateTime(rows[curIdx]["YrEnd"]).Value.Date;
+                    result.FyLabel = "FY " + Util.GetValueOfString(rows[curIdx]["FiscalYear"]);
+                    if (curIdx > 0)
+                    {
+                        prevStart = Util.GetValueOfDateTime(rows[curIdx - 1]["YrStart"]).Value.Date;
+                        prevEnd   = Util.GetValueOfDateTime(rows[curIdx - 1]["YrEnd"]).Value.Date;
+                    }
+                    else
+                    {
+                        // No earlier fiscal year defined — use the 1-year window before current.
+                        prevStart = curStart.AddYears(-1);
+                        prevEnd   = curStart.AddDays(-1);
+                    }
+                    fyResolved = true;
+                }
+            }
+
+            if (!fyResolved)
+            {
+                // Fallback — Apr 1 to Mar 31 Indian fiscal year.
+                int fyStartYear = today.Month >= 4 ? today.Year : today.Year - 1;
+                curStart  = new DateTime(fyStartYear, 4, 1);
+                curEnd    = new DateTime(fyStartYear + 1, 3, 31);
+                prevStart = new DateTime(fyStartYear - 1, 4, 1);
+                prevEnd   = new DateTime(fyStartYear, 3, 31);
+                result.FyLabel = "FY " + fyStartYear + "–" + (fyStartYear + 1).ToString().Substring(2);
+            }
+
+            string curStartLit  = curStart.ToString("yyyy-MM-dd");
+            string curEndLit    = curEnd.ToString("yyyy-MM-dd");
+            string prevStartLit = prevStart.ToString("yyyy-MM-dd");
+            string prevEndLit   = prevEnd.ToString("yyyy-MM-dd");
+
+            // Round-trip 3 — vendor spend aggregation for current FY and prior FY.
             // MRole on join-free C_Invoice base; C_BPartner + C_BP_Group joins in outer query.
             string baseVendor = @"SELECT i.C_Invoice_ID,
                        CASE WHEN i.IsReturnTrx = 'N'
@@ -104,17 +178,14 @@ namespace VAS.Areas.VAS.Controllers
 
             strQuery = @"SELECT bp.Name AS VendorName,
                        bpg.Name AS Category,
-                       SUM(CASE WHEN ((EXTRACT(YEAR FROM v.DateInvoiced) * 12 + EXTRACT(MONTH FROM v.DateInvoiced)) * 31 + EXTRACT(DAY FROM v.DateInvoiced)) >= " + fyStart + @"
-                                 AND ((EXTRACT(YEAR FROM v.DateInvoiced) * 12 + EXTRACT(MONTH FROM v.DateInvoiced)) * 31 + EXTRACT(DAY FROM v.DateInvoiced)) <= " + fyEnd + @"
+                       SUM(CASE WHEN CAST(v.DateInvoiced AS DATE) BETWEEN DATE '" + curStartLit + @"' AND DATE '" + curEndLit + @"'
                                 THEN v.GrandTotal ELSE 0 END) AS CurrAmt,
-                       SUM(CASE WHEN ((EXTRACT(YEAR FROM v.DateInvoiced) * 12 + EXTRACT(MONTH FROM v.DateInvoiced)) * 31 + EXTRACT(DAY FROM v.DateInvoiced)) >= " + prevFyStart + @"
-                                 AND ((EXTRACT(YEAR FROM v.DateInvoiced) * 12 + EXTRACT(MONTH FROM v.DateInvoiced)) * 31 + EXTRACT(DAY FROM v.DateInvoiced)) <= " + prevFyEnd + @"
+                       SUM(CASE WHEN CAST(v.DateInvoiced AS DATE) BETWEEN DATE '" + prevStartLit + @"' AND DATE '" + prevEndLit + @"'
                                 THEN v.GrandTotal ELSE 0 END) AS PrevAmt
                   FROM (" + baseVendor + @") v
                  INNER JOIN C_BPartner bp ON (v.C_BPartner_ID = bp.C_BPartner_ID)
                   LEFT OUTER JOIN C_BP_Group bpg ON (bp.C_BP_Group_ID = bpg.C_BP_Group_ID AND bpg.IsActive = 'Y')
-                 WHERE ((EXTRACT(YEAR FROM v.DateInvoiced) * 12 + EXTRACT(MONTH FROM v.DateInvoiced)) * 31 + EXTRACT(DAY FROM v.DateInvoiced)) >= " + prevFyStart + @"
-                   AND ((EXTRACT(YEAR FROM v.DateInvoiced) * 12 + EXTRACT(MONTH FROM v.DateInvoiced)) * 31 + EXTRACT(DAY FROM v.DateInvoiced)) <= " + fyEnd + @"
+                 WHERE CAST(v.DateInvoiced AS DATE) BETWEEN DATE '" + prevStartLit + @"' AND DATE '" + curEndLit + @"'
                    AND bp.IsActive = 'Y'
                  GROUP BY bp.Name, bpg.Name
                  ORDER BY CurrAmt DESC";
@@ -161,18 +232,11 @@ namespace VAS.Areas.VAS.Controllers
             return name.Substring(0, Math.Min(2, name.Length)).ToUpper();
         }
 
-        private static string FormatAmount(decimal amount, string sym, int precision)
-        {
-            if (amount >= 10000000m) { return sym + Math.Round(amount / 10000000m, 1) + "Cr"; }
-            if (amount >= 100000m)   { return sym + Math.Round(amount / 100000m,   1) + "L";  }
-            if (amount >= 1000m)     { return sym + Math.Round(amount / 1000m,      1) + "K";  }
-            return sym + Math.Round(amount, precision);
-        }
-
         public class TopFiveVendorsResult
         {
             public string           CurSymbol    { get; set; }
             public int              StdPrecision { get; set; }
+            public string           CurIso       { get; set; }
             public string           FyLabel      { get; set; }
             public List<VendorItem> Vendors      { get; set; }
         }

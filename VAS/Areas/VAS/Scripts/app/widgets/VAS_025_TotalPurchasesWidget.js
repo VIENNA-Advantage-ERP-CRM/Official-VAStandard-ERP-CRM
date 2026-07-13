@@ -1,14 +1,15 @@
 ﻿/************************************************************
  * Module Name    : VAS
  * Purpose        : Total Purchases (MTD) KPI Widget
- *                  Shows MTD total, YTD total, invoice count,
- *                  trend vs last month, and a 7-month sparkline.
+ *                  Shows MTD total and trend vs last month, with a
+ *                  server-paged material-category breakdown drill-down.
  * chronological  : Development
  * Created Date   : 12 May 2026
  * Created by     : Humam Yousif
  *
  * AD_Message keys used in this file (add via System Messages):
- *   VAS_025_TotalPurchasesMTD  => "Total Purchases (MTD)"
+ *   VAS_025_TotalPurchasesMTD  => "Total Purchases"
+ *   VAS_025_MonthToDate        => "Month to date"
  *   VAS_025_YTD                => "YTD"
  *   VAS_025_INV                => "INV"
  *   VAS_025_VsLastMonth        => "vs last month"
@@ -20,8 +21,8 @@
  *   VAS_025_Trillion           => "T"
  *   VAS_025_OpenDrilldown      => "Open material category breakdown"
  *   VAS_025_MaterialCategoryBreakdown => "Material Category Breakdown"
- *   VAS_025_MaterialSpendMTD   => "Material Spend (MTD)"
- *   VAS_025_TotalPurchasesMTD  => "Total Purchases (MTD)"
+ *   VAS_025_MaterialSpendMTD   => "Material Spend"
+ *   VAS_025_TotalPurchasesMTD  => "Total Purchases"
  *   VAS_025_ProcessedIntro     => "This month you have processed"
  *   VAS_025_PurchaseInvoicesLower => "purchase invoices"
  *   VAS_025_AcrossLower        => "across"
@@ -48,6 +49,27 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the widget's em-anchor clamps resolve against the dashboard's
+       visible width, not the viewport. One document-level ResizeObserver serves every
+       widget; without a marked container — or without ResizeObserver — the CSS falls
+       back to 100vw. (Mirrors VAS_018_OverduePayablesWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_025_TotalPurchasesWidget = function () {
         this.frame;
         this.windowNo;
@@ -57,9 +79,8 @@
         var $container;
         var $categoryDialog = null;
         var widgetID = null;
-        var drillData = null;          // cached drill-down payload for client-side paging
-        var drillPage = 0;             // current 0-based page in the drill-down popup
-        var DRILL_PAGE_SIZE = 6;       // category rows shown per page (rule 18 - paging)
+        var drillPage = 1;             // current 1-based page in the drill-down popup (server-side)
+        var DRILL_PAGE_SIZE = 6;       // category rows requested per page (rule 18 - paging)
 
         /* ---- Initialise ---- */
         this.initalize = function () {
@@ -98,16 +119,21 @@
                 e.stopPropagation();
                 openCategoryDialog();
             });
+            // The clickable overlay is a <div role="button">, so it has no native
+            // keyboard activation — wire Enter / Space up manually (mirrors VAS_018).
+            $container.on('keydown', '.vas-tpwidg-open', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openCategoryDialog();
+                }
+            });
             $root.append($container);
         }
 
         /* ---- Render KPI content ---- */
         function renderKpi(data) {
             $container.empty();
-
-            var sym = data.CurSymbol || '';
-            var mtdFormatted = formatAmount(data.MtdTotal, data.StdPrecision);
-            var ytdFormatted = formatAmount(data.YtdTotal, data.StdPrecision);
 
             var trendPct = 0;
             if (data.LastMonthTotal && data.LastMonthTotal !== 0) {
@@ -121,21 +147,30 @@
             // Up arrow: 18,15 → 12,9 → 6,15  |  Down arrow: 6,9 → 12,15 → 18,9
             var arrowPoints = trendUp ? '18 15 12 9 6 15' : '6 9 12 15 18 9';
 
-            var sparkSvg = buildSparklineSvg(data.SparklineData || []);
+            // Header icon: invoice/document carrying a $, with a $-in-circle badge —
+            // the Total Purchases glyph (design per attached image). Stroke inherits the
+            // icon well's blue via currentColor. Structure mirrors VAS_018's header.
+            var iconSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+                +   '<path d="M13.5 3H6a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h4.2"/>'
+                +   '<path d="M13.5 3l4.5 4.5V11"/>'
+                +   '<path d="M13.5 3v4.5H18"/>'
+                +   '<path d="M9 6.2c-1 0-1.7.5-1.7 1.2 0 1.6 3.2.7 3.2 2.3 0 .7-.7 1.2-1.7 1.2s-1.7-.5-1.7-1.1"/>'
+                +   '<path d="M9 5.2v1M9 11v1"/>'
+                +   '<path d="M8 14.5h3.5M8 17h2"/>'
+                +   '<circle cx="17" cy="17" r="4.6"/>'
+                +   '<path d="M18.1 15.4c0-.5-.5-.9-1.1-.9-.7 0-1.2.4-1.2.9 0 1.1 2.2.5 2.2 1.6 0 .5-.5.9-1.1.9s-1.1-.4-1.1-.8"/>'
+                +   '<path d="M17 13.8v.6M17 19v.6"/>'
+                + '</svg>';
 
-            var html = '<div class="vas-tpwidg-label">' + msg('VAS_025_TotalPurchasesMTD', 'Total Purchases (MTD)') + '</div>'
-                + '<div class="vas-tpwidg-value" id="vas_tpwidg_val_' + widgetID + '">'
-                +   sym + mtdFormatted
+            var html = '<div class="vas-tpwidg-header">'
+                +   '<div class="vas-tpwidg-icon">' + iconSvg + '</div>'
+                +   '<div class="vas-tpwidg-head-text">'
+                +     '<div class="vas-tpwidg-label">' + msg('VAS_025_TotalPurchasesMTD', 'Total Purchases') + '</div>'
+                +     '<div class="vas-tpwidg-subtitle">' + msg('VAS_025_MonthToDate', 'Month to date') + '</div>'
+                +   '</div>'
                 + '</div>'
-                + '<div class="vas-tpwidg-pills-row">'
-                +   '<div class="vas-tpwidg-pill">'
-                +     '<span class="vas-tpwidg-pill-label">' + msg('VAS_025_YTD', 'YTD') + '</span>'
-                +     '<span class="vas-tpwidg-pill-value">' + sym + ytdFormatted + '</span>'
-                +   '</div>'
-                +   '<div class="vas-tpwidg-pill">'
-                +     '<span class="vas-tpwidg-pill-label">' + msg('VAS_025_INV', 'INV') + '</span>'
-                +     '<span class="vas-tpwidg-pill-value">' + data.InvoiceCount + '</span>'
-                +   '</div>'
+                + '<div class="vas-tpwidg-value" id="vas_tpwidg_val_' + widgetID + '">'
+                +   formatMetric(data.MtdTotal, data.CurSymbol, data.CurIso, data.StdPrecision)
                 + '</div>'
                 + '<div class="vas-tpwidg-trend-row ' + trendClass + '">'
                 +   '<svg class="vas-tpwidg-trend-icon" viewBox="0 0 24 24" fill="none"'
@@ -145,12 +180,22 @@
                 +   '</svg>'
                 +   trendSign + Math.abs(trendPct).toFixed(1) + '% ' + msg('VAS_025_VsLastMonth', 'vs last month')
                 + '</div>'
-                + sparkSvg
-                + '<button type="button" class="vas-tpwidg-open" aria-label="'
+                + '<div class="vas-tpwidg-open" role="button" tabindex="0" aria-label="'
                 +   tpEsc(msg('VAS_025_OpenDrilldown', 'Open material category breakdown'))
-                + '"></button>';
+                + '"></div>';
 
             $container.append(html);
+        }
+
+        /* Compose the KPI metric via the shared CurrencyFormat util
+           (VIS.Util.formatCompactAmount): sign, then the currency symbol, then the
+           compact magnitude (Indian vs international per the base-currency ISO).
+           Mirrors VAS_018_OverduePayablesWidget.formatMetric. */
+        function formatMetric(value, symbol, isoCode, precision) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
+            return sign + (symbol || '') + absStr;
         }
 
         function openCategoryDialog() {
@@ -167,15 +212,16 @@
                 resizable: false,
                 title: msg('VAS_025_MaterialCategoryBreakdown', 'Material Category Breakdown'),
                 width: Math.min(780, Math.max(320, $(window).width() - 40)),
-                minHeight: 300,
-                maxHeight: Math.max(320, $(window).height() - 80),
+                // Fixed height (clamped to the viewport) so the busy spinner, a short
+                // page, and a full page all render at the same size — the popup never
+                // resizes as you page. The body fills it via flex (see CSS).
+                height: Math.min(350, Math.max(300, $(window).height() - 80)),
                 dialogClass: 'vas-tpwidg-dialog-shell',
                 close: function () {
                     $categoryDialog.dialog('destroy');
                     $categoryDialog.remove();
                     $categoryDialog = null;
-                    drillData = null;
-                    drillPage = 0;
+                    drillPage = 1;
                 }
             });
 
@@ -186,14 +232,23 @@
             $tpClose.on('click', function () { $categoryDialog.dialog('close'); });
             $tpWidget.find('.ui-dialog-titlebar').append($tpClose);
 
-            loadCategoryDrilldown();
+            loadCategoryDrilldown(1);
         }
 
-        function loadCategoryDrilldown() {
-            $categoryDialog.html('<div class="vas-tpwidg-drill-state">' + tpEsc(msg('VAS_025_Loading', 'Loading...')) + '</div>');
+        /* Fetch one page of the category breakdown from the server. Opens the dialog
+           immediately with the core busy spinner (mirrors VAS_018) so the user sees a
+           loading state while each page is fetched — server-side paging. */
+        function loadCategoryDrilldown(pageNo) {
+            if (!$categoryDialog) { return; }
+            if (pageNo < 1) { pageNo = 1; }
+            drillPage = pageNo;
+
+            $categoryDialog.html('<div class="vas-tpwidg-drill-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            showCategoryDialog();
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS/VAS_025_TotalPurchasesWidget/GetPurchaseCategoryDrilldown',
+                data: { pageNo: pageNo, pageSize: DRILL_PAGE_SIZE },
                 dataType: 'json',
                 async: true,
                 success: function (data) {
@@ -213,8 +268,8 @@
         function renderCategoryDrilldown(data) {
             if (!$categoryDialog) { return; }
 
-            var categories = (data && data.Categories) || [];
-            if (!categories.length) {
+            var total = data ? Number(data.TotalCount || 0) : 0;
+            if (!total) {
                 $categoryDialog.html('<div class="vas-tpwidg-drill-state">'
                     + tpEsc(msg('VAS_025_NoCategoryData', 'No material category data found for this month.'))
                     + '</div>');
@@ -222,34 +277,36 @@
                 return;
             }
 
-            drillData = data;
-            drillPage = 0;
-            paintCategoryDrilldown();
+            paintCategoryDrilldown(data);
         }
 
-        /* Renders the current drill-down page. Rule 18: client-side paging over
-           all categories; Rule 14/15: each amount carries a hover tooltip with the
-           currency symbol and the full thousand-separated value. */
-        function paintCategoryDrilldown() {
-            if (!$categoryDialog || !drillData) { return; }
+        /* Renders the current (server-supplied) drill-down page. Rule 18: server-side
+           paging over all categories; Rule 14/15: each amount carries a hover tooltip
+           with the currency symbol and the full thousand-separated value. */
+        function paintCategoryDrilldown(data) {
+            if (!$categoryDialog || !data) { return; }
 
-            var data = drillData;
             var categories = data.Categories || [];
             var sym = data.CurSymbol || '';
+            var iso = data.CurIso || '';
             var precision = data.StdPrecision != null ? data.StdPrecision : 2;
             var total = data.TotalAmount ? data.TotalAmount : 0;
-            var catCount = data.CategoryCount || categories.length;
+            var catCount = data.CategoryCount || data.TotalCount || categories.length;
             var lineCount = data.LineCount || 0;
 
-            var maxAmount = 0;
-            for (var i = 0; i < categories.length; i++) {
-                maxAmount = Math.max(maxAmount, Number(categories[i].Amount || 0));
+            // Bars scale against the largest category across the whole set (sent by the
+            // server) so widths stay comparable page-to-page.
+            var maxAmount = Number(data.MaxAmount || 0);
+            if (maxAmount <= 0) {
+                for (var m = 0; m < categories.length; m++) {
+                    maxAmount = Math.max(maxAmount, Number(categories[m].Amount || 0));
+                }
             }
 
             var subtitle = formatQty(catCount) + ' ' + msg('VAS_025_Categories', 'Categories')
                 + ' · ' + formatQty(lineCount) + ' ' + msg('VAS_025_Lines', 'Lines');
 
-            var topName = data.TopName || (categories.length ? categories[0].Name : '');
+            var topName = data.TopName || '';
             var topAmount = data.TopAmount != null ? Number(data.TopAmount) : 0;
             var summaryText = msg('VAS_025_ProcessedIntro', 'This month you have processed') + ' '
                 + formatQty(data.InvoiceCount || 0) + ' ' + msg('VAS_025_PurchaseInvoicesLower', 'purchase invoices')
@@ -257,27 +314,24 @@
                 + formatQty(catCount) + ' ' + msg('VAS_025_CategoriesLower', 'categories') + '.';
             if (topName) {
                 summaryText += ' ' + msg('VAS_025_TopSpenderIs', 'The top spender is') + ' ' + topName
-                    + ' ' + msg('VAS_025_AtLower', 'at') + ' ' + sym + formatAmount(topAmount, precision) + '.';
+                    + ' ' + msg('VAS_025_AtLower', 'at') + ' ' + sym + VIS.Util.formatCompactAmount(topAmount, iso, precision) + '.';
             }
 
-            var pageCount = Math.ceil(categories.length / DRILL_PAGE_SIZE);
-            if (drillPage >= pageCount) { drillPage = pageCount - 1; }
-            if (drillPage < 0) { drillPage = 0; }
-            var start = drillPage * DRILL_PAGE_SIZE;
-            var end = Math.min(start + DRILL_PAGE_SIZE, categories.length);
+            var pageNo = data.PageNo || drillPage || 1;
+            var pageCount = data.TotalPages || 1;
 
             var totalTip = sym + ' ' + formatFull(total, precision);
             var html = '<div class="vas-tpwidg-drill">'
                 + '<div class="vas-tpwidg-drill-card">'
-                +   '<span class="vas-tpwidg-drill-card-label">' + tpEsc(msg('VAS_025_TotalPurchasesMTD', 'Total Purchases (MTD)')) + '</span>'
-                +   '<strong class="vas-tpwidg-drill-card-value" title="' + tpEsc(totalTip) + '">' + tpEsc(sym + formatAmount(total, precision)) + '</strong>'
+                +   '<span class="vas-tpwidg-drill-card-label">' + tpEsc(msg('VAS_025_TotalPurchasesMTD', 'Total Purchases')) + '</span>'
+                +   '<strong class="vas-tpwidg-drill-card-value" title="' + tpEsc(totalTip) + '">' + tpEsc(sym + VIS.Util.formatCompactAmount(total, iso, precision)) + '</strong>'
                 +   '<em class="vas-tpwidg-drill-card-trend">' + tpEsc(subtitle) + '</em>'
                 + '</div>'
                 + '<div class="vas-tpwidg-drill-copy">'
                 +   '<p class="vas-tpwidg-drill-desc">' + tpEsc(summaryText) + '</p>'
                 +   '<div class="vas-tpwidg-drill-rows">';
 
-            for (var c = start; c < end; c++) {
+            for (var c = 0; c < categories.length; c++) {
                 var category = categories[c];
                 var amount = Number(category.Amount || 0);
                 var width = maxAmount > 0 ? (amount / maxAmount) * 100 : 0;
@@ -288,7 +342,7 @@
                 html += '<div class="vas-tpwidg-drill-row">'
                     + '<div class="vas-tpwidg-drill-row-head">'
                     +   '<span class="vas-tpwidg-drill-row-name">' + tpEsc(category.IsOther ? msg('VAS_025_OtherChargesTax', 'Other (charges & tax)') : (category.Name || '-')) + '</span>'
-                    +   '<span class="vas-tpwidg-drill-row-val" title="' + tpEsc(rowTip) + '">' + tpEsc(sym + formatAmount(amount, precision)) + '</span>'
+                    +   '<span class="vas-tpwidg-drill-row-val" title="' + tpEsc(rowTip) + '">' + tpEsc(sym + VIS.Util.formatCompactAmount(amount, iso, precision)) + '</span>'
                     + '</div>'
                     + '<div class="vas-tpwidg-drill-track">'
                     +   '<div class="vas-tpwidg-drill-fill" style="width:' + barWidth.toFixed(1) + '%"></div>'
@@ -299,43 +353,42 @@
             // Keep every popup the same (max) height: always pad the page up to
             // DRILL_PAGE_SIZE with invisible placeholder rows, so a short page or a
             // single-page popup is the same size as a full 6-row page.
-            if (pageCount >= 1) {
-                for (var pad = end - start; pad < DRILL_PAGE_SIZE; pad++) {
-                    html += '<div class="vas-tpwidg-drill-row vas-tpwidg-drill-row--ph" aria-hidden="true">'
-                        + '<div class="vas-tpwidg-drill-row-head"><span class="vas-tpwidg-drill-row-name">&nbsp;</span><span class="vas-tpwidg-drill-row-val">&nbsp;</span></div>'
-                        + '<div class="vas-tpwidg-drill-track"></div>'
-                        + '</div>';
-                }
+            for (var pad = categories.length; pad < DRILL_PAGE_SIZE; pad++) {
+                html += '<div class="vas-tpwidg-drill-row vas-tpwidg-drill-row--ph" aria-hidden="true">'
+                    + '<div class="vas-tpwidg-drill-row-head"><span class="vas-tpwidg-drill-row-name">&nbsp;</span><span class="vas-tpwidg-drill-row-val">&nbsp;</span></div>'
+                    + '<div class="vas-tpwidg-drill-track"></div>'
+                    + '</div>';
             }
 
             html += '</div>';
-            html += buildDrillPager(drillPage, pageCount, categories.length);
+            html += buildDrillPager(pageNo, pageCount, data.TotalCount || categories.length);
             html += '</div></div>';
             $categoryDialog.html(html);
 
             $categoryDialog.find('.vas-tpwidg-drill-pager-prev').on('click', function () {
-                if (drillPage > 0) { drillPage--; paintCategoryDrilldown(); }
+                if (pageNo > 1) { loadCategoryDrilldown(pageNo - 1); }
             });
             $categoryDialog.find('.vas-tpwidg-drill-pager-next').on('click', function () {
-                if (drillPage < pageCount - 1) { drillPage++; paintCategoryDrilldown(); }
+                if (pageNo < pageCount) { loadCategoryDrilldown(pageNo + 1); }
             });
 
             showCategoryDialog();
         }
 
         /* Footer pager (rule 18): "Showing X-Y of Z" on the left, "<  n of m  >" on
-           the right (24px buttons / 14px chevrons per the design spec). */
+           the right (24px buttons / 14px chevrons per the design spec). Page is 1-based
+           (server-side); prev/next re-fetch the target page. */
         function buildDrillPager(page, pageCount, total) {
             // Always render the pager so the popup keeps a uniform height; on a single
             // page both nav buttons simply stay disabled ("1 of 1").
             if (pageCount < 1) { return ''; }
-            var start = page * DRILL_PAGE_SIZE + 1;
-            var end = Math.min((page + 1) * DRILL_PAGE_SIZE, total);
-            var prevDis = page <= 0 ? ' disabled' : '';
-            var nextDis = page >= pageCount - 1 ? ' disabled' : '';
+            var start = (page - 1) * DRILL_PAGE_SIZE + 1;
+            var end = Math.min(page * DRILL_PAGE_SIZE, total);
+            var prevDis = page <= 1 ? ' disabled' : '';
+            var nextDis = page >= pageCount ? ' disabled' : '';
             var showing = msg('VAS_025_Showing', 'Showing') + ' ' + start + '–' + end
                 + ' ' + msg('VAS_025_Of', 'of') + ' ' + total;
-            var ofLabel = (page + 1) + ' ' + msg('VAS_025_Of', 'of') + ' ' + pageCount;
+            var ofLabel = page + ' ' + msg('VAS_025_Of', 'of') + ' ' + pageCount;
             return '<div class="vas-tpwidg-drill-pager">'
                 + '<span class="vas-tpwidg-drill-pager-info">' + tpEsc(showing) + '</span>'
                 + '<div class="vas-tpwidg-drill-pager-nav">'
@@ -361,59 +414,6 @@
                 minimumFractionDigits: prec,
                 maximumFractionDigits: prec
             });
-        }
-
-        /* ---- Number formatter: Trillion / Billion / Crore / Lakh / Thousand / raw ---- */
-        function formatAmount(number, stdPrecision) {
-            var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var isNegative = number < 0;
-            var absNumber = Math.abs(number);
-            var formatted;
-            var unit = '';
-            var opts2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-            var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
-
-            if (absNumber >= 1000000000000) {
-                unit = msg('VAS_025_Trillion', 'T');
-                formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000000000) {
-                unit = msg('VAS_025_Billion', 'B');
-                formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 10000000) {
-                unit = msg('VAS_025_Crore', 'Cr');
-                formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 100000) {
-                unit = msg('VAS_025_Lakh', 'L');
-                formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000) {
-                unit = msg('VAS_025_Thousand', 'K');
-                formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
-            } else {
-                formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
-            }
-
-            return (isNegative ? '-' : '') + formatted + unit;
-        }
-
-        /* ---- Build sparkline SVG from monthly data array ---- */
-        function buildSparklineSvg(data) {
-            if (!data || data.length < 2) { return ''; }
-            var W = 90, H = 48, pad = 3;
-            var maxVal = Math.max.apply(null, data);
-            var minVal = Math.min.apply(null, data);
-            if (maxVal === minVal) { maxVal = minVal + 1; }
-            var xStep = (W - pad * 2) / (data.length - 1);
-            var pts = [];
-            for (var i = 0; i < data.length; i++) {
-                var x = pad + i * xStep;
-                var y = H - pad - ((data[i] - minVal) / (maxVal - minVal)) * (H - pad * 2);
-                pts.push(x.toFixed(1) + ',' + y.toFixed(1));
-            }
-            return '<svg class="vas-tpwidg-sparkline" width="' + W + '" height="' + H
-                + '" viewBox="0 0 ' + W + ' ' + H + '">'
-                + '<polyline points="' + pts.join(' ') + '" fill="none"'
-                + ' stroke="#0083DA" stroke-width="2.2" stroke-linecap="round"/>'
-                + '</svg>';
         }
 
         function formatQty(value) {
@@ -445,8 +445,7 @@
                     $categoryDialog.dialog('destroy');
                     $categoryDialog.remove();
                     $categoryDialog = null;
-                    drillData = null;
-                    drillPage = 0;
+                    drillPage = 1;
                 }
             }
         };
@@ -477,6 +476,8 @@
         this.windowNo = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () {
             self.intialLoad();

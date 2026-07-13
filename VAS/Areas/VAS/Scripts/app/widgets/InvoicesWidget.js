@@ -32,7 +32,7 @@
  *  -  | Review-dialog keys (English fallbacks via lbl): VAS_062_DupBannerSub, VAS_062_DuplicateInvoiceReview,
  *     | VAS_062_DuplicateSets, VAS_062_SwitchTabsReview, VAS_062_MatchingField, VAS_062_DifferingField, VAS_062_PotentialDup,
  *     | VAS_062_DoubleBill, VAS_062_TripleBill, VAS_062_Newer, VAS_062_Newest, VAS_062_Original, VAS_062_Issued, VAS_062_Organization,
- *     | VAS_062_CustomerName, VAS_062_InvoiceDate, VAS_062_SalesOrderNo, VAS_062_DeliveryOrder, VAS_062_PaymentTerm,
+ *     | VAS_062_DocumentType, VAS_062_CustomerName, VAS_062_InvoiceDate, VAS_062_SalesOrderNo, VAS_062_DeliveryOrder, VAS_062_PaymentTerm,
  *     | VAS_062_DeliveryLocation, VAS_062_LineItems, VAS_062_NoLineItems, VAS_062_Product, VAS_062_AttributeSet, VAS_062_Charge,
  *     | VAS_062_Qty, VAS_062_UnitPrice, VAS_062_Amount, VAS_062_GrandTotal,
  *     | VAS_062_ReverseNewerInvoice, VAS_062_KeepBoth, VAS_Close, VAS_062_Confirm, VAS_062_ErrorOccurred, VAS_062_DupFooterNote
@@ -272,12 +272,15 @@
                 '<div class="vas-inv-header">' +
                 '<div class="vas-inv-header-left">' +
                 '<div class="vas-inv-icon">' +
-                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0083DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
-                '<polyline points="14 2 14 8 20 8"/>' +
-                '<line x1="16" y1="13" x2="8" y2="13"/>' +
-                '<line x1="16" y1="17" x2="8" y2="17"/>' +
-                '<polyline points="10 9 9 9 8 9"/>' +
+                '<svg viewBox="0 0 40 40" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">' +
+                '<rect width="40" height="40" rx="10" fill="#EAF8FF"/>' +
+                '<rect x="10" y="9" width="16" height="21" rx="2" fill="none" stroke="#0083DA" stroke-width="1.6" stroke-linejoin="round"/>' +
+                '<line x1="13.5" y1="15" x2="22.5" y2="15" stroke="#0083DA" stroke-width="1.3" stroke-linecap="round"/>' +
+                '<line x1="13.5" y1="19" x2="22.5" y2="19" stroke="#0083DA" stroke-width="1.3" stroke-linecap="round"/>' +
+                '<line x1="13.5" y1="23" x2="19" y2="23" stroke="#0083DA" stroke-width="1.3" stroke-linecap="round"/>' +
+                '<circle cx="28" cy="28" r="8" fill="#0083DA"/>' +
+                '<line x1="28" y1="24.5" x2="28" y2="28.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>' +
+                '<circle cx="28" cy="31" r="1" fill="#FFFFFF"/>' +
                 '</svg>' +
                 '</div>' +
                 '<span class="vas-inv-title">' + lbl("VAS_062_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
@@ -418,9 +421,11 @@
 
                 var $row = $(
                     '<div data-invid="' + safeId + '" ' +
+                    'data-cinvid="' + escapeHtml(inv.cInvoiceId) + '" ' +
                     'class="vas-inv-row' + (isLast ? '' : ' vas-inv-row-divided') + '" ' +
                     'style="grid-template-columns:' + COL_TMPL + ';">' +
-                    '<span class="vas-inv-cell-id">' + safeId + '</span>' +
+                    '<span class="vas-inv-cell-id vas-inv-doclink" role="link" tabindex="0" ' +
+                    'title="' + safeId + '">' + safeId + '</span>' +
                     '<span class="vas-inv-cell-customer" title="' + safeCustomer + '">' + safeCustomer + '</span>' +
                     '<span class="vas-inv-cell-due">' + formatDue(inv.due) + '</span>' +
                     '<span>' +
@@ -477,6 +482,18 @@
                 onNewInvoice();
             });
 
+            /* Document number — zoom the host window's invoice tab to that record. */
+            $root.on('click', '.vas-inv-doclink', function () {
+                zoomInvoice($(this).closest('.vas-inv-row').data('cinvid'));
+            });
+            /* Keyboard activation (Enter / Space) for the focusable doc-no link. */
+            $root.on('keydown', '.vas-inv-doclink', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    zoomInvoice($(this).closest('.vas-inv-row').data('cinvid'));
+                }
+            });
+
             /* Pager — previous / next page of attention rows. */
             $root.on('click', '.vas-inv-prev', function () {
                 if (pageNo <= 1) { return; }
@@ -501,6 +518,17 @@
                 "TabIndex": "0"
             };
             $self.widgetFirevalueChanged(windowParam);
+        }
+
+        /* Zoom: fire the value the host listens for to open the clicked invoice in the window's first
+           tab, filtered to the single record (single/form layout). */
+        function zoomInvoice(cInvoiceId) {
+            if (!cInvoiceId) { return; }
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "C_Invoice.C_Invoice_ID=" + cInvoiceId,
+                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                "TabIndex": "0"
+            });
         }
 
         /* ── Duplicate review dialog ────────────────────────────────────────────────
@@ -559,7 +587,8 @@
                     byInv[id] = {
                         id: id, no: r.invoiceDocumentNo, panelRole: r.panelRole,
                         docStatus: r.docStatus, invoiceStatus: r.invoiceStatus, date: r.invoiceDate,
-                        org: r.organizationName, customer: r.customerName,
+                        org: r.organizationName, docType: r.documentTypeName, docBaseType: r.docBaseType,
+                        customer: r.customerName,
                         salesOrderNo: r.salesOrderNo, deliveryOrderNo: r.deliveryOrderNo,
                         paymentTerm: r.paymentTermName, deliveryLocation: r.deliveryLocation,
                         grandTotal: r.grandTotal, currencyIso: r.currencyIso,
@@ -701,6 +730,10 @@
             function val(v) { return v ? escapeHtml(v) : dash; }
             var totalState = inv.isSameGrandTotal === 'Y' ? ' is-match' : (inv.isSameGrandTotal === 'N' ? ' is-diff' : '');
 
+            /* Credit memos (AR/AP) present their grand total as a reduction, so show it negative. */
+            var isCreditMemo = inv.docBaseType === 'ARC' || inv.docBaseType === 'APC';
+            var grandTotalDisplay = isCreditMemo ? -Math.abs(Number(inv.grandTotal) || 0) : inv.grandTotal;
+
             return '<div class="vas-dup-card">' +
                 '<div class="vas-dup-card-head">' +
                 '<div><div class="vas-dup-card-no">' + escapeHtml(inv.no || '—') + '</div>' +
@@ -709,6 +742,7 @@
                 '</div>' +
                 '<div class="vas-dup-fields">' +
                 fieldRow(lbl("VAS_062_Organization", 'Organization'), val(inv.org), null, inv.org) +
+                fieldRow(lbl("VAS_062_DocumentType", 'Document Type'), val(inv.docType), null, inv.docType) +
                 fieldRow(lbl("VAS_062_CustomerName", 'Customer Name'), val(inv.customer), flagState(inv.isSameCustomer), inv.customer) +
                 fieldRow(lbl("VAS_062_InvoiceDate", 'Invoice Date'), val(inv.date), flagState(inv.isSameInvoiceDate), inv.date) +
                 fieldRow(lbl("VAS_062_SalesOrderNo", 'Sales Order No.'), val(inv.salesOrderNo), null, inv.salesOrderNo) +
@@ -721,7 +755,7 @@
                 buildLineTable(inv) +
                 '</div>' +
                 '<div class="vas-dup-card-total"><span class="lbl">' + lbl("VAS_062_GrandTotal", 'Grand total') + '</span>' +
-                '<span class="val' + totalState + '">' + moneyIso(inv.grandTotal, inv.currencyIso) + '</span></div>' +
+                '<span class="val' + totalState + '">' + moneyIso(grandTotalDisplay, inv.currencyIso) + '</span></div>' +
                 '</div>';
         }
 
@@ -808,8 +842,8 @@
                 '<div class="vas-dup-footer">' +
                 '<div class="vas-dup-footer-note">' + infoSvg + '<span></span></div>' +
                 '<div class="vas-dup-actions">' +
-                '<button class="vas-dup-btn danger" type="button" data-dup-act="void">' + lbl("VAS_062_ReverseNewerInvoice", 'Reverse newer invoice') + '</button>' +
-                '<button class="vas-dup-btn primary" type="button" data-dup-act="keep">' + lbl("VAS_062_KeepBoth", 'Keep both') + '</button>' +
+                '<button class="vas-dup-btn danger" type="button" data-dup-act="void">' + lbl("VAS_062_ReverseNewerInvoice", 'Reverse Recent Invoice') + '</button>' +
+                '<button class="vas-dup-btn primary" type="button" data-dup-act="keep">' + lbl("VAS_062_KeepBoth", 'Keep All') + '</button>' +
                 '</div></div>' +
                 /* Busy overlay shown while a footer action (Keep both / Reverse) is in flight; reuses
                    the core spinner classes. */
@@ -962,7 +996,7 @@
                 });
             }
 
-            /* "Reverse newer invoice" — confirm first (a reversal is hard to undo), then run the
+            /* "Reverse Recent Invoice" — confirm first (a reversal is hard to undo), then run the
                document Reverse-Correct action. The set's line detail carries the 'Newer' marker, so
                fetch it first if the tab's detail has not loaded yet. */
             function doReverseNewer(set) {

@@ -1,0 +1,611 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Inventory Count Overview tab panel
+ *               (VAS.VAS_101_OverviewInventoryCount). All classes are
+ *               MPC-prefixed (MPC-vasic-*) and scoped under the panel root to
+ *               avoid global collisions. Shares the Onfinity windows-and-panels
+ *               em-anchored body language with VAS_099 / VAS_100 — Roboto, white
+ *               surfaces, soft blue borders, KPI tiles with accent rails, pastel
+ *               stepper, segmented filter, status-summary cards and a flat table
+ *               with signed variance cells.
+ * Chronological development:
+ *   VAI163   2026-07-06  Created
+ ***********************************************************/
+
+.MPC-vasic-root {
+    /* Canonical palette */
+    --ic-text:        #102C3F;
+    --ic-muted:       #5F7283;
+    --ic-sub:         #41576A;
+    --ic-action:      #0083DA;
+    --ic-action-dk:   #005FA3;
+    --ic-link:        #106AB0;
+    --ic-card-bd:     #D9E2EB;
+    --ic-row-div:     #E2EAF1;
+    --ic-card-radius: 12px;
+    /* Semantic tones */
+    --ic-info-bg:     #EAF8FF;  --ic-info-tx:    #0083DA;
+    --ic-success-bg:  #E9F6EE;  --ic-success-tx: #0B6B45;
+    --ic-warning-bg:  #FFF6E2;  --ic-warning-tx: #9A6500;
+    --ic-risk-bg:     #FCEFEF;  --ic-risk-tx:    #D14545;
+    --ic-neutral-bg:  #EEF1F4;  --ic-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--ic-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasic-root * { box-sizing: border-box; }
+
+.MPC-vasic-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasic-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--ic-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasic-sec { display: block; }
+
+.MPC-vasic-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasic-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--ic-text);
+    margin: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+}
+
+.MPC-vasic-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--ic-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasic-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasic-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasic-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
+}
+
+.MPC-vasic-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasic-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasic-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.2;
+}
+
+.MPC-vasic-hdrSub {
+    font-size: 0.75em;
+    color: var(--ic-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasic-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasic-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasic-hdrPill.tone-info    { background: var(--ic-info-bg);    color: var(--ic-info-tx); }
+.MPC-vasic-hdrPill.tone-success { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.MPC-vasic-hdrPill.tone-warning { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+.MPC-vasic-hdrPill.tone-risk    { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.MPC-vasic-hdrPill.tone-neutral { background: var(--ic-neutral-bg); color: var(--ic-neutral-tx); }
+
+.MPC-vasic-hdrPill .MPC-vasic-ic { color: currentColor; }
+
+.MPC-vasic-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (warehouse | document)               */
+/* ----------------------------------------------------------- */
+.MPC-vasic-hdrCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--ic-card-bd);
+    border-radius: var(--ic-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasic-hdrColL { min-width: 0; }
+
+.MPC-vasic-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasic-hdrField { min-width: 0; }
+
+.MPC-vasic-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--ic-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasic-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasic-fVal.is-link { color: var(--ic-link); }
+
+@container (max-width: 460px) {
+    .MPC-vasic-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasic-hdrTop  { flex-direction: column; }
+    .MPC-vasic-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Warehouse identity                                          */
+/* ----------------------------------------------------------- */
+.MPC-vasic-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--ic-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasic-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--ic-text);
+    margin-top: 0.375em;
+}
+.MPC-vasic-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasic-contactBit .MPC-vasic-ic { color: var(--ic-action); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (KPI metric grid)                                  */
+/* ----------------------------------------------------------- */
+.MPC-vasic-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasic-metric {
+    min-width: 0;
+    border: 1px solid var(--ic-card-bd);
+    border-left: 3px solid var(--ic-neutral-tx);
+    border-radius: var(--ic-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasic-metric.tone-total    { border-left-color: var(--ic-info-tx); }
+.MPC-vasic-metric.tone-short    { border-left-color: var(--ic-risk-tx); }
+.MPC-vasic-metric.tone-excess   { border-left-color: #E08A1E; }
+.MPC-vasic-metric.tone-variance { border-left-color: #E08A1E; }
+.MPC-vasic-metric.tone-lines    { border-left-color: var(--ic-neutral-tx); }
+
+.MPC-vasic-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasic-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--ic-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasic-metric.tone-total    .MPC-vasic-mHead .MPC-vasic-ic { color: var(--ic-info-tx); }
+.MPC-vasic-metric.tone-short    .MPC-vasic-mHead .MPC-vasic-ic { color: var(--ic-risk-tx); }
+.MPC-vasic-metric.tone-excess   .MPC-vasic-mHead .MPC-vasic-ic { color: #E08A1E; }
+.MPC-vasic-metric.tone-variance .MPC-vasic-mHead .MPC-vasic-ic { color: #E08A1E; }
+.MPC-vasic-metric.tone-lines    .MPC-vasic-mHead .MPC-vasic-ic { color: var(--ic-neutral-tx); }
+
+.MPC-vasic-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasic-metric.tone-short  .MPC-vasic-mVal { color: var(--ic-risk-tx); }
+.MPC-vasic-metric.tone-excess .MPC-vasic-mVal { color: #9A6500; }
+
+.MPC-vasic-mSub {
+    font-size: 0.6875em;
+    color: var(--ic-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 620px) {
+    .MPC-vasic-snap { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasic-snap { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Status summary cards (Matched / Short / Excess / Lines)     */
+/* ----------------------------------------------------------- */
+.MPC-vasic-status {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasic-statCard {
+    min-width: 0;
+    border: 1px solid var(--ic-card-bd);
+    border-radius: var(--ic-card-radius);
+    background: #FBFDFF;
+    padding: 0.625em 0.75em;
+    text-align: center;
+}
+.MPC-vasic-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--ic-text); }
+.MPC-vasic-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ic-muted); margin-top: 0.25em; }
+
+.MPC-vasic-statCard.tone-match  .MPC-vasic-statVal { color: var(--ic-success-tx); }
+.MPC-vasic-statCard.tone-short  .MPC-vasic-statVal { color: var(--ic-risk-tx); }
+.MPC-vasic-statCard.tone-excess .MPC-vasic-statVal { color: #9A6500; }
+
+@container (max-width: 620px) {
+    .MPC-vasic-status { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasic-status { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Count timeline (3-node stepper)                             */
+/* ----------------------------------------------------------- */
+.MPC-vasic-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.MPC-vasic-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.MPC-vasic-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.MPC-vasic-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.MPC-vasic-step:first-child .MPC-vasic-stepLine-l,
+.MPC-vasic-step:last-child  .MPC-vasic-stepLine-r { visibility: hidden; }
+
+.MPC-vasic-step.is-done   .MPC-vasic-stepLine-r,
+.MPC-vasic-step.is-done   .MPC-vasic-stepLine-l,
+.MPC-vasic-step.is-active .MPC-vasic-stepLine-l { background: #67B98A; }
+
+.MPC-vasic-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.MPC-vasic-stepDot .MPC-vasic-ic { display: inline-flex; }
+
+.MPC-vasic-step.is-done .MPC-vasic-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.MPC-vasic-step.is-active .MPC-vasic-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.MPC-vasic-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+.MPC-vasic-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--ic-text);
+}
+
+.MPC-vasic-stepMeta {
+    font-size: 0.6875em;
+    color: var(--ic-muted);
+    margin-top: 0.25em;
+}
+.MPC-vasic-step.is-active .MPC-vasic-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Segmented filter (All lines / Variances only)              */
+/* ----------------------------------------------------------- */
+.MPC-vasic-seg {
+    flex: none;
+    display: inline-flex;
+    border: 1px solid #BFE4FF;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.MPC-vasic-seg button {
+    border: none;
+    background: #fff;
+    color: var(--ic-link);
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 700;
+    padding: 0.4375em 0.875em;
+    cursor: pointer;
+}
+.MPC-vasic-seg button.on { background: var(--ic-info-bg); color: var(--ic-info-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Count line table                                           */
+/* ----------------------------------------------------------- */
+.MPC-vasic-table {
+    border: 1px solid var(--ic-card-bd);
+    border-radius: var(--ic-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.MPC-vasic-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.4fr 0.7fr 0.9fr 0.9fr 0.9fr 1.1fr 0.9fr;
+}
+
+.MPC-vasic-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--ic-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--ic-muted);
+}
+
+.MPC-vasic-tBody {
+    border-bottom: 1px solid var(--ic-row-div);
+    font-size: 0.8125em;
+    color: var(--ic-text);
+}
+.MPC-vasic-tBody:last-of-type { border-bottom: none; }
+.MPC-vasic-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasic-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasic-table .ta-c { text-align: center; justify-content: center; }
+
+.MPC-vasic-itItem { min-width: 0; }
+.MPC-vasic-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--ic-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasic-itSku {
+    font-size: 0.9231em;
+    color: var(--ic-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Signed variance cell */
+.MPC-vasic-var { font-weight: 700; }
+.MPC-vasic-var.short  { color: var(--ic-risk-tx); }
+.MPC-vasic-var.excess { color: #9A6500; }
+.MPC-vasic-var.match  { color: var(--ic-muted); font-weight: 500; }
+
+/* Status tag */
+.MPC-vasic-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasic-tag.s-match  { background: var(--ic-success-bg); color: var(--ic-success-tx); }
+.MPC-vasic-tag.s-short  { background: var(--ic-risk-bg);    color: var(--ic-risk-tx); }
+.MPC-vasic-tag.s-excess { background: var(--ic-warning-bg); color: var(--ic-warning-tx); }
+
+.MPC-vasic-tEmpty {
+    padding: 1.25em 0.875em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: var(--ic-muted);
+    border-bottom: 1px solid var(--ic-row-div);
+}
+
+/* Totals footer */
+.MPC-vasic-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--ic-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasic-tf { color: var(--ic-muted); }
+.MPC-vasic-tf b { color: var(--ic-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasic-tf.is-grand { color: var(--ic-text); font-weight: 700; }
+.MPC-vasic-tf.is-grand b { color: var(--ic-action); margin-left: 0.5em; font-size: 1.15em; }
+
+@container (max-width: 620px) {
+    .MPC-vasic-table { overflow-x: auto; }
+    .MPC-vasic-tRow { min-width: 620px; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasic-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.MPC-vasic-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.MPC-vasic-btn .MPC-vasic-ic { color: currentColor; }
+
+.MPC-vasic-btn.btn-pri {
+    background: var(--ic-action);
+    border: 1px solid var(--ic-action);
+    color: #fff;
+}
+.MPC-vasic-btn.btn-pri:hover { background: var(--ic-action-dk); border-color: var(--ic-action-dk); }
+
+.MPC-vasic-btn.btn-sec {
+    background: #fff;
+    border: 1px solid var(--ic-action);
+    color: var(--ic-action);
+}
+.MPC-vasic-btn.btn-sec:hover { background: var(--ic-info-bg); }
+
+.MPC-vasic-btn.is-disabled {
+    background: #F1F4F7;
+    border-color: #DCE5EE;
+    color: #A6B2BD;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasic-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasic-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasic-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasic-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .MPC-vasic-actions { justify-content: flex-start; }

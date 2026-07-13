@@ -108,6 +108,20 @@
     height: 100%;
 }
 
+.VAS-gljv-bar,
+.VAS-gljv-dot {
+    cursor: pointer;
+}
+
+.VAS-gljv-bar:hover {
+    opacity: 1;
+    filter: drop-shadow(0 2px 3px rgba(0, 83, 180, 0.18));
+}
+
+.VAS-gljv-dot:hover {
+    r: 4;
+}
+
 /* ── Legend row ──────────────────────────────────────────────────────────── */
 .VAS-gljv-legend {
     display: flex;
@@ -203,4 +217,79 @@ html[dir="rtl"] .VAS-gljv-sub {
 
 html[dir="rtl"] .VAS-gljv-legend {
     flex-direction: row-reverse;
+}
+
+/* Typography alignment with VAS_003_OnAccountReceipts */
+.VAS-gljv-root {
+    container-type: inline-size;
+}
+
+.VAS-gljv-card {
+    font-size: clamp(16px, 1.4cqi, 24px);
+}
+
+.VAS-gljv-root .w-title {
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.VAS-gljv-sub,
+.VAS-gljv-leg-item {
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    font-weight: 400;
+}
+
+.VAS-gljv-toggle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    font-weight: 400;
+}
+
+/* Design-system color alignment */
+.VAS-gljv-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.VAS-gljv-root .w-title {
+    color: #102C3F;
+}
+
+.VAS-gljv-icon {
+    background: #FBFDFF;
+    border: 1px solid #E4EDF4;
+    color: #0083DA;
+}
+
+.VAS-gljv-sub,
+.VAS-gljv-leg-item {
+    color: #748494;
+}
+
+.VAS-gljv-toggle {
+    color: #0083DA;
+    background: #EAF8FF;
+    border: 1px solid #BFE4FF;
+}
+
+.VAS-gljv-toggle:hover {
+    background: #DFF1FF;
+}
+
+.VAS-gljv-legend {
+    border-top: 1px solid #EDF2F6;
+}
+
+.VAS-gljv-sw-posted,
+.VAS-gljv-sw-week {
+    background: #0083DA;
+}
+
+.VAS-gljv-sw-weekend {
+    background: #DFF1FF;
+}
+
+.VAS-gljv-sw-trend {
+    background: #019D89;
 }

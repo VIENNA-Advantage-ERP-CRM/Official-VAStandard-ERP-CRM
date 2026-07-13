@@ -37,6 +37,8 @@
         var currencySymbol = '';
         var currencyIso = '';
         var stdPrecision = 0;
+        var loading = false;
+        var rowResizeObserver = null;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -62,18 +64,40 @@
             });
         }
 
-        function trimNumber(value) {
-            return Number(value).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping and Lakh/Crore compact notation; all others get
+        // international grouping and K/M/B. The symbol always comes from the DB.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        function formatCompactNumber(value, isoCode) {
+            var number = Number(value || 0);
+            var abs = Math.abs(number);
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { return trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            } else {
+                if (abs >= 1000000000) { return trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                if (abs >= 1000000) { return trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            }
+            return number.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 });
         }
 
         function formatQty(value) {
-            var number = Number(value || 0);
-            var absolute = Math.abs(number);
-
-            if (absolute >= 10000000) { return trimNumber(number / 10000000) + 'Cr'; }
-            if (absolute >= 100000) { return trimNumber(number / 100000) + 'L'; }
-            if (absolute >= 1000) { return trimNumber(number / 1000) + 'K'; }
-            return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+            return formatCompactNumber(value, currencyIso);
         }
 
         function getPrecision(value) {
@@ -89,7 +113,7 @@
             var number = Number(value || 0);
             var precision = getPrecision(stdPrecision);
             var currency = currencySymbol || currencyIso;
-            var formatted = number.toLocaleString(window.navigator.language, {
+            var formatted = number.toLocaleString(currencyLocale(currencyIso), {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
@@ -151,11 +175,33 @@
             );
         }
 
+        function measurePageSize() {
+            if (!$list || !$list[0]) { return pageSize; }
+
+            var listHeight = $list.innerHeight();
+            var rowHeight = $list.find('.MPC-tv-row').first().outerHeight(true) || 50;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            return Math.max(3, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadItems(); }
+        }
+
         function showError() {
             $list.html('<div class="MPC-tv-empty">' + escapeHtml(label('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+            loading = false;
         }
 
         function loadItems() {
+            loading = true;
             $list.html('<div class="MPC-tv-empty">' + escapeHtml(label('VAS_Loading', 'Loading...')) + '</div>');
 
             var requestData = {
@@ -169,9 +215,11 @@
                 data: requestData,
                 cache: false,
                 success: function (response) {
+                    loading = false;
                     var items = parseResponse(response);
                     if (items.error) { showError(); return; }
                     renderItems(items);
+                    window.setTimeout(syncPageSize, 0);
                 },
                 error: showError
             });
@@ -234,6 +282,13 @@
                     ''
                 );
             });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($list[0]);
+            }
         }
 
         this.Initalize = function () {
@@ -251,6 +306,7 @@
         };
 
         this.disposeComponent = function () {
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             $root.remove();
         };
     };

@@ -273,14 +273,14 @@ namespace VASLogic.Models
                 sb.Append("NULLIF(f.ReadOnlyLogic, N''), ");
             if (fieldCol)
                 sb.Append(@"NULLIF((SELECT MAX(f2.ReadOnlyLogic)
-                                    FROM AD_Field f2
-                                    INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
-                                    INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
-                                    WHERE f2.AD_Column_ID = c.AD_Column_ID
-                                      AND f2.IsActive = 'Y'
-                                      AND tt2.TableName = 'C_InvoiceLine'
-                                      AND f2.ReadOnlyLogic IS NOT NULL
-                                      AND f2.ReadOnlyLogic <> ''), N''), ");
+                                FROM AD_Field f2
+                                INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
+                                INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
+                                WHERE f2.AD_Column_ID = c.AD_Column_ID
+                                  AND f2.IsActive = 'Y'
+                                  AND tt2.TableName = 'C_InvoiceLine'
+                                  AND f2.ReadOnlyLogic IS NOT NULL
+                                  AND f2.ReadOnlyLogic <> ''), N''), ");
             sb.Append("c.ReadOnlyLogic, N'')");
             return sb.ToString();
         }
@@ -312,7 +312,7 @@ namespace VASLogic.Models
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
                                   " + roLogicExpr + @"  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
-                                  COALESCE(vr.Type, N'')          AS ValRuleType,
+                                  COALESCE(vr.Type, '')          AS ValRuleType,
                                   COALESCE(vr.Code, N'')          AS ValRuleCode,
                                   COALESCE(f.IsDisplayed, 'Y')    AS IsDisplayed,
                                   COALESCE(f.IsReadOnly, 'N')     AS IsReadOnly,
@@ -375,21 +375,16 @@ namespace VASLogic.Models
                                   COALESCE(c.FieldLength, 0)      AS FieldLength,
                                   " + roLogicExpr + @"  AS ReadOnlyLogic,
                                   COALESCE(c.AD_Val_Rule_ID, 0)   AS AD_Val_Rule_ID,
-                                  COALESCE(vr.Type, N'')          AS ValRuleType,
+                                  COALESCE(vr.Type, '')          AS ValRuleType,
                                   COALESCE(vr.Code, N'')          AS ValRuleCode,
-                                  -- DisplayLogic lives on AD_Field, not AD_Column: pick a
-                                  -- representative non-empty expression from any active
-                                  -- C_InvoiceLine field for this column, so a curated modal
-                                  -- field that isn't on the resolved window tab still has its
-                                  -- show/hide logic applied (uniform per column in practice).
                                   COALESCE((SELECT MAX(f2.DisplayLogic)
-                                            FROM AD_Field f2
-                                            INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
-                                            INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
-                                            WHERE f2.AD_Column_ID = c.AD_Column_ID
-                                              AND f2.IsActive = 'Y'
-                                              AND tt2.TableName = 'C_InvoiceLine'
-                                              AND f2.DisplayLogic IS NOT NULL
+                                                FROM AD_Field f2
+                                                INNER JOIN AD_Tab t2 ON (f2.AD_Tab_ID = t2.AD_Tab_ID)
+                                                INNER JOIN AD_Table tt2 ON (t2.AD_Table_ID = tt2.AD_Table_ID)
+                                                WHERE f2.AD_Column_ID = c.AD_Column_ID
+                                                  AND f2.IsActive = 'Y'
+                                                  AND tt2.TableName = 'C_InvoiceLine'
+                                                  AND f2.DisplayLogic IS NOT NULL
                                               AND f2.DisplayLogic <> ''), N'') AS DisplayLogic
                            FROM AD_Column c
                            INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
@@ -428,7 +423,11 @@ namespace VASLogic.Models
                 ValRuleCode = Util.GetValueOfString(r["ValRuleCode"]),
                 AD_Reference_Value_ID = Util.GetValueOfInt(r["AD_Reference_Value_ID"]),
                 Name = Util.GetValueOfString(r["FieldName"]),
-                IsDisplayed = true
+                IsDisplayed = true,
+                // fromField == true -> loaded from AD_Field on the window tab (a real GridField
+                // exists). Merged-only columns (fromField == false) have no tab field, so the
+                // client callout shim's getField() must return null for them (GridTab parity).
+                IsTabField = fromField
             };
             // DisplayLogic is selected by BOTH the tab-field query (AD_Field.DisplayLogic) and
             // the all-columns merge (representative C_InvoiceLine field via subquery), so read
@@ -936,13 +935,13 @@ namespace VASLogic.Models
                 cols.Append("il.C_InvoiceLine_ID, il.Line, il.M_Product_ID, il.C_Charge_ID, il.QtyEntered, il.C_UOM_ID, il.PriceEntered, il.C_Tax_ID, il.TaxAmt, il.LineNetAmt, il.LineTotalAmt, il.M_AttributeSetInstance_ID, il.Description, ");
 
             string sql = "SELECT " + cols.ToString() +
-                @"COALESCE(p.Name, N'')        AS VASCILDISP_ProductName,
-                  COALESCE(ch.Name, N'')       AS VASCILDISP_ChargeName,
+                @"COALESCE(p.Name, N'') AS VASCILDISP_ProductName,
+                  COALESCE(ch.Name, N'') AS VASCILDISP_ChargeName,
                   COALESCE(uom.UOMSymbol, uom.Name, N'') AS VASCILDISP_UOMName,
-                  COALESCE(t.Name, N'')        AS VASCILDISP_TaxName,
+                  COALESCE(t.Name, N'') AS VASCILDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
-                  COALESCE(p.ProductType, N'') AS VASCILDISP_ProductType
+                  COALESCE(p.ProductType, '') AS VASCILDISP_ProductType
                FROM C_InvoiceLine il
                LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
                LEFT JOIN C_Charge ch ON (il.C_Charge_ID = ch.C_Charge_ID)
@@ -1012,7 +1011,10 @@ namespace VASLogic.Models
             // Tax total includes the surcharge (totalTax = TaxAmt + SurchargeAmt) when the
             // SurchargeAmt column is installed, matching the client per-line lineTaxTotal.
             string surExpr = " + COALESCE(SUM(il.SurchargeAmt), 0)";
-            string sql = "SELECT COALESCE(SUM(il.LineNetAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0)" + surExpr + " AS Tax, "
+            // Subtotal = SUM(TaxBaseAmt) - the actual stored tax base (net) the framework writes on
+            // save. This is correct whether the price is tax-inclusive or exclusive, so no further
+            // inclusive adjustment is needed (see ComputeOtherPageTotals).
+            string sql = "SELECT COALESCE(SUM(il.TaxBaseAmt), 0) AS Net, COALESCE(SUM(il.TaxAmt), 0)" + surExpr + " AS Tax, "
                 + tcsExpr + " AS Tcs"
                 + " FROM C_InvoiceLine il WHERE il.C_Invoice_ID = @C_Invoice_ID AND il.IsActive = 'Y'";
             sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
@@ -1042,18 +1044,16 @@ namespace VASLogic.Models
             if (pageRows != null)
                 foreach (InvoiceLineRow row in pageRows)
                 {
-                    pNet += row.LineNetAmt;
+                    pNet += RowDecimal(row, "TaxBaseAmt");                  // Subtotal base = stored TaxBaseAmt
                     pTax += row.TaxAmt + RowDecimal(row, "SurchargeAmt");   // totalTax = TaxAmt + SurchargeAmt
                     pTcs += RowTcs(row);
                 }
             otherNet = gNet - pNet;
             otherTax = gTax - pTax;
             otherTcs = gTcs - pTcs;
-            // On a tax-inclusive invoice the framework stores LineNetAmt as the GROSS
-            // (PriceActual already contains tax) and TaxAmt as the tax EXTRACTED from it,
-            // so the true net Subtotal is LineNetAmt - TaxAmt. Reduce it here so the totals
-            // row shows net (and Total = net + tax = the entered gross), not gross + tax.
-            if (taxIncluded) otherNet -= otherTax;
+            // Subtotal now comes from the stored TaxBaseAmt (already the net base whether the price
+            // is tax-inclusive or exclusive), so no LineNetAmt-minus-TaxAmt inclusive adjustment is
+            // needed here. The taxIncluded flag is retained on the signature for the call sites.
         }
 
         /// <summary>Per-line TCS amount (VA106_TCSAmount) read case-insensitively; 0 when
@@ -1194,14 +1194,14 @@ namespace VASLogic.Models
                                       p.Value AS SearchKey, p.Name AS DisplayName,
                                       COALESCE(p.Description, N'') AS Description,
                                       p.M_AttributeSet_ID AS AttributeSetId,
-                                      COALESCE(p.ProductType, N'') AS ProductType
+                                      COALESCE(p.ProductType, '') AS ProductType
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.IsSummary = 'N'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                 AND (LOWER(p.Value) LIKE @kwP
-                                   OR LOWER(p.Name) LIKE @kwP
-                                   OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwP)";
+                                 AND (LOWER(p.Value) LIKE @kwPV
+                                   OR LOWER(p.Name) LIKE @kwPN
+                                   OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwPU)";
             // Enforce the M_Product_ID column's AD_Val_Rule (if any) in line context.
             string prodPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Invoice_ID, rowVars);
             if (prodPred.Length > 0) prodSql += " AND (" + prodPred + ")";
@@ -1213,12 +1213,12 @@ namespace VASLogic.Models
                                         COALESCE(ch.Name, N'') AS SearchKey, ch.Name AS DisplayName,
                                         COALESCE(ch.Description, N'') AS Description,
                                         0 AS AttributeSetId,
-                                        N'' AS ProductType
+                                        '' AS ProductType
                                  FROM C_Charge ch
                                  WHERE ch.IsActive = 'Y'
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                   AND (LOWER(ch.Name) LIKE @kwC
-                                     OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwC)";
+                                   AND (LOWER(ch.Name) LIKE @kwCN
+                                     OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwCD)";
             // Enforce the C_Charge_ID column's AD_Val_Rule (if any) in line context.
             string chargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", C_Invoice_ID, rowVars);
             if (chargePred.Length > 0) chargeSql += " AND (" + chargePred + ")";
@@ -1233,10 +1233,17 @@ namespace VASLogic.Models
                 + " ORDER BY x.Kind, x.DisplayName" + PagingSuffix(pageSize, offset);
 
             DataSet ds = DB.ExecuteDataset(combined, new SqlParameter[] {
-                new SqlParameter("@kwP", like),
-                new SqlParameter("@kwC", like)
+                new SqlParameter("@kwPV", like),
+                new SqlParameter("@kwPN", like),
+                new SqlParameter("@kwPU", like),
+                new SqlParameter("@kwCN", like),
+                new SqlParameter("@kwCD", like)
             }, null);
-            if (ds == null || ds.Tables.Count == 0) return items;
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                log.Severe($"Create Invoice Line Bottom Panel -> Prodict/Charge SQL: {DB.ConvertSqlQuery(combined)}, Parameter are : {like}");
+                return items;
+            }
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
@@ -1270,7 +1277,7 @@ namespace VASLogic.Models
             string prodSql = @"SELECT p.M_Product_ID AS RecordId, 'P' AS Kind, p.Value AS SearchKey,
                                       p.Name AS DisplayName, COALESCE(p.Description, N'') AS Description,
                                       p.M_AttributeSet_ID AS AttributeSetId,
-                                      COALESCE(p.ProductType, N'') AS ProductType
+                                      COALESCE(p.ProductType, '') AS ProductType
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
@@ -1792,10 +1799,12 @@ namespace VASLogic.Models
             "Created", "CreatedBy", "Updated", "UpdatedBy", "IsActive",
             "M_Product_ID", "C_Charge_ID", "M_AttributeSetInstance_ID",
             "QtyEntered", "C_UOM_ID", "PriceEntered", "PriceActual",
-            "C_Tax_ID", "Line", "Description", "LineNetAmt", "TaxAmt", "LineTotalAmt", "Discount"
+            "C_Tax_ID", "Line", "Description"/*, "LineNetAmt", "TaxAmt", "LineTotalAmt", "Discount"*/
         };
 
         private HashSet<string> _updateableColumns;
+        private HashSet<string> _yesNoColumns;
+        private HashSet<string> _referenceColumns;
 
         /// <summary>
         /// Persists every NON-core, updateable C_InvoiceLine column present in the
@@ -1806,17 +1815,40 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="line">invoice line being saved</param>
         /// <param name="values">full column bag from the client</param>
-        private void ApplyExtraColumns(MInvoiceLine line, Dictionary<string, object> values)
+        private void ApplyExtraColumns(MInvoiceLine line, Dictionary<string, object> values, HashSet<string> touched)
         {
             if (values == null || values.Count == 0) return;
             HashSet<string> updateable = GetUpdateableColumns();
             foreach (KeyValuePair<string, object> kv in values)
             {
                 string col = kv.Key;
-                if (kv.Value == null) continue;
+                // A column the user explicitly edited in the "..." modal (including a clear).
+                // Its null / 0 is INTENTIONAL and must persist, so it bypasses the no-clobber
+                // skips below. An untouched null stays skipped (the bag carries every column,
+                // most naturally empty - we must not wipe them or re-touch every field).
+                bool isTouched = touched != null && touched.Contains(col);
+                if (kv.Value == null && !isTouched) continue;
                 if (CORE_OR_SYSTEM_COLUMNS.Contains(col)) continue;
                 if (updateable.Count > 0 && !updateable.Contains(col)) continue;
-                try { line.Set_Value(col, CoerceJsonValue(kv.Value)); }
+                try
+                {
+                    // YesNo (AD_Reference 20) columns: PO.Set_Value expects a CLR boolean,
+                    // NOT the client's "Y"/"N" string - coerce so the flag persists correctly.
+                    object val = GetYesNoColumns().Contains(col)
+                        ? (object)CoerceYesNo(kv.Value)
+                        : CoerceJsonValue(kv.Value);
+                    // Table / TableDirect / Search (FK) columns hold a record ID; a null or
+                    // <= 0 value means "no selection". Leave it untouched (don't clobber a valid
+                    // FK with 0/null from the bag) UNLESS the user explicitly cleared the field -
+                    // then persist NULL so the dimension/reference is actually removed.
+                    if (GetReferenceColumns().Contains(col) &&
+                        (val == null || (decimal.TryParse(val.ToString(), out decimal number) && number == 0)))
+                    {
+                        if (isTouched) line.Set_Value(col, null);
+                        continue;
+                    }
+                    line.Set_Value(col, val);
+                }
                 catch (Exception ex) { log.Warning("VAS_074 SaveLines: skip column " + col + " - " + ex.Message); }
             }
         }
@@ -1846,14 +1878,17 @@ namespace VASLogic.Models
             return v;
         }
 
-        /// <summary>Active + updateable C_InvoiceLine column names (per-instance cached).</summary>
-        /// <returns>updateable column set</returns>
-        private HashSet<string> GetUpdateableColumns()
+        /// <summary>Loads (once) the active + updateable C_InvoiceLine columns AND, in the
+        /// same pass, the subset that are YesNo (AD_Reference 20) - one query serves both
+        /// GetUpdateableColumns and GetYesNoColumns.</summary>
+        private void EnsureColumnSets()
         {
-            if (_updateableColumns != null) return _updateableColumns;
+            if (_updateableColumns != null) return;
             _updateableColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _yesNoColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _referenceColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             DataSet ds = DB.ExecuteDataset(
-                @"SELECT c.ColumnName
+                @"SELECT c.ColumnName, c.AD_Reference_ID
                   FROM AD_Column c
                   INNER JOIN AD_Table t ON (c.AD_Table_ID = t.AD_Table_ID)
                   WHERE t.TableName = 'C_InvoiceLine'
@@ -1861,8 +1896,41 @@ namespace VASLogic.Models
                     AND COALESCE(c.IsUpdateable, 'Y') = 'Y'");
             if (ds != null && ds.Tables.Count > 0)
                 foreach (DataRow r in ds.Tables[0].Rows)
-                    _updateableColumns.Add(Util.GetValueOfString(r["ColumnName"]));
-            return _updateableColumns;
+                {
+                    string name = Util.GetValueOfString(r["ColumnName"]);
+                    _updateableColumns.Add(name);
+                    int refId = Util.GetValueOfInt(r["AD_Reference_ID"]);
+                    if (refId == 20) _yesNoColumns.Add(name);   // DisplayType.YesNo
+                    // Table (18), TableDirect (19), Search (30): FK references holding a record ID.
+                    if (refId == 18 || refId == 19 || refId == 30) _referenceColumns.Add(name);
+                }
+        }
+
+        /// <summary>Active + updateable C_InvoiceLine column names (per-instance cached).</summary>
+        /// <returns>updateable column set</returns>
+        private HashSet<string> GetUpdateableColumns() { EnsureColumnSets(); return _updateableColumns; }
+
+        /// <summary>Updateable C_InvoiceLine YesNo columns (AD_Reference 20), per-instance cached.
+        /// PO.Set_Value on these expects a CLR boolean rather than a "Y"/"N" string.</summary>
+        /// <returns>YesNo column-name set</returns>
+        private HashSet<string> GetYesNoColumns() { EnsureColumnSets(); return _yesNoColumns; }
+
+        /// <summary>Updateable C_InvoiceLine FK columns (Table / TableDirect / Search).
+        /// A null or &lt;= 0 value for these means "no selection" and must not be persisted.</summary>
+        /// <returns>reference (FK) column-name set</returns>
+        private HashSet<string> GetReferenceColumns() { EnsureColumnSets(); return _referenceColumns; }
+
+        /// <summary>Coerces a client YesNo value (bool, "Y"/"N", "true"/"false", 1/0) to a
+        /// CLR boolean for PO.Set_Value on a YesNo column.</summary>
+        /// <param name="v">deserialized client value</param>
+        /// <returns>true when the value represents Yes/true</returns>
+        private static bool CoerceYesNo(object v)
+        {
+            if (v is bool) return (bool)v;
+            string s = Util.GetValueOfString(v).Trim();
+            return s.Equals("Y", StringComparison.OrdinalIgnoreCase)
+                || s.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || s == "1";
         }
 
         /// <summary>Returns the UOM symbol (or name) for display, or empty.</summary>
@@ -2056,7 +2124,11 @@ namespace VASLogic.Models
                 return res;
             }
 
-            Trx trx = Trx.Get("VAS074_SaveLines_" + C_Invoice_ID, true);
+            // Unique trx name per request (CreateTrxName appends a counter) so two concurrent
+            // saves of the SAME invoice never share one named transaction - a fixed name let the
+            // first request's finally{ trx.Close() } close the transaction the second was still
+            // using, failing the second save. (Matches the VAS_065 pattern.)
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS074Save_" + C_Invoice_ID));
             try
             {
                 MInvoice inv = new MInvoice(ctx, C_Invoice_ID, trx);
@@ -2125,8 +2197,12 @@ namespace VASLogic.Models
                     // the callout / panel set (e.g. PriceList, PriceLimit, C_Currency_ID,
                     // PrintDescription, HSN, TCS, revenue recognition) is applied through
                     // PO.Set_Value so the full VO is saved - the core financial columns
-                    // above keep their business-rule values (denylist below).
-                    ApplyExtraColumns(line, input.Values);
+                    // above keep their business-rule values (denylist below). TouchedCols
+                    // carries the modal fields the user explicitly cleared so those persist as null.
+                    HashSet<string> touchedCols = (input.TouchedCols != null && input.TouchedCols.Count > 0)
+                        ? new HashSet<string>(input.TouchedCols, StringComparer.OrdinalIgnoreCase)
+                        : null;
+                    ApplyExtraColumns(line, input.Values, touchedCols);
 
                     // QtyInvoiced (base UOM). SetQty() set QtyInvoiced = QtyEntered (raw); the
                     // framework only converts it to the product base UOM in MInvoiceLine.beforeSave
@@ -2236,7 +2312,9 @@ namespace VASLogic.Models
             if (ctxData.C_Invoice_ID <= 0) { res.ErrorKey = "VAS_074_NoAccess"; return res; }
             if (!ctxData.IsEditable) { res.ErrorKey = "VAS_074_InvoiceNotEditable"; return res; }
 
-            Trx trx = Trx.Get("VAS074_DeleteLines_" + C_Invoice_ID, true);
+            // Unique trx name per request (see SaveLines) so a concurrent save/delete or a
+            // second delete of the same invoice never collides on one shared named transaction.
+            Trx trx = Trx.GetTrx(Trx.CreateTrxName("VAS074Delete_" + C_Invoice_ID));
             try
             {
                 foreach (int id in lineIds)
@@ -2383,6 +2461,7 @@ namespace VASLogic.Models
         public string ValRuleType { get; set; }      // 'S' SQL, 'J' Java/JS, 'F' filter
         public string ValRuleCode { get; set; }
         public bool IsDisplayed { get; set; }        // AD_Field.IsDisplayed (window-driven)
+        public bool IsTabField { get; set; }         // true when this column is an actual AD_Field on the window tab (not a merged-only table column) - mirrors GridTab.getField() != null
         public bool IsReadOnly { get; set; }         // AD_Field.IsReadOnly (window-driven)
         public int SeqNo { get; set; }               // AD_Field.SeqNo (window-driven)
         public string DisplayLogic { get; set; }     // AD_Field.DisplayLogic (dynamic show/hide expr)
@@ -2650,7 +2729,15 @@ namespace VASLogic.Models
         /// / panel touched). Non-core updateable columns are persisted generically.
         /// </summary>
         public Dictionary<string, object> Values { get; set; }
-        public InvoiceLineInput() { Values = new Dictionary<string, object>(); }
+        /// <summary>
+        /// Column names the user explicitly edited in the "..." modal (including clears).
+        /// The Values bag carries EVERY column, so the server can't tell a user-cleared
+        /// FK / reference / list from a naturally-empty one; TouchedCols marks the nulls /
+        /// zeros that are intentional so ApplyExtraColumns force-applies them (bypassing the
+        /// no-clobber skips) instead of leaving the old value in place.
+        /// </summary>
+        public List<string> TouchedCols { get; set; }
+        public InvoiceLineInput() { Values = new Dictionary<string, object>(); TouchedCols = new List<string>(); }
     }
 
     /// <summary>POST body for the batch line save.</summary>
