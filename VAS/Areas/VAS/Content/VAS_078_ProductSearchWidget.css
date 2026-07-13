@@ -472,10 +472,26 @@
     font-weight: 700;
 }
 
+/* Review #44: three fields per row so the whole overview fits the dialog
+   with no scrolling; the last field stretches over the leftover cells so
+   the final row carries no dead space. Sizes stay in em so the grid keeps
+   scaling with the dialog's clamp() font-size lever. */
 .MPC-product-search-form-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0 1.5em;
+    align-content: start;
+}
+
+/* Fill a trailing gap only when the LAST field really lands mid-row; with
+   the full 12-field set (4 exact rows of 3, Discontinued From beside
+   Status) neither selector matches and every field keeps its normal size. */
+.MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n-1):last-child {
+    grid-column: span 2;
+}
+
+.MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n+1):last-child {
+    grid-column: 1 / -1;
 }
 
 .MPC-product-search-field {
@@ -668,6 +684,11 @@
 
     .MPC-product-search-form-grid {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n-1):last-child,
+    .MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n+1):last-child {
+        grid-column: auto;
     }
 
     .MPC-product-search-stats {

@@ -125,6 +125,8 @@
 
 @import "../VAS_097_ExpectedGRNWidget.css";
 
+@import "../VAS_093_PendingGRNWidget.css";
+
 
 @import "../VAS_048_TodayCashOutCashJournalWidget.css";
 @import "../VAS_049_NetCashForCashJournalWidget.css";

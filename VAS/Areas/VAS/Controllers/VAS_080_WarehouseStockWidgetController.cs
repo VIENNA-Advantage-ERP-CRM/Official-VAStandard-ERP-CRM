@@ -33,30 +33,6 @@ namespace VAS.Controllers
         // Review #15: AD_Preference attribute holding each user's own default warehouse.
         private const string DefaultWarehousePreference = "VAS_080_DefaultWarehouse";
 
-        // Review #36: M_Transaction.IsReversed exists on some deployments (the
-        // Oracle test DB) but not on others (the PostgreSQL one), and a query
-        // that references a missing column fails outright - the widget then
-        // shows no data. Cached per app lifetime; a dictionary sync that adds
-        // the column takes effect after the next app restart.
-        private static bool? _transactionHasIsReversed;
-
-        /// <summary>True when the application dictionary has M_Transaction.IsReversed.</summary>
-        private bool TransactionHasIsReversed()
-        {
-            if (_transactionHasIsReversed.HasValue) { return _transactionHasIsReversed.Value; }
-
-            string sql = @"
-                SELECT COUNT(1)
-                FROM AD_Column ColumnInfo
-                INNER JOIN AD_Table TableInfo ON (TableInfo.AD_Table_ID=ColumnInfo.AD_Table_ID AND TableInfo.IsActive='Y')
-                WHERE ColumnInfo.IsActive='Y'
-                  AND UPPER(TableInfo.TableName)='M_TRANSACTION'
-                  AND UPPER(ColumnInfo.ColumnName)='ISREVERSED'";
-
-            _transactionHasIsReversed = Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[0], null)) > 0;
-            return _transactionHasIsReversed.Value;
-        }
-
         /// <summary>Returns active warehouses available to the current role.</summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -337,14 +313,13 @@ namespace VAS.Controllers
                   AND Movement.AD_Client_ID=@Movement_Client_ID
                   AND Movement.AD_Org_ID IN (0,COALESCE(NULLIF(@Movement_Org_ID,0),Movement.AD_Org_ID))";
 
-            // Review #36: only deployments whose dictionary has the column get
-            // the reversed-receipt filter; elsewhere the reversal's negative
-            // row is already excluded by MovementQty>0.
-            if (TransactionHasIsReversed())
-            {
-                movementSql += @"
+            // Review #36: the reversed-receipt filter stays exactly as the
+            // widget spec (overall-warehouse-stock.txt) mandates. On a database
+            // whose M_Transaction has no IsReversed column the query fails and
+            // the widget SHOWS the database error naming the field, so the
+            // missing column is visible instead of a silently empty widget.
+            movementSql += @"
                   AND COALESCE(CAST(Movement.IsReversed AS VARCHAR(1)),'N')='N'";
-            }
 
             // Review #14 (follow-up): the product category's material policy
             // decides which receipt layers remain on hand (FIFO vs LIFO).
