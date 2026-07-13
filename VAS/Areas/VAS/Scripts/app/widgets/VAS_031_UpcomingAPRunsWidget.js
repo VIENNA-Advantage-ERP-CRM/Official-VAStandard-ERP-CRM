@@ -2763,23 +2763,7 @@
                     );
             }
 
-            paymentMethodId =
-                getValidLookupValue(
-                    paymentMethods,
-                    firstPositiveValue(
-                        row.paymentMethodId,
-                        row.va009PaymentMethodId,
-                        selectedRun &&
-                        selectedRun.paymentMethodId
-                    )
-                );
-
-            if (!paymentMethodId) {
-                paymentMethodId =
-                    getFirstPositiveLookupValue(
-                        paymentMethods
-                    );
-            }
+            paymentMethodId = 0;
 
             html =
                 fieldHtml(
