@@ -1523,7 +1523,15 @@
                 );
         }
 
-        function ensurePopupLookups(callback) {
+        function ensurePopupLookups(
+            currencyId,
+            callback
+        ) {
+            if (typeof currencyId === 'function') {
+                callback = currencyId;
+                currencyId = 0;
+            }
+
             if (popupLookups) {
                 callback(true);
                 return;
@@ -1537,6 +1545,10 @@
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
+                data: {
+                    currencyId:
+                        Number(currencyId || 0)
+                },
 
                 success: function (response) {
                     var data = normalizeResponse(
@@ -3370,6 +3382,12 @@
             );
 
             ensurePopupLookups(
+                firstPositiveValue(
+                    run &&
+                    run.currencyId,
+                    run &&
+                    run.cCurrencyId
+                ),
                 function (loaded) {
                     if (!loaded) {
                         setPayDialogBusy(
@@ -3545,6 +3563,12 @@
                 ).trim(),
 
                 documentNo: '',
+
+                paymentDescription: String(
+                    getPayField(
+                        'invoiceDescription'
+                    ).val() || ''
+                ).trim(),
 
                 discountAmt: Number(
                     getPayField(
