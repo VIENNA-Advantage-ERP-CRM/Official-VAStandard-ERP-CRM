@@ -2479,6 +2479,7 @@
             var payAmt;
             var discountAmt;
             var writeOffAmt;
+            var maximumPayAmt;
 
             openAmount =
                 getPopupCurrentOpenAmount();
@@ -2509,35 +2510,34 @@
                 getPayField('writeOffAmt').val() || 0
             );
 
+            discountAmt = Number(
+                getPayField('discountAmt').val() || 0
+            );
+
             if (isNaN(writeOffAmt) || writeOffAmt < 0) {
                 writeOffAmt = 0;
             }
 
-            if (writeOffAmt > openAmount) {
-                writeOffAmt = openAmount;
+            if (isNaN(discountAmt) || discountAmt < 0) {
+                discountAmt = 0;
             }
 
-            discountAmt = roundPopupAmount(
-                openAmount -
-                payAmt -
-                writeOffAmt
+            maximumPayAmt = roundPopupAmount(
+                openAmount - discountAmt - writeOffAmt
             );
 
-            if (discountAmt < 0) {
-                discountAmt = 0;
-                writeOffAmt = roundPopupAmount(
-                    openAmount - payAmt
-                );
+            if (maximumPayAmt < 0) {
+                maximumPayAmt = 0;
+            }
+
+            if (payAmt > maximumPayAmt) {
+                payAmt = maximumPayAmt;
             }
 
             getPayField('payAmt').val(
                 normalizeNumber(
                     roundPopupAmount(payAmt)
                 )
-            );
-
-            getPayField('discountAmt').val(
-                normalizeNumber(discountAmt)
             );
 
             getPayField('writeOffAmt').val(

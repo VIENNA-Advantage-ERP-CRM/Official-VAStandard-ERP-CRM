@@ -7,6 +7,7 @@ using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
+using VAdvantage.Process;
 using VAdvantage.Utility;
 using VIS.Filters;
 
@@ -28,6 +29,8 @@ namespace VAS.Controllers
     public class VAS_031_UpcomingAPRunsWidgetController : Controller
     {
         private const int MaximumRows = 30;
+        private const int PaymentTableId = 335;
+        private const int PaymentProcessId = 149;
 
         #region Upcoming AP Runs
 
@@ -2972,10 +2975,7 @@ AND PaymentMethod.AD_Client_ID IN
                     ) >= 0
                 )
                 {
-                    payment.Set_Value(
-                        "WriteOffAmt",
-                        writeOffAmt
-                    );
+                    payment.SetWriteOffAmt(writeOffAmt);
                 }
 
                 decimal overUnderAmt =
@@ -2990,9 +2990,8 @@ AND PaymentMethod.AD_Client_ID IN
                 );
 
                 /*
-                 * Use the standard payment completion path:
-                 * save In Progress, set Complete action, then
-                 * execute ProcessIt with the standard constant.
+                 * Save the payment in progress first, then complete
+                 * it through the standard workflow process below.
                  */
                 payment.SetDocStatus(
                     MPayment.DOCSTATUS_InProgress
@@ -3020,46 +3019,44 @@ AND PaymentMethod.AD_Client_ID IN
                     );
                 }
 
+                int createdPaymentId =
+                    payment.GetC_Payment_ID();
+
                 /*
-                 * Important:
-                 * Complete the payment so Vienna Advantage creates
-                 * the accounting/allocation records.
+                 * Complete through the standard workflow process.
+                 * CompleteOrReverse runs outside this transaction,
+                 * so commit the saved payment first just like the
+                 * existing shipment/payment workflow callers do.
                  */
-                bool completed = payment.ProcessIt(
-                    MPayment.DOCACTION_Complete
+                trx.Commit();
+                trx.Close();
+                trx = null;
+
+                string completionMessage =
+                    DocumentEngine.CompleteOrReverse(
+                        ctx,
+                        "C_Payment",
+                        PaymentTableId,
+                        createdPaymentId,
+                        PaymentProcessId,
+                        MPayment.DOCACTION_Complete
+                    );
+
+                if (!string.IsNullOrWhiteSpace(completionMessage))
+                {
+                    throw new InvalidOperationException(
+                        completionMessage
+                    );
+                }
+
+                /*
+                 * Reload changes made by the workflow completion.
+                 */
+                payment = new MPayment(
+                    ctx,
+                    createdPaymentId,
+                    null
                 );
-
-                if (!completed)
-                {
-                    string processMessage = payment.GetProcessMsg();
-
-                    if (string.IsNullOrWhiteSpace(processMessage))
-                    {
-                        processMessage = GetMsg(
-                            ctx,
-                            "VAS_031_MessageCouldNotCompleteAPPayment",
-                            "Could not complete AP payment."
-                        );
-                    }
-
-                    throw new InvalidOperationException(
-                        processMessage
-                    );
-                }
-
-                /*
-                 * Save changes made by ProcessIt.
-                 */
-                if (!payment.Save(trx))
-                {
-                    throw new InvalidOperationException(
-                        GetLastModelError(
-                            ctx,
-                            "VAS_031_MessageCouldNotCompleteAPPayment",
-                            "Could not save the completed AP payment."
-                        )
-                    );
-                }
 
                 /*
                  * Confirm that payment is really completed.
@@ -3113,16 +3110,11 @@ AND PaymentMethod.AD_Client_ID IN
                  */
                 decimal remainingOpenAmount = GetInvoiceOpenAmount(
                     invoiceId,
-                    trx
+                    null
                 );
 
                 bool invoiceFullyPaid =
                     remainingOpenAmount <= 0;
-
-                /*
-                 * Commit payment and allocation together.
-                 */
-                trx.Commit();
 
                 string createdPaymentDocumentNo =
                     payment.GetDocumentNo();
