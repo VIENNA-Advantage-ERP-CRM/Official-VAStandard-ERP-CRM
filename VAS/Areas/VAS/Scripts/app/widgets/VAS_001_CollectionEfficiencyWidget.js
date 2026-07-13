@@ -594,7 +594,7 @@
                 '<div class="vas-ce-body">' +
                 '<div class="vas-ce-donut">' +
                 '<svg viewBox="0 0 140 140" aria-hidden="true">' +
-                '<circle cx="70" cy="70" r="56" fill="none" stroke="#EDF2F6" stroke-width="14"/>' +
+                '<circle cx="70" cy="70" r="56" fill="none" stroke="#E2EAF1" stroke-width="14"/>' +
                 '<circle class="vas-ce-ring-fg" cx="70" cy="70" r="56" fill="none" stroke="#019D89" stroke-width="14" pathLength="100" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 70 70)"/>' +
                 '</svg>' +
                 '<div class="vas-ce-donut-center">' +

@@ -9,12 +9,13 @@
  *                  customer (AR) invoice. The host AR Invoice window
  *                  is what reacts to the fired event.
  *
- *                  Design: Onfinity Quick Action Widget shell —
+ *                  Design: dashboard-widgets.md §"Quick Action Widget" —
  *                    2px dashed #9ED1FF border
  *                    pale blue-to-white gradient surface
- *                    14px radius, 16px padding
- *                    40px blue icon well with white "+" glyph
- *                  All CSS uses em units only (CLAUDE.md rule).
+ *                    14px radius, 0.85em padding
+ *                    1.75em solid-blue icon well (top-right) with white "+" glyph
+ *                    Regular title + muted subtitle pinned to the bottom
+ *                  Internal type/spacing in em; borders/radii/shadows in px.
  *
  * Chronological development:
  *   VIS_145        Created  Date 2026-06-10
@@ -82,7 +83,6 @@
             $root = $('<div class="vas-cai-root" id="vas-cai-root-' + widgetID + '"></div>');
 
             var title = getMsg("VAS_064_NewARInvoice", "New Invoice");
-            var copy = getMsg("VAS_064_CreateSalesInvoice", "Create a sales invoice");
 
             /* Plus glyph — matches the supplied mock (white "+" on the blue
                icon well). The icon-well CSS already sets color:#FFFFFF on the
@@ -91,7 +91,7 @@
                .vas-cai-icon svg already sizes the SVG in em. */
             var iconSvg =
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
-                ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' +
+                ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"' +
                 ' aria-hidden="true" focusable="false">' +
                 '<line x1="12" y1="5" x2="12" y2="19"></line>' +
                 '<line x1="5" y1="12" x2="19" y2="12"></line>' +
@@ -101,11 +101,9 @@
                 '<button type="button" class="vas-cai-card" aria-label="' + escapeAttr(title) + '">' +
                 '<span class="vas-cai-icon">' + iconSvg + '</span>' +
                 '<span class="vas-cai-title"></span>' +
-                '<span class="vas-cai-copy"></span>' +
                 '</button>'
             );
             $btn.find(".vas-cai-title").text(title);
-            $btn.find(".vas-cai-copy").text(copy);
 
             $btn.on("click", onTileClick);
             $root.append($btn);

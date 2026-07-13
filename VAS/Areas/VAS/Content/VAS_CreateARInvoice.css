@@ -2,15 +2,13 @@
  * VAS_CreateARInvoice — Quick Action dashboard widget that opens a new
  * AR Invoice (C_Invoice with IsSoTrx = 'Y') on the host AR Invoice window.
  *
- * Design (per supplied "New Lead" mock): pale-blue tile with a solid blue
- * rounded-square icon well pinned to the top-left and the action title
- * pinned to the bottom-left. The subtitle markup is kept in the DOM for
- * backward compatibility but hidden visually — the mock no longer shows
- * it. The three-dot kebab in the top-right of the screenshot is the host
- * dashboard's per-widget menu, not part of this widget.
- *
- * Per CLAUDE.md project rule: every CSS value is expressed in `em` only.
- * Namespaced vas-cai-*.
+ * Design: dashboard-widgets.md §"Quick Action Widget" —
+ *   2px dashed #9ED1FF border, pale blue-to-white gradient surface, 14px
+ *   radius, 0.85em padding. Flex column: solid-blue icon well pinned top-RIGHT,
+ *   title + subtitle pinned to the bottom (Regular title, muted subtitle).
+ * Internal type/spacing use em against the widget root anchor
+ * (clamp(16px, 1.2cqi, 20px) → dashboard-relative via --dash-inline-size);
+ * physical edges (border, radius, shadow) stay in px. Namespaced vas-cai-*.
  * ───────────────────────────────────────────────────────────────────────── */
 
 .vas-cai-root {
@@ -26,31 +24,27 @@
         box-sizing: border-box;
     }
 
-/* ── Quick-action card — icon top-left, title bottom-left ─────────── */
+/* ── Quick-action card — icon top-right, title/subtitle bottom-left ─────── */
 
 .vas-cai-card {
     width: 100%;
     height: 100%;
-    min-height: 8.75em;
-    /* Anchored to the widget's own inline width (cqi resolves against .vas-cai-root's
-       container-type: inline-size) so interior type scales with the cell, not the viewport
-       (foundations.md §Responsive Unit Rules). 1x1 quick-action tile → 8cqi. */
+    /* Widget root anchor (dashboard-widgets.md §"Widget Root Anchor"): 2K
+       calibration clamp — floor 16px, ceiling 20px, dashboard-relative via
+       --dash-inline-size (≡ 1.2cqi of the dashboard content width). */
     font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
     font-family: inherit;
-    /* No visible border — the mock relies on the pale-blue surface alone
-       to define the tile, sitting flush with the dashboard background. */
-    border: 0;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.05);
-    background: linear-gradient(180deg, #EAF4FE 0%, #F8FBFE 100%);
-    padding: 1em;
-    /* Column layout with space-between so the icon stays anchored at the
-       top and the title sits anchored at the bottom of the card. */
+    /* Dashed action border + pale blue-to-white surface signal "create new". */
+    border: 2px #9ED1FF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
+    padding: 0.85em;
+    /* Column layout: icon anchored top-right, title + subtitle pushed to the
+       bottom as a group via margin-top:auto on the title. */
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.5em;
+    align-items: stretch;
     cursor: pointer;
     text-align: left;
     color: #102C3F;
@@ -59,8 +53,9 @@
 }
 
     .vas-cai-card:hover {
+        border-color: #7CC0FF;
         background: linear-gradient(180deg, #DEEEFC 0%, #F0F7FD 100%);
-        box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.08);
+        box-shadow: 0 8px 18px rgba(16, 47, 74, 0.08);
     }
 
     .vas-cai-card:focus-visible {
@@ -72,66 +67,61 @@
         transform: scale(0.99);
     }
 
-/* ── Icon well: solid blue rounded square with white glyph ────────── */
+/* ── Icon well: solid blue rounded square with white glyph, top-right ───── */
 
 .vas-cai-icon {
+    /* Spec well size 1.75em, solid action blue, 10px radius. */
     width: 2.5em;
     height: 2.5em;
     min-width: 2.5em;
-    border-radius: 0.625em;
-    background: linear-gradient(180deg, #1F83FF, #0083DA);
+    border-radius: 10px;
+    background: #1F83FF;
     color: #FFFFFF;
-    box-shadow: 0 0.375em 0.875em rgba(0, 131, 218, 0.30);
+    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    /* No bottom margin needed — the space-between layout already places
-       the title at the opposite end of the card. */
+    align-self: flex-start; /* pinned to the top-right of the flex column */
 }
 
     .vas-cai-icon svg {
+        /* Glyph ≈ 1em, white via currentColor. */
         width: 1.25em;
         height: 1.25em;
         stroke: currentColor;
     }
 
-/* ── Title: bottom-left, bold, single line ─────────────────────────── */
+/* ── Title: bottom-left, Regular, dark ─────────────────────────────────── */
 
 .vas-cai-title {
     display: block;
-    /* Dashboard-width-anchored clamp (via --dash-inline-size — the dashboard's
-       visible content width in px, written to :root by the widget bootstrap;
-       falls back to 100vw when unset) instead of the old fixed 1.5em, which
-       rode the cell base up to ~48px on big dashboards and truncated
-       the title. Allowed to WRAP so the full name shows. */
-    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.01), 32px);
-    font-weight: 700;
-    color: #141414;
-    line-height: 1.2;
-    letter-spacing: -0.00625em;
-    min-width: 0;               /* allow flex item to shrink below content width */
-    max-width: 100%;
-    white-space: normal;        /* wrap rather than truncate — show full name */
-    overflow-wrap: break-word;
+    font-size: clamp(18px,calc(var(--dash-inline-size, 100vw)*.01),32px);
+    margin-top: auto; /* push the title + subtitle group to the bottom */
     align-self: flex-start;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.2;
+    min-width: 0; /* allow flex item to shrink below content width */
+    max-width: 100%;
+    white-space: normal; /* wrap rather than truncate — show full name */
+    overflow-wrap: break-word;
 }
 
-/* The mock no longer shows a subtitle. The markup is kept in the DOM
-   (the JS still renders it) so existing message-key wiring is preserved,
-   but it is hidden visually. To bring it back, remove this rule and
-   re-enable .vas-cai-copy styling. */
+/* ── Subtitle: muted helper under the title, max 2 lines ───────────────── */
+
 .vas-cai-copy {
     display: none;
 }
 
 /* ── Responsive: shrink the whole card on narrow dashboard cells by
- *    lowering its base font-size. Inner em sizing scales automatically. */
-@container (max-width: 12.5em) {       /* < 200px */
-    .vas-cai-card { font-size: 0.875em; }
+ *    lowering its base font-size. Inner em sizing scales automatically.
+ *    Title drops to the sm token (0.75em) on the narrowest 1x1 cells. */
+@container (max-width: 12.5em) { /* < 200px */
+    .vas-cai-card {font-size: 0.875em;}
 }
 
-@container (max-width: 10em) {         /* < 160px */
+@container (max-width: 10em) {/* < 160px */
     .vas-cai-card {
         font-size: 0.8125em;
         padding: 0.75em;

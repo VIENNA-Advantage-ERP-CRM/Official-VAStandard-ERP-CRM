@@ -7,8 +7,8 @@
  *           currency, no conversion), and a Matched flag.
  * Design   - Per design.md / dashboard-widgets.md §"KPI And Summary Widget":
  *            glass KPI shell on the em-based Widget Root Anchor
- *            (clamp(16px, 5.6cqi, 32px) tuned to the 2-col cell) — 2em icon
- *            well, dark bold title-label, ↗ View hint, 1.75em Medium
+ *            (clamp(16px, --dash-inline-size*0.012, 20px)) — clamped icon
+ *            well, Regular #102C3F title-label, 1.75em SemiBold (600)
  *            success-green percentage, and an xs muted "Receipt Match to
  *            Invoice" meta line.
  *

@@ -107,7 +107,7 @@
         var toDate = "";
 
         var pageNo = 1;
-        var pageSize = 7;
+        var pageSize = 6;
         var totalPages = 0;
         var totalRecords = 0;
 
