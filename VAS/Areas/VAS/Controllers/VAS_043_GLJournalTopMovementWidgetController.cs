@@ -92,7 +92,7 @@ namespace VAS.Controllers
                             success = false,
                             errorKey = "SessionExpired",
                             messageKey = "SessionExpired",
-                            error = "Session Expired",
+                            error = "SessionExpired",
                             hasData = false
                         }
                     ),
@@ -112,7 +112,7 @@ namespace VAS.Controllers
                             success = false,
                             errorKey = "SessionExpired",
                             messageKey = "SessionExpired",
-                            error = "Session Expired",
+                            error = "SessionExpired",
                             hasData = false
                         }
                     ),

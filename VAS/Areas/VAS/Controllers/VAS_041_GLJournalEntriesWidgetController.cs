@@ -2563,9 +2563,9 @@ AND AD_Ref_List.IsActive = 'Y'";
                     {
                         success = false,
                         error =
-                            "You do not have permission to update this journal.",
+                            GetMsg(ctx, "AccessTableNoUpdate", "You do not have permission to update this journal."),
                         errorText =
-                            "You do not have permission to update this journal."
+                            GetMsg(ctx, "AccessTableNoUpdate", "You do not have permission to update this journal.")
                     }
                 );
             }
@@ -2788,7 +2788,7 @@ AND IsActive = 'Y'",
             if (!journal.IsActive())
             {
                 throw new InvalidOperationException(
-                    "The journal is inactive."
+                    GetMsg(ctx, "VAS_041_JournalInactive", "The journal is inactive.")
                 );
             }
 
@@ -2798,7 +2798,7 @@ AND IsActive = 'Y'",
             )
             {
                 throw new InvalidOperationException(
-                    "You do not have permission to update this journal."
+                    GetMsg(ctx, "AccessTableNoUpdate", "You do not have permission to update this journal.")
                 );
             }
         }

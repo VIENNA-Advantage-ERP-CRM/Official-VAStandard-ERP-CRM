@@ -89,7 +89,7 @@
 
         var end = Math.min(start + size - 1, total);
 
-        return 'Showing ' + start + '-' + end + ' of ' + total;
+        return lbl('VAS_Showing', 'Showing') + ' ' + start + '-' + end + ' ' + lbl('VIS_Of', 'of') + ' ' + total;
     }
 
     // ──────────────────────────────────────────────────────────────────────────

@@ -429,6 +429,32 @@
             );
         }
 
+        function getResponseMessage(
+            response,
+            fallback
+        ) {
+            if (!response) {
+                return fallback;
+            }
+
+            if (response.errorKey || response.messageKey) {
+                return lbl(
+                    response.errorKey || response.messageKey,
+                    response.errorText ||
+                    response.error ||
+                    response.message ||
+                    fallback
+                );
+            }
+
+            return (
+                response.errorText ||
+                response.error ||
+                response.message ||
+                fallback
+            );
+        }
+
         function isPosted(value) {
             if (
                 value === true ||
@@ -900,8 +926,13 @@
                                 data.error
                             ) {
                                 showError(
-                                    data.errorText ||
-                                    data.error
+                                    getResponseMessage(
+                                        data,
+                                        lbl(
+                                            "VAS_045_LoadPendingQueueFailed",
+                                            "Could Not Load Pending Queue"
+                                        )
+                                    )
                                 );
 
                                 return;
@@ -1817,12 +1848,12 @@
                                 data.error
                             ) {
                                 renderDetailError(
-                                    data.errorText ||
-                                    data.error ||
-                                    data.message ||
-                                    lbl(
-                                        "VAS_045_JournalDetailsNotFound",
-                                        "Journal Details Not Found."
+                                    getResponseMessage(
+                                        data,
+                                        lbl(
+                                            "VAS_045_JournalDetailsNotFound",
+                                            "Journal Details Not Found."
+                                        )
                                     )
                                 );
 
@@ -2771,18 +2802,12 @@
                                 data.error
                             ) {
                                 showProcessError(
-                                    (
-                                        data &&
-                                        (
-                                            data.errorText ||
-                                            data.error ||
-                                            data.message
+                                    getResponseMessage(
+                                        data,
+                                        lbl(
+                                            "VAS_045_JournalProcessFailed",
+                                            "Journal Process Failed."
                                         )
-                                    ) ||
-
-                                    lbl(
-                                        "VAS_045_JournalProcessFailed",
-                                        "Journal Process Failed."
                                     )
                                 );
 

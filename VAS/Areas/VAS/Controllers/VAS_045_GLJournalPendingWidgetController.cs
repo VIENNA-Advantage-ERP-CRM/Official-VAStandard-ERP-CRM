@@ -73,10 +73,10 @@ namespace VAS.Controllers
                         new
                         {
                             success = false,
-                    errorKey = "SessionExpired",
-                    messageKey = "SessionExpired",
-                    error = "Session Expired",
-                    errorText = "Session Expired",
+                            errorKey = "SessionExpired",
+                            messageKey = "SessionExpired",
+                            error = "SessionExpired",
+                            errorText = "SessionExpired",
                             Queue = new List<object>(),
                             TotalCount = 0
                         }
@@ -95,10 +95,10 @@ namespace VAS.Controllers
                         new
                         {
                             success = false,
-                    errorKey = "SessionExpired",
-                    messageKey = "SessionExpired",
-                    error = "Session Expired",
-                    errorText = "Session Expired",
+                            errorKey = "SessionExpired",
+                            messageKey = "SessionExpired",
+                            error = "SessionExpired",
+                            errorText = "SessionExpired",
                             Queue = new List<object>(),
                             TotalCount = 0
                         }
@@ -912,8 +912,8 @@ ORDER BY
                     success = false,
                     errorKey = "SessionExpired",
                     messageKey = "SessionExpired",
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    error = "SessionExpired",
+                    errorText = "SessionExpired"
                 });
             }
 
@@ -1145,8 +1145,8 @@ ORDER BY
                     success = false,
                     errorKey = "SessionExpired",
                     messageKey = "SessionExpired",
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    error = "SessionExpired",
+                    errorText = "SessionExpired"
                 });
             }
 

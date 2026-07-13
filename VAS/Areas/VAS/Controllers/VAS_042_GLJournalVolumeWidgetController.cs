@@ -44,7 +44,7 @@ namespace VAS.Controllers
                     success = false,
                     errorKey = "SessionExpired",
                     messageKey = "SessionExpired",
-                    error = "Session Expired",
+                    error = "SessionExpired",
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
             }
@@ -58,7 +58,7 @@ namespace VAS.Controllers
                     success = false,
                     errorKey = "SessionExpired",
                     messageKey = "SessionExpired",
-                    error = "Session Expired",
+                    error = "SessionExpired",
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
             }
