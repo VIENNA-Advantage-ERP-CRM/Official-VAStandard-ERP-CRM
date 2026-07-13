@@ -1095,7 +1095,7 @@
                     Number(data.PageNo || dialogPageNo || 1);
 
                 dialogPageSize =
-                    Number(data.PageSize || dialogPageSize || 10);
+                    Number(data.PageSize || dialogPageSize || 8);
 
                 dialogTotalPages =
                     Math.max(
