@@ -44,12 +44,16 @@
         write();
     }
 
-    /* Dollar-circle icon (lucide-style). Stroke inherits the icon-well color via currentColor. */
+    /* Rising-bars icon (self-contained tile: its own pale-blue well + blue bars
+       and an upward trend arrow). Fills the icon well via width/height 100%. */
     var ICON_SVG =
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
-        'stroke-linecap="round" stroke-linejoin="round">' +
-        '<line x1="12" y1="1" x2="12" y2="23"/>' +
-        '<path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>' +
+        '<svg viewBox="0 0 40 40" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">' +
+        '<rect width="40" height="40" rx="10" fill="#EAF8FF"/>' +
+        '<rect x="9" y="26" width="5" height="8" rx="1" fill="#0083DA" opacity="0.4"/>' +
+        '<rect x="17" y="20" width="5" height="14" rx="1" fill="#0083DA" opacity="0.7"/>' +
+        '<rect x="25" y="15" width="5" height="19" rx="1" fill="#0083DA"/>' +
+        '<polyline points="23,12 27,7 31,12" fill="none" stroke="#0083DA" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<line x1="27" y1="7" x2="27" y2="15" stroke="#0083DA" stroke-width="1.6" stroke-linecap="round"/>' +
         '</svg>';
 
     VIS.OutstandingSalesOrderWidget = function () {

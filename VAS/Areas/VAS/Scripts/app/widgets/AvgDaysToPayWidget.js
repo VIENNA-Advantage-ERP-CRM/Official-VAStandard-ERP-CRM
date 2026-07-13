@@ -12,6 +12,7 @@
  *  1  | Avg Days to Pay                               | VAS_056_AvgDaysToPay           | Avg days to pay
  *  2  | Loading…                                      | VIS_Loading                    | Loading…
  *  3  | No change                                     | VIS_NoChange                   | No change
+ *  4  | Days to Pay (This Quarter)                    | VAS_056_DaysToPayThisQuarter   | Days to Pay (This Quarter)
  * ──────────────────────────────────────────────────────────────────────────────────────
  */
 ; VIS = window.VIS || {};
@@ -49,10 +50,18 @@
 
         var $metricEl;
         var $subtitleEl;
+        /* Busy/loading overlay shown while data is being fetched (initial load + refresh). */
+        var $busy;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
+        }
+
+        /* Toggle the busy/loading overlay. */
+        function showBusy(show) {
+            if (!$busy || !$busy[0]) { return; }
+            $busy[0].style.visibility = show ? 'visible' : 'hidden';
         }
 
         /* ── Initialize ── */
@@ -63,6 +72,7 @@
 
         /* ── Load data from backend ── */
         function loadData() {
+            showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'AvgDaysToPay/GetAvgDaysToPay',
                 type: 'GET',
@@ -72,7 +82,8 @@
                         renderMetric(data.currentAvgDays, data.displayText);
                     }
                 },
-                error: function () { /* leave placeholder on error */ }
+                error: function () { /* leave placeholder on error */ },
+                complete: function () { showBusy(false); }
             });
         }
 
@@ -115,8 +126,13 @@
                         '</svg>' +
                     '</div>' +
 
-                    '<div class="vas-adtp-title">' +
-                        lbl('VAS_056_AvgDaysToPay', 'Avg Days to Pay') +
+                    '<div class="vas-adtp-labels">' +
+                        '<div class="vas-adtp-title">' +
+                            lbl('VAS_056_AvgDaysToPay', 'Avg Days to Pay') +
+                        '</div>' +
+                        '<div class="vas-adtp-header-subtitle">' +
+                            lbl('VAS_056_DaysToPayThisQuarter', 'Days to Pay (This Quarter)') +
+                        '</div>' +
                     '</div>' +
 
                 '</div>'
@@ -138,6 +154,12 @@
 
             $card.append($header).append($metricEl).append($subtitleEl);
             $root.append($card);
+
+            /* Busy/loading overlay over the whole card, using the core spinner classes. Hidden until
+               a fetch is in flight; shown for both initial load and refresh. */
+            $busy = $('<div class="vas-adtp-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            $busy[0].style.visibility = 'hidden';
+            $root.append($busy);
         }
 
         /* ── Refresh ── */
