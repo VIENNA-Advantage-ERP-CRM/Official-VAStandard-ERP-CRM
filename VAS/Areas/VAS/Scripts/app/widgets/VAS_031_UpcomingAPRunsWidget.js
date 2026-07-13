@@ -1,7 +1,7 @@
 ﻿/**
  * VAS_031 Upcoming AP Runs Widget
  * Purpose - Displays upcoming AP invoices due within the next seven days,
- * groups them by due date, payment method and currency, displays invoice
+ * groups them by due date, business partner, payment method and currency, displays invoice
  * details, and creates an AP payment linked to the selected invoice.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
@@ -449,11 +449,18 @@
         }
 
         function showBusy(show) {
-            if ($busy) {
-                $busy.toggleClass(
-                    'is-visible',
-                    !!show
-                );
+            var $b = $root.find(
+                '#VAS-gljtm-busy-' +
+                $self.AD_UserHomeWidgetID
+            );
+
+            if (show) {
+                $b.show();
+                $b.addClass('is-visible');
+            }
+            else {
+                $b.hide();
+                $b.removeClass('is-visible');
             }
         }
 
@@ -2210,9 +2217,9 @@
 
             adClientId =
                 VIS.Env &&
-                VIS.Env.getCtx &&
-                VIS.Env.getCtx() &&
-                VIS.Env.getCtx().getAD_Client_ID
+                    VIS.Env.getCtx &&
+                    VIS.Env.getCtx() &&
+                    VIS.Env.getCtx().getAD_Client_ID
                     ? Number(
                         VIS.Env.getCtx().getAD_Client_ID()
                     )
@@ -2995,7 +3002,7 @@
                         ),
                         '0.01',
                         false
-                    ), 
+                    ),
 
                     true
                 ) +
@@ -3221,8 +3228,31 @@
                     )
                 );
         }
-
         function loadRunInvoiceDetails(run) {
+            var cBPartnerId = Number(
+                firstValue(
+                    run && run.cBPartnerId,
+                    run && run.vendorId,
+                    0
+                )
+            );
+
+            if (cBPartnerId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_MessageBusinessPartnerRequired',
+                        'Business partner is required.'
+                    )
+                );
+
+                setPayDialogBusy(
+                    false,
+                    false
+                );
+
+                return;
+            }
+
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
@@ -3241,14 +3271,24 @@
 
                     paymentMethodId:
                         Number(
-                            run.paymentMethodId ||
-                            0
+                            firstValue(
+                                run.paymentMethodId,
+                                run.va009PaymentMethodId,
+                                0
+                            )
                         ),
 
                     currencyId:
                         Number(
-                            run.currencyId
-                        )
+                            firstValue(
+                                run.currencyId,
+                                run.cCurrencyId,
+                                0
+                            )
+                        ),
+
+                    cBPartnerId:
+                        cBPartnerId
                 },
 
                 success: function (response) {
@@ -4103,6 +4143,10 @@
 
         function createLayout() {
             var $head;
+
+            if ($card && $card.length) {
+                return;
+            }
             var $headLeft;
             var $titleRow;
             var $iconBox;
@@ -4179,7 +4223,11 @@
             $head.append($headLeft);
 
             $busy = $(
-                '<div class="vas-upcoming-ap-runs-busy">' +
+                '<div ' +
+                'id="VAS-gljtm-busy-' +
+                escapeHtml($self.AD_UserHomeWidgetID) +
+                '" ' +
+                'class="vas-upcoming-ap-runs-busy">' +
                 '<div class="vis-busyindicatorinnerwrap">' +
                 '<i class="vis_widgetloader"></i>' +
                 '</div>' +
@@ -4317,11 +4365,24 @@
             $self.frame =
                 frame || null;
 
+            if (
+                frame &&
+                frame.widgetInfo
+            ) {
+                $self.AD_UserHomeWidgetID =
+                    Number(
+                        frame.widgetInfo
+                            .AD_UserHomeWidgetID ||
+                        0
+                    );
+            }
+
             createLayout();
 
             if (
                 $self.frame &&
-                $self.frame.getContentGrid
+                $self.frame.getContentGrid &&
+                !$root.parent().length
             ) {
                 $self.frame
                     .getContentGrid()
@@ -4336,12 +4397,13 @@
          * VIS widget lifecycle compatibility.
          */
         this.initialize = function () {
-            if (!$root.parent().length) {
-                createLayout();
-            }
-
+            createLayout();
             startAdaptiveRowObserver();
             loadData();
+        };
+
+        this.Initalize = function () {
+            $self.initialize();
         };
 
         this.refresh = function () {
@@ -4427,29 +4489,17 @@
 
     VAS.VAS_031_UpcomingAPRunsWidget.prototype.init =
         function (windowNo, frame) {
-            this.frame = frame;
-            this.windowNo = windowNo;
-
             if (
-                frame &&
-                frame.widgetInfo
+                typeof this.init === 'function' &&
+                Object.prototype.hasOwnProperty.call(
+                    this,
+                    'init'
+                )
             ) {
-                this.AD_UserHomeWidgetID =
-                    frame.widgetInfo
-                        .AD_UserHomeWidgetID;
-            }
-
-            this.Initalize();
-
-            if (
-                this.frame &&
-                this.frame.getContentGrid
-            ) {
-                this.frame
-                    .getContentGrid()
-                    .append(
-                        this.getRoot()
-                    );
+                return this.init(
+                    windowNo,
+                    frame
+                );
             }
         };
 
@@ -4485,8 +4535,11 @@
     VAS.VAS_031_UpcomingAPRunsWidget.prototype
         .refreshWidget =
         function () {
-            loadData();
-
+            if (
+                typeof this.refresh === 'function'
+            ) {
+                this.refresh();
+            }
         };
 
     /**
@@ -4494,16 +4547,11 @@
      */
     VAS.VAS_031_UpcomingAPRunsWidget.prototype.dispose =
         function () {
-            this.disposeComponent();
-
             if (
-                this.frame &&
-                this.frame.dispose
+                typeof this.disposeComponent === 'function'
             ) {
-                this.frame.dispose();
+                this.disposeComponent();
             }
-
-            this.frame = null;
         };
 
 })(VAS, jQuery);

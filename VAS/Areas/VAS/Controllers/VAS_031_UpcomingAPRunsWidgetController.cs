@@ -20,7 +20,7 @@ namespace VAS.Controllers
     ///
     /// Details popup:
     ///     Reads individual invoices for the selected:
-    ///     Due Date + Payment Method + Currency.
+    ///     Due Date + Payment Method + Currency + Business Partner.
     ///
     /// Create:
     ///     Creates and completes C_Payment linked to C_Invoice.
@@ -155,6 +155,16 @@ namespace VAS.Controllers
                                 "StdPrecision",
                                 2
                             )
+                        ),
+
+                        cBPartnerId = GetInt(
+                            reader,
+                            "C_BPartner_ID"
+                        ),
+
+                        vendorId = GetInt(
+                            reader,
+                            "C_BPartner_ID"
                         ),
 
                         vendorName = GetString(
@@ -432,6 +442,8 @@ UpcomingInvoices AS
 
 SELECT
     DueDate AS RunDate,
+    C_BPartner_ID,
+    VendorName,
     COALESCE(VA009_PaymentMethod_ID, 0) AS VA009_PaymentMethod_ID,
     PaymentMethodName,
     C_Currency_ID,
@@ -439,12 +451,13 @@ SELECT
     CurrencySymbol,
     MAX(COALESCE(StdPrecision, 2)) AS StdPrecision,
     COUNT(1) AS PaymentCount,
-    MIN(VendorName) AS VendorName,
     SUM(OpenAmount) AS Amount
 FROM UpcomingInvoices
 WHERE OpenAmount > 0
 GROUP BY
     DueDate,
+    C_BPartner_ID,
+    VendorName,
     COALESCE(VA009_PaymentMethod_ID, 0),
     PaymentMethodName,
     C_Currency_ID,
@@ -452,7 +465,8 @@ GROUP BY
     CurrencySymbol
 ORDER BY
     RunDate,
-    Amount DESC";
+    Amount DESC,
+    VendorName";
 
             return sql;
         }
@@ -466,9 +480,10 @@ ORDER BY
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetUpcomingAPRunDetails(
-    string runDate,
-    int paymentMethodId = 0,
-    int currencyId = 0)
+            string runDate,
+            int paymentMethodId = 0,
+            int currencyId = 0,
+            int cBPartnerId = 0)
         {
             Ctx ctx = GetContext();
 
@@ -520,6 +535,24 @@ ORDER BY
                 }, JsonRequestBehavior.AllowGet);
             }
 
+            if (cBPartnerId <= 0)
+            {
+                string businessPartnerMessage = GetMsg(
+                    ctx,
+                    "VAS_031_MessageBusinessPartnerRequired",
+                    "Business partner is required."
+                );
+
+                return Json(new
+                {
+                    success = false,
+                    error = businessPartnerMessage,
+                    errorText = businessPartnerMessage,
+                    hasData = false,
+                    rows = new List<object>()
+                }, JsonRequestBehavior.AllowGet);
+            }
+
             IDataReader reader = null;
 
             try
@@ -539,6 +572,11 @@ ORDER BY
 
                 string currencyIdSql =
                     currencyId.ToString(
+                        CultureInfo.InvariantCulture
+                    );
+
+                string cBPartnerIdSql =
+                    cBPartnerId.ToString(
                         CultureInfo.InvariantCulture
                     );
 
@@ -632,6 +670,9 @@ AND EXISTS
 
 AND Invoice.C_Currency_ID =
     " + currencyIdSql + @"
+
+AND Invoice.C_BPartner_ID =
+    " + cBPartnerIdSql + @"
 
 AND COALESCE
 (
@@ -1152,8 +1193,9 @@ AND BusinessPartner.IsVendor = 'Y'
  * 1. Due Date
  * 2. Payment Method
  * 3. Currency
+ * 4. Business Partner
  *
- * Payment Method and Currency are already filtered
+ * Payment Method, Currency, and Business Partner are already filtered
  * inside SecuredInvoice.
  *
  * This date filter ensures that the popup returns only
@@ -1618,7 +1660,7 @@ ORDER BY
                 CloseReader(reader);
             }
         }
-     
+
 
         #endregion
 
@@ -2826,8 +2868,8 @@ AND PaymentMethod.AD_Client_ID IN
                     validatedInvoicePayScheduleId
                 );
 
-                payment.SetDateTrx(DateTime.Now);
-                payment.SetDateAcct(DateTime.Now);
+                payment.SetDateTrx(dateTrx);
+                payment.SetDateAcct(dateTrx);
 
                 payment.SetTenderType(
                     normalizedTenderType
@@ -3520,20 +3562,34 @@ SELECT
     CASE
         WHEN
         (
-            Invoice.GrandTotal -
             COALESCE
             (
-                Allocation.AllocatedAmt,
+                Invoice.GrandTotal,
                 0
+            ) -
+            ABS
+            (
+                COALESCE
+                (
+                    Allocation.AllocatedAmt,
+                    0
+                )
             )
         ) > 0
         THEN
         (
-            Invoice.GrandTotal -
             COALESCE
             (
-                Allocation.AllocatedAmt,
+                Invoice.GrandTotal,
                 0
+            ) -
+            ABS
+            (
+                COALESCE
+                (
+                    Allocation.AllocatedAmt,
+                    0
+                )
             )
         )
         ELSE 0
