@@ -37,20 +37,27 @@ namespace VIS.Controllers
             DateTime monthStart = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
             DateTime nextMonthStart = monthStart.AddMonths(1);
 
+            /* Single-row currency CTE: filtered to the current client so it yields
+               exactly one row, which is CROSS JOINed below. This makes the base
+               currency symbol / ISO / precision available independently of whether
+               any receipts exist this month (mirrors OverdueController). */
             string schemaCurrencySql = @"
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision,
+                       Currency.ISO_Code AS ISO_Code,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
-                INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)";
+                INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID=Currency.C_Currency_ID)
+                WHERE ClientInfo.AD_Client_ID=" + ctx.GetAD_Client_ID();
 
+            /* Aggregate-only (no GROUP BY, no currency columns): SUM/COUNT with no
+               GROUP BY always yields exactly one row (SUM=NULL, COUNT=0 when nothing
+               matches), so the CROSS JOIN with SchemaCurrency below always carries a
+               row — even at zero receipts. */
             string receivedThisMonthSql = @"
-                SELECT SchemaCurrency.C_Currency_ID,
-                       SchemaCurrency.StdPrecision,
-                       SchemaCurrency.Cur_Symbol,
-                       SUM(
+                SELECT SUM(
                            CASE
                                WHEN Payment.C_Currency_ID = SchemaCurrency.C_Currency_ID
                                THEN COALESCE(Payment.PaymentAmount, 0)
@@ -86,11 +93,9 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            receivedThisMonthSql += @"
-                GROUP BY SchemaCurrency.C_Currency_ID,
-                         SchemaCurrency.StdPrecision,
-                         SchemaCurrency.Cur_Symbol";
-
+            /* Currency columns come from the single-row SchemaCurrency CTE via the
+               CROSS JOIN, not from the aggregate — so symbol/ISO/precision are always
+               present even when ReceivedThisMonth aggregates zero rows. */
             string sql = @"
                 WITH SchemaCurrency AS (
                     " + schemaCurrencySql + @"
@@ -98,21 +103,27 @@ namespace VIS.Controllers
                 ReceivedThisMonth AS (
                     " + receivedThisMonthSql + @"
                 )
-                SELECT ReceivedThisMonth.C_Currency_ID,
-                       ReceivedThisMonth.Cur_Symbol,
+                SELECT SchemaCurrency.C_Currency_ID,
+                       SchemaCurrency.Cur_Symbol,
+                       SchemaCurrency.ISO_Code,
+                       SchemaCurrency.StdPrecision,
                        ReceivedThisMonth.Receipt_Count,
                        ROUND(
                            COALESCE(ReceivedThisMonth.TotalAmountReceived, 0),
-                           ReceivedThisMonth.StdPrecision
+                           SchemaCurrency.StdPrecision
                        ) AS TotalAmountReceivedThisMonth
-                FROM ReceivedThisMonth";
+                FROM SchemaCurrency
+                CROSS JOIN ReceivedThisMonth";
 
             decimal totalAmountReceivedThisMonth = 0;
             int currencyId = 0;
             int receiptCount = 0;
-            /* Base-currency symbol (accounting schema currency); amount above is already
-               converted to this currency by CurrencyConvert. */
+            /* Base-currency symbol / ISO / precision (accounting schema currency); amount
+               above is already converted to this currency by CurrencyConvert. The
+               CROSS JOIN keeps these populated even at zero receipts. */
             string currencySymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
 
             IDataReader dr = null;
 
@@ -126,6 +137,12 @@ namespace VIS.Controllers
                     totalAmountReceivedThisMonth = Util.GetValueOfDecimal(dr["TotalAmountReceivedThisMonth"]);
                     receiptCount = Util.GetValueOfInt(dr["Receipt_Count"]);
                     currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    isoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                    /* CROSS JOIN always carries the schema precision; guard anyway. */
+                    if (dr["StdPrecision"] != null && dr["StdPrecision"] != System.DBNull.Value)
+                    {
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                    }
                 }
 
                 var result = new
@@ -134,6 +151,8 @@ namespace VIS.Controllers
                     totalAmountReceivedThisMonth = totalAmountReceivedThisMonth,
                     receiptCount = receiptCount,
                     symbol = currencySymbol,
+                    isoCode = isoCode,
+                    stdPrecision = stdPrecision,
                     period = monthStart.ToString("MMMM yyyy", CultureInfo.InvariantCulture)
                 };
 

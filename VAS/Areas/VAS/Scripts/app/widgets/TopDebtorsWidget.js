@@ -138,7 +138,7 @@
            backend status text (e.g. "Not yet overdue"). */
         function overdueLabel(daysOverdue, statusText) {
             var text = Number(daysOverdue) > 0
-                ? lbl("VAS_061_OldestOverdueDays", 'Oldest Overdue Days') + ': ' + daysOverdue
+                ? lbl("VAS_061_OldestOverdueDays", 'Oldest Overdue Days') + daysOverdue
                 : (statusText || lbl("VAS_061_NotYetOverdue", 'Not yet overdue'));
             return '<span class="vas-td-overdue-label">' + escapeHtml(text) + '</span>';
         }

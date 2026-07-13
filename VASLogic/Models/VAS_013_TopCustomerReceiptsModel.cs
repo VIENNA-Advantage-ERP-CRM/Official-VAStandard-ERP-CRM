@@ -158,6 +158,35 @@ namespace VASLogic.Models
                 new SqlParameter("@TopN", topN)
             };
 
+            /* Resolve the base/accounting-currency descriptors up front, straight
+               from the SchemaCurrency query, so the symbol / ISO / precision are
+               ALWAYS present — even when there are zero collection rows. Previously
+               these were captured only from the first data row, so they came back
+               empty at zero rows and the widget lost its currency symbol (same
+               class of bug fixed in OverdueController by sourcing the symbol from
+               the schema-currency query independently of the data). This query
+               reads only system/reference tables, so no MRole predicate applies. */
+            result.StdPrecision = 2;
+            IDataReader curDr = null;
+            try
+            {
+                curDr = DB.ExecuteReader(schemaCurrencySql);
+                if (curDr != null && curDr.Read())
+                {
+                    result.CurrencySymbol = Util.GetValueOfString(curDr["Currency_Symbol"]);
+                    result.CurrencyIso = Util.GetValueOfString(curDr["Currency_ISO"]);
+                    result.StdPrecision = Util.GetValueOfInt(curDr["Std_Precision"]);
+                }
+            }
+            finally
+            {
+                if (curDr != null)
+                {
+                    curDr.Close();
+                    curDr.Dispose();
+                }
+            }
+
             IDataReader dr = null;
             try
             {
@@ -172,14 +201,9 @@ namespace VASLogic.Models
                         MidpointRounding.AwayFromZero
                     );
 
-                    /* All rows share the base currency — capture the symbol /
-                       ISO / precision once from the first row read. */
-                    if (result.Rows.Count == 0)
-                    {
-                        result.CurrencySymbol = Util.GetValueOfString(dr["Currency_Symbol"]);
-                        result.CurrencyIso = Util.GetValueOfString(dr["Currency_ISO"]);
-                        result.StdPrecision = stdPrecision;
-                    }
+                    /* Currency symbol / ISO / precision are resolved once up front
+                       from the SchemaCurrency query (above) so they are present even
+                       at zero rows; nothing to capture per row here. */
 
                     result.Rows.Add(new TopCustomerRow
                     {

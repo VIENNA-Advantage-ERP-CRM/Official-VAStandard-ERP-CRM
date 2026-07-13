@@ -32,7 +32,7 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
@@ -40,20 +40,20 @@
 
 .vas-rr-card {
     /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
-       every inner value is em so the whole card rescales with the cell. cqi resolves
-       against .vas-rr-root (container-type: inline-size), so the spec's 1.4cqi is
-       retuned for the 6-col cell width (≈1.9cqi, matching VAS_015) and the ceiling
-       raised to 32px so content keeps pace with the grid on 2560-wide dashboards. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+       every inner value is em so the whole card rescales with the cell. Anchored on
+       --dash-inline-size (the dashboard's visible content width in px) — canonical
+       2K-calibrated clamp: floor 16px, ceiling 20px (was 32px). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    /* foundations.md §Standard Gradients — canonical glass surface (top fully opaque). */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border: 2px solid #FFFFFF;       /* physical edge — px (foundations §Borders) */
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;                 /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
     min-width: 0;
     min-height: 0;
@@ -80,12 +80,14 @@
 }
 
 .vas-rr-icon {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
+    /* dashboard-widgets.md §Widget Header — well ≈2× title clamp, glyph ≈1.1×,
+       both on the same --dash-inline-size lever as the title. */
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #0083DA;
     display: inline-flex;
     align-items: center;
@@ -94,8 +96,8 @@
 }
 
     .vas-rr-icon svg {
-        width: 1.125em;
-        height: 1.125em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
         stroke: currentColor;
     }
 
@@ -105,7 +107,7 @@
        written to :root by the widget bootstrap via ResizeObserver — see
        §Measurement Setup; falls back to 100vw when unset). Dark #102C3F;
        weight Medium (500) per project request. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
@@ -117,8 +119,9 @@
 
 .vas-rr-head-hint {
     /* Spec §Widget Header subtitle clamp — paired with the title above. */
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 22px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
+    line-height: 1.3;
     white-space: nowrap;
     flex-shrink: 0;
 }
@@ -141,21 +144,21 @@
     .vas-rr-table thead th {
         position: sticky;
         top: 0;
-        /* Fully opaque white so scrolling rows never bleed through the
-           header. The card's glass gradient is lightest at the top, so a
-           solid white header blends with it cleanly. z-index keeps the
-           thead above the tbody during scroll. */
-        background: #FFFFFF;
+        /* dashboard-widgets.md §Grid Data Widget > Header Row — canonical rail
+           variant: background MUST be transparent (never tint the header row);
+           differentiation comes from typography + divider, not a bg band.
+           z-index keeps the thead above the tbody during scroll. */
+        background: transparent;
         z-index: 2;
-        /* Spec §Grid Data Widget header row: sm token — viewport-anchored
-           (0.75 × the 16–32px root range) so data renders the SAME px in
-           every widget at every screen size. */
-        font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-        font-weight: 400;
-        color: #748494;
+        /* Rail header token: 0.6875em, Roboto Medium, capitalize, #41576A —
+           one step under the body row (0.75em). */
+        font-size: 0.6875em;
+        font-weight: 500;
+        color: #41576A;
         text-align: left;
-        padding: 0.625em 0.5em;
-        border-bottom: 0.0625em solid #EDF2F6;
+        text-transform: capitalize;
+        padding: 0.5em;
+        border-bottom: 1px solid #C5D2DD;   /* header divider — darkest tier */
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -166,12 +169,11 @@
         }
 
     .vas-rr-table tbody td {
-        padding: 0.875em 0.5em;
-        border-bottom: 0.0625em solid #EDF2F6;
-        /* spec §"List / Grid Hierarchy Rule": all cells share the sm token,
-           one step below the title; weight/color carry the hierarchy.
-           Viewport-anchored like the title so rows match sibling widgets. */
-        font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+        padding: 0.625em 0.5em;
+        border-bottom: 1px solid #E2EAF1;   /* body divider — lightest tier */
+        /* spec §"List / Grid Hierarchy Rule": all cells share the sm token
+           (0.75em), one step below the title; weight/color carry the hierarchy. */
+        font-size: 0.75em;
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
@@ -211,21 +213,21 @@
 .vas-rr-th-amount,      .vas-rr-td-amount      { width: 10em; text-align: right; }
 
 .vas-rr-td-doc {
-    /*font-family: "Roboto Mono", "Roboto", monospace;*/
-    color: #5F7283;
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);   /* xs — secondary metadata cell */
-}
-
-.vas-rr-td-customer {
-    /* Primary row title cell: same sm size as the other cells, bold + dark
-       per the hierarchy rule (differentiate by weight/color, not size). */
+    /* Primary identifier cell (receipt no.): bold + dark per the hierarchy
+       rule — differentiate by weight/color, not size (shares the sm token). */
     font-weight: 400;
     color: #102C3F;
 }
 
+.vas-rr-td-customer {
+    /* Standard body cell: regular weight, muted secondary tone. */
+    font-weight: 400;
+    color: #5F7283;
+}
+
 .vas-rr-td-amount {
     text-align: right;
-    font-weight: 400;
+    font-weight: 400;                /* emphasized value cell */
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     /* Amount column is the rightmost column and has a generous fixed
@@ -237,8 +239,8 @@
     text-overflow: ellipsis;
 }
 
-.vas-rr-td-amount-pos { color: #0B6B45; }
-.vas-rr-td-amount-neg { color: #8F2D2D; }
+.vas-rr-td-amount-pos { color: #0B6B45; }   /* foundations §Semantic — success */
+.vas-rr-td-amount-neg { color: #A33F3F; }   /* foundations §Semantic — danger */
 
 .vas-rr-amt-sign {
     margin-inline-end: 0.05em;
@@ -264,15 +266,16 @@
    is the xs token via the shared viewport clamp (absolute, so it doesn't
    compound against the cell's font-size). */
 .vas-rr-method-chip {
+    /* foundations §Chips And Pills — neutral/gray Chip tier. */
     display: inline-flex;
     align-items: center;
-    padding: 0.25em 0.625em;
-    border-radius: 999em;
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.008), 22px);
-    font-weight: 400;
+    padding: 0.3125em 0.625em;
+    border-radius: 999px;
+    font-size: 0.6875em;
+    font-weight: 500;
     line-height: 1.3;
-    background: #EDF2F6;
-    color: #5F7283;
+    background: #F1F4F8;
+    color: #41576A;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -283,7 +286,7 @@
 .vas-rr-empty {
     padding: 1.875em 0.75em;
     text-align: center;
-    color: #748494;
+    color: #5F7283;
     font-size: 0.875em;
     background: transparent;
 }
@@ -296,16 +299,15 @@
     justify-content: space-between;
     gap: 0.75em;
     padding-top: 0.625em;
-    border-top: 0.0625em solid #EDF2F6;
+    border-top: 1px solid #D9E2EB;   /* footer divider — middle tier */
     margin-top: 0.25em;
     flex-shrink: 0;
 }
 
 .vas-rr-pager-helper {
-    /* Spec §Widget Footer Pager helper text — shared viewport clamp
-       (0.8125 × the 16–32px root range) so it matches sibling widgets. */
-    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.0095), 26px);
-    color: #748494;
+    /* Spec §Widget Footer Pager helper text — 0.75em, muted. */
+    font-size: 0.75em;
+    color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -326,8 +328,8 @@
     width: 1.5em;
     height: 1.5em;
     padding: 0;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.375em;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
     background: #FBFDFF;
     color: #0083DA;
     cursor: pointer;
@@ -355,10 +357,9 @@
 .vas-rr-pager-text {
     min-width: 2.5em;
     text-align: center;
-    /* Spec page text: Roboto Medium, dark — shared viewport clamp
-       (0.875 × the 16–32px root range). */
-    font-size: clamp(14px, calc(var(--dash-inline-size, 100vw) * 0.0103), 28px);
-    font-weight: 400;
+    /* Spec §Widget Footer Pager page text — 0.8125em, Roboto Medium, dark. */
+    font-size: 0.8125em;
+    font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

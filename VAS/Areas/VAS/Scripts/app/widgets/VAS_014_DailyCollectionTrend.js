@@ -257,8 +257,8 @@
             var svg =
                 '<svg class="vas-dct-svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" role="img">' +
                 '<defs><linearGradient id="' + uid + '-area" x1="0" y1="0" x2="0" y2="1">' +
-                '<stop offset="0%" stop-color="#1F83FF" stop-opacity="0.20"/>' +
-                '<stop offset="100%" stop-color="#1F83FF" stop-opacity="0"/>' +
+                '<stop offset="0%" stop-color="#0083DA" stop-opacity="0.20"/>' +
+                '<stop offset="100%" stop-color="#0083DA" stop-opacity="0"/>' +
                 '</linearGradient></defs>' +
                 grid +
                 '<path d="' + areaD + '" fill="url(#' + uid + '-area)" stroke="none"/>' +
