@@ -90,7 +90,7 @@
         var $tabUnallocatedCount = null;
 
         var rowsLoading = false;
-        var pageSize = 10;
+        var pageSize = 8;
         var activeFilter = "allocated";
         var isDisposed = false;
 

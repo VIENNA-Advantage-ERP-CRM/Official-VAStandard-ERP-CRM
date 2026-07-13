@@ -268,8 +268,25 @@
             data,
             fallback
         ) {
+            var key;
+
             if (!data) {
                 return fallback || "";
+            }
+
+            key =
+                data.errorKey ||
+                data.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    data.error ||
+                    data.errorText ||
+                    data.message ||
+                    fallback ||
+                    ""
+                );
             }
 
             if (data.error) {
@@ -2000,10 +2017,12 @@
                     }
 
                     VIS.ADialog.info(
-                        data.message ||
-                        lbl(
-                            "VAS_072_ApplySuccess",
-                            "Allocation completed successfully"
+                        getServerMessage(
+                            data,
+                            lbl(
+                                "VAS_072_ApplySuccess",
+                                "Allocation completed successfully"
+                            )
                         )
                     );
 
@@ -2130,10 +2149,12 @@
                     }
 
                     VIS.ADialog.info(
-                        data.message ||
-                        lbl(
-                            "VAS_072_ApplySuccess",
-                            "Allocation completed successfully"
+                        getServerMessage(
+                            data,
+                            lbl(
+                                "VAS_072_ApplySuccess",
+                                "Allocation completed successfully"
+                            )
                         )
                     );
 

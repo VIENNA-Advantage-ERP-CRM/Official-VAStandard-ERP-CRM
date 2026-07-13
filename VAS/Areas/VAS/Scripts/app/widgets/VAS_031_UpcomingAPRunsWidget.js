@@ -178,6 +178,36 @@
                 return fallback;
             }
 
+            return getResponseMessage(
+                response,
+                fallback
+            );
+        }
+
+        function getResponseMessage(
+            response,
+            fallback
+        ) {
+            var key;
+
+            if (!response) {
+                return fallback;
+            }
+
+            key =
+                response.errorKey ||
+                response.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    response.error ||
+                    response.errorText ||
+                    response.message ||
+                    fallback
+                );
+            }
+
             return (
                 response.error ||
                 response.errorText ||
@@ -1423,16 +1453,12 @@
                     ) {
                         showState(
                             true,
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load data'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load data'
                             )
                         );
 
@@ -1570,16 +1596,12 @@
                         popupLookups = null;
 
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load lookup data.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load lookup data.'
                             )
                         );
 
@@ -1638,16 +1660,12 @@
                         data.error
                     ) {
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load lookup data.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load lookup data.'
                             )
                         );
 
@@ -3302,16 +3320,12 @@
                         data.error
                     ) {
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load invoice details.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load invoice details.'
                             )
                         );
 
@@ -3875,17 +3889,12 @@
                         data.error
                     ) {
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.error ||
-                                    data.errorText ||
-                                    data.message
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_031_MessageCouldNotSaveAPPayment',
+                                    'Could not save AP payment.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
-                                'Could not save AP payment.'
                             )
                         );
 
@@ -3914,10 +3923,12 @@
                         VIS.ADialog.info
                     ) {
                         VIS.ADialog.info(
-                            data.message ||
-                            lbl(
-                                'VAS_031_MessagePaymentCreatedSuccessfully',
-                                'AP payment created successfully.'
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_031_MessagePaymentCreatedSuccessfully',
+                                    'AP payment created successfully.'
+                                )
                             )
                         );
                     }

@@ -170,15 +170,23 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
                         success = false,
                         hasData = false,
-                        error = ex.Message,
-                        errorText = ex.Message
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -770,15 +778,23 @@ ORDER BY
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
                         success = false,
                         hasData = false,
-                        error = ex.Message,
-                        errorText = ex.Message,
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage,
                         summarySql = summarySql,
                         rowsSql = rowsSql
                     },

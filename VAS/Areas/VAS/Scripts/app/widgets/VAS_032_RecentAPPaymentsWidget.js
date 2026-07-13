@@ -86,6 +86,46 @@
                 .replace(/'/g, '&#039;');
         }
 
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (error) {
+                return null;
+            }
+        }
+
+        function getResponseMessage(data, fallback) {
+            var key;
+
+            if (!data) {
+                return fallback;
+            }
+
+            key = data.errorKey || data.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    data.error ||
+                    data.errorText ||
+                    data.message ||
+                    fallback
+                );
+            }
+
+            return (
+                data.error ||
+                data.errorText ||
+                data.message ||
+                fallback
+            );
+        }
+
         this.Initalize = function () {
             createWidget();
             setupAdaptivePagination();
@@ -1037,7 +1077,10 @@
 
             if (!paymentId || paymentId <= 0) {
                 VIS.ADialog.error(
-                    'Payment ID is required.'
+                    lbl(
+                        'VAS_032_MessagePaymentIdRequired',
+                        'Payment ID is required.'
+                    )
                 );
                 return;
             }
@@ -1064,14 +1107,13 @@
                         data.error
                     ) {
                         VIS.ADialog.error(
-                            (
-                                data &&
-                                (
-                                    data.error ||
-                                    data.errorText
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_032_MessageCouldNotLoadAllocationDetails',
+                                    'Could not load allocation details.'
                                 )
-                            ) ||
-                            'Could not load allocation details.'
+                            )
                         );
                         return;
                     }
@@ -1081,7 +1123,10 @@
 
                 error: function () {
                     VIS.ADialog.error(
-                        'Could not load allocation details.'
+                        lbl(
+                            'VAS_032_MessageCouldNotLoadAllocationDetails',
+                            'Could not load allocation details.'
+                        )
                     );
                 }
             });

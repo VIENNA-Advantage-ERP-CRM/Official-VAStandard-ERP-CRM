@@ -2262,12 +2262,7 @@ ORDER BY
 
             if (ctx == null)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = "Session Expired",
-                    errorText = "Session Expired"
-                });
+                return GetSessionExpiredResult();
             }
 
             if (invoiceId <= 0)
@@ -2424,9 +2419,14 @@ ORDER BY
                 ))
                 {
                     throw new InvalidOperationException(
-                        "The selected document is not a normal AP Invoice. " +
-                        "Invoice DocBaseType must be API, but it is " +
-                        invoiceDocBaseType + "."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidAPInvoiceDocBaseType",
+                            "The selected document is not a normal AP Invoice. Invoice DocBaseType must be API, but it is {0}."
+                        ).Replace(
+                            "{0}",
+                            invoiceDocBaseType
+                        )
                     );
                 }
 
@@ -2437,14 +2437,22 @@ ORDER BY
                 if (invoice.GetAD_Org_ID() != adOrgId)
                 {
                     throw new InvalidOperationException(
-                        "Selected organization does not match the invoice."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageOrganizationInvoiceMismatch",
+                            "Selected organization does not match the invoice."
+                        )
                     );
                 }
 
                 if (invoice.GetC_BPartner_ID() != vendorId)
                 {
                     throw new InvalidOperationException(
-                        "Selected vendor does not match the invoice."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageVendorInvoiceMismatch",
+                            "Selected vendor does not match the invoice."
+                        )
                     );
                 }
 
@@ -2458,8 +2466,11 @@ ORDER BY
                 if (validatedInvoicePayScheduleId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "The selected invoice payment schedule is invalid, inactive, paid, " +
-                        "or does not belong to the selected invoice."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidInvoicePaySchedule",
+                            "The selected invoice payment schedule is invalid, inactive, paid, or does not belong to the selected invoice."
+                        )
                     );
                 }
 
@@ -2470,7 +2481,11 @@ ORDER BY
                 ))
                 {
                     throw new InvalidOperationException(
-                        "Invoice schedule already has an active payment."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageScheduleAlreadyHasPayment",
+                            "Invoice schedule already has an active payment."
+                        )
                     );
                 }
 
@@ -2547,7 +2562,11 @@ ORDER BY
                     !organization.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Organization was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageOrganizationInactive",
+                            "Organization was not found or is inactive."
+                        )
                     );
                 }
 
@@ -2564,14 +2583,22 @@ ORDER BY
                     !bankAccount.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Bank account was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageBankAccountInactive",
+                            "Bank account was not found or is inactive."
+                        )
                     );
                 }
 
                 if (bankAccount.GetAD_Client_ID() != ctx.GetAD_Client_ID())
                 {
                     throw new InvalidOperationException(
-                        "Bank account does not belong to the current client."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageBankAccountInvalidClient",
+                            "Bank account does not belong to the current client."
+                        )
                     );
                 }
 
@@ -2589,7 +2616,11 @@ ORDER BY
                     !vendor.IsVendor())
                 {
                     throw new InvalidOperationException(
-                        "Selected business partner is not an active vendor."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInactiveVendor",
+                            "Selected business partner is not an active vendor."
+                        )
                     );
                 }
 
@@ -2602,7 +2633,11 @@ ORDER BY
                 if (bPartnerLocationId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "No active business partner location was found for the selected vendor."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageVendorLocationNotFound",
+                            "No active business partner location was found for the selected vendor."
+                        )
                     );
                 }
 
@@ -2619,7 +2654,11 @@ ORDER BY
                     !currency.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Currency was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageCurrencyInactive",
+                            "Currency was not found or is inactive."
+                        )
                     );
                 }
 
@@ -2636,7 +2675,11 @@ ORDER BY
                     !conversionType.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Conversion type was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageConversionTypeInactive",
+                            "Conversion type was not found or is inactive."
+                        )
                     );
                 }
 
@@ -2653,7 +2696,11 @@ ORDER BY
                 if (resolvedDocTypeId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "AP Payment document type was not found."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageAPPaymentDocTypeNotFound",
+                            "AP Payment document type was not found."
+                        )
                     );
                 }
 
@@ -2672,7 +2719,11 @@ ORDER BY
                     ))
                 {
                     throw new InvalidOperationException(
-                        "The selected document type is not an AP Payment document type."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidAPPaymentDocType",
+                            "The selected document type is not an AP Payment document type."
+                        )
                     );
                 }
 
@@ -2688,7 +2739,11 @@ ORDER BY
                 ))
                 {
                     throw new InvalidOperationException(
-                        "The selected tender type is not valid."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidTenderType",
+                            "The selected tender type is not valid."
+                        )
                     );
                 }
 
@@ -3030,9 +3085,14 @@ AND PaymentMethod.AD_Client_ID IN
                     if (string.IsNullOrWhiteSpace(processMessage))
                     {
                         processMessage =
-                            "Payment was saved but was not completed. " +
-                            "Current status: " +
-                            completedDocStatus;
+                            GetMsg(
+                                ctx,
+                                "VAS_031_MessagePaymentSavedNotCompleted",
+                                "Payment was saved but was not completed. Current status: {0}"
+                            ).Replace(
+                                "{0}",
+                                completedDocStatus
+                            );
                     }
 
                     throw new InvalidOperationException(
@@ -3796,6 +3856,8 @@ WHERE Invoice.C_Invoice_ID =
             return Json(new
             {
                 success = false,
+                errorKey = messageKey,
+                messageKey = messageKey,
                 error = message,
                 errorText = message
             });
@@ -3993,11 +4055,16 @@ AND " + columnName + @" < DATE '" +
 
         private JsonResult GetSessionExpiredResult()
         {
+            const string messageKey = "SessionExpired";
+            const string message = "Session Expired";
+
             return Json(new
             {
                 success = false,
-                error = "Session Expired",
-                errorText = "Session Expired",
+                errorKey = messageKey,
+                messageKey = messageKey,
+                error = message,
+                errorText = message,
                 hasData = false
             }, JsonRequestBehavior.AllowGet);
         }

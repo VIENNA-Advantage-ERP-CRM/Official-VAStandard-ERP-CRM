@@ -103,6 +103,38 @@
             }
         }
 
+        function getResponseMessage(
+            data,
+            fallback
+        ) {
+            var key;
+
+            if (!data) {
+                return fallback;
+            }
+
+            key =
+                data.errorKey ||
+                data.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    data.errorText ||
+                    data.error ||
+                    data.message ||
+                    fallback
+                );
+            }
+
+            return (
+                data.errorText ||
+                data.error ||
+                data.message ||
+                fallback
+            );
+        }
+
         function normalizePrecision(value) {
             var precision = Number(value);
 
@@ -496,12 +528,13 @@
                     ) {
                         showState(
                             true,
-                            data && data.errorText
-                                ? data.errorText
-                                : lbl(
+                            getResponseMessage(
+                                data,
+                                lbl(
                                     'VAS_ErrorLoading',
                                     'Could not load data'
                                 )
+                            )
                         );
 
                         return;
@@ -625,12 +658,13 @@
                         data.error
                     ) {
                         renderErrorRow(
-                            data && data.errorText
-                                ? data.errorText
-                                : lbl(
+                            getResponseMessage(
+                                data,
+                                lbl(
                                     'VAS_ErrorLoading',
                                     'Could not load data'
                                 )
+                            )
                         );
 
                         return;

@@ -323,13 +323,21 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
-                        error = ex.Message,
-                        errorText = ex.Message,
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage,
                         sql = sql
                     },
                     JsonRequestBehavior.AllowGet
