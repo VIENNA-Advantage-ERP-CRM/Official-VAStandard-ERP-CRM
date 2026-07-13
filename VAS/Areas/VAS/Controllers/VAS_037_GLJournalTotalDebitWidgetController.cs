@@ -1368,10 +1368,19 @@ ROUND
 
         private object SessionExpired()
         {
+            Ctx ctx = GetContext();
+            string message = GetMsg(
+                ctx,
+                "SessionExpired",
+                "Session Expired"
+            );
+
             return new
             {
                 success = false,
-                error = "Session Expired",
+                errorKey = "SessionExpired",
+                messageKey = "SessionExpired",
+                error = message,
                 hasData = false
             };
         }
@@ -1383,6 +1392,8 @@ ROUND
             return new
             {
                 success = false,
+                errorKey = "VAS_ErrorLoading",
+                messageKey = "VAS_ErrorLoading",
                 error = message,
                 hasData = false
             };

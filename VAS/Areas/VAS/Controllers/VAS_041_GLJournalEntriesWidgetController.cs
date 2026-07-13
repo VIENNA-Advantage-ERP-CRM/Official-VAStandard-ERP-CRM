@@ -1022,7 +1022,7 @@ FROM ProtectedJournal ProtectedJournal";
                         success = false,
                         error = true,
                         errorText =
-                            "Invalid journal ID."
+                            GetMsg(ctx, "VAS_041_InvalidJournalID", "Invalid journal ID.")
                     }
                 );
             }
@@ -1220,7 +1220,7 @@ GROUP BY
                             success = false,
                             error = true,
                             errorText =
-                                "Journal details not found."
+                                GetMsg(ctx, "VAS_041_JournalDetailsNotFound", "Journal details not found.")
                         }
                     );
                 }
@@ -1715,9 +1715,9 @@ ORDER BY
                     {
                         success = false,
                         error =
-                            "Session Expired",
+                            GetMsg(ctx, "SessionExpired", "Session Expired"),
                         errorText =
-                            "Session Expired"
+                            GetMsg(ctx, "SessionExpired", "Session Expired")
                     }
                 );
             }
@@ -1762,7 +1762,7 @@ ORDER BY
                 if (IsJournalPosted(journal))
                 {
                     throw new InvalidOperationException(
-                        "The journal is already posted."
+                        GetMsg(ctx, "VAS_041_JournalAlreadyPosted", "The journal is already posted.")
                     );
                 }
 
@@ -1799,7 +1799,7 @@ ORDER BY
                                 ),
 
                             message =
-                                "The journal is already approved."
+                                GetMsg(ctx, "VAS_041_JournalAlreadyApproved", "The journal is already approved.")
                         }
                     );
                 }
@@ -1832,7 +1832,7 @@ ORDER BY
                         throw new InvalidOperationException(
                             GetJournalProcessError(
                                 journal,
-                                "The journal could not be prepared."
+                                GetMsg(ctx, "VAS_041_JournalCouldNotBePrepared", "The journal could not be prepared.")
                             )
                         );
                     }
@@ -1852,7 +1852,7 @@ ORDER BY
                 )
                 {
                     throw new InvalidOperationException(
-                        "Only Draft, In Progress or Not Approved journals can be approved."
+                        GetMsg(ctx, "VAS_041_InvalidApprovalStatus", "Only Draft, In Progress or Not Approved journals can be approved.")
                     );
                 }
 
@@ -1871,7 +1871,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetJournalProcessError(
                             journal,
-                            "The journal could not be approved."
+                            GetMsg(ctx, "VAS_041_JournalCouldNotBeApproved", "The journal could not be approved.")
                         )
                     );
                 }
@@ -1900,7 +1900,7 @@ ORDER BY
                             ),
 
                         message =
-                            "Journal approved successfully."
+                            GetMsg(ctx, "VAS_041_JournalApprovedSuccessfully", "Journal approved successfully.")
                     }
                 );
             }
@@ -1990,9 +1990,9 @@ ORDER BY
                     {
                         success = false,
                         error =
-                            "Session Expired",
+                            GetMsg(ctx, "SessionExpired", "Session Expired"),
                         errorText =
-                            "Session Expired"
+                            GetMsg(ctx, "SessionExpired", "Session Expired")
                     }
                 );
             }
@@ -2053,7 +2053,7 @@ ORDER BY
                                 journal.GetDocStatus(),
                             posted = true,
                             message =
-                                "The journal is already posted."
+                                GetMsg(ctx, "VAS_041_JournalAlreadyPosted", "The journal is already posted.")
                         }
                     );
                 }
@@ -2084,7 +2084,7 @@ ORDER BY
                         throw new InvalidOperationException(
                             GetJournalProcessError(
                                 journal,
-                                "The journal could not be completed."
+                                GetMsg(ctx, "VAS_041_JournalCouldNotBeCompleted", "The journal could not be completed.")
                             )
                         );
                     }
@@ -2105,7 +2105,7 @@ ORDER BY
                 )
                 {
                     throw new InvalidOperationException(
-                        "The journal must be approved before it can be posted."
+                        GetMsg(ctx, "VAS_041_JournalMustBeApproved", "The journal must be approved before it can be posted.")
                     );
                 }
 
@@ -2151,9 +2151,9 @@ ORDER BY
                     {
                         success = false,
                         error =
-                            "Journal details not found.",
+                            GetMsg(ctx, "VAS_041_JournalDetailsNotFound", "Journal details not found."),
                         errorText =
-                            "Journal details not found."
+                            GetMsg(ctx, "VAS_041_JournalDetailsNotFound", "Journal details not found.")
                     }
                 );
             }
@@ -2178,7 +2178,7 @@ ORDER BY
                             journalState.DocStatus,
                         posted = true,
                         message =
-                            "The journal is already posted."
+                            GetMsg(ctx, "VAS_041_JournalAlreadyPosted", "The journal is already posted.")
                     }
                 );
             }
@@ -2197,9 +2197,14 @@ ORDER BY
             )
             {
                 string errorMessage =
-                    "The journal was not completed successfully. " +
-                    "Current status: " +
-                    journalState.DocStatus;
+                    GetMsg(
+                        ctx,
+                        "VAS_041_JournalPostingNotCompletedStatus",
+                        "The journal was not completed successfully. Current status: {0}"
+                    ).Replace(
+                        "{0}",
+                        journalState.DocStatus
+                    );
 
                 return Json(
                     new
@@ -2226,9 +2231,9 @@ ORDER BY
                     {
                         success = false,
                         error =
-                            "The journal is completed but Processed is not Y.",
+                            GetMsg(ctx, "VAS_041_JournalCompletedNotProcessed", "The journal is completed but Processed is not Y."),
                         errorText =
-                            "The journal is completed but Processed is not Y."
+                            GetMsg(ctx, "VAS_041_JournalCompletedNotProcessed", "The journal is completed but Processed is not Y.")
                     }
                 );
             }
@@ -2256,9 +2261,9 @@ ORDER BY
                         {
                             success = false,
                             error =
-                                "No accounting schema was found for the client.",
+                                GetMsg(ctx, "VAS_041_NoAccountingSchema", "No accounting schema was found for the client."),
                             errorText =
-                                "No accounting schema was found for the client."
+                                GetMsg(ctx, "VAS_041_NoAccountingSchema", "No accounting schema was found for the client.")
                         }
                     );
                 }
@@ -2276,6 +2281,7 @@ ORDER BY
                 {
                     string errorMessage =
                         GetPostingErrorMessage(
+                            ctx,
                             postingResult
                         );
 
@@ -2311,9 +2317,9 @@ ORDER BY
                         {
                             success = false,
                             error =
-                                "The accounting engine finished, but the journal was not posted.",
+                                GetMsg(ctx, "VAS_041_AccountingFinishedNotPosted", "The accounting engine finished, but the journal was not posted."),
                             errorText =
-                                "The accounting engine finished, but the journal was not posted."
+                                GetMsg(ctx, "VAS_041_AccountingFinishedNotPosted", "The accounting engine finished, but the journal was not posted.")
                         }
                     );
                 }
@@ -2330,7 +2336,7 @@ ORDER BY
                             journalState.DocStatus,
                         posted = true,
                         message =
-                            "Journal posted successfully."
+                            GetMsg(ctx, "VAS_041_JournalPostedSuccessfully", "Journal posted successfully.")
                     }
                 );
             }
@@ -2529,9 +2535,9 @@ AND AD_Ref_List.IsActive = 'Y'";
                     {
                         success = false,
                         error =
-                            "Journal details not found.",
+                            GetMsg(ctx, "VAS_041_JournalDetailsNotFound", "Journal details not found."),
                         errorText =
-                            "Journal details not found."
+                            GetMsg(ctx, "VAS_041_JournalDetailsNotFound", "Journal details not found.")
                     }
                 );
             }
@@ -2775,7 +2781,7 @@ AND IsActive = 'Y'",
             )
             {
                 throw new InvalidOperationException(
-                    "Journal details not found."
+                    GetMsg(ctx, "VAS_041_JournalDetailsNotFound", "Journal details not found.")
                 );
             }
 
@@ -2931,7 +2937,7 @@ AND GL_Journal.AD_Client_ID =
             }
 
             string errorMessage =
-                "Could not save the journal.";
+                GetMsg(ctx, "VAS_041_CouldNotSaveJournal", "Could not save the journal.");
 
             try
             {
@@ -3029,6 +3035,7 @@ AND GL_Journal.AD_Client_ID =
         }
 
         private string GetPostingErrorMessage(
+            Ctx ctx,
             string postingResult)
         {
             string result =
@@ -3045,7 +3052,7 @@ AND GL_Journal.AD_Client_ID =
             )
             {
                 return
-                    "The journal could not be posted because it is not balanced.";
+                    GetMsg(ctx, "VAS_041_JournalNotBalanced", "The journal could not be posted because it is not balanced.");
             }
 
             if (
@@ -3057,7 +3064,7 @@ AND GL_Journal.AD_Client_ID =
             )
             {
                 return
-                    "The journal could not be posted because currency conversion is missing.";
+                    GetMsg(ctx, "VAS_041_JournalNotConvertible", "The journal could not be posted because currency conversion is missing.");
             }
 
             if (
@@ -3069,7 +3076,7 @@ AND GL_Journal.AD_Client_ID =
             )
             {
                 return
-                    "The journal could not be posted because the accounting period is closed.";
+                    GetMsg(ctx, "VAS_041_JournalPeriodClosed", "The journal could not be posted because the accounting period is closed.");
             }
 
             if (
@@ -3081,18 +3088,32 @@ AND GL_Journal.AD_Client_ID =
             )
             {
                 return
-                    "The journal could not be posted because one or more accounts are invalid.";
+                    GetMsg(
+                        ctx,
+                        "VAS_041_JournalInvalidAccount",
+                        "The journal could not be posted because one or more accounts are invalid."
+                    );
             }
 
             if (string.IsNullOrWhiteSpace(result))
             {
                 return
-                    "The journal could not be posted.";
+                    GetMsg(
+                        ctx,
+                        "VAS_041_JournalProcessFailed",
+                        "The journal could not be posted."
+                    );
             }
 
             return
-                "Accounting posting failed: " +
-                result;
+                GetMsg(
+                    ctx,
+                    "VAS_041_AccountingPostingFailed",
+                    "Accounting posting failed: {0}"
+                ).Replace(
+                    "{0}",
+                    result
+                );
         }
 
         private string GetReferenceName(
@@ -3216,15 +3237,57 @@ AND GL_Journal.AD_Client_ID =
 
         private JsonResult GetSessionExpiredResult()
         {
+            string message =
+                GetMsg(
+                    null,
+                    "SessionExpired",
+                    "Session Expired"
+                );
+
             return JsonString(
                 new
                 {
                     success = false,
                     error = true,
+                    errorKey =
+                        "SessionExpired",
                     errorText =
-                        "Session Expired"
+                        message
                 }
             );
+        }
+
+        private string GetMsg(
+            Ctx ctx,
+            string key,
+            string fallback)
+        {
+            if (ctx == null)
+            {
+                ctx = GetContext();
+            }
+
+            if (ctx == null)
+            {
+                return fallback;
+            }
+
+            string message =
+                Msg.GetMsg(
+                    ctx,
+                    key
+                );
+
+            if (
+                string.IsNullOrWhiteSpace(message) ||
+                message == key ||
+                message == "[" + key + "]"
+            )
+            {
+                return fallback;
+            }
+
+            return message;
         }
 
         private int NormalizePrecision(

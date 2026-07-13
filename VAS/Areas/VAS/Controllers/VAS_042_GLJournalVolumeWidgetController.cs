@@ -42,6 +42,8 @@ namespace VAS.Controllers
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = false,
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
                     error = "Session Expired",
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
@@ -54,6 +56,8 @@ namespace VAS.Controllers
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = false,
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
                     error = "Session Expired",
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);

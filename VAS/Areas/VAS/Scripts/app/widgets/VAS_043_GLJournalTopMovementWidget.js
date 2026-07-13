@@ -295,9 +295,9 @@
                 var fillCls = 'VAS-gljtm-fill' + (a.IsCredit ? ' VAS-gljtm-fill-cr' : '');
                 var valStr  = sym + fmtAmt(a.NetMovement, prec);
                 var rowInfo = esc((a.AccountCode || '') + ' ' + (a.AccountName || '')
-                    + ' - Net Movement: ' + valStr
-                    + ', Debit: ' + sym + fmtAmt(a.TotalDebit, prec)
-                    + ', Credit: ' + sym + fmtAmt(a.TotalCredit, prec));
+                    + ' - ' + lbl('VAS_043_NetMovement', 'Net Movement') + ': ' + valStr
+                    + ', ' + lbl('VAS_043_Debit', 'Debit') + ': ' + sym + fmtAmt(a.TotalDebit, prec)
+                    + ', ' + lbl('VAS_043_Credit', 'Credit') + ': ' + sym + fmtAmt(a.TotalCredit, prec));
 
                 html += '<div class="VAS-gljtm-row" title="' + rowInfo + '">'
                     +     '<div class="VAS-gljtm-row-head">'

@@ -60,6 +60,16 @@
                 .replace(/'/g, "&#039;");
         }
 
+        function getResponseMessage(data, fallback) {
+            var key = data && (data.errorKey || data.messageKey);
+
+            if (key) {
+                return lbl(key, data.error || data.errorText || data.message || fallback);
+            }
+
+            return data && (data.error || data.errorText || data.message) || fallback;
+        }
+
         function getCurrencyText(data) {
             return data.currencySymbol ||
                 data.CurSymbol ||
@@ -251,7 +261,7 @@
                     }
 
                     if (data.success === false || data.error) {
-                        renderEmpty(data.error || lbl('VIS_Error', 'Error loading data.'));
+                        renderEmpty(getResponseMessage(data, lbl('VIS_Error', 'Error loading data.')));
                         return;
                     }
 

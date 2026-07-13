@@ -403,6 +403,20 @@
             );
 
         if (response) {
+            if (response.errorKey || response.messageKey) {
+                return lbl(
+                    response.errorKey || response.messageKey,
+                    response.errorText ||
+                    response.error ||
+                    response.message ||
+                    fallback ||
+                    lbl(
+                        "VIS_Error",
+                        "Error loading data."
+                    )
+                );
+            }
+
             return (
                 response.errorText ||
                 response.error ||
@@ -420,14 +434,15 @@
             xhr.status
         ) {
             return (
-                fallback ||
                 lbl(
-                    "VIS_Error",
-                    "Error loading data."
+                    "VAS_044_RequestFailedHttp",
+                    "Request failed. HTTP {0}"
                 )
-            ) +
-                " HTTP " +
-                xhr.status;
+                    .replace(
+                        "{0}",
+                        xhr.status
+                    )
+            );
         }
 
         return (
@@ -2523,14 +2538,16 @@
                             ? "disabled "
                             : ""
                     ) +
-                    'aria-label="Previous">&#8249;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
 
                     '<span class="VAS-gljr-page-count">' +
                     esc(
                         detailLineCount
                             ? (
                                 detailLinePageNo +
-                                " of " +
+                                " " +
+                                lbl("VIS_Of", "of") +
+                                " " +
                                 detailLineTotalPages
                             )
                             : ""
@@ -2545,7 +2562,7 @@
                             ? "disabled "
                             : ""
                     ) +
-                    'aria-label="Next">&#8250;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
 
                     "</div>" +
 

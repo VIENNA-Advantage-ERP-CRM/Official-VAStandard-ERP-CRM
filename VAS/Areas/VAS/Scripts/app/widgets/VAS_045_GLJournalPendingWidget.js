@@ -379,6 +379,20 @@
                 );
 
             if (response) {
+                if (response.errorKey || response.messageKey) {
+                    return lbl(
+                        response.errorKey || response.messageKey,
+                        response.errorText ||
+                        response.error ||
+                        response.message ||
+                        fallback ||
+                        lbl(
+                            "VIS_Error",
+                            "Error Loading Data."
+                        )
+                    );
+                }
+
                 return (
                     response.errorText ||
                     response.error ||
