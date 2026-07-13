@@ -2181,7 +2181,7 @@ AND PaymentMethod.AD_Client_ID IN
 (
     0,
     " + clientIdSql + @"
-)
+) AND  PaymentMethod.VA009_PAYMENTBASETYPE NOT IN ('B','C','P') 
 ORDER BY
     PaymentMethod.VA009_Name";
 
