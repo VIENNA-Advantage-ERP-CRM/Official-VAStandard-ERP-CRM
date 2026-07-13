@@ -74,6 +74,13 @@
         var currentPO = null;
         var currentLines = [];
         var poPageNo = 1;
+        var poSearchText = "";
+        var poSearchTimer = null;
+        /* Review #49: receive-form header data and line-level locators. */
+        var poDocTypeName = "";
+        var poWarehouses = [];
+        var poSelectedWarehouseId = 0;
+        var poLocators = [];
         var poPageSize = 8;
         var poTotalPages = 0;
         var poTotalRecords = 0;
@@ -134,6 +141,7 @@
             var available = Math.floor($dialogBody.innerHeight());
             available -= outerHeight($dialogBody.find('.vas-ra-note:first'));
             available -= outerHeight($dialogBody.find('.vas-ra-search:first'));
+            available -= outerHeight($dialogBody.find('.vas-ra-search-pill:first'));
             available -= outerHeight($dialogBody.find('.vas-ra-modal-pager:first'));
             available -= outerHeight($dialogBody.find('.vas-ra-label-table thead:first'));
             available -= 12;
@@ -392,6 +400,10 @@
             $dialog.on('click', '.vas-ra-po-prev', function () { if (poPageNo > 1) { loadOpenPOLines(poPageNo - 1); } });
             $dialog.on('click', '.vas-ra-po-next', function () { if (poPageNo < poTotalPages) { loadOpenPOLines(poPageNo + 1); } });
             $dialog.on('click', '.vas-ra-back-po', function () { currentPO = null; currentLines = []; renderReceiveAgainstPO(); });
+            $dialog.on('change', '.vas-ra-wh-select', function () {
+                poSelectedWarehouseId = Number($(this).val() || 0);
+                loadWarehouseLocators(poSelectedWarehouseId);
+            });
             $dialog.on('click', '.vas-ra-make-grn', makeGRN);
             $dialog.on('click', '.vas-ra-gc-row', function () { openGRNConfirmationDetail(Number($(this).data('gcid'))); });
             $dialog.on('click', '.vas-ra-gc-prev', function () { if (gcPageNo > 1) { loadGRNConfirmations(gcPageNo - 1); } });
@@ -410,6 +422,14 @@
                     searchGRNLabels(searchText, 1);
                 }, 250);
             });
+            $dialog.on('input', '.vas-ra-po-search', function () {
+                var searchText = $(this).val();
+                clearTimeout(poSearchTimer);
+                poSearchTimer = setTimeout(function () {
+                    poSearchText = searchText;
+                    loadOpenPOLines(1);
+                }, 250);
+            });
             $dialog.on('click', '.vas-ra-label-row', function () { queueGRNLabelPrint($(this).data('grnid')); });
             $dialog.on('click', '.vas-ra-label-prev', function () { if (labelPageNo > 1) { searchGRNLabels(labelSearchText, labelPageNo - 1); } });
             $dialog.on('click', '.vas-ra-label-next', function () { if (labelPageNo < labelTotalPages) { searchGRNLabels(labelSearchText, labelPageNo + 1); } });
@@ -424,6 +444,7 @@
         function openReceiveAgainstPOModal() {
             currentPO = null;
             currentLines = [];
+            poSearchText = "";
             setModal(lbl("VAS_090_ReceiveAgainstPO", "Receive Against PO"), "", "");
             $dialogBody.html('<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_Loading", "Loading...")) + '</div>');
             openDialog();
@@ -437,7 +458,7 @@
                 url: VIS.Application.contextUrl + 'VAS_090_ReceivingActionsWidget/GetOpenPurchaseOrders',
                 type: 'GET',
                 cache: false,
-                data: { pageNo: page, pageSize: poPageSize },
+                data: { pageNo: page, pageSize: poPageSize, searchText: poSearchText },
                 success: function (res) {
                     var data = parseResponse(res);
                     showDialogBusy(false);
@@ -474,8 +495,13 @@
             }
 
             var rows = data && data.rows ? data.rows : purchaseOrders;
+            /* Search pill styled after the Product Search widget's bar; the
+               old instruction note above the list is removed. */
             var html =
-                '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_090_SelectPOThenReceive", "Select an open purchase order, enter received quantities, then create the GRN.")) + '</span></div>' +
+                '<div class="vas-ra-search-pill">' +
+                '<span class="vas-ra-search-pill-ic">' + icon("search") + '</span>' +
+                '<input class="vas-ra-po-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_POSearchPlaceholder", "PO number or supplier name...")) + '"/>' +
+                '</div>' +
                 '<div class="vas-ra-po-list">';
 
             if (!rows || rows.length === 0) {
@@ -483,20 +509,39 @@
             } else {
                 for (var i = 0; i < rows.length; i++) {
                     var po = rows[i];
-                    var meta = (po.dockName || "-") + " - " + (po.openLineCount || 0) + " " + lbl("VAS_090_OpenLines", "open lines");
+                    /* Review #47 (design reference): card rows like the GRN
+                       confirmation list - icon tile, PO number over its
+                       supplier, line count over a status pill, chevron. */
+                    var meta = (po.dockName ? po.dockName + " · " : "") + (po.supplier || "-");
+                    var openLineCount = Number(po.openLineCount || 0);
+                    var lineText = openLineCount + ' ' + (openLineCount === 1 ? lbl("VAS_090_Line", "line") : lbl("VAS_090_Lines2", "lines"));
                     html +=
                         '<button type="button" class="vas-ra-po-row" data-poid="' + escapeHtml(po.poId) + '">' +
-                        '<span class="vas-ra-po-main">' +
-                        '<span class="vas-ra-po-no" title="' + escapeHtml(po.poNo || "-") + '">' + escapeHtml(po.poNo || "-") + '</span>' +
-                        '<span class="vas-ra-po-supplier" title="' + escapeHtml(po.supplier || "-") + '">' + escapeHtml(po.supplier || "-") + '</span>' +
+                        '<span class="vas-ra-gc-ic">' + icon("file") + '</span>' +
+                        '<span class="vas-ra-gc-main">' +
+                        '<span class="vas-ra-gc-ref" title="' + escapeHtml(po.poNo || "-") + '">' + escapeHtml(po.poNo || "-") + '</span>' +
+                        '<span class="vas-ra-gc-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
                         '</span>' +
-                        '<span class="vas-ra-po-meta" title="' + escapeHtml(meta) + '">' + escapeHtml(meta) + '</span>' +
+                        '<span class="vas-ra-gc-side">' +
+                        '<span class="vas-ra-gc-lines">' + escapeHtml(lineText) + '</span>' +
+                        '<span class="vas-ra-pill info">' + escapeHtml(lbl("VAS_090_Pending", "Pending")) + '</span>' +
+                        '</span>' +
+                        '<span class="vas-ra-gc-chev">' + icon("chevR") + '</span>' +
                         '</button>';
                 }
             }
 
             html += '</div>' + receivePagerHtml();
             $dialogBody.html(html);
+
+            /* Keep the typed text (and caret at the end) across list re-renders. */
+            var $poSearch = $dialogBody.find('.vas-ra-po-search');
+            if ($poSearch.val() !== poSearchText) { $poSearch.val(poSearchText); }
+            if (poSearchText) {
+                var el = $poSearch[0];
+                $poSearch.trigger('focus');
+                if (el && el.setSelectionRange) { el.setSelectionRange(el.value.length, el.value.length); }
+            }
         }
 
         function receivePagerHtml() {
@@ -531,7 +576,17 @@
                         return;
                     }
                     currentLines = data.rows || [];
+                    /* Review #49: header extras - PO document type and the
+                       warehouses of the org the PO was created in. */
+                    poDocTypeName = data.docTypeName || "";
+                    poWarehouses = data.warehouses || [];
+                    poSelectedWarehouseId = Number(data.defaultWarehouseId || 0);
+                    if (!poSelectedWarehouseId && poWarehouses.length) {
+                        poSelectedWarehouseId = Number(poWarehouses[0].warehouseId);
+                    }
+                    poLocators = [];
                     renderReceiveLines();
+                    loadWarehouseLocators(poSelectedWarehouseId);
                 },
                 error: function () {
                     showDialogBusy(false);
@@ -540,18 +595,50 @@
             });
         }
 
+        function warehouseSelectHtml() {
+            var options = "";
+            for (var i = 0; i < poWarehouses.length; i++) {
+                var warehouse = poWarehouses[i];
+                options +=
+                    '<option value="' + escapeHtml(warehouse.warehouseId) + '"' +
+                    (Number(warehouse.warehouseId) === poSelectedWarehouseId ? ' selected' : '') + '>' +
+                    escapeHtml(warehouse.warehouseName || "-") +
+                    '</option>';
+            }
+            return '<select class="vas-ra-field-select vas-ra-wh-select">' + options + '</select>';
+        }
+
+        function locatorSelectHtml(poLineId) {
+            var options = "";
+            for (var i = 0; i < poLocators.length; i++) {
+                var locator = poLocators[i];
+                options +=
+                    '<option value="' + escapeHtml(locator.locatorId) + '"' + (locator.isDefault ? ' selected' : '') + '>' +
+                    escapeHtml(locator.locatorName || "-") +
+                    '</option>';
+            }
+            if (!options) {
+                options = '<option value="0">-</option>';
+            }
+            return '<select class="vas-ra-line-select vas-ra-loc-select" data-polineid="' + escapeHtml(poLineId) + '">' + options + '</select>';
+        }
+
+        /* Review #49: header shows Document Type + Warehouse (of the PO's org)
+           instead of Supplier / PO / Dock / Supplier Reference; every line has
+           a Locator choice that follows the selected warehouse. */
         function renderReceiveLines() {
             var html =
                 '<div class="vas-ra-form">' +
-                fieldHtml(lbl("VAS_090_PO", "PO"), currentPO.poNo, true) +
-                fieldHtml(lbl("VAS_090_Supplier", "Supplier"), currentPO.supplier) +
-                fieldHtml(lbl("VAS_090_Dock", "Dock"), currentPO.dockName || currentPO.warehouseName) +
-                fieldHtml(lbl("VAS_090_SupplierReference", "Supplier Reference"), currentPO.supplierReference) +
+                fieldHtml(lbl("VAS_090_DocumentType", "Document Type"), poDocTypeName, true) +
+                '<div class="vas-ra-field">' +
+                '<div class="vas-ra-field-label">' + escapeHtml(lbl("VAS_090_Warehouse", "Warehouse")) + '</div>' +
+                '<div class="vas-ra-field-value">' + warehouseSelectHtml() + '</div>' +
+                '</div>' +
                 '</div>' +
                 '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_090_ReceiveQtyNote", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
                 '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ReceivedLines", "Received Lines")) + '</div>' +
                 '<div class="vas-ra-receive-table">' +
-                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_AlreadyReceived", "Already Received")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
+                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_AlreadyReceived", "Already Received")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Locator", "Locator")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
 
             if (!currentLines || currentLines.length === 0) {
                 html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_NoOpenPOLines", "No open PO lines available.")) + '</div>';
@@ -564,6 +651,7 @@
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.poQty, line.uom)) + '</span>' +
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.alreadyReceivedQty, line.uom)) + '</span>' +
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.openQty, line.uom)) + '</span>' +
+                        '<span>' + locatorSelectHtml(line.poLineId) + '</span>' +
                         '<span><input class="vas-ra-rcv-input" type="number" min="0" step="any" value="' + escapeHtml(toInputValue(line.defaultReceivedQty)) + '" data-polineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(toInputValue(line.openQty)) + '"/></span>' +
                         '</div>';
                 }
@@ -577,6 +665,39 @@
                 '</div>';
 
             $dialogBody.html(html);
+        }
+
+        /* Review #49: line locators follow the selected warehouse; changing the
+           warehouse reloads its locators into every line's dropdown. */
+        function loadWarehouseLocators(warehouseId) {
+            if (!warehouseId) {
+                poLocators = [];
+                refreshLocatorSelects();
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_090_ReceivingActionsWidget/GetWarehouseLocators',
+                type: 'GET',
+                cache: false,
+                data: { warehouseId: warehouseId },
+                success: function (res) {
+                    var data = parseResponse(res);
+                    poLocators = (data && !data.error && data.rows) ? data.rows : [];
+                    refreshLocatorSelects();
+                },
+                error: function () {
+                    poLocators = [];
+                    refreshLocatorSelects();
+                }
+            });
+        }
+
+        function refreshLocatorSelects() {
+            $dialogBody.find('.vas-ra-loc-select').each(function () {
+                var $select = $(this);
+                $select.html($(locatorSelectHtml($select.data('polineid'))).html());
+            });
         }
 
         function makeGRN() {
@@ -602,7 +723,9 @@
                 }
 
                 if (qty > 0) {
-                    lines.push({ poLineId: Number($input.data('polineid')), receivedQty: qty });
+                    var poLineId = Number($input.data('polineid'));
+                    var locatorId = Number($dialogBody.find('.vas-ra-loc-select[data-polineid="' + poLineId + '"]').val() || 0);
+                    lines.push({ poLineId: poLineId, receivedQty: qty, locatorId: locatorId });
                 }
             });
 
@@ -623,7 +746,7 @@
                 url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/CreateGRN',
                 type: 'POST',
                 cache: false,
-                data: { poId: currentPO.poId, linesJson: JSON.stringify(lines) },
+                data: { poId: currentPO.poId, linesJson: JSON.stringify(lines), warehouseId: poSelectedWarehouseId },
                 success: function (res) {
                     var data = parseResponse(res);
                     if (!data || data.error) {
@@ -1074,8 +1197,10 @@
             if ($dialogBody.find('.vas-ra-label-shell').length === 0) {
                 $dialogBody.html(
                     '<div class="vas-ra-label-shell">' +
-                    '<div class="vas-ra-note">' + icon("search") + '<span>' + escapeHtml(lbl("VAS_090_LabelSearchNote", "Search by GRN number or customer/supplier, then pick a GRN to print its label.")) + '</span></div>' +
-                    '<div class="vas-ra-search"><input class="vas-ra-label-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_GRNSearchPlaceholder", "GRN number or supplier name...")) + '"/></div>' +
+                    '<div class="vas-ra-search-pill">' +
+                    '<span class="vas-ra-search-pill-ic">' + icon("search") + '</span>' +
+                    '<input class="vas-ra-label-search" type="text" placeholder="' + escapeHtml(lbl("VAS_090_GRNSearchPlaceholder", "GRN number or supplier name...")) + '"/>' +
+                    '</div>' +
                     '<table class="vas-ra-label-table">' +
                     '<thead><tr><th>' + escapeHtml(lbl("VAS_090_GRNNo", "GRN #")) + '</th><th>' + escapeHtml(lbl("VAS_090_CustomerSupplier", "Customer / Supplier")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Qty", "Qty")) + '</th><th class="r">' + escapeHtml(lbl("VAS_090_Label", "Label")) + '</th></tr></thead>' +
                     '<tbody class="vas-ra-label-rows"></tbody>' +
@@ -1109,10 +1234,9 @@
 
         function labelPagerHtml() {
             if (labelTotalPages <= 1) { return ""; }
-            var from = (labelPageNo - 1) * labelPageSize + 1;
-            var to = Math.min(labelPageNo * labelPageSize, labelTotalRecords);
+            /* No "Showing X-Y of Z" info line here - keeps the print popup
+               compact so the table never forces a scrollbar. */
             return '<div class="vas-ra-modal-pager">' +
-                '<span>' + escapeHtml(lbl("VAS_090_Showing", "Showing") + ' ' + from + '-' + to + ' ' + lbl("VAS_090_Of", "of") + ' ' + labelTotalRecords) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-label-prev"' + (labelPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
                 '<span class="vas-ra-pgtext">' + escapeHtml(labelPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + labelTotalPages) + '</span>' +
                 '<button type="button" class="vas-ra-pgbtn vas-ra-label-next"' + (labelPageNo >= labelTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
@@ -1152,25 +1276,35 @@
             });
         }
 
-        /* Hands the GRN report process (DTD001_GRNReport) to VIS.APrint - the same
-           launcher the standard document print uses - to generate the label PDF for
-           the selected GRN. Degrades silently when the process / engine is not
-           available so the queued confirmation still stands. */
+        /* Review #27 (follow-up): runs the DTD001_GRNReport process through the
+           same print pipeline the existing project widgets use
+           (VAS_RecentReceiptsWidget / forms/vpayprint.js): VIS.APrint(...)
+           .startPdf() opens the generated PDF in the browser's own viewer.
+           When the process is not configured the user gets a clear message
+           instead of a silent no-op. */
         function launchGRNLabelPrint(data, grnId) {
-            if (!window.VIS || typeof VIS.APrint !== "function") { return; }
-
             var processId = Number((data && data.AD_Process_ID) || 0);
             var tableId = Number((data && data.AD_Table_ID) || 0);
             var recordId = Number((data && data.Record_ID) || grnId || 0);
 
-            if (processId <= 0 || tableId <= 0 || recordId <= 0) { return; }
+            if (!window.VIS || typeof VIS.APrint !== "function"
+                || processId <= 0 || tableId <= 0 || recordId <= 0) {
+                notify(lbl("VAS_090_PrintProcessNotFound", "Print process (DTD001_GRNReport) is not configured."));
+                return;
+            }
 
             var windowNo = widgetSelf && widgetSelf.windowNo ? widgetSelf.windowNo : 0;
 
             /* Signature: new VIS.APrint(AD_Process_ID, AD_Table_ID, Record_ID, windowNo, null). */
             var prin = new VIS.APrint(processId, tableId, recordId, windowNo, null);
-            try { prin.startPdf(function () { }); }
-            catch (e) { try { prin.startPdf(); } catch (e2) { /* swallow */ } }
+            try {
+                prin.startPdf(function () { });
+            }
+            catch (e) {
+                /* Older APrint builds may not accept a callback - same
+                   fallback the reference widget uses. */
+                try { prin.startPdf(null); } catch (e2) { /* swallow */ }
+            }
         }
 
         this.refreshWidget = function () {

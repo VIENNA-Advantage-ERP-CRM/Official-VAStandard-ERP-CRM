@@ -45,7 +45,7 @@ namespace VIS.Controllers
         /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 8)
+        public JsonResult GetOpenPurchaseOrders(int pageNo = 1, int pageSize = 8, string searchText = "")
         {
             if (Session["ctx"] == null)
             {
@@ -71,6 +71,7 @@ namespace VIS.Controllers
                        " + dockSql + @" AS Dock_Name,
                        COALESCE(PurchaseOrder.POReference, " + NLiteral("-") + @") AS Supplier_Reference,
                        COALESCE(OrderLine.DatePromised, PurchaseOrder.DatePromised) AS Line_Promise_Date,
+                       PurchaseOrder.DateOrdered AS PO_Date,
                        OrderLine.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
@@ -82,6 +83,15 @@ namespace VIS.Controllers
                   AND PurchaseOrder.DocStatus='CO'
                   AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
                   AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
+
+            // Search over the PO number or supplier name (parameterized;
+            // appended before role security so it stays inside the WHERE).
+            string trimmedSearch = (searchText ?? "").Trim();
+            if (trimmedSearch.Length > 0)
+            {
+                rawSql += @"
+                  AND (UPPER(PurchaseOrder.DocumentNo) LIKE @PO_Search1 OR UPPER(BPartner.Name) LIKE @PO_Search2)";
+            }
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
@@ -108,6 +118,7 @@ namespace VIS.Controllers
                            RawData.Dock_Name,
                            RawData.Supplier_Reference,
                            MIN(RawData.Line_Promise_Date) AS Promise_Date,
+                           MIN(RawData.PO_Date) AS PO_Date,
                            COUNT(RawData.PO_Line_ID) AS Open_Line_Count
                     FROM (
                         " + rawSql + @"
@@ -119,11 +130,21 @@ namespace VIS.Controllers
                              RawData.Dock_Name,
                              RawData.Supplier_Reference
                 ) OpenPO
-                ORDER BY OpenPO.Promise_Date, OpenPO.PO_No
+                -- Review #48: PO date (DateOrdered), oldest first; document
+                -- number as the deterministic tiebreak for stable paging.
+                ORDER BY OpenPO.PO_Date, OpenPO.PO_No
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
+            // Positional binding: parameters ordered exactly as they appear in
+            // the final SQL (@AD_Client_ID, search params, then paging).
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            if (trimmedSearch.Length > 0)
+            {
+                string like = "%" + trimmedSearch.ToUpperInvariant() + "%";
+                parameters.Add(new SqlParameter("@PO_Search1", like));
+                parameters.Add(new SqlParameter("@PO_Search2", like));
+            }
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
 
@@ -247,6 +268,155 @@ namespace VIS.Controllers
                         openQty = openQty,
                         defaultReceivedQty = openQty,
                         uom = Util.GetValueOfString(dr["Uom"])
+                    });
+                }
+
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                // Review #49: header data for the receive form - the PO's
+                // document type and the warehouses of the org the PO was
+                // created in (line locators follow the selected warehouse).
+                int poOrgId = 0;
+                int defaultWarehouseId = 0;
+                string docTypeName = "";
+
+                string headerSql = @"
+                    SELECT PurchaseOrder.AD_Org_ID AS PO_Org_ID,
+                           COALESCE(PurchaseOrder.M_Warehouse_ID, 0) AS PO_Warehouse_ID,
+                           DocType.Name AS DocType_Name
+                    FROM C_Order PurchaseOrder
+                    LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=PurchaseOrder.C_DocType_ID AND DocType.IsActive='Y')
+                    WHERE PurchaseOrder.C_Order_ID=@Header_PO_ID
+                      AND PurchaseOrder.AD_Client_ID=@Header_Client_ID";
+
+                dr = DB.ExecuteReader(headerSql, new SqlParameter[]
+                {
+                    new SqlParameter("@Header_PO_ID", poId),
+                    new SqlParameter("@Header_Client_ID", ctx.GetAD_Client_ID())
+                });
+                if (dr != null && dr.Read())
+                {
+                    poOrgId = Util.GetValueOfInt(dr["PO_Org_ID"]);
+                    defaultWarehouseId = Util.GetValueOfInt(dr["PO_Warehouse_ID"]);
+                    docTypeName = Util.GetValueOfString(dr["DocType_Name"]);
+                }
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                List<object> warehouses = new List<object>();
+                bool defaultInList = false;
+                string warehouseSql = @"
+                    SELECT Warehouse.M_Warehouse_ID AS Warehouse_ID,
+                           Warehouse.Name AS Warehouse_Name
+                    FROM M_Warehouse Warehouse
+                    WHERE Warehouse.IsActive='Y'
+                      AND Warehouse.AD_Client_ID=@WH_Client_ID
+                      AND Warehouse.AD_Org_ID=@WH_Org_ID
+                    ORDER BY Warehouse.Name";
+
+                dr = DB.ExecuteReader(warehouseSql, new SqlParameter[]
+                {
+                    new SqlParameter("@WH_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@WH_Org_ID", poOrgId)
+                });
+                while (dr != null && dr.Read())
+                {
+                    int warehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]);
+                    if (warehouseId == defaultWarehouseId) { defaultInList = true; }
+                    warehouses.Add(new
+                    {
+                        warehouseId = warehouseId,
+                        warehouseName = Util.GetValueOfString(dr["Warehouse_Name"])
+                    });
+                }
+
+                // The PO's own warehouse always stays selectable even when it
+                // belongs to another org (legacy data).
+                if (defaultWarehouseId > 0 && !defaultInList)
+                {
+                    string poWarehouseName = Util.GetValueOfString(DB.ExecuteScalar(
+                        "SELECT Name FROM M_Warehouse WHERE M_Warehouse_ID=@PO_WH_ID",
+                        new SqlParameter[] { new SqlParameter("@PO_WH_ID", defaultWarehouseId) },
+                        null));
+                    warehouses.Insert(0, new { warehouseId = defaultWarehouseId, warehouseName = poWarehouseName });
+                }
+
+                return Ok(new
+                {
+                    rows = rows,
+                    docTypeName = docTypeName,
+                    poOrgId = poOrgId,
+                    defaultWarehouseId = defaultWarehouseId,
+                    warehouses = warehouses
+                });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (dr != null)
+                {
+                    dr.Close();
+                    dr.Dispose();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Active locators of one warehouse for the line-level locator choice
+        /// (review #49). The warehouse default locator is flagged so the client
+        /// can preselect it.
+        /// </summary>
+        /// <param name="warehouseId">M_Warehouse_ID selected on the form.</param>
+        /// <returns>JSON { rows[] } of locatorId / locatorName / isDefault.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetWarehouseLocators(int warehouseId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            if (warehouseId <= 0) { return Ok(new { rows = new List<object>() }); }
+
+            string locatorNameSql = HasColumn("M_Locator", "LocatorCombination")
+                ? "COALESCE(Locator.LocatorCombination, Locator.Value)"
+                : "Locator.Value";
+
+            string sql = @"
+                SELECT Locator.M_Locator_ID AS Locator_ID,
+                       " + locatorNameSql + @" AS Locator_Name,
+                       Locator.IsDefault AS Is_Default
+                FROM M_Locator Locator
+                WHERE Locator.IsActive='Y'
+                  AND Locator.AD_Client_ID=@AD_Client_ID
+                  AND Locator.M_Warehouse_ID=@Warehouse_ID
+                ORDER BY Locator.IsDefault DESC, " + locatorNameSql;
+
+            List<object> rows = new List<object>();
+            IDataReader dr = null;
+
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Warehouse_ID", warehouseId)
+                });
+                while (dr != null && dr.Read())
+                {
+                    rows.Add(new
+                    {
+                        locatorId = Util.GetValueOfInt(dr["Locator_ID"]),
+                        locatorName = Util.GetValueOfString(dr["Locator_Name"]),
+                        isDefault = Util.GetValueOfString(dr["Is_Default"]) == "Y"
                     });
                 }
 
@@ -584,7 +754,8 @@ namespace VIS.Controllers
                 WHERE Confirm.IsActive='Y'
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
-                  AND Confirm.AD_Client_ID=@AD_Client_ID";
+                  AND Confirm.AD_Client_ID=@AD_Client_ID
+                  AND Confirm.DocStatus IN ('DR','IP')";
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,

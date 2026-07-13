@@ -37,7 +37,8 @@
     align-items: center;
     gap: 0.625em;
     flex: 0 0 auto;
-    margin-bottom: 0.625em;
+    /* Review #45: tighter head/foot spacing frees the height the 4th row needs. */
+    margin-bottom: 0.45em;
 }
 
 .vas-mrr-ico {
@@ -127,7 +128,8 @@
     background: transparent;
     border: 0;
     border-bottom: 1px solid #EDF2F6;   /* px */
-    padding: 0.55em 0.25em;
+    /* Review #45: compact rows so 4 records fit on the standard 2x3 card. */
+    padding: 0.3em 0.25em;
     cursor: pointer;
 }
 
@@ -157,8 +159,8 @@
 .vas-mrr-row-meta {
     font-size: 0.6875em;                /* xs — secondary metadata */
     color: #748494;
-    line-height: 1.3;
-    margin-top: 0.09em;
+    line-height: 1.25;
+    margin-top: 0.04em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -187,7 +189,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5em;
-    padding-top: 0.6em;
+    padding-top: 0.4em;
     margin-top: 0.4em;
     border-top: 1px solid #EDF2F6;      /* px */
 }
