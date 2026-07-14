@@ -81,7 +81,7 @@
 
 .vas-apwdg-value {
     font-size: 1.75em;
-    font-weight: 600;
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
     color: #5F4AA6;
     line-height: 1.05;
     letter-spacing: -0.01em;
@@ -142,6 +142,9 @@
    DPO analysis dialog (jQuery UI) — matches the Onfinity modal
    ========================================================== */
 .vas-apwdg-dialog-shell {
+    /* Baseline em anchor for the drill-down dialog (document-baseline surface, not
+       --dash-inline-size scaled): every em inside resolves against this. Mirrors VAS_025. */
+    font-size: 16px;
     background: #FFFFFF;
     border: 1px solid #ECEFF3 !important;
     border-radius: 14px !important;
@@ -156,7 +159,7 @@
     color: #102C3F;
     font-family: Roboto, sans-serif;
     letter-spacing: 0;
-    padding: 18px 20px 14px;
+    padding: 1.125em 1.25em 0.875em;
     position: relative;
     overflow: visible;
 }
@@ -164,7 +167,7 @@
 .vas-apwdg-dialog-shell .ui-dialog-title {
     color: #102C3F !important;
     font-family: Roboto, sans-serif;
-    font-size: 15px;
+    font-size: 0.9375em;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.2;
@@ -182,17 +185,17 @@
     color: #6B7280;
     cursor: pointer;
     display: flex;
-    height: 30px;
+    height: 1.875em;
     justify-content: center;
     line-height: 0;
     margin: 0;
     outline: 0;
     padding: 0;
     position: absolute;
-    right: 14px;
+    right: 0.875em;
     top: 50%;
     transform: translateY(-50%);
-    width: 30px;
+    width: 1.875em;
 }
 
 .vas-apwdg-dialog-shell .vas-apwdg-dialog-close:hover,
@@ -204,20 +207,20 @@
 .vas-apwdg-dialog-shell .vas-apwdg-dialog-close svg {
     display: block;
     fill: currentColor;
-    height: 14px;
+    height: 0.875em;
     pointer-events: none;
-    width: 14px;
+    width: 0.875em;
 }
 
 .vas-apwdg-dialog-shell .ui-dialog-content {
-    padding: 18px 20px;
+    padding: 1.125em 1.25em;
 }
 
 .vas-apwdg-dialog-shell .ui-dialog-buttonpane {
     background: #FFFFFF;
     border-top: 1px solid #EDF2F6;
     margin: 0;
-    padding: 12px 20px;
+    padding: 0.75em 1.25em;
 }
 
 .vas-apwdg-dialog-shell .ui-dialog-buttonset button {
@@ -226,11 +229,11 @@
     border-radius: 999px;
     color: #41576A;
     font-family: Roboto, sans-serif;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.2;
-    padding: 0.45rem 0.9rem;
+    padding: 0.5em 0.875em;
 }
 
 .vas-apwdg-dialog-shell .ui-dialog-buttonset button:hover,
@@ -243,16 +246,16 @@
 .vas-apwdg-dialog {
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    min-height: 220px;
+    min-height: 13.75em;
 }
 
 .vas-apwdg-drill-state {
     align-items: center;
     color: #5F7283;
     display: flex;
-    font-size: 14px;
+    font-size: 0.875em;
     justify-content: center;
-    min-height: 180px;
+    min-height: 11.25em;
     text-align: center;
     position: relative;
 }
@@ -264,26 +267,26 @@
 /* ---- Three mini-stat cards ---- */
 .vas-apwdg-drill-stats {
     display: grid;
-    gap: 12px;
+    gap: 0.75em;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-bottom: 16px;
+    margin-bottom: 1em;
 }
 
 .vas-apwdg-drill-mini {
     border: 1px solid #E4EDF4;
     border-radius: 8px;
-    padding: 10px 12px;
+    padding: 0.625em 0.75em;
     text-align: center;
 }
 
 .vas-apwdg-drill-mini-label {
     color: #5F7283;
-    font-size: 10px;
-    margin-bottom: 4px;
+    font-size: 0.6875em;
+    margin-bottom: 0.25em;
 }
 
 .vas-apwdg-drill-mini-value {
-    font-size: 22px;
+    font-size: 1.375em;
     font-weight: 700;
     line-height: 1;
 }
@@ -318,9 +321,9 @@
 /* ---- Description + warning ---- */
 .vas-apwdg-drill-desc {
     color: #41576A;
-    font-size: 13px;
+    font-size: 0.8125em;
     line-height: 1.6;
-    margin: 0 0 12px;
+    margin: 0 0 0.75em;
 }
 
 .vas-apwdg-drill-warn {
@@ -328,27 +331,27 @@
     border-left: 3px solid #D78B10;
     border-radius: 6px;
     color: #7A4A00;
-    font-size: 12px;
+    font-size: 0.75em;
     line-height: 1.5;
-    margin-bottom: 14px;
-    padding: 10px 12px;
+    margin-bottom: 0.875em;
+    padding: 0.625em 0.75em;
 }
 
 /* ---- DPO by category ---- */
 .vas-apwdg-drill-title {
     color: #41576A;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: 0.5em;
 }
 
 .vas-apwdg-drill-row {
     align-items: center;
     border-bottom: 1px solid #EDF2F6;
     display: flex;
-    gap: 10px;
+    gap: 0.625em;
     justify-content: space-between;
-    padding: 7px 0;
+    padding: 0.4375em 0;
 }
 
 /* Invisible filler row — keeps the popup body a stable height on short pages. */
@@ -362,7 +365,7 @@
 
 .vas-apwdg-drill-row-name {
     color: #102C3F;
-    font-size: 12px;
+    font-size: 0.75em;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -371,7 +374,7 @@
 
 .vas-apwdg-drill-row-val {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 700;
 }
 
@@ -411,11 +414,11 @@
     color: #102C3F;
     cursor: pointer;
     display: flex;
-    height: 24px;
+    height: 1.5em;
     justify-content: center;
     padding: 0;
     transition: background 0.15s ease, border-color 0.15s ease;
-    width: 24px;
+    width: 1.5em;
 }
 
 .vas-apwdg-drill-pager-btn:hover:not([disabled]) {
@@ -441,7 +444,7 @@
    document-baseline surface) reflows at narrow widths. */
 @media screen and (max-width: 680px) {
     .vas-apwdg-dialog-shell .ui-dialog-content {
-        padding: 0.875rem;
+        padding: 0.875em;
     }
 
     .vas-apwdg-drill-stats {

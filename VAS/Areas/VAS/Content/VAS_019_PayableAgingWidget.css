@@ -6,6 +6,8 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Establishes the query container for the widget root anchor (matches peer widgets). */
+    container-type: inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
@@ -135,7 +137,8 @@
 }
 
 .vas-pawdg-ag-cnt {
-    font-size: 0.75em;
+    /* Secondary metadata (invoice count) — one step below the row label/value (xs token). */
+    font-size: 0.6875em;
     font-weight: 400;
     color: #5F7283;
     text-align: right;

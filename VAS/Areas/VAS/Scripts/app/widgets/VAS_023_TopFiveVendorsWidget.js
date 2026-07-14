@@ -108,7 +108,7 @@
             var total = 0;
             for (var ti = 0; ti < vendors.length; ti++) { total += (vendors[ti].CurrAmt || 0); }
 
-            var html =
+            var headerHtml =
                 '<div class="vas-t5vwdg-header">' +
                     '<div class="vas-t5vwdg-title">' +
                         '<svg class="vas-t5vwdg-title-icon" viewBox="0 0 24 24" fill="none"' +
@@ -118,12 +118,22 @@
                         '</svg>' +
                         t5vEsc(msg('VAS_023_Top5VendorsBySpend', 'Top 5 Vendors by Spend')) +
                     '</div>' +
-                '</div>' +
-                '<div class="vas-t5vwdg-list">';
+                '</div>';
+
+            /* No vendors — show the header and a centered no-data message; skip the
+               list, divider and donut entirely. */
+            if (!vendors.length) {
+                $container.html(headerHtml +
+                    '<div class="vas-t5vwdg-nodata">' + t5vEsc(msg('VIS_NoDataFound', 'No Data Found')) + '</div>');
+                return;
+            }
+
+            var html = headerHtml + '<div class="vas-t5vwdg-list">';
 
             for (var i = 0; i < vendors.length; i++) {
                 var v   = vendors[i];
                 var rankCls = 'vas-t5vwdg-avatar--r' + Math.min(v.Rank, 5);
+                var amtStr  = t5vFmt(v.CurrAmt, sym, data.StdPrecision);
                 html +=
                     '<div class="vas-t5vwdg-row">' +
                         '<span class="vas-t5vwdg-avatar ' + rankCls + '">' +
@@ -134,7 +144,7 @@
                             '<div class="vas-t5vwdg-cat" title="'  + t5vEsc(v.Category) + '">' + t5vEsc(v.Category) + '</div>' +
                         '</div>' +
                         '<div class="vas-t5vwdg-metrics">' +
-                            '<div class="vas-t5vwdg-amt">' + t5vFmt(v.CurrAmt, sym, data.StdPrecision) + '</div>' +
+                            '<div class="vas-t5vwdg-amt" title="' + t5vEsc(amtStr) + '">' + t5vEsc(amtStr) + '</div>' +
                         '</div>' +
                     '</div>';
             }
