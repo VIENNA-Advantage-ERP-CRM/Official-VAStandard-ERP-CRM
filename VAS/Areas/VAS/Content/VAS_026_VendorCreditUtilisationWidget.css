@@ -6,6 +6,8 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Establishes the query container for the widget root anchor (matches peer widgets). */
+    container-type: inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));

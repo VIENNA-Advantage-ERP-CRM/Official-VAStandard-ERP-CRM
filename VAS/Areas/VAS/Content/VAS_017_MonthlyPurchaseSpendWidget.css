@@ -81,7 +81,7 @@
     display: flex;
     align-items: center;
     gap: 0.35em;
-    font-size: 0.6875em;
+    font-size: 0.75em;
     color: #5F7283;
     white-space: nowrap;
 }
@@ -118,7 +118,7 @@
     border: none;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.78em;
+    font-size: 0.75em;
     font-weight: 400;
     color: #5F7283;
     padding: 0.2em 0.45em;
@@ -129,7 +129,7 @@
 
 .vas-mpswdg-tab.vas-mpswdg-tab-active {
     color: #102C3F;
-    font-weight: 600;
+    font-weight: 700;
 }
 
 .vas-mpswdg-tab:hover:not(.vas-mpswdg-tab-active) {

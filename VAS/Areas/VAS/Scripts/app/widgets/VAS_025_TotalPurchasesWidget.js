@@ -75,7 +75,7 @@
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-tpwidg-root">');
+        var $root = $('<div class="h-100 w-100 vas-tpwidg-root">');
         var $container;
         var $categoryDialog = null;
         var widgetID = null;

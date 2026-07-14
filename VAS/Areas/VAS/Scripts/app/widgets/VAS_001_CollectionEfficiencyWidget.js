@@ -264,8 +264,7 @@
             updateDonut(percent, status);
 
             if ($percentText) {
-                var prec = getStdPrecision();
-                $percentText.text(formatExactAmount(percent, prec) + "%");
+                $percentText.text(formatExactAmount(percent, 2) + "%");
                 $percentText.css("color", donutValueColor(status));
             }
 
@@ -273,7 +272,7 @@
 
             if ($dsoText) {
                 $dsoText.html(
-                    '<strong>' + escapeHtml(lbl("VAS_001_DSO", "DSO")) + '</strong> ' +
+                    escapeHtml(lbl("VAS_001_DSO", "DSO")) +
                     escapeHtml(String(dsoDays)) + ' ' +
                     escapeHtml(lbl("VAS_001_DaysTarget", "days · target")) + ' ' +
                     escapeHtml(String(targetDays))

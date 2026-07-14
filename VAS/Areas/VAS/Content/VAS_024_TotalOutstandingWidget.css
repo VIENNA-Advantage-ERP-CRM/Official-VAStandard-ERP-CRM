@@ -54,7 +54,7 @@
 
 .vas-towdg-value {
     font-size: 1.75em;
-    font-weight: 600; /* Roboto SemiBold */
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
     color: #D14545;
     line-height: 1.05;
     letter-spacing: -0.01em;

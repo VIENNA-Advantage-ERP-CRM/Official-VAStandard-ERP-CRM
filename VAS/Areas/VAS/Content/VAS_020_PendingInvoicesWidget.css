@@ -111,7 +111,7 @@
     /* Multi-stat tile grid (2x2), not a single hero KPI: use the xl token so
        four values fit the stat-card budget (cap ~24px) instead of 1.75em/35px. */
     font-size: 1.375em;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.05;
 }
 
@@ -223,6 +223,10 @@
 }
 
 .vas-piawdg-due-empty {
+    /* Centered in the middle of the due-list body (flex column) per the no-data
+       reference; margin:auto absorbs the free space on both axes. */
+    margin: auto;
+    text-align: center;
     font-size: 0.75em;
     color: #5F7283;
     padding: 0.5em 0;
@@ -410,11 +414,17 @@
     }
 
 .vas-piawdg-pop-state {
-    padding: 28px 8px;
+    /* No-data / error message centered in the middle of the modal body (fills the
+       fixed-height dialog body like the .vas-piawdg-pop data state does). */
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
+    padding: 1.75em 0.5em;
     color: #41576A;
     font-family: Roboto, sans-serif;
-    font-size: 14px;
+    font-size: 0.75em;
 }
 
 .vas-piawdg-pop-error {
@@ -559,7 +569,7 @@
 
 .vas-piawdg-pop-amount {
     font-size: 0.82rem;
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.25;
     font-variant-numeric: tabular-nums;

@@ -289,7 +289,7 @@
 
                 html += '<div class="vas-opwdg-drill-row">'
                     + '<div class="vas-opwdg-drill-row-head">'
-                    +   '<span class="vas-opwdg-drill-row-name">' + opEsc(vendor.VendorName || '-') + '</span>'
+                    +   '<span class="vas-opwdg-drill-row-name" title="' + opEsc(vendor.VendorName || '-') + '">' + opEsc(vendor.VendorName || '-') + '</span>'
                     +   '<span class="vas-opwdg-drill-row-val" title="' + opEsc(rowTip) + '">' + opEsc(rowValue) + '</span>'
                     + '</div>'
                     + '<div class="vas-opwdg-drill-track">'

@@ -76,7 +76,7 @@
     border: none;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.78em;
+    font-size: 0.75em;
     font-weight: 400;
     color: #5F7283;
     padding: 0.22em 0.7em;
@@ -116,6 +116,19 @@
     width: 100%;
     height: 100%;
     display: block;
+}
+
+/* No-data message centered in the chart area (chart-wrap is position:relative),
+   at the canonical sm no-data token. */
+.vas-sbcwdg-nodata {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.75em;
 }
 
 /* ---- Responsive ----

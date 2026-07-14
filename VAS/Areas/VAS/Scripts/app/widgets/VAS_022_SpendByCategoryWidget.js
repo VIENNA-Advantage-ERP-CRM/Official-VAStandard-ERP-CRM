@@ -103,6 +103,8 @@
             $container.empty();
             _currentView = 'bar';
 
+            var hasData = !!(data && data.Categories && data.Categories.length);
+
             var html = '<div class="vas-sbcwdg-header">'
                 +   '<div class="vas-sbcwdg-title">'
                 +     '<svg class="vas-sbcwdg-title-icon" viewBox="0 0 24 24" fill="none"'
@@ -123,7 +125,9 @@
                 +   '</div>'
                 + '</div>'
                 + '<div class="vas-sbcwdg-chart-wrap">'
-                +   '<canvas class="vas-sbcwdg-canvas" id="vas_sbcwdg_cv_' + widgetID + '"></canvas>'
+                +   (hasData
+                        ? '<canvas class="vas-sbcwdg-canvas" id="vas_sbcwdg_cv_' + widgetID + '"></canvas>'
+                        : '<div class="vas-sbcwdg-nodata">' + msg('VIS_NoDataFound', 'No Data Found') + '</div>')
                 + '</div>';
 
             $container.html(html);
@@ -135,7 +139,11 @@
                 drawChart(data);
             });
 
-            window.setTimeout(function () { drawChart(data); }, 80);
+            /* Only draw when there is data; otherwise the chart-wrap shows a
+               centered "No Data Found" message. */
+            if (hasData) {
+                window.setTimeout(function () { drawChart(data); }, 80);
+            }
         }
 
         /* ---- Master draw dispatcher ---- */
