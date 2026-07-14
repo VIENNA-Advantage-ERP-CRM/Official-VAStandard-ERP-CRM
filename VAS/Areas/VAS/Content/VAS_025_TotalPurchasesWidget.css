@@ -14,12 +14,9 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
-    /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
-       widget root so it never depends on the shared .vas-widget-bg being loaded. */
-    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
-    border: none;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-tpwidg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -42,7 +39,8 @@
     justify-content: space-between;
     gap: 0.5em; /* spec stack gap between header / value / why */
     padding: 0.875em; /* Widget Edge Spacing */
-    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 100%);
+    /*border: 2px solid #FFFFFF;*/
     border-radius: 14px;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     position: relative;
@@ -108,7 +106,7 @@
 /* ---- Primary KPI value ---- */
 .vas-tpwidg-value {
     font-size: 1.75em;
-    font-weight: 600; /* Roboto SemiBold */
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
     color: #0B5EA8;
     line-height: 1.05;
     letter-spacing: -0.01em;
@@ -463,6 +461,16 @@
    Widget interior scales via the em anchor clamp on .vas-tpwidg-container, so no
    per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
    document-baseline surface) reflows at narrow widths. */
+/* Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-tpwidg (max-width: 300px) {
+    .vas-tpwidg-container { font-size: 13px; }
+}
+
+@container vas-tpwidg (max-width: 220px) {
+    .vas-tpwidg-container { font-size: 11px; }
+}
+
 @media (max-width: 680px) {
     .vas-tpwidg-dialog-shell .ui-dialog-content {
         padding: 0.875em;

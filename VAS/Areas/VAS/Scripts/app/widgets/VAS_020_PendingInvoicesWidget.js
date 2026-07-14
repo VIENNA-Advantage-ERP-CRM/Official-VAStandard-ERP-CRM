@@ -402,7 +402,7 @@
             _catTotalPgs = data.TotalPages || (_catPageSize > 0 ? Math.ceil(_catTotal / _catPageSize) : 0);
 
             if (_catTotal === 0) {
-                $catDialog.html('<div class="vas-piawdg-pop-state">' + piEsc(msg('VAS_020_NoInvoices', 'No invoices found.')) + '</div>');
+                $catDialog.html('<div class="vas-piawdg-pop-state">' + piEsc(msg('VAS_020_NoInvoices', 'No data found.')) + '</div>');
                 return;
             }
 
