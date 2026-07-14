@@ -184,11 +184,12 @@
             var detailLoaded = false;
 
             var dialogPageNo = 1;
-            var dialogPageSize = 10;
+            var dialogPageSize = 8;
             var dialogTotalPages = 1;
+            var dialogTotalCount = 0;
 
             var detailLinePageNo = 1;
-            var detailLinePageSize = 3;
+            var detailLinePageSize = 5;
             var detailLineTotalPages = 1;
 
             var selectedJournalId = 0;
@@ -244,6 +245,57 @@
 
                     "</svg>"
                 );
+            }
+
+            function resolveTotalCount(totalCount, visibleCount, pageNo, pageSize, totalPages) {
+                var total = Number(totalCount || 0);
+
+                if (!isNaN(total) && total > 0) {
+                    return total;
+                }
+
+                var rows = Number(visibleCount || 0);
+
+                if (isNaN(rows) || rows <= 0) {
+                    return 0;
+                }
+
+                var size = Math.max(parseInt(pageSize || rows || 1, 10), 1);
+                var pages = Math.max(parseInt(totalPages || 1, 10), 1);
+
+                if (pages > 1) {
+                    return Math.max(((pages - 1) * size) + rows, rows);
+                }
+
+                return rows;
+            }
+
+            function formatRangeText(pageNo, pageSize, totalCount) {
+                var total = Number(totalCount || 0);
+
+                if (isNaN(total) || total <= 0) {
+                    return "";
+                }
+
+                var page = Math.max(parseInt(pageNo || 1, 10), 1);
+                var size = Math.max(parseInt(pageSize || total, 10), 1);
+                var start = ((page - 1) * size) + 1;
+
+                if (start > total) {
+                    start = total;
+                }
+
+                var end = Math.min(start + size - 1, total);
+
+                return lbl("VAS_Showing", "Showing") +
+                    " " +
+                    start +
+                    "-" +
+                    end +
+                    " " +
+                    lbl("VIS_Of", "of") +
+                    " " +
+                    total;
             }
 
             function createBusyIndicator() {
@@ -324,13 +376,6 @@
                         )
                     ) +
                     "</div>" +
-
-                    '<span class="VAS-glju-zoom">' +
-                    '<svg viewBox="0 0 24 24" fill="none" ' +
-                    'stroke="currentColor" stroke-width="2.6">' +
-                    '<path d="M9 18l6-6-6-6"></path>' +
-                    "</svg>" +
-                    "</span>" +
 
                     "</div>" +
 
@@ -1050,7 +1095,7 @@
                     Number(data.PageNo || dialogPageNo || 1);
 
                 dialogPageSize =
-                    Number(data.PageSize || dialogPageSize || 10);
+                    Number(data.PageSize || dialogPageSize || 8);
 
                 dialogTotalPages =
                     Math.max(
@@ -1068,6 +1113,15 @@
                         )
                     );
 
+                dialogTotalCount =
+                    resolveTotalCount(
+                        data.TotalCount,
+                        rows.length,
+                        dialogPageNo,
+                        dialogPageSize,
+                        dialogTotalPages
+                    );
+
                 if (!rows.length) {
                     $dialogBody.html(
                         '<div class="VAS-glju-dialog-empty">' +
@@ -1080,6 +1134,12 @@
                         "</div>"
                     );
 
+                    $dialogBody
+                        .siblings(
+                            ".VAS-glju-dialog-pager"
+                        )
+                        .remove();
+
                     $dialogFooterText.text("");
                     return;
                 }
@@ -1088,12 +1148,12 @@
                     '<table class="VAS-glju-dialog-table">' +
                     "<thead><tr>" +
 
-                    "<th>Journal No.</th>" +
-                    "<th>Date</th>" +
-                    "<th>Description</th>" +
-                    "<th>Status</th>" +
-                    "<th>Total Debit</th>" +
-                    "<th>Total Credit</th>" +
+                    "<th>" + esc(lbl("VAS_036_JournalNo", "Journal No.")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_Date", "Date")) + "</th>" +
+                    "<th>" + esc(lbl("Description", "Description")) + "</th>" +
+                    "<th>" + esc(lbl("Status", "Status")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_TotalDebit", "Total Debit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_TotalCredit", "Total Credit")) + "</th>" +
 
                     "</tr></thead><tbody>";
 
@@ -1169,7 +1229,11 @@
 
                 $dialogFooterText.text(
                     rows.length +
-                    " journals \u00B7 total " +
+                    " " +
+                    lbl("VAS_036_Journals", "journals") +
+                    " \u00B7 " +
+                    lbl("Total", "total") +
+                    " " +
                     symbol +
                     formatAmount(
                         data.TotalDebit,
@@ -1180,10 +1244,13 @@
 
             function renderDialogPager() {
                 return '<div class="VAS-glju-line-pager VAS-glju-dialog-pager">' +
+                    '<span class="VAS-glju-page-text">' +
+                    esc(formatRangeText(dialogPageNo, dialogPageSize, dialogTotalCount)) +
+                    '</span>' +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-dialog-page VAS-glju-dialog-prev" ' +
                     (dialogPageNo <= 1 || dialogTotalPages <= 1 ? "disabled " : "") +
                     'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
-                    '<span class="VAS-glju-page-text">' +
+                    '<span class="VAS-glju-page-count">' +
                     esc(dialogPageNo + " " + lbl("VIS_Of", "of") + " " + dialogTotalPages) +
                     '</span>' +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-dialog-page VAS-glju-dialog-next" ' +
@@ -1368,16 +1435,8 @@
                     symbol + totalCreditAmt;
 
                 var currencyText =
+                    data.ISOCode ||
                     symbol;
-
-                if (
-                    data.ISOCode &&
-                    data.ISOCode !== symbol
-                ) {
-                    currencyText +=
-                        " \u00B7 " +
-                        data.ISOCode;
-                }
 
                 var id =
                     $self.AD_UserHomeWidgetID;
@@ -1412,62 +1471,58 @@
                 var html =
                     '<div class="VAS-glju-detail-summary">' +
 
-                    "<div><span>Journal No.</span><strong>" +
+                    "<div><span>" + esc(lbl("VAS_036_JournalNo", "Journal No.")) + "</span><strong>" +
                     esc(journal.DocumentNo) +
                     "</strong></div>" +
 
-                    "<div><span>Date</span><strong>" +
+                    "<div><span>" + esc(lbl("VAS_Date", "Date")) + "</span><strong>" +
                     esc(journal.DateAcct) +
                     "</strong></div>" +
 
-                    "<div><span>Status</span><strong>" +
+                    "<div><span>" + esc(lbl("Status", "Status")) + "</span><strong>" +
                     '<span class="VAS-glju-pill ' +
                     pillClass +
                     '"><span></span>' +
                     esc(statusText) +
                     "</span></strong></div>" +
 
-                    "<div><span>Accounting Book</span><strong>" +
+                    "<div><span>" + esc(lbl("VAS_036_AccountingBook", "Accounting Book")) + "</span><strong>" +
                     esc(
                         journal.AccountingBook ||
-                        "Primary"
+                        lbl("VAS_036_Primary", "Primary")
                     ) +
                     "</strong></div>" +
 
-                    "<div><span>Currency</span><strong>" +
+                    "<div><span>" + esc(lbl("VAS_PaymentCurrency", "Currency")) + "</span><strong>" +
                     esc(currencyText) +
                     "</strong></div>" +
 
-                    "<div><span>Total Debit</span><strong>" +
+                    "<div><span>" + esc(lbl("VAS_036_TotalDebit", "Total Debit")) + "</span><strong>" +
                     esc(totalDebitAmt) +
                     "</strong></div>" +
 
-                    "<div><span>Total Credit</span><strong>" +
+                    "<div><span>" + esc(lbl("VAS_036_TotalCredit", "Total Credit")) + "</span><strong>" +
                     esc(totalCreditAmt) +
                     "</strong></div>" +
 
                     "<div>" +
-                    "<span>Description</span><strong>" +
+                    "<span>" + esc(lbl("Description", "Description")) + "</span><strong>" +
                     esc(journal.Description) +
                     "</strong></div>" +
 
-                    "</div>" +
-
-                    '<div class="VAS-glju-detail-section-title">' +
-                    "Journal Lines" +
                     "</div>" +
 
                     '<div class="VAS-glju-detail-lines-wrap">' +
                     '<table class="VAS-glju-detail-lines">' +
 
                     "<thead><tr>" +
-                    "<th>Account</th>" +
-                    "<th>Debit</th>" +
-                    "<th>Credit</th>" +
-                    "<th>Cost Center</th>" +
-                    "<th>Business Partner</th>" +
-                    "<th>Product</th>" +
-                    "<th>Project</th>" +
+                    "<th>" + esc(lbl("Account", "Account")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_Debit", "Debit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_Credit", "Credit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_CostCenter", "Cost Center")) + "</th>" +
+                    "<th>" + esc(lbl("C_BPartner_ID", "Business Partner")) + "</th>" +
+                    "<th>" + esc(lbl("M_Product_ID", "Product")) + "</th>" +
+                    "<th>" + esc(lbl("C_Project_ID", "Project")) + "</th>" +
                     "</tr></thead><tbody>";
 
                 if (!lines.length) {
@@ -1554,7 +1609,7 @@
 
                     "<tfoot><tr>" +
 
-                    "<td>Total</td>" +
+                    "<td>" + esc(lbl("Total", "Total")) + "</td>" +
 
                     '<td class="VAS-glju-amt" title="' + esc(totalDebitAmt) + '">' +
                     esc(totalDebitAmt) +
@@ -1572,15 +1627,18 @@
                     "</div>" +
 
                     '<div class="VAS-glju-line-pager">' +
+                    '<span class="VAS-glju-page-text">' +
+                    esc(detailLineCount ? formatRangeText(detailLinePageNo, detailLinePageSize, detailLineCount) : "") +
+                    "</span>" +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-line-prev" ' +
                     (detailLinePageNo <= 1 || detailLineTotalPages <= 1 ? "disabled " : "") +
-                    'aria-label="Previous">&#8249;</button>' +
-                    '<span class="VAS-glju-page-text">' +
-                    esc(detailLineCount ? (detailLinePageNo + " of " + detailLineTotalPages) : "") +
+                    'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
+                    '<span class="VAS-glju-page-count">' +
+                    esc(detailLineCount ? (detailLinePageNo + " " + lbl("VIS_Of", "of") + " " + detailLineTotalPages) : "") +
                     "</span>" +
                     '<button type="button" class="VAS-glju-page-btn VAS-glju-line-next" ' +
                     (detailLinePageNo >= detailLineTotalPages || detailLineTotalPages <= 1 ? "disabled " : "") +
-                    'aria-label="Next">&#8250;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
                     "</div>" +
 
                     '<div class="VAS-glju-created-strip">' +
@@ -1594,7 +1652,7 @@
                     "</span>" +
 
                     "<div>" +
-                    "<span>Created By</span>" +
+                    "<span>" + esc(lbl("VAS_036_CreatedBy", "Created By")) + "</span>" +
                     "<strong>" +
                     esc(
                         journal.CreatedByName ||
@@ -1605,7 +1663,9 @@
                     (
                         journal.CreatedDate
                             ? (
-                                " \u00B7 drafted " +
+                                " \u00B7 " +
+                                lbl("VAS_036_Drafted", "drafted") +
+                                " " +
                                 esc(
                                     journal.CreatedDate
                                 )
@@ -1698,7 +1758,10 @@
                                         data.message
                                     )
                                 ) ||
-                                "Journal process failed."
+                                lbl(
+                                    "VAS_036_JournalProcessFailed",
+                                    "Journal process failed."
+                                )
                             );
 
                             return;
@@ -1739,19 +1802,35 @@
 
                 if (response) {
                     return (
-                        response.errorText ||
-                        response.error ||
-                        response.message ||
-                        "Error loading data."
+                        response.errorKey
+                            ? lbl(
+                                response.errorKey,
+                                response.errorText ||
+                                response.error ||
+                                response.message ||
+                                lbl("VIS_Error", "Error loading data.")
+                            )
+                            : (
+                                response.errorText ||
+                                response.error ||
+                                response.message ||
+                                lbl("VIS_Error", "Error loading data.")
+                            )
                     );
                 }
 
                 return xhr && xhr.status
                     ? (
-                        "Request failed. HTTP " +
-                        xhr.status
+                        lbl("VAS_036_RequestFailedHttp", "Request failed. HTTP {0}")
+                            .replace(
+                                "{0}",
+                                xhr.status
+                            )
                     )
-                    : "Error loading data.";
+                    : lbl(
+                        "VIS_Error",
+                        "Error loading data."
+                    );
             }
 
             function renderDialogError(message) {
@@ -1761,7 +1840,10 @@
                     '<div class="VAS-glju-dialog-empty">' +
                     esc(
                         message ||
-                        "Error loading data."
+                        lbl(
+                            "VIS_Error",
+                            "Error loading data."
+                        )
                     ) +
                     "</div>"
                 );

@@ -42,7 +42,9 @@ namespace VAS.Controllers
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = false,
-                    error = "Session Expired",
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
+                    error = "SessionExpired",
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
             }
@@ -54,7 +56,9 @@ namespace VAS.Controllers
                 return Json(JsonConvert.SerializeObject(new
                 {
                     success = false,
-                    error = "Session Expired",
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
+                    error = "SessionExpired",
                     hasData = false
                 }), JsonRequestBehavior.AllowGet);
             }

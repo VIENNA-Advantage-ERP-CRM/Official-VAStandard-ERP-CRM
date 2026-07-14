@@ -292,6 +292,114 @@
             );
     }
 
+    function resolveTotalCount(totalCount, visibleCount, pageNo, pageSize, totalPages) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            !isNaN(total) &&
+            total > 0
+        ) {
+            return total;
+        }
+
+        var rows =
+            Number(
+                visibleCount || 0
+            );
+
+        if (
+            isNaN(rows) ||
+            rows <= 0
+        ) {
+            return 0;
+        }
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || rows || 1,
+                    10
+                ),
+                1
+            );
+
+        var pages =
+            Math.max(
+                parseInt(
+                    totalPages || 1,
+                    10
+                ),
+                1
+            );
+
+        if (pages > 1) {
+            return Math.max(
+                ((pages - 1) * size) + rows,
+                rows
+            );
+        }
+
+        return rows;
+    }
+
+    function formatRangeText(pageNo, pageSize, totalCount) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            isNaN(total) ||
+            total <= 0
+        ) {
+            return "";
+        }
+
+        var page =
+            Math.max(
+                parseInt(
+                    pageNo || 1,
+                    10
+                ),
+                1
+            );
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || total,
+                    10
+                ),
+                1
+            );
+
+        var start =
+            ((page - 1) * size) + 1;
+
+        if (start > total) {
+            start =
+                total;
+        }
+
+        var end =
+            Math.min(
+                start + size - 1,
+                total
+            );
+
+        return (
+            "Showing " +
+            start +
+            "-" +
+            end +
+            " of " +
+            total
+        );
+    }
+
     function isPosted(value) {
         if (
             value === true ||
@@ -325,12 +433,23 @@
             );
 
         if (response) {
+            if (response.errorKey || response.messageKey) {
+                return lbl(
+                    response.errorKey || response.messageKey,
+                    response.errorText ||
+                    response.error ||
+                    response.message ||
+                    fallback ||
+                    lbl("VIS_Error", "Error loading data.")
+                );
+            }
+
             return (
                 response.errorText ||
                 response.error ||
                 response.message ||
                 fallback ||
-                "Error loading data."
+                lbl("VIS_Error", "Error loading data.")
             );
         }
 
@@ -339,14 +458,17 @@
             xhr.status
         ) {
             return (
-                "Request failed. HTTP " +
-                xhr.status
+                lbl("VAS_041_RequestFailedHttp", "Request failed. HTTP {0}")
+                    .replace(
+                        "{0}",
+                        xhr.status
+                    )
             );
         }
 
         return (
             fallback ||
-            "Error loading data."
+            lbl("VIS_Error", "Error loading data.")
         );
     }
 
@@ -444,16 +566,19 @@
                 1;
 
             var dialogPageSize =
-                10;
+                8;
 
             var dialogTotalPages =
                 1;
+
+            var dialogTotalCount =
+                0;
 
             var detailLinePageNo =
                 1;
 
             var detailLinePageSize =
-                3;
+                5;
 
             var detailLineTotalPages =
                 1;
@@ -633,22 +758,6 @@
                     " &middot; &mdash;" +
 
                     "</div>" +
-
-                    '<span class="VAS-glje-zoom" ' +
-                    'aria-hidden="true">' +
-
-                    '<svg viewBox="0 0 24 24" ' +
-                    'fill="none" ' +
-                    'stroke="currentColor" ' +
-                    'stroke-width="2.6" ' +
-                    'stroke-linecap="round" ' +
-                    'stroke-linejoin="round">' +
-
-                    '<path d="M9 18l6-6-6-6"></path>' +
-
-                    "</svg>" +
-
-                    "</span>" +
 
                     "</div>" +
 
@@ -1717,6 +1826,15 @@
                         )
                     );
 
+                dialogTotalCount =
+                    resolveTotalCount(
+                        data.TotalCount,
+                        rows.length,
+                        dialogPageNo,
+                        dialogPageSize,
+                        dialogTotalPages
+                    );
+
                 $dialog.find(
                     "#VAS-glje-dialog-sub-" +
                     $self.AD_UserHomeWidgetID
@@ -1744,6 +1862,12 @@
                     $dialogFooterText.text(
                         ""
                     );
+
+                    $dialogBody
+                        .siblings(
+                            ".VAS-glje-dialog-pager"
+                        )
+                        .remove();
 
                     return;
                 }
@@ -1975,6 +2099,16 @@
                     '<div class="VAS-glje-line-pager VAS-glje-dialog-pager">';
 
                 html +=
+                    '<span class="VAS-glje-page-text">' +
+                    esc(
+                        formatRangeText(
+                            dialogPageNo,
+                            dialogPageSize,
+                            dialogTotalCount
+                        )
+                    ) +
+                    "</span>" +
+
                     '<button type="button" ' +
                     'class="VAS-glje-page-btn VAS-glje-dialog-page VAS-glje-dialog-prev" ' +
                     (
@@ -1987,7 +2121,7 @@
                     esc(lbl("VIS_Previous", "Previous")) +
                     '">&#8249;</button>' +
 
-                    '<span class="VAS-glje-page-text">' +
+                    '<span class="VAS-glje-page-count">' +
                     esc(
                         dialogPageNo +
                         " " +
@@ -2372,29 +2506,20 @@
 
                 var accountingBook =
                     journal.AccountingBook ||
-                    "Primary";
+                    lbl(
+                        "VAS_041_Primary",
+                        "Primary"
+                    );
 
                 var currencyText =
+                    data.ISOCode ||
                     symbol;
-
-                if (
-                    data.ISOCode &&
-                    data.ISOCode !== symbol
-                ) {
-                    currencyText +=
-                        (
-                            currencyText
-                                ? " \u00B7 "
-                                : ""
-                        ) +
-                        data.ISOCode;
-                }
 
                 var html =
                     '<div class="VAS-glje-detail-summary">' +
 
                     "<div>" +
-                    "<span>Journal No.</span>" +
+                    "<span>" + esc(lbl("VAS_041_JournalNo", "Journal No.")) + "</span>" +
                     "<strong>" +
                     esc(
                         journal.DocumentNo
@@ -2403,7 +2528,7 @@
                     "</div>" +
 
                     "<div>" +
-                    "<span>Date</span>" +
+                    "<span>" + esc(lbl("VAS_Date", "Date")) + "</span>" +
                     "<strong>" +
                     esc(
                         journal.DateAcct
@@ -2412,7 +2537,7 @@
                     "</div>" +
 
                     "<div>" +
-                    "<span>Status</span>" +
+                    "<span>" + esc(lbl("Status", "Status")) + "</span>" +
                     "<strong>" +
 
                     '<span class="VAS-glje-pill ' +
@@ -2431,7 +2556,7 @@
                     "</div>" +
 
                     "<div>" +
-                    "<span>Accounting Book</span>" +
+                    "<span>" + esc(lbl("VAS_041_AccountingBook", "Accounting Book")) + "</span>" +
                     "<strong>" +
                     esc(
                         accountingBook
@@ -2440,7 +2565,7 @@
                     "</div>" +
 
                     "<div>" +
-                    "<span>Currency</span>" +
+                    "<span>" + esc(lbl("VAS_PaymentCurrency", "Currency")) + "</span>" +
                     "<strong>" +
                     esc(
                         currencyText
@@ -2450,7 +2575,7 @@
 
                     "<div>" +
 
-                    "<span>Description</span>" +
+                    "<span>" + esc(lbl("Description", "Description")) + "</span>" +
 
                     "<strong>" +
                     esc(
@@ -2462,12 +2587,6 @@
 
                     "</div>" +
 
-                    '<div class="VAS-glje-detail-section-title">' +
-
-                    "Journal Lines" +
-
-                    "</div>" +
-
                     '<div class="VAS-glje-detail-lines-wrap">' +
 
                     '<table class="VAS-glje-detail-lines">' +
@@ -2475,13 +2594,13 @@
                     "<thead>" +
                     "<tr>" +
 
-                    "<th>Account</th>" +
-                    "<th>Debit</th>" +
-                    "<th>Credit</th>" +
-                    "<th>Cost Center</th>" +
-                    "<th>Business Partner</th>" +
-                    "<th>Product</th>" +
-                    "<th>Project</th>" +
+                    "<th>" + esc(lbl("Account", "Account")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_Debit", "Debit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_Credit", "Credit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_CostCenter", "Cost Center")) + "</th>" +
+                    "<th>" + esc(lbl("C_BPartner_ID", "Business Partner")) + "</th>" +
+                    "<th>" + esc(lbl("M_Product_ID", "Product")) + "</th>" +
+                    "<th>" + esc(lbl("C_Project_ID", "Project")) + "</th>" +
 
                     "</tr>" +
                     "</thead>" +
@@ -2590,7 +2709,7 @@
                     "<tfoot>" +
                     "<tr>" +
 
-                    "<td>Total</td>" +
+                    "<td>" + esc(lbl("Total", "Total")) + "</td>" +
 
                     '<td class="VAS-glje-amt" title="' + esc(totalDebitAmt) + '">' +
                     esc(totalDebitAmt) +
@@ -2610,6 +2729,18 @@
 
                     '<div class="VAS-glje-line-pager">' +
 
+                    '<span class="VAS-glje-page-text">' +
+                    esc(
+                        detailLineCount
+                            ? formatRangeText(
+                                detailLinePageNo,
+                                detailLinePageSize,
+                                detailLineCount
+                            )
+                            : ""
+                    ) +
+                    "</span>" +
+
                     '<button type="button" ' +
                     'class="VAS-glje-page-btn VAS-glje-line-prev" ' +
                     (
@@ -2618,14 +2749,16 @@
                             ? "disabled "
                             : ""
                     ) +
-                    'aria-label="Previous">&#8249;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
 
-                    '<span class="VAS-glje-page-text">' +
+                    '<span class="VAS-glje-page-count">' +
                     esc(
                         detailLineCount
                             ? (
                                 detailLinePageNo +
-                                " of " +
+                                " " +
+                                lbl("VIS_Of", "of") +
+                                " " +
                                 detailLineTotalPages
                             )
                             : ""
@@ -2640,7 +2773,7 @@
                             ? "disabled "
                             : ""
                     ) +
-                    'aria-label="Next">&#8250;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
 
                     "</div>" +
 
@@ -2658,7 +2791,7 @@
 
                     "<div>" +
 
-                    "<span>Created By</span>" +
+                    "<span>" + esc(lbl("VAS_041_CreatedBy", "Created By")) + "</span>" +
 
                     "<strong>" +
                     esc(
@@ -2670,7 +2803,9 @@
                     (
                         journal.CreatedDate
                             ? (
-                                " \u00B7 drafted " +
+                                " \u00B7 " +
+                                lbl("VAS_041_Drafted", "drafted") +
+                                " " +
 
                                 esc(
                                     journal.CreatedDate
@@ -3088,7 +3223,10 @@
                             "W",
 
                         originName:
-                            "GL Journal"
+                            lbl(
+                                "VAS_041_GLJournal",
+                                "GL Journal"
+                            )
                     },
 
                     success:

@@ -57,6 +57,16 @@
                 .replace(/'/g, "&#039;");
         }
 
+        function getResponseMessage(data, fallback) {
+            var key = data && (data.errorKey || data.messageKey);
+
+            if (key) {
+                return lbl(key, data.error || data.errorText || data.message || fallback);
+            }
+
+            return data && (data.error || data.errorText || data.message) || fallback;
+        }
+
         function formatCurrencyAmount(value, currencySymbol, currencyISO) {
             var numericValue = Number(value || 0);
             var stdPrecision = 2;
@@ -227,12 +237,7 @@
                     }
 
                     if (data.success === false || data.error) {
-                        renderEmpty(data.error || lbl('VIS_Error', 'Error loading data.'));
-                        return;
-                    }
-
-                    if (data.hasData === false) {
-                        renderEmpty(lbl('VIS_NoData', 'No data available.'));
+                        renderEmpty(getResponseMessage(data, lbl('VIS_Error', 'Error loading data.')));
                         return;
                     }
 

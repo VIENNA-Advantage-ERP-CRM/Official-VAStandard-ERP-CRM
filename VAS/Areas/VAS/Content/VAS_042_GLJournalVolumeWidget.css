@@ -6,6 +6,7 @@
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
 .VAS-gljv-root {
+    --on-text-muted: #748494;
     height: 100%;
     width: 100%;
 }
@@ -90,6 +91,48 @@
 
 .VAS-gljv-toggle:hover {
     background: rgba(0, 131, 218, 0.14);
+}
+
+.VAS-gljv-period-group {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 0;
+    flex-shrink: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid #BFE4FF;
+    border-radius: 8px;
+    background: #FFFFFF;
+}
+
+.VAS-gljv-period-btn {
+    min-width: 54px;
+    height: 26px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 0;
+    background: #FFFFFF;
+    color: #748494;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+
+.VAS-gljv-period-btn + .VAS-gljv-period-btn {
+    border-left: 1px solid #BFE4FF;
+}
+
+.VAS-gljv-period-btn:hover {
+    background: #F4FBFF;
+    color: #0083DA;
+}
+
+.VAS-gljv-period-btn.is-active {
+    background: #EAF8FF;
+    color: #0083DA;
 }
 
 /* ── Chart area ──────────────────────────────────────────────────────────── */
