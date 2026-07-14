@@ -219,7 +219,7 @@
     width: min(62em, 100%);
     /* Tall enough for a full 10-row page so the body doesn't scroll on a full
        page; clamps to the viewport on short screens. */
-    height: min(34em, 100%);
+    height: min(32em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -408,7 +408,7 @@
 
 .vas-oar-td-customer {
     /* Primary identity cell — bold dark (dashboard-widgets.md §"Cell Types"). */
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -426,7 +426,7 @@
 /* Amount: emphasized bold deep-green, right-aligned, full value — never ellipsis-clipped. */
 .vas-oar-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

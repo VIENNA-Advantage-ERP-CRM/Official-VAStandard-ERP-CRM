@@ -312,7 +312,7 @@
     position: relative;
     min-height: 34em;
     width: min(68em, 100%);
-    height: min(42em, 100%);
+    height: min(34em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);

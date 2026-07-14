@@ -222,13 +222,13 @@
 
 .vas-tarm-dialog-card {
     position: relative;
-    min-height: min(34em, 100%);
+    min-height: min(32em, 100%);
     width: min(53.75em, 100%); /* max ~860px */
     /* Fixed dialog height so the modal does NOT fluctuate based on row count —
        header/footer stay put, body scrolls when there are more rows than fit,
        and the empty area below a partial page stays small. `min(...)` clamps
        on short viewports. */
-    height: min(33em, 100%);
+    height: min(32em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -427,7 +427,7 @@
 
 .vas-tarm-td-customer {
     /* Primary column — bold, primary ink (dashboard-widgets.md §Body Cell roles). */
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -438,7 +438,7 @@
 .vas-tarm-td-amount {
     /* Emphasized amount — bold, right-aligned; success-green (cash received). */
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     /* Keep amounts on one line and never let them ellipsis-truncate — the

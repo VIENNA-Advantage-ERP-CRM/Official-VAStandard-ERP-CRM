@@ -150,6 +150,7 @@ namespace VASLogic.Models
                            CustomerCollections.Std_Precision
                        ) AS Collection_Amount
                 FROM CustomerCollections
+                WHERE COALESCE(CustomerCollections.Collection_Amount, 0) > 0
                 ORDER BY Collection_Amount DESC
                 OFFSET 0 ROWS FETCH NEXT @TopN ROWS ONLY";
 

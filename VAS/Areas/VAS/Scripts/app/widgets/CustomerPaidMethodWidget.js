@@ -168,7 +168,7 @@
                 var color = METHOD_COLORS[i % METHOD_COLORS.length];
 
                 var absVal = percent;
-                var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                var stdPrecision = 2;
                 var formattedPercent = absVal.toLocaleString(window.navigator.language, {
                     minimumFractionDigits: stdPrecision,
                     maximumFractionDigits: stdPrecision

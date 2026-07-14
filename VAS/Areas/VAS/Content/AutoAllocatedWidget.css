@@ -209,7 +209,7 @@
        fit inside without forcing the body to show a scrollbar. The body still
        has `overflow: auto` as a safety net but should rarely engage at the
        default pageSize of 10. */
-    height: min(34em, 100%);
+    height: min(32em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);

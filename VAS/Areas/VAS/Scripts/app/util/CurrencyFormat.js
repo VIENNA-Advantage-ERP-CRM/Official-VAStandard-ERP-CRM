@@ -46,7 +46,7 @@
 
         for (var i = 0; i < tiers.length; i++) {
             if (absVal >= tiers[i][0]) {
-                return parseFloat((absVal / tiers[i][0]).toFixed(precision)) + tiers[i][1];
+                return (absVal / tiers[i][0]).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + tiers[i][1];
             }
         }
         return absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });

@@ -176,7 +176,7 @@
 
 .vas-tcr-cur {
     margin-inline-end: 0.1em;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 /* Proportion bar — track + data-driven fill (width set in JS). Fill anchors to
