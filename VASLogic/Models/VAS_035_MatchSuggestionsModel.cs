@@ -159,7 +159,7 @@ namespace VASLogic.Models
                     " + openReceiptsSql + @"
                 ),
                 ReceiptPartners AS (
-                    SELECT DISTINCT OpenReceipts.Client_ID, OpenReceipts.BPartner_ID
+                    SELECT DISTINCT OpenReceipts.Client_ID, OpenReceipts.BPartner_ID, OpenReceipts.Org_ID  
                     FROM OpenReceipts OpenReceipts
                 ),
                 OpenSchedules AS (
@@ -173,7 +173,8 @@ namespace VASLogic.Models
                            Invoice.C_Currency_ID AS Invoice_Currency_ID,
                            COALESCE(PaySchedule.DueAmt, 0) AS Open_Amount
                     FROM ReceiptPartners ReceiptPartners
-                    INNER JOIN C_Invoice Invoice ON (Invoice.AD_Client_ID=ReceiptPartners.Client_ID AND Invoice.C_BPartner_ID=ReceiptPartners.BPartner_ID)
+                    INNER JOIN C_Invoice Invoice ON (Invoice.AD_Client_ID=ReceiptPartners.Client_ID AND Invoice.AD_Org_ID=ReceiptPartners.Org_ID 
+                                AND Invoice.C_BPartner_ID=ReceiptPartners.BPartner_ID)
                     INNER JOIN C_InvoicePaySchedule PaySchedule ON (PaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
                     WHERE Invoice.IsSOTrx = 'Y'
                       AND Invoice.IsActive = 'Y'
@@ -271,8 +272,9 @@ namespace VASLogic.Models
                 ORDER BY CASE WHEN ScoredCandidates.Match_Confidence = 'HIGH' THEN 1
                               WHEN ScoredCandidates.Match_Confidence = 'REVIEW' THEN 2
                               ELSE 3 END,
-                         ScoredCandidates.Difference_Amount,
-                         ScoredCandidates.Receipt_Date DESC
+                         ScoredCandidates.Customer_Name,
+                         ScoredCandidates.Receipt_Date DESC,
+                         ScoredCandidates.Difference_Amount
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
             SqlParameter[] parameters = new SqlParameter[]
@@ -387,9 +389,9 @@ namespace VASLogic.Models
                 FROM C_Payment Payment
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
                 INNER JOIN C_Currency ReceiptCurrency ON (ReceiptCurrency.C_Currency_ID=Payment.C_Currency_ID)
-                LEFT OUTER JOIN VA009_PaymentMethod PayMethod ON (PayMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID)
-                LEFT OUTER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
-                LEFT OUTER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
+                INNER JOIN VA009_PaymentMethod PayMethod ON (PayMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID)
+                INNER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
+                INNER JOIN C_Bank Bank ON (Bank.C_Bank_ID=BankAccount.C_Bank_ID)
                 WHERE Payment.C_Payment_ID = @PaymentId
                   AND Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
@@ -403,11 +405,9 @@ namespace VASLogic.Models
                 MRole.SQL_RO
             );
 
-            string sql = @"
-                WITH ReceiptData AS (
-                    " + receiptDataSql + @"
-                ),
-                InvoiceData AS (
+            /* InvoiceData CTE — main physical table C_Invoice (alias Invoice);
+               MRole keeps a hand-crafted ID from leaking another org's invoice. */
+            string invoiceDataSql = @"
                     SELECT Invoice.C_Invoice_ID AS Invoice_ID,
                            PaySchedule.C_InvoicePaySchedule_ID AS PaySchedule_ID,
                            Invoice.C_BPartner_ID AS Invoice_BPartner_ID,
@@ -426,7 +426,7 @@ namespace VASLogic.Models
                     INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Invoice.C_BPartner_ID)
                     INNER JOIN C_InvoicePaySchedule PaySchedule ON (PaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
                     INNER JOIN C_Currency InvoiceCurrency ON (InvoiceCurrency.C_Currency_ID=Invoice.C_Currency_ID)
-                    LEFT OUTER JOIN C_PaymentTerm PaymentTerm ON (PaymentTerm.C_PaymentTerm_ID=Invoice.C_PaymentTerm_ID)
+                    INNER JOIN C_PaymentTerm PaymentTerm ON (PaymentTerm.C_PaymentTerm_ID=Invoice.C_PaymentTerm_ID)
                     WHERE Invoice.C_Invoice_ID = @InvoiceId
                       AND PaySchedule.C_InvoicePaySchedule_ID = @PayScheduleId
                       AND Invoice.IsSOTrx = 'Y'
@@ -435,7 +435,22 @@ namespace VASLogic.Models
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
-                      AND COALESCE(PaySchedule.DueAmt, 0) > 0
+                      AND COALESCE(PaySchedule.DueAmt, 0) > 0";
+
+            /* MRole only on the main physical table (C_Invoice / alias Invoice). */
+            invoiceDataSql = MRole.GetDefault(ctx).AddAccessSQL(
+                invoiceDataSql,
+                "Invoice",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            string sql = @"
+                WITH ReceiptData AS (
+                    " + receiptDataSql + @"
+                ),
+                InvoiceData AS (
+                    " + invoiceDataSql + @"
                 )
                 SELECT ReceiptData.Payment_ID,
                        ReceiptData.Receipt_BPartner_ID,

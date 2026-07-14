@@ -224,7 +224,7 @@
     width: min(62em, 100%);
     /* Tall enough for a full 10-row page so the body doesn't scroll on a full
        page; clamps to the viewport on short screens. */
-    height: min(34em, 100%);
+    height: min(32em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -407,7 +407,7 @@
 }
 
 .vas-tdr-td-customer {
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -425,7 +425,7 @@
 /* Amount: deep-green, right-aligned, full value — never ellipsis-clipped. */
 .vas-tdr-td-amount {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     color: #0B6B45;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -439,9 +439,17 @@
     color: inherit;
 }
 
+/* No-data cell centered in the middle of the (fixed-height) dialog body:
+   stretch the table to fill only in the empty state so the single row's
+   vertical-align:middle lands the muted line dead-center on both axes. */
+.vas-tdr-dialog-table:has(.vas-tdr-dialog-empty) {
+    height: 100%;
+}
+
 .vas-tdr-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
+    vertical-align: middle;
     color: #5F7283;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;

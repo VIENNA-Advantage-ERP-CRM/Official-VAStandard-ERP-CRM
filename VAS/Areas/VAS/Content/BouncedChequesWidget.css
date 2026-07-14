@@ -131,12 +131,16 @@
     white-space: nowrap;
 }
 
-/* ── Responsive: shrink the whole card by lowering its base font-size on
- *    narrow dashboard cells. Inner em sizing scales automatically. ── */
-@container (max-width: 300px) {
-    .vas-bc-card { font-size: 13px; }
+/* ── Responsive: narrow dashboard cells shrink the whole card by lowering its
+ *    base font-size; every inner size is em off this lever, so it scales with it.
+ *    Breakpoints and overrides are em, not px (foundations.md §"Responsive Unit
+ *    Rules" — typography → em; CLAUDE em-only rule). The container sets no font
+ *    anchor, so 1em = 16px → 18.75em = 300px and 13.75em = 220px. Mirrors the
+ *    canonical widget narrow-cell pattern (VAS_013 .vas-tcr-card). ── */
+@container (max-width: 18.75em) {     /* < 300px */
+    .vas-bc-card { font-size: 0.875em; }
 }
 
-@container (max-width: 220px) {
-    .vas-bc-card { font-size: 11px; }
+@container (max-width: 13.75em) {     /* < 220px */
+    .vas-bc-card { font-size: 0.75em; }
 }

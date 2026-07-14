@@ -240,16 +240,6 @@
         function formatPercent(value) {
             var absVal = Number(value || 0);
             var stdPrecision = 2;
-
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                }
-            }
-            catch (e) {
-                stdPrecision = 2;
-            }
-
             return absVal.toLocaleString(window.navigator.language, {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
