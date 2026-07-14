@@ -146,12 +146,31 @@
             });
         }
 
+        /* The GRN window opens in the SAME window (view manager) directly on a
+           NEW record: an all-excluding query keeps existing receipts out and
+           cmd_new switches the panel to record entry - the same pattern the
+           core product uses for open-on-new-record flows. */
         function startWindowById(windowId) {
+            var emptyQuery = null;
+            try {
+                emptyQuery = new VIS.Query();
+                emptyQuery.addRestriction("M_InOut_ID", VIS.Query.prototype.EQUAL, 0);
+            } catch (e) { emptyQuery = null; }
+
+            var view = null;
             if (VIS.viewManager && VIS.viewManager.startWindow) {
-                VIS.viewManager.startWindow(windowId, null);
+                view = VIS.viewManager.startWindow(windowId, emptyQuery);
             }
             else if (VIS.AEnv && VIS.AEnv.startWindow) {
-                VIS.AEnv.startWindow(windowId, null);
+                view = VIS.AEnv.startWindow(windowId, emptyQuery);
+            }
+
+            if (view) {
+                view.onLoad = function () {
+                    try {
+                        if (view.cPanel && view.cPanel.cmd_new) { view.cPanel.cmd_new(false); }
+                    } catch (e) { /* window still opens; user can press New */ }
+                };
             }
         }
 
