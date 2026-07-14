@@ -6,6 +6,11 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Named query container so the card can step its base font down on narrow / zoomed
+       cells (see the @container rules at the bottom). Without this the card only had the
+       --dash-inline-size clamp, which floors at 16px and overflows a narrow cell —
+       mirrors VIS.OutstandingSalesOrderWidget. */
+    container: vas-t5vwdg / inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
@@ -255,5 +260,18 @@
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-t5vwdg-container, so no
-   per-breakpoint font-size stepping is needed. */
+   The card base size follows the --dash-inline-size clamp, but that clamp floors at
+   16px; on a narrow / zoomed-in cell the content overflows at 16px. Step the base font
+   down on narrow cells (query the .vas-t5vwdg-root container), mirroring
+   VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-t5vwdg (max-width: 300px) {
+    .vas-t5vwdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-t5vwdg (max-width: 220px) {
+    .vas-t5vwdg-container {
+        font-size: 11px;
+    }
+}

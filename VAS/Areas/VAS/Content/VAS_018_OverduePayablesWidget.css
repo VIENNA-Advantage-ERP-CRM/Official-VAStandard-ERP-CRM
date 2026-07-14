@@ -11,6 +11,9 @@
     box-sizing: border-box;
     position: relative;
     font-family: Roboto, sans-serif;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-opwdg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -434,6 +437,16 @@
    Widget interior scales via the em anchor clamp on .vas-opwdg-container, so no
    per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
    document-baseline surface) reflows at narrow widths. */
+/* Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-opwdg (max-width: 300px) {
+    .vas-opwdg-container { font-size: 13px; }
+}
+
+@container vas-opwdg (max-width: 220px) {
+    .vas-opwdg-container { font-size: 11px; }
+}
+
 @media (max-width: 768px) {
     .vas-opwdg-pills-row { gap: 0.35em; }
 }
