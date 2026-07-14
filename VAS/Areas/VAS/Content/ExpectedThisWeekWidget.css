@@ -206,13 +206,13 @@
 
 .vas-etw-dialog-card {
     position: relative;
-    min-height: min(34em, 100%);
+    min-height: min(32em, 100%);
     width: min(64em, 100%); /* ~1024px on wide screens */
     /* Fixed dialog height so it doesn't shrink (or grow) with row count —
        header/footer stay put, body scrolls when there are more rows than
        fit. Sized so the empty area below the last row stays small even on a
        partly-filled page. `min(...)` clamps it on short viewports. */
-    height: min(33em, 100%);
+    height: min(32em, 100%);
     background: #FFFFFF;
     border-radius: 16px;
     box-shadow: 0 24px 48px rgba(15, 61, 97, 0.22);
@@ -414,7 +414,7 @@
 
 .vas-etw-td-customer {
     /* Primary identity cell — Bold, dark (dashboard-widgets.md §"Cell Types"). */
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 
@@ -429,7 +429,7 @@
     /* Emphasized value cell — Bold, right-aligned (dashboard-widgets.md §"Cell
        Types"). Amber tone kept as the due-amount theme cue. */
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     color: #856404;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -478,9 +478,21 @@
     }
 
 /* Empty / loading states */
+/* When the only row is the empty placeholder, stretch the table to fill the
+   fixed-height dialog body so the single cell centers vertically
+   (vertical-align: middle) as well as horizontally (text-align: center) —
+   one muted line sitting in the middle of the free space between the sticky
+   header and the footer. `:has()` scopes this to the empty state only, so
+   data rows keep their natural height. */
+.vas-etw-dialog-table:has(.vas-etw-dialog-empty) {
+    height: 100%;
+}
+
 .vas-etw-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
+    vertical-align: middle;          /* center in the stretched row */
+    height: 100%;
     color: #748494;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;

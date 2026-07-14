@@ -176,7 +176,7 @@
 
 .vas-tcr-cur {
     margin-inline-end: 0.1em;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 /* Proportion bar — track + data-driven fill (width set in JS). Fill anchors to
@@ -195,10 +195,13 @@
     background: linear-gradient(90deg, #2EA45A, #82D49E);
 }
 
-/* Empty state — top-anchored (same spacing from the top as a populated list),
-   not vertically centered in the card. */
+/* Empty state — centered both axes in the card body (the message sits in the
+   middle of the empty space, per the no-data reference). `margin:auto` absorbs
+   the free space of the flex-column list on both the main and cross axis. */
 .vas-tcr-empty {
     flex: 0 0 auto;
+    margin: auto;
+    text-align: center;
     color: #5F7283;
     font-size: 0.75em;
     padding: 0.25em 0;

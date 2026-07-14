@@ -193,13 +193,14 @@
             });
         }
 
-        /* Compact "18 May" used by the row meta line (image_1). */
+        /* Compact "18 May 2026" used by the row meta line (image_1) — the year
+           is kept so the invoice due date is unambiguous across year boundaries. */
         function formatShortDate(value) {
             if (!value) { return ""; }
             var d = new Date(value);
             if (isNaN(d.getTime())) { return value; }
             return d.toLocaleDateString(window.navigator.language, {
-                day: "numeric", month: "short"
+                day: "numeric", month: "short", year: "numeric"
             });
         }
 
