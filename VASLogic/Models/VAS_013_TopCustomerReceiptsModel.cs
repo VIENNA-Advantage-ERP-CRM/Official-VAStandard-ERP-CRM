@@ -19,24 +19,30 @@ namespace VASLogic.Models
     /// <summary>
     /// Module Name : VAS_013_TopCustomerReceipts
     /// Purpose     : Backs the VAS_013_TopCustomerReceipts dashboard widget.
-    ///               Returns the top N customers ranked by total AR receipt
-    ///               collections (C_Payment.PaymentAmount) over a rolling window of the
-    ///               last 30 days, converted to the accounting-schema (base)
-    ///               currency. MRole row-level security is applied only on the
-    ///               main physical table (C_Payment, alias Payment) inside the
-    ///               CustomerCollections CTE body — never on the SchemaCurrency
-    ///               CTE alias nor on the outer combined query. Compatible with
-    ///               PostgreSQL and Oracle.
+    ///               Returns the top N customers ranked by total collections over a
+    ///               rolling window of the last 30 days, converted to the
+    ///               accounting-schema (base) currency. Collections come from BOTH
+    ///               AR receipts (C_Payment.PaymentAmount) and cash-journal
+    ///               collections (C_CashLine.Amount of Receipt / ReceiptReturn lines,
+    ///               attributed to the line's business partner); the two sources are
+    ///               UNIONed per partner before ranking. MRole row-level security is
+    ///               applied on each main physical table independently (C_Payment in
+    ///               the CustomerCollections CTE, C_Cash in the CashCollections CTE)
+    ///               — never on the SchemaCurrency CTE alias nor on the outer
+    ///               combined query. Compatible with PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI154      2026-06-02 Created
+    ///   VAI154      2026-07-14 Add cash-journal Receipt / ReceiptReturn collections
+    ///                          (C_Cash / C_CashLine) to the per-customer total.
     /// </summary>
     public class VAS_013_TopCustomerReceiptsModel
     {
         /// <summary>
         /// Returns the top N customers by collection amount for the session
-        /// client over the last 30 days (transaction date), highest first. All
-        /// amounts are converted to the base/accounting currency so a single
-        /// symbol applies to the whole list.
+        /// client over the last 30 days, highest first, combining AR receipts (by
+        /// transaction date) and cash-journal Receipt / ReceiptReturn collections
+        /// (by statement date). All amounts are converted to the base/accounting
+        /// currency so a single symbol applies to the whole list.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
         /// <param name="topN">Number of customers to return (default 5).</param>
@@ -132,25 +138,115 @@ namespace VASLogic.Models
                          SchemaCurrency.Currency_ISO,
                          SchemaCurrency.Std_Precision";
 
-            /* Top-N ranked output. OFFSET / FETCH NEXT is portable across
-               Oracle 12c+ and PostgreSQL and lets the row cap be parameterized. */
+            /* CashCollections CTE — the main physical table is C_Cash (alias
+               Cash); its C_CashLine child supplies the collected Amount and the
+               business partner. Include completed/closed cash lines whose
+               VSS_PAYMENTTYPE is a customer Receipt or ReceiptReturn (the return
+               leg signed by its own Amount), over the same 30-day window (by
+               statement date). Same source, currency conversion and payment-type
+               rule as the Daily Collection Trend / Outstanding-vs-Received widgets
+               (VAS_014 / 015). Mirrors the CustomerCollections CTE so the two can
+               be UNIONed per partner. */
+            string cashDateCondition;
+            if (DB.IsPostgreSQL())
+            {
+                cashDateCondition = "Cash.StatementDate >= CURRENT_DATE - 30 AND Cash.StatementDate < CURRENT_DATE + 1";
+            }
+            else
+            {
+                cashDateCondition = "TRUNC(Cash.StatementDate) >= TRUNC(SYSDATE) - 30 AND TRUNC(Cash.StatementDate) <= TRUNC(SYSDATE)";
+            }
+
+            /* VSS_PAYMENTTYPE list values rendered as SQL literals via the same
+               framework helper used elsewhere (e.g. VAS_014). */
+            string cashReceiptTypes =
+                GlobalVariable.TO_STRING(MCashLine.VSS_PAYMENTTYPE_Receipt) + ", " +
+                GlobalVariable.TO_STRING(MCashLine.VSS_PAYMENTTYPE_ReceiptReturn);
+
+            string cashCollectionsSql = @"
+                SELECT BPartner.C_BPartner_ID AS C_BPartner_ID,
+                       BPartner.Name AS Customer_Name,
+                       SchemaCurrency.Currency_Symbol,
+                       SchemaCurrency.Currency_ISO,
+                       SchemaCurrency.Std_Precision,
+                       SUM(
+                           CASE
+                               WHEN Cash.C_Currency_ID = SchemaCurrency.Acct_Currency_ID
+                               THEN COALESCE(CashLine.Amount, 0)
+                               ELSE CurrencyConvert(
+                                   COALESCE(CashLine.Amount, 0),
+                                   CashLine.C_Currency_ID,
+                                   SchemaCurrency.Acct_Currency_ID,
+                                   COALESCE(Cash.DateAcct, Cash.StatementDate),
+                                   COALESCE(CashLine.C_ConversionType_ID, 0),
+                                   CashLine.AD_Client_ID,
+                                   CashLine.AD_Org_ID
+                               )
+                           END
+                       ) AS Collection_Amount
+                FROM C_Cash Cash
+                INNER JOIN C_CashLine CashLine ON (CashLine.C_Cash_ID=Cash.C_Cash_ID)
+                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=CashLine.C_BPartner_ID)
+                INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Cash.AD_Client_ID)
+                WHERE Cash.IsActive = 'Y'
+                  AND CashLine.IsActive = 'Y'
+                  AND CashLine.VSS_PAYMENTTYPE IN (" + cashReceiptTypes + @")
+                  AND Cash.DocStatus IN ('CO', 'CL')
+                  AND Cash.AD_Client_ID = " + clientId + @"
+                  AND " + cashDateCondition;
+
+            /* MRole only on the main physical table (C_Cash / alias Cash); the
+               joined C_CashLine / C_BPartner are child/lookup tables. GROUP BY is
+               appended AFTER MRole so the FROM-clause parser is not confused by a
+               trailing clause. */
+            cashCollectionsSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashCollectionsSql,
+                "Cash",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            cashCollectionsSql += @"
+                GROUP BY BPartner.C_BPartner_ID,
+                         BPartner.Name,
+                         SchemaCurrency.Currency_Symbol,
+                         SchemaCurrency.Currency_ISO,
+                         SchemaCurrency.Std_Precision";
+
+            /* Top-N ranked output. The two per-partner sources are UNIONed and
+               re-aggregated by partner so a customer with both a receipt and a
+               cash-book collection ranks on the combined total. OFFSET / FETCH
+               NEXT is portable across Oracle 12c+ and PostgreSQL and lets the row
+               cap be parameterized. */
             string sql = @"
                 WITH SchemaCurrency AS (
                     " + schemaCurrencySql + @"
                 ),
                 CustomerCollections AS (
                     " + customerCollectionsSql + @"
+                ),
+                CashCollections AS (
+                    " + cashCollectionsSql + @"
+                ),
+                CombinedCollections AS (
+                    SELECT C_BPartner_ID, Customer_Name, Currency_Symbol, Currency_ISO, Std_Precision, Collection_Amount
+                    FROM CustomerCollections
+                    UNION ALL
+                    SELECT C_BPartner_ID, Customer_Name, Currency_Symbol, Currency_ISO, Std_Precision, Collection_Amount
+                    FROM CashCollections
                 )
-                SELECT CustomerCollections.Customer_Name,
-                       CustomerCollections.Currency_Symbol,
-                       CustomerCollections.Currency_ISO,
-                       CustomerCollections.Std_Precision,
+                SELECT CombinedCollections.Customer_Name,
+                       MAX(CombinedCollections.Currency_Symbol) AS Currency_Symbol,
+                       MAX(CombinedCollections.Currency_ISO) AS Currency_ISO,
+                       MAX(CombinedCollections.Std_Precision) AS Std_Precision,
                        ROUND(
-                           COALESCE(CustomerCollections.Collection_Amount, 0),
-                           CustomerCollections.Std_Precision
+                           SUM(COALESCE(CombinedCollections.Collection_Amount, 0)),
+                           MAX(CombinedCollections.Std_Precision)
                        ) AS Collection_Amount
-                FROM CustomerCollections
-                WHERE COALESCE(CustomerCollections.Collection_Amount, 0) > 0
+                FROM CombinedCollections
+                GROUP BY CombinedCollections.C_BPartner_ID,
+                         CombinedCollections.Customer_Name
+                HAVING SUM(COALESCE(CombinedCollections.Collection_Amount, 0)) > 0
                 ORDER BY Collection_Amount DESC
                 OFFSET 0 ROWS FETCH NEXT @TopN ROWS ONLY";
 

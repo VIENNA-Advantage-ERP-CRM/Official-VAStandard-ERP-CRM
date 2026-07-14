@@ -547,9 +547,17 @@
     color: #A33F3F;
 }
 
+/* No-data cell centered in the middle of the (fixed-height) dialog body:
+   stretch the table to fill only in the empty state so the single row's
+   vertical-align:middle lands the muted line dead-center on both axes. */
+.vas-ce-dialog-table:has(.vas-ce-d-empty) {
+    height: 100%;
+}
+
 .vas-ce-d-empty {
     padding: 2.25em 1em;
     text-align: center;
+    vertical-align: middle;
     color: #5F7283;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;

@@ -478,9 +478,21 @@
     }
 
 /* Empty / loading states */
+/* When the only row is the empty placeholder, stretch the table to fill the
+   fixed-height dialog body so the single cell centers vertically
+   (vertical-align: middle) as well as horizontally (text-align: center) —
+   one muted line sitting in the middle of the free space between the sticky
+   header and the footer. `:has()` scopes this to the empty state only, so
+   data rows keep their natural height. */
+.vas-etw-dialog-table:has(.vas-etw-dialog-empty) {
+    height: 100%;
+}
+
 .vas-etw-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
+    vertical-align: middle;          /* center in the stretched row */
+    height: 100%;
     color: #748494;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;

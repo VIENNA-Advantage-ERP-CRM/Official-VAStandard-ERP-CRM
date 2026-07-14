@@ -142,6 +142,18 @@
     font-size: 0.75em;
 }
 
+/* Empty state — centered both axes in the list body (a single muted line in
+   the middle of the free space between header and footer, per the no-data
+   reference). Scoped to the widget body so the shared class is unaffected in
+   the review dialog. The body is a height-filling flex item (flex:1), so
+   height:100% resolves and flex-centres the message. */
+.vas-msug-body .vas-msug-nodata {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .vas-msug-row {
     display: flex;
     align-items: center;

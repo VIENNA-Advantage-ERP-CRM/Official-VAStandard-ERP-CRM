@@ -500,10 +500,19 @@
     color: inherit;
 }
 
-/* Empty / loading states */
+/* Empty / loading states — stretch the table to fill the fixed-height dialog
+   body so the single empty cell centers vertically (vertical-align: middle) as
+   well as horizontally (text-align: center): one muted line sitting in the
+   middle of the free space between the sticky header and the footer. `:has()`
+   scopes this to the empty state only, so data rows keep their natural height. */
+.vas-aa-dialog-table:has(.vas-aa-dialog-empty) {
+    height: 100%;
+}
+
 .vas-aa-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
+    vertical-align: middle;          /* center in the stretched row */
     color: #5F7283;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;

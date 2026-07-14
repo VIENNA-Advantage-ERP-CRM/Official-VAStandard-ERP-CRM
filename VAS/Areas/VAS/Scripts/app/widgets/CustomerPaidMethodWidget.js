@@ -117,7 +117,7 @@
             if ($listBody) {
                 $listBody.html(
                     '<div class="vas-cpm-nodata">' +
-                    lbl("VIS_NoData", "No data") +
+                    lbl("VAS_034_NoData", "No Data Found") +
                     '</div>'
                 );
             }

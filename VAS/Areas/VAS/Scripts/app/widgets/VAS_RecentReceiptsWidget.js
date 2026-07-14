@@ -307,6 +307,9 @@
             $tbody.empty();
 
             if (!rows || rows.length === 0) {
+                /* Stretch the table to fill the flex-1 wrap so the empty cell's
+                   vertical-align:middle centres the message in the body area. */
+                $tbody.closest('.vas-rr-table').addClass('vas-rr-table--empty');
                 $tbody.html(
                     '<tr><td class="vas-rr-empty" colspan="6">' +
                     escapeHtml(lbl("VAS_NoReceiptsThisPeriod", "No receipts in this period")) +
@@ -314,6 +317,9 @@
                 );
                 return;
             }
+
+            /* Populated: table sizes to its rows (top-anchored), not the wrap. */
+            $tbody.closest('.vas-rr-table').removeClass('vas-rr-table--empty');
 
             for (var i = 0; i < rows.length; i++) {
                 var row = rows[i];

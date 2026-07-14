@@ -424,9 +424,17 @@
     color: inherit;
 }
 
+/* No-data cell centered in the middle of the (fixed-height) dialog body:
+   stretch the table to fill only in the empty state so the single row's
+   vertical-align:middle lands the muted line dead-center on both axes. */
+.vas-unr-dialog-table:has(.vas-unr-dialog-empty) {
+    height: 100%;
+}
+
 .vas-unr-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
+    vertical-align: middle;
     color: #5F7283;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;

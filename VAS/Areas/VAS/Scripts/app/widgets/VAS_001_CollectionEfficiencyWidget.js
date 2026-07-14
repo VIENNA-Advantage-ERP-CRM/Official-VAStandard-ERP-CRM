@@ -603,7 +603,7 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-ce-meta">' +
-                '<div class="vas-ce-dso"><strong>' + escapeHtml(lbl("VAS_001_DSO", "DSO")) + '</strong> 0 ' + escapeHtml(lbl("VAS_001_DaysTarget", "days · target days")) + ' 0</div>' +
+                '<div class="vas-ce-dso">' + escapeHtml(lbl("VAS_001_DSO", "DSO")) + ' 0 ' + escapeHtml(lbl("VAS_001_DaysTarget", "days · target days")) + ' 0</div>' +
                 '<div class="vas-ce-overdue">0 ' + escapeHtml(lbl("VAS_001_OverdueDot", "overdue ·")) + ' 0 ' + escapeHtml(lbl("VAS_001_Invoices", "invoices")) + '</div>' +
                 '</div>' +
                 '</div>' +

@@ -252,7 +252,7 @@
     align-items: center;
     justify-content: center;
     color: #5F7283;
-    font-size: 0.8125em;
+    font-size: 0.75em;               /* sm — canonical no-data size, matches sibling widgets */
 }
 
 /* ── Legend ───────────────────────────────────────────────────────── */

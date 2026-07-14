@@ -184,7 +184,7 @@
             if ($listBody) {
                 $listBody.html(
                     '<div class="vas-er-nodata">' +
-                    lbl("VIS_NoData", "No data") +
+                    lbl("VAS_034_NoData", "No Data Found") +
                     '</div>'
                 );
             }
@@ -304,7 +304,8 @@
             return d.toLocaleDateString(window.navigator.language, {
                 weekday: "short",
                 day: "2-digit",
-                month: "short"
+                month: "short",
+                year: "numeric"
             });
         }
 

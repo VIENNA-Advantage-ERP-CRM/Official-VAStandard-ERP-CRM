@@ -282,13 +282,26 @@
     white-space: nowrap;
 }
 
-/* Empty-state row inside the inline table. */
+/* Empty-state row inside the inline table — centered both axes in the body
+   area (the message sits in the middle of the empty space between the widget
+   header and the footer, per the no-data reference). The table stretches to
+   fill the flex-1 table-wrap via .vas-rr-table--empty (toggled from JS when
+   there are no rows), so this single cell's vertical-align:middle lands the
+   message in the vertical centre; text-align:center handles the horizontal. */
 .vas-rr-empty {
-    padding: 1.875em 0.75em;
+    padding: 0.75em;
     text-align: center;
+    vertical-align: middle;
     color: #5F7283;
     font-size: 0.875em;
     background: transparent;
+}
+
+/* When the table holds only the empty-state row, let it fill the table-wrap's
+   height so the cell's vertical-align:middle can centre the message. Scoped to
+   the empty state so populated rows stay top-anchored at their natural height. */
+.vas-rr-table.vas-rr-table--empty {
+    height: 100%;
 }
 
 /* ── Footer: helper text + compact pager ──────────────────────────── */
