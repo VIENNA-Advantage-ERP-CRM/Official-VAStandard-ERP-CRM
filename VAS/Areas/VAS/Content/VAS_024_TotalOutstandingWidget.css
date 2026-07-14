@@ -3,13 +3,18 @@
    ========================================================== */
 
 .vas-towdg-root {
-    /* Positioning context only (mirrors VIS.OutstandingSalesOrderWidget's root);
-       the glass surface lives on the card (.vas-towdg-container) below. No
+    /* Positioning context + query container (mirrors VIS.OutstandingSalesOrderWidget's
+       root); the glass surface lives on the card (.vas-towdg-container) below. No
        overflow:hidden here so the card's drop-shadow is not clipped. */
     width: 100%;
     height: 100%;
     box-sizing: border-box;
     position: relative;
+    /* Named query container so the card can step its base font down on narrow /
+       zoomed cells (see the @container rules at the bottom). Without this the card
+       only had the --dash-inline-size clamp, which floors at 16px and overflows a
+       narrow cell — the reason zoom-in/out misbehaved vs. OutstandingSalesOrderWidget. */
+    container: vas-towdg / inline-size;
     font-family: Roboto, sans-serif;
 }
 
@@ -428,9 +433,23 @@
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-towdg-container, so no
-   per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
-   document-baseline surface) reflows at narrow widths. */
+   The card base size follows the --dash-inline-size clamp, but that clamp floors
+   at 16px; on a narrow / zoomed-in cell the KPI value + icon overflow at 16px.
+   Step the base font down on narrow cells (query the .vas-towdg-root container),
+   mirroring VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-towdg (max-width: 300px) {
+    .vas-towdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-towdg (max-width: 220px) {
+    .vas-towdg-container {
+        font-size: 11px;
+    }
+}
+
+/* Only the drill-down dialog (a document-baseline surface) reflows at narrow widths. */
 @media (max-width: 680px) {
     .vas-towdg-dialog-shell .ui-dialog-content {
         padding: 0.875em;

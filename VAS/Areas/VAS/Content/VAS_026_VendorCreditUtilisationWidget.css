@@ -259,5 +259,19 @@
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-vcuwdg-container, so no
-   per-breakpoint font-size stepping is needed. */
+   The card base size follows the --dash-inline-size clamp, but that clamp floors at
+   16px; on a narrow / zoomed-in cell the content overflows at 16px. Step the base font
+   down on narrow cells. The .vas-vcuwdg-root already declares container-type: inline-size
+   (unnamed), so these unnamed @container rules query it — mirrors
+   VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container (max-width: 300px) {
+    .vas-vcuwdg-container {
+        font-size: 13px;
+    }
+}
+
+@container (max-width: 220px) {
+    .vas-vcuwdg-container {
+        font-size: 11px;
+    }
+}

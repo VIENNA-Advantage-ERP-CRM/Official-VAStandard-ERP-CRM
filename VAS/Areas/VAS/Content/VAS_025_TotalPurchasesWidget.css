@@ -14,6 +14,9 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-tpwidg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -458,6 +461,16 @@
    Widget interior scales via the em anchor clamp on .vas-tpwidg-container, so no
    per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
    document-baseline surface) reflows at narrow widths. */
+/* Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-tpwidg (max-width: 300px) {
+    .vas-tpwidg-container { font-size: 13px; }
+}
+
+@container vas-tpwidg (max-width: 220px) {
+    .vas-tpwidg-container { font-size: 11px; }
+}
+
 @media (max-width: 680px) {
     .vas-tpwidg-dialog-shell .ui-dialog-content {
         padding: 0.875em;

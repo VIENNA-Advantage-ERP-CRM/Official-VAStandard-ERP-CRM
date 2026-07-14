@@ -6,6 +6,9 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Named query container so @container rules can step the card base font down
+       on narrow / zoomed-in cells (the card can't query itself). */
+    container: vas-mpswdg / inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
@@ -162,5 +165,13 @@
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-mpswdg-container, so no
-   per-breakpoint font-size stepping is needed. */
+   The em anchor clamp on .vas-mpswdg-container FLOORS at 16px, so on a narrow /
+   zoomed-in cell content overflows. Step the card base font below that floor via
+   the named root container (matches .vas-oso-* reference). */
+@container vas-mpswdg (max-width: 300px) {
+    .vas-mpswdg-container { font-size: 13px; }
+}
+
+@container vas-mpswdg (max-width: 220px) {
+    .vas-mpswdg-container { font-size: 11px; }
+}

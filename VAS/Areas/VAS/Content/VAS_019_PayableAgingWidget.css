@@ -239,5 +239,14 @@
 .vas-pawdg-lv-err  { color: #D14545; }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-pawdg-container, so no
-   per-breakpoint font-size stepping is needed. */
+   The em anchor clamp on .vas-pawdg-container FLOORS at 16px, so on a narrow /
+   zoomed-in cell content overflows. Step the card base font below that floor. The
+   root already establishes an (unnamed) inline-size container, so these unnamed
+   @container rules query it (matches .vas-oso-* reference). */
+@container (max-width: 300px) {
+    .vas-pawdg-container { font-size: 13px; }
+}
+
+@container (max-width: 220px) {
+    .vas-pawdg-container { font-size: 11px; }
+}
