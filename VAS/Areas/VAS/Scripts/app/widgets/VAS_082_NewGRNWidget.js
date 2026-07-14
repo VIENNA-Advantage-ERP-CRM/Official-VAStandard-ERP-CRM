@@ -146,32 +146,100 @@
             });
         }
 
-        /* The GRN window opens in the SAME window (view manager) directly on a
-           NEW record: an all-excluding query keeps existing receipts out and
-           cmd_new switches the panel to record entry - the same pattern the
-           core product uses for open-on-new-record flows. */
-        function startWindowById(windowId) {
-            var emptyQuery = null;
+        /* The GRN window must open on a NEW record and must never be duplicated.
+           viewManager.startWindow only reuses windows in its closed-window cache;
+           an already-OPEN window gets a second instance on every click. So:
+           - if the GRN window this widget opened is still open, bring that SAME
+             window to the front and start another new record in it (cmd_new);
+           - otherwise open it once with a "new record" query so the CORE itself
+             auto-starts the blank record when the tab loads (buildNewRecordQuery).
+           The opened-window reference is kept on a WINDOW-GLOBAL (keyed by window
+           id), not on widget-instance state, so it survives the dashboard
+           re-creating the widget - otherwise the reference resets and a new window
+           opens every time. */
+        var GRN_VIEW_STORE = '__vasGrnViews';
+
+        function rememberGrnView(windowId, view) {
+            if (!window[GRN_VIEW_STORE]) { window[GRN_VIEW_STORE] = {}; }
+            window[GRN_VIEW_STORE][windowId] = view || null;
+        }
+
+        function recallGrnView(windowId) {
+            return window[GRN_VIEW_STORE] ? window[GRN_VIEW_STORE][windowId] : null;
+        }
+
+        function startNewRecordIn(view) {
             try {
-                emptyQuery = new VIS.Query();
-                emptyQuery.addRestriction("M_InOut_ID", VIS.Query.prototype.EQUAL, 0);
-            } catch (e) { emptyQuery = null; }
+                if (view && view.cPanel && view.cPanel.cmd_new) {
+                    view.cPanel.cmd_new(false);
+                    return true;
+                }
+            } catch (e) { /* window still open; user can press New */ }
+            return false;
+        }
+
+        // The taskbar LI carries the view id and is removed on close, so its
+        // presence in the DOM means that window is still open.
+        function isViewStillOpen(view) {
+            if (!view || !view.getId) { return false; }
+            var li = document.getElementById(String(view.getId()));
+            return !!(li && li.tagName === 'LI');
+        }
+
+        function focusView(view) {
+            var viewId = view.getId();
+            var li = document.getElementById(String(viewId));
+            if (li && $(li).hasClass('vis-app-f-selected')) { return; }
+            if (VIS.desktopMgr && VIS.desktopMgr.toggleContainer) {
+                VIS.desktopMgr.toggleContainer(viewId);
+            }
+            if (VIS.desktopMgr && VIS.desktopMgr.activateTaskBarItemUsingID) {
+                VIS.desktopMgr.activateTaskBarItemUsingID({ data: function () { return viewId; } });
+            }
+        }
+
+        /* Core-native "open on new record": a query flagged as a new-record query
+           loads no rows ("2=3"), and GridController.queryCompleted ->
+           checkInsertNewRow() then auto-starts a blank record (dataNew) as soon
+           as the tab finishes loading. No onLoad/cmd_new timing needed - this is
+           the same path the core itself uses for zoom-to-new-record. */
+        function buildNewRecordQuery() {
+            var query = null;
+            try {
+                query = new VIS.Query("M_InOut");
+                query.addRestriction(VIS.Query.prototype.NEWRECORD); // "2=3" -> loads no rows
+                // addRestriction only auto-flags against the static VIS.Query.NEWRECORD,
+                // which this core never assigns (only the prototype constant exists),
+                // so set the flag checkInsertNewRow() reads directly.
+                query.newRecord = true;
+                if (query.setRecordCount) { query.setRecordCount(0); }
+            } catch (e) { query = null; }
+            return query;
+        }
+
+        function startWindowById(windowId) {
+            // Reuse the window we already opened, if it is still open: focus it
+            // and start a new record in it - no second window.
+            var existing = recallGrnView(windowId);
+            if (existing && isViewStillOpen(existing)) {
+                try {
+                    focusView(existing);
+                    startNewRecordIn(existing);
+                    return;
+                } catch (e) { /* fall through and open it again */ }
+            }
+
+            var newRecordQuery = buildNewRecordQuery();
 
             var view = null;
             if (VIS.viewManager && VIS.viewManager.startWindow) {
-                view = VIS.viewManager.startWindow(windowId, emptyQuery);
+                view = VIS.viewManager.startWindow(windowId, newRecordQuery);
             }
             else if (VIS.AEnv && VIS.AEnv.startWindow) {
-                view = VIS.AEnv.startWindow(windowId, emptyQuery);
+                view = VIS.AEnv.startWindow(windowId, newRecordQuery);
             }
 
-            if (view) {
-                view.onLoad = function () {
-                    try {
-                        if (view.cPanel && view.cPanel.cmd_new) { view.cPanel.cmd_new(false); }
-                    } catch (e) { /* window still opens; user can press New */ }
-                };
-            }
+            rememberGrnView(windowId, view);
         }
 
         function openGrnWindow() {
