@@ -24,7 +24,7 @@ namespace VIS.Controllers
     {
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult SearchReceipts(string q, int max = 10)
+        public JsonResult SearchReceipts(string q, int max = 10, int page = 1)
         {
             if (Session["ctx"] == null)
             {
@@ -42,6 +42,11 @@ namespace VIS.Controllers
             if (max <= 0 || max > 25)
             {
                 max = 25;
+            }
+            /* 1-based page for scroll paging (25 rows per page). */
+            if (page < 1)
+            {
+                page = 1;
             }
 
             /* All user input goes through SqlParameter; only fixed status-code
@@ -92,6 +97,7 @@ namespace VIS.Controllers
             if (ql.Contains("draft")) { codes.Add("'DR'"); }
             if (ql.Contains("progress")) { codes.Add("'IP'"); }
             if (ql.Contains("complete")) { codes.Add("'CO'"); }
+            if (ql.Contains("reverse")) { codes.Add("'RE'"); codes.Add("'VO'"); }
             if (ql.Contains("close")) { codes.Add("'CL'"); }
             if (ql.Contains("approv")) { codes.Add("'AP'"); }
             if (ql.Contains("invalid")) { codes.Add("'IN'"); }
@@ -120,12 +126,14 @@ namespace VIS.Controllers
                 ors.Add("Payment.IsAllocated = 'Y'");
             }
 
-            /* Amount match when the term parses as a number (commas/symbols stripped). */
+            /* Amount match when the term parses as a number (commas/symbols stripped).
+               Sign-agnostic: compare on absolute values so a receipt of +500 or -500
+               both match whether the user types "500" or "-500". */
             decimal amt;
             if (decimal.TryParse(q.Replace(",", "").Replace("$", "").Trim(), out amt))
             {
-                parameters.Add(new SqlParameter("@Amt", amt));
-                ors.Add("(Payment.PayAmt = @Amt OR Payment.PaymentAmount = @Amt)");
+                parameters.Add(new SqlParameter("@Amt", Math.Abs(amt)));
+                ors.Add("(ABS(Payment.PayAmt) = @Amt OR ABS(Payment.PaymentAmount) = @Amt)");
             }
 
             /* Inner query carries no nested C_Invoice subquery in its SELECT, so
@@ -158,7 +166,6 @@ namespace VIS.Controllers
                 LEFT OUTER JOIN C_Invoice Invoice ON (Payment.C_Invoice_ID=Invoice.C_Invoice_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
-                  AND Payment.DocStatus NOT IN ('RE', 'VO')
                   AND Payment.AD_Client_ID = " + clientId + @"
                   AND (" + string.Join(" OR ", ors) + @")";
 
@@ -202,11 +209,15 @@ namespace VIS.Controllers
                        Receipts.Date_Acct
                 FROM (" + innerSelectSql + @") Receipts
                 ORDER BY Receipts.Date_Acct DESC, Receipts.Payment_ID DESC
-                OFFSET 0 ROWS FETCH NEXT @Max ROWS ONLY";
+                OFFSET @Offset ROWS FETCH NEXT @Max ROWS ONLY";
 
-            /* @Max appears last in the SQL — Oracle's positional binding requires
-               it to be added last to the parameter list. */
-            parameters.Add(new SqlParameter("@Max", max));
+            /* Scroll paging: skip the pages already loaded, then fetch ONE row more
+               than the page size so we can tell the client whether another page
+               exists (hasMore) without a separate COUNT query. @Offset then @Max
+               appear last in the SQL — Oracle's positional binding requires them to
+               be added last, in that order. */
+            parameters.Add(new SqlParameter("@Offset", (page - 1) * max));
+            parameters.Add(new SqlParameter("@Max", max + 1));
 
             List<object> rows = new List<object>();
             IDataReader dr = null;
@@ -237,7 +248,15 @@ namespace VIS.Controllers
                     });
                 }
 
-                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+                /* The extra (max+1)th row only signals another page exists; trim it
+                   so the client always receives at most a full page of `max` rows. */
+                bool hasMore = rows.Count > max;
+                if (hasMore)
+                {
+                    rows.RemoveAt(rows.Count - 1);
+                }
+
+                return Json(JsonConvert.SerializeObject(new { rows = rows, page = page, pageSize = max, hasMore = hasMore }), JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
             {
