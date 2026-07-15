@@ -7,7 +7,9 @@ using System.Globalization;
 using System.Web.Mvc;
 using VAdvantage.Classes;
 using VAdvantage.DataBase;
+using VAdvantage.Logging;
 using VAdvantage.Model;
+using VAdvantage.Process;
 using VAdvantage.Utility;
 using VIS.Filters;
 
@@ -82,7 +84,7 @@ namespace VIS.Controllers
                   AND PurchaseOrder.IsSOTrx='N'
                   AND PurchaseOrder.DocStatus='CO'
                   AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
-                  AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
+                  AND (COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
 
             // Search over the PO number or supplier name (parameterized;
             // appended before role security so it stays inside the WHERE).
@@ -99,6 +101,20 @@ namespace VIS.Controllers
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+
+            // Net off quantities already on unposted GRNs (draft / in-progress
+            // receipts) so a PO fully covered by an awaiting-confirmation receipt
+            // no longer counts as open. Injected after the access SQL so MRole
+            // does not push predicates for the subquery's M_InOutLine alias into
+            // the outer where-clause (ORA-00904).
+            rawSql = rawSql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=OrderLine.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )");
 
             string sql = @"
                 SELECT OpenPO.PO_ID,
@@ -218,20 +234,22 @@ namespace VIS.Controllers
                 SELECT OrderLine.C_OrderLine_ID AS PO_Line_ID,
                        OrderLine.Line AS Line_No,
                        COALESCE(Product.Name, " + NLiteral("-") + @") AS Item_Name,
+                       AttributeInstance.Description AS Attribute_Name,
                        COALESCE(OrderLine.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(OrderLine.QtyDelivered, 0) AS Already_Received_Qty,
-                       COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) AS Open_Qty,
-                       COALESCE(UOM.UOMSymbol, UOM.Name) AS Uom
+                       COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Open_Qty,
+                       UOM.Name AS Uom
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
                 LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=OrderLine.M_Product_ID AND Product.IsActive='Y')
+                LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=OrderLine.M_AttributeSetInstance_ID)
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=OrderLine.C_UOM_ID AND UOM.IsActive='Y')
                 WHERE PurchaseOrder.IsActive='Y'
                   AND PurchaseOrder.IsSOTrx='N'
                   AND PurchaseOrder.DocStatus='CO'
                   AND PurchaseOrder.AD_Client_ID=@AD_Client_ID
                   AND PurchaseOrder.C_Order_ID=@PO_ID
-                  AND COALESCE(OrderLine.QtyOrdered, 0) > COALESCE(OrderLine.QtyDelivered, 0)";
+                  AND (COALESCE(OrderLine.QtyOrdered, 0) - COALESCE(OrderLine.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -239,6 +257,21 @@ namespace VIS.Controllers
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+
+            // Open qty also nets off quantities already sitting on unposted GRNs
+            // (draft / in-progress receipts, e.g. a "with confirmation" receipt
+            // awaiting its confirmation) so the form never offers to receive a
+            // quantity twice. Injected after the access SQL is applied so MRole
+            // does not try to add predicates for the subquery's M_InOutLine alias
+            // to the outer where-clause (ORA-00904).
+            sql = sql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=OrderLine.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )");
 
             sql += @"
                 ORDER BY OrderLine.Line";
@@ -263,6 +296,7 @@ namespace VIS.Controllers
                         poLineId = Util.GetValueOfInt(dr["PO_Line_ID"]),
                         lineNo = Util.GetValueOfInt(dr["Line_No"]),
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
+                        attributeName = Util.GetValueOfString(dr["Attribute_Name"]),
                         poQty = Util.GetValueOfDecimal(dr["PO_Qty"]),
                         alreadyReceivedQty = Util.GetValueOfDecimal(dr["Already_Received_Qty"]),
                         openQty = openQty,
@@ -275,19 +309,16 @@ namespace VIS.Controllers
                 dr.Dispose();
                 dr = null;
 
-                // Review #49: header data for the receive form - the PO's
-                // document type and the warehouses of the org the PO was
-                // created in (line locators follow the selected warehouse).
+                // Review #49: header data for the receive form - the warehouses
+                // of the org the PO was created in (line locators follow the
+                // selected warehouse).
                 int poOrgId = 0;
                 int defaultWarehouseId = 0;
-                string docTypeName = "";
 
                 string headerSql = @"
                     SELECT PurchaseOrder.AD_Org_ID AS PO_Org_ID,
-                           COALESCE(PurchaseOrder.M_Warehouse_ID, 0) AS PO_Warehouse_ID,
-                           DocType.Name AS DocType_Name
+                           COALESCE(PurchaseOrder.M_Warehouse_ID, 0) AS PO_Warehouse_ID
                     FROM C_Order PurchaseOrder
-                    LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=PurchaseOrder.C_DocType_ID AND DocType.IsActive='Y')
                     WHERE PurchaseOrder.C_Order_ID=@Header_PO_ID
                       AND PurchaseOrder.AD_Client_ID=@Header_Client_ID";
 
@@ -300,7 +331,47 @@ namespace VIS.Controllers
                 {
                     poOrgId = Util.GetValueOfInt(dr["PO_Org_ID"]);
                     defaultWarehouseId = Util.GetValueOfInt(dr["PO_Warehouse_ID"]);
-                    docTypeName = Util.GetValueOfString(dr["DocType_Name"]);
+                }
+                dr.Close();
+                dr.Dispose();
+                dr = null;
+
+                // The Document Type is chosen on the receive form and drives the
+                // created GRN. Offer every active Material Receipt type
+                // (DocBaseType 'MMR', non-return) of the client/org, e.g.
+                // "MM Receipt" and "MM Receipt with Confirmation". The plain
+                // receipt (lowest C_DocType_ID for the most specific org) is
+                // preselected: ordering by AD_Org_ID DESC, C_DocType_ID makes the
+                // default deterministic (the old single-row lookup had no tiebreak
+                // and could return the wrong receipt type).
+                List<object> docTypes = new List<object>();
+                int defaultDocTypeId = 0;
+
+                dr = DB.ExecuteReader(@"
+                    SELECT DocType.C_DocType_ID AS DocType_ID,
+                           DocType.Name AS DocType_Name
+                    FROM C_DocType DocType
+                    WHERE DocType.DocBaseType='MMR'
+                      AND DocType.AD_Client_ID=@DocType_Client_ID
+                      AND DocType.IsActive='Y'
+                      AND DocType.AD_Org_ID IN (0, @DocType_Org_ID)
+                      AND DocType.IsSOTrx='N'
+                      AND DocType.IsReturnTrx='N'
+                    ORDER BY DocType.AD_Org_ID DESC, DocType.C_DocType_ID",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@DocType_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@DocType_Org_ID", poOrgId)
+                    });
+                while (dr != null && dr.Read())
+                {
+                    int listDocTypeId = Util.GetValueOfInt(dr["DocType_ID"]);
+                    if (defaultDocTypeId == 0) { defaultDocTypeId = listDocTypeId; }
+                    docTypes.Add(new
+                    {
+                        docTypeId = listDocTypeId,
+                        docTypeName = Util.GetValueOfString(dr["DocType_Name"])
+                    });
                 }
                 dr.Close();
                 dr.Dispose();
@@ -347,7 +418,8 @@ namespace VIS.Controllers
                 return Ok(new
                 {
                     rows = rows,
-                    docTypeName = docTypeName,
+                    docTypes = docTypes,
+                    defaultDocTypeId = defaultDocTypeId,
                     poOrgId = poOrgId,
                     defaultWarehouseId = defaultWarehouseId,
                     warehouses = warehouses
@@ -434,6 +506,435 @@ namespace VIS.Controllers
                     dr.Dispose();
                 }
             }
+        }
+
+        /// <summary>
+        /// Creates and completes a Material Receipt (GRN) for a purchase order using
+        /// the Document Type chosen on the receive form. Re-validates each line
+        /// against the live open quantity, saves the receipt and its lines through
+        /// the M_InOut / M_InOutLine models inside a single transaction (rolled back
+        /// on any failure), then runs the standard document completion
+        /// (DOCACTION_Complete). Returns the resulting document status so the client
+        /// can show it truthfully rather than a hardcoded label.
+        /// </summary>
+        /// <param name="poId">C_Order_ID of the purchase order being received.</param>
+        /// <param name="linesJson">JSON array of { poLineId, receivedQty, locatorId }.</param>
+        /// <param name="warehouseId">Receiving warehouse chosen on the form (0 = PO's own).</param>
+        /// <param name="docTypeId">Chosen Material Receipt C_DocType_ID (0 = default).</param>
+        /// <returns>JSON { success, grnId, grnNo, docStatus, docStatusName } or { error }.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult CreateGRN(int poId = 0, string linesJson = null, int warehouseId = 0, int docTypeId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            if (poId <= 0)
+            {
+                return Fail("Purchase Order is required.");
+            }
+
+            List<ReceiveLineInput> inputs = string.IsNullOrWhiteSpace(linesJson)
+                ? new List<ReceiveLineInput>()
+                : JsonConvert.DeserializeObject<List<ReceiveLineInput>>(linesJson);
+            if (inputs == null) { inputs = new List<ReceiveLineInput>(); }
+
+            // Aggregate typed quantities per PO line and remember the chosen locator.
+            Dictionary<int, decimal> qtyByLine = new Dictionary<int, decimal>();
+            Dictionary<int, int> locatorByLine = new Dictionary<int, int>();
+
+            foreach (ReceiveLineInput input in inputs)
+            {
+                if (input == null || input.PoLineId <= 0) { continue; }
+                if (input.ReceivedQty < 0) { return Fail("Received quantity cannot be negative."); }
+                if (input.ReceivedQty == 0) { continue; }
+
+                if (qtyByLine.ContainsKey(input.PoLineId))
+                {
+                    qtyByLine[input.PoLineId] += input.ReceivedQty;
+                }
+                else
+                {
+                    qtyByLine[input.PoLineId] = input.ReceivedQty;
+                }
+
+                if (input.LocatorId > 0)
+                {
+                    locatorByLine[input.PoLineId] = input.LocatorId;
+                }
+            }
+
+            if (qtyByLine.Count == 0)
+            {
+                return Fail("Enter received quantity for at least one line.");
+            }
+
+            List<int> lineIds = new List<int>(qtyByLine.Keys);
+            Dictionary<int, ReceiveOpenLine> openLines = GetOpenLineInfo(ctx, poId, lineIds);
+
+            if (openLines.Count != qtyByLine.Count)
+            {
+                return Fail("One or more selected PO lines are no longer open.");
+            }
+
+            foreach (KeyValuePair<int, decimal> selectedLine in qtyByLine)
+            {
+                if (selectedLine.Value > openLines[selectedLine.Key].OpenQty)
+                {
+                    return Fail("Received quantity cannot be greater than open quantity.");
+                }
+            }
+
+            Trx trx = null;
+
+            try
+            {
+                trx = Trx.Get("VAS_090_NewGRN" + DateTime.Now.Ticks);
+
+                MOrder order = new MOrder(ctx, poId, trx);
+                if (order.Get_ID() == 0 || order.IsSOTrx() || order.GetDocStatus() != MOrder.DOCSTATUS_Completed)
+                {
+                    trx.Rollback();
+                    return Fail("Purchase Order is not available for receiving.");
+                }
+
+                int receiptWarehouseId = warehouseId > 0 ? warehouseId : order.GetM_Warehouse_ID();
+                if (receiptWarehouseId <= 0)
+                {
+                    foreach (KeyValuePair<int, ReceiveOpenLine> openLine in openLines)
+                    {
+                        receiptWarehouseId = openLine.Value.WarehouseId;
+                        break;
+                    }
+                }
+
+                int locatorId = GetDefaultLocatorId(receiptWarehouseId, trx);
+
+                // Use the Document Type chosen on the form when it is a valid
+                // Material Receipt type for this client/org, otherwise the
+                // deterministic default (plain receipt, most specific org).
+                int resolvedDocTypeId = ResolveReceiptDocTypeId(ctx, order.GetAD_Org_ID(), docTypeId);
+                if (resolvedDocTypeId <= 0)
+                {
+                    trx.Rollback();
+                    return Fail("Material Receipt document type was not found.");
+                }
+
+                MInOut receipt = new MInOut(order, resolvedDocTypeId, DateTime.Now);
+                receipt.SetAD_Client_ID(ctx.GetAD_Client_ID());
+                receipt.SetAD_Org_ID(order.GetAD_Org_ID());
+                receipt.SetIsSOTrx(false);
+                receipt.SetIsReturnTrx(false);
+                receipt.SetMovementType(MInOut.MOVEMENTTYPE_VendorReceipts);
+                receipt.SetC_DocType_ID(resolvedDocTypeId);
+                receipt.SetM_Warehouse_ID(receiptWarehouseId);
+                receipt.SetC_Order_ID(poId);
+                if (locatorId > 0)
+                {
+                    receipt.Set_Value("M_Locator_ID", locatorId);
+                }
+
+                if (!receipt.Save(trx))
+                {
+                    trx.Rollback();
+                    return Fail(GetSaveError(ctx, "VAS_GRNNotSaved", "GRN could not be saved."));
+                }
+
+                foreach (KeyValuePair<int, decimal> selectedLine in qtyByLine)
+                {
+                    MOrderLine orderLine = new MOrderLine(ctx, selectedLine.Key, trx);
+                    if (orderLine.Get_ID() == 0)
+                    {
+                        trx.Rollback();
+                        return Fail("One or more selected PO lines are no longer available.");
+                    }
+
+                    decimal receivedQty = selectedLine.Value;
+                    int lineLocatorId = locatorByLine.ContainsKey(selectedLine.Key) && locatorByLine[selectedLine.Key] > 0
+                        ? locatorByLine[selectedLine.Key]
+                        : locatorId;
+
+                    MInOutLine receiptLine = new MInOutLine(receipt);
+                    receiptLine.SetOrderLine(orderLine, lineLocatorId, receivedQty);
+                    receiptLine.SetQty(receivedQty);
+
+                    if (orderLine.GetQtyOrdered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
+                    {
+                        receiptLine.SetQtyEntered(decimal.Round(
+                            decimal.Divide(decimal.Multiply(receivedQty, orderLine.GetQtyEntered()), orderLine.GetQtyOrdered()),
+                            12,
+                            MidpointRounding.AwayFromZero));
+                    }
+
+                    if (receiptLine.Get_ColumnIndex("PrintDescription") >= 0)
+                    {
+                        receiptLine.Set_Value("PrintDescription", orderLine.Get_Value("PrintDescription"));
+                    }
+
+                    if (!receiptLine.Save(trx))
+                    {
+                        trx.Rollback();
+                        return Fail(GetSaveError(ctx, "VAS_GRNNotSaved", "GRN line could not be saved."));
+                    }
+                }
+
+                // The receipt and its lines are saved in this transaction as a
+                // DRAFT; commit them, then run the standard document completion
+                // through the document process (DocumentEngine.CompleteOrReverse -
+                // the same path the core runs on Complete). That process executes
+                // outside this transaction, so the record is committed first. The
+                // AD_Table_ID and AD_Process_ID are resolved from the dictionary
+                // at runtime by name/Value - never hardcoded.
+                trx.Commit();
+                trx.Close();
+                trx = null;
+
+                int receiptId = receipt.GetM_InOut_ID();
+                string completeError = DocumentEngine.CompleteOrReverse(
+                    ctx,
+                    "M_InOut",
+                    GetTableId("M_InOut"),
+                    receiptId,
+                    GetProcessIdByValue(ctx, "M_InOut Process"),
+                    MInOut.DOCACTION_Complete);
+
+                if (!string.IsNullOrEmpty(completeError))
+                {
+                    return Fail(completeError);
+                }
+
+                // Reload for the final document status after completion.
+                MInOut completedReceipt = new MInOut(ctx, receiptId, null);
+                string docStatus = completedReceipt.GetDocStatus();
+                return Ok(new
+                {
+                    success = true,
+                    shipmentId = receiptId,
+                    grnId = receiptId,
+                    grnNo = completedReceipt.GetDocumentNo(),
+                    docStatus = docStatus,
+                    docStatusName = DocStatusLabel(ctx, docStatus),
+                    message = Msg.GetMsg(ctx, "VAS_GRNSaved") ?? "GRN created."
+                });
+            }
+            catch (Exception ex)
+            {
+                if (trx != null) { trx.Rollback(); }
+                return Fail(ex.Message);
+            }
+            finally
+            {
+                if (trx != null) { trx.Close(); }
+            }
+        }
+
+        /// <summary>
+        /// Validates a requested Material Receipt document type against the active
+        /// client/org; returns it when valid, otherwise the deterministic default
+        /// (plain receipt, most specific org, lowest C_DocType_ID as the tiebreak).
+        /// </summary>
+        private int ResolveReceiptDocTypeId(Ctx ctx, int orgId, int requestedDocTypeId)
+        {
+            if (requestedDocTypeId > 0)
+            {
+                int valid = Util.GetValueOfInt(DB.ExecuteScalar(@"
+                    SELECT C_DocType_ID
+                    FROM C_DocType
+                    WHERE C_DocType_ID=@DocType_ID
+                      AND DocBaseType='MMR'
+                      AND IsActive='Y'
+                      AND IsSOTrx='N'
+                      AND IsReturnTrx='N'
+                      AND AD_Client_ID=@AD_Client_ID
+                      AND AD_Org_ID IN (0, @AD_Org_ID)",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@DocType_ID", requestedDocTypeId),
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                        new SqlParameter("@AD_Org_ID", orgId)
+                    }, null));
+                if (valid > 0) { return valid; }
+            }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                SELECT C_DocType_ID
+                FROM C_DocType
+                WHERE DocBaseType='MMR'
+                  AND IsActive='Y'
+                  AND IsSOTrx='N'
+                  AND IsReturnTrx='N'
+                  AND AD_Client_ID=@AD_Client_ID
+                  AND AD_Org_ID IN (0, @AD_Org_ID)
+                ORDER BY AD_Org_ID DESC, C_DocType_ID
+                FETCH FIRST 1 ROW ONLY",
+                new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@AD_Org_ID", orgId)
+                }, null));
+        }
+
+        /// <summary>
+        /// Re-reads the live open quantity and warehouse for the selected PO lines,
+        /// keyed by C_OrderLine_ID, so CreateGRN validates against current data.
+        /// </summary>
+        private Dictionary<int, ReceiveOpenLine> GetOpenLineInfo(Ctx ctx, int poId, List<int> lineIds)
+        {
+            Dictionary<int, ReceiveOpenLine> lines = new Dictionary<int, ReceiveOpenLine>();
+
+            List<int> selectedLineIds = new List<int>();
+            if (lineIds != null)
+            {
+                foreach (int id in lineIds)
+                {
+                    if (id > 0 && !selectedLineIds.Contains(id)) { selectedLineIds.Add(id); }
+                }
+            }
+            if (selectedLineIds.Count == 0) { return lines; }
+
+            List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@PO_ID", poId));
+
+            List<string> lineIdParameters = new List<string>();
+            for (int i = 0; i < selectedLineIds.Count; i++)
+            {
+                string parameterName = "@PO_Line_ID" + i.ToString(CultureInfo.InvariantCulture);
+                lineIdParameters.Add(parameterName);
+                parameters.Add(new SqlParameter(parameterName, selectedLineIds[i]));
+            }
+
+            string sql = @"
+                SELECT ol.C_OrderLine_ID AS PO_Line_ID,
+                       COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AS Warehouse_ID,
+                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Open_Qty
+                FROM C_Order o
+                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
+                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')
+                WHERE o.IsActive='Y'
+                  AND ol.IsActive='Y'
+                  AND o.IsSOTrx='N'
+                  AND o.DocStatus='CO'
+                  AND o.AD_Client_ID=@AD_Client_ID
+                  AND o.C_Order_ID=@PO_ID
+                  AND ol.C_OrderLine_ID IN (" + string.Join(",", lineIdParameters) + @")
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "o", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            // Same in-progress-GRN netting as the display query, so CreateGRN
+            // validates each line against the truly-open quantity and cannot
+            // accept a duplicate/over-receipt. Injected after the access SQL.
+            sql = sql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )");
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                while (dr != null && dr.Read())
+                {
+                    int lineId = Util.GetValueOfInt(dr["PO_Line_ID"]);
+                    lines[lineId] = new ReceiveOpenLine
+                    {
+                        WarehouseId = Util.GetValueOfInt(dr["Warehouse_ID"]),
+                        OpenQty = Util.GetValueOfDecimal(dr["Open_Qty"])
+                    };
+                }
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+
+            return lines;
+        }
+
+        /// <summary>Default locator of a warehouse (any active one as fallback).</summary>
+        private int GetDefaultLocatorId(int warehouseId, Trx trx)
+        {
+            if (warehouseId <= 0) { return 0; }
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(@"
+                SELECT Locator.M_Locator_ID
+                FROM M_Locator Locator
+                WHERE Locator.IsActive='Y'
+                  AND Locator.M_Warehouse_ID=@M_Warehouse_ID
+                ORDER BY Locator.IsDefault DESC",
+                new SqlParameter[] { new SqlParameter("@M_Warehouse_ID", warehouseId) }, trx));
+        }
+
+        /// <summary>Human-readable label for a document status code.</summary>
+        private string DocStatusLabel(Ctx ctx, string docStatus)
+        {
+            switch (docStatus)
+            {
+                case "CO": return Msg.GetMsg(ctx, "Completed") ?? "Completed";
+                case "CL": return Msg.GetMsg(ctx, "Closed") ?? "Closed";
+                case "IP": return Msg.GetMsg(ctx, "InProgress") ?? "In Progress";
+                case "DR": return Msg.GetMsg(ctx, "Drafted") ?? "Drafted";
+                case "IN": return Msg.GetMsg(ctx, "Invalid") ?? "Invalid";
+                default: return docStatus ?? "";
+            }
+        }
+
+        /// <summary>
+        /// Builds a user-facing save/complete error: the logged model error if
+        /// present, else the resolved fallback message key, else the literal
+        /// fallback text. Unresolved keys (Msg.GetMsg returns "[Key]") are treated
+        /// as missing so the caller never surfaces a raw "[VAS_GRNNotSaved]".
+        /// </summary>
+        private string GetSaveError(Ctx ctx, string fallbackKey, string fallback)
+        {
+            ValueNamePair pp = VLogger.RetrieveError();
+            string error = pp != null ? pp.GetName() : "";
+
+            if (string.IsNullOrEmpty(error) && pp != null)
+            {
+                error = ResolveMessage(ctx, pp.GetValue());
+            }
+
+            if (string.IsNullOrEmpty(error))
+            {
+                error = ResolveMessage(ctx, fallbackKey);
+            }
+
+            return string.IsNullOrEmpty(error) ? fallback : error;
+        }
+
+        /// <summary>Resolves an AD_Message key, returning "" when it does not resolve.</summary>
+        private string ResolveMessage(Ctx ctx, string key)
+        {
+            if (string.IsNullOrEmpty(key)) { return ""; }
+            string text = Msg.GetMsg(ctx, key);
+            if (string.IsNullOrEmpty(text) || text.StartsWith("[")) { return ""; }
+            return text;
+        }
+
+        /// <summary>Received-line input from the receive form.</summary>
+        private sealed class ReceiveLineInput
+        {
+            public int PoLineId { get; set; }
+            public decimal ReceivedQty { get; set; }
+            public int LocatorId { get; set; }
+        }
+
+        /// <summary>Live open-quantity snapshot for one PO line.</summary>
+        private sealed class ReceiveOpenLine
+        {
+            public int WarehouseId { get; set; }
+            public decimal OpenQty { get; set; }
         }
 
         /// <summary>
@@ -1201,6 +1702,39 @@ namespace VIS.Controllers
                 return Util.GetValueOfInt(DB.ExecuteScalar(
                     @"SELECT AD_Table_ID FROM AD_Table WHERE TableName=@TableName AND IsActive='Y'",
                     new SqlParameter[] { new SqlParameter("@TableName", tableName) }, null));
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Resolves the AD_Process_ID of a document process by its (stable) Value -
+        /// e.g. "M_InOut Process" - preferring a client-specific record, then the
+        /// system one. Resolving by Value keeps the completion dynamic (the numeric
+        /// id can differ per database).
+        /// </summary>
+        /// <param name="ctx">Session context (for the active client).</param>
+        /// <param name="processValue">AD_Process.Value key.</param>
+        /// <returns>AD_Process_ID, or 0 when not found.</returns>
+        private int GetProcessIdByValue(Ctx ctx, string processValue)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Process_ID
+                      FROM AD_Process
+                      WHERE Value=@Value
+                        AND IsActive='Y'
+                        AND AD_Client_ID IN (0, @AD_Client_ID)
+                      ORDER BY AD_Client_ID DESC
+                      FETCH FIRST 1 ROW ONLY",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Value", processValue),
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                    }, null));
             }
             catch
             {

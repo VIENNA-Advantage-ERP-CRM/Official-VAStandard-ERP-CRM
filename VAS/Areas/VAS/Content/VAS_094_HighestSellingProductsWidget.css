@@ -145,7 +145,8 @@
     /* Enlarged from the 3.6em box-graphic slot it replaces. */
     width: 6em;
     height: 6em;
-    object-fit: cover;
+    /* The full image always fits its box - no cropped borders. */
+    object-fit: contain;
     border: 1px solid rgba(15, 61, 97, 0.08);
     border-radius: 8px;
     background: #fff;
@@ -339,8 +340,13 @@
     color: #102c3f;
     font-family: Roboto, sans-serif;
     /* The modal lives on <body>, outside the widget root, so it carries its
-       own scaling lever for the em sizing inside. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+       own scaling lever for the em sizing inside. Everything in the popup (text,
+       spacing, and the em-based width) scales off this one base, so bumping it
+       makes the whole popup bigger - sized to read like the Product Search
+       popup instead of feeling small. The lever still follows the viewport
+       height (~1.92vh) so the popup shrinks on zoom and fits without a
+       scrollbar instead of overflowing. */
+    font-size: clamp(12px, min(calc(var(--dash-inline-size, 100vw) * 0.014), 1.92vh), 36px);
 }
 
     .MPC-hsp-modal,

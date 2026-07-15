@@ -304,7 +304,7 @@
                     '<div class="vas-qah-row-label" title="' + escapeHtml((r.grnNo || "") + " - " + (r.supplier || "")) + '">' + label + '</div>' +
                     '<div class="vas-qah-row-meta">' + meta + '</div>' +
                     '</div>' +
-                    '<div class="vas-qah-row-qty" title="' + escapeHtml(formatQty(r.heldQty)) + '">' + escapeHtml(formatQty(r.heldQty)) + ' u</div>' +
+                    '<div class="vas-qah-row-qty" title="' + escapeHtml(formatQty(r.heldQty)) + '">' + escapeHtml(formatQty(r.heldQty)) + '</div>' +
                     '</button>'
                 );
             }
@@ -403,10 +403,12 @@
                 '<div class="vas-qah-qc-main">' +
                 '<div class="vas-qah-qc-label req">' + escapeHtml(lbl("VAS_086_ActualValue", "Actual Value")) + '</div>' +
                 '<div class="vas-qah-select-wrap">' +
+                /* The Actual Value options are the test parameter's own value
+                   list loaded from the database (loadActualValueOptions); the
+                   saved actual value is preselected once the list arrives. */
                 '<select class="vas-qah-actual">' +
                 '<option value="">' + escapeHtml(lbl("VAS_086_SelectResult", "Select result...")) + '</option>' +
-                '<option value="Working Fine"' + (actual === "Working Fine" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_086_WorkingFine", "Working Fine")) + '</option>' +
-                '<option value="Not Satisfactory"' + (actual === "Not Satisfactory" ? " selected" : "") + '>' + escapeHtml(lbl("VAS_086_NotSatisfactory", "Not Satisfactory")) + '</option>' +
+                (actual ? '<option value="' + escapeHtml(actual) + '" selected>' + escapeHtml(actual) + '</option>' : '') +
                 '</select>' +
                 '<span class="vas-qah-select-arr">' + icon("chevD") + '</span>' +
                 '</div>' +
@@ -442,6 +444,71 @@
             );
 
             updateActualTone();
+            loadActualValueOptions(record);
+        }
+
+        /* Loads the test parameter's value list from the database and fills
+           the Actual Value dropdown with it. When the database has no list
+           (e.g. VA010 not installed), the default result pair stays so the
+           inspector can still record an outcome. */
+        function loadActualValueOptions(record) {
+            var testParameterId = Number(record.testParameterId || 0);
+            var saved = record.actualValue || "";
+
+            /* options: [{value, label}]. The stored VA010_ActualValue may hold
+               either the value-list ID or the value text (both exist in real
+               data), so the saved entry is matched against both. */
+            function fillOptions(options) {
+                var $select = $dialogBody.find('.vas-qah-actual');
+                if (!$select.length) { return; }
+                var html = '<option value="">' + escapeHtml(lbl("VAS_086_SelectResult", "Select result...")) + '</option>';
+                var hasSaved = false;
+                for (var i = 0; i < options.length; i++) {
+                    var isSaved = saved !== "" && (String(options[i].value) === String(saved) || options[i].label === saved);
+                    if (isSaved) { hasSaved = true; }
+                    html += '<option value="' + escapeHtml(options[i].value) + '"' + (isSaved ? ' selected' : '') + '>' + escapeHtml(options[i].label) + '</option>';
+                }
+                if (saved && !hasSaved) {
+                    html += '<option value="' + escapeHtml(saved) + '" selected>' + escapeHtml(saved) + '</option>';
+                }
+                $select.html(html);
+                updateActualTone();
+            }
+
+            /* The Actual Value must be one of the test parameter's own values
+               from VA010_TestPrmtrList (each option's value is its list ID, which
+               is what VA010_ActualValue stores). When the database has no list
+               there is no valid value to record, so no fallback options are
+               offered. */
+            function defaultOptions() {
+                return [];
+            }
+
+            if (testParameterId <= 0) {
+                fillOptions(defaultOptions());
+                return;
+            }
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_086_QAHoldsWidget/GetTestParameterValues',
+                type: 'GET',
+                cache: false,
+                data: { testParameterId: testParameterId },
+                success: function (res) {
+                    var data = res;
+                    if (typeof data === 'string' && data) { data = JSON.parse(data); }
+                    if (typeof data === 'string' && data) { data = JSON.parse(data); }
+                    var rows = (data && !data.error && data.rows) ? data.rows : [];
+                    var options = [];
+                    for (var i = 0; i < rows.length; i++) {
+                        if (rows[i].valueName) { options.push({ value: rows[i].valueId, label: rows[i].valueName }); }
+                    }
+                    fillOptions(options.length ? options : defaultOptions());
+                },
+                error: function () {
+                    fillOptions(defaultOptions());
+                }
+            });
         }
 
         function updateActualTone() {

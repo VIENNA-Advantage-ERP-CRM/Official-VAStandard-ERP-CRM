@@ -69,8 +69,14 @@
         var rowsById = {};
         var currentPO = null;
         var currentLines = [];
+        /* Line entry is paged: at most 4 data rows per page (paged, not
+           scrolled). Typed received quantities live in lineEntry (poLineId ->
+           value) so they survive page switches. */
+        var RCV_PAGE_SIZE = 4;
+        var rcvPageNo = 1;
+        var lineEntry = {};
         var pageNo = 1;
-        var pageSize = 3;
+        var pageSize = 4;
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
@@ -155,7 +161,9 @@
             var rowHeight = $rows.find('.vas-egrn-row').first().outerHeight(true) || 58;
             if (!listHeight || !rowHeight) { return pageSize; }
 
-            return Math.max(2, Math.floor(listHeight / rowHeight));
+            /* Paged like the Material Receipt Register: at least 4 records on
+               the standard card; the count still grows with taller screens. */
+            return Math.max(4, Math.floor(listHeight / rowHeight));
         }
 
         function syncPageSize() {
@@ -380,8 +388,15 @@
             $dialog.find('.vas-egrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-egrn-back').on('click', closeDialog);
 
-            $dialogBody.on('input', '.vas-egrn-rcv-in', validateLines);
+            $dialogBody.on('input', '.vas-egrn-rcv-in', function () {
+                var $row = $(this).closest('.vas-egrn-rcv-line[data-lineid]');
+                var lineId = Number($row.data('lineid') || 0);
+                if (lineId > 0) { lineEntry[lineId] = String($(this).val() || ""); }
+                validateLines();
+            });
             $dialogBody.on('click', '.vas-egrn-create-btn', createGRN);
+            $dialogBody.on('click', '.vas-egrn-rcv-prev', function () { if (rcvPageNo > 1) { rcvPageNo--; renderLineEntry(); } });
+            $dialogBody.on('click', '.vas-egrn-rcv-next', function () { rcvPageNo++; renderLineEntry(); });
 
             $(document).on('keydown.vas-egrn', function (e) {
                 if (e.key === 'Escape' && !$dialog.hasClass('vas-egrn-hidden')) { closeDialog(); }
@@ -418,6 +433,11 @@
                         return;
                     }
                     currentLines = data.rows || [];
+                    rcvPageNo = 1;
+                    lineEntry = {};
+                    for (var li = 0; li < currentLines.length; li++) {
+                        lineEntry[currentLines[li].poLineId] = toInputValue(currentLines[li].defaultReceivedQty);
+                    }
                     renderLineEntry();
                 },
                 error: function () {
@@ -432,6 +452,25 @@
             return '<div class="vas-egrn-field">' +
                 '<div class="vas-egrn-field-lbl">' + escapeHtml(label) + '</div>' +
                 '<div class="vas-egrn-field-val' + (strong ? ' strong' : '') + '" title="' + escapeHtml(shown) + '">' + escapeHtml(shown) + '</div>' +
+                '</div>';
+        }
+
+        /* Footer pager matching the widget's own pagination design: "Showing
+           X-Y of Z" on the left, the ‹ X of Y › pager on the right (same
+           vas-egrn-foot / vas-egrn-pager markup and text). */
+        function linePagerHtml(pageNo, totalPages, totalRows, pageSize) {
+            if (totalPages <= 1) { return ''; }
+            var chevL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+            var chevR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            var from = (pageNo - 1) * pageSize + 1;
+            var to = Math.min(pageNo * pageSize, totalRows);
+            return '<div class="vas-egrn-foot">' +
+                '<span class="vas-egrn-foot-info">' + escapeHtml(VIS.Msg.getMsg("VAS_Showing") + ' ' + from + '-' + to + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + totalRows) + '</span>' +
+                '<div class="vas-egrn-pager">' +
+                '<button type="button" class="vas-egrn-pgbtn vas-egrn-rcv-prev"' + (pageNo <= 1 ? ' disabled' : '') + '>' + chevL + '</button>' +
+                '<span class="vas-egrn-pgtext">' + escapeHtml(pageNo + VIS.Msg.getMsg("VAS_Of") + totalPages) + '</span>' +
+                '<button type="button" class="vas-egrn-pgbtn vas-egrn-rcv-next"' + (pageNo >= totalPages ? ' disabled' : '') + '>' + chevR + '</button>' +
+                '</div>' +
                 '</div>';
         }
 
@@ -451,14 +490,27 @@
                 fieldHtml(lbl("VAS_NoOfLines", "No of Lines"), String(currentLines.length)) +
                 '</div>';
 
+            /* Show at most RCV_PAGE_SIZE (4) rows per page; further lines are
+               paged, never scrolled. Typed quantities persist in lineEntry. */
+            var totalPages = Math.max(1, Math.ceil(currentLines.length / RCV_PAGE_SIZE));
+            if (rcvPageNo > totalPages) { rcvPageNo = totalPages; }
+            if (rcvPageNo < 1) { rcvPageNo = 1; }
+            var start = (rcvPageNo - 1) * RCV_PAGE_SIZE;
+            var end = Math.min(start + RCV_PAGE_SIZE, currentLines.length);
+
             var rows = '';
-            for (var i = 0; i < currentLines.length; i++) {
+            for (var i = start; i < end; i++) {
                 var line = currentLines[i];
+                /* Empty attribute-set instances carry dash-only descriptions
+                   ("-", "---"): fall back to a single dash for those. */
+                var attributeText = (line.attributeName && !/^-+$/.test(String(line.attributeName).trim())) ? line.attributeName : '-';
+                var qtyValue = lineEntry[line.poLineId] != null ? lineEntry[line.poLineId] : toInputValue(line.defaultReceivedQty);
                 rows +=
                     '<div class="vas-egrn-rcv-line" data-lineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(line.openQty) + '">' +
                     '<div class="vas-egrn-rcv-name" title="' + escapeHtml(line.itemName) + '">' + escapeHtml(line.itemName) + '</div>' +
+                    '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(attributeText) + '">' + escapeHtml(attributeText) + '</div>' +
                     '<div class="vas-egrn-rcv-po">' + escapeHtml(formatQty(line.poQty)) + '</div>' +
-                    '<input class="vas-egrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(toInputValue(line.defaultReceivedQty)) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
+                    '<input class="vas-egrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
                     '</div>';
             }
@@ -468,11 +520,13 @@
                 '<div class="vas-egrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
                 '<div class="vas-egrn-rcv-line vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_Item", "Item")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_POQty", "PO Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Received", "Received")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
                 '</div>' +
                 '<div class="vas-egrn-lines">' + rows + '</div>' +
+                linePagerHtml(rcvPageNo, totalPages, currentLines.length, RCV_PAGE_SIZE) +
                 '<div class="vas-egrn-error vas-egrn-hidden"></div>' +
                 '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn">' + checkIcon() + '<span>' + escapeHtml(lbl("VAS_SelectAndMakeGRN", "Select & Make GRN")) + '</span></button></div>'
             );
@@ -480,37 +534,34 @@
             validateLines();
         }
 
+        /* Reads every line from lineEntry state (covers ALL pages, not just the
+           visible one), so paging never drops a typed quantity. */
         function collectLines() {
             var lines = [];
             var invalid = false;
             var message = "";
 
-            $dialogBody.find('.vas-egrn-rcv-line[data-lineid]').each(function () {
-                var $row = $(this);
-                var lineId = Number($row.data('lineid') || 0);
-                var openQty = Number($row.data('openqty') || 0);
-                var qty = Number($row.find('.vas-egrn-rcv-in').val() || 0);
-
-                $row.removeClass('invalid');
+            for (var i = 0; i < currentLines.length; i++) {
+                var line = currentLines[i];
+                var lineId = Number(line.poLineId);
+                var openQty = Number(line.openQty || 0);
+                var raw = lineEntry[lineId] != null ? lineEntry[lineId] : toInputValue(line.defaultReceivedQty);
+                var qty = Number(raw);
 
                 if (!isFinite(qty) || qty < 0) {
                     invalid = true;
                     message = lbl("VAS_NegativeReceivedQty", "Received quantity cannot be negative.");
-                    $row.addClass('invalid');
-                    return;
+                    break;
                 }
-
                 if (qty > openQty) {
                     invalid = true;
                     message = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
-                    $row.addClass('invalid');
-                    return;
+                    break;
                 }
-
                 if (qty > 0) {
                     lines.push({ poLineId: lineId, receivedQty: qty });
                 }
-            });
+            }
 
             return { lines: lines, invalid: invalid, message: message };
         }
@@ -519,6 +570,14 @@
             var result = collectLines();
             var $error = $dialogBody.find('.vas-egrn-error');
             var $button = $dialogBody.find('.vas-egrn-create-btn');
+
+            /* Flag invalid rows visible on the current page. */
+            $dialogBody.find('.vas-egrn-rcv-line[data-lineid]').each(function () {
+                var $row = $(this);
+                var openQty = Number($row.data('openqty') || 0);
+                var qty = Number($row.find('.vas-egrn-rcv-in').val() || 0);
+                $row.toggleClass('invalid', !isFinite(qty) || qty < 0 || qty > openQty);
+            });
 
             if (result.invalid) {
                 $error.text(result.message).removeClass('vas-egrn-hidden');

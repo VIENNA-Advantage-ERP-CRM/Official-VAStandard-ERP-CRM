@@ -242,6 +242,18 @@
             rememberGrnView(windowId, view);
         }
 
+        // Open the widget's configured window (the Material Receipt / GRN window)
+        // directly on a NEW record through the widget framework's value-changed
+        // channel. The host reuses the same window and starts a blank record
+        // (IsTabInNewMode) - no duplicate window is opened.
+        function openGrnNewRecord() {
+            var windowParam = {
+                "IsTabInNewMode": "true",
+                "TabIndex": "0"
+            };
+            $self.widgetFirevalueChanged(windowParam);
+        }
+
         function openGrnWindow() {
             if (grnWindowId > 0) {
                 startWindowById(grnWindowId);
@@ -277,8 +289,10 @@
                 '</button>'
             );
 
-            // Review #17: navigate to the GRN window; the PO-pick modal stays unused.
-            $card.on('click', function () { openGrnWindow(); });
+            // Open the GRN window on a NEW record via the widget framework's
+            // value-changed channel (IsTabInNewMode), reusing the same window
+            // instead of opening a duplicate each click.
+            $card.on('click', function () { openGrnNewRecord(); });
             $root.append($card);
         }
 

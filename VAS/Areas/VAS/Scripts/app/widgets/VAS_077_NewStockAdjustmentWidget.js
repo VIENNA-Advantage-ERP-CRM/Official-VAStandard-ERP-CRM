@@ -18,6 +18,7 @@
         this.frame;
         this.windowNo;
 
+        var $self = this;
         var $root = $('<div class="MPC-stock-adjustment-root">');
         var $tile;
         var isOpening = false;
@@ -43,7 +44,23 @@
 
                     var windowId = Number(result && result.window_id);
                     if (windowId > 0) {
-                        VIS.viewManager.startWindow(windowId, new VIS.Query());
+                        /* Open the window in the SAME view directly on a NEW
+                           record: an all-excluding query keeps existing
+                           adjustments out and cmd_new switches the panel to
+                           record entry (same pattern as the New GRN widget). */
+                        var emptyQuery = new VIS.Query();
+                        try {
+                            emptyQuery.addRestriction("M_Inventory_ID", VIS.Query.prototype.EQUAL, 0);
+                        } catch (e) { /* keep the plain query */ }
+
+                        var view = VIS.viewManager.startWindow(windowId, emptyQuery);
+                        if (view) {
+                            view.onLoad = function () {
+                                try {
+                                    if (view.cPanel && view.cPanel.cmd_new) { view.cPanel.cmd_new(false); }
+                                } catch (e) { /* window still opens; user can press New */ }
+                            };
+                        }
                         return;
                     }
 
@@ -57,6 +74,18 @@
                     if ($tile) { $tile.prop('disabled', false); }
                 }
             });
+        }
+
+        // Open the widget's configured window (Inventory Count / Physical
+        // Inventory) directly on a NEW record through the widget framework's
+        // value-changed channel. The host reuses the same window and starts a
+        // blank record (IsTabInNewMode) - same approach as the New GRN widget.
+        function openStockAdjustmentNewRecord() {
+            var windowParam = {
+                "IsTabInNewMode": "true",
+                "TabIndex": "0"
+            };
+            $self.widgetFirevalueChanged(windowParam);
         }
 
         function createWidget() {
@@ -82,7 +111,10 @@
             $tile.attr('aria-label', title + '. ' + subtitle);
             $tile.find('.MPC-stock-adjustment-title').text(title);
             $tile.find('.MPC-stock-adjustment-subtitle').text(subtitle);
-            $tile.on('click', openInventoryCount);
+            // Open the window on a NEW record via the widget framework's
+            // value-changed channel (IsTabInNewMode), reusing the same window
+            // instead of opening a duplicate each click.
+            $tile.on('click', openStockAdjustmentNewRecord);
             $root.append($tile);
         }
 
@@ -95,9 +127,17 @@
         };
 
         this.disposeComponent = function () {
-            if ($tile) { $tile.off('click', openInventoryCount); }
+            if ($tile) { $tile.off('click', openStockAdjustmentNewRecord); }
             $root.remove();
         };
+    };
+
+    VAS.VAS_077_NewStockAdjustmentWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_077_NewStockAdjustmentWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     VAS.VAS_077_NewStockAdjustmentWidget.prototype.init = function (windowNo, frame) {
