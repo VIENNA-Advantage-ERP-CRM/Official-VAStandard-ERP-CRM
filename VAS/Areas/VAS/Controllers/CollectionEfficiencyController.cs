@@ -49,7 +49,7 @@ namespace VIS.Controllers
             DateTime todayDate = DateTime.Today;
             /* Trailing-30-day window for the Efficiency % and DSO roll-ups
                (the widget always requests Last30Days). */
-            DateTime windowStart = todayDate.AddDays(-30);
+            DateTime windowStart = todayDate.AddDays(-29);
 
             /* Reference CTEs (client-scoped, single row each). */
             string primarySchemaSql = @"
@@ -100,13 +100,17 @@ namespace VIS.Controllers
             string invoiceAllocationsSql = @"
                 SELECT AllocationLine.C_Invoice_ID AS C_Invoice_ID,
                        " + DateValueSql("AllocationHdr.DateAcct") + @" AS AllocationDate,
-                       SUM(CASE WHEN Invoice.C_Currency_ID=PrimarySchema.Primary_Currency_ID
+                       AllocationLine.C_InvoicePaySchedule_ID,
+                       (CASE WHEN Invoice.C_Currency_ID=PrimarySchema.Primary_Currency_ID
                                 THEN AllocationLine.Amount
-                                ELSE CurrencyConvert(AllocationLine.Amount, Invoice.C_Currency_ID, PrimarySchema.Primary_Currency_ID, COALESCE(AllocationHdr.DateAcct, Invoice.DateAcct, Invoice.DateInvoiced, " + ToSqlDate(todayDate) + @"), Invoice.C_ConversionType_ID, Invoice.AD_Client_ID, Invoice.AD_Org_ID)
+                                ELSE CurrencyConvert(AllocationLine.Amount, Invoice.C_Currency_ID, PrimarySchema.Primary_Currency_ID,
+                                    COALESCE(AllocationHdr.DateAcct, Invoice.DateAcct, Invoice.DateInvoiced, " + ToSqlDate(todayDate) + @"), 
+                                    Invoice.C_ConversionType_ID, Invoice.AD_Client_ID, Invoice.AD_Org_ID)
                            END) AS AllocatedAmt_Converted
                 FROM C_Invoice Invoice
                 INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON (InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
-                INNER JOIN C_AllocationLine AllocationLine ON (AllocationLine.C_Invoice_ID=Invoice.C_Invoice_ID)
+                INNER JOIN C_AllocationLine AllocationLine ON (AllocationLine.C_Invoice_ID=Invoice.C_Invoice_ID 
+                            AND AllocationLine.C_InvoicePaySchedule_ID=InvoicePaySchedule.C_InvoicePaySchedule_ID)
                 INNER JOIN C_AllocationHdr AllocationHdr ON (AllocationHdr.C_AllocationHdr_ID=AllocationLine.C_AllocationHdr_ID)
                 INNER JOIN PrimarySchema PrimarySchema ON (PrimarySchema.AD_Client_ID=Invoice.AD_Client_ID)
                 WHERE AllocationHdr.DocStatus IN ('CO', 'CL')
@@ -115,8 +119,7 @@ namespace VIS.Controllers
                   AND (NVL(AllocationLine.C_Payment_ID, 0) != 0 OR NVL(AllocationLine.C_CashLine_ID, 0) != 0)
                   AND Invoice.DocStatus IN ('CO', 'CL')
                   AND " + TruncColumn("AllocationHdr.DateAcct") + @" >= " + ToSqlDate(windowStart) + @"
-                  AND " + TruncColumn("AllocationHdr.DateAcct") + @" <= " + ToSqlDate(todayDate) + @"
-                GROUP BY AllocationLine.C_Invoice_ID, " + DateValueSql("AllocationHdr.DateAcct");
+                  AND " + TruncColumn("AllocationHdr.DateAcct") + @" <= " + ToSqlDate(todayDate);
 
             /* Receipt invoices — sales invoices with an allocation posted in
                the last 30 days, one row per invoice carrying its representative
@@ -338,7 +341,7 @@ namespace VIS.Controllers
             DateTime today = DateTime.Today;
             /* Trailing-30-day window — the modal shows only the last 30 days
                of overdue schedules, matching the main widget. */
-            DateTime windowStart = today.AddDays(-30);
+            DateTime windowStart = today.AddDays(-29);
 
             /* Per-row aging tuple, kept in the invoice's OWN currency (no
                base/schema-currency conversion). MRole on Invoice (the main

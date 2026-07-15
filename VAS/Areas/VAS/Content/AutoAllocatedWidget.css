@@ -500,6 +500,45 @@
     color: inherit;
 }
 
+/* ── Unallocated amount column (Unallocated tab only) ─────────────────
+   Rendered for every row but hidden until the table carries
+   .vas-aa-show-unalloc (toggled from the JS on the Unallocated tab). */
+.vas-aa-th-unallocated,
+.vas-aa-td-unallocated {
+    display: none;
+    width: 9em;
+}
+
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-unallocated,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-unallocated {
+    display: table-cell;
+}
+
+.vas-aa-dialog-table thead th.vas-aa-th-unallocated {
+    text-align: right;
+}
+
+.vas-aa-td-unallocated {
+    /* emphasized value cell — bold, right-aligned; distinct dark tone from the
+       green Amount so the "still open" figure reads as its own value. */
+    text-align: right;
+    font-weight: 600;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* When the 7th column is visible, reclaim horizontal room from the flexible
+   text columns so the row fits the dialog width without a horizontal scroll. */
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-customer,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-customer { width: 11em; }
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-bank,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-bank { width: 11em; }
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-amount,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-amount { width: 9em; }
+
 /* Empty / loading states — stretch the table to fill the fixed-height dialog
    body so the single empty cell centers vertically (vertical-align: middle) as
    well as horizontally (text-align: center): one muted line sitting in the

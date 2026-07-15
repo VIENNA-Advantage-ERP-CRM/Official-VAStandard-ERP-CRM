@@ -31,22 +31,34 @@ namespace VIS.Controllers
             }
 
             Ctx ctx = Session["ctx"] as Ctx;
-
+            int clientId = ctx.GetAD_Client_ID();
             List<SqlParameter> parameters = new List<SqlParameter>();
 
-            parameters.Add(new SqlParameter("@ADUserID", ctx.GetAD_User_ID()));
+            /* Base (accounting-schema) currency for this client — every receipt's
+               PayAmt is rolled up in this single currency before the percentage
+               split so mixed-currency receipts are comparable. */
+            string schemaCurrencySql = @"
+                SELECT ClientInfo.AD_Client_ID AS AD_Client_ID,
+                       AcctSchema.C_Currency_ID AS C_Currency_ID
+                FROM AD_ClientInfo ClientInfo
+                INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
+                WHERE ClientInfo.AD_Client_ID=" + clientId;
 
+            /* PayAmt converted to the schema currency (same-currency rows skip the
+               conversion); MethodAmount — and therefore the percentage below — is
+               computed on base-currency amounts. MRole is applied only on the
+               physical C_Payment table. */
             string paymentMethodSql = @"
                 SELECT PaymentMethod.VA009_Name AS PaymentMethodName,
                        Payment.TenderType AS TenderType,
-                       SUM(COALESCE(Payment.PayAmt, 0)) AS MethodAmount
-
+                       SUM(CASE WHEN Payment.C_Currency_ID=SchemaCurrency.C_Currency_ID
+                                THEN COALESCE(Payment.PayAmt, 0)
+                                ELSE CurrencyConvert(COALESCE(Payment.PayAmt, 0), Payment.C_Currency_ID, SchemaCurrency.C_Currency_ID, COALESCE(Payment.DateAcct, Payment.DateTrx), Payment.C_ConversionType_ID, Payment.AD_Client_ID, Payment.AD_Org_ID)
+                           END) AS MethodAmount
                 FROM C_Payment Payment
-
-                LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod
-                    ON Payment.VA009_PaymentMethod_ID = PaymentMethod.VA009_PaymentMethod_ID
+                INNER JOIN VA009_PaymentMethod PaymentMethod ON (Payment.VA009_PaymentMethod_ID = PaymentMethod.VA009_PaymentMethod_ID)
                    AND PaymentMethod.IsActive = 'Y'
-
+                INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.AD_Client_ID=Payment.AD_Client_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')";
@@ -58,25 +70,13 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            paymentMethodSql += @"
-                  AND (
-                      PaymentMethod.VA009_PaymentMethod_ID IS NULL
-                      OR PaymentMethod.VA009_PaymentMethod_ID NOT IN (
-                          SELECT PrivateAccess.Record_ID
-                          FROM AD_Private_Access PrivateAccess
-                          INNER JOIN AD_Table TableInfo
-                              ON TableInfo.AD_Table_ID = PrivateAccess.AD_Table_ID
-                          WHERE TableInfo.TableName = 'VA009_PaymentMethod'
-                            AND PrivateAccess.AD_User_ID <> @ADUserID
-                            AND PrivateAccess.IsActive = 'Y'
-                      )
-                  )
-
-                GROUP BY PaymentMethod.VA009_Name,
-                         Payment.TenderType";
+            paymentMethodSql += @" GROUP BY PaymentMethod.VA009_Name, Payment.TenderType";
 
             string sql = @"
-                WITH PaymentMethodData AS (
+                WITH SchemaCurrency AS (
+                    " + schemaCurrencySql + @"
+                ),
+                PaymentMethodData AS (
                     " + paymentMethodSql + @"
                 ),
                 TotalData AS (
@@ -88,7 +88,7 @@ namespace VIS.Controllers
                        PaymentMethodData.MethodAmount,
                        CASE
                            WHEN COALESCE(TotalData.TotalAmount, 0) = 0 THEN 0
-                           ELSE ROUND((PaymentMethodData.MethodAmount * 100.0) / TotalData.TotalAmount, 0)
+                           ELSE ROUND((PaymentMethodData.MethodAmount * 100.0) / TotalData.TotalAmount, 2)
                        END AS PaymentMethodPercent
                 FROM PaymentMethodData
                 CROSS JOIN TotalData
@@ -100,7 +100,7 @@ namespace VIS.Controllers
 
             try
             {
-                dr = DB.ExecuteReader(sql, parameters.ToArray());
+                dr = DB.ExecuteReader(sql);
 
                 while (dr != null && dr.Read())
                 {

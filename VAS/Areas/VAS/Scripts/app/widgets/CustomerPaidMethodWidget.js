@@ -153,7 +153,7 @@
                 return;
             }
 
-            var maxRows = Math.min(rows.length, 4);
+            var maxRows = Math.min(rows.length, 5);
             var topMethodName = "";
 
             for (var i = 0; i < maxRows; i++) {
