@@ -1385,6 +1385,16 @@ ROUND
             };
         }
 
+        private Ctx GetContext()
+        {
+            if (Session["ctx"] == null)
+            {
+                return null;
+            }
+
+            return Session["ctx"] as Ctx;
+        }
+
         private object Error(
             string message
         )

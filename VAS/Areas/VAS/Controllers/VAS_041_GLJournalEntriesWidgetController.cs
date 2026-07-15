@@ -1837,7 +1837,7 @@ ORDER BY
                         );
                     }
 
-                    SaveJournal(journal);
+                    SaveJournal(ctx, journal);
 
                     docStatus =
                         journal.GetDocStatus();
@@ -1876,7 +1876,7 @@ ORDER BY
                     );
                 }
 
-                SaveJournal(journal);
+                SaveJournal(ctx, journal);
 
                 transaction.Commit();
 
@@ -2089,7 +2089,7 @@ ORDER BY
                         );
                     }
 
-                    SaveJournal(journal);
+                    SaveJournal(ctx, journal);
                 }
                 else if (
                     !string.Equals(
@@ -2928,7 +2928,7 @@ AND GL_Journal.AD_Client_ID =
                 );
         }
 
-        private void SaveJournal(
+        private void SaveJournal(Ctx ctx,
             MJournal journal)
         {
             if (journal.Save())
