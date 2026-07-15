@@ -6,6 +6,7 @@
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
 .VAS-gljtd-root {
+    --on-text-muted: #748494;
     height: 100%;
     width: 100%;
 }
@@ -253,4 +254,11 @@ html[dir="rtl"] .VAS-gljtd-root .kpi-why {
 .VAS-gljtd-root .kpi-why-text,
 .VAS-gljtd-period {
     color: #748494;
+}
+
+/* Selected period must win over the muted .VAS-gljtd-period rule above
+   (same specificity, so it has to come last) — matches VAS_040 behaviour. */
+.VAS-gljtd-period-active {
+    color: #019D89;
+    font-weight: 700;
 }

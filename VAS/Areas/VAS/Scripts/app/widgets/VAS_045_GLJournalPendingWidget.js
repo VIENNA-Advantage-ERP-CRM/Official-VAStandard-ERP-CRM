@@ -80,6 +80,7 @@
         var pageNo = 1;
         var pageSize = 2;
         var totalPages = 0;
+        var totalCount = 0;
 
         var selectedJournalId = 0;
         var selectedJournalStatus = "";
@@ -219,6 +220,114 @@
             );
         }
 
+        function resolveTotalCount(totalCount, visibleCount, pageSize, totalPages) {
+            var total =
+                Number(
+                    totalCount || 0
+                );
+
+            if (
+                !isNaN(total) &&
+                total > 0
+            ) {
+                return total;
+            }
+
+            var rows =
+                Number(
+                    visibleCount || 0
+                );
+
+            if (
+                isNaN(rows) ||
+                rows <= 0
+            ) {
+                return 0;
+            }
+
+            var size =
+                Math.max(
+                    parseInt(
+                        pageSize || rows || 1,
+                        10
+                    ),
+                    1
+                );
+
+            var pages =
+                Math.max(
+                    parseInt(
+                        totalPages || 1,
+                        10
+                    ),
+                    1
+                );
+
+            if (pages > 1) {
+                return Math.max(
+                    ((pages - 1) * size) + rows,
+                    rows
+                );
+            }
+
+            return rows;
+        }
+
+        function formatRangeText(pageNo, pageSize, totalCount) {
+            var total =
+                Number(
+                    totalCount || 0
+                );
+
+            if (
+                isNaN(total) ||
+                total <= 0
+            ) {
+                return "";
+            }
+
+            var page =
+                Math.max(
+                    parseInt(
+                        pageNo || 1,
+                        10
+                    ),
+                    1
+                );
+
+            var size =
+                Math.max(
+                    parseInt(
+                        pageSize || total,
+                        10
+                    ),
+                    1
+                );
+
+            var start =
+                ((page - 1) * size) + 1;
+
+            if (start > total) {
+                start =
+                    total;
+            }
+
+            var end =
+                Math.min(
+                    start + size - 1,
+                    total
+                );
+
+            return (
+                "Showing " +
+                start +
+                "-" +
+                end +
+                " of " +
+                total
+            );
+        }
+
         function normalizeResponse(result) {
             var data = result;
 
@@ -270,6 +379,20 @@
                 );
 
             if (response) {
+                if (response.errorKey || response.messageKey) {
+                    return lbl(
+                        response.errorKey || response.messageKey,
+                        response.errorText ||
+                        response.error ||
+                        response.message ||
+                        fallback ||
+                        lbl(
+                            "VIS_Error",
+                            "Error Loading Data."
+                        )
+                    );
+                }
+
                 return (
                     response.errorText ||
                     response.error ||
@@ -303,6 +426,32 @@
                     "VIS_Error",
                     "Error Loading Data."
                 )
+            );
+        }
+
+        function getResponseMessage(
+            response,
+            fallback
+        ) {
+            if (!response) {
+                return fallback;
+            }
+
+            if (response.errorKey || response.messageKey) {
+                return lbl(
+                    response.errorKey || response.messageKey,
+                    response.errorText ||
+                    response.error ||
+                    response.message ||
+                    fallback
+                );
+            }
+
+            return (
+                response.errorText ||
+                response.error ||
+                response.message ||
+                fallback
             );
         }
 
@@ -561,6 +710,8 @@
 
                 '<div class="VAS-gljpq-pager">' +
 
+                '<span class="VAS-gljpq-page-text"></span>' +
+
                 '<button type="button" ' +
 
                 'class="VAS-gljpq-page-btn VAS-gljpq-prev" ' +
@@ -580,7 +731,7 @@
 
                 "</button>" +
 
-                '<span class="VAS-gljpq-page-text"></span>' +
+                '<span class="VAS-gljpq-page-count"></span>' +
 
                 '<button type="button" ' +
 
@@ -775,8 +926,13 @@
                                 data.error
                             ) {
                                 showError(
-                                    data.errorText ||
-                                    data.error
+                                    getResponseMessage(
+                                        data,
+                                        lbl(
+                                            "VAS_045_LoadPendingQueueFailed",
+                                            "Could Not Load Pending Queue"
+                                        )
+                                    )
                                 );
 
                                 return;
@@ -908,6 +1064,9 @@
                 totalPages =
                     0;
 
+                totalCount =
+                    0;
+
                 updatePager();
 
                 return;
@@ -943,6 +1102,14 @@
                     data.PageNo ||
                     pageNo ||
                     1
+                );
+
+            totalCount =
+                resolveTotalCount(
+                    data.TotalCount,
+                    queue.length,
+                    pageSize,
+                    totalPages
                 );
 
             var html =
@@ -1154,6 +1321,11 @@
                     ".VAS-gljpq-page-text"
                 );
 
+            var $pageCount =
+                $root.find(
+                    ".VAS-gljpq-page-count"
+                );
+
             var $previousButton =
                 $root.find(
                     ".VAS-gljpq-prev"
@@ -1164,24 +1336,29 @@
                     ".VAS-gljpq-next"
                 );
 
-            if (totalPages > 1) {
+            if (totalCount > 0) {
                 $pageText.text(
+                    formatRangeText(
+                        pageNo,
+                        pageSize,
+                        totalCount
+                    )
+                );
+
+                $pageCount.text(
                     pageNo +
-
                     " " +
-
                     lbl(
                         "VIS_Of",
                         "of"
                     ) +
-
                     " " +
-
                     totalPages
                 );
             }
             else {
                 $pageText.text("");
+                $pageCount.text("");
             }
 
             $previousButton.prop(
@@ -1671,12 +1848,12 @@
                                 data.error
                             ) {
                                 renderDetailError(
-                                    data.errorText ||
-                                    data.error ||
-                                    data.message ||
-                                    lbl(
-                                        "VAS_045_JournalDetailsNotFound",
-                                        "Journal Details Not Found."
+                                    getResponseMessage(
+                                        data,
+                                        lbl(
+                                            "VAS_045_JournalDetailsNotFound",
+                                            "Journal Details Not Found."
+                                        )
                                     )
                                 );
 
@@ -1920,24 +2097,11 @@
                 "Primary";
 
             var currencyText =
-                data.CurSymbol ||
-                data.currencySymbol ||
                 data.ISOCode ||
                 data.currencyISO ||
+                data.CurSymbol ||
+                data.currencySymbol ||
                 "";
-
-            if (
-                data.ISOCode &&
-                data.ISOCode !== currencyText
-            ) {
-                currencyText +=
-                    (
-                        currencyText
-                            ? " \u00B7 "
-                            : ""
-                    ) +
-                    data.ISOCode;
-            }
 
             $detailDialog.find(
                 "#VAS-gljpq-dialog-title-" +
@@ -2164,17 +2328,6 @@
                 "</strong>" +
 
                 "</div>" +
-
-                "</div>" +
-
-                '<div class="VAS-gljpq-detail-section-title">' +
-
-                esc(
-                    lbl(
-                        "VAS_045_JournalLines",
-                        "Journal Lines"
-                    )
-                ) +
 
                 "</div>" +
 
@@ -2422,6 +2575,18 @@
 
                 '<div class="VAS-gljpq-line-pager">' +
 
+                '<span class="VAS-gljpq-page-text">' +
+                esc(
+                    detailLineCount
+                        ? formatRangeText(
+                            detailLinePageNo,
+                            detailLinePageSize,
+                            detailLineCount
+                        )
+                        : ""
+                ) +
+                "</span>" +
+
                 '<button type="button" ' +
                 'class="VAS-gljpq-page-btn VAS-gljpq-line-prev" ' +
                 (
@@ -2432,7 +2597,7 @@
                 ) +
                 'aria-label="Previous">&#8249;</button>' +
 
-                '<span class="VAS-gljpq-page-text">' +
+                '<span class="VAS-gljpq-page-count">' +
                 esc(
                     detailLineCount
                         ? (
@@ -2637,18 +2802,12 @@
                                 data.error
                             ) {
                                 showProcessError(
-                                    (
-                                        data &&
-                                        (
-                                            data.errorText ||
-                                            data.error ||
-                                            data.message
+                                    getResponseMessage(
+                                        data,
+                                        lbl(
+                                            "VAS_045_JournalProcessFailed",
+                                            "Journal Process Failed."
                                         )
-                                    ) ||
-
-                                    lbl(
-                                        "VAS_045_JournalProcessFailed",
-                                        "Journal Process Failed."
                                     )
                                 );
 
@@ -2842,6 +3001,9 @@
                 1;
 
             totalPages =
+                0;
+
+            totalCount =
                 0;
 
             $root.find(

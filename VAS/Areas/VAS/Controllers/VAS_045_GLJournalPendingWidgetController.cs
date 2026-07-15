@@ -73,8 +73,10 @@ namespace VAS.Controllers
                         new
                         {
                             success = false,
-                            error = "Session Expired",
-                            errorText = "Session Expired",
+                            errorKey = "SessionExpired",
+                            messageKey = "SessionExpired",
+                            error = "SessionExpired",
+                            errorText = "SessionExpired",
                             Queue = new List<object>(),
                             TotalCount = 0
                         }
@@ -93,8 +95,10 @@ namespace VAS.Controllers
                         new
                         {
                             success = false,
-                            error = "Session Expired",
-                            errorText = "Session Expired",
+                            errorKey = "SessionExpired",
+                            messageKey = "SessionExpired",
+                            error = "SessionExpired",
+                            errorText = "SessionExpired",
                             Queue = new List<object>(),
                             TotalCount = 0
                         }
@@ -906,8 +910,10 @@ ORDER BY
                 return Json(new
                 {
                     success = false,
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
+                    error = "SessionExpired",
+                    errorText = "SessionExpired"
                 });
             }
 
@@ -1137,8 +1143,10 @@ ORDER BY
                 return Json(new
                 {
                     success = false,
-                    error = "Session Expired",
-                    errorText = "Session Expired"
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
+                    error = "SessionExpired",
+                    errorText = "SessionExpired"
                 });
             }
 
@@ -1387,9 +1395,14 @@ ORDER BY
                 )
                 {
                     throw new InvalidOperationException(
-                        "The journal was not completed successfully. " +
-                        "Current status: " +
-                        completedStatus
+                        GetMsg(
+                            ctx,
+                            "VAS_045_JournalPostingNotCompletedStatus",
+                            "The journal was not completed successfully. Current status: {0}"
+                        ).Replace(
+                            "{0}",
+                            completedStatus
+                        )
                     );
                 }
 
@@ -1723,8 +1736,14 @@ ORDER BY
              * with a generic error.
              */
             return
-                "Accounting posting failed: " +
-                result;
+                GetMsg(
+                    ctx,
+                    "VAS_045_AccountingPostingFailed",
+                    "Accounting posting failed: {0}"
+                ).Replace(
+                    "{0}",
+                    result
+                );
         }
 
 

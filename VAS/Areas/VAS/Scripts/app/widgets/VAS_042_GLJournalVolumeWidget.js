@@ -234,9 +234,14 @@
                 +   '<div class="VAS-gljv-icon">' + barIcon + '</div>'
                 +   '<div class="w-title">' + lbl('VAS_042_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
                 +   '<span class="VAS-gljv-sub" id="VAS-gljv-sub-' + id + '">—</span>'
-                +   '<button class="VAS-gljv-toggle" id="VAS-gljv-toggle-' + id + '">'
-                +     lbl('VAS_042_Month', 'Month') + ' ▾'
-                +   '</button>'
+                +   '<div class="VAS-gljv-period-group" role="group" aria-label="Period">'
+                +     '<button type="button" class="VAS-gljv-period-btn" data-period="week">'
+                +       lbl('VAS_042_Week', 'Week')
+                +     '</button>'
+                +     '<button type="button" class="VAS-gljv-period-btn is-active" data-period="month">'
+                +       lbl('VAS_042_Month', 'Month')
+                +     '</button>'
+                +   '</div>'
                 + '</div>'
 
                 // ── Chart area ────────────────────────────────────────────────
@@ -266,13 +271,16 @@
 
             $root.append(html);
 
-            // Period toggle
-            $root.find('#VAS-gljv-toggle-' + id).on('click', function () {
-                activePeriod = (activePeriod === 'month') ? 'week' : 'month';
-                $(this).text(
-                    lbl(activePeriod === 'month' ? 'VAS_042_Month' : 'VAS_042_Week',
-                        activePeriod === 'month' ? 'Month' : 'Week') + ' ▾'
-                );
+            $root.on('click', '.VAS-gljv-period-btn', function () {
+                var nextPeriod = String($(this).data('period') || 'month');
+
+                if (nextPeriod === activePeriod) {
+                    return;
+                }
+
+                activePeriod = nextPeriod;
+                $root.find('.VAS-gljv-period-btn').removeClass('is-active');
+                $(this).addClass('is-active');
                 showBusy(true);
                 loadData();
             });

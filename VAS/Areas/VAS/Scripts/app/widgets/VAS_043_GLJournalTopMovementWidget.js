@@ -6,7 +6,6 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Top Ledger Movement                  | VAS_043_TopLedgerMovement
- *  2  | by value                             | VAS_043_ByValue
  *  3  | Month                                | VAS_043_Month
  *  4  | YTD                                  | VAS_043_YTD
  *  5  | Loading                              | VIS_Loading
@@ -24,7 +23,7 @@
 
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
-    // Labels   : VAS_043_TopLedgerMovement, VAS_043_ByValue, VAS_043_Month, VAS_043_YTD
+    // Labels   : VAS_043_TopLedgerMovement, VAS_043_Month, VAS_043_YTD
     // ───────────────────────────────────────────────────────────────────────────
 
     function lbl(key, fallback) {
@@ -50,6 +49,49 @@
         });
     }
 
+    function resolveTotalCount(totalCount, visibleCount, pageSize, totalPages) {
+        var total = Number(totalCount || 0);
+
+        if (!isNaN(total) && total > 0) {
+            return total;
+        }
+
+        var rows = Number(visibleCount || 0);
+
+        if (isNaN(rows) || rows <= 0) {
+            return 0;
+        }
+
+        var size = Math.max(parseInt(pageSize || rows || 1, 10), 1);
+        var pages = Math.max(parseInt(totalPages || 1, 10), 1);
+
+        if (pages > 1) {
+            return Math.max(((pages - 1) * size) + rows, rows);
+        }
+
+        return rows;
+    }
+
+    function formatRangeText(pageNo, pageSize, totalCount) {
+        var total = Number(totalCount || 0);
+
+        if (isNaN(total) || total <= 0) {
+            return '';
+        }
+
+        var page = Math.max(parseInt(pageNo || 1, 10), 1);
+        var size = Math.max(parseInt(pageSize || total, 10), 1);
+        var start = ((page - 1) * size) + 1;
+
+        if (start > total) {
+            start = total;
+        }
+
+        var end = Math.min(start + size - 1, total);
+
+        return lbl('VAS_Showing', 'Showing') + ' ' + start + '-' + end + ' ' + lbl('VIS_Of', 'of') + ' ' + total;
+    }
+
     // ──────────────────────────────────────────────────────────────────────────
     VAS.VAS_043_GLJournalTopMovementWidget = function () {
 
@@ -60,8 +102,9 @@
         var activePeriod = 'month';
         var currentData  = null;
         var pageNo       = 1;
-        var pageSize     = 5;
+        var pageSize     = 4;
         var totalPages   = 0;
+        var totalCount   = 0;
         var refreshTimer = null;
         var baseUrl      = VIS.Application.contextUrl;
 
@@ -101,10 +144,14 @@
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljtm-icon">' + listIcon + '</div>'
                 +   '<div class="w-title">' + lbl('VAS_043_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
-                +   '<span class="VAS-gljtm-sub">' + lbl('VAS_043_ByValue', 'by value') + '</span>'
-                +   '<button class="VAS-gljtm-toggle" id="VAS-gljtm-toggle-' + id + '">'
-                +     lbl('VAS_043_Month', 'Month')
-                +   '</button>'
+                +   '<div class="VAS-gljtm-period-group" role="group" aria-label="Period">'
+                +     '<button type="button" class="VAS-gljtm-period-btn" data-period="ytd">'
+                +       lbl('VAS_043_YTD', 'YTD')
+                +     '</button>'
+                +     '<button type="button" class="VAS-gljtm-period-btn is-active" data-period="month">'
+                +       lbl('VAS_043_Month', 'Month')
+                +     '</button>'
+                +   '</div>'
                 + '</div>'
 
                 + '<div class="VAS-gljtm-body" id="VAS-gljtm-body-' + id + '"></div>'
@@ -114,26 +161,31 @@
 
             $root.append(html);
 
-            $root.find('#VAS-gljtm-toggle-' + id).on('click', function () {
-                activePeriod = (activePeriod === 'month') ? 'ytd' : 'month';
+            $root.on('click', '.VAS-gljtm-period-btn', function () {
+                var nextPeriod = String($(this).data('period') || 'month');
+
+                if (nextPeriod === activePeriod) {
+                    return;
+                }
+
+                activePeriod = nextPeriod;
                 pageNo = 1;
-                $(this).text(activePeriod === 'month'
-                    ? lbl('VAS_043_Month', 'Month')
-                    : lbl('VAS_043_YTD', 'YTD'));
+                $root.find('.VAS-gljtm-period-btn').removeClass('is-active');
+                $(this).addClass('is-active');
                 showBusy(true);
                 loadData();
             });
 
             $root.on('click', '.VAS-gljtm-page-prev', function () {
-                if (pageNo <= 1) { return; }
+                if (pageNo <= 1 || !currentData) { return; }
                 pageNo -= 1;
-                loadData();
+                renderBars(currentData);
             });
 
             $root.on('click', '.VAS-gljtm-page-next', function () {
-                if (totalPages <= 1 || pageNo >= totalPages) { return; }
+                if (totalPages <= 1 || pageNo >= totalPages || !currentData) { return; }
                 pageNo += 1;
-                loadData();
+                renderBars(currentData);
             });
         }
 
@@ -197,6 +249,7 @@
             var id = $self.AD_UserHomeWidgetID;
 
             totalPages = 0;
+            totalCount = 0;
             $root.find('#VAS-gljtm-body-' + id).html(
                 '<div class="VAS-gljtm-loading">' + esc(lbl('VIS_Loading', 'Loading...')) + '</div>'
             );
@@ -208,44 +261,43 @@
             var sym      = esc(data.currencySymbol || data.CurSymbol || data.currencyISO || data.ISOCode || '');
             var prec     = data.stdPrecision || data.StdPrecision;
             var $body    = $root.find('#VAS-gljtm-body-' + id);
-            var serverPageSize = parseInt(data.PageSize || data.pageSize || pageSize, 10);
-
-            if (!isNaN(serverPageSize) && serverPageSize > 0) {
-                pageSize = serverPageSize;
-            }
 
             if (accounts.length === 0) {
                 $body.addClass('is-empty');
                 $body.html('<div class="VAS-gljtm-empty">' + lbl('VIS_NoData', 'No data available.') + '</div>');
                 totalPages = 0;
+                totalCount = 0;
                 updatePager();
                 return;
             }
 
             $body.removeClass('is-empty');
 
-            totalPages = parseInt(data.TotalPages || data.totalPages || 1, 10);
-
-            if (isNaN(totalPages) || totalPages < 1) {
-                totalPages = 1;
-            }
-
-            pageNo = parseInt(data.PageNo || data.pageNo || pageNo || 1, 10);
+            /* The service returns the full top-N set, so page it here. */
+            totalCount = accounts.length;
+            totalPages = Math.max(Math.ceil(totalCount / pageSize), 1);
 
             if (isNaN(pageNo) || pageNo < 1) {
                 pageNo = 1;
             }
 
-            var pageAccounts = accounts;
+            if (pageNo > totalPages) {
+                pageNo = totalPages;
+            }
+
+            var pageAccounts = accounts.slice(
+                (pageNo - 1) * pageSize,
+                pageNo * pageSize
+            );
             var html = '<div class="VAS-gljtm-list">';
             for (var i = 0; i < pageAccounts.length; i++) {
                 var a       = pageAccounts[i];
                 var fillCls = 'VAS-gljtm-fill' + (a.IsCredit ? ' VAS-gljtm-fill-cr' : '');
                 var valStr  = sym + fmtAmt(a.NetMovement, prec);
                 var rowInfo = esc((a.AccountCode || '') + ' ' + (a.AccountName || '')
-                    + ' - Net Movement: ' + valStr
-                    + ', Debit: ' + sym + fmtAmt(a.TotalDebit, prec)
-                    + ', Credit: ' + sym + fmtAmt(a.TotalCredit, prec));
+                    + ' - ' + lbl('VAS_043_NetMovement', 'Net Movement') + ': ' + valStr
+                    + ', ' + lbl('VAS_043_Debit', 'Debit') + ': ' + sym + fmtAmt(a.TotalDebit, prec)
+                    + ', ' + lbl('VAS_043_Credit', 'Credit') + ': ' + sym + fmtAmt(a.TotalCredit, prec));
 
                 html += '<div class="VAS-gljtm-row" title="' + rowInfo + '">'
                     +     '<div class="VAS-gljtm-row-head">'
@@ -267,21 +319,25 @@
 
         function renderPager() {
             return '<div class="VAS-gljtm-pager">'
-                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-prev" aria-label="' + esc(lbl('VIS_Previous', 'Previous')) + '">&#8249;</button>'
                 + '<span class="VAS-gljtm-page-text"></span>'
+                + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-prev" aria-label="' + esc(lbl('VIS_Previous', 'Previous')) + '">&#8249;</button>'
+                + '<span class="VAS-gljtm-page-count"></span>'
                 + '<button type="button" class="VAS-gljtm-page-btn VAS-gljtm-page-next" aria-label="' + esc(lbl('VIS_Next', 'Next')) + '">&#8250;</button>'
                 + '</div>';
         }
 
         function updatePager() {
             var $pageText = $root.find('.VAS-gljtm-page-text');
+            var $pageCount = $root.find('.VAS-gljtm-page-count');
             var $prevBtn = $root.find('.VAS-gljtm-page-prev');
             var $nextBtn = $root.find('.VAS-gljtm-page-next');
 
-            if (totalPages > 1) {
-                $pageText.text(pageNo + ' ' + lbl('VIS_Of', 'of') + ' ' + totalPages);
+            if (totalCount > 0) {
+                $pageText.text(formatRangeText(pageNo, pageSize, totalCount));
+                $pageCount.text(pageNo + ' ' + lbl('VIS_Of', 'of') + ' ' + totalPages);
             } else {
                 $pageText.text('');
+                $pageCount.text('');
             }
 
             $prevBtn.prop('disabled', pageNo <= 1 || totalPages <= 1);
@@ -294,6 +350,7 @@
                 '<div class="VAS-gljtm-empty">' + lbl('VIS_Error', 'Error loading data.') + '</div>'
             );
             totalPages = 0;
+            totalCount = 0;
             updatePager();
         }
 

@@ -1462,11 +1462,13 @@ ORDER BY
                     new
                     {
                         success = false,
+                        errorKey = "SessionExpired",
+                        messageKey = "SessionExpired",
                         error =
-                            "Session Expired",
+                            GetMsg(ctx, "SessionExpired", "Session Expired"),
 
                         errorText =
-                            "Session Expired"
+                            GetMsg(ctx, "SessionExpired", "Session Expired")
                     }
                 );
             }
@@ -1720,12 +1722,13 @@ ORDER BY
                     new
                     {
                         success = false,
-
+                        errorKey = "SessionExpired",
+                        messageKey = "SessionExpired",
                         error =
-                            "Session Expired",
+                            GetMsg(ctx, "SessionExpired", "Session Expired"),
 
                         errorText =
-                            "Session Expired"
+                            GetMsg(ctx, "SessionExpired", "Session Expired")
                     }
                 );
             }
@@ -2268,7 +2271,7 @@ ORDER BY
             {
                 return
                     code +
-                    " · " +
+                    " ï¿½ " +
                     name;
             }
 
@@ -2918,12 +2921,13 @@ AND GL_Journal.AD_Client_ID =
                 new
                 {
                     success = false,
+                        errorKey = "SessionExpired",
+                        messageKey = "SessionExpired",
+                        error =
+                            GetMsg(ctx, "SessionExpired", "Session Expired"),
 
-                    error =
-                        "Session Expired",
-
-                    errorText =
-                        "Session Expired"
+                        errorText =
+                            GetMsg(ctx, "SessionExpired", "Session Expired")
                 }
             );
         }

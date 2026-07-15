@@ -219,6 +219,114 @@
         );
     }
 
+    function resolveTotalCount(totalCount, visibleCount, pageSize, totalPages) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            !isNaN(total) &&
+            total > 0
+        ) {
+            return total;
+        }
+
+        var rows =
+            Number(
+                visibleCount || 0
+            );
+
+        if (
+            isNaN(rows) ||
+            rows <= 0
+        ) {
+            return 0;
+        }
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || rows || 1,
+                    10
+                ),
+                1
+            );
+
+        var pages =
+            Math.max(
+                parseInt(
+                    totalPages || 1,
+                    10
+                ),
+                1
+            );
+
+        if (pages > 1) {
+            return Math.max(
+                ((pages - 1) * size) + rows,
+                rows
+            );
+        }
+
+        return rows;
+    }
+
+    function formatRangeText(pageNo, pageSize, totalCount) {
+        var total =
+            Number(
+                totalCount || 0
+            );
+
+        if (
+            isNaN(total) ||
+            total <= 0
+        ) {
+            return "";
+        }
+
+        var page =
+            Math.max(
+                parseInt(
+                    pageNo || 1,
+                    10
+                ),
+                1
+            );
+
+        var size =
+            Math.max(
+                parseInt(
+                    pageSize || total,
+                    10
+                ),
+                1
+            );
+
+        var start =
+            ((page - 1) * size) + 1;
+
+        if (start > total) {
+            start =
+                total;
+        }
+
+        var end =
+            Math.min(
+                start + size - 1,
+                total
+            );
+
+        return (
+            "Showing " +
+            start +
+            "-" +
+            end +
+            " of " +
+            total
+        );
+    }
+
     function isPosted(value) {
         if (
             value === true ||
@@ -295,6 +403,20 @@
             );
 
         if (response) {
+            if (response.errorKey || response.messageKey) {
+                return lbl(
+                    response.errorKey || response.messageKey,
+                    response.errorText ||
+                    response.error ||
+                    response.message ||
+                    fallback ||
+                    lbl(
+                        "VIS_Error",
+                        "Error loading data."
+                    )
+                );
+            }
+
             return (
                 response.errorText ||
                 response.error ||
@@ -312,14 +434,15 @@
             xhr.status
         ) {
             return (
-                fallback ||
                 lbl(
-                    "VIS_Error",
-                    "Error loading data."
+                    "VAS_044_RequestFailedHttp",
+                    "Request failed. HTTP {0}"
                 )
-            ) +
-                " HTTP " +
-                xhr.status;
+                    .replace(
+                        "{0}",
+                        xhr.status
+                    )
+            );
         }
 
         return (
@@ -398,9 +521,12 @@
                 1;
 
             var pageSize =
-                3;
+                4;
 
             var totalPages =
+                0;
+
+            var totalCount =
                 0;
 
             var selectedJournalId =
@@ -419,7 +545,7 @@
                 1;
 
             var detailLinePageSize =
-                3;
+                5;
 
             var detailLineTotalPages =
                 1;
@@ -653,6 +779,8 @@
 
                     '<div class="VAS-gljr-pager">' +
 
+                    '<span class="VAS-gljr-page-text"></span>' +
+
                     '<button type="button" ' +
 
                     'class="VAS-gljr-page-btn VAS-gljr-prev" ' +
@@ -672,7 +800,7 @@
 
                     "</button>" +
 
-                    '<span class="VAS-gljr-page-text"></span>' +
+                    '<span class="VAS-gljr-page-count"></span>' +
 
                     '<button type="button" ' +
 
@@ -968,6 +1096,9 @@
                     totalPages =
                         0;
 
+                    totalCount =
+                        0;
+
                     updatePager();
 
                     return;
@@ -1005,6 +1136,14 @@
                         data.PageNo ||
                         pageNo ||
                         1
+                    );
+
+                totalCount =
+                    resolveTotalCount(
+                        data.TotalCount,
+                        entries.length,
+                        pageSize,
+                        totalPages
                     );
 
                 var html =
@@ -1202,6 +1341,11 @@
                         ".VAS-gljr-page-text"
                     );
 
+                var $pageCount =
+                    $root.find(
+                        ".VAS-gljr-page-count"
+                    );
+
                 var $previousButton =
                     $root.find(
                         ".VAS-gljr-prev"
@@ -1212,24 +1356,32 @@
                         ".VAS-gljr-next"
                     );
 
-                if (totalPages > 1) {
+                if (totalCount > 0) {
                     $pageText.text(
+                        formatRangeText(
+                            pageNo,
+                            pageSize,
+                            totalCount
+                        )
+                    );
+
+                    $pageCount.text(
                         pageNo +
-
                         " " +
-
                         lbl(
                             "VIS_Of",
                             "of"
                         ) +
-
                         " " +
-
                         totalPages
                     );
                 }
                 else {
                     $pageText.text(
+                        ""
+                    );
+
+                    $pageCount.text(
                         ""
                     );
                 }
@@ -1951,16 +2103,8 @@
                     "Primary";
 
                 var currencyText =
+                    data.ISOCode ||
                     symbol;
-
-                if (
-                    data.ISOCode &&
-                    data.ISOCode !== symbol
-                ) {
-                    currencyText +=
-                        " \u00B7 " +
-                        data.ISOCode;
-                }
 
                 var html =
                     '<div class="VAS-gljr-detail-summary">' +
@@ -2162,17 +2306,6 @@
                     "</strong>" +
 
                     "</div>" +
-
-                    "</div>" +
-
-                    '<div class="VAS-gljr-detail-section-title">' +
-
-                    esc(
-                        lbl(
-                            "VAS_044_JournalLines",
-                            "Journal Lines"
-                        )
-                    ) +
 
                     "</div>" +
 
@@ -2385,6 +2518,18 @@
 
                     '<div class="VAS-gljr-line-pager">' +
 
+                    '<span class="VAS-gljr-page-text">' +
+                    esc(
+                        detailLineCount
+                            ? formatRangeText(
+                                detailLinePageNo,
+                                detailLinePageSize,
+                                detailLineCount
+                            )
+                            : ""
+                    ) +
+                    "</span>" +
+
                     '<button type="button" ' +
                     'class="VAS-gljr-page-btn VAS-gljr-line-prev" ' +
                     (
@@ -2393,14 +2538,16 @@
                             ? "disabled "
                             : ""
                     ) +
-                    'aria-label="Previous">&#8249;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
 
-                    '<span class="VAS-gljr-page-text">' +
+                    '<span class="VAS-gljr-page-count">' +
                     esc(
                         detailLineCount
                             ? (
                                 detailLinePageNo +
-                                " of " +
+                                " " +
+                                lbl("VIS_Of", "of") +
+                                " " +
                                 detailLineTotalPages
                             )
                             : ""
@@ -2415,7 +2562,7 @@
                             ? "disabled "
                             : ""
                     ) +
-                    'aria-label="Next">&#8250;</button>' +
+                    'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
 
                     "</div>" +
 
@@ -2986,6 +3133,12 @@
 
                     "</tr>"
                 );
+
+                totalPages =
+                    0;
+
+                totalCount =
+                    0;
 
                 updatePager();
             }
