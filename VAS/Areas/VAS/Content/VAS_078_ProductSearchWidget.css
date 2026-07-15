@@ -202,7 +202,11 @@
     justify-content: center;
     padding: 2em;
     font-family: Roboto, sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    /* The dialog's base size follows the width lever AND the viewport
+       height (1.6vh): when the window is zoomed the available height
+       shrinks, the em base shrinks with it, and the popup fits with no
+       scrollbar instead of overflowing. */
+    font-size: clamp(11px, min(calc(var(--dash-inline-size, 100vw) * 0.011733), 1.6vh), 32px);
 }
 
 .MPC-product-search-dialog-wrap.is-open {
@@ -361,7 +365,9 @@
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    /* The full image always fits its box - no cropped borders. */
+    object-fit: contain;
+    background: #FFFFFF;
     border-radius: 15px;
 }
 
@@ -479,8 +485,17 @@
 .MPC-product-search-form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0 1.5em;
-    align-content: start;
+    /* Overview fields fill the tab body with EVEN spacing: the grid grows to
+       take all the available height and the leftover space is spread equally
+       between the rows (space-evenly) - no empty gap left at the bottom, and the
+       gaps stay balanced rather than stretched edge-to-edge. Each field keeps
+       its original internal size. No scrollbar; all in em so it scales with the
+       dialog's size lever. */
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-auto-rows: auto;
+    gap: 1em 1.5em;
+    align-content: space-evenly;
 }
 
 /* Fill a trailing gap only when the LAST field really lands mid-row; with
@@ -502,14 +517,14 @@
 
 .MPC-product-search-field-label {
     color: #5F7283;
-    font-size: 0.75em;
+    font-size: 0.9em;
 }
 
 .MPC-product-search-field-value {
     margin-block-start: 0.375em;
     overflow: hidden;
     color: #102C3F;
-    font-size: 1em;
+    font-size: 1.375em;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -684,6 +699,11 @@
 
     .MPC-product-search-form-grid {
         grid-template-columns: minmax(0, 1fr);
+        /* One column stacks all 12 fields; don't force them to share the height
+           (that would squeeze/overflow on a small screen) - keep natural heights. */
+        flex: 0 0 auto;
+        grid-auto-rows: auto;
+        align-content: start;
     }
 
     .MPC-product-search-form-grid .MPC-product-search-field:nth-child(3n-1):last-child,

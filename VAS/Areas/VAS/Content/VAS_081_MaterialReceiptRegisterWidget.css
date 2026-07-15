@@ -49,14 +49,15 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    color: #106AB0;
+    /* Same icon tile as the Pending / Expected GRN widgets (.vas-egrn-ico):
+       flat light-blue tint, blue glyph, no border. */
+    background: rgba(0, 131, 218, .10);
+    color: #0083DA;
 }
 
     .vas-mrr-ico svg {
-        width: 1.125em;
-        height: 1.125em;
+        width: 1em;
+        height: 1em;
     }
 
 .vas-mrr-titles {

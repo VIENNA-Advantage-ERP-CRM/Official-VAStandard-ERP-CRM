@@ -26,9 +26,6 @@ namespace VIS.Controllers
     /// </summary>
     public class VAS_086_QAHoldsWidgetController : Controller
     {
-        private const string ActualWorkingFine = "Working Fine";
-        private const string ActualNotSatisfactory = "Not Satisfactory";
-
         /// <summary>
         /// One page of unresolved QA holds for vendor GRN confirmation lines.
         /// </summary>
@@ -129,6 +126,7 @@ namespace VIS.Controllers
                   AND LineConfirm.VA010_QualCheckMArk='Y'
                   AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='')
                   AND COALESCE(Confirm.Processed,'N')<>'Y'
+                  AND COALESCE(Confirm.IsApproved,'N')='N'
                   AND COALESCE(Confirm.DocStatus,'DR') IN ('DR','IP')";
 
             holdSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -238,10 +236,81 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// Value list of one test parameter (VA010_TestPrmtrList) for the QA
+        /// popup's Actual Value choice - the options come from the database
+        /// instead of a fixed pair of texts. Schema-guarded like the rest of
+        /// the widget so databases without the VA010 module return an empty
+        /// list (the client then falls back to its default options).
+        /// </summary>
+        /// <param name="testParameterId">VA010_TestParameter_ID of the record.</param>
+        /// <returns>JSON { rows[] } of valueId / valueName.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetTestParameterValues(int testParameterId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            List<object> rows = new List<object>();
+            if (testParameterId <= 0) { return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet); }
+
+            string listTable = GetQATableName("VA010_TestPrmtrList");
+            if (!HasTable(listTable))
+            {
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+
+            string displayColumn = FindDisplayColumn(listTable, new[] { "VA010_ParameterValue", "Name", "Description", "Value" });
+            if (string.IsNullOrEmpty(displayColumn))
+            {
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+
+            string sql = @"
+                SELECT ValueList.VA010_TestPrmtrList_ID AS Value_ID,
+                       ValueList." + displayColumn + @" AS Value_Name
+                FROM " + listTable + @" ValueList
+                WHERE ValueList.IsActive='Y'
+                  AND ValueList.AD_Client_ID=@AD_Client_ID
+                  AND ValueList.VA010_TestParameter_ID=@Test_Parameter_ID
+                ORDER BY ValueList." + displayColumn;
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Test_Parameter_ID", testParameterId)
+                });
+                while (dr != null && dr.Read())
+                {
+                    rows.Add(new
+                    {
+                        valueId = Util.GetValueOfInt(dr["Value_ID"]),
+                        valueName = Util.GetValueOfString(dr["Value_Name"])
+                    });
+                }
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(JsonConvert.SerializeObject(new { error = ex.Message }), JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+        }
+
+        /// <summary>
         /// Saves the QA actual value, QA/QC date and remark for one QA parameter record.
         /// </summary>
         /// <param name="qaRecordId">VA010_ShipConfParameters_ID.</param>
-        /// <param name="actualValue">Working Fine or Not Satisfactory.</param>
+        /// <param name="actualValue">A value from the parameter's value list.</param>
         /// <param name="qaQcDate">QA/QC date in yyyy-MM-dd format.</param>
         /// <param name="description">Optional QA note.</param>
         /// <returns>JSON { success, updated } or { error }.</returns>
@@ -266,8 +335,12 @@ namespace VIS.Controllers
                 return Json(new { error = "QA inspection record is missing." });
             }
 
+            // VA010_ActualValue is a Table reference (VARCHAR2(10)) that stores the
+            // chosen VA010_TestPrmtrList_ID, not free text - the actual value must be
+            // one of the record's test-parameter values (validated below).
             actualValue = (actualValue ?? "").Trim();
-            if (actualValue != ActualWorkingFine && actualValue != ActualNotSatisfactory)
+            int actualValueId;
+            if (!int.TryParse(actualValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out actualValueId) || actualValueId <= 0)
             {
                 return Json(new { error = "Select a valid QA actual value." });
             }
@@ -298,7 +371,7 @@ namespace VIS.Controllers
 
             SqlParameter[] parameters =
             {
-                new SqlParameter("@ActualValue", actualValue),
+                new SqlParameter("@ActualValue", actualValueId.ToString(CultureInfo.InvariantCulture)),
                 new SqlParameter("@QAQCDate", qaDateValue),
                 new SqlParameter("@Description", string.IsNullOrWhiteSpace(description) ? (object)DBNull.Value : description.Trim()),
                 new SqlParameter("@UpdatedBy", ctx.GetAD_User_ID()),
@@ -311,6 +384,11 @@ namespace VIS.Controllers
                 if (!CanUpdateQARecord(ctx, qaRecordId))
                 {
                     return Json(new { error = "QA inspection record was not found." });
+                }
+
+                if (!IsValidActualValue(ctx, qaRecordId, actualValueId))
+                {
+                    return Json(new { error = "Select a valid QA actual value." });
                 }
 
                 int updated = DB.ExecuteQuery(sql, parameters);
@@ -348,6 +426,7 @@ namespace VIS.Controllers
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
                   AND COALESCE(Confirm.Processed,'N')<>'Y'
+                  AND COALESCE(Confirm.IsApproved,'N')='N'
                   AND COALESCE(Confirm.DocStatus,'DR') IN ('DR','IP')";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -364,6 +443,39 @@ namespace VIS.Controllers
             };
 
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) == qaRecordId;
+        }
+
+        /// <summary>
+        /// True when the chosen actual value is an active VA010_TestPrmtrList entry
+        /// belonging to the QA record's own test parameter (same client). The QA
+        /// actual value is a reference into that value list, so only its own values
+        /// are accepted.
+        /// </summary>
+        private bool IsValidActualValue(Ctx ctx, int qaRecordId, int actualValueId)
+        {
+            string qaTable = GetQATableName("VA010_ShipConfParameters");
+            string listTable = GetQATableName("VA010_TestPrmtrList");
+            if (!HasTable(listTable)) { return false; }
+
+            string sql = @"
+                SELECT COUNT(1)
+                FROM " + qaTable + @" QAParam
+                INNER JOIN " + listTable + @" ValueList
+                    ON (ValueList.VA010_TestParameter_ID=QAParam.VA010_TestParameter_ID AND ValueList.IsActive='Y')
+                WHERE QAParam.VA010_ShipConfParameters_ID=@QARecordId
+                  AND QAParam.AD_Client_ID=@AD_Client_ID
+                  AND QAParam.IsActive='Y'
+                  AND ValueList.VA010_TestPrmtrList_ID=@ActualValueId
+                  AND ValueList.AD_Client_ID=@AD_Client_ID";
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@QARecordId", qaRecordId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@ActualValueId", actualValueId)
+            };
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) > 0;
         }
 
         private string FormatReferenceFallback(int id)

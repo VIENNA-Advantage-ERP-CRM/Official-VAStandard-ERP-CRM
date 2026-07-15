@@ -10,6 +10,7 @@ using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
+using VAdvantage.Process;
 using VAdvantage.Utility;
 using VIS.Filters;
 
@@ -95,21 +96,29 @@ namespace VIS.Controllers
                   AND o.IsReturnTrx='N'
                   AND o.IsSalesQuotation='N'
                   AND o.IsBlanketTrx='N'
-                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - (
-                      SELECT COALESCE(SUM(il.MovementQty), 0)
-                      FROM M_InOut i
-                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
-                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
-                        AND il.IsActive='Y'
-                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
-                  )) > 0";
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
 
+            // MRole must not see the unposted-GRN netting subquery: on roles
+            // with record-access rules AddAccessSQL appends a predicate for
+            // every table it finds - including the subquery's M_InOutLine
+            // alias - to the OUTER where-clause, where the alias is out of
+            // scope (ORA-00904 "il"."M_InOutLine_ID"). The subquery is
+            // injected after the access SQL is applied.
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
                 "o",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+
+            rawSql = rawSql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )");
 
             string sql = @"
                 SELECT ExpectedPO.PO_ID,
@@ -254,40 +263,39 @@ namespace VIS.Controllers
             string lineSql = @"
                 SELECT ol.C_OrderLine_ID AS PO_Line_ID,
                        p.Name AS Item_Name,
+                       asi.Description AS Attribute_Name,
                        COALESCE(ol.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(ol.QtyDelivered, 0) AS Already_Received_Qty,
-                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - (
-                           SELECT COALESCE(SUM(il.MovementQty), 0)
-                           FROM M_InOut i
-                           INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
-                           WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
-                             AND il.IsActive='Y'
-                             AND i.DocStatus NOT IN ('RE','VO','CL','CO')
-                       ) AS Default_Received_Qty,
+                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Default_Received_Qty,
                        u.Name AS UOM
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
                 INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID" + (!allowNonItem ? " AND p.ProductType='I'" : "") + @")
+                LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID=ol.M_AttributeSetInstance_ID)
                 LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID=ol.C_UOM_ID)
                 WHERE o.IsSOTrx='N'
                   AND o.DocStatus='CO'
                   AND o.AD_Client_ID=@AD_Client_ID
                   AND ol.C_Order_ID=@PO_ID
-                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - (
-                      SELECT COALESCE(SUM(il.MovementQty), 0)
-                      FROM M_InOut i
-                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
-                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
-                        AND il.IsActive='Y'
-                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
-                  )) > 0";
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
 
+            // Same ORA-00904 guard as the list query: the netting subquery is
+            // injected only after MRole has added its access predicates.
             lineSql = MRole.GetDefault(ctx).AddAccessSQL(
                 lineSql,
                 "o",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
+
+            lineSql = lineSql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
+                      SELECT COALESCE(SUM(il.MovementQty), 0)
+                      FROM M_InOut i
+                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
+                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
+                        AND il.IsActive='Y'
+                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
+                  )");
 
             string sql = lineSql + @"
                 ORDER BY ol.Line";
@@ -313,6 +321,7 @@ namespace VIS.Controllers
                     {
                         poLineId = Util.GetValueOfInt(dr["PO_Line_ID"]),
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
+                        attributeName = Util.GetValueOfString(dr["Attribute_Name"]),
                         poQty = poQty,
                         alreadyReceivedQty = alreadyReceivedQty,
                         defaultReceivedQty = defaultReceivedQty,
@@ -492,28 +501,38 @@ namespace VIS.Controllers
                     }
                 }
 
-                receipt.SetDocAction(MInOut.DOCACTION_Complete);
-                if (!receipt.ProcessIt(MInOut.DOCACTION_Complete))
-                {
-                    string processMessage = receipt.GetProcessMsg();
-                    trx.Rollback();
-                    return Fail(!string.IsNullOrEmpty(processMessage) ? processMessage : "GRN could not be completed.");
-                }
-
-                if (!receipt.Save(trx))
-                {
-                    trx.Rollback();
-                    return Fail(GetSaveError(ctx, "VAS_GRNNotSaved", "GRN could not be completed."));
-                }
-
+                // The receipt + lines are saved in this transaction as a DRAFT;
+                // commit them, then run the standard document completion through
+                // the document process (DocumentEngine.CompleteOrReverse - the same
+                // path the core runs on Complete). That process executes outside
+                // this transaction, so the record is committed first. The
+                // AD_Table_ID and AD_Process_ID are resolved from the dictionary at
+                // runtime by name/Value - never hardcoded.
                 trx.Commit();
+                trx.Close();
+                trx = null;
 
+                int receiptId = receipt.GetM_InOut_ID();
+                string completeError = DocumentEngine.CompleteOrReverse(
+                    ctx,
+                    "M_InOut",
+                    GetTableId("M_InOut"),
+                    receiptId,
+                    GetProcessIdByValue(ctx, "M_InOut Process"),
+                    MInOut.DOCACTION_Complete);
+
+                if (!string.IsNullOrEmpty(completeError))
+                {
+                    return Fail(completeError);
+                }
+
+                MInOut completedReceipt = new MInOut(ctx, receiptId, null);
                 return Ok(new
                 {
                     success = true,
-                    shipmentId = receipt.GetM_InOut_ID(),
-                    grnId = receipt.GetM_InOut_ID(),
-                    grnNo = receipt.GetDocumentNo(),
+                    shipmentId = receiptId,
+                    grnId = receiptId,
+                    grnNo = completedReceipt.GetDocumentNo(),
                     message = Msg.GetMsg(ctx, "VAS_GRNSaved") ?? "GRN created."
                 });
             }
@@ -626,6 +645,11 @@ namespace VIS.Controllers
         /// <returns>C_DocType_ID, or 0 when none is configured.</returns>
         private int GetDocTypeId(int orgId, int clientId)
         {
+            // Prefer an org-specific receipt type; C_DocType_ID is the deterministic
+            // tiebreak so the plain "MM Receipt" (lower id) is chosen over the
+            // "MM Receipt with Confirmation" one - the latter completes to In
+            // Progress (awaiting confirmation) instead of Completed. Without the
+            // tiebreak the pick was arbitrary and GRNs could land un-completed.
             string sql = @"
                 SELECT DocType.C_DocType_ID
                 FROM C_DocType DocType
@@ -635,7 +659,7 @@ namespace VIS.Controllers
                   AND DocType.AD_Org_ID IN (0, @AD_Org_ID)
                   AND DocType.IsSOTrx='N'
                   AND DocType.IsReturnTrx='N'
-                ORDER BY DocType.AD_Org_ID DESC";
+                ORDER BY DocType.AD_Org_ID DESC, DocType.C_DocType_ID";
 
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", clientId));
@@ -690,6 +714,51 @@ namespace VIS.Controllers
             }
 
             return string.IsNullOrEmpty(error) ? fallback : error;
+        }
+
+        /// <summary>Resolves the AD_Table_ID for a physical table name (0 when missing).</summary>
+        private int GetTableId(string tableName)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Table_ID FROM AD_Table WHERE TableName=@TableName AND IsActive='Y'",
+                    new SqlParameter[] { new SqlParameter("@TableName", tableName) }, null));
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Resolves the AD_Process_ID of a document process by its (stable) Value -
+        /// e.g. "M_InOut Process" - preferring a client-specific record, then the
+        /// system one. Resolving by Value keeps the completion dynamic (the numeric
+        /// id can differ per database).
+        /// </summary>
+        private int GetProcessIdByValue(Ctx ctx, string processValue)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Process_ID
+                      FROM AD_Process
+                      WHERE Value=@Value
+                        AND IsActive='Y'
+                        AND AD_Client_ID IN (0, @AD_Client_ID)
+                      ORDER BY AD_Client_ID DESC
+                      FETCH FIRST 1 ROW ONLY",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Value", processValue),
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                    }, null));
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>

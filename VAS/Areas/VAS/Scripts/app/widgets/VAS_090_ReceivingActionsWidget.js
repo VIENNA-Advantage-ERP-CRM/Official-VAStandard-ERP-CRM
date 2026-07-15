@@ -4,7 +4,8 @@
  *           confirmations (review #30), and GRN label print/search flows.
  * Backend - VAS_090_ReceivingActionsWidget/GetOpenPurchaseOrders
  *           VAS_090_ReceivingActionsWidget/GetPurchaseOrderLines
- *           VAS_082_NewGRNWidget/CreateGRN
+ *           VAS_090_ReceivingActionsWidget/GetWarehouseLocators
+ *           VAS_090_ReceivingActionsWidget/CreateGRN
  *           VAS_090_ReceivingActionsWidget/GetGRNConfirmations
  *           VAS_090_ReceivingActionsWidget/GetGRNConfirmationDetail
  *           VAS_090_ReceivingActionsWidget/SaveGRNConfirmationLine
@@ -77,11 +78,20 @@
         var poSearchText = "";
         var poSearchTimer = null;
         /* Review #49: receive-form header data and line-level locators. */
-        var poDocTypeName = "";
+        /* Document Type is now editable: the receive form offers every Material
+           Receipt type of the PO's org and the chosen one drives the created GRN. */
+        var poDocTypes = [];
+        var poSelectedDocTypeId = 0;
         var poWarehouses = [];
         var poSelectedWarehouseId = 0;
         var poLocators = [];
-        var poPageSize = 8;
+        /* The line table shows at most 5 data lines per page (no scrolling);
+           typed quantities and locator choices live here so they survive
+           page switches. poLineId -> { qty, locatorId }. */
+        var RCV_PAGE_SIZE = 5;
+        var rcvPageNo = 1;
+        var lineEntry = {};
+        var poPageSize = 5;
         var poTotalPages = 0;
         var poTotalRecords = 0;
         var poLoading = false;
@@ -154,14 +164,9 @@
         }
 
         function syncPOPageSize() {
-            if (currentPO || poLoading || !$dialogBody.find('.vas-ra-po-list').length) { return; }
-
-            var nextPageSize = measureRowsInDialog('.vas-ra-po-row', 54, 3);
-            if (!nextPageSize || nextPageSize === poPageSize) { return; }
-
-            var firstRecord = ((poPageNo - 1) * poPageSize) + 1;
-            poPageSize = nextPageSize;
-            loadOpenPOLines(Math.max(1, Math.ceil(firstRecord / poPageSize)));
+            /* The Receive Against PO list is FIXED at 5 rows per page - the
+               same count from the first open onward, no dynamic re-measuring
+               (which caused a taller first render plus a scrollbar). */
         }
 
         function syncLabelPageSize() {
@@ -400,10 +405,30 @@
             $dialog.on('click', '.vas-ra-po-prev', function () { if (poPageNo > 1) { loadOpenPOLines(poPageNo - 1); } });
             $dialog.on('click', '.vas-ra-po-next', function () { if (poPageNo < poTotalPages) { loadOpenPOLines(poPageNo + 1); } });
             $dialog.on('click', '.vas-ra-back-po', function () { currentPO = null; currentLines = []; renderReceiveAgainstPO(); });
+            $dialog.on('change', '.vas-ra-doctype-select', function () {
+                poSelectedDocTypeId = Number($(this).val() || 0);
+            });
             $dialog.on('change', '.vas-ra-wh-select', function () {
                 poSelectedWarehouseId = Number($(this).val() || 0);
+                /* Another warehouse means another locator list: previously
+                   chosen locators no longer apply. */
+                for (var key in lineEntry) {
+                    if (lineEntry.hasOwnProperty(key)) { lineEntry[key].locatorId = 0; }
+                }
                 loadWarehouseLocators(poSelectedWarehouseId);
             });
+            $dialog.on('input', '.vas-ra-rcv-input', function () {
+                var id = Number($(this).data('polineid'));
+                if (!lineEntry[id]) { lineEntry[id] = {}; }
+                lineEntry[id].qty = String($(this).val() || "");
+            });
+            $dialog.on('change', '.vas-ra-loc-select', function () {
+                var id = Number($(this).data('polineid'));
+                if (!lineEntry[id]) { lineEntry[id] = {}; }
+                lineEntry[id].locatorId = Number($(this).val() || 0);
+            });
+            $dialog.on('click', '.vas-ra-rcv-prev', function () { if (rcvPageNo > 1) { rcvPageNo--; renderReceiveLines(); } });
+            $dialog.on('click', '.vas-ra-rcv-next', function () { rcvPageNo++; renderReceiveLines(); });
             $dialog.on('click', '.vas-ra-make-grn', makeGRN);
             $dialog.on('click', '.vas-ra-gc-row', function () { openGRNConfirmationDetail(Number($(this).data('gcid'))); });
             $dialog.on('click', '.vas-ra-gc-prev', function () { if (gcPageNo > 1) { loadGRNConfirmations(gcPageNo - 1); } });
@@ -512,7 +537,10 @@
                     /* Review #47 (design reference): card rows like the GRN
                        confirmation list - icon tile, PO number over its
                        supplier, line count over a status pill, chevron. */
-                    var meta = (po.dockName ? po.dockName + " · " : "") + (po.supplier || "-");
+                    /* No "-" placeholders in the meta line: the dock joins in
+                       only when it carries a real value. */
+                    var dockName = (po.dockName && po.dockName !== "-") ? po.dockName : "";
+                    var meta = (dockName ? dockName + " · " : "") + (po.supplier || "");
                     var openLineCount = Number(po.openLineCount || 0);
                     var lineText = openLineCount + ' ' + (openLineCount === 1 ? lbl("VAS_090_Line", "line") : lbl("VAS_090_Lines2", "lines"));
                     html +=
@@ -576,15 +604,27 @@
                         return;
                     }
                     currentLines = data.rows || [];
-                    /* Review #49: header extras - PO document type and the
+                    /* Review #49: header extras - selectable document type and the
                        warehouses of the org the PO was created in. */
-                    poDocTypeName = data.docTypeName || "";
+                    poDocTypes = data.docTypes || [];
+                    poSelectedDocTypeId = Number(data.defaultDocTypeId || 0);
+                    if (!poSelectedDocTypeId && poDocTypes.length) {
+                        poSelectedDocTypeId = Number(poDocTypes[0].docTypeId);
+                    }
                     poWarehouses = data.warehouses || [];
                     poSelectedWarehouseId = Number(data.defaultWarehouseId || 0);
                     if (!poSelectedWarehouseId && poWarehouses.length) {
                         poSelectedWarehouseId = Number(poWarehouses[0].warehouseId);
                     }
                     poLocators = [];
+                    rcvPageNo = 1;
+                    lineEntry = {};
+                    for (var i = 0; i < currentLines.length; i++) {
+                        lineEntry[currentLines[i].poLineId] = {
+                            qty: toInputValue(currentLines[i].defaultReceivedQty),
+                            locatorId: 0
+                        };
+                    }
                     renderReceiveLines();
                     loadWarehouseLocators(poSelectedWarehouseId);
                 },
@@ -608,12 +648,30 @@
             return '<select class="vas-ra-field-select vas-ra-wh-select">' + options + '</select>';
         }
 
+        function docTypeSelectHtml() {
+            var options = "";
+            for (var i = 0; i < poDocTypes.length; i++) {
+                var docType = poDocTypes[i];
+                options +=
+                    '<option value="' + escapeHtml(docType.docTypeId) + '"' +
+                    (Number(docType.docTypeId) === poSelectedDocTypeId ? ' selected' : '') + '>' +
+                    escapeHtml(docType.docTypeName || "-") +
+                    '</option>';
+            }
+            if (!options) {
+                options = '<option value="0">-</option>';
+            }
+            return '<select class="vas-ra-field-select vas-ra-doctype-select">' + options + '</select>';
+        }
+
         function locatorSelectHtml(poLineId) {
+            var chosen = lineEntry[poLineId] ? Number(lineEntry[poLineId].locatorId || 0) : 0;
             var options = "";
             for (var i = 0; i < poLocators.length; i++) {
                 var locator = poLocators[i];
+                var selected = chosen > 0 ? Number(locator.locatorId) === chosen : locator.isDefault;
                 options +=
-                    '<option value="' + escapeHtml(locator.locatorId) + '"' + (locator.isDefault ? ' selected' : '') + '>' +
+                    '<option value="' + escapeHtml(locator.locatorId) + '"' + (selected ? ' selected' : '') + '>' +
                     escapeHtml(locator.locatorName || "-") +
                     '</option>';
             }
@@ -627,38 +685,73 @@
            instead of Supplier / PO / Dock / Supplier Reference; every line has
            a Locator choice that follows the selected warehouse. */
         function renderReceiveLines() {
+            /* Header fields styled like the Quality Control form: icon tile +
+               label + value on an underline. Both Document Type and Warehouse are
+               editable, so both carry the BLUE (.active) underline - the Quality
+               Control form convention for changeable fields. */
             var html =
                 '<div class="vas-ra-form">' +
-                fieldHtml(lbl("VAS_090_DocumentType", "Document Type"), poDocTypeName, true) +
-                '<div class="vas-ra-field">' +
+                '<div class="vas-ra-hdr-field active">' +
+                '<div class="vas-ra-qc-ico">' + icon("file") + '</div>' +
+                '<div class="vas-ra-qc-main">' +
+                '<div class="vas-ra-field-label">' + escapeHtml(lbl("VAS_090_DocumentType", "Document Type")) + '</div>' +
+                '<div class="vas-ra-field-value">' + docTypeSelectHtml() + '</div>' +
+                '</div>' +
+                '</div>' +
+                '<div class="vas-ra-hdr-field active">' +
+                '<div class="vas-ra-qc-ico">' + icon("package") + '</div>' +
+                '<div class="vas-ra-qc-main">' +
                 '<div class="vas-ra-field-label">' + escapeHtml(lbl("VAS_090_Warehouse", "Warehouse")) + '</div>' +
                 '<div class="vas-ra-field-value">' + warehouseSelectHtml() + '</div>' +
                 '</div>' +
                 '</div>' +
-                '<div class="vas-ra-note">' + icon("file") + '<span>' + escapeHtml(lbl("VAS_090_ReceiveQtyNote", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
+                '</div>' +
                 '<div class="vas-ra-lines-title">' + escapeHtml(lbl("VAS_090_ReceivedLines", "Received Lines")) + '</div>' +
                 '<div class="vas-ra-receive-table">' +
-                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_AlreadyReceived", "Already Received")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Locator", "Locator")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
+                '<div class="vas-ra-receive-row head"><span>' + escapeHtml(lbl("VAS_090_Item", "Item")) + '</span><span>' + escapeHtml(lbl("VAS_090_Attribute", "Attribute")) + '</span><span>' + escapeHtml(lbl("VAS_090_POQty", "PO Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_OpenQty", "Open Qty")) + '</span><span>' + escapeHtml(lbl("VAS_090_Locator", "Locator")) + '</span><span>' + escapeHtml(lbl("VAS_090_Received", "Received")) + '</span></div>';
+
+            var rcvTotalPages = Math.max(1, Math.ceil((currentLines || []).length / RCV_PAGE_SIZE));
+            if (rcvPageNo > rcvTotalPages) { rcvPageNo = rcvTotalPages; }
+            if (rcvPageNo < 1) { rcvPageNo = 1; }
 
             if (!currentLines || currentLines.length === 0) {
                 html += '<div class="vas-ra-empty">' + escapeHtml(lbl("VAS_090_NoOpenPOLines", "No open PO lines available.")) + '</div>';
             } else {
-                for (var i = 0; i < currentLines.length; i++) {
+                /* Max 6 data lines visible - further lines are paged, never
+                   scrolled. Typed values persist in lineEntry across pages. */
+                var start = (rcvPageNo - 1) * RCV_PAGE_SIZE;
+                var end = Math.min(start + RCV_PAGE_SIZE, currentLines.length);
+                for (var i = start; i < end; i++) {
                     var line = currentLines[i];
+                    /* Empty attribute instances carry dash-only descriptions
+                       ("-", "---"): show nothing for those. */
+                    var attributeText = (line.attributeName && !/^-+$/.test(String(line.attributeName).trim())) ? line.attributeName : "";
+                    var entry = lineEntry[line.poLineId] || {};
+                    var qtyValue = entry.qty != null ? entry.qty : toInputValue(line.defaultReceivedQty);
                     html +=
                         '<div class="vas-ra-receive-row">' +
                         '<span class="vas-ra-line-name" title="' + escapeHtml(line.itemName || "-") + '">' + escapeHtml(line.itemName || "-") + '</span>' +
+                        '<span class="vas-ra-line-attr" title="' + escapeHtml(attributeText) + '">' + escapeHtml(attributeText) + '</span>' +
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.poQty, line.uom)) + '</span>' +
-                        '<span class="num">' + escapeHtml(formatQtyWithUom(line.alreadyReceivedQty, line.uom)) + '</span>' +
                         '<span class="num">' + escapeHtml(formatQtyWithUom(line.openQty, line.uom)) + '</span>' +
                         '<span>' + locatorSelectHtml(line.poLineId) + '</span>' +
-                        '<span><input class="vas-ra-rcv-input" type="number" min="0" step="any" value="' + escapeHtml(toInputValue(line.defaultReceivedQty)) + '" data-polineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(toInputValue(line.openQty)) + '"/></span>' +
+                        '<span><input class="vas-ra-rcv-input" type="number" min="0" step="any" value="' + escapeHtml(qtyValue) + '" data-polineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(toInputValue(line.openQty)) + '"/></span>' +
                         '</div>';
                 }
             }
 
+            html += '</div>';
+
+            if (rcvTotalPages > 1) {
+                html +=
+                    '<div class="vas-ra-modal-pager">' +
+                    '<button type="button" class="vas-ra-pgbtn vas-ra-rcv-prev"' + (rcvPageNo <= 1 ? ' disabled' : '') + '>' + icon("chevL") + '</button>' +
+                    '<span class="vas-ra-pgtext">' + escapeHtml(rcvPageNo + ' ' + lbl("VAS_090_Of", "of") + ' ' + rcvTotalPages) + '</span>' +
+                    '<button type="button" class="vas-ra-pgbtn vas-ra-rcv-next"' + (rcvPageNo >= rcvTotalPages ? ' disabled' : '') + '>' + icon("chevR") + '</button>' +
+                    '</div>';
+            }
+
             html +=
-                '</div>' +
                 '<div class="vas-ra-action-footer">' +
                 '<button type="button" class="vas-ra-secondary vas-ra-back-po">' + icon("chevL") + escapeHtml(lbl("VAS_090_Back", "Back")) + '</button>' +
                 '<button type="button" class="vas-ra-primary vas-ra-make-grn">' + icon("check") + escapeHtml(lbl("VAS_090_MakeGRN", "Make GRN")) + '</button>' +
@@ -706,28 +799,30 @@
             var lines = [];
             var invalidMessage = "";
 
-            $dialogBody.find('.vas-ra-rcv-input').each(function () {
-                var $input = $(this);
-                var raw = String($input.val() || "").replace(/,/g, "");
+            /* The table is paged (max 6 lines visible): quantities and locators
+               are read from the lineEntry state, which covers EVERY line of the
+               PO, not just the visible page. */
+            for (var i = 0; i < currentLines.length; i++) {
+                var line = currentLines[i];
+                var entry = lineEntry[line.poLineId] || {};
+                var raw = String(entry.qty != null ? entry.qty : toInputValue(line.defaultReceivedQty)).replace(/,/g, "");
                 var qty = Number(raw);
-                var openQty = Number($input.data('openqty') || 0);
+                var openQty = Number(line.openQty || 0);
 
                 if (!isFinite(qty) || qty < 0) {
                     invalidMessage = lbl("VAS_090_ReceivedQtyInvalid", "Received quantity cannot be negative.");
-                    return false;
+                    break;
                 }
 
                 if (qty > openQty + 0.000001) {
                     invalidMessage = lbl("VAS_090_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
-                    return false;
+                    break;
                 }
 
                 if (qty > 0) {
-                    var poLineId = Number($input.data('polineid'));
-                    var locatorId = Number($dialogBody.find('.vas-ra-loc-select[data-polineid="' + poLineId + '"]').val() || 0);
-                    lines.push({ poLineId: poLineId, receivedQty: qty, locatorId: locatorId });
+                    lines.push({ poLineId: Number(line.poLineId), receivedQty: qty, locatorId: Number(entry.locatorId || 0) });
                 }
-            });
+            }
 
             if (invalidMessage) {
                 notify(invalidMessage);
@@ -743,10 +838,10 @@
             $dialogBody.find('.vas-ra-make-grn').prop('disabled', true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/CreateGRN',
+                url: VIS.Application.contextUrl + 'VAS_090_ReceivingActionsWidget/CreateGRN',
                 type: 'POST',
                 cache: false,
-                data: { poId: currentPO.poId, linesJson: JSON.stringify(lines), warehouseId: poSelectedWarehouseId },
+                data: { poId: currentPO.poId, linesJson: JSON.stringify(lines), warehouseId: poSelectedWarehouseId, docTypeId: poSelectedDocTypeId },
                 success: function (res) {
                     var data = parseResponse(res);
                     if (!data || data.error) {
@@ -754,15 +849,16 @@
                         return;
                     }
 
-                    setModal(lbl("VAS_090_GRNCreatedFrom", "GRN created from") + " " + currentPO.poNo, lbl("VAS_090_Unloading", "Unloading"), "info");
+                    /* The receipt is created AND completed server-side; show the
+                       real resulting document status, not a fixed placeholder. */
+                    var statusText = data.docStatusName || lbl("VAS_090_Completed", "Completed");
+                    setModal(lbl("VAS_090_GRNCreatedFrom", "GRN created from") + " " + currentPO.poNo, statusText, "ok");
                     $dialogBody.html(
                         '<div class="vas-ra-form">' +
                         fieldHtml(lbl("VAS_090_FromPO", "From PO"), currentPO.poNo, true) +
                         fieldHtml(lbl("VAS_090_Supplier", "Supplier"), currentPO.supplier) +
                         fieldHtml(lbl("VAS_090_Lines", "Lines"), String(lines.length)) +
                         fieldHtml(lbl("VAS_090_NewGRNNo", "New GRN #"), data.grnNo || data.shipmentId || "-") +
-                        fieldHtml(lbl("VAS_090_Dock", "Dock"), currentPO.dockName || currentPO.warehouseName) +
-                        fieldHtml(lbl("VAS_090_Status", "Status"), lbl("VAS_090_Unloading", "Unloading")) +
                         '</div>'
                     );
                     $(document).trigger('VAS_GRNCreated');
