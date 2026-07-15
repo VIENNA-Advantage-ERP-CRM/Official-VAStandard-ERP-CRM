@@ -245,9 +245,9 @@
     display: inline-flex;
     align-items: center;
     padding: 0.0625em 0.4375em;
-    border-radius: 999em;
+    border-radius: 999px;             /* pill radius sentinel — stays px (foundations.md) */
     font-size: 0.95em;                /* matches rowmeta size visually after rem nesting */
-    font-weight: 600;
+    font-weight: 700;                 /* semantic status chip — Bold (spec palette 400/500/700, no 600) */
     background: #CCEFDD;
     color: #0C5D38;
     line-height: 1.3;
@@ -264,6 +264,14 @@
     padding: 1.625em 1.25em;
     color: #748494;
     font-size: 0.8125em;              /* 13px */
+}
+
+/* Bottom "Loading more…" indicator shown while the next scroll page is fetched. */
+.vas-rsw-more {
+    text-align: center;
+    padding: 0.625em 0.75em;
+    color: #748494;
+    font-size: 0.6875em;              /* 11px — matches the meta count line */
 }
 
     .vas-rsw-empty strong {
