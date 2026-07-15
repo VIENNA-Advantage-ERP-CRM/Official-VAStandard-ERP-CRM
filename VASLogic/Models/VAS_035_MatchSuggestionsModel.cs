@@ -140,6 +140,7 @@ namespace VASLogic.Models
                 INNER JOIN C_Currency ReceiptCurrency ON (ReceiptCurrency.C_Currency_ID=Payment.C_Currency_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
+                  AND NVL(Payment.VA009_OrderPaySchedule_ID, 0) = 0 
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND COALESCE(Payment.IsAllocated, 'N') = 'N'
                   AND COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) > 0

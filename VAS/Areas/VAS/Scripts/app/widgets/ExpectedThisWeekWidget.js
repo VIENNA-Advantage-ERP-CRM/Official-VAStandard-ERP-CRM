@@ -1,9 +1,11 @@
 /**
  * Expected This Week Widget
- * Purpose - KPI card showing AR invoice amount due in the next 7 days in
- *           base (accounting schema) currency. Clicking the card opens a
- *           modal dialog listing the invoices with Date, Invoice No., Customer,
- *           Invoice Currency, Amount (in invoice currency — no conversion).
+ * Purpose - KPI card showing the AR amount due in the next 7 days in base
+ *           (accounting schema) currency — from BOTH AR invoice pay schedules
+ *           and sales-order (VA009) pay schedules. Clicking the card opens a
+ *           modal listing each document with Document No., Document Type,
+ *           Document Date, Customer, Due Date, Currency, Due Amount, Due In
+ *           (amount in document currency — no conversion in the list).
  * Design   - Per design.md / dashboard-widgets.md: Onfinity Glass Widget with
  *            `tint-success` KPI shell — icon well, muted label, ↗ View hint,
  *            big bold success-green metric prefixed with the base currency
@@ -16,8 +18,9 @@
  *  2  | View                                  | VIS_View
  *  3  | Invoice due in 7 days                 | VIS_InvoiceDueIn7Days
  *  4  | Invoices due within the next 7 days   | VIS_InvoicesDueWithinNext7Days
- *  5  | Invoice No.                           | VIS_InvoiceNo
- *  6  | Invoice date                          | VIS_InvoiceDate
+ *  5  | Document No                           | VIS_DocumentNo
+ *  5a | Document Type                         | VIS_DocumentType
+ *  6  | Document Date                         | VIS_DocumentDate
  *  7  | Customer                              | VIS_Customer
  *  8  | Due date                              | VIS_DueDate
  *  9  | Invoice Currency                      | VIS_InvoiceCurrency
@@ -325,7 +328,7 @@
 
             if (!rows || rows.length === 0) {
                 $dialogTbody.html(
-                    '<tr><td class="vas-etw-dialog-empty" colspan="7">' +
+                    '<tr><td class="vas-etw-dialog-empty" colspan="8">' +
                     lbl("VIS_NoInvoicesDuePeriod", "No invoices due in this period") +
                     '</td></tr>'
                 );
@@ -335,7 +338,8 @@
             for (var i = 0; i < rows.length; i++) {
                 var row = rows[i];
                 var docNo = row.documentNo || "";
-                var invoiceDateText = formatDate(row.invoiceDate);
+                var docType = row.documentType || "";
+                var documentDateText = formatDate(row.documentDate);
                 var customer = row.customer || "";
                 var dueDateText = formatDate(row.dueDate);
                 var invoiceCurrency = row.invoiceCurrency || "";
@@ -368,7 +372,10 @@
                     '<td class="vas-etw-td-doc" title="' + escapeHtml(docNo) + '">' +
                     '<span class="vas-etw-truncate">' + escapeHtml(docNo) + '</span>' +
                     '</td>' +
-                    '<td class="vas-etw-td-invdate" title="' + escapeHtml(invoiceDateText) + '">' + escapeHtml(invoiceDateText) + '</td>' +
+                    '<td class="vas-etw-td-doctype" title="' + escapeHtml(docType) + '">' +
+                    '<span class="vas-etw-truncate">' + escapeHtml(docType) + '</span>' +
+                    '</td>' +
+                    '<td class="vas-etw-td-invdate" title="' + escapeHtml(documentDateText) + '">' + escapeHtml(documentDateText) + '</td>' +
                     '<td class="vas-etw-td-customer" title="' + escapeHtml(customer) + '">' +
                     '<span class="vas-etw-truncate">' + escapeHtml(customer) + '</span>' +
                     '</td>' +
@@ -466,8 +473,9 @@
                 '<table class="vas-etw-dialog-table">' +
                 '<thead>' +
                 '<tr>' +
-                '<th class="vas-etw-th-doc" title="' + escapeHtml(lbl("VIS_InvoiceNo", "Invoice No.")) + '">' + lbl("VIS_InvoiceNo", "Invoice No.") + '</th>' +
-                '<th class="vas-etw-th-invdate" title="' + escapeHtml(lbl("VIS_InvoiceDate", "Invoice date")) + '">' + lbl("VIS_InvoiceDate", "Invoice date") + '</th>' +
+                '<th class="vas-etw-th-doc" title="' + escapeHtml(lbl("VIS_DocumentNo", "Document No")) + '">' + lbl("VIS_DocumentNo", "Document No") + '</th>' +
+                '<th class="vas-etw-th-doctype" title="' + escapeHtml(lbl("VIS_DocumentType", "Document Type")) + '">' + lbl("VIS_DocumentType", "Document Type") + '</th>' +
+                '<th class="vas-etw-th-invdate" title="' + escapeHtml(lbl("VIS_DocumentDate", "Document Date")) + '">' + lbl("VIS_DocumentDate", "Document Date") + '</th>' +
                 '<th class="vas-etw-th-customer" title="' + escapeHtml(lbl("VIS_Customer", "Customer")) + '">' + lbl("VIS_Customer", "Customer") + '</th>' +
                 '<th class="vas-etw-th-duedate" title="' + escapeHtml(lbl("VIS_DueDate", "Due date")) + '">' + lbl("VIS_DueDate", "Due date") + '</th>' +
                 '<th class="vas-etw-th-currency" title="' + escapeHtml(lbl("VIS_InvoiceCurrency", "Invoice Currency")) + '">' + lbl("VIS_InvoiceCurrency", "Invoice Currency") + '</th>' +

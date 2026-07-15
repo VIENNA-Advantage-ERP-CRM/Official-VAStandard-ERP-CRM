@@ -4,7 +4,9 @@
  *           are matched/allocated to invoices. Clicking the card opens a
  *           modal dialog listing every receipt with Date, Receipt No.,
  *           Customer, Bank Account, Payment Currency, Amount (in payment
- *           currency, no conversion), and a Matched flag.
+ *           currency, no conversion), and a Matched flag. On the Unallocated
+ *           tab an extra "Unallocated" column follows Amount, showing the
+ *           still-open amount (C_Payment.vas_unallocatedamount).
  * Design   - Per design.md / dashboard-widgets.md §"KPI And Summary Widget":
  *            glass KPI shell on the em-based Widget Root Anchor
  *            (clamp(16px, --dash-inline-size*0.012, 20px)) — clamped icon
@@ -74,6 +76,7 @@
         var $metricEl;
         var $busy;
         var $dialog;
+        var $dialogTable;
         var $dialogTbody;
         var $dialogSubtitle;
         var $dialogBusy;
@@ -321,6 +324,12 @@
         function updateActiveTabStyles() {
             if (!$tabAllocated || !$tabUnallocated) { return; }
 
+            /* The Unallocated amount column is only meaningful on the
+               Unallocated tab; show it there, hide it on Allocated. */
+            if ($dialogTable) {
+                $dialogTable.toggleClass("vas-aa-show-unalloc", activeFilter === "unallocated");
+            }
+
             $tabAllocated.toggleClass("vas-aa-tab-active", activeFilter === "allocated");
             $tabAllocated.attr("aria-selected", activeFilter === "allocated" ? "true" : "false");
 
@@ -365,7 +374,7 @@
 
             if (!rows || rows.length === 0) {
                 $dialogTbody.html(
-                    '<tr><td class="vas-aa-dialog-empty" colspan="6">' +
+                    '<tr><td class="vas-aa-dialog-empty" colspan="7">' +
                     lbl("VAS_NoReceiptsThisPeriod", "No receipts in this period") +
                     '</td></tr>'
                 );
@@ -390,6 +399,15 @@
                     (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
                     escapeHtml(amountMagnitude);
 
+                /* Unallocated amount (payment-currency, same formatting as Amount).
+                   The cell is always rendered; CSS shows it only on the Unallocated
+                   tab (table carries .vas-aa-show-unalloc). */
+                var unallocParts = formatExactAmount(row.unallocatedAmount);
+                var unallocHtml = escapeHtml(unallocParts.sign) +
+                    (sym ? '<span class="vas-aa-cur-inline">' + escapeHtml(sym) + '</span>' : '') +
+                    escapeHtml(unallocParts.magnitude);
+                var unallocTitle = unallocParts.sign + (sym ? sym : '') + unallocParts.magnitude;
+
                 /* The Matched column was dropped — the active tab itself
                    indicates the allocated/unallocated state. */
                 var $tr = $(
@@ -406,6 +424,7 @@
                     '</td>' +
                     '<td class="vas-aa-td-currency" title="' + escapeHtml(currencyCode) + '">' + escapeHtml(currencyCode) + '</td>' +
                     '<td class="vas-aa-td-amount" title="' + escapeHtml(amountSign + (sym ? sym : '') + amountMagnitude) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-aa-td-unallocated" title="' + escapeHtml(unallocTitle) + '">' + unallocHtml + '</td>' +
                     '</tr>'
                 );
 
@@ -520,6 +539,7 @@
                 '<th class="vas-aa-th-bank" title="' + escapeHtml(lbl("VAS_BankAccount", "Bank account")) + '">' + lbl("VAS_BankAccount", "Bank account") + '</th>' +
                 '<th class="vas-aa-th-currency" title="' + escapeHtml(lbl("VAS_PaymentCurrency", "Payment Currency")) + '">' + lbl("VAS_PaymentCurrency", "Payment Currency") + '</th>' +
                 '<th class="vas-aa-th-amount" title="' + escapeHtml(lbl("VAS_Amount", "Amount")) + '">' + lbl("VAS_Amount", "Amount") + '</th>' +
+                '<th class="vas-aa-th-unallocated" title="' + escapeHtml(lbl("VAS_Unallocated", "Unallocated")) + '">' + lbl("VAS_Unallocated", "Unallocated") + '</th>' +
                 '</tr>' +
                 '</thead>' +
                 '<tbody class="vas-aa-dialog-tbody"></tbody>' +
@@ -543,6 +563,7 @@
                 '</div>'
             );
 
+            $dialogTable = $dialog.find('.vas-aa-dialog-table');
             $dialogTbody = $dialog.find('.vas-aa-dialog-tbody');
             $dialogSubtitle = $dialog.find('.vas-aa-dialog-subtitle');
             $dialogBusy = $dialog.find('.vas-aa-dialog-busy');
