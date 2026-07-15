@@ -650,10 +650,13 @@
                 var refDateText = formatDate(refDate);
                 var refAmtNumVal = Number(refAmtNum || 0);
                 var refAmtSign = refAmtNumVal < 0 ? '-' : '';
-                var refAmount = refAmtSign + formatExactAmount(Math.abs(refAmtNumVal), stdPrecision);
+                /* Magnitude only — the sign is emitted BEFORE the currency symbol
+                   at render time (e.g. "-$58,643.20", not "$-58,643.20"), matching
+                   the summary Amount / Receipt Total. */
+                var refAmount = formatExactAmount(Math.abs(refAmtNumVal), stdPrecision);
                 var appliedNum = Number(pick(line, "AppliedAmount", "appliedAmount") || 0);
                 var appliedSign = appliedNum < 0 ? '-' : '';
-                var applied = appliedSign + formatExactAmount(Math.abs(appliedNum), stdPrecision);
+                var applied = formatExactAmount(Math.abs(appliedNum), stdPrecision);
 
                 /* Type chip — INV (blue) / PMT (success-deep) / GL (warning). */
                 var chipText = type === "Payment" ? "PMT"
@@ -672,8 +675,8 @@
                     '<span class="vas-rr-d-inv-no">' + escapeHtml(refDocText) + '</span>' +
                     '</td>' +
                     '<td class="vas-rr-d-inv-date">' + escapeHtml(refDateText) + '</td>' +
-                    '<td class="vas-rr-d-num">' + symHtml + escapeHtml(refAmount) + '</td>' +
-                    '<td class="vas-rr-d-num vas-rr-d-alloc-amt">' + symHtml + escapeHtml(applied) + '</td>' +
+                    '<td class="vas-rr-d-num">' + refAmtSign + symHtml + escapeHtml(refAmount) + '</td>' +
+                    '<td class="vas-rr-d-num vas-rr-d-alloc-amt">' + appliedSign + symHtml + escapeHtml(applied) + '</td>' +
                     '</tr>';
             }
 
