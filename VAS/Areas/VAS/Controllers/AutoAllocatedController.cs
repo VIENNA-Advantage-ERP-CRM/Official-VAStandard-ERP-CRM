@@ -52,6 +52,7 @@ namespace VIS.Controllers
                 FROM C_Payment Payment
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
+                  AND NVL(Payment.VA009_OrderPaySchedule_ID, 0) = 0 
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND " + TruncColumn("Payment.DateAcct") + @" >= " + ToSqlDate(rangeStart) + @"
                   AND " + TruncColumn("Payment.DateAcct") + @" < " + ToSqlDate(rangeEnd);
@@ -185,6 +186,7 @@ namespace VIS.Controllers
                        COALESCE(Bank.Name, BankAccount.Name) AS Bank_Name,
                        COALESCE(BankAccount.AccountNo, N'') AS Account_No,
                        Payment.PaymentAmount AS Pay_Amount,
+                       Payment.vas_unallocatedamount AS Unallocated_Amount,
                        Currency.ISO_Code AS Payment_Currency,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Payment_Currency_Symbol,
                        CASE
@@ -199,6 +201,7 @@ namespace VIS.Controllers
                 LEFT JOIN C_BPartner BPartner ON (Payment.C_BPartner_ID=BPartner.C_BPartner_ID)
                 WHERE Payment.IsReceipt = 'Y'
                   AND Payment.IsActive = 'Y'
+                  AND NVL(Payment.VA009_OrderPaySchedule_ID, 0) = 0 
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND " + TruncColumn("Payment.DateAcct") + @" >= " + ToSqlDate(rangeStart) + @"
                   AND " + TruncColumn("Payment.DateAcct") + @" < " + ToSqlDate(rangeEnd) +
@@ -229,6 +232,7 @@ namespace VIS.Controllers
                        ReceiptsData.Bank_Name,
                        ReceiptsData.Account_No,
                        ReceiptsData.Pay_Amount,
+                       ReceiptsData.Unallocated_Amount,
                        ReceiptsData.Payment_Currency,
                        ReceiptsData.Payment_Currency_Symbol,
                        ReceiptsData.Is_Matched,
@@ -264,6 +268,7 @@ namespace VIS.Controllers
                         bankName = Util.GetValueOfString(dr["Bank_Name"]),
                         accountNo = Util.GetValueOfString(dr["Account_No"]),
                         amount = Util.GetValueOfDecimal(dr["Pay_Amount"]),
+                        unallocatedAmount = Util.GetValueOfDecimal(dr["Unallocated_Amount"]),
                         paymentCurrency = Util.GetValueOfString(dr["Payment_Currency"]),
                         paymentCurrencySymbol = Util.GetValueOfString(dr["Payment_Currency_Symbol"]),
                         matched = Util.GetValueOfString(dr["Is_Matched"]) == "Y"

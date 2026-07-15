@@ -384,11 +384,12 @@
     }
 
 /* Per-column widths — Customer flexes; everything else fixed so Dates and
-   Amount always have room to render their full value. Order per spec:
-   Invoice No | Invoice date | Customer | Due date | Currency | Due amount | Due in. */
-.vas-etw-th-doc,         .vas-etw-td-doc         { width: 8.5em; }
+   Amount always have room to render their full value. Order:
+   Document No | Document Type | Document date | Customer | Due date | Currency | Due amount | Due in. */
+.vas-etw-th-doc,         .vas-etw-td-doc         { width: 7.5em; }
+.vas-etw-th-doctype,     .vas-etw-td-doctype     { width: 8em; }
 .vas-etw-th-invdate,     .vas-etw-td-invdate     { width: 7em; }
-.vas-etw-th-customer,    .vas-etw-td-customer    { width: 12em; }
+.vas-etw-th-customer,    .vas-etw-td-customer    { width: 10em; }
 .vas-etw-th-duedate,     .vas-etw-td-duedate     { width: 7em; }
 .vas-etw-th-currency,    .vas-etw-td-currency    { width: 5em; text-align: center; }
 .vas-etw-th-amount,      .vas-etw-td-amount      { width: 9em; }
@@ -407,6 +408,7 @@
     color: #5F7283;
 }
 
+.vas-etw-td-doctype,
 .vas-etw-td-invdate,
 .vas-etw-td-duedate {
     color: #5F7283;
@@ -580,9 +582,10 @@
         border-radius: 0;
     }
 
-    .vas-etw-th-doc,         .vas-etw-td-doc         { width: 7.5em; }
+    .vas-etw-th-doc,         .vas-etw-td-doc         { width: 6.5em; }
+    .vas-etw-th-doctype,     .vas-etw-td-doctype     { width: 7em; }
     .vas-etw-th-invdate,     .vas-etw-td-invdate     { width: 6.5em; }
-    .vas-etw-th-customer,    .vas-etw-td-customer    { width: 10em; }
+    .vas-etw-th-customer,    .vas-etw-td-customer    { width: 9em; }
     .vas-etw-th-duedate,     .vas-etw-td-duedate     { width: 6.5em; }
     .vas-etw-th-currency,    .vas-etw-td-currency    { width: 4.5em; }
     .vas-etw-th-amount,      .vas-etw-td-amount      { width: 8em; }
@@ -603,11 +606,13 @@
         font-size: 0.75em;
     }
 
-    /* On the narrowest screens drop the Invoice Date column to keep the
-       primary (Invoice No / Customer / Due date / Currency / Amount / Due in)
-       visible without horizontal scrolling. */
+    /* On the narrowest screens drop the Document Type + Document Date columns to
+       keep the primary (Document No / Customer / Due date / Currency / Amount /
+       Due in) visible without horizontal scrolling. */
     .vas-etw-th-invdate,
-    .vas-etw-td-invdate {
+    .vas-etw-td-invdate,
+    .vas-etw-th-doctype,
+    .vas-etw-td-doctype {
         display: none;
     }
 
