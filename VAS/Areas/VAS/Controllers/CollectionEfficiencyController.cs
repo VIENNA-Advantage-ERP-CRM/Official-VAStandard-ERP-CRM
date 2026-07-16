@@ -208,7 +208,7 @@ namespace VIS.Controllers
                            ReceiptInvoices.DateInvoiced AS DateInvoiced,
                            ReceiptInvoices.AllocationDate AS AllocationDate,
                            InvoicePaySchedule.DueDate AS DueDate,
-                           InvoicePaySchedule.DueAmt AS DueAmt
+                           InvoicePaySchedule.VA009_OpenAmnt AS DueAmt
                     FROM ReceiptInvoices ReceiptInvoices
                     INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON (InvoicePaySchedule.C_Invoice_ID=ReceiptInvoices.C_Invoice_ID 
                                                         AND InvoicePaySchedule.C_InvoicePaySchedule_ID = ReceiptInvoices.C_InvoicePaySchedule_ID)

@@ -459,7 +459,10 @@
                 '<div class="vas-oar-head">' +
                 '<div class="vas-oar-head-left">' +
                 '<div class="vas-oar-icon">' + cardIconSvg() + '</div>' +
+                '<div class="vas-oar-label-group">' +
                 '<span class="vas-oar-label">' + escapeHtml(lbl("VAS_003_OnAccount", "On-account")) + '</span>' +
+                '<span class="vas-oar-subtitle">' + escapeHtml(lbl("VAS_003_TotalUnallocatedReceipts", "Total Unallocated Receipts")) + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

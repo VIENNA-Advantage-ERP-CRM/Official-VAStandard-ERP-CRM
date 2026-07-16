@@ -2,6 +2,9 @@
    VAS GL Journal Top Ledger Movement Widget
    File  : VAS_043_GLJournalTopMovementWidget.css
    Scope : .VAS-gljtm-root
+   Design: Onfinity design system (design.md + dashboard-widgets.md).
+           Bar-list widget — glass card, period switcher, semantic bars,
+           list body per design.md list rules, footer pager (no inner scroll).
    ========================================================================== */
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
@@ -9,78 +12,69 @@
     --on-text-muted: #748494;
     height: 100%;
     width: 100%;
+    container-type: inline-size;
 }
 
-/* ── Card container ──────────────────────────────────────────────────────── */
+/* ── Glass card container (shared foundation) ────────────────────────────── */
 .VAS-gljtm-card {
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 1em;
-    border-radius: 0.875em;
+    padding: 0.85em;
+    border-radius: 14px;
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    background: linear-gradient(180deg, #FAFCFE 0%, #EEF6FF 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-sizing: border-box;
     overflow: hidden;
+    /* Root anchor — design.md clamp(16px, 1.2cqi, 20px) on dashboard width.
+       cqi is NOT usable (root sets its own container-type). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
 }
 
 /* ── Header row ──────────────────────────────────────────────────────────── */
 .VAS-gljtm-root .w-head {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     flex-shrink: 0;
     margin-bottom: 0.75em;
 }
 
-/* Icon well */
+/* Glass icon well — accent glyph color preserved */
 .VAS-gljtm-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.75em;
-    height: 1.75em;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
     flex-shrink: 0;
-    border-radius: 0.375em;
-    background: rgba(0, 131, 218, 0.10);
-    color: #004E9A;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #0083DA;
 }
 
 .VAS-gljtm-icon svg {
-    width: 1em;
-    height: 1em;
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     stroke: currentColor;
 }
 
-/* Title */
+/* Title — Roboto Regular 400 (design.md Widget Header) */
 .VAS-gljtm-root .w-title {
-    font-size: 0.8125em;
-    font-weight: 600;
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
     color: #102C3F;
-    letter-spacing: 0.01em;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Month / YTD toggle */
-.VAS-gljtm-toggle {
-    font-size: 0.75em;
-    font-weight: 600;
-    color: #0083DA;
-    background: rgba(0, 131, 218, 0.07);
-    border: 1px solid rgba(0, 131, 218, 0.20);
-    border-radius: 0.35em;
-    padding: 0.2em 0.55em;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: background 0.12s;
-    white-space: nowrap;
-}
-
-.VAS-gljtm-toggle:hover {
-    background: rgba(0, 131, 218, 0.14);
-}
-
+/* ── Period switcher (labeled state switcher) ────────────────────────────── */
 .VAS-gljtm-period-group {
     display: inline-flex;
     align-items: stretch;
@@ -95,16 +89,16 @@
 }
 
 .VAS-gljtm-period-btn {
-    min-width: 54px;
-    height: 26px;
-    padding: 0 12px;
+    min-width: 3.375em;
+    height: 1.625em;
+    padding: 0 0.75em;
     border: 0;
     border-radius: 0;
     background: #FFFFFF;
     color: #748494;
     cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 0.75em;
+    font-weight: 500;
     line-height: 1;
     white-space: nowrap;
     transition: background 0.14s ease, color 0.14s ease;
@@ -119,39 +113,39 @@
     color: #0083DA;
 }
 
+/* Active state — stronger color + weight */
 .VAS-gljtm-period-btn.is-active {
     background: #EAF8FF;
     color: #0083DA;
+    font-weight: 600;
 }
 
-/* ── Scrollable body ─────────────────────────────────────────────────────── */
+/* ── List body (no inner scroll — the list paginates) ────────────────────── */
 .VAS-gljtm-body {
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
 }
 
-/* ── Account list ────────────────────────────────────────────────────────── */
 .VAS-gljtm-list {
     display: flex;
     flex-direction: column;
-    gap: 0.55em;
+    gap: 0;
 }
 
 /* ── Single account row ──────────────────────────────────────────────────── */
 .VAS-gljtm-row {
     display: flex;
     flex-direction: column;
-    gap: 0.2em;
+    gap: 0.35em;
     cursor: pointer;
-    border-radius: 0.35em;
-    padding: 0.12em 0.2em;
+    border-radius: 0;
+    padding: 0.375em 0.2em;
     transition: background 0.12s;
 }
 
 .VAS-gljtm-row:hover {
-    background: rgba(0, 131, 218, 0.06);
+    background: #F8FBFE;
 }
 
 /* Row header: label + value */
@@ -162,43 +156,42 @@
     gap: 0.5em;
 }
 
-/* Account label (code + name) */
+/* Account label — account name is the muted portion (design.md list sm) */
 .VAS-gljtm-label {
-    font-size: 0.8em;
-    font-weight: 700;
-    color: #102C3F;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
 }
 
-/* Account search key (e.g. "4001") */
+/* Account code — bold dark */
 .VAS-gljtm-acct {
-    font-size: 0.85em;
     font-weight: 400;
-    color: #748494;
+    color: #102C3F;
     margin-right: 0.4em;
 }
 
-/* Net movement value */
+/* Net movement value — sm bold */
 .VAS-gljtm-val {
-    font-size: 0.8em;
-    font-weight: 700;
+    font-size: 0.75em;
+    font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-/* ── Bar track ───────────────────────────────────────────────────────────── */
+/* ── Bar track + semantic fills (preserved) ──────────────────────────────── */
 .VAS-gljtm-track {
     height: 0.45em;
-    background: rgba(0, 131, 218, 0.10);
+    background: #EAF8FF;
     border-radius: 999px;
     overflow: hidden;
 }
 
-/* ── Bar fill — blue (debit-heavy) ──────────────────────────────────────── */
+/* Debit-heavy (blue) */
 .VAS-gljtm-fill {
     height: 100%;
     width: var(--bar-w, 0%);
@@ -207,7 +200,7 @@
     transition: width 0.4s ease;
 }
 
-/* ── Bar fill — green (credit-heavy) ────────────────────────────────────── */
+/* Credit-heavy (green) */
 .VAS-gljtm-fill-cr {
     background: #019D89;
 }
@@ -219,192 +212,10 @@
     align-items: center;
     justify-content: center;
     height: 6em;
-    font-size: 0.8em;
+    font-size: 0.75em;
     color: #748494;
 }
 
-/* ── Responsive scaling ──────────────────────────────────────────────────── */
-@media screen and (max-width: 1920px) {
-    .vis-editModeWidget .VAS-gljtm-card {
-        font-size: 10px;
-    }
-}
-
-@media screen and (max-width: 1366px) {
-    .VAS-gljtm-card {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .VAS-gljtm-card {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 1024px) {
-    .VAS-gljtm-card {
-        font-size: 9px;
-    }
-
-    .vis-editModeWidget .VAS-gljtm-card {
-        font-size: 6px;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .VAS-gljtm-card {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .VAS-gljtm-card {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .VAS-gljtm-card {
-        font-size: 11px;
-    }
-}
-
-/* ── RTL support ─────────────────────────────────────────────────────────── */
-html[dir="rtl"] .VAS-gljtm-root .w-head {
-    flex-direction: row-reverse;
-}
-
-/* Typography alignment with VAS_003_OnAccountReceipts */
-.VAS-gljtm-root {
-    container-type: inline-size;
-}
-
-.VAS-gljtm-card {
-    font-size: clamp(16px, 1.4cqi, 24px);
-}
-
-.VAS-gljtm-root .w-title {
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 400;
-    letter-spacing: 0;
-}
-
-.VAS-gljtm-row,
-.VAS-gljtm-empty {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    font-weight: 400;
-}
-
-.VAS-gljtm-amt,
-.VAS-gljtm-name {
-    font-weight: 400;
-}
-
-/* Design-system color alignment */
-.VAS-gljtm-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
-    border: 2px solid #FFFFFF;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-}
-
-.VAS-gljtm-root .w-title,
-.VAS-gljtm-label,
-.VAS-gljtm-val {
-    color: #102C3F;
-}
-
-.VAS-gljtm-icon {
-    background: #FBFDFF;
-    border: 1px solid #E4EDF4;
-    color: #0083DA;
-}
-
-.VAS-gljtm-acct {
-    color: #748494;
-}
-
-.VAS-gljtm-toggle {
-    color: #0083DA;
-    background: #EAF8FF;
-    border: 1px solid #BFE4FF;
-}
-
-.VAS-gljtm-toggle:hover,
-.VAS-gljtm-row:hover {
-    background: #EAF8FF;
-}
-
-.VAS-gljtm-track {
-    background: #EAF8FF;
-}
-
-.VAS-gljtm-fill {
-    background: #0083DA;
-}
-
-.VAS-gljtm-fill-cr {
-    background: #019D89;
-}
-
-html[dir="rtl"] .VAS-gljtm-row-head {
-    flex-direction: row-reverse;
-}
-
-.VAS-gljtm-val {
-    position: sticky;
-    right: 0;
-    z-index: 1;
-    background: rgba(255, 255, 255, 0.86);
-    padding-left: 0.5em;
-}
-
-.VAS-gljtm-pager {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.625em;
-    flex-shrink: 0;
-    margin-top: 0.75em;
-    padding-top: 0.625em;
-    border-top: 1px solid #EDF2F6;
-}
-
-.VAS-gljtm-page-btn {
-    width: 2.25em;
-    height: 2.25em;
-    padding: 0;
-    border: 1px solid #CFE9FF;
-    border-radius: 0.5em;
-    background: rgba(255, 255, 255, 0.86);
-    color: #0083DA;
-    font-size: 1em;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.VAS-gljtm-page-btn:hover:not(:disabled) {
-    background: #EAF8FF;
-    border-color: #9ED1FF;
-}
-
-.VAS-gljtm-page-btn:disabled {
-    background: rgba(255, 255, 255, 0.64);
-    color: #C7D3DF;
-    cursor: default;
-}
-
-.VAS-gljtm-page-text {
-    display: inline-block;
-    min-width: 4.25em;
-    text-align: center;
-    font-size: 1em;
-    font-weight: 700;
-    color: #141414;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-/* Compact bottom pager and centered empty state */
 .VAS-gljtm-body.is-empty {
     display: flex;
     align-items: center;
@@ -417,58 +228,7 @@ html[dir="rtl"] .VAS-gljtm-row-head {
     width: 100%;
 }
 
-.VAS-gljtm-pager {
-    gap: 0.45em;
-    margin-top: auto;
-    padding-top: 0.45em;
-}
-
-.VAS-gljtm-page-btn {
-    width: 1.75em;
-    height: 1.75em;
-    font-size: 0.875em;
-}
-
-.VAS-gljtm-page-text {
-    min-width: 3.5em;
-    font-size: 0.8125em;
-}
-
-/* Unified GL Journal list placement */
-.VAS-gljtm-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-    border: 0;
-    border-radius: 0;
-}
-
-.VAS-gljtm-list {
-    gap: 0;
-}
-
-.VAS-gljtm-row {
-    border-radius: 0;
-    border-bottom: 0.0625em solid #EDF2F6;
-    padding: 0.85em 0.75em;
-}
-
-.VAS-gljtm-row:hover {
-    background: #F8FBFE;
-}
-
-.VAS-gljtm-pager {
-    justify-content: flex-end;
-    margin-top: auto;
-    padding: 1.35em 0.625em 1em;
-    border-top: 1px solid #EDF2F6;
-}
-
-/* MD widget pager pattern */
-.VAS-gljtm-body {
-    overflow: hidden;
-}
-
+/* ── Footer pager (design.md widget pager) ───────────────────────────────── */
 .VAS-gljtm-pager {
     display: flex;
     align-items: center;
@@ -513,27 +273,36 @@ html[dir="rtl"] .VAS-gljtm-row-head {
     opacity: 1;
 }
 
+/* Range helper (left, muted) */
 .VAS-gljtm-page-text {
     min-width: 116px;
     margin-right: auto;
     text-align: left;
-    font-size: 11.5px;
-    font-family: 'Roboto Mono', monospace;
-    color: var(--on-text-muted);
+    font-size: 0.75em;
+    color: #748494;
+    letter-spacing: 0.02em;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Page N of M (centered) */
+.VAS-gljtm-page-count {
+    min-width: 48px;
+    text-align: center;
+    font-size: 0.8125em;
+    color: #102C3F;
     letter-spacing: 0.02em;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.VAS-gljtm-page-count {
-    min-width: 48px;
-    text-align: center;
-    font-size: 11.5px;
-    font-family: 'Roboto Mono', monospace;
-    color: var(--on-text-muted);
-    letter-spacing: 0.02em;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+/* ── RTL support ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .VAS-gljtm-root .w-head {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljtm-row-head {
+    flex-direction: row-reverse;
 }

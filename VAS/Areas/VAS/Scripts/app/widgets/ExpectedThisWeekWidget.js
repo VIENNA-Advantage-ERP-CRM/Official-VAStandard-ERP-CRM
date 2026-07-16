@@ -557,7 +557,10 @@
                 '<line x1="3" y1="10" x2="21" y2="10"/>' +
                 '</svg>' +
                 '</div>' +
+                '<div class="vas-etw-label-group">' +
                 '<span class="vas-etw-label">' + lbl("VIS_ExpectedThisWeek", "Expected this week") + '</span>' +
+                '<span class="vas-etw-subtitle">' + lbl("VIS_ReceivablesDueThisWeek", "Receivables due this week.") + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

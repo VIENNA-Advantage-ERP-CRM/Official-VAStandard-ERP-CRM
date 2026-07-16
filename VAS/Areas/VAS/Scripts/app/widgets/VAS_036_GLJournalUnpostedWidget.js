@@ -23,7 +23,25 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
-    "use strict";
+
+    /* Creates a single document-level ResizeObserver on the dashboard container
+       and mirrors its width into the global CSS var --dash-inline-size (px), so
+       the widget's clamp() sizing tracks the dashboard width, not the viewport. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     function lbl(key, fallback) {
         var text = VIS.Msg.getMsg(key);
@@ -174,35 +192,15 @@
             var $dialogFooterText = null;
             var $dialogBusy = null;
 
-            var $detailDialog = null;
-            var $detailBody = null;
-            var $detailBusy = null;
-
-            var $postButton = null;
-
             var dialogLoaded = false;
-            var detailLoaded = false;
 
             var dialogPageNo = 1;
-            var dialogPageSize = 8;
+            var dialogPageSize = 9;
             var dialogTotalPages = 1;
             var dialogTotalCount = 0;
 
-            var detailLinePageNo = 1;
-            var detailLinePageSize = 5;
-            var detailLineTotalPages = 1;
-
-            var selectedJournalId = 0;
-            var selectedJournalStatus = "";
-            var selectedJournalPosted = false;
-
-            var actionInProgress = false;
-            var refreshTimer = null;
-
             var countRequest = null;
             var listRequest = null;
-            var detailRequest = null;
-            var actionRequest = null;
 
             var isDisposed = false;
 
@@ -215,19 +213,6 @@
 
                 showBusy(true);
                 loadData();
-
-                refreshTimer =
-                    window.setInterval(
-                        function () {
-                            if (
-                                !isDisposed &&
-                                !actionInProgress
-                            ) {
-                                refreshData();
-                            }
-                        },
-                        1000 * 60 * 5
-                    );
             };
 
             function docIconSvg() {
@@ -338,19 +323,6 @@
                 }
             }
 
-            function showDetailBusy(show) {
-                if (
-                    $detailBusy &&
-                    $detailBusy[0]
-                ) {
-                    $detailBusy[0]
-                        .style.visibility =
-                        show
-                            ? "visible"
-                            : "hidden";
-                }
-            }
-
             function createWidget() {
                 var id =
                     $self.AD_UserHomeWidgetID;
@@ -435,7 +407,6 @@
                     );
 
                 createDialog(icon);
-                createDetailDialog(icon);
             }
 
             function createDialog(icon) {
@@ -611,6 +582,54 @@
                         }
                     );
 
+                /*
+                 * Clicking the document number zooms to the GL Journal record
+                 * (opens the window). stopPropagation keeps the row's detail
+                 * popup from also opening.
+                 */
+                $dialogBody
+                    .off(
+                        "click.VAS036Zoom",
+                        ".VAS-glju-doc-zoom"
+                    )
+                    .on(
+                        "click.VAS036Zoom",
+                        ".VAS-glju-doc-zoom",
+                        function (event) {
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            zoomToJournal(
+                                $(this).attr("data-journal-id")
+                            );
+                        }
+                    );
+
+                $dialogBody
+                    .off(
+                        "keydown.VAS036Zoom",
+                        ".VAS-glju-doc-zoom"
+                    )
+                    .on(
+                        "keydown.VAS036Zoom",
+                        ".VAS-glju-doc-zoom",
+                        function (event) {
+                            if (
+                                event.key !== "Enter" &&
+                                event.key !== " "
+                            ) {
+                                return;
+                            }
+
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            zoomToJournal(
+                                $(this).attr("data-journal-id")
+                            );
+                        }
+                    );
+
                 $dialogBody
                     .parent()
                     .off(
@@ -651,20 +670,15 @@
                     function (event) {
                         if (
                             event.key !== "Escape" ||
-                            actionInProgress
+                            VAS.GLJournalDetailDialog.isBusy()
                         ) {
                             return;
                         }
 
                         if (
-                            $detailDialog &&
-                            $detailDialog.is(":visible")
-                        ) {
-                            closeDetailDialog();
-                        }
-                        else if (
                             $dialog &&
-                            $dialog.is(":visible")
+                            $dialog.is(":visible") &&
+                            !VAS.GLJournalDetailDialog.isOpen()
                         ) {
                             closeDialog();
                         }
@@ -672,144 +686,6 @@
                 );
 
                 $("body").append($dialog);
-            }
-
-            function createDetailDialog(icon) {
-                var id =
-                    $self.AD_UserHomeWidgetID;
-
-                $detailDialog =
-                    $(
-                        '<div class="VAS-glju-dialog ' +
-                        'VAS-glju-detail-dialog" ' +
-                        'id="VAS-glju-detail-dialog-' +
-                        id +
-                        '" style="display:none;z-index:1000002" ' +
-                        'role="dialog" aria-modal="true">' +
-
-                        '<div class="VAS-glju-dialog-scrim"></div>' +
-
-                        '<div class="VAS-glju-dialog-card ' +
-                        'VAS-glju-detail-card">' +
-
-                        '<div class="VAS-glju-dialog-head">' +
-
-                        '<div class="VAS-glju-dialog-icon">' +
-                        icon +
-                        "</div>" +
-
-                        '<div class="VAS-glju-dialog-title-wrap">' +
-
-                        '<div class="VAS-glju-dialog-title" ' +
-                        'id="VAS-glju-detail-title-' +
-                        id +
-                        '">&mdash;</div>' +
-
-                        '<div class="VAS-glju-dialog-sub" ' +
-                        'id="VAS-glju-detail-sub-' +
-                        id +
-                        '">&mdash;</div>' +
-
-                        "</div>" +
-
-                        '<button type="button" ' +
-                        'class="VAS-glju-dialog-close">' +
-                        `<svg viewBox="0 0 24 24"" fill="none"" stroke="currentColor"" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>` +
-
-                        "</button>" +
-
-                        "</div>" +
-
-                        '<div class="VAS-glju-dialog-body ' +
-                        'VAS-glju-detail-body">' +
-
-                        '<div class="VAS-glju-dialog-busy">' +
-                        '<div class="vis-busyindicatorinnerwrap">' +
-                        '<i class="vis_widgetloader"></i>' +
-                        "</div>" +
-                        "</div>" +
-
-                        '<div class="VAS-glju-detail-content" ' +
-                        'id="VAS-glju-detail-body-' +
-                        id +
-                        '"></div>' +
-
-                        "</div>" +
-
-                        '<div class="VAS-glju-dialog-footer">' +
-
-                        '<span class="VAS-glju-detail-footer-spacer"></span>' +
-
-                        '<div class="VAS-glju-dialog-actions">' +
-
-                        '<button type="button" ' +
-                        'class="VAS-glju-close-primary ' +
-                        'VAS-glju-action-post">' +
-                        esc(
-                            lbl(
-                                "VAS_036_PostJournal",
-                                "Post journal"
-                            )
-                        ) +
-                        "</button>" +
-
-                        '<button type="button" ' +
-                        'class="VAS-glju-close-primary ' +
-                        'VAS-glju-detail-close">' +
-                        esc(
-                            lbl(
-                                "VAS_Close",
-                                "Close"
-                            )
-                        ) +
-                        "</button>" +
-
-                        "</div>" +
-                        "</div>" +
-                        "</div>" +
-                        "</div>"
-                    );
-
-                $detailBody =
-                    $detailDialog.find(
-                        "#VAS-glju-detail-body-" +
-                        id
-                    );
-
-                $detailBusy =
-                    $detailDialog.find(
-                        ".VAS-glju-dialog-busy"
-                    );
-
-                $postButton =
-                    $detailDialog.find(
-                        ".VAS-glju-action-post"
-                    );
-
-                showDetailBusy(false);
-
-                $postButton.on(
-                    "click",
-                    function () {
-                        executeJournalAction(
-                            "PostJournal",
-                            "post"
-                        );
-                    }
-                );
-
-                $detailDialog.find(
-                    ".VAS-glju-dialog-close, " +
-                    ".VAS-glju-detail-close, " +
-                    ".VAS-glju-dialog-scrim"
-                ).on(
-                    "click",
-                    closeDetailDialog
-                );
-
-                $("body").append($detailDialog);
-
-                updateActionButtons();
             }
 
             function loadData() {
@@ -917,11 +793,11 @@
             }
 
             function closeDialog() {
-                if (actionInProgress) {
+                if (VAS.GLJournalDetailDialog.isBusy()) {
                     return;
                 }
 
-                closeDetailDialog();
+                VAS.GLJournalDetailDialog.close();
 
                 if ($dialog) {
                     $dialog.hide();
@@ -932,76 +808,73 @@
                 );
             }
 
-            function openDetailDialog(
-                journalId
-            ) {
-                journalId =
-                    parseInt(
-                        journalId,
-                        10
-                    );
+            function openDetailDialog(journalId) {
+                VAS.GLJournalDetailDialog.open(journalId, {
+                    windowNo: $self.windowNo,
+                    onChanged: function () {
+                        loadData();
 
-                if (
-                    !$detailDialog ||
-                    !$detailDialog.length ||
-                    isNaN(journalId) ||
-                    journalId <= 0
-                ) {
-                    return;
-                }
-
-                selectedJournalId =
-                    journalId;
-
-                selectedJournalStatus = "";
-                selectedJournalPosted = false;
-
-                detailLoaded = false;
-                detailLinePageNo = 1;
-                detailLineTotalPages = 1;
-
-                $detailBody.empty();
-
-                updateActionButtons();
-
-                $detailDialog
-                    .css(
-                        "z-index",
-                        "1000002"
-                    )
-                    .show();
-
-                loadJournalDetail(
-                    journalId
-                );
+                        if (
+                            $dialog &&
+                            $dialog.is(":visible")
+                        ) {
+                            dialogLoaded = false;
+                            loadDialogRows();
+                        }
+                    }
+                });
             }
 
-            function closeDetailDialog() {
-                if (
-                    !$detailDialog ||
-                    actionInProgress
-                ) {
+            /*
+             * The framework navigates in-place (no new window) only when
+             * ActionName matches the window currently hosting this widget;
+             * otherwise it opens a new window. Resolve the host window name
+             * from the listener chain.
+             */
+            function hostWindowName() {
+                try {
+                    var l = $self.listener;
+
+                    for (var i = 0; i < 6 && l; i++) {
+                        if (
+                            l.apanel &&
+                            l.apanel.gridWindow &&
+                            l.apanel.gridWindow.getName
+                        ) {
+                            return l.apanel.gridWindow.getName();
+                        }
+
+                        if (l.gridWindow && l.gridWindow.getName) {
+                            return l.gridWindow.getName();
+                        }
+
+                        l = l.listener;
+                    }
+                }
+                catch (e) { }
+
+                return "";
+            }
+
+            /* Zoom to the GL Journal record (opens the GL Journal window). */
+            function zoomToJournal(recordId) {
+                recordId = parseInt(recordId, 10);
+
+                if (isNaN(recordId) || recordId <= 0) {
                     return;
                 }
 
-                if (
-                    detailRequest &&
-                    detailRequest.readyState !== 4
-                ) {
-                    detailRequest.abort();
+                try {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause":
+                            "GL_Journal.GL_Journal_ID=" + recordId,
+                        "TabLayout": "Y",
+                        "TabIndex": "0",
+                        "ActionName": hostWindowName() || "VAS_GLJournal",
+                        "ActionType": "W"
+                    });
                 }
-
-                selectedJournalId = 0;
-                selectedJournalStatus = "";
-                selectedJournalPosted = false;
-
-                detailLoaded = false;
-                detailLinePageNo = 1;
-                detailLineTotalPages = 1;
-
-                updateActionButtons();
-
-                $detailDialog.hide();
+                catch (e) { /* zoom is best-effort */ }
             }
 
             function loadDialogRows() {
@@ -1095,7 +968,7 @@
                     Number(data.PageNo || dialogPageNo || 1);
 
                 dialogPageSize =
-                    Number(data.PageSize || dialogPageSize || 8);
+                    Number(data.PageSize || dialogPageSize || 9);
 
                 dialogTotalPages =
                     Math.max(
@@ -1181,7 +1054,13 @@
                         '">' +
 
                         '<td class="VAS-glju-doc">' +
+                        '<span class="VAS-glju-doc-zoom" data-journal-id="' +
+                        esc(row.GL_Journal_ID) +
+                        '" role="link" tabindex="0" title="' +
+                        esc(lbl("VAS_036_OpenRecord", "Open record")) +
+                        '">' +
                         esc(row.DocumentNo) +
+                        "</span>" +
                         "</td>" +
 
                         '<td class="VAS-glju-date">' +
@@ -1258,540 +1137,6 @@
                     'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
                     '</div>';
             }
-            function loadJournalDetail(
-                journalId
-            ) {
-                if (
-                    detailRequest &&
-                    detailRequest.readyState !== 4
-                ) {
-                    detailRequest.abort();
-                }
-
-                detailLoaded = false;
-
-                showDetailBusy(true);
-                updateActionButtons();
-
-                $detailBody
-                    .off(".VAS036LinePager")
-                    .on(
-                        "click.VAS036LinePager",
-                        ".VAS-glju-line-prev, .VAS-glju-line-next",
-                        function () {
-                            if (actionInProgress || selectedJournalId <= 0) {
-                                return;
-                            }
-
-                            var nextPage = $(this).hasClass("VAS-glju-line-prev")
-                                ? detailLinePageNo - 1
-                                : detailLinePageNo + 1;
-
-                            if (nextPage < 1 || nextPage > detailLineTotalPages) {
-                                return;
-                            }
-
-                            detailLinePageNo = nextPage;
-                            loadJournalDetail(selectedJournalId);
-                        }
-                    );
-
-                detailRequest = $.ajax({
-                    url:
-                        baseUrl +
-                        "VAS/VAS_041_GLJournalEntriesWidget/GetJournalEntryDetail",
-
-                    type: "GET",
-                    dataType: "json",
-                    cache: false,
-
-                    data: {
-                        journalId:
-                            journalId,
-
-                        pageNo:
-                            detailLinePageNo,
-
-                        pageSize:
-                            detailLinePageSize
-                    },
-
-                    success: function (result) {
-                        var data =
-                            normalizeResponse(result);
-
-                        if (
-                            data &&
-                            !data.error &&
-                            data.success !== false
-                        ) {
-                            renderJournalDetail(data);
-                        }
-                        else {
-                            renderDetailError(
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
-                                )
-                            );
-                        }
-                    },
-
-                    error: function (
-                        xhr,
-                        textStatus
-                    ) {
-                        if (textStatus === "abort") {
-                            return;
-                        }
-
-                        renderDetailError(
-                            getAjaxErrorMessage(xhr)
-                        );
-                    },
-
-                    complete: function () {
-                        detailRequest = null;
-
-                        if (!isDisposed) {
-                            showDetailBusy(false);
-                        }
-                    }
-                });
-            }
-
-            function renderJournalDetail(data) {
-                var journal =
-                    data.Journal || {};
-
-                var lines =
-                    Array.isArray(data.Lines)
-                        ? data.Lines
-                        : [];
-
-                detailLinePageNo =
-                    Number(data.LinePageNo || detailLinePageNo || 1);
-
-                detailLinePageSize =
-                    Number(data.LinePageSize || detailLinePageSize || 3);
-
-                detailLineTotalPages =
-                    Math.max(Number(data.LineTotalPages || 1), 1);
-
-                var detailLineCount =
-                    Number(data.LineCount || lines.length || 0);
-
-                var symbol =
-                    data.CurSymbol ||
-                    data.ISOCode ||
-                    "";
-
-                var precision =
-                    Number(data.StdPrecision);
-
-                selectedJournalId =
-                    parseInt(
-                        journal.GL_Journal_ID ||
-                        selectedJournalId,
-                        10
-                    );
-
-                selectedJournalStatus =
-                    String(
-                        journal.DocStatus || ""
-                    ).toUpperCase();
-
-                selectedJournalPosted =
-                    isPosted(journal.Posted);
-
-                var statusText =
-                    journal.StatusName ||
-                    journal.DocStatus ||
-                    "";
-
-                var pillClass =
-                    PILL_CLASS[
-                    selectedJournalStatus
-                    ] ||
-                    "VAS-glju-pill-draft";
-
-                var totalDebitAmt =
-                    formatAmount(
-                        journal.TotalDebit,
-                        precision
-                    );
-
-                var totalCreditAmt =
-                    formatAmount(
-                        journal.TotalCredit,
-                        precision
-                    );
-
-                var totalDebit =
-                    symbol + totalDebitAmt;
-
-                var totalCredit =
-                    symbol + totalCreditAmt;
-
-                var currencyText =
-                    data.ISOCode ||
-                    symbol;
-
-                var id =
-                    $self.AD_UserHomeWidgetID;
-
-                $detailDialog.find(
-                    "#VAS-glju-detail-title-" +
-                    id
-                ).text(
-                    (
-                        journal.DocumentNo ||
-                        ""
-                    ) +
-                    " \u00B7 " +
-                    (
-                        journal.Description ||
-                        ""
-                    )
-                );
-
-                $detailDialog.find(
-                    "#VAS-glju-detail-sub-" +
-                    id
-                ).text(
-                    statusText +
-                    " \u00B7 " +
-                    (
-                        journal.DateAcct ||
-                        ""
-                    )
-                );
-
-                var html =
-                    '<div class="VAS-glju-detail-summary">' +
-
-                    "<div><span>" + esc(lbl("VAS_036_JournalNo", "Journal No.")) + "</span><strong>" +
-                    esc(journal.DocumentNo) +
-                    "</strong></div>" +
-
-                    "<div><span>" + esc(lbl("VAS_Date", "Date")) + "</span><strong>" +
-                    esc(journal.DateAcct) +
-                    "</strong></div>" +
-
-                    "<div><span>" + esc(lbl("Status", "Status")) + "</span><strong>" +
-                    '<span class="VAS-glju-pill ' +
-                    pillClass +
-                    '"><span></span>' +
-                    esc(statusText) +
-                    "</span></strong></div>" +
-
-                    "<div><span>" + esc(lbl("VAS_036_AccountingBook", "Accounting Book")) + "</span><strong>" +
-                    esc(
-                        journal.AccountingBook ||
-                        lbl("VAS_036_Primary", "Primary")
-                    ) +
-                    "</strong></div>" +
-
-                    "<div><span>" + esc(lbl("VAS_PaymentCurrency", "Currency")) + "</span><strong>" +
-                    esc(currencyText) +
-                    "</strong></div>" +
-
-                    "<div><span>" + esc(lbl("VAS_036_TotalDebit", "Total Debit")) + "</span><strong>" +
-                    esc(totalDebitAmt) +
-                    "</strong></div>" +
-
-                    "<div><span>" + esc(lbl("VAS_036_TotalCredit", "Total Credit")) + "</span><strong>" +
-                    esc(totalCreditAmt) +
-                    "</strong></div>" +
-
-                    "<div>" +
-                    "<span>" + esc(lbl("Description", "Description")) + "</span><strong>" +
-                    esc(journal.Description) +
-                    "</strong></div>" +
-
-                    "</div>" +
-
-                    '<div class="VAS-glju-detail-lines-wrap">' +
-                    '<table class="VAS-glju-detail-lines">' +
-
-                    "<thead><tr>" +
-                    "<th>" + esc(lbl("Account", "Account")) + "</th>" +
-                    "<th>" + esc(lbl("VAS_036_Debit", "Debit")) + "</th>" +
-                    "<th>" + esc(lbl("VAS_036_Credit", "Credit")) + "</th>" +
-                    "<th>" + esc(lbl("VAS_CostCenter", "Cost Center")) + "</th>" +
-                    "<th>" + esc(lbl("C_BPartner_ID", "Business Partner")) + "</th>" +
-                    "<th>" + esc(lbl("M_Product_ID", "Product")) + "</th>" +
-                    "<th>" + esc(lbl("C_Project_ID", "Project")) + "</th>" +
-                    "</tr></thead><tbody>";
-
-                if (!lines.length) {
-                    html +=
-                        '<tr><td colspan="7">' +
-                        esc(
-                            lbl(
-                                "VAS_036_NoJournalLines",
-                                "No journal lines."
-                            )
-                        ) +
-                        "</td></tr>";
-                }
-                else {
-                    for (
-                        var index = 0;
-                        index < lines.length;
-                        index++
-                    ) {
-                        var line = lines[index];
-
-                        var account =
-                            line.AccountCode &&
-                                line.AccountName
-                                ? (
-                                    line.AccountCode +
-                                    " \u00B7 " +
-                                    line.AccountName
-                                )
-                                : (
-                                    line.AccountCode ||
-                                    line.AccountName ||
-                                    "-"
-                                );
-
-                        html +=
-                            "<tr>" +
-
-                            '<td title="' + esc(account) + '">' +
-                            esc(account) +
-                            "</td>" +
-
-                            (function () {
-                                var d = Number(line.Debit || 0) > 0 ? formatAmount(line.Debit, precision) : "-";
-                                var c = Number(line.Credit || 0) > 0 ? formatAmount(line.Credit, precision) : "-";
-                                return '<td class="VAS-glju-amt" title="' + esc(d) + '">' + esc(d) + "</td>" +
-                                       '<td class="VAS-glju-amt" title="' + esc(c) + '">' + esc(c) + "</td>";
-                            }()) +
-
-                            "<td>" +
-                            esc(
-                                line.CostCenter ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
-                                line.BPartner ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
-                                line.Product ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
-                                line.Project ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "</tr>";
-                    }
-                }
-
-                html +=
-                    "</tbody>" +
-
-                    "<tfoot><tr>" +
-
-                    "<td>" + esc(lbl("Total", "Total")) + "</td>" +
-
-                    '<td class="VAS-glju-amt" title="' + esc(totalDebitAmt) + '">' +
-                    esc(totalDebitAmt) +
-                    "</td>" +
-
-                    '<td class="VAS-glju-amt" title="' + esc(totalCreditAmt) + '">' +
-                    esc(totalCreditAmt) +
-                    "</td>" +
-
-                    '<td colspan="4"></td>' +
-
-                    "</tr></tfoot>" +
-
-                    "</table>" +
-                    "</div>" +
-
-                    '<div class="VAS-glju-line-pager">' +
-                    '<span class="VAS-glju-page-text">' +
-                    esc(detailLineCount ? formatRangeText(detailLinePageNo, detailLinePageSize, detailLineCount) : "") +
-                    "</span>" +
-                    '<button type="button" class="VAS-glju-page-btn VAS-glju-line-prev" ' +
-                    (detailLinePageNo <= 1 || detailLineTotalPages <= 1 ? "disabled " : "") +
-                    'aria-label="' + esc(lbl("VIS_Previous", "Previous")) + '">&#8249;</button>' +
-                    '<span class="VAS-glju-page-count">' +
-                    esc(detailLineCount ? (detailLinePageNo + " " + lbl("VIS_Of", "of") + " " + detailLineTotalPages) : "") +
-                    "</span>" +
-                    '<button type="button" class="VAS-glju-page-btn VAS-glju-line-next" ' +
-                    (detailLinePageNo >= detailLineTotalPages || detailLineTotalPages <= 1 ? "disabled " : "") +
-                    'aria-label="' + esc(lbl("VIS_Next", "Next")) + '">&#8250;</button>' +
-                    "</div>" +
-
-                    '<div class="VAS-glju-created-strip">' +
-
-                    '<span class="VAS-glju-avatar">' +
-                    esc(
-                        initials(
-                            journal.CreatedByName
-                        )
-                    ) +
-                    "</span>" +
-
-                    "<div>" +
-                    "<span>" + esc(lbl("VAS_036_CreatedBy", "Created By")) + "</span>" +
-                    "<strong>" +
-                    esc(
-                        journal.CreatedByName ||
-                        "-"
-                    ) +
-                    "</strong>" +
-
-                    (
-                        journal.CreatedDate
-                            ? (
-                                " \u00B7 " +
-                                lbl("VAS_036_Drafted", "drafted") +
-                                " " +
-                                esc(
-                                    journal.CreatedDate
-                                )
-                            )
-                            : ""
-                    ) +
-
-                    "</div>" +
-                    "</div>";
-
-                $detailBody.html(html);
-
-                detailLoaded = true;
-
-                updateActionButtons();
-            }
-
-            function updateActionButtons() {
-                var status =
-                    String(
-                        selectedJournalStatus || ""
-                    ).toUpperCase();
-
-                var canPost =
-                    detailLoaded &&
-                    !selectedJournalPosted &&
-                    (
-                        status === "AP" ||
-                        status === "CO" ||
-                        status === "CL"
-                    );
-
-                if ($postButton) {
-                    $postButton
-                        .toggle(canPost)
-                        .prop(
-                            "disabled",
-                            actionInProgress ||
-                            !canPost
-                        );
-                }
-            }
-
-            function executeJournalAction(
-                actionName,
-                actionType
-            ) {
-                if (
-                    actionInProgress ||
-                    selectedJournalId <= 0
-                ) {
-                    return;
-                }
-
-                actionInProgress = true;
-
-                showDetailBusy(true);
-                updateActionButtons();
-
-                actionRequest = $.ajax({
-                    url:
-                        baseUrl +
-                        "VAS/VAS_041_GLJournalEntriesWidget/" +
-                        actionName,
-
-                    type: "POST",
-                    dataType: "json",
-                    cache: false,
-
-                    data: {
-                        journalId:
-                            selectedJournalId
-                    },
-
-                    success: function (result) {
-                        var data =
-                            normalizeResponse(result);
-
-                        if (
-                            !data ||
-                            data.success === false ||
-                            data.error
-                        ) {
-                            window.alert(
-                                (
-                                    data &&
-                                    (
-                                        data.errorText ||
-                                        data.error ||
-                                        data.message
-                                    )
-                                ) ||
-                                lbl(
-                                    "VAS_036_JournalProcessFailed",
-                                    "Journal process failed."
-                                )
-                            );
-
-                            return;
-                        }
-
-                        dialogLoaded = false;
-
-                        loadData();
-                        loadDialogRows();
-
-                        loadJournalDetail(
-                            selectedJournalId
-                        );
-                    },
-
-                    error: function (xhr) {
-                        window.alert(
-                            getAjaxErrorMessage(xhr)
-                        );
-                    },
-
-                    complete: function () {
-                        actionRequest = null;
-                        actionInProgress = false;
-
-                        showDetailBusy(false);
-                        updateActionButtons();
-                    }
-                });
-            }
 
             function getAjaxErrorMessage(xhr) {
                 var response =
@@ -1849,49 +1194,6 @@
                 );
 
                 $dialogFooterText.text("");
-            }
-
-            function renderDetailError(message) {
-                detailLoaded = false;
-
-                selectedJournalStatus = "";
-                selectedJournalPosted = false;
-
-                $detailBody.html(
-                    '<div class="VAS-glju-dialog-empty">' +
-                    esc(
-                        message ||
-                        "Error loading journal details."
-                    ) +
-                    "</div>"
-                );
-
-                updateActionButtons();
-            }
-
-            function initials(name) {
-                var parts =
-                    String(name || "")
-                        .trim()
-                        .split(/\s+/);
-
-                if (
-                    !parts.length ||
-                    !parts[0]
-                ) {
-                    return "--";
-                }
-
-                if (parts.length === 1) {
-                    return parts[0]
-                        .charAt(0)
-                        .toUpperCase();
-                }
-
-                return (
-                    parts[0].charAt(0) +
-                    parts[1].charAt(0)
-                ).toUpperCase();
             }
 
             function exportDialogRows() {
@@ -1966,12 +1268,6 @@
                 function () {
                     isDisposed = true;
 
-                    if (refreshTimer) {
-                        window.clearInterval(
-                            refreshTimer
-                        );
-                    }
-
                     if (
                         countRequest &&
                         countRequest.readyState !== 4
@@ -1986,20 +1282,6 @@
                         listRequest.abort();
                     }
 
-                    if (
-                        detailRequest &&
-                        detailRequest.readyState !== 4
-                    ) {
-                        detailRequest.abort();
-                    }
-
-                    if (
-                        actionRequest &&
-                        actionRequest.readyState !== 4
-                    ) {
-                        actionRequest.abort();
-                    }
-
                     $(document).off(
                         "keydown.VAS-glju-" +
                         $self.AD_UserHomeWidgetID
@@ -2008,10 +1290,6 @@
                     $("body").removeClass(
                         "VAS-glju-body-lock"
                     );
-
-                    if ($detailDialog) {
-                        $detailDialog.remove();
-                    }
 
                     if ($dialog) {
                         $dialog.remove();
@@ -2055,11 +1333,32 @@
                 .append(
                     this.getRoot()
                 );
+
+            ensureDashInlineSizeVar(
+                this.getRoot()
+            );
         };
 
     VAS.VAS_036_GLJournalUnpostedWidget
         .prototype.widgetSizeChange =
         function () {
+        };
+
+    /* The widget host registers itself here so the widget can drive the host
+       (in-place tab navigation / zoom). */
+    VAS.VAS_036_GLJournalUnpostedWidget
+        .prototype.addChangeListener =
+        function (listener) {
+            this.listener = listener;
+        };
+
+    /* Relay a fired value (e.g. zoom TabWhereClause) to the registered host. */
+    VAS.VAS_036_GLJournalUnpostedWidget
+        .prototype.widgetFirevalueChanged =
+        function (value) {
+            if (this.listener) {
+                this.listener.widgetFirevalueChanged(value);
+            }
         };
 
     VAS.VAS_036_GLJournalUnpostedWidget

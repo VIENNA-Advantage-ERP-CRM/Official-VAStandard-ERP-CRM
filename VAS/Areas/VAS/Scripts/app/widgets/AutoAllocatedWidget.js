@@ -627,7 +627,10 @@
                 '<path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>' +
                 '</svg>' +
                 '</div>' +
+                '<div class="vas-aa-label-group">' +
                 '<span class="vas-aa-label">' + lbl("VAS_AutoAllocated", "Auto-allocated") + '</span>' +
+                '<span class="vas-aa-subtitle">' + lbl("VAS_AllocatedReceiptsLast30Days", "Allocated Receipts(Last 30 Days)") + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 
