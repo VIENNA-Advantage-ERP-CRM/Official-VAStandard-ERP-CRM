@@ -56,6 +56,25 @@
 
 ; (function (VAS, $) {
 
+    /* Creates a single document-level ResizeObserver on the dashboard container
+       and mirrors its width into the global CSS var --dash-inline-size (px), so
+       the widget's clamp() sizing tracks the dashboard width, not the viewport. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_045_GLJournalPendingWidget = function () {
         this.frame = null;
         this.windowNo = 0;
@@ -1606,6 +1625,10 @@
                 .append(
                     this.getRoot()
                 );
+
+            ensureDashInlineSizeVar(
+                this.getRoot()
+            );
         };
 
     VAS.VAS_045_GLJournalPendingWidget
