@@ -454,6 +454,11 @@
     padding: 1.25em 0.5em;
 }
 
+/* Filler rows keep the modal a constant height on short pages (blank, no divider). */
+.MPC-cm-filler td {
+    border-bottom-color: transparent;
+}
+
 /* Modal pager */
 .MPC-cm-modal-pager {
     display: flex;

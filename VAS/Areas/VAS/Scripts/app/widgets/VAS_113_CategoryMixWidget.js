@@ -349,18 +349,27 @@
                 '</div>';
 
             var rowsHtml = '';
-            for (var index = start; index < end; index++) {
-                var item = items[index];
-                rowsHtml +=
-                    '<tr>' +
-                        '<td class="MPC-cm-td-s">' + escapeHtml(item.sku) + '</td>' +
-                        '<td class="MPC-cm-td-s">' + escapeHtml(item.name) + '</td>' +
-                        '<td class="MPC-cm-td-r">' + escapeHtml(formatQty(item.on_hand)) + '</td>' +
-                        '<td class="MPC-cm-td-r" title="' + escapeHtml(formatFullAmount(item.stock_value)) + '">' + escapeHtml(formatCompactAmount(item.stock_value)) + '</td>' +
-                    '</tr>';
-            }
+            var shownRows = 0;
             if (!totalItems) {
                 rowsHtml = '<tr><td class="MPC-cm-td-empty" colspan="4">' + escapeHtml(label('VAS_113_NoCategories', 'No items.')) + '</td></tr>';
+                shownRows = 1;
+            } else {
+                for (var index = start; index < end; index++) {
+                    var item = items[index];
+                    rowsHtml +=
+                        '<tr>' +
+                            '<td class="MPC-cm-td-s">' + escapeHtml(item.sku) + '</td>' +
+                            '<td class="MPC-cm-td-s">' + escapeHtml(item.name) + '</td>' +
+                            '<td class="MPC-cm-td-r">' + escapeHtml(formatQty(item.on_hand)) + '</td>' +
+                            '<td class="MPC-cm-td-r" title="' + escapeHtml(formatFullAmount(item.stock_value)) + '">' + escapeHtml(formatCompactAmount(item.stock_value)) + '</td>' +
+                        '</tr>';
+                    shownRows++;
+                }
+            }
+            // Fixed modal height: pad short pages to MODAL_PER_PAGE rows so a page
+            // with fewer lines does not shrink the popup (no scrolling either).
+            for (var fillIndex = shownRows; fillIndex < MODAL_PER_PAGE; fillIndex++) {
+                rowsHtml += '<tr class="MPC-cm-filler"><td>&nbsp;</td><td></td><td></td><td></td></tr>';
             }
 
             var table =
