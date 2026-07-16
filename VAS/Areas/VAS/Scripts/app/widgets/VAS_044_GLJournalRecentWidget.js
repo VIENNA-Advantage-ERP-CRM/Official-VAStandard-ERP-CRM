@@ -612,6 +612,8 @@
                     documentIcon +
                     "</div>" +
 
+                    '<div class="VAS-gljr-title-wrap">' +
+
                     '<div class="w-title">' +
 
                     esc(
@@ -620,6 +622,19 @@
                             "Recent Journal Entries"
                         )
                     ) +
+
+                    "</div>" +
+
+                    '<div class="VAS-gljr-subtitle">' +
+
+                    esc(
+                        lbl(
+                            "VAS_044_RecentSubtitle",
+                            "Records Created in Last 15 Days"
+                        )
+                    ) +
+
+                    "</div>" +
 
                     "</div>" +
 

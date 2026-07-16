@@ -980,7 +980,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 
 .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-pager {
     margin: 0;
-    padding: 1.35em 0.625em 1em;
+    padding: 0.75em 0em;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
@@ -1042,7 +1042,7 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     flex-shrink: 0;
     margin: 8px 0 0;
     padding: 8px 10px 0;
-    border-top: 1px solid #EDF2F6;
+   /* border-top: 1px solid #EDF2F6;*/
     background: transparent;
     box-sizing: border-box;
 }

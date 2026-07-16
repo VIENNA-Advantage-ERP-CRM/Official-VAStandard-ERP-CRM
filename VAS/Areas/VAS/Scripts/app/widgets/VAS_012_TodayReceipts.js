@@ -486,7 +486,10 @@
                 '<div class="vas-tdr-head">' +
                 '<div class="vas-tdr-head-left">' +
                 '<div class="vas-tdr-icon">' + clockIconSvg() + '</div>' +
+                '<div class="vas-tdr-label-group">' +
                 '<span class="vas-tdr-label">' + escapeHtml(lbl("VAS_012_TodayReceipts", "Today's receipts")) + '</span>' +
+                '<span class="vas-tdr-subtitle">' + escapeHtml(lbl("VAS_012_ReceiptsRecordedToday", "Receipts Recorded Today")) + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

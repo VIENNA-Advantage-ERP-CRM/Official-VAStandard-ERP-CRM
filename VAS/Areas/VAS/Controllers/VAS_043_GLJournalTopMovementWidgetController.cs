@@ -29,59 +29,24 @@ namespace VAS.Controllers
     {
         private class MovementRow
         {
-            public string AccountCode
-            {
-                get;
-                set;
-            }
+            public string AccountCode { get; set; }
 
-            public string AccountName
-            {
-                get;
-                set;
-            }
+            public string AccountName { get; set; }
 
-            public decimal TotalDebit
-            {
-                get;
-                set;
-            }
+            public decimal TotalDebit { get; set; }
 
-            public decimal TotalCredit
-            {
-                get;
-                set;
-            }
+            public decimal TotalCredit { get; set; }
 
-            public decimal NetMovement
-            {
-                get;
-                set;
-            }
+            public decimal NetMovement { get; set; }
 
-            public bool IsCredit
-            {
-                get;
-                set;
-            }
+            public bool IsCredit { get; set; }
 
-            public int BarPct
-            {
-                get;
-                set;
-            }
+            public int BarPct { get; set; }
 
-            public int RankNo
-            {
-                get;
-                set;
-            }
+            public int RankNo { get; set; }
         }
 
-        public JsonResult GetTopMovement(
-            string period,
-            int pageNo = 1
-        )
+        public JsonResult GetTopMovement(string period, int pageNo = 1)
         {
             if (Session["ctx"] == null)
             {
@@ -100,8 +65,7 @@ namespace VAS.Controllers
                 );
             }
 
-            Ctx ctx =
-                Session["ctx"] as Ctx;
+            Ctx ctx = Session["ctx"] as Ctx;
 
             if (ctx == null)
             {
@@ -120,43 +84,31 @@ namespace VAS.Controllers
                 );
             }
 
-            IDataReader dr =
-                null;
+            IDataReader dr = null;
 
             try
             {
-                bool isYtd =
-                    string.Compare(
-                        period,
-                        "ytd",
-                        StringComparison.OrdinalIgnoreCase
-                    ) == 0;
+                bool isYtd = string.Compare(period, "ytd", StringComparison.OrdinalIgnoreCase) == 0;
 
-                int pageSize =
-                    5;
+                int pageSize = 5;
 
-                int topLimit =
-                    10;
+                int topLimit = 10;
 
-                string periodStartExpression =
-                    isYtd
-                        ? "CurrentPeriod.YearStart"
-                        : "CurrentPeriod.PeriodStart";
+                string periodStartExpression = isYtd
+                    ? "CurrentPeriod.YearStart"
+                    : "CurrentPeriod.PeriodStart";
 
-                string periodEndExclusiveExpression =
-                    DB.IsOracle()
-                        ? "CurrentPeriod.PeriodEnd + 1"
-                        : "CurrentPeriod.PeriodEnd + INTERVAL '1 day'";
+                string periodEndExclusiveExpression = DB.IsOracle()
+                    ? "CurrentPeriod.PeriodEnd + 1"
+                    : "CurrentPeriod.PeriodEnd + INTERVAL '1 day'";
 
-                string currentDateEndExpression =
-                    DB.IsOracle()
-                        ? "PeriodData.EndDate + 1"
-                        : "PeriodData.EndDate + INTERVAL '1 day'";
+                string currentDateEndExpression = DB.IsOracle()
+                    ? "PeriodData.EndDate + 1"
+                    : "PeriodData.EndDate + INTERVAL '1 day'";
 
-                string clientParamSql =
-                    DB.IsOracle()
-                        ? "SELECT @ClientID AS AD_Client_ID FROM DUAL"
-                        : "SELECT @ClientID AS AD_Client_ID";
+                string clientParamSql = DB.IsOracle()
+                    ? "SELECT @ClientID AS AD_Client_ID FROM DUAL"
+                    : "SELECT @ClientID AS AD_Client_ID";
 
                 /*
                  * Oracle:
@@ -165,10 +117,9 @@ namespace VAS.Controllers
                  * PostgreSQL:
                  * ROUND(value, precision) requires NUMERIC.
                  */
-                string numericType =
-                    DB.IsOracle()
-                        ? "NUMBER"
-                        : "NUMERIC";
+                string numericType = DB.IsOracle()
+                    ? "NUMBER"
+                    : "NUMERIC";
 
                 string schemaCurrencySql = @"
 SELECT
@@ -307,14 +258,12 @@ AND GL_Journal.Posted = 'Y'
 
 AND GL_Journal.IsActive = 'Y'";
 
-                secureJournalSql =
-                    MRole.GetDefault(ctx)
-                        .AddAccessSQL(
-                            secureJournalSql,
-                            "GL_Journal",
-                            MRole.SQL_FULLYQUALIFIED,
-                            MRole.SQL_RO
-                        );
+                secureJournalSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    secureJournalSql,
+                    "GL_Journal",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 string ledgerMovementSql = @"
 SELECT
@@ -594,178 +543,95 @@ ORDER BY
 
                 SqlParameter[] parameters =
                 {
-                    new SqlParameter(
-                        "@ClientID",
-                        ctx.GetAD_Client_ID()
-                    )
+                    new SqlParameter("@ClientID", ctx.GetAD_Client_ID())
                 };
 
-                dr =
-                    DB.ExecuteReader(
-                        sql,
-                        parameters,
-                        null
-                    );
+                dr = DB.ExecuteReader(sql, parameters, null);
 
-                List<MovementRow> rows =
-                    new List<MovementRow>();
+                List<MovementRow> rows = new List<MovementRow>();
 
-                string curSymbol =
-                    "";
+                string curSymbol = "";
 
-                string isoCode =
-                    "";
+                string isoCode = "";
 
-                int stdPrecision =
-                    2;
+                int stdPrecision = 2;
 
-                string periodName =
-                    "";
+                string periodName = "";
 
-                string yearName =
-                    "";
+                string yearName = "";
 
-                DateTime periodStart =
-                    DateTime.MinValue;
+                DateTime periodStart = DateTime.MinValue;
 
-                DateTime periodEnd =
-                    DateTime.MinValue;
+                DateTime periodEnd = DateTime.MinValue;
 
-                DateTime yearStart =
-                    DateTime.MinValue;
+                DateTime yearStart = DateTime.MinValue;
 
-                int totalCount =
-                    0;
+                int totalCount = 0;
 
-                decimal maxAbs =
-                    0m;
+                decimal maxAbs = 0m;
 
-                while (
-                    dr != null &&
-                    dr.Read()
-                )
+                while (dr != null && dr.Read())
                 {
                     if (rows.Count == 0)
                     {
-                        curSymbol =
-                            Util.GetValueOfString(
-                                dr["Cur_Symbol"]
-                            );
+                        curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
 
-                        isoCode =
-                            Util.GetValueOfString(
-                                dr["ISO_Code"]
-                            );
+                        isoCode = Util.GetValueOfString(dr["ISO_Code"]);
 
-                        stdPrecision =
-                            Util.GetValueOfInt(
-                                dr["StdPrecision"]
-                            );
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
 
                         if (stdPrecision <= 0)
                         {
-                            stdPrecision =
-                                2;
+                            stdPrecision = 2;
                         }
 
-                        periodName =
-                            Util.GetValueOfString(
-                                dr["PeriodName"]
-                            );
+                        periodName = Util.GetValueOfString(dr["PeriodName"]);
 
-                        yearName =
-                            Util.GetValueOfString(
-                                dr["YearName"]
-                            );
+                        yearName = Util.GetValueOfString(dr["YearName"]);
 
-                        totalCount =
-                            Util.GetValueOfInt(
-                                dr["TotalCount"]
-                            );
+                        totalCount = Util.GetValueOfInt(dr["TotalCount"]);
 
-                        if (
-                            dr["PeriodStart"] !=
-                            DBNull.Value
-                        )
+                        if (dr["PeriodStart"] != DBNull.Value)
                         {
-                            periodStart =
-                                Convert.ToDateTime(
-                                    dr["PeriodStart"]
-                                ).Date;
+                            periodStart = Convert.ToDateTime(dr["PeriodStart"]).Date;
                         }
 
-                        if (
-                            dr["PeriodEnd"] !=
-                            DBNull.Value
-                        )
+                        if (dr["PeriodEnd"] != DBNull.Value)
                         {
-                            periodEnd =
-                                Convert.ToDateTime(
-                                    dr["PeriodEnd"]
-                                ).Date;
+                            periodEnd = Convert.ToDateTime(dr["PeriodEnd"]).Date;
                         }
 
-                        if (
-                            dr["YearStart"] !=
-                            DBNull.Value
-                        )
+                        if (dr["YearStart"] != DBNull.Value)
                         {
-                            yearStart =
-                                Convert.ToDateTime(
-                                    dr["YearStart"]
-                                ).Date;
+                            yearStart = Convert.ToDateTime(dr["YearStart"]).Date;
                         }
                     }
 
-                    decimal netMovement =
-                        Util.GetValueOfDecimal(
-                            dr["NetMovement"]
-                        );
+                    decimal netMovement = Util.GetValueOfDecimal(dr["NetMovement"]);
 
                     if (netMovement > maxAbs)
                     {
-                        maxAbs =
-                            netMovement;
+                        maxAbs = netMovement;
                     }
 
                     rows.Add(
                         new MovementRow
                         {
-                            AccountCode =
-                                Util.GetValueOfString(
-                                    dr["AccountCode"]
-                                ),
+                            AccountCode = Util.GetValueOfString(dr["AccountCode"]),
 
-                            AccountName =
-                                Util.GetValueOfString(
-                                    dr["AccountName"]
-                                ),
+                            AccountName = Util.GetValueOfString(dr["AccountName"]),
 
-                            TotalDebit =
-                                Util.GetValueOfDecimal(
-                                    dr["TotalDebit"]
-                                ),
+                            TotalDebit = Util.GetValueOfDecimal(dr["TotalDebit"]),
 
-                            TotalCredit =
-                                Util.GetValueOfDecimal(
-                                    dr["TotalCredit"]
-                                ),
+                            TotalCredit = Util.GetValueOfDecimal(dr["TotalCredit"]),
 
-                            NetMovement =
-                                netMovement,
+                            NetMovement = netMovement,
 
-                            IsCredit =
-                                Util.GetValueOfString(
-                                    dr["IsCredit"]
-                                ) == "Y",
+                            IsCredit = Util.GetValueOfString(dr["IsCredit"]) == "Y",
 
-                            BarPct =
-                                0,
+                            BarPct = 0,
 
-                            RankNo =
-                                Util.GetValueOfInt(
-                                    dr["RowNo"]
-                                )
+                            RankNo = Util.GetValueOfInt(dr["RowNo"])
                         }
                     );
                 }
@@ -776,49 +642,27 @@ ORDER BY
                     dr = null;
                 }
 
-                for (
-                    int index = 0;
-                    index < rows.Count;
-                    index++
-                )
+                for (int index = 0; index < rows.Count; index++)
                 {
-                    rows[index].BarPct =
-                        maxAbs > 0m
-                            ? (int)Math.Round(
-                                rows[index].NetMovement /
-                                maxAbs *
-                                100m,
-                                MidpointRounding.AwayFromZero
-                            )
-                            : 0;
-                }
-
-                int totalPages =
-                    totalCount > 0
-                        ? (int)Math.Ceiling(
-                            (decimal)totalCount /
-                            pageSize
+                    rows[index].BarPct = maxAbs > 0m
+                        ? (int)Math.Round(
+                            rows[index].NetMovement / maxAbs * 100m,
+                            MidpointRounding.AwayFromZero
                         )
                         : 0;
+                }
 
-                string periodLabel =
-                    isYtd
-                        ? GetMsg(
-                            ctx,
-                            "VAS_043_YTD",
-                            "YTD"
-                        ) +
-                        " " +
-                        yearName
+                int totalPages = totalCount > 0
+                    ? (int)Math.Ceiling((decimal)totalCount / pageSize)
+                    : 0;
 
-                        : periodName +
-                        " " +
-                        yearName;
+                string periodLabel = isYtd
+                    ? GetMsg(ctx, "VAS_043_YTD", "YTD") + " " + yearName
+                    : periodName + " " + yearName;
 
-                DateTime displayStart =
-                    isYtd
-                        ? yearStart
-                        : periodStart;
+                DateTime displayStart = isYtd
+                    ? yearStart
+                    : periodStart;
 
                 if (rows.Count == 0)
                 {
@@ -829,65 +673,41 @@ ORDER BY
                                 success = true,
                                 error = "",
 
-                                title = GetMsg(
-                                    ctx,
-                                    "VAS_043_TopLedgerMovement",
-                                    "Top Ledger Movement"
-                                ),
+                                title = GetMsg(ctx, "VAS_043_TopLedgerMovement", "Top Ledger Movement"),
 
                                 mainMetric = 0,
                                 mainMetricText = "0",
 
-                                description = GetMsg(
-                                    ctx,
-                                    "VAS_043_NoData",
-                                    "No data found"
-                                ),
+                                description = GetMsg(ctx, "VAS_043_NoData", "No data found"),
 
-                                badgeText =
-                                    periodLabel,
+                                badgeText = periodLabel,
 
-                                dateFrom =
-                                    displayStart ==
-                                    DateTime.MinValue
-                                        ? ""
-                                        : FormatDate(
-                                            displayStart
-                                        ),
+                                dateFrom = displayStart == DateTime.MinValue
+                                    ? ""
+                                    : FormatDate(displayStart),
 
-                                dateTo =
-                                    periodEnd ==
-                                    DateTime.MinValue
-                                        ? ""
-                                        : FormatDate(
-                                            periodEnd
-                                        ),
+                                dateTo = periodEnd == DateTime.MinValue
+                                    ? ""
+                                    : FormatDate(periodEnd),
 
-                                currencyISO =
-                                    isoCode,
+                                currencyISO = isoCode,
 
-                                currencySymbol =
-                                    curSymbol,
+                                currencySymbol = curSymbol,
 
-                                stdPrecision =
-                                    stdPrecision,
+                                stdPrecision = stdPrecision,
 
                                 hasData = false,
 
-                                Accounts =
-                                    rows,
+                                Accounts = rows,
 
                                 TotalCount = 0,
                                 TotalPages = 0,
 
-                                PageNo =
-                                    pageNo,
+                                PageNo = pageNo,
 
-                                PageSize =
-                                    pageSize,
+                                PageSize = pageSize,
 
-                                TopLimit =
-                                    topLimit
+                                TopLimit = topLimit
                             }
                         ),
                         JsonRequestBehavior.AllowGet
@@ -901,71 +721,43 @@ ORDER BY
                             success = true,
                             error = "",
 
-                            title = GetMsg(
-                                ctx,
-                                "VAS_043_TopLedgerMovement",
-                                "Top Ledger Movement"
-                            ),
+                            title = GetMsg(ctx, "VAS_043_TopLedgerMovement", "Top Ledger Movement"),
 
-                            mainMetric =
-                                totalCount,
+                            mainMetric = totalCount,
 
-                            mainMetricText =
-                                totalCount.ToString(),
+                            mainMetricText = totalCount.ToString(),
 
-                            description =
-                                periodLabel,
+                            description = periodLabel,
 
-                            badgeText = GetMsg(
-                                ctx,
-                                "VAS_043_Top10",
-                                "Top 10"
-                            ),
+                            badgeText = GetMsg(ctx, "VAS_043_Top10", "Top 10"),
 
-                            dateFrom =
-                                displayStart ==
-                                DateTime.MinValue
-                                    ? ""
-                                    : FormatDate(
-                                        displayStart
-                                    ),
+                            dateFrom = displayStart == DateTime.MinValue
+                                ? ""
+                                : FormatDate(displayStart),
 
-                            dateTo =
-                                periodEnd ==
-                                DateTime.MinValue
-                                    ? ""
-                                    : FormatDate(
-                                        periodEnd
-                                    ),
+                            dateTo = periodEnd == DateTime.MinValue
+                                ? ""
+                                : FormatDate(periodEnd),
 
-                            currencyISO =
-                                isoCode,
+                            currencyISO = isoCode,
 
-                            currencySymbol =
-                                curSymbol,
+                            currencySymbol = curSymbol,
 
-                            stdPrecision =
-                                stdPrecision,
+                            stdPrecision = stdPrecision,
 
                             hasData = true,
 
-                            Accounts =
-                                rows,
+                            Accounts = rows,
 
-                            TotalCount =
-                                totalCount,
+                            TotalCount = totalCount,
 
-                            TotalPages =
-                                totalPages,
+                            TotalPages = totalPages,
 
-                            PageNo =
-                                pageNo,
+                            PageNo = pageNo,
 
-                            PageSize =
-                                pageSize,
+                            PageSize = pageSize,
 
-                            TopLimit =
-                                topLimit
+                            TopLimit = topLimit
                         }
                     ),
                     JsonRequestBehavior.AllowGet
@@ -985,11 +777,7 @@ ORDER BY
                         {
                             success = false,
 
-                            error = GetMsg(
-                                ctx,
-                                "VAS_043_ErrorLoadingData",
-                                "Could not load data"
-                            ),
+                            error = GetMsg(ctx, "VAS_043_ErrorLoadingData", "Could not load data"),
 
                             hasData = false
                         }
@@ -1006,33 +794,16 @@ ORDER BY
             }
         }
 
-        private string FormatDate(
-            DateTime date
-        )
+        private string FormatDate(DateTime date)
         {
-            return date.ToString(
-                "yyyy-MM-dd"
-            );
+            return date.ToString("yyyy-MM-dd");
         }
 
-        private string GetMsg(
-            Ctx ctx,
-            string key,
-            string fallback
-        )
+        private string GetMsg(Ctx ctx, string key, string fallback)
         {
-            string msg =
-                Msg.GetMsg(
-                    ctx,
-                    key
-                );
+            string msg = Msg.GetMsg(ctx, key);
 
-            if (
-                string.IsNullOrEmpty(
-                    msg
-                ) ||
-                msg == key
-            )
+            if (string.IsNullOrEmpty(msg) || msg == key)
             {
                 return fallback;
             }

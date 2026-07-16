@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -55,16 +55,11 @@ namespace VAS.Controllers
     /// </summary>
     public class VAS_045_GLJournalPendingWidgetController : Controller
     {
-
-      
-
         /// <summary>
         /// Returns pending GL journals with translated document status.
         /// Status is returned as Value and Name.
         /// </summary>
-        public JsonResult GetPendingQueue(
-            int pageNo = 1,
-            int pageSize = 2)
+        public JsonResult GetPendingQueue(int pageNo = 1, int pageSize = 2)
         {
             if (Session["ctx"] == null)
             {
@@ -85,8 +80,7 @@ namespace VAS.Controllers
                 );
             }
 
-            Ctx ctx =
-                Session["ctx"] as Ctx;
+            Ctx ctx = Session["ctx"] as Ctx;
 
             if (ctx == null)
             {
@@ -107,43 +101,23 @@ namespace VAS.Controllers
                 );
             }
 
-            IDataReader reader =
-                null;
+            IDataReader reader = null;
 
             try
             {
-                pageNo =
-                    Math.Max(
-                        1,
-                        pageNo
-                    );
+                pageNo = Math.Max(1, pageNo);
 
-                pageSize =
-                    Math.Max(
-                        1,
-                        Math.Min(
-                            pageSize,
-                            25
-                        )
-                    );
+                pageSize = Math.Max(1, Math.Min(pageSize, 25));
 
-                int rowStart =
-                    ((pageNo - 1) * pageSize) + 1;
+                int rowStart = ((pageNo - 1) * pageSize) + 1;
 
-                int rowEnd =
-                    pageNo * pageSize;
+                int rowEnd = pageNo * pageSize;
 
-                string language =
-                    ctx.GetAD_Language();
+                string language = ctx.GetAD_Language();
 
-                if (
-                    string.IsNullOrWhiteSpace(
-                        language
-                    )
-                )
+                if (string.IsNullOrWhiteSpace(language))
                 {
-                    language =
-                        "en_US";
+                    language = "en_US";
                 }
 
                 /*
@@ -189,14 +163,12 @@ AND GL_Journal.DocStatus IN
     'NA'
 )";
 
-                protectedJournalSql =
-                    MRole.GetDefault(ctx)
-                        .AddAccessSQL(
-                            protectedJournalSql,
-                            "GL_Journal",
-                            MRole.SQL_FULLYQUALIFIED,
-                            MRole.SQL_RO
-                        );
+                protectedJournalSql = MRole.GetDefault(ctx).AddAccessSQL(
+                    protectedJournalSql,
+                    "GL_Journal",
+                    MRole.SQL_FULLYQUALIFIED,
+                    MRole.SQL_RO
+                );
 
                 /*
                  * One query provides:
@@ -453,73 +425,38 @@ ORDER BY
                  */
                 SqlParameter[] parameters =
                 {
-            new SqlParameter(
-                "@SchemaClientID",
-                ctx.GetAD_Client_ID()
-            ),
+                    new SqlParameter("@SchemaClientID", ctx.GetAD_Client_ID()),
 
-            new SqlParameter(
-                "@PendingClientID",
-                ctx.GetAD_Client_ID()
-            ),
+                    new SqlParameter("@PendingClientID", ctx.GetAD_Client_ID()),
 
-            new SqlParameter(
-                "@StatusLanguage",
-                language
-            ),
+                    new SqlParameter("@StatusLanguage", language),
 
-            new SqlParameter(
-                "@PageRowStart",
-                rowStart
-            ),
+                    new SqlParameter("@PageRowStart", rowStart),
 
-            new SqlParameter(
-                "@PageRowEnd",
-                rowEnd
-            )
-        };
+                    new SqlParameter("@PageRowEnd", rowEnd)
+                };
 
-                reader =
-                    CoreLibrary.DataBase.DB.ExecuteReader(
-                        sql,
-                        parameters,
-                        null
-                    );
+                reader = CoreLibrary.DataBase.DB.ExecuteReader(sql, parameters, null);
 
-                List<object> queue =
-                    new List<object>();
+                List<object> queue = new List<object>();
 
-                int totalCount =
-                    0;
+                int totalCount = 0;
 
-                string curSymbol =
-                    string.Empty;
+                string curSymbol = string.Empty;
 
-                string isoCode =
-                    string.Empty;
+                string isoCode = string.Empty;
 
-                int stdPrecision =
-                    2;
+                int stdPrecision = 2;
 
-                DateTime now =
-                    DateTime.Now;
+                DateTime now = DateTime.Now;
 
                 while (reader.Read())
                 {
-                    int journalId =
-                        Util.GetValueOfInt(
-                            reader["GL_Journal_ID"]
-                        );
+                    int journalId = Util.GetValueOfInt(reader["GL_Journal_ID"]);
 
-                    string documentNo =
-                        Util.GetValueOfString(
-                            reader["DocumentNo"]
-                        );
+                    string documentNo = Util.GetValueOfString(reader["DocumentNo"]);
 
-                    string description =
-                        Util.GetValueOfString(
-                            reader["Description"]
-                        );
+                    string description = Util.GetValueOfString(reader["Description"]);
 
                     /*
                      * Original stored reference value.
@@ -530,10 +467,7 @@ ORDER BY
                      * AP
                      * NA
                      */
-                    string statusValue =
-                        Util.GetValueOfString(
-                            reader["DocStatus"]
-                        );
+                    string statusValue = Util.GetValueOfString(reader["DocStatus"]);
 
                     /*
                      * Translation fallback order:
@@ -542,274 +476,165 @@ ORDER BY
                      * 2. AD_Ref_List.Name
                      * 3. Original DocStatus value
                      */
-                    string translatedStatusName =
-                        Util.GetValueOfString(
-                            reader[
-                                "StatusTranslatedName"
-                            ]
-                        );
+                    string translatedStatusName = Util.GetValueOfString(reader["StatusTranslatedName"]);
 
-                    string baseStatusName =
-                        Util.GetValueOfString(
-                            reader[
-                                "StatusBaseName"
-                            ]
-                        );
+                    string baseStatusName = Util.GetValueOfString(reader["StatusBaseName"]);
 
                     string statusName;
 
-                    if (
-                        !string.IsNullOrWhiteSpace(
-                            translatedStatusName
-                        )
-                    )
+                    if (!string.IsNullOrWhiteSpace(translatedStatusName))
                     {
-                        statusName =
-                            translatedStatusName;
+                        statusName = translatedStatusName;
                     }
-                    else if (
-                        !string.IsNullOrWhiteSpace(
-                            baseStatusName
-                        )
-                    )
+                    else if (!string.IsNullOrWhiteSpace(baseStatusName))
                     {
-                        statusName =
-                            baseStatusName;
+                        statusName = baseStatusName;
                     }
                     else
                     {
-                        statusName =
-                            statusValue;
+                        statusName = statusValue;
                     }
 
-                    string userName =
-                        Util.GetValueOfString(
-                            reader["UserName"]
-                        );
+                    string userName = Util.GetValueOfString(reader["UserName"]);
 
-                    if (
-                        string.IsNullOrWhiteSpace(
-                            userName
-                        )
-                    )
+                    if (string.IsNullOrWhiteSpace(userName))
                     {
-                        userName =
-                            "-";
+                        userName = "-";
                     }
 
-                    stdPrecision =
-                        (
-                            Util.GetValueOfInt(
-                                reader["StdPrecision"]
-                            )
-                        );
+                    stdPrecision = (Util.GetValueOfInt(reader["StdPrecision"]));
 
                     decimal totalDebit =
                         Decimal.Round(
-                            Util.GetValueOfDecimal(
-                                reader["TotalDebit"]
-                            ),
+                            Util.GetValueOfDecimal(reader["TotalDebit"]),
                             stdPrecision,
                             MidpointRounding.AwayFromZero
                         );
 
-                    totalCount =
-                        Util.GetValueOfInt(
-                            reader["TotalCount"]
-                        );
+                    totalCount = Util.GetValueOfInt(reader["TotalCount"]);
 
-                    curSymbol =
-                        Util.GetValueOfString(
-                            reader["CurSymbol"]
-                        );
+                    curSymbol = Util.GetValueOfString(reader["CurSymbol"]);
 
-                    isoCode =
-                        Util.GetValueOfString(
-                            reader["ISO_Code"]
-                        );
+                    isoCode = Util.GetValueOfString(reader["ISO_Code"]);
 
-                    if (
-                        string.IsNullOrWhiteSpace(
-                            curSymbol
-                        )
-                    )
+                    if (string.IsNullOrWhiteSpace(curSymbol))
                     {
-                        curSymbol =
-                            isoCode;
+                        curSymbol = isoCode;
                     }
 
                     DateTime created =
                         reader["Created"] != DBNull.Value
-                            ? Convert.ToDateTime(
-                                reader["Created"]
-                            )
+                            ? Convert.ToDateTime(reader["Created"])
                             : now;
 
-                    double totalHours =
-                        (now - created).TotalHours;
+                    double totalHours = (now - created).TotalHours;
 
                     if (totalHours < 0)
                     {
-                        totalHours =
-                            0;
+                        totalHours = 0;
                     }
 
                     string ageText;
 
                     if (totalHours < 1)
                     {
-                        ageText =
-                            "< 1h";
+                        ageText = "< 1h";
                     }
                     else if (totalHours < 24)
                     {
-                        ageText =
-                            ((int)totalHours) +
-                            "h";
+                        ageText = ((int)totalHours) + "h";
                     }
                     else if (totalHours < 48)
                     {
-                        ageText =
-                            "1d";
+                        ageText = "1d";
                     }
                     else
                     {
-                        ageText =
-                            (
-                                (int)(
-                                    totalHours / 24
-                                )
-                            ) +
-                            "d";
+                        ageText = ((int)(totalHours / 24)) + "d";
                     }
 
                     string markerType;
 
                     if (totalHours >= 48)
                     {
-                        markerType =
-                            "danger";
+                        markerType = "danger";
                     }
                     else if (totalHours >= 24)
                     {
-                        markerType =
-                            "warn";
+                        markerType = "warn";
                     }
                     else
                     {
-                        markerType =
-                            "info";
+                        markerType = "info";
                     }
 
                     string actionLabel;
 
-                    switch (
-                        statusValue.ToUpperInvariant()
-                    )
+                    switch (statusValue.ToUpperInvariant())
                     {
                         case "IP":
-                            actionLabel =
-                                GetMsg(
-                                    ctx,
-                                    "VAS_045_Approval",
-                                    "Approval"
-                                );
+                            actionLabel = GetMsg(ctx, "VAS_045_Approval", "Approval");
                             break;
 
                         case "AP":
-                            actionLabel =
-                                GetMsg(
-                                    ctx,
-                                    "VAS_045_Post",
-                                    "Post"
-                                );
+                            actionLabel = GetMsg(ctx, "VAS_045_Post", "Post");
                             break;
 
                         case "NA":
-                            actionLabel =
-                                GetMsg(
-                                    ctx,
-                                    "VAS_045_Resubmit",
-                                    "Resubmit"
-                                );
+                            actionLabel = GetMsg(ctx, "VAS_045_Resubmit", "Resubmit");
                             break;
 
                         default:
-                            actionLabel =
-                                GetMsg(
-                                    ctx,
-                                    "VAS_045_Draft",
-                                    "Draft"
-                                );
+                            actionLabel = GetMsg(ctx, "VAS_045_Draft", "Draft");
                             break;
                     }
 
                     queue.Add(
                         new
                         {
-                            GL_Journal_ID =
-                                journalId,
+                            GL_Journal_ID = journalId,
 
-                            DocumentNo =
-                                documentNo,
+                            DocumentNo = documentNo,
 
-                            Description =
-                                description,
+                            Description = description,
 
                             /*
                              * Existing field retained for compatibility.
                              */
-                            DocStatus =
-                                statusValue,
+                            DocStatus = statusValue,
 
                             /*
                              * Separate value and name fields.
                              */
-                            StatusValue =
-                                statusValue,
+                            StatusValue = statusValue,
 
-                            StatusName =
-                                statusName,
+                            StatusName = statusName,
 
                             /*
                              * Requested reference object.
                              */
                             Status = new
                             {
-                                Value =
-                                    statusValue,
+                                Value = statusValue,
 
-                                Name =
-                                    statusName
+                                Name = statusName
                             },
 
-                            Posted =
-                                Util.GetValueOfString(
-                                    reader["Posted"]
-                                ),
+                            Posted = Util.GetValueOfString(reader["Posted"]),
 
-                            Processed =
-                                Util.GetValueOfString(
-                                    reader["Processed"]
-                                ),
+                            Processed = Util.GetValueOfString(reader["Processed"]),
 
-                            ActionLabel =
-                                actionLabel,
+                            ActionLabel = actionLabel,
 
-                            MarkerType =
-                                markerType,
+                            MarkerType = markerType,
 
-                            AgeStr =
-                                ageText,
+                            AgeStr = ageText,
 
-                            IsOverdue =
-                                totalHours >= 48,
+                            IsOverdue = totalHours >= 48,
 
-                            TotalDebit =
-                                totalDebit,
+                            TotalDebit = totalDebit,
 
-                            UserName =
-                                userName
+                            UserName = userName
                         }
                     );
                 }
@@ -821,34 +646,24 @@ ORDER BY
                             success = true,
                             error = string.Empty,
 
-                            Queue =
-                                queue,
+                            Queue = queue,
 
-                            TotalCount =
-                                totalCount,
+                            TotalCount = totalCount,
 
-                            PageNo =
-                                pageNo,
+                            PageNo = pageNo,
 
-                            PageSize =
-                                pageSize,
+                            PageSize = pageSize,
 
                             TotalPages =
                                 pageSize <= 0
                                     ? 0
-                                    : (int)Math.Ceiling(
-                                        totalCount /
-                                        (decimal)pageSize
-                                    ),
+                                    : (int)Math.Ceiling(totalCount / (decimal)pageSize),
 
-                            CurSymbol =
-                                curSymbol,
+                            CurSymbol = curSymbol,
 
-                            ISOCode =
-                                isoCode,
+                            ISOCode = isoCode,
 
-                            StdPrecision =
-                                stdPrecision
+                            StdPrecision = stdPrecision
                         }
                     ),
                     JsonRequestBehavior.AllowGet
@@ -857,11 +672,7 @@ ORDER BY
             catch (Exception)
             {
                 string errorMessage =
-                    GetMsg(
-                        ctx,
-                        "VAS_045_LoadPendingQueueFailed",
-                        "Error loading pending journal queue."
-                    );
+                    GetMsg(ctx, "VAS_045_LoadPendingQueueFailed", "Error loading pending journal queue.");
 
                 return Json(
                     JsonConvert.SerializeObject(
@@ -869,17 +680,13 @@ ORDER BY
                         {
                             success = false,
 
-                            error =
-                                errorMessage,
+                            error = errorMessage,
 
-                            errorText =
-                                errorMessage,
+                            errorText = errorMessage,
 
-                            Queue =
-                                new List<object>(),
+                            Queue = new List<object>(),
 
-                            TotalCount =
-                                0
+                            TotalCount = 0
                         }
                     ),
                     JsonRequestBehavior.AllowGet
@@ -896,34 +703,23 @@ ORDER BY
             }
         }
 
-        private string GetMsg(
-            Ctx ctx,
-            string key,
-            string fallback)
+        private string GetMsg(Ctx ctx, string key, string fallback)
         {
             if (ctx == null)
             {
                 return fallback;
             }
 
-            string message =
-                Msg.GetMsg(
-                    ctx,
-                    key
-                );
+            string message = Msg.GetMsg(ctx, key);
 
-            if (
-                string.IsNullOrWhiteSpace(message) ||
+            if (string.IsNullOrWhiteSpace(message) ||
                 message == key ||
-                message == "[" + key + "]"
-            )
+                message == "[" + key + "]")
             {
                 return fallback;
             }
 
             return message;
         }
-
-
     }
 }

@@ -379,6 +379,8 @@ namespace VASLogic.Models
                        Payment.C_Currency_ID AS Receipt_Currency_ID,
                        Payment.C_ConversionType_ID AS Receipt_ConversionType_ID,
                        BPartner.Name AS Receipt_Customer,
+                       DocType.Name AS Receipt_DocType,
+                       DocType.DocBaseType AS Receipt_DocBaseType,
                        PayMethod.VA009_Name AS Payment_Method,
                        COALESCE(Payment.TrxNo, Payment.CheckNo) AS Reference_No,
                        Bank.Name AS Bank_Name,
@@ -389,6 +391,7 @@ namespace VASLogic.Models
                        COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) AS Receipt_Amount
                 FROM C_Payment Payment
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Payment.C_BPartner_ID)
+                INNER JOIN C_DocType DocType ON (DocType.C_DocType_ID=Payment.C_DocType_ID)
                 INNER JOIN C_Currency ReceiptCurrency ON (ReceiptCurrency.C_Currency_ID=Payment.C_Currency_ID)
                 INNER JOIN VA009_PaymentMethod PayMethod ON (PayMethod.VA009_PaymentMethod_ID=Payment.VA009_PaymentMethod_ID)
                 INNER JOIN C_BankAccount BankAccount ON (BankAccount.C_BankAccount_ID=Payment.C_BankAccount_ID)
@@ -415,6 +418,8 @@ namespace VASLogic.Models
                            Invoice.DocumentNo AS Invoice_No,
                            Invoice.DateInvoiced AS Invoice_Date,
                            BPartner.Name AS Invoice_Customer,
+                           DocType.Name AS Invoice_DocType,
+                           DocType.DocBaseType AS Invoice_DocBaseType,
                            PaymentTerm.Name AS Payment_Terms,
                            PaySchedule.DueDate AS Due_Date,
                            Invoice.GrandTotal AS Grand_Total,
@@ -425,6 +430,7 @@ namespace VASLogic.Models
                            COALESCE(PaySchedule.DueAmt, 0) AS Open_Amount
                     FROM C_Invoice Invoice
                     INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Invoice.C_BPartner_ID)
+                    INNER JOIN C_DocType DocType ON (DocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
                     INNER JOIN C_InvoicePaySchedule PaySchedule ON (PaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
                     INNER JOIN C_Currency InvoiceCurrency ON (InvoiceCurrency.C_Currency_ID=Invoice.C_Currency_ID)
                     INNER JOIN C_PaymentTerm PaymentTerm ON (PaymentTerm.C_PaymentTerm_ID=Invoice.C_PaymentTerm_ID)
@@ -458,6 +464,8 @@ namespace VASLogic.Models
                        ReceiptData.Receipt_No,
                        ReceiptData.Receipt_Date,
                        ReceiptData.Receipt_Customer,
+                       ReceiptData.Receipt_DocType,
+                       ReceiptData.Receipt_DocBaseType,
                        ReceiptData.Payment_Method,
                        ReceiptData.Reference_No,
                        ReceiptData.Bank_Name,
@@ -472,6 +480,8 @@ namespace VASLogic.Models
                        InvoiceData.Invoice_No,
                        InvoiceData.Invoice_Date,
                        InvoiceData.Invoice_Customer,
+                       InvoiceData.Invoice_DocType,
+                       InvoiceData.Invoice_DocBaseType,
                        InvoiceData.Payment_Terms,
                        InvoiceData.Due_Date,
                        InvoiceData.Grand_Total,
@@ -566,6 +576,8 @@ namespace VASLogic.Models
                         ReceiptNo = receiptNo,
                         ReceiptDate = FormatDate(receiptDate),
                         ReceiptCustomer = Util.GetValueOfString(dr["Receipt_Customer"]),
+                        ReceiptDocType = Util.GetValueOfString(dr["Receipt_DocType"]),
+                        ReceiptDocBaseType = Util.GetValueOfString(dr["Receipt_DocBaseType"]),
                         PaymentMethod = Util.GetValueOfString(dr["Payment_Method"]),
                         Reference = referenceNo,
                         BankName = Util.GetValueOfString(dr["Bank_Name"]),
@@ -580,6 +592,8 @@ namespace VASLogic.Models
                         InvoiceNo = invoiceNo,
                         InvoiceDate = FormatDate(Util.GetValueOfDateTime(dr["Invoice_Date"])),
                         InvoiceCustomer = Util.GetValueOfString(dr["Invoice_Customer"]),
+                        InvoiceDocType = Util.GetValueOfString(dr["Invoice_DocType"]),
+                        InvoiceDocBaseType = Util.GetValueOfString(dr["Invoice_DocBaseType"]),
                         PaymentTerms = Util.GetValueOfString(dr["Payment_Terms"]),
                         DueDate = FormatDate(dueDate),
                         GrandTotal = Math.Round(Util.GetValueOfDecimal(dr["Grand_Total"]), invoicePrecision, MidpointRounding.AwayFromZero),
@@ -908,6 +922,8 @@ namespace VASLogic.Models
             public string ReceiptNo { get; set; }
             public string ReceiptDate { get; set; }
             public string ReceiptCustomer { get; set; }
+            public string ReceiptDocType { get; set; }
+            public string ReceiptDocBaseType { get; set; }
             public string PaymentMethod { get; set; }
             public string Reference { get; set; }
             public string BankName { get; set; }
@@ -923,6 +939,8 @@ namespace VASLogic.Models
             public string InvoiceNo { get; set; }
             public string InvoiceDate { get; set; }
             public string InvoiceCustomer { get; set; }
+            public string InvoiceDocType { get; set; }
+            public string InvoiceDocBaseType { get; set; }
             public string PaymentTerms { get; set; }
             public string DueDate { get; set; }
             public decimal GrandTotal { get; set; }

@@ -420,9 +420,14 @@
                 '<line x1="3" y1="10" x2="21" y2="10"></line>' +
                 '</svg>' +
                 '</span>' +
+                '<div class="vas-er-title-group">' +
                 '<span class="vas-er-title">' +
                 lbl("VAS_034_ExpectedReceipts", "Expected Receipts") +
                 '</span>' +
+                '<span class="vas-er-subtitle">' +
+                lbl("VAS_034_ReceiptsExpectedSoon", "Receipts Expected Soon") +
+                '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
                 '<button type="button" class="vas-er-filter-icon-btn" aria-label="' + lbl("VAS_034_Filter", "Filter") + '">' +

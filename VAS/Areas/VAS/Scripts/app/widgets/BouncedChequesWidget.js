@@ -119,7 +119,10 @@
                 '<line x1="12" y1="16" x2="12.01" y2="16"/>' +
                 '</svg>' +
                 '</div>' +
+                '<div class="vas-bc-title-group">' +
                 '<span class="vas-bc-title">' + lbl("VIS_BouncedCheques", "Bounced cheques") + '</span>' +
+                '<span class="vas-bc-subtitle">' + lbl("VIS_ChequesDishonoured", "Cheques Dishonoured.") + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>'
             );

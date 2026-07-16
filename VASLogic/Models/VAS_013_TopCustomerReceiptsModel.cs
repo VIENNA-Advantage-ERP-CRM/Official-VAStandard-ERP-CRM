@@ -66,11 +66,11 @@ namespace VASLogic.Models
             string dateCondition;
             if (DB.IsPostgreSQL())
             {
-                dateCondition = "Payment.DateTrx >= CURRENT_DATE - 30 AND Payment.DateTrx < CURRENT_DATE + 1";
+                dateCondition = "Payment.DateAcct >= CURRENT_DATE - 30 AND Payment.DateAcct < CURRENT_DATE + 1";
             }
             else
             {
-                dateCondition = "TRUNC(Payment.DateTrx) >= TRUNC(SYSDATE) - 30 AND TRUNC(Payment.DateTrx) <= TRUNC(SYSDATE)";
+                dateCondition = "TRUNC(Payment.DateAcct) >= TRUNC(SYSDATE) - 30 AND TRUNC(Payment.DateAcct) <= TRUNC(SYSDATE)";
             }
 
             /* SchemaCurrency CTE resolves the accounting-schema (base) currency

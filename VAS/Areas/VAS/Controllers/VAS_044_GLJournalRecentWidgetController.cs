@@ -58,17 +58,14 @@ namespace VAS.Controllers
          * Change this value only if the DocStatus reference
          * has another Name in AD_Reference.
          */
-        private const string DocumentStatusReferenceName =
-            "_Document Status";
+        private const string DocumentStatusReferenceName = "_Document Status";
 
         /// <summary>
         /// Returns the six most recent GL journals.
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetRecentEntries(
-            int pageNo = 1,
-            int pageSize = 5)
+        public JsonResult GetRecentEntries(int pageNo = 1, int pageSize = 5)
         {
             Ctx ctx = GetContext();
 
@@ -79,32 +76,17 @@ namespace VAS.Controllers
 
             try
             {
-                pageNo =
-                    Math.Max(
-                        1,
-                        pageNo
-                    );
+                pageNo = Math.Max(1, pageNo);
 
-                pageSize =
-                    Math.Max(
-                        1,
-                        Math.Min(
-                            pageSize,
-                            25
-                        )
-                    );
+                pageSize = Math.Max(1, Math.Min(pageSize, 25));
 
-                int rowStart =
-                    ((pageNo - 1) * pageSize) + 1;
+                int rowStart = ((pageNo - 1) * pageSize) + 1;
 
-                int rowEnd =
-                    pageNo * pageSize;
+                int rowEnd = pageNo * pageSize;
 
-                string language =
-                    GetLanguage(ctx);
+                string language = GetLanguage(ctx);
 
-                string castType =
-                    GetTextCastType();
+                string castType = GetTextCastType();
 
                 /*
                  * Apply MRole only to the physical GL_Journal query.
@@ -130,14 +112,13 @@ AND GL_Journal.AD_Client_ID =
 @RecentClientID
 AND GL_Journal.Created >= @RecentCreatedFrom";
 
-                protectedJournalSql =
-                    MRole.GetDefault(ctx)
-                        .AddAccessSQL(
-                            protectedJournalSql,
-                            "GL_Journal",
-                            MRole.SQL_FULLYQUALIFIED,
-                            MRole.SQL_RO
-                        );
+                protectedJournalSql = MRole.GetDefault(ctx)
+                    .AddAccessSQL(
+                        protectedJournalSql,
+                        "GL_Journal",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
                 /*
                  * ANSI SQL query compatible with Oracle and PostgreSQL.
@@ -364,223 +345,118 @@ ORDER BY
                  * Unique parameter names prevent Oracle binding issues.
                  */
                 /* Recent = created within the last 15 days (by GL_Journal.Created). */
-                DateTime recentCreatedFrom =
-                    DateTime.Now.AddDays(-15);
+                DateTime recentCreatedFrom = DateTime.Now.AddDays(-15);
 
                 SqlParameter[] parameters =
                 {
-                    new SqlParameter(
-                        "@RecentClientID",
-                        ctx.GetAD_Client_ID()
-                    ),
-
-                    new SqlParameter(
-                        "@RecentCreatedFrom",
-                        recentCreatedFrom
-                    ),
-
-                    new SqlParameter(
-                        "@RecentSchemaClientID",
-                        ctx.GetAD_Client_ID()
-                    ),
-
-                    new SqlParameter(
-                        "@RecentLanguage",
-                        language
-                    ),
-
-                    new SqlParameter(
-                        "@RecentStatusReferenceName",
-                        DocumentStatusReferenceName
-                    ),
-
-                    new SqlParameter(
-                        "@PageRowStart",
-                        rowStart
-                    ),
-
-                    new SqlParameter(
-                        "@PageRowEnd",
-                        rowEnd
-                    )
+                    new SqlParameter("@RecentClientID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@RecentCreatedFrom", recentCreatedFrom),
+                    new SqlParameter("@RecentSchemaClientID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@RecentLanguage", language),
+                    new SqlParameter("@RecentStatusReferenceName", DocumentStatusReferenceName),
+                    new SqlParameter("@PageRowStart", rowStart),
+                    new SqlParameter("@PageRowEnd", rowEnd)
                 };
 
-                DataSet dataSet =
-                    DB.ExecuteDataset(
-                        sql,
-                        parameters,
-                        null
-                    );
+                DataSet dataSet = DB.ExecuteDataset(sql, parameters, null);
 
-                List<object> entries =
-                    new List<object>();
+                List<object> entries = new List<object>();
 
-                string curSymbol =
-                    string.Empty;
+                string curSymbol = string.Empty;
 
-                string isoCode =
-                    string.Empty;
+                string isoCode = string.Empty;
 
-                int stdPrecision =
-                    2;
+                int stdPrecision = 2;
 
-                int totalCount =
-                    0;
+                int totalCount = 0;
 
-                if (
-                    dataSet != null &&
-                    dataSet.Tables.Count > 0
-                )
+                if (dataSet != null && dataSet.Tables.Count > 0)
                 {
-                    foreach (
-                        DataRow row in
-                        dataSet.Tables[0].Rows
-                    )
+                    foreach (DataRow row in dataSet.Tables[0].Rows)
                     {
-                        string statusValue =
-                            Util.GetValueOfString(
-                                row["DocStatus"]
-                            );
+                        string statusValue = Util.GetValueOfString(row["DocStatus"]);
 
                         if (totalCount <= 0)
                         {
-                            totalCount =
-                                Util.GetValueOfInt(
-                                    row["TotalCount"]
-                                );
+                            totalCount = Util.GetValueOfInt(row["TotalCount"]);
                         }
 
-                        string statusName =
-                            GetReferenceDisplayName(
-                                row,
-                                "StatusTranslatedName",
-                                "StatusBaseName",
-                                statusValue
-                            );
+                        string statusName = GetReferenceDisplayName(
+                            row,
+                            "StatusTranslatedName",
+                            "StatusBaseName",
+                            statusValue
+                        );
 
-                        DateTime? dateAcct =
-                            Util.GetValueOfDateTime(
-                                row["DateAcct"]
-                            );
+                        DateTime? dateAcct = Util.GetValueOfDateTime(row["DateAcct"]);
 
-                        stdPrecision =
-                            NormalizePrecision(
-                                Util.GetValueOfInt(
-                                    row["StdPrecision"]
-                                )
-                            );
+                        stdPrecision = NormalizePrecision(Util.GetValueOfInt(row["StdPrecision"]));
 
-                        decimal totalDebit =
-                            Decimal.Round(
-                                Util.GetValueOfDecimal(
-                                    row["TotalDebit"]
-                                ),
-                                stdPrecision,
-                                MidpointRounding.AwayFromZero
-                            );
+                        decimal totalDebit = Decimal.Round(
+                            Util.GetValueOfDecimal(row["TotalDebit"]),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        decimal totalCredit =
-                            Decimal.Round(
-                                Util.GetValueOfDecimal(
-                                    row["TotalCredit"]
-                                ),
-                                stdPrecision,
-                                MidpointRounding.AwayFromZero
-                            );
+                        decimal totalCredit = Decimal.Round(
+                            Util.GetValueOfDecimal(row["TotalCredit"]),
+                            stdPrecision,
+                            MidpointRounding.AwayFromZero
+                        );
 
-                        curSymbol =
-                            Util.GetValueOfString(
-                                row["CurSymbol"]
-                            );
+                        curSymbol = Util.GetValueOfString(row["CurSymbol"]);
 
-                        isoCode =
-                            Util.GetValueOfString(
-                                row["ISOCode"]
-                            );
+                        isoCode = Util.GetValueOfString(row["ISOCode"]);
 
-                        if (
-                            string.IsNullOrWhiteSpace(
-                                curSymbol
-                            )
-                        )
+                        if (string.IsNullOrWhiteSpace(curSymbol))
                         {
-                            curSymbol =
-                                isoCode;
+                            curSymbol = isoCode;
                         }
 
                         entries.Add(
                             new
                             {
-                                GL_Journal_ID =
-                                    Util.GetValueOfInt(
-                                        row[
-                                            "GL_Journal_ID"
-                                        ]
-                                    ),
+                                GL_Journal_ID = Util.GetValueOfInt(row["GL_Journal_ID"]),
 
-                                DocumentNo =
-                                    Util.GetValueOfString(
-                                        row["DocumentNo"]
-                                    ),
+                                DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
 
-                                DateAcct =
-                                    dateAcct.HasValue
-                                        ? dateAcct.Value.ToString(
-                                            "dd MMM yyyy"
-                                        )
-                                        : string.Empty,
+                                DateAcct = dateAcct.HasValue
+                                    ? dateAcct.Value.ToString("dd MMM yyyy")
+                                    : string.Empty,
 
-                                Description =
-                                    Util.GetValueOfString(
-                                        row["Description"]
-                                    ),
+                                Description = Util.GetValueOfString(row["Description"]),
 
                                 /*
                                  * Existing compatibility field.
                                  */
-                                DocStatus =
-                                    statusValue,
+                                DocStatus = statusValue,
 
                                 /*
                                  * Separate status fields.
                                  */
-                                StatusValue =
-                                    statusValue,
+                                StatusValue = statusValue,
 
-                                StatusName =
-                                    statusName,
+                                StatusName = statusName,
 
                                 /*
                                  * Requested Status Value / Name object.
                                  */
                                 Status = new
                                 {
-                                    Value =
-                                        statusValue,
+                                    Value = statusValue,
 
-                                    Name =
-                                        statusName
+                                    Name = statusName
                                 },
 
-                                Posted =
-                                    Util.GetValueOfString(
-                                        row["Posted"]
-                                    ),
+                                Posted = Util.GetValueOfString(row["Posted"]),
 
-                                Processed =
-                                    Util.GetValueOfString(
-                                        row["Processed"]
-                                    ),
+                                Processed = Util.GetValueOfString(row["Processed"]),
 
-                                TotalDebit =
-                                    totalDebit,
+                                TotalDebit = totalDebit,
 
-                                TotalCredit =
-                                    totalCredit,
+                                TotalCredit = totalCredit,
 
-                                IsUnbalanced =
-                                    totalDebit !=
-                                    totalCredit
+                                IsUnbalanced = totalDebit != totalCredit
                             }
                         );
                     }
@@ -592,61 +468,44 @@ ORDER BY
                         success = true,
                         error = string.Empty,
 
-                        Entries =
-                            entries,
+                        Entries = entries,
 
-                        TotalCount =
-                            totalCount,
+                        TotalCount = totalCount,
 
-                        PageNo =
-                            pageNo,
+                        PageNo = pageNo,
 
-                        PageSize =
-                            pageSize,
+                        PageSize = pageSize,
 
-                        TotalPages =
-                            pageSize <= 0
-                                ? 0
-                                : (int)Math.Ceiling(
-                                    totalCount /
-                                    (decimal)pageSize
-                                ),
+                        TotalPages = pageSize <= 0
+                            ? 0
+                            : (int)Math.Ceiling(totalCount / (decimal)pageSize),
 
-                        CurSymbol =
-                            curSymbol,
+                        CurSymbol = curSymbol,
 
-                        ISOCode =
-                            isoCode,
+                        ISOCode = isoCode,
 
-                        StdPrecision =
-                            stdPrecision
+                        StdPrecision = stdPrecision
                     }
                 );
             }
             catch (Exception exception)
             {
-                LogException(
-                    "GetRecentEntries",
-                    exception
-                );
+                LogException("GetRecentEntries", exception);
 
-                string errorMessage =
-                    GetMsg(
-                        ctx,
-                        "VAS_044_LoadFailed",
-                        "Error loading journal entries."
-                    );
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_044_LoadFailed",
+                    "Error loading journal entries."
+                );
 
                 return JsonString(
                     new
                     {
                         success = false,
 
-                        error =
-                            errorMessage,
+                        error = errorMessage,
 
-                        errorText =
-                            errorMessage
+                        errorText = errorMessage
                     }
                 );
             }
@@ -662,19 +521,13 @@ ORDER BY
             return "VARCHAR(4000)";
         }
 
-        private string GetLanguage(
-            Ctx ctx)
+        private string GetLanguage(Ctx ctx)
         {
-            string language =
-                ctx == null
-                    ? string.Empty
-                    : ctx.GetAD_Language();
+            string language = ctx == null
+                ? string.Empty
+                : ctx.GetAD_Language();
 
-            if (
-                string.IsNullOrWhiteSpace(
-                    language
-                )
-            )
+            if (string.IsNullOrWhiteSpace(language))
             {
                 return "en_US";
             }
@@ -688,30 +541,16 @@ ORDER BY
             string baseColumn,
             string fallback)
         {
-            string translatedName =
-                Util.GetValueOfString(
-                    row[translatedColumn]
-                );
+            string translatedName = Util.GetValueOfString(row[translatedColumn]);
 
-            if (
-                !string.IsNullOrWhiteSpace(
-                    translatedName
-                )
-            )
+            if (!string.IsNullOrWhiteSpace(translatedName))
             {
                 return translatedName;
             }
 
-            string baseName =
-                Util.GetValueOfString(
-                    row[baseColumn]
-                );
+            string baseName = Util.GetValueOfString(row[baseColumn]);
 
-            if (
-                !string.IsNullOrWhiteSpace(
-                    baseName
-                )
-            )
+            if (!string.IsNullOrWhiteSpace(baseName))
             {
                 return baseName;
             }
@@ -743,24 +582,14 @@ ORDER BY
             );
         }
 
-        private JsonResult JsonString(
-            object value)
+        private JsonResult JsonString(object value)
         {
-            return Json(
-                JsonConvert.SerializeObject(
-                    value
-                ),
-                JsonRequestBehavior.AllowGet
-            );
+            return Json(JsonConvert.SerializeObject(value), JsonRequestBehavior.AllowGet);
         }
 
-        private int NormalizePrecision(
-            int precision)
+        private int NormalizePrecision(int precision)
         {
-            if (
-                precision < 0 ||
-                precision > 28
-            )
+            if (precision < 0 || precision > 28)
             {
                 return 2;
             }
@@ -768,24 +597,11 @@ ORDER BY
             return precision;
         }
 
-        private string GetMsg(
-            Ctx ctx,
-            string key,
-            string fallback)
+        private string GetMsg(Ctx ctx, string key, string fallback)
         {
-            string message =
-                Msg.GetMsg(
-                    ctx,
-                    key
-                );
+            string message = Msg.GetMsg(ctx, key);
 
-            if (
-                string.IsNullOrEmpty(
-                    message
-                ) ||
-                message == key ||
-                message == "[" + key + "]"
-            )
+            if (string.IsNullOrEmpty(message) || message == key || message == "[" + key + "]")
             {
                 return fallback;
             }
@@ -793,9 +609,7 @@ ORDER BY
             return message;
         }
 
-        private void LogException(
-            string actionName,
-            Exception exception)
+        private void LogException(string actionName, Exception exception)
         {
             Trace.TraceError(
                 "VAS_044_GLJournalRecentWidgetController." +

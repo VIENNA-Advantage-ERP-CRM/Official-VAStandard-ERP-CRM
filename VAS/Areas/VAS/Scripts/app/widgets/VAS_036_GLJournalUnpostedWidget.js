@@ -177,7 +177,7 @@
             var dialogLoaded = false;
 
             var dialogPageNo = 1;
-            var dialogPageSize = 8;
+            var dialogPageSize = 9;
             var dialogTotalPages = 1;
             var dialogTotalCount = 0;
 
@@ -950,7 +950,7 @@
                     Number(data.PageNo || dialogPageNo || 1);
 
                 dialogPageSize =
-                    Number(data.PageSize || dialogPageSize || 8);
+                    Number(data.PageSize || dialogPageSize || 9);
 
                 dialogTotalPages =
                     Math.max(

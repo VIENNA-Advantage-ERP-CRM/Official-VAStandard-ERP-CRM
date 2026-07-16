@@ -560,6 +560,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\OutstandingSalesOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\OverdueWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PaidthismonthWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_GLJournalDetailDialog.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_041_GLJournalEntriesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_039_GLJournalPostedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_038_GLJournalTotalCreditWidget.js" />

@@ -545,7 +545,7 @@
                 1;
 
             var dialogPageSize =
-                10;
+                9;
 
             var dialogTotalPages =
                 1;
@@ -1443,7 +1443,7 @@
                     Number(
                         data.PageSize ||
                         dialogPageSize ||
-                        10
+                        9
                     );
 
                 dialogTotalPages =
