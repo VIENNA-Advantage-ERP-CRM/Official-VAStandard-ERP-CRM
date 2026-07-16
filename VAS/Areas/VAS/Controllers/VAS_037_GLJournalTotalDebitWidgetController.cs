@@ -40,182 +40,90 @@ namespace VAS.Controllers
     /// </summary>
     public class VAS_037_GLJournalTotalDebitWidgetController : Controller
     {
-        public JsonResult GetTotalDebit(
-            string period
-        )
+        public JsonResult GetTotalDebit(string period)
         {
             if (Session["ctx"] == null)
             {
-                return Json(
-                    SessionExpired(),
-                    JsonRequestBehavior.AllowGet
-                );
+                return Json(SessionExpired(), JsonRequestBehavior.AllowGet);
             }
 
-            Ctx ctx =
-                Session["ctx"] as Ctx;
+            Ctx ctx = Session["ctx"] as Ctx;
 
             return Json(
-                GetJournalTotal(
-                    ctx,
-                    "AmtAcctDr",
-                    "TotalDebit",
-                    period
-                ),
+                GetJournalTotal(ctx, "AmtAcctDr", "TotalDebit", period),
                 JsonRequestBehavior.AllowGet
             );
         }
 
-        public JsonResult GetTotalCredit(
-            string period
-        )
+        public JsonResult GetTotalCredit(string period)
         {
             if (Session["ctx"] == null)
             {
-                return Json(
-                    SessionExpired(),
-                    JsonRequestBehavior.AllowGet
-                );
+                return Json(SessionExpired(), JsonRequestBehavior.AllowGet);
             }
 
-            Ctx ctx =
-                Session["ctx"] as Ctx;
+            Ctx ctx = Session["ctx"] as Ctx;
 
             return Json(
-                GetJournalTotal(
-                    ctx,
-                    "AmtAcctCr",
-                    "TotalCredit",
-                    period
-                ),
+                GetJournalTotal(ctx, "AmtAcctCr", "TotalCredit", period),
                 JsonRequestBehavior.AllowGet
             );
         }
 
-        public JsonResult GetNetDifference(
-            string period
-        )
+        public JsonResult GetNetDifference(string period)
         {
             if (Session["ctx"] == null)
             {
-                return Json(
-                    SessionExpired(),
-                    JsonRequestBehavior.AllowGet
-                );
+                return Json(SessionExpired(), JsonRequestBehavior.AllowGet);
             }
 
-            Ctx ctx =
-                Session["ctx"] as Ctx;
+            Ctx ctx = Session["ctx"] as Ctx;
 
             return Json(
-                GetNetDifferenceData(
-                    ctx,
-                    period
-                ),
+                GetNetDifferenceData(ctx, period),
                 JsonRequestBehavior.AllowGet
             );
         }
 
-        private object GetJournalTotal(
-            Ctx ctx,
-            string amountColumn,
-            string resultAlias,
-            string period
-        )
+        private object GetJournalTotal(Ctx ctx, string amountColumn, string resultAlias, string period)
         {
-            if (
-                amountColumn != "AmtAcctDr" &&
-                amountColumn != "AmtAcctCr"
-            )
+            if (amountColumn != "AmtAcctDr" && amountColumn != "AmtAcctCr")
             {
-                return Error(
-                    GetMsg(
-                        ctx,
-                        "VAS_037_InvalidColumn",
-                        "Invalid Column"
-                    )
-                );
+                return Error(GetMsg(ctx, "VAS_037_InvalidColumn", "Invalid Column"));
             }
 
-            if (
-                resultAlias != "TotalDebit" &&
-                resultAlias != "TotalCredit"
-            )
+            if (resultAlias != "TotalDebit" && resultAlias != "TotalCredit")
             {
-                return Error(
-                    GetMsg(
-                        ctx,
-                        "VAS_037_InvalidAlias",
-                        "Invalid Alias"
-                    )
-                );
+                return Error(GetMsg(ctx, "VAS_037_InvalidAlias", "Invalid Alias"));
             }
 
             try
             {
-                bool isYTD =
-                    IsYTD(period);
+                bool isYTD = IsYTD(period);
 
-                string titleKey =
-                    resultAlias == "TotalDebit"
-                        ? "VAS_037_TotalDebitTitle"
-                        : "VAS_037_TotalCreditTitle";
+                string titleKey = resultAlias == "TotalDebit" ? "VAS_037_TotalDebitTitle" : "VAS_037_TotalCreditTitle";
 
-                string titleFallback =
-                    resultAlias == "TotalDebit"
-                        ? "Total Debit"
-                        : "Total Credit";
+                string titleFallback = resultAlias == "TotalDebit" ? "Total Debit" : "Total Credit";
 
-                string queryParametersSql =
-                    BuildQueryParametersSql();
+                string queryParametersSql = BuildQueryParametersSql();
 
-                string schemaCurrencySql =
-                    BuildSchemaCurrencySql();
+                string schemaCurrencySql = BuildSchemaCurrencySql();
 
-                string periodRangeSql =
-                    BuildPeriodRangeSql();
+                string periodRangeSql = BuildPeriodRangeSql();
 
-                string protectedJournalSql =
-                    BuildProtectedJournalSql(
-                        ctx
-                    );
+                string protectedJournalSql = BuildProtectedJournalSql(ctx);
 
-                string journalDataSql =
-                    BuildJournalDataSql();
+                string journalDataSql = BuildJournalDataSql();
 
-                string dateFromColumn =
-                    isYTD
-                        ? "PeriodRange.YTDDateFrom"
-                        : "PeriodRange.MonthDateFrom";
+                string dateFromColumn = isYTD ? "PeriodRange.YTDDateFrom" : "PeriodRange.MonthDateFrom";
 
-                string dateToColumn =
-                    isYTD
-                        ? "PeriodRange.YTDDateTo"
-                        : "PeriodRange.MonthDateTo";
+                string dateToColumn = isYTD ? "PeriodRange.YTDDateTo" : "PeriodRange.MonthDateTo";
 
-                string dateToExclusiveExpression =
-                    GetDateToExclusiveExpression(
-                        dateToColumn
-                    );
+                string dateToExclusiveExpression = GetDateToExclusiveExpression(dateToColumn);
 
-                string amountSumExpression = @"
-COALESCE
-(
-    SUM
-    (
-        COALESCE
-        (
-            JournalData." + amountColumn + @",
-            0
-        )
-    ),
-    0
-)";
+                string amountSumExpression = @"COALESCE(SUM(COALESCE(JournalData." + amountColumn + @",0)), 0)";
 
-                string roundedAmountExpression =
-                    BuildRoundedAmountExpression(
-                        amountSumExpression
-                    );
+                string roundedAmountExpression = BuildRoundedAmountExpression(amountSumExpression);
 
                 string sql = @"
 WITH QueryParameters AS
@@ -299,13 +207,7 @@ LEFT OUTER JOIN JournalData JournalData ON
         " + dateToExclusiveExpression + @"
 )";
 
-                SqlParameter[] parameters =
-                {
-                    new SqlParameter(
-                        "@AD_Client_ID",
-                        ctx.GetAD_Client_ID()
-                    )
-                };
+                SqlParameter[] parameters = { new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()) };
 
                 decimal total = 0;
                 int journalCount = 0;
@@ -313,169 +215,81 @@ LEFT OUTER JOIN JournalData JournalData ON
                 string isoCode = string.Empty;
                 int stdPrecision = 2;
 
-                DateTime? dateFromValue =
-                    null;
+                DateTime? dateFromValue = null;
 
-                DateTime? dateToValue =
-                    null;
+                DateTime? dateToValue = null;
 
-                using (
-                    IDataReader reader =
-                        DB.ExecuteReader(
-                            sql,
-                            parameters,
-                            null
-                        )
-                )
+                using (IDataReader reader = DB.ExecuteReader(sql, parameters, null))
                 {
-                    if (
-                        reader != null &&
-                        reader.Read()
-                    )
+                    if (reader != null && reader.Read())
                     {
-                        stdPrecision =
-                            NormalizePrecision(
-                                Util.GetValueOfInt(
-                                    reader["StdPrecision"]
-                                )
-                            );
+                        stdPrecision = NormalizePrecision(Util.GetValueOfInt(reader["StdPrecision"]));
 
-                        total =
-                            GetSafeDecimal(
-                                reader[resultAlias],
-                                stdPrecision
-                            );
+                        total = GetSafeDecimal(reader[resultAlias], stdPrecision);
 
-                        journalCount =
-                            Util.GetValueOfInt(
-                                reader["JournalCount"]
-                            );
+                        journalCount = Util.GetValueOfInt(reader["JournalCount"]);
 
-                        curSymbol =
-                            Util.GetValueOfString(
-                                reader["CurSymbol"]
-                            );
+                        curSymbol = Util.GetValueOfString(reader["CurSymbol"]);
 
-                        isoCode =
-                            Util.GetValueOfString(
-                                reader["ISOCode"]
-                            );
+                        isoCode = Util.GetValueOfString(reader["ISOCode"]);
 
-                        dateFromValue =
-                            GetNullableDateTime(
-                                reader["DateFrom"]
-                            );
+                        dateFromValue = GetNullableDateTime(reader["DateFrom"]);
 
-                        dateToValue =
-                            GetNullableDateTime(
-                                reader["DateTo"]
-                            );
+                        dateToValue = GetNullableDateTime(reader["DateTo"]);
                     }
                 }
 
-                if (
-                    !dateFromValue.HasValue ||
-                    !dateToValue.HasValue
-                )
+                if (!dateFromValue.HasValue || !dateToValue.HasValue)
                 {
-                    return Error(
-                        GetMsg(
-                            ctx,
-                            "VAS_037_PeriodNotFound",
-                            "Current period was not found"
-                        )
-                    );
+                    return Error(GetMsg(ctx, "VAS_037_PeriodNotFound", "Current period was not found"));
                 }
 
-                if (string.IsNullOrWhiteSpace(
-                    curSymbol
-                ))
+                if (string.IsNullOrWhiteSpace(curSymbol))
                 {
-                    curSymbol =
-                        isoCode;
+                    curSymbol = isoCode;
                 }
 
-                bool hasData =
-                    journalCount > 0;
+                bool hasData = journalCount > 0;
 
-                string description =
-                    string.Format(
-                        GetMsg(
-                            ctx,
-                            "VAS_037_JournalCountDescription",
-                            "{0} journal(s)"
-                        ),
-                        journalCount
-                    );
+                string description = string.Format(GetMsg(ctx, "VAS_037_JournalCountDescription", "{0} journal(s)"), journalCount);
 
                 return new
                 {
                     success = true,
                     error = string.Empty,
-
-                    title = GetMsg(
-                        ctx,
-                        titleKey,
-                        titleFallback
-                    ),
+                    title = GetMsg(ctx, titleKey, titleFallback),
 
                     mainMetric = total,
 
-                    mainMetricText =
-                        total.ToString(
-                            CultureInfo.InvariantCulture
-                        ),
+                    mainMetricText = total.ToString(CultureInfo.InvariantCulture),
 
                     description = description,
 
-                    badgeText =
-                        GetPeriodBadgeText(
-                            ctx,
-                            isYTD
-                        ),
+                    badgeText = GetPeriodBadgeText(ctx, isYTD),
 
-                    dateFrom =
-                        FormatDate(
-                            dateFromValue.Value
-                        ),
+                    dateFrom = FormatDate(dateFromValue.Value),
 
-                    dateTo =
-                        FormatDate(
-                            dateToValue.Value
-                        ),
+                    dateTo = FormatDate(dateToValue.Value),
 
-                    currencyISO =
-                        isoCode,
+                    currencyISO = isoCode,
 
-                    currencySymbol =
-                        curSymbol,
+                    currencySymbol = curSymbol,
 
-                    stdPrecision =
-                        stdPrecision,
+                    stdPrecision = stdPrecision,
 
-                    hasData =
-                        hasData,
+                    hasData = hasData,
 
-                    Total =
-                        total,
+                    Total = total,
 
-                    JournalCount =
-                        journalCount,
+                    JournalCount = journalCount,
 
-                    CurSymbol =
-                        curSymbol,
+                    CurSymbol = curSymbol,
 
-                    ISOCode =
-                        isoCode,
+                    ISOCode = isoCode,
 
-                    StdPrecision =
-                        stdPrecision,
+                    StdPrecision = stdPrecision,
 
-                    MonthAbbr =
-                        DateTime.Now.ToString(
-                            "MMM",
-                            CultureInfo.InvariantCulture
-                        )
+                    MonthAbbr = DateTime.Now.ToString("MMM", CultureInfo.InvariantCulture)
                 };
             }
             catch (Exception ex)
@@ -484,47 +298,27 @@ LEFT OUTER JOIN JournalData JournalData ON
                     ex.ToString()
                 );
 
-                return Error(
-                    GetMsg(
-                        ctx,
-                        "VAS_037_ErrorLoadingData",
-                        "Could not load data"
-                    )
-                );
+                return Error(GetMsg(ctx, "VAS_037_ErrorLoadingData", "Could not load data"));
             }
         }
 
-        private object GetNetDifferenceData(
-            Ctx ctx,
-            string period
-        )
+        private object GetNetDifferenceData(Ctx ctx, string period)
         {
             try
             {
-                bool isYTD =
-                    IsYTD(period);
+                bool isYTD = IsYTD(period);
 
-                string queryParametersSql =
-                    BuildQueryParametersSql();
+                string queryParametersSql = BuildQueryParametersSql();
 
-                string schemaCurrencySql =
-                    BuildSchemaCurrencySql();
+                string schemaCurrencySql = BuildSchemaCurrencySql();
 
-                string periodRangeSql =
-                    BuildPeriodRangeSql();
+                string periodRangeSql = BuildPeriodRangeSql();
 
-                string protectedJournalSql =
-                    BuildProtectedJournalSql(
-                        ctx
-                    );
+                string protectedJournalSql = BuildProtectedJournalSql(ctx);
 
-                string journalDataSql =
-                    BuildJournalDataSql();
+                string journalDataSql = BuildJournalDataSql();
 
-                string dateFromColumn =
-                    isYTD
-                        ? "PeriodRange.YTDDateFrom"
-                        : "PeriodRange.MonthDateFrom";
+                string dateFromColumn = isYTD ? "PeriodRange.YTDDateFrom" : "PeriodRange.MonthDateFrom";
 
                 string dateToColumn =
                     isYTD
@@ -1383,6 +1177,16 @@ ROUND
                 error = message,
                 hasData = false
             };
+        }
+
+        private Ctx GetContext()
+        {
+            if (Session["ctx"] == null)
+            {
+                return null;
+            }
+
+            return Session["ctx"] as Ctx;
         }
 
         private object Error(

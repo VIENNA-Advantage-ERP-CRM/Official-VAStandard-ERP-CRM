@@ -2921,13 +2921,10 @@ AND GL_Journal.AD_Client_ID =
                 new
                 {
                     success = false,
-                        errorKey = "SessionExpired",
-                        messageKey = "SessionExpired",
-                        error =
-                            GetMsg(ctx, "SessionExpired", "Session Expired"),
-
-                        errorText =
-                            GetMsg(ctx, "SessionExpired", "Session Expired")
+                    errorKey = "SessionExpired",
+                    messageKey = "SessionExpired",
+                    error = "SessionExpired",
+                    errorText = "SessionExpired"
                 }
             );
         }

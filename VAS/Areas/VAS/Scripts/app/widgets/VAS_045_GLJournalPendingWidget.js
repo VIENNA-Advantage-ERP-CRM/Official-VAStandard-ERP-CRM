@@ -78,9 +78,19 @@
         var currentData = null;
 
         var pageNo = 1;
-        var pageSize = 2;
+        var pageSize = 2;                 // initial guess; replaced by the adaptive measure
         var totalPages = 0;
         var totalCount = 0;
+
+        /* Adaptive page size (VAS_020 pattern): derive the visible row count from the
+           list's available height at runtime so the rows always fit the card (no clipped
+           last row); a ResizeObserver re-pages on resize. Measure only on the first paint
+           (via _needsSync) and on resize (via the observer) — never on manual navigation. */
+        var _rowH = 0;                    // last measured row height (px)
+        var _needsSync = true;            // measure capacity on first paint only
+        var _listObserver = null;
+        var LIST_MIN_ROWS = 1;            // never force more rows than physically fit
+        var LIST_ROW_FALLBACK = 44;       // px, used only before a real row is measured
 
         var selectedJournalId = 0;
         var selectedJournalStatus = "";
@@ -1313,6 +1323,87 @@
             $body.html(html);
 
             updatePager();
+
+            /* Fit the visible row count to the card height (first paint + resize). */
+            observeList();
+            if (_needsSync) { scheduleSync(); }
+        }
+
+        /* ---- Adaptive row capacity (VAS_020 pattern) ---- */
+        function scheduleSync() {
+            var raf =
+                window.requestAnimationFrame ||
+                function (cb) { return window.setTimeout(cb, 16); };
+
+            raf(function () { syncCapacity(); });
+        }
+
+        function syncCapacity() {
+            if (isDisposed) { return; }
+            if (loadRequest && loadRequest.readyState !== 4) { return; }   // mid-fetch
+            if (totalCount <= 0) { return; }
+
+            var el =
+                $root.find(
+                    "#VAS-gljpq-body-" +
+                    $self.AD_UserHomeWidgetID
+                )[0];
+
+            if (!el) { return; }
+
+            var avail = el.clientHeight;
+
+            if (avail <= 0) {
+                if (_needsSync) { scheduleSync(); }   // layout not settled — retry
+                return;
+            }
+
+            /* Size off the tallest rendered row so a wrapped title never clips. */
+            var rows = el.querySelectorAll(".VAS-gljpq-item");
+            var maxH = 0;
+
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > maxH) { maxH = rows[i].offsetHeight; }
+            }
+
+            if (maxH > 0) { _rowH = maxH; }
+            var rowH = _rowH > 0 ? _rowH : LIST_ROW_FALLBACK;
+
+            _needsSync = false;
+
+            var capacity = Math.max(LIST_MIN_ROWS, Math.floor(avail / rowH));
+
+            if (capacity !== pageSize) {
+                pageSize = capacity;
+
+                /* Clamp the current page to the new page count so a grown page size
+                   never lands on an empty page. */
+                var maxPages = Math.max(1, Math.ceil(totalCount / pageSize));
+                if (pageNo > maxPages) { pageNo = maxPages; }
+
+                loadData();
+            }
+        }
+
+        function observeList() {
+            if (typeof ResizeObserver === "undefined") { return; }
+
+            var el =
+                $root.find(
+                    "#VAS-gljpq-body-" +
+                    $self.AD_UserHomeWidgetID
+                )[0];
+
+            if (!el) { return; }
+            if (_listObserver) { _listObserver.disconnect(); }
+
+            _listObserver = new ResizeObserver(function () {
+                if (!(loadRequest && loadRequest.readyState !== 4)) {
+                    syncCapacity();
+                }
+            });
+
+            _listObserver.observe(el);
         }
 
         function updatePager() {
@@ -3076,6 +3167,11 @@
 
                     refreshTimer =
                         null;
+                }
+
+                if (_listObserver) {
+                    _listObserver.disconnect();
+                    _listObserver = null;
                 }
 
                 if (

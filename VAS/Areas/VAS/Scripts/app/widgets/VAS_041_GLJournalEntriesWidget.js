@@ -566,7 +566,7 @@
                 1;
 
             var dialogPageSize =
-                8;
+                10;
 
             var dialogTotalPages =
                 1;
@@ -578,7 +578,7 @@
                 1;
 
             var detailLinePageSize =
-                5;
+                20;
 
             var detailLineTotalPages =
                 1;
@@ -1361,6 +1361,11 @@
                         id +
                         '">&mdash;</div>' +
 
+                        '<div class="VAS-glje-dialog-desc" ' +
+                        'id="VAS-glje-detail-desc-' +
+                        id +
+                        '"></div>' +
+
                         '<div class="VAS-glje-dialog-sub" ' +
                         'id="VAS-glje-detail-sub-' +
                         id +
@@ -1593,6 +1598,14 @@
                 detailLoaded =
                     false;
 
+                /* Always reopen from the first line page — a previous session may
+                   have left the pager on page 2+. */
+                detailLinePageNo =
+                    1;
+
+                detailLineTotalPages =
+                    1;
+
                 $detailBody.empty();
 
                 $detailDialog.find(
@@ -1601,6 +1614,12 @@
                 ).html(
                     "&mdash;"
                 );
+
+                $detailDialog.find(
+                    "#VAS-glje-detail-desc-" +
+                    $self.AD_UserHomeWidgetID
+                ).text("")
+                    .removeAttr("title");
 
                 $detailDialog.find(
                     "#VAS-glje-detail-sub-" +
@@ -1621,6 +1640,12 @@
                         "1000002"
                     )
                     .show();
+
+                /* Show the busy indicator immediately on open, before the first
+                   page request returns. */
+                showDetailBusy(
+                    true
+                );
 
                 loadJournalDetail(
                     journalId
@@ -2150,7 +2175,8 @@
             }
 
             function loadJournalDetail(
-                journalId
+                journalId,
+                linePageOnly
             ) {
                 journalId =
                     parseInt(
@@ -2178,54 +2204,62 @@
                     detailRequest.abort();
                 }
 
-                detailLoaded =
-                    false;
+                /* linePageOnly = a line prev/next click. Keep the already-built
+                   modal (header title/sub, tfoot totals, line-pager, created
+                   strip) mounted and only swap the tbody rows on success — no
+                   full rebuild, no busy overlay, no empty(). A full load (first
+                   open) still rebuilds everything below. */
+                if (!linePageOnly) {
+                    detailLoaded =
+                        false;
 
-                updateActionButtons();
+                    updateActionButtons();
 
-                showDetailBusy(
-                    true
-                );
-
-                $detailBody.empty();
-
-                $detailBody
-                    .off(
-                        ".VAS041LinePager"
-                    )
-                    .on(
-                        "click.VAS041LinePager",
-                        ".VAS-glje-line-prev, .VAS-glje-line-next",
-                        function () {
-                            if (
-                                journalActionInProgress ||
-                                selectedJournalId <= 0
-                            ) {
-                                return;
-                            }
-
-                            var nextPage =
-                                $(this).hasClass(
-                                    "VAS-glje-line-prev"
-                                )
-                                    ? detailLinePageNo - 1
-                                    : detailLinePageNo + 1;
-
-                            if (
-                                nextPage < 1 ||
-                                nextPage > detailLineTotalPages
-                            ) {
-                                return;
-                            }
-
-                            detailLinePageNo =
-                                nextPage;
-
-                            loadJournalDetail(
-                                selectedJournalId
-                            );
-                        }
+                    showDetailBusy(
+                        true
                     );
+
+                    $detailBody.empty();
+
+                    $detailBody
+                        .off(
+                            ".VAS041LinePager"
+                        )
+                        .on(
+                            "click.VAS041LinePager",
+                            ".VAS-glje-line-prev, .VAS-glje-line-next",
+                            function () {
+                                if (
+                                    journalActionInProgress ||
+                                    selectedJournalId <= 0
+                                ) {
+                                    return;
+                                }
+
+                                var nextPage =
+                                    $(this).hasClass(
+                                        "VAS-glje-line-prev"
+                                    )
+                                        ? detailLinePageNo - 1
+                                        : detailLinePageNo + 1;
+
+                                if (
+                                    nextPage < 1 ||
+                                    nextPage > detailLineTotalPages
+                                ) {
+                                    return;
+                                }
+
+                                detailLinePageNo =
+                                    nextPage;
+
+                                loadJournalDetail(
+                                    selectedJournalId,
+                                    true
+                                );
+                            }
+                        );
+                }
 
                 detailRequest =
                     $.ajax({
@@ -2271,7 +2305,8 @@
                                     data.Journal
                                 ) {
                                     renderJournalDetail(
-                                        data
+                                        data,
+                                        linePageOnly
                                     );
                                 }
                                 else {
@@ -2362,8 +2397,144 @@
                     });
             }
 
+            /* Dimension cell: left-aligned when it has a value, but the null
+               placeholder ("-") is centered (VAS-glje-null). */
+            function dimCell(value) {
+                var text =
+                    (
+                        value === undefined ||
+                        value === null ||
+                        String(value) === ""
+                    )
+                        ? ""
+                        : String(value);
+
+                return "<td" +
+                    (text ? "" : ' class="VAS-glje-null"') +
+                    ">" +
+                    esc(text || "-") +
+                    "</td>";
+            }
+
+            /* Builds only the <tbody> rows for the line table — shared by the full
+               render and the line-page fast path so both stay identical. */
+            function buildDetailLineRows(
+                lines,
+                precision
+            ) {
+                if (!lines.length) {
+                    return "<tr><td colspan=\"7\">" +
+                        esc(
+                            lbl(
+                                "VAS_041_NoJournalLines",
+                                "No journal lines."
+                            )
+                        ) +
+                        "</td></tr>";
+                }
+
+                var rows = "";
+
+                for (
+                    var index = 0;
+                    index < lines.length;
+                    index++
+                ) {
+                    var line =
+                        lines[index] ||
+                        {};
+
+                    var accountText =
+                        (
+                            line.AccountCode &&
+                            line.AccountName
+                        )
+                            ? (
+                                line.AccountCode +
+                                " · " +
+                                line.AccountName
+                            )
+                            : (
+                                line.AccountCode ||
+                                line.AccountName ||
+                                "-"
+                            );
+
+                    var ld =
+                        Number(line.Debit || 0) > 0
+                            ? formatAmount(line.Debit, precision)
+                            : "-";
+
+                    var lc =
+                        Number(line.Credit || 0) > 0
+                            ? formatAmount(line.Credit, precision)
+                            : "-";
+
+                    rows +=
+                        "<tr>" +
+                        "<td>" + esc(accountText) + "</td>" +
+                        '<td class="VAS-glje-amt" title="' + esc(ld) + '">' + esc(ld) + "</td>" +
+                        '<td class="VAS-glje-amt" title="' + esc(lc) + '">' + esc(lc) + "</td>" +
+                        dimCell(line.CostCenter) +
+                        dimCell(line.BPartner) +
+                        dimCell(line.Product) +
+                        dimCell(line.Project) +
+                        "</tr>";
+                }
+
+                return rows;
+            }
+
+            /* Updates the existing line-pager text/count/disabled state in place
+               (no DOM rebuild) so paging never re-renders the pager element. */
+            function applyLinePagerState(lineCount) {
+                if (!$detailBody) {
+                    return;
+                }
+
+                var $pager =
+                    $detailBody.find(
+                        ".VAS-glje-line-pager"
+                    );
+
+                $pager.find(".VAS-glje-page-text").text(
+                    lineCount
+                        ? formatRangeText(
+                            detailLinePageNo,
+                            detailLinePageSize,
+                            lineCount
+                        )
+                        : ""
+                );
+
+                $pager.find(".VAS-glje-page-count").text(
+                    lineCount
+                        ? (
+                            detailLinePageNo +
+                            " " +
+                            lbl("VIS_Of", "of") +
+                            " " +
+                            detailLineTotalPages
+                        )
+                        : ""
+                );
+
+                $pager.find(".VAS-glje-line-prev").prop(
+                    "disabled",
+                    detailLinePageNo <= 1 ||
+                    detailLineTotalPages <= 1
+                );
+
+                $pager.find(".VAS-glje-line-next").prop(
+                    "disabled",
+                    detailLinePageNo >= detailLineTotalPages ||
+                    detailLineTotalPages <= 1
+                );
+            }
+
             function renderJournalDetail(
-                data
+                data,
+                linePageOnly
             ) {
                 var journal =
                     data.Journal ||
@@ -2387,7 +2558,7 @@
                     Number(
                         data.LinePageSize ||
                         detailLinePageSize ||
-                        3
+                        20
                     );
 
                 detailLineTotalPages =
@@ -2458,6 +2629,37 @@
                 var id =
                     $self.AD_UserHomeWidgetID;
 
+                /* Line-page fast path: the modal is already built, so only swap the
+                   tbody rows and refresh the pager state in place. The header
+                   (title/sub), tfoot totals, line-pager element, and created strip
+                   are left untouched. */
+                if (
+                    linePageOnly &&
+                    $detailBody &&
+                    $detailBody.find(
+                        ".VAS-glje-detail-lines-wrap tbody"
+                    ).length
+                ) {
+                    $detailBody.find(
+                        ".VAS-glje-detail-lines-wrap tbody"
+                    ).html(
+                        buildDetailLineRows(
+                            lines,
+                            precision
+                        )
+                    );
+
+                    applyLinePagerState(
+                        detailLineCount
+                    );
+
+                    detailLoaded = true;
+
+                    return;
+                }
+
+                /* Title = Journal No \u00B7 Accounting Book name (the summary block that
+                   used to carry these is now hidden). */
                 $detailDialog.find(
                     "#VAS-glje-detail-title-" +
                     id
@@ -2470,19 +2672,47 @@
                     " \u00B7 " +
 
                     (
-                        journal.Description ||
-                        ""
+                        journal.AccountingBook ||
+                        lbl(
+                            "VAS_041_Primary",
+                            "Primary"
+                        )
                     )
                 );
 
+                /* Description on its own header line \u2014 visually truncated with an
+                   ellipsis (CSS) and shown in full on hover via the title attr. */
+                var fullDescription =
+                    String(
+                        journal.Description ||
+                        ""
+                    );
+
+                var $detailDesc =
+                    $detailDialog.find(
+                        "#VAS-glje-detail-desc-" +
+                        id
+                    );
+
+                $detailDesc.text(fullDescription);
+
+                if (fullDescription) {
+                    $detailDesc.attr(
+                        "title",
+                        fullDescription
+                    );
+                }
+                else {
+                    $detailDesc.removeAttr("title");
+                }
+
+                /* Subtitle = Status \u00B7 Date only. */
                 $detailDialog.find(
                     "#VAS-glje-detail-sub-" +
                     id
                 ).text(
                     statusText +
-
                     " \u00B7 " +
-
                     (
                         journal.DateAcct ||
                         ""
@@ -2607,123 +2837,28 @@
 
                     "<tbody>";
 
-                if (!lines.length) {
-                    html +=
-                        "<tr>" +
-
-                        '<td colspan="7">' +
-
-                        esc(
-                            lbl(
-                                "VAS_041_NoJournalLines",
-                                "No journal lines."
-                            )
-                        ) +
-
-                        "</td>" +
-
-                        "</tr>";
-                }
-                else {
-                    for (
-                        var index = 0;
-                        index < lines.length;
-                        index++
-                    ) {
-                        var line =
-                            lines[index] ||
-                            {};
-
-                        var accountText =
-                            "";
-
-                        if (
-                            line.AccountCode &&
-                            line.AccountName
-                        ) {
-                            accountText =
-                                line.AccountCode +
-
-                                " \u00B7 " +
-
-                                line.AccountName;
-                        }
-                        else {
-                            accountText =
-                                line.AccountCode ||
-                                line.AccountName ||
-                                "-";
-                        }
-
-                        html +=
-                            "<tr>" +
-
-                            "<td>" +
-                            esc(
-                                accountText
-                            ) +
-                            "</td>" +
-
-                            (function () {
-                                var ld = Number(line.Debit || 0) > 0 ? formatAmount(line.Debit, precision) : "-";
-                                var lc = Number(line.Credit || 0) > 0 ? formatAmount(line.Credit, precision) : "-";
-                                return '<td class="VAS-glje-amt" title="' + esc(ld) + '">' + esc(ld) + "</td>" +
-                                       '<td class="VAS-glje-amt" title="' + esc(lc) + '">' + esc(lc) + "</td>";
-                            }()) +
-
-                            "<td>" +
-                            esc(
-                                line.CostCenter ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
-                                line.BPartner ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
-                                line.Product ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "<td>" +
-                            esc(
-                                line.Project ||
-                                "-"
-                            ) +
-                            "</td>" +
-
-                            "</tr>";
-                    }
-                }
+                html += buildDetailLineRows(
+                    lines,
+                    precision
+                );
 
                 html +=
                     "</tbody>" +
+                    "</table>" +
+                    "</div>" +
 
-                    "<tfoot>" +
-                    "<tr>" +
-
+                    /* Total row lives OUTSIDE the scrolling table, in its own
+                       column-aligned table, so it stays fixed at the bottom and
+                       can never bleed the scrolling rows through it. 7 explicit
+                       cells keep the columns aligned with the table above. */
+                    '<div class="VAS-glje-detail-total-wrap">' +
+                    '<table class="VAS-glje-detail-lines VAS-glje-detail-total-table">' +
+                    "<tbody><tr>" +
                     "<td>" + esc(lbl("Total", "Total")) + "</td>" +
-
-                    '<td class="VAS-glje-amt" title="' + esc(totalDebitAmt) + '">' +
-                    esc(totalDebitAmt) +
-                    "</td>" +
-
-                    '<td class="VAS-glje-amt" title="' + esc(totalCreditAmt) + '">' +
-                    esc(totalCreditAmt) +
-                    "</td>" +
-
-                    '<td colspan="4"></td>' +
-
-                    "</tr>" +
-                    "</tfoot>" +
-
+                    '<td class="VAS-glje-amt" title="' + esc(totalDebit) + '">' + esc(totalDebit) + "</td>" +
+                    '<td class="VAS-glje-amt" title="' + esc(totalCredit) + '">' + esc(totalCredit) + "</td>" +
+                    "<td></td><td></td><td></td><td></td>" +
+                    "</tr></tbody>" +
                     "</table>" +
                     "</div>" +
 

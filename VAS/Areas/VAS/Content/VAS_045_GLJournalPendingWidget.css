@@ -16,11 +16,11 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 1em;
-    border-radius: 0.875em;
+    padding: 0.85em;
+    border-radius: 14px;
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    background: linear-gradient(180deg, #FAFCFE 0%, #EEF6FF 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -29,27 +29,28 @@
 .VAS-gljpq-root .w-head {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     flex-shrink: 0;
     margin-bottom: 0.75em;
 }
 
-/* Icon well — amber/clock theme for "pending" */
+/* Icon well — glass surface, amber glyph carries the "pending" accent */
 .VAS-gljpq-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 1.75em;
-    height: 1.75em;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
     flex-shrink: 0;
-    border-radius: 0.375em;
-    background: rgba(245, 158, 11, 0.12);
-    color: #B45309;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    color: #D78B10;
 }
 
 .VAS-gljpq-icon svg {
-    width: 1em;
-    height: 1em;
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     stroke: currentColor;
 }
 
@@ -120,8 +121,9 @@
 .VAS-gljpq-body {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* Adaptive paging fits the rows to this height, so the body never scrolls
+       (design.md "No Inner Scrollbars"); clip the in-progress measurement frame. */
+    overflow: hidden;
 }
 
 /* ── Queue list ──────────────────────────────────────────────────────────── */
@@ -136,7 +138,7 @@
     display: flex;
     align-items: center;
     gap: 0.6em;
-    padding: 0.5em 0.6em;
+    padding: 0.375em 0.1em;
     background: #FFFFFF;
     border-radius: 0.5em;
     border: 1px solid rgba(0, 131, 218, 0.08);
@@ -168,25 +170,26 @@
     gap: 0.15em;
 }
 
-/* Document number + description */
+/* Document number + description — primary cell: Roboto Bold, dark */
 .VAS-gljpq-title {
-    font-size: 0.8em;
-    font-weight: 600;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.75em;
+    font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Action · age · user */
+/* Action · age · user — secondary meta: xs, muted */
 .VAS-gljpq-meta {
-    font-size: 0.7em;
+    font-size: 0.6875em;
     font-weight: 400;
-    color: #748494;
+    color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
 }
 
 .VAS-gljpq-meta-approved {
@@ -194,13 +197,14 @@
     font-weight: 700;
 }
 
-/* ── Amount ──────────────────────────────────────────────────────────────── */
+/* ── Amount — emphasis cell: bold, tabular ───────────────────────────────── */
 .VAS-gljpq-amt {
-    font-size: 0.8em;
-    font-weight: 600;
+    font-size: 0.75em;
+    font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
     flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Empty / error states ────────────────────────────────────────────────── */
@@ -213,48 +217,9 @@
     color: #748494;
 }
 
-/* ── Responsive scaling ──────────────────────────────────────────────────── */
-@media screen and (max-width: 1920px) {
-    .vis-editModeWidget .VAS-gljpq-card {
-        font-size: 10px;
-    }
-}
-
-@media screen and (max-width: 1366px) {
-    .VAS-gljpq-card {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .VAS-gljpq-card {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 1024px) {
-    .VAS-gljpq-card {
-        font-size: 9px;
-    }
-
-    .vis-editModeWidget .VAS-gljpq-card {
-        font-size: 6px;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .VAS-gljpq-card {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .VAS-gljpq-card {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .VAS-gljpq-card {
-        font-size: 11px;
-    }
-}
+/* Widget content scales off the widget-root font-size lever (set below), not
+   px breakpoints. The old per-viewport font-size hacks are removed per design.md
+   (Widget Internal Sizing) — one em lever drives every internal value. */
 
 /* ── RTL support ─────────────────────────────────────────────────────────── */
 html[dir="rtl"] .VAS-gljpq-root .w-head {
@@ -266,14 +231,21 @@ html[dir="rtl"] .VAS-gljpq-root .w-head {
     container-type: inline-size;
 }
 
+/* Widget-root anchor — design.md clamp(16px, 1.2cqi, 20px) expressed on the
+   dashboard-width variable. cqi is NOT usable here because this root sets its
+   own container-type, so cqi would resolve against the narrow widget cell. */
 .VAS-gljpq-card {
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
 }
 
+/* Title — Roboto Regular 400, clamp ceiling 17px (design.md Widget Header) */
 .VAS-gljpq-root .w-title {
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
+    line-height: 1.2;
     letter-spacing: 0;
+    color: #102C3F;
 }
 
 .VAS-gljpq-sub,
@@ -283,16 +255,13 @@ html[dir="rtl"] .VAS-gljpq-root .w-head {
     font-weight: 400;
 }
 
-.VAS-gljpq-amt,
-.VAS-gljpq-name,
-.VAS-gljpq-pill {
-    font-weight: 400;
+.VAS-gljpq-name {
     letter-spacing: 0;
 }
 
-/* Design-system color alignment */
+/* Design-system color alignment — canonical glass surface */
 .VAS-gljpq-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
@@ -304,8 +273,9 @@ html[dir="rtl"] .VAS-gljpq-root .w-head {
 }
 
 .VAS-gljpq-icon {
-    background: #FBFDFF;
-    border: 1px solid #E4EDF4;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    border: 0;
     color: #D78B10;
 }
 
@@ -542,13 +512,13 @@ html[dir="rtl"] .VAS-gljpq-item {
     top: 0;
     z-index: 1;
     background: #FFFFFF;
-    color: #748494;
-    font-size: 0.75em;
-    font-weight: 400;
+    color: #41576A;
+    font-size: 0.6875em;
+    font-weight: 500;
     letter-spacing: 0;
     text-align: left;
     padding: 0.875em 0.75em;
-    border-bottom: 0.0625em solid #E4EDF4;
+    border-bottom: 1px solid #C5D2DD;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -559,10 +529,14 @@ html[dir="rtl"] .VAS-gljpq-item {
     padding: 0.875em 0.75em;
     color: #001D32;
     font-size: 0.75em;
-    border-bottom: 0.0625em solid #EDF2F6;
+    border-bottom: 1px solid #E2EAF1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.VAS-gljpq-detail-lines tbody tr:last-child td {
+    border-bottom: 0;
 }
 
 .VAS-gljpq-detail-lines tbody tr:hover td {
@@ -1004,10 +978,14 @@ html[dir="rtl"] .VAS-gljpq-item {
 
 .VAS-gljpq-item {
     border: 0;
-    border-bottom: 0.0625em solid #EDF2F6;
+    border-bottom: 1px solid #E2EAF1;
     border-radius: 0;
-    background: #FFFFFF;
-    padding: 1em 0.75em;
+    background: transparent;
+    /*padding: 1em 0.75em;*/
+}
+
+.VAS-gljpq-list .VAS-gljpq-item:last-child {
+    border-bottom: 0;
 }
 
 .VAS-gljpq-item:hover {

@@ -20,7 +20,7 @@ namespace VAS.Controllers
         [AjaxSessionFilterAttribute]
         public JsonResult GetMonthlyEntries(
             int pageNo = 1,
-            int pageSize = 8)
+            int pageSize = 10)
         {
             return GetJournalEntries(
                 false,
@@ -67,7 +67,7 @@ namespace VAS.Controllers
                         1,
                         Math.Min(
                             pageSize,
-                            8
+                            50
                         )
                     );
 
@@ -211,7 +211,12 @@ JournalTotals AS
 
 " + periodJoin + @"
 
-    INNER JOIN SchemaCurrency SchemaCurrency ON
+    /* LEFT (not INNER): SchemaCurrency is joined only to enrich the row with the
+       display currency symbol/precision. An INNER JOIN silently dropped journals
+       whose C_AcctSchema_ID has no active schema-currency row, so the list showed
+       fewer records (8) than the KPI count (12). LEFT keeps every journal; the
+       symbol/precision fall back when unmatched. */
+    LEFT OUTER JOIN SchemaCurrency SchemaCurrency ON
     (
         SchemaCurrency.AD_Client_ID =
         ProtectedJournal.AD_Client_ID
@@ -1039,7 +1044,7 @@ FROM ProtectedJournal ProtectedJournal";
                     Math.Max(
                         Math.Min(
                             pageSize,
-                            8
+                            50
                         ),
                         1
                     );
@@ -1837,7 +1842,7 @@ ORDER BY
                         );
                     }
 
-                    SaveJournal(journal);
+                    SaveJournal(ctx, journal);
 
                     docStatus =
                         journal.GetDocStatus();
@@ -1876,7 +1881,7 @@ ORDER BY
                     );
                 }
 
-                SaveJournal(journal);
+                SaveJournal(ctx, journal);
 
                 transaction.Commit();
 
@@ -2089,7 +2094,7 @@ ORDER BY
                         );
                     }
 
-                    SaveJournal(journal);
+                    SaveJournal(ctx, journal);
                 }
                 else if (
                     !string.Equals(
@@ -2928,8 +2933,7 @@ AND GL_Journal.AD_Client_ID =
                 );
         }
 
-        private void SaveJournal(
-            MJournal journal)
+        private void SaveJournal(Ctx ctx, MJournal journal)
         {
             if (journal.Save())
             {
@@ -3162,7 +3166,7 @@ AND GL_Journal.AD_Client_ID =
                 !string.IsNullOrWhiteSpace(name)
             )
             {
-                return code + " · " + name;
+                return code + " ï¿½ " + name;
             }
 
             if (!string.IsNullOrWhiteSpace(code))
