@@ -29,7 +29,6 @@
         var $root = $('<div class="VAS-gljtd-root">');
         var $kpiValue = null;
         var $whyText = null;
-        var refreshTimer = null;
         var activePeriod = 'month';
         var baseUrl = VIS.Application.contextUrl;
 
@@ -37,10 +36,6 @@
             createWidget();
             createBusyIndicator();
             loadData();
-
-            refreshTimer = setInterval(function () {
-                $self.refreshWidget();
-            }, 1000 * 60 * 5);
         };
 
         function lbl(key, fallback) {
@@ -265,11 +260,6 @@
         };
 
         this.disposeComponent = function () {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
-            }
-
             if ($root) {
                 $root.off();
                 $root.remove();

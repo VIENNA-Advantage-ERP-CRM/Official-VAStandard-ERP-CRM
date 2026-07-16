@@ -105,7 +105,6 @@
         var pageSize     = 4;      // initial guess; replaced by the adaptive measure
         var totalPages   = 0;
         var totalCount   = 0;
-        var refreshTimer = null;
         var baseUrl      = VIS.Application.contextUrl;
 
         /* Adaptive page size (VAS_020 pattern): derive the visible row count from the
@@ -124,7 +123,6 @@
             createBusyIndicator();
             showBusy(true);
             loadData();
-            refreshTimer = setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {
@@ -424,11 +422,6 @@
         this.refreshWidget    = function () { showBusy(true); loadData(); };
         this.getRoot          = function () { return $root; };
         this.disposeComponent = function () {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
-            }
-
             if (_listObserver) {
                 _listObserver.disconnect();
                 _listObserver = null;

@@ -143,7 +143,7 @@ namespace VASLogic.Models
                   AND NVL(Payment.VA009_OrderPaySchedule_ID, 0) = 0 
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND COALESCE(Payment.IsAllocated, 'N') = 'N'
-                  AND COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) > 0
+                  AND COALESCE(ALLOCPAYMENTAVAILABLE(Payment.C_Payment_ID), 0) != 0
                   AND " + dateCondition + @"
                   AND Payment.AD_Client_ID = " + clientId;
 
@@ -181,7 +181,7 @@ namespace VASLogic.Models
                       AND Invoice.IsActive = 'Y'
                       AND Invoice.DocStatus IN ('CO', 'CL')
                       AND COALESCE(Invoice.IsPaid, 'N') = 'N'
-                      AND COALESCE(Invoice.IsReturnTrx, 'N') = 'N'
+                      /*AND COALESCE(Invoice.IsReturnTrx, 'N') = 'N'*/
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'

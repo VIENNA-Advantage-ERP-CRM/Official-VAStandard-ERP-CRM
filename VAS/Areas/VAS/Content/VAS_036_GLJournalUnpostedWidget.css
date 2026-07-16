@@ -427,6 +427,19 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     color: #5F7283;
 }
 
+/* Document number acts as a zoom link to the GL Journal record */
+.VAS-glju-doc-zoom {
+    color: #0069AE;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.VAS-glju-doc-zoom:hover,
+.VAS-glju-doc-zoom:focus {
+    text-decoration: underline;
+    outline: none;
+}
+
 .VAS-glju-desc {
     color: #102C3F;
 }

@@ -200,7 +200,6 @@
             createBusyIndicator();
             showBusy(true);
             loadData();
-            setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {

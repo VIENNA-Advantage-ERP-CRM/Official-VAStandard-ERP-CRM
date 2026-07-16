@@ -174,11 +174,24 @@
 .VAS-gljpq-title {
     font-family: 'Roboto', sans-serif;
     font-size: 0.75em;
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Document number acts as a zoom link to the GL Journal record */
+.VAS-gljpq-doc-zoom {
+    color: #0069AE;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.VAS-gljpq-doc-zoom:hover,
+.VAS-gljpq-doc-zoom:focus {
+    text-decoration: underline;
+    outline: none;
 }
 
 /* Action · age · user — secondary meta: xs, muted */
@@ -200,7 +213,7 @@
 /* ── Amount — emphasis cell: bold, tabular ───────────────────────────────── */
 .VAS-gljpq-amt {
     font-size: 0.75em;
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
     flex-shrink: 0;
