@@ -136,8 +136,8 @@ namespace VASLogic.Models
             /* Month grouping is dialect-aware (date_trunc on PostgreSQL, TRUNC on
                Oracle); both yield the first-of-month DATE used as the bucket key. */
             string monthExpr = DB.IsPostgreSQL()
-                ? "CAST(date_trunc('month', Payment.DateTrx) AS DATE)"
-                : "TRUNC(Payment.DateTrx, 'MM')";
+                ? "CAST(date_trunc('month', Payment.DateAcct) AS DATE)"
+                : "TRUNC(Payment.DateAcct, 'MM')";
 
             /* acctCurrencyId is a trusted int from the schema lookup, so it is
                inlined (same style as clientId) rather than parameterized. PaymentAmount is
@@ -164,8 +164,8 @@ namespace VASLogic.Models
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND Payment.AD_Client_ID = " + clientId + @"
-                  AND Payment.DateTrx >= " + startLit + @"
-                  AND Payment.DateTrx < " + endLit;
+                  AND Payment.DateAcct >= " + startLit + @"
+                  AND Payment.DateAcct < " + endLit;
 
             /* MRole only on the main physical table (C_Payment / alias Payment).
                GROUP BY is appended AFTER MRole so the FROM-clause parser is not

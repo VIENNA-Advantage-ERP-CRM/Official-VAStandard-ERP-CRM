@@ -512,7 +512,7 @@
                 '<thead><tr>' +
                 '<th class="vas-ce-d-th-doc">' + escapeHtml(lbl("VAS_InvoiceNo", "Invoice No.")) + '</th>' +
                 '<th class="vas-ce-d-th-cust">' + escapeHtml(lbl("VAS_Customer", "Customer")) + '</th>' +
-                '<th class="vas-ce-d-th-date">' + escapeHtml(lbl("VAS_DueDate", "Due date")) + '</th>' +
+                '<th class="vas-ce-d-th-date">' + escapeHtml(lbl("VAS_DueDate", "Due Date")) + '</th>' +
                 '<th class="vas-ce-d-th-age">' + escapeHtml(lbl("VAS_001_Age", "Age")) + '</th>' +
                 '<th class="vas-ce-d-th-cur">' + escapeHtml(lbl("VAS_Currency", "Currency")) + '</th>' +
                 '<th class="vas-ce-d-th-amount">' + escapeHtml(lbl("VAS_001_OverdueAmount", "Overdue amount")) + '</th>' +

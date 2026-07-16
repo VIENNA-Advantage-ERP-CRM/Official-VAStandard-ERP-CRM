@@ -21,6 +21,25 @@
 
 ; (function (VAS, $) {
 
+    /* Creates a single document-level ResizeObserver on the dashboard container
+       and mirrors its width into the global CSS var --dash-inline-size (px), so
+       the widget's clamp() sizing tracks the dashboard width, not the viewport. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
     // Labels   : VAS_043_TopLedgerMovement, VAS_043_Month, VAS_043_YTD
@@ -102,18 +121,27 @@
         var activePeriod = 'month';
         var currentData  = null;
         var pageNo       = 1;
-        var pageSize     = 4;
+        var pageSize     = 4;      // initial guess; replaced by the adaptive measure
         var totalPages   = 0;
         var totalCount   = 0;
-        var refreshTimer = null;
         var baseUrl      = VIS.Application.contextUrl;
+
+        /* Adaptive page size (VAS_020 pattern): derive the visible row count from the
+           list's available height at runtime so the rows always fit the card. Paging is
+           client-side here (the service returns the full top-N), so a capacity change just
+           re-slices via renderBars — no refetch. Measure on first paint (via _needsSync)
+           and on resize (via the observer), never on manual navigation. */
+        var _rowH         = 0;     // last measured row height (px)
+        var _needsSync    = true;  // measure capacity on first paint only
+        var _listObserver = null;
+        var LIST_MIN_ROWS     = 1; // never force more rows than physically fit
+        var LIST_ROW_FALLBACK = 44;// px, used only before a real row is measured
 
         this.Initalize = function () {
             createWidget();
             createBusyIndicator();
             showBusy(true);
             loadData();
-            refreshTimer = setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {
@@ -315,6 +343,62 @@
             html += '</div>';
             $body.html(html);
             updatePager();
+
+            /* Fit the visible row count to the card height (first paint + resize). */
+            observeList();
+            if (_needsSync) { scheduleSync(); }
+        }
+
+        /* ---- Adaptive row capacity (VAS_020 pattern; client-side re-page) ---- */
+        function scheduleSync() {
+            var raf = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
+            raf(function () { syncCapacity(); });
+        }
+
+        function syncCapacity() {
+            if (!currentData || totalCount <= 0) { return; }
+
+            var el = $root.find('#VAS-gljtm-body-' + $self.AD_UserHomeWidgetID)[0];
+            if (!el) { return; }
+
+            var avail = el.clientHeight;
+            if (avail <= 0) {
+                if (_needsSync) { scheduleSync(); }   // layout not settled — retry
+                return;
+            }
+
+            var rows = el.querySelectorAll('.VAS-gljtm-row');
+            var maxH = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > maxH) { maxH = rows[i].offsetHeight; }
+            }
+            if (maxH > 0) { _rowH = maxH; }
+            var rowH = _rowH > 0 ? _rowH : LIST_ROW_FALLBACK;
+
+            _needsSync = false;
+
+            var capacity = Math.max(LIST_MIN_ROWS, Math.floor(avail / rowH));
+            if (capacity !== pageSize) {
+                pageSize = capacity;
+
+                /* Clamp the current page to the new page count so a grown page size
+                   never lands on an empty page. */
+                var maxPages = Math.max(1, Math.ceil(totalCount / pageSize));
+                if (pageNo > maxPages) { pageNo = maxPages; }
+
+                renderBars(currentData);   // client-side re-slice at the new page size
+            }
+        }
+
+        function observeList() {
+            if (typeof ResizeObserver === 'undefined') { return; }
+            if (_listObserver) { return; }   // observe the persistent body once
+
+            var el = $root.find('#VAS-gljtm-body-' + $self.AD_UserHomeWidgetID)[0];
+            if (!el) { return; }
+
+            _listObserver = new ResizeObserver(function () { syncCapacity(); });
+            _listObserver.observe(el);
         }
 
         function renderPager() {
@@ -357,9 +441,9 @@
         this.refreshWidget    = function () { showBusy(true); loadData(); };
         this.getRoot          = function () { return $root; };
         this.disposeComponent = function () {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
+            if (_listObserver) {
+                _listObserver.disconnect();
+                _listObserver = null;
             }
 
             if ($root) {
@@ -381,6 +465,8 @@
         this.windowNo            = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_043_GLJournalTopMovementWidget.prototype.widgetSizeChange = function (height, width) {};

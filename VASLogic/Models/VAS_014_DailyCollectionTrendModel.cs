@@ -106,13 +106,13 @@ namespace VASLogic.Models
             string dateCondition;
             if (DB.IsPostgreSQL())
             {
-                dayExpr = "CAST(Payment.DateTrx AS DATE)";
-                dateCondition = "Payment.DateTrx >= CURRENT_DATE - " + (days - 1) + " AND Payment.DateTrx < CURRENT_DATE + 1";
+                dayExpr = "CAST(Payment.DateAcct AS DATE)";
+                dateCondition = "Payment.DateAcct >= CURRENT_DATE - " + (days - 1) + " AND Payment.DateAcct < CURRENT_DATE + 1";
             }
             else
             {
-                dayExpr = "TRUNC(Payment.DateTrx)";
-                dateCondition = "TRUNC(Payment.DateTrx) >= TRUNC(SYSDATE) - " + (days - 1) + " AND TRUNC(Payment.DateTrx) <= TRUNC(SYSDATE)";
+                dayExpr = "TRUNC(Payment.DateAcct)";
+                dateCondition = "TRUNC(Payment.DateAcct) >= TRUNC(SYSDATE) - " + (days - 1) + " AND TRUNC(Payment.DateAcct) <= TRUNC(SYSDATE)";
             }
 
             /* acctCurrencyId is a trusted int from the schema lookup above, so it
