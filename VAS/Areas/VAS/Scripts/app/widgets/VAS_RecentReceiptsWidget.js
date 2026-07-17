@@ -813,7 +813,7 @@
                 '</span>' +
                 '<div class="vas-rr-title-group">' +
                 '<span class="vas-rr-title">' + escapeHtml(lbl("VAS_RecentReceipts", "Recent receipts")) + '</span>' +
-                '<span class="vas-rr-subtitle">' + escapeHtml(lbl("VAS_RecentReceiptsSubtitle", "Receipts in last 30 days")) + '</span>' +
+                '<span class="vas-rr-subtitle">' + escapeHtml(lbl("VAS_008_RecentReceiptsSubtitle", "Receipts in last 30 days")) + '</span>' +
                 '</div>' +
                 '</div>' +
                 '<span class="vas-rr-head-hint">' + escapeHtml(lbl("VAS_ClickRowForDetail", "Click a row for full detail")) + '</span>' +

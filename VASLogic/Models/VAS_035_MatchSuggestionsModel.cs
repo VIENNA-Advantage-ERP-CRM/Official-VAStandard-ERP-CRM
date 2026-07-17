@@ -52,6 +52,13 @@ namespace VASLogic.Models
     ///   VAI145      2026-06-04 Receipt open amount via ALLOCPAYMENTAVAILABLE;
     ///                          suggestions made (and applied) per individual
     ///                          C_InvoicePaySchedule_ID.
+    ///   VAI_145    2026-07-17 Sign-aware pairing: schedule open amount signed by
+    ///                          DocBaseType (ARI positive, ARC negative), so a
+    ///                          positive receipt matches only regular AR invoices
+    ///                          and a negative receipt matches only AR credit
+    ///                          memos (ARC). Enforced across the list, the detail
+    ///                          modal and ApplyAllocation (with a magnitude-aware
+    ///                          applied amount and a server-side sign guard).
     /// </summary>
     public class VAS_035_MatchSuggestionsModel
     {
@@ -172,20 +179,25 @@ namespace VASLogic.Models
                            Invoice.DateInvoiced AS Invoice_Date,
                            PaySchedule.DueDate AS Due_Date,
                            Invoice.C_Currency_ID AS Invoice_Currency_ID,
-                           COALESCE(PaySchedule.DueAmt, 0) AS Open_Amount
+                           InvDocType.DocBaseType AS Doc_Base_Type,
+                           CASE WHEN InvDocType.DocBaseType = 'ARC'
+                                THEN -(COALESCE(PaySchedule.DueAmt, 0))
+                                ELSE (COALESCE(PaySchedule.DueAmt, 0))
+                           END AS Open_Amount
                     FROM ReceiptPartners ReceiptPartners
-                    INNER JOIN C_Invoice Invoice ON (Invoice.AD_Client_ID=ReceiptPartners.Client_ID AND Invoice.AD_Org_ID=ReceiptPartners.Org_ID 
+                    INNER JOIN C_Invoice Invoice ON (Invoice.AD_Client_ID=ReceiptPartners.Client_ID AND Invoice.AD_Org_ID=ReceiptPartners.Org_ID
                                 AND Invoice.C_BPartner_ID=ReceiptPartners.BPartner_ID)
+                    INNER JOIN C_DocType InvDocType ON (InvDocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
                     INNER JOIN C_InvoicePaySchedule PaySchedule ON (PaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID)
                     WHERE Invoice.IsSOTrx = 'Y'
                       AND Invoice.IsActive = 'Y'
                       AND Invoice.DocStatus IN ('CO', 'CL')
                       AND COALESCE(Invoice.IsPaid, 'N') = 'N'
-                      /*AND COALESCE(Invoice.IsReturnTrx, 'N') = 'N'*/
+                      AND InvDocType.DocBaseType IN ('ARI', 'ARC')
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
-                      AND COALESCE(PaySchedule.DueAmt, 0) > 0
+                      AND COALESCE(PaySchedule.DueAmt, 0) <> 0
                 ),
                 MatchCandidates AS (
                     SELECT Receipt.Payment_ID,
@@ -218,7 +230,9 @@ namespace VASLogic.Models
                                )
                            END AS Open_Amount_Pay
                     FROM OpenReceipts Receipt
-                    INNER JOIN OpenSchedules Schedule ON (Schedule.Client_ID=Receipt.Client_ID AND Schedule.BPartner_ID=Receipt.BPartner_ID)
+                    INNER JOIN OpenSchedules Schedule ON (Schedule.Client_ID=Receipt.Client_ID AND Schedule.BPartner_ID=Receipt.BPartner_ID
+                                AND ((Receipt.Receipt_Amount > 0 AND Schedule.Doc_Base_Type = 'ARI')
+                                  OR (Receipt.Receipt_Amount < 0 AND Schedule.Doc_Base_Type = 'ARC')))
                 ),
                 ScoredCandidates AS (
                     SELECT MatchCandidates.Payment_ID,
@@ -239,9 +253,9 @@ namespace VASLogic.Models
                            CASE
                                WHEN ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) <= " + AMOUNT_TOLERANCE.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
                                WHEN MatchCandidates.Open_Amount_Pay <> 0
-                                    AND ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) * 100 / MatchCandidates.Open_Amount_Pay <= " + HIGH_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
+                                    AND ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + HIGH_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'HIGH'
                                WHEN MatchCandidates.Open_Amount_Pay <> 0
-                                    AND ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) * 100 / MatchCandidates.Open_Amount_Pay <= " + REVIEW_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'REVIEW'
+                                    AND ABS(MatchCandidates.Receipt_Amount - MatchCandidates.Open_Amount_Pay) * 100 / ABS(MatchCandidates.Open_Amount_Pay) <= " + REVIEW_PCT_THRESHOLD.ToString(CultureInfo.InvariantCulture) + @" THEN 'REVIEW'
                                ELSE 'LOW'
                            END AS Match_Confidence,
                            ROW_NUMBER() OVER (
@@ -427,7 +441,13 @@ namespace VASLogic.Models
                            InvoiceCurrency.ISO_Code AS Invoice_Currency,
                            CASE WHEN InvoiceCurrency.CurSymbol IS NOT NULL THEN InvoiceCurrency.CurSymbol ELSE InvoiceCurrency.ISO_Code END AS Invoice_Currency_Symbol,
                            InvoiceCurrency.StdPrecision AS Invoice_Precision,
-                           COALESCE(PaySchedule.DueAmt, 0) AS Open_Amount
+                           /* Signed open amount — AR credit memos (ARC) come back
+                              negative so the modal, the balance line and the amount
+                              signal all agree in sign with a negative receipt. */
+                           CASE WHEN DocType.DocBaseType = 'ARC'
+                                THEN -(COALESCE(PaySchedule.DueAmt, 0))
+                                ELSE (COALESCE(PaySchedule.DueAmt, 0))
+                           END AS Open_Amount
                     FROM C_Invoice Invoice
                     INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=Invoice.C_BPartner_ID)
                     INNER JOIN C_DocType DocType ON (DocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
@@ -442,7 +462,7 @@ namespace VASLogic.Models
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
-                      AND COALESCE(PaySchedule.DueAmt, 0) > 0";
+                      AND COALESCE(PaySchedule.DueAmt, 0) <> 0";
 
             /* MRole only on the main physical table (C_Invoice / alias Invoice). */
             invoiceDataSql = MRole.GetDefault(ctx).AddAccessSQL(
@@ -683,7 +703,7 @@ namespace VASLogic.Models
                 decimal availableAmt = Util.GetValueOfDecimal(DB.ExecuteScalar(
                     "SELECT COALESCE(ALLOCPAYMENTAVAILABLE(" + paymentId + "), 0) FROM C_Payment WHERE C_Payment_ID = " + paymentId,
                     null, trx));
-                if (availableAmt <= 0)
+                if (availableAmt == 0)
                 {
                     trx.Rollback();
                     result.Message = Msg.GetMsg(ctx, "AmountIsZero");
@@ -696,6 +716,7 @@ namespace VASLogic.Models
                 string scheduleSql = @"
                     SELECT PaySchedule.C_InvoicePaySchedule_ID AS PaySchedule_ID,
                            COALESCE(PaySchedule.DueAmt, 0) AS Due_Amount,
+                           InvDocType.DocBaseType AS Doc_Base_Type,
                            Invoice.C_Invoice_ID AS Invoice_ID,
                            Invoice.C_BPartner_ID AS Invoice_BPartner_ID,
                            Invoice.C_Currency_ID AS Invoice_Currency_ID,
@@ -703,15 +724,17 @@ namespace VASLogic.Models
                            Invoice.AD_Org_ID AS Org_ID
                     FROM C_InvoicePaySchedule PaySchedule
                     INNER JOIN C_Invoice Invoice ON (Invoice.C_Invoice_ID=PaySchedule.C_Invoice_ID)
+                    INNER JOIN C_DocType InvDocType ON (InvDocType.C_DocType_ID=Invoice.C_DocTypeTarget_ID)
                     WHERE Invoice.C_Invoice_ID = " + invoiceId + @"
                       AND PaySchedule.C_InvoicePaySchedule_ID = " + payScheduleId + @"
                       AND Invoice.IsSOTrx = 'Y'
                       AND Invoice.IsActive = 'Y'
                       AND Invoice.DocStatus IN ('CO', 'CL')
+                      AND InvDocType.DocBaseType IN ('ARI', 'ARC')
                       AND PaySchedule.IsActive = 'Y'
                       AND COALESCE(PaySchedule.IsValid, 'Y') = 'Y'
                       AND COALESCE(PaySchedule.VA009_IsPaid, 'N') = 'N'
-                      AND COALESCE(PaySchedule.DueAmt, 0) > 0";
+                      AND COALESCE(PaySchedule.DueAmt, 0) <> 0";
 
                 DataSet dsSchedules = DB.ExecuteDataset(scheduleSql, null, trx);
                 if (dsSchedules == null || dsSchedules.Tables.Count == 0 || dsSchedules.Tables[0].Rows.Count == 0)
@@ -723,7 +746,27 @@ namespace VASLogic.Models
 
                 DataRow schedule = dsSchedules.Tables[0].Rows[0];
 
-                decimal dueAmt = Util.GetValueOfDecimal(schedule["Due_Amount"]);
+                string docBaseType = Util.GetValueOfString(schedule["Doc_Base_Type"]);
+
+                /* Sign gate (mirrors the suggestion query): a negative receipt may only
+                   be applied to an AR credit memo (ARC); a positive receipt only to a
+                   regular AR invoice (ARI). Defends this POST endpoint against a
+                   hand-crafted, sign-mismatched pairing. */
+                bool signMatches = (availableAmt < 0 && docBaseType == "ARC")
+                                   || (availableAmt > 0 && docBaseType == "ARI");
+                if (!signMatches)
+                {
+                    trx.Rollback();
+                    result.Message = Msg.GetMsg(ctx, "VIS_NoRecordFound");
+                    return result;
+                }
+
+                /* Signed schedule due — ARC negative so it nets against the negative
+                   receipt (ABS() normalises whatever sign DueAmt is physically stored
+                   with). */
+                decimal dueAmt = docBaseType == "ARC"
+                    ? -Math.Abs(Util.GetValueOfDecimal(schedule["Due_Amount"]))
+                    : Math.Abs(Util.GetValueOfDecimal(schedule["Due_Amount"]));
                 int invoiceCurrencyId = Util.GetValueOfInt(schedule["Invoice_Currency_ID"]);
 
                 /* Schedule due in the PAYMENT currency, converted at the
@@ -738,7 +781,7 @@ namespace VASLogic.Models
                         Util.GetValueOfInt(schedule["Org_ID"]));
                 }
 
-                if (duePay <= 0)
+                if (duePay == 0)
                 {
                     trx.Rollback();
                     result.Message = Msg.GetMsg(ctx, "AmountIsZero");
@@ -762,8 +805,15 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                /* ── Single line against the suggested schedule (payment currency) ── */
-                decimal appliedAmt = availableAmt >= duePay ? duePay : availableAmt;
+                /* ── Single line against the suggested schedule (payment currency) ──
+                   Work in magnitudes then reapply the receipt sign, so we apply the
+                   smaller of the receipt's open amount and the schedule due. An
+                   over-payment leaves the receipt open; an under-payment leaves the
+                   schedule balance open — correct for both positive receipt↔ARI and
+                   negative receipt↔ARC (a raw numeric MIN/MAX would pick the wrong
+                   operand once the amounts go negative). */
+                int applySign = availableAmt < 0 ? -1 : 1;
+                decimal appliedAmt = applySign * Math.Min(Math.Abs(availableAmt), Math.Abs(duePay));
                 /* Under-payment keeps the remaining schedule balance open. */
                 decimal overUnderAmt = duePay - appliedAmt;
 
