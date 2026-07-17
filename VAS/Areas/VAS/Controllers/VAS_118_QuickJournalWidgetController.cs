@@ -56,36 +56,57 @@ namespace VAS.Controllers
         /// <param name="cAcctSchemaId">C_AcctSchema_ID whose accounts are listed.</param>
         /// <param name="search">Optional filter on account code / name.</param>
         /// <param name="pageNo">1-based page number.</param>
+        /// <param name="adOrgId">Selected header organization (org-scopes the accounts).</param>
         /// <returns>JSON-serialized account list, or "" when no session.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetAccounts(int cAcctSchemaId = 0, string search = "", int pageNo = 1)
+        public JsonResult GetAccounts(int cAcctSchemaId = 0, string search = "", int pageNo = 1, int adOrgId = 0)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 VAS_118_QuickJournalModel model = new VAS_118_QuickJournalModel();
-                retJSON = JsonConvert.SerializeObject(model.GetAccounts(ctx, cAcctSchemaId, search, pageNo));
+                retJSON = JsonConvert.SerializeObject(model.GetAccounts(ctx, cAcctSchemaId, search, pageNo, adOrgId));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>
-        /// Cost/profit-center organizations accessible to the role (the optional
-        /// AD_OrgTrx_ID picker).
+        /// GL-Journal document types scoped to the selected organization.
         /// </summary>
-        /// <returns>JSON-serialized org list, or "" when no session.</returns>
+        /// <param name="cAdOrgId">Selected header organization.</param>
+        /// <returns>JSON-serialized doc-type list, or "" when no session.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetCostCenters()
+        public JsonResult GetDocTypes(int cAdOrgId = 0)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
             {
                 Ctx ctx = Session["ctx"] as Ctx;
                 VAS_118_QuickJournalModel model = new VAS_118_QuickJournalModel();
-                retJSON = JsonConvert.SerializeObject(model.GetCostCenters(ctx));
+                retJSON = JsonConvert.SerializeObject(model.GetDocTypes(ctx, cAdOrgId));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
+        /// Cost/profit-center organizations of the selected organization (the optional
+        /// AD_OrgTrx_ID picker).
+        /// </summary>
+        /// <param name="cAdOrgId">Selected header organization.</param>
+        /// <returns>JSON-serialized org list, or "" when no session.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetCostCenters(int cAdOrgId = 0)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_118_QuickJournalModel model = new VAS_118_QuickJournalModel();
+                retJSON = JsonConvert.SerializeObject(model.GetCostCenters(ctx, cAdOrgId));
             }
             return Json(retJSON, JsonRequestBehavior.AllowGet);
         }

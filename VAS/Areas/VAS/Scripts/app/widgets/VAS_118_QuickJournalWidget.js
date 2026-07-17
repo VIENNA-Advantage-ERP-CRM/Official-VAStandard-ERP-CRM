@@ -4,7 +4,7 @@
  * journal (one debit + one credit) and saves it as Draft or Complete it, without
  * leaving the dashboard.
  *
- * Backend - VAS_118_QuickJournalWidget/GetInitData, GetAccounts, GetCostCenters, CreateQuickJournal
+ * Backend - VAS_118_QuickJournalWidget/GetInitData, GetDocTypes, GetAccounts, GetCostCenters, CreateQuickJournal, CompleteQuickJournal
  *
  * Labels / Message Keys (English fallback shown; add to AD_Message)
  *  #  | Text                                             | Message Key
@@ -373,20 +373,40 @@
                     if (data.Today) { $dialog.find('.vas-qj-date').val(data.Today); }
 
                     /* Resolve currency + enable the debit/credit account pickers for the
-                       defaulted schema (they are schema-scoped). */
+                       defaulted schema (they are schema-scoped). Document types arrive
+                       already org-scoped for the default org; cost centers load for it. */
                     onSchemaChange();
-                    loadCostCenters();
+                    loadCostCenters(data.DefaultOrgId);
                 },
                 complete: function () { showBusy(false); }
             });
         }
 
-        function loadCostCenters() {
+        /* Selected header organization id (0 when none). */
+        function selectedOrgId() { return Number($dialog.find('.vas-qj-org .vas-qj-combo-id').val() || 0); }
+
+        function loadCostCenters(orgId) {
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/GetCostCenters',
                 type: 'GET',
                 cache: false,
+                data: { cAdOrgId: orgId || 0 },
                 success: function (res) { costCenters = parseResponse(res) || []; }
+            });
+        }
+
+        /* Reloads the GL-Journal document types for an organization; optionally
+           re-selects the first one. */
+        function loadDocTypes(orgId, presetFirst) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/GetDocTypes',
+                type: 'GET',
+                cache: false,
+                data: { cAdOrgId: orgId || 0 },
+                success: function (res) {
+                    docTypes = parseResponse(res) || [];
+                    if (presetFirst) { presetCombo('.vas-qj-doctype', docTypes.length ? docTypes[0] : null); }
+                }
             });
         }
 
@@ -410,10 +430,15 @@
         }
 
         function onOrgChange() {
-            /* Clear dependent picks on organization change. */
+            /* Document type, cost center and account are all org-scoped — reload for
+               the new organization and clear the now-stale dependent picks. */
+            var orgId = selectedOrgId();
+            clearCombo($dialog.find('.vas-qj-doctype'));
             clearCombo($dialog.find('.vas-qj-costcenter'));
             clearCombo($dialog.find('.vas-qj-debit'));
             clearCombo($dialog.find('.vas-qj-credit'));
+            loadDocTypes(orgId, true);
+            loadCostCenters(orgId);
         }
 
         function onSchemaChange() {
@@ -446,6 +471,19 @@
                         (items[i].html || escapeHtml(items[i].label)) + '</div>';
                 }
                 $list.html(html).removeClass('vas-qj-hidden');
+                positionList();
+            }
+
+            /* Open the list upward when there isn't room below inside the modal — a
+               downward list on the last row (Cost center) overflows the modal and
+               triggers its scrollbar. */
+            function positionList() {
+                var inputEl = $input[0], listEl = $list[0];
+                if (!inputEl || !listEl) { return; }
+                var $modal = $combo.closest('.vas-qj-modal');
+                var boundBottom = $modal.length ? $modal[0].getBoundingClientRect().bottom : window.innerHeight;
+                var spaceBelow = boundBottom - inputEl.getBoundingClientRect().bottom;
+                $list.toggleClass('vas-qj-combo-list-up', spaceBelow < listEl.offsetHeight + 8);
             }
 
             /* Click / focus opens the list (empty term => all / first page). */
@@ -496,7 +534,7 @@
                     url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/GetAccounts',
                     type: 'GET',
                     cache: false,
-                    data: { cAcctSchemaId: currentSchema.Id, search: term || '', pageNo: 1 },
+                    data: { cAcctSchemaId: currentSchema.Id, search: term || '', pageNo: 1, adOrgId: selectedOrgId() },
                     success: function (res) {
                         var list = parseResponse(res) || [];
                         var out = [];

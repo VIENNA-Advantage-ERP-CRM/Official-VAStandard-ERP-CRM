@@ -74,11 +74,13 @@ namespace VASLogic.Models
             InitData data = new InitData();
             if (ctx == null) { return data; }
 
-            data.Organizations = GetOrganizations(ctx, false);
+            data.Organizations = GetOrganizations(ctx, false, 0);
             data.Schemas = GetAcctSchemas(ctx);
-            data.DocTypes = GetDocTypes(ctx);
             data.DefaultOrgId = ctx.GetAD_Org_ID();
             data.DefaultSchemaId = ResolveDefaultSchemaId(ctx, data.Schemas);
+            /* Document types are scoped to the (default) organization — reloaded when
+               the user changes the organization. */
+            data.DocTypes = GetDocTypes(ctx, data.DefaultOrgId);
             data.Today = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
             return data;
         }
@@ -111,8 +113,9 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="ctx">Session context.</param>
         /// <param name="costCentersOnly">True for the cost/profit-center list.</param>
+        /// <param name="adOrgId">Selected header organization — cost centers are filtered to those whose parent (LegalEntityOrg) is this org.</param>
         /// <returns>List of <see cref="Option"/> (Id + Name).</returns>
-        public List<Option> GetOrganizations(Ctx ctx, bool costCentersOnly)
+        public List<Option> GetOrganizations(Ctx ctx, bool costCentersOnly, int adOrgId)
         {
             List<Option> list = new List<Option>();
             if (ctx == null) { return list; }
@@ -129,6 +132,9 @@ namespace VASLogic.Models
             if (costCentersOnly)
             {
                 sql += " AND (AD_Org.IsCostCenter = 'Y' OR AD_Org.IsProfitCenter = 'Y')";
+                /* A cost center belongs to a header organization via LegalEntityOrg
+                   (the parent org id, stored as text). */
+                sql += $" AND CAST(AD_Org.LegalEntityOrg AS INTEGER) = {adOrgId}";
             }
             else
             {
@@ -212,11 +218,12 @@ namespace VASLogic.Models
 
         /// <summary>
         /// Active GL-Journal document types (DocBaseType 'GLJ') for the current
-        /// client.
+        /// client, scoped to the selected organization (shared org 0 + that org).
         /// </summary>
         /// <param name="ctx">Session context.</param>
+        /// <param name="adOrgId">Selected header organization.</param>
         /// <returns>List of <see cref="Option"/> (Id + Name).</returns>
-        public List<Option> GetDocTypes(Ctx ctx)
+        public List<Option> GetDocTypes(Ctx ctx, int adOrgId)
         {
             List<Option> list = new List<Option>();
             if (ctx == null) { return list; }
@@ -228,6 +235,7 @@ namespace VASLogic.Models
                 FROM C_DocType DocType
                 WHERE DocType.IsActive = 'Y'
                   AND DocType.DocBaseType = 'GLJ'
+                  AND (DocType.AD_Org_ID = 0 OR DocType.AD_Org_ID = " + adOrgId + @")
                   AND DocType.AD_Client_ID = " + ctx.GetAD_Client_ID();
             if (Env.IsModuleInstalled("VA028_"))
             {
@@ -267,8 +275,9 @@ namespace VASLogic.Models
         /// <param name="cAcctSchemaId">C_AcctSchema_ID whose account element is used.</param>
         /// <param name="search">Optional filter on Value / Name (may be null/empty).</param>
         /// <param name="pageNo">1-based page number.</param>
+        /// <param name="adOrgId">Selected header organization (shared org 0 + that org).</param>
         /// <returns>List of <see cref="AccountOption"/> (Id + Code + Name).</returns>
-        public List<AccountOption> GetAccounts(Ctx ctx, int cAcctSchemaId, string search, int pageNo)
+        public List<AccountOption> GetAccounts(Ctx ctx, int cAcctSchemaId, string search, int pageNo, int adOrgId)
         {
             List<AccountOption> list = new List<AccountOption>();
             if (ctx == null || cAcctSchemaId <= 0) { return list; }
@@ -290,6 +299,7 @@ namespace VASLogic.Models
                 WHERE EleVal.IsActive = 'Y'
                   AND EleVal.IsSummary = 'N'
                   AND SchemaEle.C_AcctSchema_ID = @SchemaId
+                  AND (EleVal.AD_Org_ID = 0 OR EleVal.AD_Org_ID = " + adOrgId + @")
                   AND EleVal.AD_Client_ID = " + ctx.GetAD_Client_ID();
 
             if (hasSearch)
@@ -334,14 +344,15 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Cost/profit-center organizations accessible to the role (the optional
-        /// AD_OrgTrx_ID picker).
+        /// Cost/profit-center organizations of the selected organization (the optional
+        /// AD_OrgTrx_ID picker) — those whose parent LegalEntityOrg is that org.
         /// </summary>
         /// <param name="ctx">Session context.</param>
+        /// <param name="adOrgId">Selected header organization.</param>
         /// <returns>List of <see cref="Option"/> (Id + Name).</returns>
-        public List<Option> GetCostCenters(Ctx ctx)
+        public List<Option> GetCostCenters(Ctx ctx, int adOrgId)
         {
-            return GetOrganizations(ctx, true);
+            return GetOrganizations(ctx, true, adOrgId);
         }
 
         /// <summary>

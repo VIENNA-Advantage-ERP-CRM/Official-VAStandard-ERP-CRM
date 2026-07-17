@@ -231,6 +231,9 @@
     z-index: 20;
     padding: 0.25em;
 }
+/* Bottom-row combos (Cost center) open upward so the list never overflows the
+   modal and forces a scrollbar. */
+.vas-qj-combo-list.vas-qj-combo-list-up { top: auto; bottom: calc(100% + 4px); }
 .vas-qj-combo-item {
     padding: 0.5em 0.625em;
     border-radius: 7px;
