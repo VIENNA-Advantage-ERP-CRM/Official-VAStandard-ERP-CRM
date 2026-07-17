@@ -290,7 +290,7 @@
             setupCombo($dialog.find('.vas-qj-org'), staticProvider(function () { return orgs; }), onOrgChange);
             setupCombo($dialog.find('.vas-qj-schema'), staticProvider(function () { return schemas; }), onSchemaChange);
             setupCombo($dialog.find('.vas-qj-doctype'), staticProvider(function () { return docTypes; }), null);
-            setupCombo($dialog.find('.vas-qj-costcenter'), staticProvider(function () { return costCenters; }), null);
+            setupCombo($dialog.find('.vas-qj-costcenter'), staticProvider(function () { return costCenters; }, true), null);
             setupCombo($dialog.find('.vas-qj-debit'), accountProvider, null);
             setupCombo($dialog.find('.vas-qj-credit'), accountProvider, null);
 
@@ -494,14 +494,21 @@
             $list.on('mousedown', '.vas-qj-combo-item', function (e) {
                 e.preventDefault();
                 var $item = $(this);
-                $id.val($item.attr('data-id'));
-                $input.val($item.attr('data-label'));
+                var id = $item.attr('data-id') || '';
+                $id.val(id);
+                /* The "None" row (empty id) clears the field. */
+                $input.val(id ? $item.attr('data-label') : '');
                 $list.addClass('vas-qj-hidden').empty();
                 if (onSelect) { onSelect(); }
             });
 
             $input.on('blur', function () {
-                setTimeout(function () { $list.addClass('vas-qj-hidden'); }, 150);
+                setTimeout(function () {
+                    $list.addClass('vas-qj-hidden');
+                    /* Typed text that was never resolved to a real pick is discarded so
+                       a filled-looking input never carries an unselected value. */
+                    if (!$id.val()) { $input.val(''); }
+                }, 150);
             });
         }
 
@@ -511,12 +518,16 @@
             $combo.find('.vas-qj-combo-list').addClass('vas-qj-hidden').empty();
         }
 
-        /* Client-side filter over a pre-loaded list of { Id, Name }. */
-        function staticProvider(getRaw) {
+        /* Client-side filter over a pre-loaded list of { Id, Name }. allowEmpty
+           prepends a "None" row (empty id) so an optional field can be cleared. */
+        function staticProvider(getRaw, allowEmpty) {
             return function (term, cb) {
                 var t = $.trim(term || '').toLowerCase();
                 var raw = getRaw() || [];
                 var out = [];
+                if (allowEmpty && !t) {
+                    out.push({ id: '', label: '', html: '<span class="vas-qj-none"></span>' });
+                }
                 for (var i = 0; i < raw.length; i++) {
                     var label = String(raw[i].Name == null ? '' : raw[i].Name);
                     if (!t || label.toLowerCase().indexOf(t) >= 0) { out.push({ id: raw[i].Id, label: label }); }

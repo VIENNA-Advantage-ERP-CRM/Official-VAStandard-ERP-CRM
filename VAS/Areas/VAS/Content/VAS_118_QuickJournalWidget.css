@@ -242,12 +242,14 @@
     display: flex; gap: 0.5em; align-items: baseline;
 }
 .vas-qj-combo-item:hover { background: #EEF6FF; }
+.vas-qj-none { color: #8A97A6; font-style: italic; }
 .vas-qj-acct-code { font-family: 'Roboto Mono', monospace; font-weight: 600; color: #0069AE; }
 .vas-qj-acct-name { color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Balance preview */
 .vas-qj-preview {
-    display: flex; align-items: center; gap: 0.875em;
+    display: flex; align-items: center; 
+    gap: 3em;
     padding: 0.75em 0.875em;
     background: linear-gradient(90deg, #E6F6EF 0%, #EEF6FF 100%);
     border: 1px solid rgba(11, 107, 69, 0.15);
@@ -257,9 +259,9 @@
 .vas-qj-leg { display: flex; flex-direction: column; gap: 0.1em; }
 .vas-qj-leg span {
     font-family: 'Roboto Mono', monospace;
-    font-size: 0.68em; letter-spacing: 0.08em; text-transform: uppercase; color: #748494;
+    font-size: 0.68em; letter-spacing: 0.08em; /*text-transform: uppercase;*/ color: #748494;
 }
-.vas-qj-leg strong { font-size: 0.95em; color: #141414; font-variant-numeric: tabular-nums; }
+.vas-qj-leg strong { font-size: 1.2em; color: #141414; font-variant-numeric: tabular-nums; }
 .vas-qj-balanced {
     margin-left: auto;
     display: inline-flex; align-items: center; gap: 0.375em;
