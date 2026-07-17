@@ -177,7 +177,7 @@
 .vas-cpm-percent {
     /* Emphasized value cell — sm token, Bold (Cell Types §"Emphasized value"). */
     font-size: 0.75em;
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;

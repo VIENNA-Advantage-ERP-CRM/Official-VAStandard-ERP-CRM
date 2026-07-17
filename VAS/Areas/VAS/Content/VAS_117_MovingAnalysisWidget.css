@@ -1,0 +1,412 @@
+/* Product section Moving Analysis (Top Moving / Slow Moving) widget.
+   All selectors are MPC-mv- prefixed. Internal sizing in em (scales with the
+   card); borders / radii / shadows stay in px. Widget number 117. */
+
+.MPC-mv-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-mv-root,
+.MPC-mv-root * {
+    box-sizing: border-box;
+}
+
+.MPC-mv-hidden {
+    display: none !important;
+}
+
+.MPC-mv-busy-hidden {
+    visibility: hidden;
+}
+
+.MPC-mv-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header */
+.MPC-mv-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    margin-bottom: 0.625em;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.MPC-mv-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 131, 218, 0.1);
+    color: #0083da;
+}
+
+    .MPC-mv-ico svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.MPC-mv-titles {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-mv-title {
+    font-size: clamp(13px, 1.1375cqi, 16px);
+    font-weight: 500;
+    color: #102c3f;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-mv-sub {
+    font-size: clamp(11px, .9625cqi, 13px);
+    font-weight: 400;
+    color: #717182;
+    margin-top: 2px;
+    line-height: 1.25;
+}
+
+.MPC-mv-spacer {
+    flex: 1;
+}
+
+/* Fast / Slow segmented toggle */
+.MPC-mv-seg {
+    display: inline-flex;
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.MPC-mv-seg-btn {
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #5f7283;
+    padding: 0.35em 0.8em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+    .MPC-mv-seg-btn.MPC-mv-active {
+        background: #0083da;
+        color: #fff;
+    }
+
+/* Body */
+.MPC-mv-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-mv-list {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-mv-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;
+    padding: 1em;
+}
+
+/* Row */
+.MPC-mv-row {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    width: 100%;
+    text-align: left;
+    padding: 0.42em 0.2em;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+}
+
+    .MPC-mv-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.MPC-mv-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+.MPC-mv-name {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102c3f;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-mv-bar {
+    display: block;
+    width: 100%;
+    height: 0.32em;
+    border-radius: 999px;
+    background: rgba(16, 44, 63, 0.06);
+    overflow: hidden;
+}
+
+.MPC-mv-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+}
+
+.MPC-mv-fill-fast {
+    background: #20a464;
+}
+
+.MPC-mv-fill-slow {
+    background: #d78b10;
+}
+
+.MPC-mv-r {
+    flex: 0 0 auto;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+.MPC-mv-vel {
+    font-size: 0.75em;
+    font-weight: 700;
+}
+
+.MPC-mv-vel-fast {
+    color: #20a464;
+}
+
+.MPC-mv-vel-slow {
+    color: #d78b10;
+}
+
+.MPC-mv-turns {
+    font-size: 0.6875em;
+    color: #748494;
+}
+
+/* Footer */
+.MPC-mv-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 0.6em;
+    margin-top: 0.4em;
+    border-top: 1px solid #edf2f6;
+}
+
+.MPC-mv-foot-helper {
+    font-size: 0.6875em;
+    color: #748494;
+}
+
+/* Modal (lives on <body>, so it carries its own em scaling lever) */
+.MPC-mv-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(12px, min(calc(var(--dash-inline-size, 100vw) * 0.014), 1.92vh), 36px);
+}
+
+    .MPC-mv-modal,
+    .MPC-mv-modal * {
+        box-sizing: border-box;
+    }
+
+.MPC-mv-modal.MPC-mv-modal-open {
+    display: flex;
+}
+
+.MPC-mv-modal-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 38, 64, 0.28);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-mv-modal-dialog {
+    position: relative;
+    width: min(48em, calc(100vw - 2em));
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.3);
+}
+
+.MPC-mv-modal-head {
+    flex: 0 0 auto;
+    height: 3.5em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0 1.25em;
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid #1f83ff;
+}
+
+.MPC-mv-modal-title-wrap {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+}
+
+.MPC-mv-modal-title {
+    min-width: 0;
+    overflow: hidden;
+    color: #141414;
+    font-size: 1em;
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-mv-modal-badge {
+    flex: 0 0 auto;
+    font-size: 0.72em;
+}
+
+.MPC-mv-pill {
+    display: inline-block;
+    padding: 0.18em 0.7em;
+    border-radius: 999px;
+    font-size: 0.92em;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.MPC-mv-pill-ok {
+    background: #e2f6ef;
+    color: #0b6b45;
+}
+
+.MPC-mv-pill-warn {
+    background: #fcf1dd;
+    color: #9a6500;
+}
+
+.MPC-mv-modal-close {
+    width: 2em;
+    height: 2em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0;
+    color: #141414;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+    .MPC-mv-modal-close:hover,
+    .MPC-mv-modal-close:focus-visible {
+        color: #0083da;
+        background: #eef6ff;
+        outline: none;
+    }
+
+    .MPC-mv-modal-close svg {
+        width: 1.25em;
+        height: 1.25em;
+    }
+
+.MPC-mv-modal-body {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.375em 1.5em;
+}
+
+/* Modal form grid */
+.MPC-mv-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0 1.5em;
+}
+
+.MPC-mv-field {
+    padding: 0.75em 0 0.5em;
+    border-bottom: 1px solid #d7d7d7;
+}
+
+.MPC-mv-field-label {
+    font-size: 0.75em;
+    color: #748494;
+    margin-bottom: 0.375em;
+}
+
+.MPC-mv-field-value {
+    font-size: 1em;
+    color: #102c3f;
+}
+
+    .MPC-mv-field-value.MPC-mv-strong {
+        font-weight: 700;
+    }
