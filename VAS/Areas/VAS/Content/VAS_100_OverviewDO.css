@@ -9,6 +9,11 @@
  *               pastel stepper and a flat line table.
  * Chronological development:
  *   VAI163   2026-07-06  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
  ***********************************************************/
 
 .MPC-vasdo-root {
@@ -96,7 +101,6 @@
 .MPC-vasdo-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
-    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
 }
 
 .MPC-vasdo-hdrTop {
@@ -164,7 +168,7 @@
 /* ----------------------------------------------------------- */
 .MPC-vasdo-hdrCard {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--do-card-bd);
     border-radius: var(--do-card-radius);
@@ -172,7 +176,7 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasdo-hdrColL { min-width: 0; }
+.MPC-vasdo-hdrColL { min-width: 0; border-right: 1px solid var(--do-row-div); padding-right: 1.25em; }
 
 .MPC-vasdo-hdrColR {
     min-width: 0;
@@ -205,6 +209,7 @@
 
 @container (max-width: 460px) {
     .MPC-vasdo-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasdo-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--do-row-div); padding-bottom: 0.75em; }
     .MPC-vasdo-hdrTop  { flex-direction: column; }
     .MPC-vasdo-hdrPills { justify-content: flex-start; }
 }
@@ -568,6 +573,7 @@
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasdo-hdrColL { border-right: none; border-left: 1px solid var(--do-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .MPC-vasdo-table .ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .MPC-vasdo-recv { justify-content: flex-start; }
 [dir="rtl"] .MPC-vasdo-tFoot { justify-content: flex-start; }

@@ -10,6 +10,11 @@
  *               To route strip and a "Generated from" origin-chip row.
  * Chronological development:
  *   VAI163   2026-07-07  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
  ***********************************************************/
 
 .MPC-vasmt-root {
@@ -97,7 +102,6 @@
 .MPC-vasmt-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
-    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
 }
 
 .MPC-vasmt-hdrTop {
@@ -173,7 +177,7 @@
 /* ----------------------------------------------------------- */
 .MPC-vasmt-hdrCard {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--mt-card-bd);
     border-radius: var(--mt-card-radius);
@@ -181,7 +185,7 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasmt-hdrColL { min-width: 0; }
+.MPC-vasmt-hdrColL { min-width: 0; border-right: 1px solid var(--mt-row-div); padding-right: 1.25em; }
 
 .MPC-vasmt-hdrColR {
     min-width: 0;
@@ -214,6 +218,7 @@
 
 @container (max-width: 460px) {
     .MPC-vasmt-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasmt-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--mt-row-div); padding-bottom: 0.75em; }
     .MPC-vasmt-hdrTop  { flex-direction: column; }
     .MPC-vasmt-hdrPills { justify-content: flex-start; }
 }
@@ -657,6 +662,7 @@
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasmt-hdrColL { border-right: none; border-left: 1px solid var(--mt-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .MPC-vasmt-table .ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .MPC-vasmt-tFoot { justify-content: flex-start; }
 [dir="rtl"] .MPC-vasmt-tf { margin-right: 0; margin-left: auto; }

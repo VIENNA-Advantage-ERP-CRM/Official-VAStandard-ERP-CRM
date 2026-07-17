@@ -10,6 +10,11 @@
  *               table with Full / Partial / Short status tags.
  * Chronological development:
  *   VAI163   2026-07-07  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
  ***********************************************************/
 
 .MPC-vasiu-root {
@@ -97,7 +102,6 @@
 .MPC-vasiu-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
-    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
 }
 
 .MPC-vasiu-hdrTop {
@@ -164,7 +168,7 @@
 /* ----------------------------------------------------------- */
 .MPC-vasiu-hdrCard {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--iu-card-bd);
     border-radius: var(--iu-card-radius);
@@ -172,7 +176,7 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasiu-hdrColL { min-width: 0; }
+.MPC-vasiu-hdrColL { min-width: 0; border-right: 1px solid var(--iu-row-div); padding-right: 1.25em; }
 
 .MPC-vasiu-hdrColR {
     min-width: 0;
@@ -205,6 +209,7 @@
 
 @container (max-width: 460px) {
     .MPC-vasiu-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasiu-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--iu-row-div); padding-bottom: 0.75em; }
     .MPC-vasiu-hdrTop  { flex-direction: column; }
     .MPC-vasiu-hdrPills { justify-content: flex-start; }
 }
@@ -596,6 +601,7 @@
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasiu-hdrColL { border-right: none; border-left: 1px solid var(--iu-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .MPC-vasiu-table .ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .MPC-vasiu-tFoot { justify-content: flex-start; }
 [dir="rtl"] .MPC-vasiu-tf b { margin-left: 0; margin-right: 0.375em; }
