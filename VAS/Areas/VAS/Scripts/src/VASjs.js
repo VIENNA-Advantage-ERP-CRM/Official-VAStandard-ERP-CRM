@@ -187,6 +187,7 @@ import "../app/widgets/OverdueWidget.js";
 import "../app/widgets/PaidthismonthWidget.js";
 import "../app/widgets/TopDebtorsWidget.js";
 
+import "../app/widgets/VAS_GLJournalDetailDialog.js";
 import "../app/widgets/VAS_041_GLJournalEntriesWidget.js";
 import "../app/widgets/VAS_036_GLJournalUnpostedWidget.js";
 import "../app/widgets/VAS_039_GLJournalPostedWidget.js";
