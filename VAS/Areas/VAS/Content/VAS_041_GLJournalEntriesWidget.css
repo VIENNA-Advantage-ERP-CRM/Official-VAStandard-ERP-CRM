@@ -378,7 +378,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 }
 
 .VAS-glje-amt {
-    font-weight: 700;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
 }
 
@@ -755,7 +755,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-amt {
     text-align: right;
-    font-weight: 600;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
