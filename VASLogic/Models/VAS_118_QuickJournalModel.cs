@@ -7,6 +7,7 @@
  * Created by     : VAI_XXX
  ******************************************************/
 
+using DocumentFormat.OpenXml.VariantTypes;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -344,16 +345,17 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Creates a two-line GL journal (one debit + one credit) from the modal
-        /// input and either leaves it Drafted (Action "draft") or completes it
-        /// (Action "post"). All derived accounting values are resolved here; the
-        /// whole operation runs in a single transaction that is rolled back on any
-        /// validation, save or completion failure so no partial document remains.
+        /// Saves the two-line GL journal (one debit + one credit) as a DRAFT: creates
+        /// it when req.GL_Journal_ID is 0, otherwise updates the existing draft (header
+        /// + both lines) in place. It never completes the document — completion is the
+        /// separate <see cref="CompleteQuickJournal"/> step so the draft is committed
+        /// first. All derived accounting values are resolved here; the whole save runs
+        /// in one transaction rolled back on any validation or save failure.
         /// </summary>
         /// <param name="ctx">Session context (client / org / role).</param>
-        /// <param name="req">Raw modal input.</param>
-        /// <returns><see cref="QuickJournalResponse"/> with Success, DocumentNo, DocStatus, per-field errors and a user message.</returns>
-        public QuickJournalResponse CreateQuickJournal(Ctx ctx, QuickJournalRequest req)
+        /// <param name="req">Raw modal input (GL_Journal_ID = 0 to create, &gt; 0 to update).</param>
+        /// <returns><see cref="QuickJournalResponse"/> with Success, GL_Journal_ID, DocumentNo, DocStatus, per-field errors and a user message.</returns>
+        public QuickJournalResponse SaveQuickJournal(Ctx ctx, QuickJournalRequest req)
         {
             QuickJournalResponse result = new QuickJournalResponse { Success = false, FieldErrors = new Dictionary<string, string>() };
 
@@ -399,7 +401,7 @@ namespace VASLogic.Models
 
             int clientId = ctx.GetAD_Client_ID();
 
-            /* ── 2. Security: the posted org must be accessible to the role ── */
+            /* ── 2. Security: the completed org must be accessible to the role ── */
             if (!IsOrgAccessible(ctx, req.AD_Org_ID))
             {
                 result.FieldErrors["AD_Org_ID"] = Msg.GetMsg(ctx, "VAS_118_SelectOrganization");
@@ -471,8 +473,31 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                /* ── 4. Journal header ── */
-                MJournal journal = new MJournal(ctx, 0, trx);
+                /* ── 4. Journal header — create a new draft, or load the existing
+                       draft to update (the modal stays open after the first save). ── */
+                MJournal journal;
+                bool isNew = req.GL_Journal_ID <= 0;
+                if (isNew)
+                {
+                    journal = new MJournal(ctx, 0, trx);
+                }
+                else
+                {
+                    journal = new MJournal(ctx, req.GL_Journal_ID, trx);
+                    if (journal.Get_ID() == 0)
+                    {
+                        trx.Rollback();
+                        result.Message = Msg.GetMsg(ctx, "VIS_NoRecordFound");
+                        return result;
+                    }
+                    if (journal.GetDocStatus() != MJournal.DOCSTATUS_Drafted)
+                    {
+                        /* A completed / closed journal can no longer be edited here. */
+                        trx.Rollback();
+                        result.Message = Msg.GetMsg(ctx, "VAS_118_JournalNotDraft");
+                        return result;
+                    }
+                }
                 journal.SetClientOrg(clientId, req.AD_Org_ID);
                 journal.SetC_AcctSchema_ID(req.C_AcctSchema_ID);
                 journal.SetC_DocType_ID(req.C_DocType_ID);
@@ -482,10 +507,13 @@ namespace VASLogic.Models
                 journal.SetDateDoc(dateAcct);
                 journal.SetDateAcct(dateAcct);   /* auto-resolves C_Period_ID */
                 journal.SetDescription(req.Description);
-                journal.SetDocStatus(MJournal.DOCSTATUS_Drafted);
-                journal.SetDocAction(MJournal.DOCACTION_Complete);
-                journal.SetIsApproved(false);
-                journal.SetProcessed(false);
+                if (isNew)
+                {
+                    journal.SetDocStatus(MJournal.DOCSTATUS_Drafted);
+                    journal.SetDocAction(MJournal.DOCACTION_Complete);
+                    journal.SetIsApproved(false);
+                    journal.SetProcessed(false);
+                }
                 if (!journal.Save())
                 {
                     trx.Rollback();
@@ -493,25 +521,45 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                /* ── 5. Two balanced lines (debit 10, credit 20) ── */
-                if (!CreateLine(ctx, trx, journal, 10, clientId, req.AD_Org_ID, req.C_AcctSchema_ID,
-                        req.DebitAccount_ID, req.AD_OrgTrx_ID, amount, Env.ZERO, req.Description, result))
+                /* ── 5. The two balanced lines (debit 10, credit 20). On an update the
+                       existing lines are UPDATED in place (never deleted); on create
+                       they are new. Match by line number so debit/credit stay stable. ── */
+                MJournalLine[] existingLines = journal.GetLines(true);
+                MJournalLine debitLine = null, creditLine = null;
+                for (int i = 0; i < existingLines.Length; i++)
+                {
+                    if (existingLines[i].GetLine() == 10)
+                    {
+                        debitLine = existingLines[i];
+                    }
+                    else if (existingLines[i].GetLine() == 20)
+                    {
+                        creditLine = existingLines[i];
+                    }
+                }
+                if (debitLine == null)
+                {
+                    debitLine = new MJournalLine(journal);
+                }
+                if (creditLine == null)
+                {
+                    creditLine = new MJournalLine(journal);
+                }
+
+                if (!SaveLine(ctx, debitLine, 10, req.AD_Org_ID, req.DebitAccount_ID, req.AD_OrgTrx_ID,
+                        amount, Env.ZERO, req.Description, result))
                 {
                     trx.Rollback();
                     return result;
                 }
-                if (!CreateLine(ctx, trx, journal, 20, clientId, req.AD_Org_ID, req.C_AcctSchema_ID,
-                        req.CreditAccount_ID, req.AD_OrgTrx_ID, Env.ZERO, amount, req.Description, result))
+                if (!SaveLine(ctx, creditLine, 20, req.AD_Org_ID, req.CreditAccount_ID, req.AD_OrgTrx_ID,
+                        Env.ZERO, amount, req.Description, result))
                 {
                     trx.Rollback();
                     return result;
                 }
 
-                /* ── 6. Balance guard (server-side, decimal) ── Sum the two legs'
-                   source amounts and require debit == credit. It holds by
-                   construction here (both legs use the same schema-currency amount),
-                   and on Complete MJournal.PrepareIt re-enforces DR == CR and rolls back
-                   on any mismatch; this guards the draft path too. */
+                /* ── 6. Balance guard (server-side, decimal). ── */
                 decimal totalSourceDr = amount + Env.ZERO;   /* debit leg Dr + credit leg Dr(0) */
                 decimal totalSourceCr = Env.ZERO + amount;   /* debit leg Cr(0) + credit leg Cr */
                 if (totalSourceDr != totalSourceCr)
@@ -521,47 +569,22 @@ namespace VASLogic.Models
                     return result;
                 }
 
-                /* ── 7. Action: draft leaves it Drafted; post completes it ── */
-                bool post = string.Equals(req.Action, "complete", StringComparison.OrdinalIgnoreCase);
-                if (post)
-                {
-                    //if (!journal.ProcessIt(DocActionVariables.ACTION_COMPLETE) || journal.GetProcessMsg() != null)
-                    //{
-                    //    trx.Rollback();
-                    //    result.Message = Msg.GetMsg(ctx, "VAS_118_JournalNotPosted")
-                    //        + (journal.GetProcessMsg() != null ? " :- " + journal.GetProcessMsg() : "");
-                    //    return result;
-                    //}
-                    //if (!journal.Save())
-                    //{
-                    //    trx.Rollback();
-                    //    result.Message = Msg.GetMsg(ctx, "VAS_118_JournalNotPosted") + RetrieveError();
-                    //    return result;
-                    //}
-                    int AD_Process_ID = Util.GetValueOfInt(DB.ExecuteScalar($@"SELECT AD_Process_ID FROM AD_Column WHERE ColumnName = 'DocAction' AND IsActive='Y' AND AD_Table_ID = {MJournal.Table_ID}"));
-                    string CompletiondResult = DocumentEngine.CompleteOrReverse(ctx, MJournal.Table_Name, MJournal.Table_ID, journal.GetGL_Journal_ID(), AD_Process_ID, MJournal.DOCACTION_Complete);
-                    if (!string.IsNullOrEmpty(CompletiondResult))
-                    {
-                        result.Message = Msg.GetMsg(ctx, "VAS_118_JournalNotPosted") + CompletiondResult;
-                        return result;
-                    }
-                }
-
                 trx.Commit();
 
+                /* Draft is saved / updated — the caller keeps the modal open, shows the
+                   document number and enables Complete. Completion is a separate step
+                   (CompleteQuickJournal) so the document is committed before it posts. */
                 result.Success = true;
                 result.GL_Journal_ID = journal.GetGL_Journal_ID();
                 result.DocumentNo = journal.GetDocumentNo();
                 result.DocStatus = journal.GetDocStatus();
-                result.Message = post
-                    ? Msg.GetMsg(ctx, "VAS_118_JournalPosted")
-                    : Msg.GetMsg(ctx, "VAS_118_JournalSavedDraft");
+                result.Message = Msg.GetMsg(ctx, "VAS_118_JournalSavedDraft");
                 return result;
             }
             catch (Exception ex)
             {
                 trx.Rollback();
-                _log.Log(Level.SEVERE, "VAS_118 CreateQuickJournal", ex);
+                _log.Log(Level.SEVERE, "VAS_118 SaveQuickJournal", ex);
                 result.Message = ex.Message;
                 return result;
             }
@@ -572,53 +595,114 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Builds and saves one journal line for the given account. The account and
-        /// optional cost center are set as line dimensions; MJournalLine.BeforeSave
-        /// resolves (or creates) the C_ValidCombination from them — the standard
-        /// model path.
+        /// Completes a previously-saved DRAFT GL journal through the standard document
+        /// process (DocumentEngine.CompleteOrReverse). The draft is already committed,
+        /// so the document engine sees its header and lines. Returns the final
+        /// DocumentNo / DocStatus. When the journal is already completed it is treated
+        /// as success (idempotent).
+        /// </summary>
+        /// <param name="ctx">Session context (client / org / role).</param>
+        /// <param name="gLJournalId">GL_Journal_ID of the draft to complete.</param>
+        /// <returns><see cref="QuickJournalResponse"/> with Success, DocumentNo, DocStatus and a user message.</returns>
+        public QuickJournalResponse CompleteQuickJournal(Ctx ctx, int gLJournalId)
+        {
+            QuickJournalResponse result = new QuickJournalResponse { Success = false, FieldErrors = new Dictionary<string, string>() };
+
+            if (ctx == null || gLJournalId <= 0)
+            {
+                result.Message = Msg.GetMsg(ctx, "FillMandatory");
+                return result;
+            }
+
+            MJournal journal = new MJournal(ctx, gLJournalId, null);
+            if (journal.Get_ID() == 0 || journal.GetAD_Client_ID() != ctx.GetAD_Client_ID())
+            {
+                result.Message = Msg.GetMsg(ctx, "VIS_NoRecordFound");
+                return result;
+            }
+
+            string status = journal.GetDocStatus();
+            if (status == MJournal.DOCSTATUS_Completed || status == MJournal.DOCSTATUS_Closed)
+            {
+                /* Already completed — idempotent success. */
+                result.Success = true;
+                result.GL_Journal_ID = gLJournalId;
+                result.DocumentNo = journal.GetDocumentNo();
+                result.DocStatus = status;
+                result.Message = Msg.GetMsg(ctx, "VAS_118_JournalCompleted");
+                return result;
+            }
+            if (status != MJournal.DOCSTATUS_Drafted)
+            {
+                result.Message = Msg.GetMsg(ctx, "VAS_118_JournalNotDraft");
+                return result;
+            }
+
+            try
+            {
+                /* AD_Process_ID of the GL_Journal DocAction (Export_ID-independent: resolved
+                   from AD_Column, portable across environments). */
+                int adProcessId = Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT AD_Process_ID FROM AD_Column WHERE ColumnName = 'DocAction' AND IsActive = 'Y' AND AD_Table_ID = " + MJournal.Table_ID,
+                    null, null));
+
+                string completionMsg = DocumentEngine.CompleteOrReverse(ctx, MJournal.Table_Name, MJournal.Table_ID,
+                    gLJournalId, adProcessId, MJournal.DOCACTION_Complete);
+                if (!string.IsNullOrEmpty(completionMsg))
+                {
+                    result.Message = Msg.GetMsg(ctx, "VAS_118_JournalNotCompleted") + " " + completionMsg;
+                    return result;
+                }
+
+                /* Reload for the final document number / status. */
+                journal = new MJournal(ctx, gLJournalId, null);
+                result.Success = true;
+                result.GL_Journal_ID = gLJournalId;
+                result.DocumentNo = journal.GetDocumentNo();
+                result.DocStatus = journal.GetDocStatus();
+                result.Message = Msg.GetMsg(ctx, "VAS_118_JournalCompleted");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _log.Log(Level.SEVERE, "VAS_118 CompleteQuickJournal", ex);
+                result.Message = ex.Message;
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Sets the account, cost center and amounts on a journal line — NEW or an
+        /// EXISTING line loaded from the draft (update-in-place, no delete) — and
+        /// saves it. The account (+ optional cost center) are set as line dimensions;
+        /// MJournalLine.BeforeSave resolves / refreshes the C_ValidCombination from
+        /// them. Same currency as the schema ⇒ accounted amount equals source amount.
         /// </summary>
         /// <param name="ctx">Session context.</param>
-        /// <param name="trx">Open transaction.</param>
-        /// <param name="journal">Parent journal (already saved).</param>
+        /// <param name="line">Line to save: new MJournalLine(journal) or an existing draft line.</param>
         /// <param name="lineNo">Line number (10 debit / 20 credit).</param>
-        /// <param name="clientId">AD_Client_ID.</param>
         /// <param name="orgId">Header AD_Org_ID.</param>
-        /// <param name="schemaId">C_AcctSchema_ID.</param>
         /// <param name="accountId">Account element value (C_ElementValue_ID).</param>
-        /// <param name="orgTrxId">Optional AD_OrgTrx_ID (0 when none).</param>
+        /// <param name="orgTrxId">Cost/profit-center AD_OrgTrx_ID (0 clears any prior value).</param>
         /// <param name="amtDr">Source debit amount.</param>
         /// <param name="amtCr">Source credit amount.</param>
         /// <param name="description">Line description.</param>
         /// <param name="result">Response carrying the failure message on error.</param>
         /// <returns>True when the line saved; false (with result.Message set) otherwise.</returns>
-        private bool CreateLine(Ctx ctx, Trx trx, MJournal journal, int lineNo, int clientId, int orgId,
-            int schemaId, int accountId, int orgTrxId, decimal amtDr, decimal amtCr, string description,
-            QuickJournalResponse result)
+        private bool SaveLine(Ctx ctx, MJournalLine line, int lineNo, int orgId, int accountId,
+            int orgTrxId, decimal amtDr, decimal amtCr, string description, QuickJournalResponse result)
         {
-            /* Resolve / create the account combination (reuses an identical one). */
-            //MAccount acct = MAccount.Get(ctx, clientId, orgId, schemaId, accountId,
-            //    0, 0, 0, orgTrxId, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-            //if (acct == null || acct.Get_ID() == 0)
-            //{
-            //    result.Message = Msg.GetMsg(ctx, "VAS_118_CombinationNotCreated");
-            //    return false;
-            //}
-
-            MJournalLine line = new MJournalLine(journal);   /* inherits currency / rate / dates */
             line.SetLine(lineNo);
             line.SetDescription(description);
             line.SetAD_Org_ID(orgId);
             line.Set_ValueNoCheck("Account_ID", accountId);
-            if (orgTrxId > 0)
-            {
-                line.SetAD_OrgTrx_ID(orgTrxId);
-            }
+            line.SetAD_OrgTrx_ID(orgTrxId);   /* 0 clears any prior cost center */
+            line.SetCurrencyRate(1);
+
             line.SetAmtSourceDr(amtDr);
             line.SetAmtAcctDr(amtDr);
             line.SetAmtSourceCr(amtCr);
             line.SetAmtAcctCr(amtCr);
-            /* Same currency as the schema ⇒ accounted amount equals source amount. */
-            line.SetAmtAcct(amtDr, amtCr);
             if (!line.Save())
             {
                 result.Message = Msg.GetMsg(ctx, "VAS_118_JournalLineNotSaved") + RetrieveError();
@@ -758,6 +842,8 @@ namespace VASLogic.Models
         /// <summary>Raw Quick-Journal input from the modal (no derived accounting values).</summary>
         public class QuickJournalRequest
         {
+            /// <summary>0 to create a new draft; &gt; 0 to update that existing draft.</summary>
+            public int GL_Journal_ID { get; set; }
             public int AD_Org_ID { get; set; }
             public string DateAcct { get; set; }
             public int C_AcctSchema_ID { get; set; }
@@ -767,8 +853,6 @@ namespace VASLogic.Models
             public int CreditAccount_ID { get; set; }
             public decimal Amount { get; set; }
             public int AD_OrgTrx_ID { get; set; }
-            /// <summary>"draft" or "post".</summary>
-            public string Action { get; set; }
         }
 
         /// <summary>Quick-Journal create result.</summary>

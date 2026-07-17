@@ -68,7 +68,7 @@
     height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
 }
 /* Title sits directly above the subtitle (icon on the row above). */
-.vas-qj-card-text { display: flex; flex-direction: column; gap: 0.1em; }
+.vas-qj-card-text { display: flex; flex-direction: column; gap: 0.3em; }
 .vas-qj-card-title {
     font-weight: 400;
     color: #102C3F;
@@ -146,42 +146,18 @@
 .vas-qj-close:hover { background: rgba(0, 0, 0, 0.05); color: #141414; }
 .vas-qj-close svg { width: 1.125em; height: 1.125em; }
 
-.vas-qj-body { padding: 1.125em 1.5em 1.25em; display: flex; flex-direction: column; gap: 1.15em; }
-.vas-qj-row { display: flex; gap: 1.75em; }
+.vas-qj-body { padding: 1.125em 1.5em 1.25em; display: flex; flex-direction: column; gap: 0.9em; }
+.vas-qj-row { display: flex; gap: 1.5em; }
 
-/* Field = [icon box] + (label over control) with a bottom underline (image_2). */
-.vas-qj-field {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.75em;
-    border-bottom: 1px solid #E1E7EE;
-    padding-bottom: 0.35em;
-    transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-.vas-qj-field.vas-qj-field-multiline { align-items: flex-start; }
-.vas-qj-field:focus-within { border-bottom-color: #0083DA; box-shadow: 0 1px 0 0 #0083DA; }
-.vas-qj-field.vas-qj-invalid { border-bottom-color: #ED1C24; box-shadow: 0 1px 0 0 #ED1C24; }
-
-.vas-qj-field-ico {
-    width: 2.5em; height: 2.5em;
-    border-radius: 8px;
-    background: #F1F4F7;
-    color: #8A97A6;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-}
-.vas-qj-field-ico svg { width: 1.25em; height: 1.25em; }
-.vas-qj-field-ico i { font-size: 1.2em; line-height: 1; }
-.vas-qj-field-multiline .vas-qj-field-ico { margin-top: 0.1em; }
-.vas-qj-field.vas-qj-invalid .vas-qj-field-ico { background: #FBE9EA; color: #D14545; }
-
-.vas-qj-field-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.05em; }
-.vas-qj-field-main > label {
+/* Field (VAS_065 pattern): label on top, then a .vas-qj-control row that holds a
+   plain inline icon before the input, with a bottom underline. */
+.vas-qj-field { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vas-qj-field > label {
     font-size: 0.7em;
     font-weight: 500;
     color: #6B7C8C;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.15em;
     display: flex; align-items: center; gap: 0.4em;
 }
 .vas-qj-req { color: #ED1C24; }
@@ -189,43 +165,60 @@
 .vas-qj-dr-dot { background: #20A464; }
 .vas-qj-cr-dot { background: #0083DA; }
 
-.vas-qj-field-main input,
-.vas-qj-field-main select,
-.vas-qj-field-main textarea,
-.vas-qj-field-main .vas-qj-combo-input {
-    font-family: inherit;
-    font-size: 0.95em;
-    font-weight: 500;
-    color: #141414;
+.vas-qj-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
     border: none;
+    border-bottom: 1px solid #E1E7EE;
+    border-radius: 0;
     background: transparent;
-    box-shadow: none !important;
-    padding: 0.15em 0;
-    width: 100%;
-    outline: none;
+    padding: 0 0.1em;
+    min-height: 2.5em;
+    transition: border-color 0.15s ease;
 }
-.vas-qj-field-main input::placeholder,
-.vas-qj-field-main textarea::placeholder { color: #A6B2BE; font-weight: 400; }
+.vas-qj-control:focus-within { border-bottom-color: #0083DA; }
+.vas-qj-field.vas-qj-invalid .vas-qj-control { border-bottom-color: #ED1C24; }
+.vas-qj-field-multiline .vas-qj-control { align-items: flex-start; padding-top: 0.4em; }
 
-/* Selects and the account combo read as dropdowns (chevron on the right). */
-.vas-qj-field-main select,
-.vas-qj-field-main .vas-qj-combo-input {
+/* Plain inline field icon (no box) — muted, sits before the input. */
+.vas-qj-field-ic { flex-shrink: 0; width: 1.15em; text-align: center; color: #8A97A6; font-size: 1em; }
+.vas-qj-field.vas-qj-invalid .vas-qj-field-ic { color: #D14545; }
+
+.vas-qj-field input,
+.vas-qj-field select,
+.vas-qj-field textarea,
+.vas-qj-combo-input {
+    border: none; outline: none; background: none; box-shadow: none !important;
+    font-family: inherit; font-size: 0.95em; font-weight: 400; color: #141414;
+    width: 100%; padding: 0.15em 0;
+}
+.vas-qj-field input::placeholder,
+.vas-qj-field textarea::placeholder { color: #A6B2BE; font-weight: 400; }
+
+/* Native date (VAS_065): hide the native indicator/spinner; the whole control
+   opens the picker on click (wired in JS). */
+.vas-qj-field input[type="date"] { -moz-appearance: textfield; appearance: textfield; cursor: pointer; }
+.vas-qj-field input[type="date"]::-webkit-calendar-picker-indicator { display: none; }
+.vas-qj-field input[type="date"]::-webkit-inner-spin-button { display: none; }
+
+/* Selects and the account combo show a dropdown chevron. */
+.vas-qj-field select,
+.vas-qj-combo-input {
     appearance: none; -webkit-appearance: none; cursor: pointer;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%235F7283' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 0 center;
-    padding-right: 1.4em;
+    background-repeat: no-repeat; background-position: right 0 center; padding-right: 1.3em;
 }
 
 /* Description multi-line */
-.vas-qj-desc { min-height: 3.5em; resize: vertical; line-height: 1.4; }
+.vas-qj-desc { min-height: 3em; resize: vertical; line-height: 1.4; }
 
-/* Amount — inline currency symbol + number, no boxed prefix (image_2). */
-.vas-qj-amount { display: flex; align-items: baseline; gap: 0.35em; }
+/* Amount — inline currency symbol + number. */
 .vas-qj-cur { color: #5F7283; font-size: 0.85em; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
 .vas-qj-amount-input { font-variant-numeric: tabular-nums; }
 
-/* Searchable account combobox */
-.vas-qj-combo { position: relative; }
+/* Searchable account combobox fills the control width. */
+.vas-qj-combo { position: relative; flex: 1; min-width: 0; }
 .vas-qj-combo-list {
     position: absolute;
     top: calc(100% + 4px); left: 0; right: 0;
@@ -270,6 +263,17 @@
     font-weight: 600; color: #0B6B45;
 }
 .vas-qj-balanced svg { width: 0.95em; height: 0.95em; }
+
+/* Saved-draft status strip (shows the document number). */
+.vas-qj-status {
+    font-size: 0.8em;
+    font-weight: 500;
+    color: #0069AE;
+    background: #EAF6FF;
+    border: 1px solid #CFE9FF;
+    border-radius: 8px;
+    padding: 0.5em 0.75em;
+}
 
 /* General error banner */
 .vas-qj-general-err {

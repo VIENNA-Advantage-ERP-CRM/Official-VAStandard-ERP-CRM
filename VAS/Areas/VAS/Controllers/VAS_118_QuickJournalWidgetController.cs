@@ -111,9 +111,9 @@ namespace VAS.Controllers
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult CreateQuickJournal(int adOrgId = 0, string dateAcct = "", int cAcctSchemaId = 0,
+        public JsonResult CreateQuickJournal(int glJournalId = 0, int adOrgId = 0, string dateAcct = "", int cAcctSchemaId = 0,
             int cDocTypeId = 0, string description = "", int debitAccountId = 0, int creditAccountId = 0,
-            string amount = "", int adOrgTrxId = 0, string action = "draft")
+            string amount = "", int adOrgTrxId = 0)
         {
             string retJSON = "";
             if (Session["ctx"] != null)
@@ -128,6 +128,7 @@ namespace VAS.Controllers
 
                 VAS_118_QuickJournalModel.QuickJournalRequest req = new VAS_118_QuickJournalModel.QuickJournalRequest
                 {
+                    GL_Journal_ID = glJournalId,
                     AD_Org_ID = adOrgId,
                     DateAcct = dateAcct,
                     C_AcctSchema_ID = cAcctSchemaId,
@@ -136,12 +137,32 @@ namespace VAS.Controllers
                     DebitAccount_ID = debitAccountId,
                     CreditAccount_ID = creditAccountId,
                     Amount = parsedAmount,
-                    AD_OrgTrx_ID = adOrgTrxId,
-                    Action = action
+                    AD_OrgTrx_ID = adOrgTrxId
                 };
 
                 VAS_118_QuickJournalModel model = new VAS_118_QuickJournalModel();
-                retJSON = JsonConvert.SerializeObject(model.CreateQuickJournal(ctx, req));
+                retJSON = JsonConvert.SerializeObject(model.SaveQuickJournal(ctx, req));
+            }
+            return Json(retJSON);
+        }
+
+        /// <summary>
+        /// Completes a previously-saved DRAFT GL journal (the modal's kept
+        /// GL_Journal_ID) through the standard document process.
+        /// </summary>
+        /// <param name="glJournalId">GL_Journal_ID of the draft to complete.</param>
+        /// <returns>JSON-serialized QuickJournalResponse, or "" when no session.</returns>
+        [HttpPost]
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult CompleteQuickJournal(int glJournalId = 0)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_118_QuickJournalModel model = new VAS_118_QuickJournalModel();
+                retJSON = JsonConvert.SerializeObject(model.CompleteQuickJournal(ctx, glJournalId));
             }
             return Json(retJSON);
         }

@@ -36,6 +36,13 @@
  * 25  | The journal could not be saved.                  | VAS_118_JournalNotSaved
  * 26  | Journal {0} saved as draft.                      | VAS_118_JournalSavedDraft
  * 27  | Journal {0} Complete successfully.               | VAS_118_JournalComplete
+ * 28  | Search organization                              | VAS_118_SearchOrg
+ * 29  | Search accounting schema                         | VAS_118_SearchSchema
+ * 30  | Search document type                             | VAS_118_SearchDocType
+ * 31  | Search cost center                               | VAS_118_SearchCostCenter
+ * 32  | Draft                                            | VAS_118_Draft
+ * 33  | Completed                                        | VAS_118_Completed
+ * 34  | Closed                                           | VAS_118_Closed
  */
 ; VAS = window.VAS || {};
 
@@ -67,6 +74,9 @@
         var $dialog = null;
 
         /* Lookup state */
+        var orgs = [];
+        var docTypes = [];
+        var costCenters = [];
         var schemas = [];
         var schemasById = {};
         var currentSchema = null;
@@ -75,6 +85,8 @@
         var currencyIso = '';
         var submitting = false;
         var acctSearchTimer = null;
+        var currentJournalId = 0;   /* > 0 once saved as draft; the modal stays open on it */
+        var savedSnapshot = '';     /* JSON of the field values at the last save (dirty check) */
 
         /* ---------------- helpers ---------------- */
 
@@ -127,16 +139,6 @@
             return currencySymbol.length === 3 ? (text + ' ' + currencySymbol) : (currencySymbol + text);
         }
 
-        function populateSelect($sel, items, valKey, textKey, includeBlank) {
-            /* Only optional controls (Cost center) carry a leading blank option;
-               mandatory controls default to a real selected value. */
-            var html = includeBlank ? '<option value=""></option>' : '';
-            for (var i = 0; i < items.length; i++) {
-                html += '<option value="' + escapeHtml(items[i][valKey]) + '">' + escapeHtml(items[i][textKey]) + '</option>';
-            }
-            $sel.html(html);
-        }
-
         function markInvalid($el, on) {
             /* The invalid state lives on the field wrapper (red underline + icon). */
             $el.closest('.vas-qj-field').toggleClass('vas-qj-invalid', !!on);
@@ -164,45 +166,41 @@
 
         /* ---------------- modal ---------------- */
 
-        /* Field icons — FontAwesome (fa) + VIS (vis) icon fonts loaded by the host
-           shell. Organization / Cost center = fa-university, Journal date =
-           fa-calendar, Accounting Schema = vis-open-book, Document Type =
-           fa-file-text, Description = vis-file-text, Debit/Credit = vis-move-doc,
-           Amount = fa-money. */
+        /* Field icon CLASSES — FontAwesome (fa) + VIS (vis) icon fonts loaded by the
+           host shell, rendered as a plain inline <i> inside the control (no box),
+           the VAS_065_APInvoicePanel pattern. */
         var ICON = {
-            org: '<i class="fa fa-university" aria-hidden="true"></i>',
-            calendar: '<i class="fa fa-calendar" aria-hidden="true"></i>',
-            book: '<i class="vis vis-open-book" aria-hidden="true"></i>',
-            file: '<i class="fa fa-file-text" aria-hidden="true"></i>',
-            note: '<i class="vis vis-file-text" aria-hidden="true"></i>',
-            money: '<i class="vis vis-move-doc" aria-hidden="true"></i>',
-            calc: '<i class="fa fa-money" aria-hidden="true"></i>',
-            costcenter: '<i class="fa fa-university" aria-hidden="true"></i>'
+            org: 'fa fa-university',
+            calendar: 'fa fa-calendar',
+            book: 'vis vis-open-book',
+            file: 'fa fa-file-text',
+            note: 'vis vis-file-text',
+            money: 'vis vis-move-doc',
+            calc: 'fa fa-money',
+            costcenter: 'fa fa-university'
         };
 
         function reqStar(required) { return required ? ' <span class="vas-qj-req">*</span>' : ''; }
 
-        /* One field = [icon box] + (label over control), with a bottom underline. */
-        function fieldWrap(iconSvg, labelHtml, controlHtml, extraClass) {
+        /* One field (VAS_065 style) = label on top, then a .vas-qj-control row that
+           holds a plain <i> icon before the input, with a bottom underline. */
+        function fieldWrap(iconCls, labelHtml, controlHtml, extraClass) {
             return '<div class="vas-qj-field ' + (extraClass || '') + '">' +
-                '<span class="vas-qj-field-ico">' + iconSvg + '</span>' +
-                '<div class="vas-qj-field-main">' +
                 '<label>' + labelHtml + '</label>' +
+                '<div class="vas-qj-control">' +
+                '<i class="vas-qj-field-ic ' + iconCls + '" aria-hidden="true"></i>' +
                 controlHtml +
                 '</div>' +
                 '</div>';
         }
 
-        function fieldSelect(iconKey, fieldClass, labelText, required) {
-            return fieldWrap(ICON[iconKey], escapeHtml(labelText) + reqStar(required),
-                '<select class="' + fieldClass + '"></select>');
-        }
-
-        function fieldCombo(iconKey, fieldClass, dotClass, labelText) {
-            return fieldWrap(ICON[iconKey],
-                '<span class="' + dotClass + '"></span> ' + escapeHtml(labelText) + reqStar(true),
+        /* Every picker (organization, schema, document type, cost center, debit,
+           credit) is the same type-to-filter combobox. labelHtml is pre-built by the
+           caller (it may include a debit/credit colour dot). */
+        function fieldCombo(iconKey, fieldClass, labelHtml, placeholder, required) {
+            return fieldWrap(ICON[iconKey], labelHtml + reqStar(required),
                 '<div class="vas-qj-combo ' + fieldClass + '">' +
-                '<input type="text" class="vas-qj-combo-input" autocomplete="off" placeholder="' + escapeHtml(lbl("VAS_118_SearchAccount", "Search account by code or name")) + '" />' +
+                '<input type="text" class="vas-qj-combo-input" autocomplete="off" placeholder="' + escapeHtml(placeholder) + '" />' +
                 '<input type="hidden" class="vas-qj-combo-id" value="" />' +
                 '<div class="vas-qj-combo-list vas-qj-hidden"></div>' +
                 '</div>');
@@ -227,17 +225,18 @@
                 '</div>' +
 
                 '<div class="vas-qj-body">' +
+                '<div class="vas-qj-status vas-qj-hidden"></div>' +
                 '<div class="vas-qj-general-err vas-qj-hidden"></div>' +
 
                 '<div class="vas-qj-row">' +
-                fieldSelect('org', 'vas-qj-org', lbl("VAS_118_Organization", "Organization"), true) +
+                fieldCombo('org', 'vas-qj-org', escapeHtml(lbl("VAS_118_Organization", "Organization")), lbl("VAS_118_SearchOrg", "Search organization"), true) +
                 fieldWrap(ICON.calendar, escapeHtml(lbl("VAS_118_JournalDate", "Journal date")) + reqStar(true),
                     '<input type="date" class="vas-qj-date" />') +
                 '</div>' +
 
                 '<div class="vas-qj-row">' +
-                fieldSelect('book', 'vas-qj-schema', lbl("VAS_118_AccountingSchema", "Accounting Schema"), true) +
-                fieldSelect('file', 'vas-qj-doctype', lbl("VAS_118_DocumentType", "Document Type"), true) +
+                fieldCombo('book', 'vas-qj-schema', escapeHtml(lbl("VAS_118_AccountingSchema", "Accounting Schema")), lbl("VAS_118_SearchSchema", "Search accounting schema"), true) +
+                fieldCombo('file', 'vas-qj-doctype', escapeHtml(lbl("VAS_118_DocumentType", "Document Type")), lbl("VAS_118_SearchDocType", "Search document type"), true) +
                 '</div>' +
 
                 fieldWrap(ICON.note, escapeHtml(lbl("VAS_118_Description", "Description / narration")) + reqStar(true),
@@ -245,15 +244,15 @@
                     'vas-qj-field-multiline') +
 
                 '<div class="vas-qj-row">' +
-                fieldCombo('money', 'vas-qj-debit', 'vas-qj-dr-dot', lbl("VAS_118_DebitAccount", "Debit account")) +
-                fieldCombo('money', 'vas-qj-credit', 'vas-qj-cr-dot', lbl("VAS_118_CreditAccount", "Credit account")) +
+                fieldCombo('money', 'vas-qj-debit', '<span class="vas-qj-dr-dot"></span> ' + escapeHtml(lbl("VAS_118_DebitAccount", "Debit account")), lbl("VAS_118_SearchAccount", "Search account by code or name"), true) +
+                fieldCombo('money', 'vas-qj-credit', '<span class="vas-qj-cr-dot"></span> ' + escapeHtml(lbl("VAS_118_CreditAccount", "Credit account")), lbl("VAS_118_SearchAccount", "Search account by code or name"), true) +
                 '</div>' +
 
                 '<div class="vas-qj-row">' +
                 fieldWrap(ICON.calc, escapeHtml(lbl("VAS_118_Amount", "Amount")) + reqStar(true),
-                    '<div class="vas-qj-amount"><span class="vas-qj-cur"></span>' +
-                    '<input type="text" class="vas-qj-amount-input" inputmode="decimal" placeholder="0.00" /></div>') +
-                fieldSelect('costcenter', 'vas-qj-costcenter', lbl("VAS_118_CostCenter", "Cost center"), false) +
+                    '<span class="vas-qj-cur"></span>' +
+                    '<input type="text" class="vas-qj-amount-input" inputmode="decimal" placeholder="0.00" />') +
+                fieldCombo('costcenter', 'vas-qj-costcenter', escapeHtml(lbl("VAS_118_CostCenter", "Cost center")), lbl("VAS_118_SearchCostCenter", "Search cost center"), false) +
                 '</div>' +
 
                 '<div class="vas-qj-preview">' +
@@ -270,7 +269,7 @@
                 '<button type="button" class="vas-qj-btn vas-qj-btn-ghost vas-qj-cancel">' + escapeHtml(lbl("VAS_118_Cancel", "Cancel")) + '</button>' +
                 '<div class="vas-qj-foot-actions">' +
                 '<button type="button" class="vas-qj-btn vas-qj-btn-secondary vas-qj-draft">' + escapeHtml(lbl("VAS_118_SaveDraft", "Save draft")) + '</button>' +
-                '<button type="button" class="vas-qj-btn vas-qj-btn-primary vas-qj-post">' + escapeHtml(lbl("VAS_118_CompleteJournal", "Complete journal")) + '</button>' +
+                '<button type="button" class="vas-qj-btn vas-qj-btn-primary vas-qj-post" disabled>' + escapeHtml(lbl("VAS_118_CompleteJournal", "Complete journal")) + '</button>' +
                 '</div>' +
                 '</div>' +
 
@@ -279,15 +278,36 @@
                 '</div>'
             );
 
-            $dialog.find('.vas-qj-scrim, .vas-qj-close, .vas-qj-cancel').on('click', closeDialog);
-            $dialog.find('.vas-qj-org').on('change', onOrgChange);
-            $dialog.find('.vas-qj-schema').on('change', onSchemaChange);
+            /* Do NOT close on scrim (outside) click — only the X and Cancel close it. */
+            $dialog.find('.vas-qj-close, .vas-qj-cancel').on('click', closeDialog);
             $dialog.find('.vas-qj-amount-input').on('input', updateBalance);
-            $dialog.find('.vas-qj-draft').on('click', function () { submit('draft'); });
-            $dialog.find('.vas-qj-post').on('click', function () { submit('complete'); });
+            $dialog.find('.vas-qj-draft').on('click', onSaveDraft);
+            $dialog.find('.vas-qj-post').on('click', onComplete);
 
-            setupCombo($dialog.find('.vas-qj-debit'));
-            setupCombo($dialog.find('.vas-qj-credit'));
+            /* Type-to-filter comboboxes. Organization / Schema / Document Type / Cost
+               center filter a pre-loaded list client-side; Debit / Credit search the
+               schema's accounts on the server. */
+            setupCombo($dialog.find('.vas-qj-org'), staticProvider(function () { return orgs; }), onOrgChange);
+            setupCombo($dialog.find('.vas-qj-schema'), staticProvider(function () { return schemas; }), onSchemaChange);
+            setupCombo($dialog.find('.vas-qj-doctype'), staticProvider(function () { return docTypes; }), null);
+            setupCombo($dialog.find('.vas-qj-costcenter'), staticProvider(function () { return costCenters; }), null);
+            setupCombo($dialog.find('.vas-qj-debit'), accountProvider, null);
+            setupCombo($dialog.find('.vas-qj-credit'), accountProvider, null);
+
+            /* Native date control (VAS_065 pattern): the native right-side indicator
+               is hidden in CSS; clicking anywhere on the field opens the picker.
+               showPicker() must run from a user gesture. */
+            $dialog.find('.vas-qj-control').each(function () {
+                var $ctrl = $(this);
+                var dateInput = $ctrl.find('input[type="date"]')[0];
+                if (dateInput) {
+                    $ctrl.on('click', function () {
+                        if (typeof dateInput.showPicker === 'function') {
+                            try { dateInput.showPicker(); } catch (e) { /* unsupported */ }
+                        }
+                    });
+                }
+            });
 
             $('body').append($dialog);
         }
@@ -308,14 +328,18 @@
         }
 
         function resetForm() {
-            $dialog.find('select').val('');
             $dialog.find('.vas-qj-desc, .vas-qj-amount-input').val('');
             $dialog.find('.vas-qj-combo-input').val('');
             $dialog.find('.vas-qj-combo-id').val('');
             $dialog.find('.vas-qj-combo-list').addClass('vas-qj-hidden').empty();
             $dialog.find('.vas-qj-invalid').removeClass('vas-qj-invalid');
             $dialog.find('.vas-qj-general-err').addClass('vas-qj-hidden').empty();
+            $dialog.find('.vas-qj-status').addClass('vas-qj-hidden').empty();
             currentSchema = null; precision = 2; currencySymbol = ''; currencyIso = '';
+            currentJournalId = 0; savedSnapshot = '';
+            /* Fresh entry: Complete is disabled until the draft is saved. */
+            $dialog.find('.vas-qj-draft').prop('disabled', false);
+            $dialog.find('.vas-qj-post').prop('disabled', true);
             $dialog.find('.vas-qj-cur').text('');
             updateBalance();
         }
@@ -337,16 +361,15 @@
                     schemas = data.Schemas || [];
                     schemasById = {};
                     for (var i = 0; i < schemas.length; i++) { schemasById[schemas[i].Id] = schemas[i]; }
+                    orgs = data.Organizations || [];
+                    docTypes = data.DocTypes || [];
 
-                    /* Mandatory selects carry NO blank option — they default to a
-                       real value: Organization = the login org (when > 0), Accounting
-                       Schema = the client's primary schema, Document Type = first. */
-                    populateSelect($dialog.find('.vas-qj-org'), data.Organizations || [], 'Id', 'Name', false);
-                    populateSelect($dialog.find('.vas-qj-schema'), schemas, 'Id', 'Name', false);
-                    populateSelect($dialog.find('.vas-qj-doctype'), data.DocTypes || [], 'Id', 'Name', false);
-
-                    if (data.DefaultOrgId > 0) { $dialog.find('.vas-qj-org').val(String(data.DefaultOrgId)); }
-                    if (data.DefaultSchemaId > 0) { $dialog.find('.vas-qj-schema').val(String(data.DefaultSchemaId)); }
+                    /* Pre-fill the type-to-filter combos with real defaults: Organization
+                       = login org (when > 0), Accounting Schema = primary schema,
+                       Document Type = first. Cost center stays blank (optional). */
+                    presetCombo('.vas-qj-org', findById(orgs, data.DefaultOrgId));
+                    presetCombo('.vas-qj-schema', findById(schemas, data.DefaultSchemaId));
+                    presetCombo('.vas-qj-doctype', docTypes.length ? docTypes[0] : null);
                     if (data.Today) { $dialog.find('.vas-qj-date').val(data.Today); }
 
                     /* Resolve currency + enable the debit/credit account pickers for the
@@ -363,23 +386,38 @@
                 url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/GetCostCenters',
                 type: 'GET',
                 cache: false,
-                success: function (res) {
-                    var list = parseResponse(res) || [];
-                    populateSelect($dialog.find('.vas-qj-costcenter'), list, 'Id', 'Name', true);
-                }
+                success: function (res) { costCenters = parseResponse(res) || []; }
             });
         }
 
+        /* Finds a { Id, Name } item by id in a loaded list. */
+        function findById(list, id) {
+            for (var i = 0; i < (list || []).length; i++) {
+                if (Number(list[i].Id) === Number(id)) { return list[i]; }
+            }
+            return null;
+        }
+
+        /* Presets a combo to a { Id, Name } item (or clears it when null). */
+        function presetCombo(sel, obj) {
+            var $c = $dialog.find(sel);
+            if (obj) {
+                $c.find('.vas-qj-combo-input').val(obj.Name);
+                $c.find('.vas-qj-combo-id').val(obj.Id);
+            } else {
+                clearCombo($c);
+            }
+        }
+
         function onOrgChange() {
-            /* Cost centers are role/client scoped, not org-specific here, but the
-               spec clears dependent selections on org change. */
-            $dialog.find('.vas-qj-costcenter').val('');
+            /* Clear dependent picks on organization change. */
+            clearCombo($dialog.find('.vas-qj-costcenter'));
             clearCombo($dialog.find('.vas-qj-debit'));
             clearCombo($dialog.find('.vas-qj-credit'));
         }
 
         function onSchemaChange() {
-            var id = Number($dialog.find('.vas-qj-schema').val() || 0);
+            var id = Number($dialog.find('.vas-qj-schema .vas-qj-combo-id').val() || 0);
             currentSchema = schemasById[id] || null;
             precision = currentSchema ? Number(currentSchema.Precision || 2) : 2;
             currencySymbol = currentSchema ? (currentSchema.CurrencySymbol || '') : '';
@@ -391,23 +429,29 @@
             updateBalance();
         }
 
-        /* ---------------- account combobox ---------------- */
+        /* ---------------- combobox (type-to-filter) ---------------- */
 
-        function setupCombo($combo) {
+        /* Wires a combo to a provider(term, cb) that yields [{ id, label, html? }].
+           onSelect (optional) fires after the user picks an item. */
+        function setupCombo($combo, provider, onSelect) {
             var $input = $combo.find('.vas-qj-combo-input');
             var $id = $combo.find('.vas-qj-combo-id');
             var $list = $combo.find('.vas-qj-combo-list');
 
-            /* Click / focus opens the list (empty term => first page of accounts). */
-            $input.on('focus click', function () {
-                scheduleAccountSearch($combo, $input.val());
-            });
-            /* Typing invalidates a prior pick and re-searches. */
-            $input.on('input', function () {
-                $id.val('');
-                markInvalid($combo, false);
-                scheduleAccountSearch($combo, $input.val());
-            });
+            function render(items) {
+                if (!items || !items.length) { $list.addClass('vas-qj-hidden').empty(); return; }
+                var html = '';
+                for (var i = 0; i < items.length; i++) {
+                    html += '<div class="vas-qj-combo-item" data-id="' + escapeHtml(items[i].id) + '" data-label="' + escapeHtml(items[i].label) + '">' +
+                        (items[i].html || escapeHtml(items[i].label)) + '</div>';
+                }
+                $list.html(html).removeClass('vas-qj-hidden');
+            }
+
+            /* Click / focus opens the list (empty term => all / first page). */
+            $input.on('focus click', function () { provider($input.val(), render); });
+            /* Typing invalidates a prior pick and re-filters. */
+            $input.on('input', function () { $id.val(''); markInvalid($combo, false); provider($input.val(), render); });
 
             $list.on('mousedown', '.vas-qj-combo-item', function (e) {
                 e.preventDefault();
@@ -415,6 +459,7 @@
                 $id.val($item.attr('data-id'));
                 $input.val($item.attr('data-label'));
                 $list.addClass('vas-qj-hidden').empty();
+                if (onSelect) { onSelect(); }
             });
 
             $input.on('blur', function () {
@@ -428,33 +473,45 @@
             $combo.find('.vas-qj-combo-list').addClass('vas-qj-hidden').empty();
         }
 
-        function scheduleAccountSearch($combo, term) {
-            if (acctSearchTimer) { clearTimeout(acctSearchTimer); }
-            if (!currentSchema) { return; }
-            acctSearchTimer = setTimeout(function () { loadComboAccounts($combo, term); }, 220);
+        /* Client-side filter over a pre-loaded list of { Id, Name }. */
+        function staticProvider(getRaw) {
+            return function (term, cb) {
+                var t = $.trim(term || '').toLowerCase();
+                var raw = getRaw() || [];
+                var out = [];
+                for (var i = 0; i < raw.length; i++) {
+                    var label = String(raw[i].Name == null ? '' : raw[i].Name);
+                    if (!t || label.toLowerCase().indexOf(t) >= 0) { out.push({ id: raw[i].Id, label: label }); }
+                }
+                cb(out);
+            };
         }
 
-        function loadComboAccounts($combo, term) {
-            var $list = $combo.find('.vas-qj-combo-list');
-            $.ajax({
-                url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/GetAccounts',
-                type: 'GET',
-                cache: false,
-                data: { cAcctSchemaId: currentSchema.Id, search: term || '', pageNo: 1 },
-                success: function (res) {
-                    var list = parseResponse(res) || [];
-                    if (!list.length) { $list.addClass('vas-qj-hidden').empty(); return; }
-                    var html = '';
-                    for (var i = 0; i < list.length; i++) {
-                        var label = list[i].Code + ' · ' + list[i].Name;
-                        html += '<div class="vas-qj-combo-item" data-id="' + escapeHtml(list[i].Id) + '" data-label="' + escapeHtml(label) + '">' +
-                            '<span class="vas-qj-acct-code">' + escapeHtml(list[i].Code) + '</span> ' +
-                            '<span class="vas-qj-acct-name">' + escapeHtml(list[i].Name) + '</span>' +
-                            '</div>';
-                    }
-                    $list.html(html).removeClass('vas-qj-hidden');
-                }
-            });
+        /* Server-side account search (debounced), scoped to the chosen schema. */
+        function accountProvider(term, cb) {
+            if (!currentSchema) { cb([]); return; }
+            if (acctSearchTimer) { clearTimeout(acctSearchTimer); }
+            acctSearchTimer = setTimeout(function () {
+                $.ajax({
+                    url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/GetAccounts',
+                    type: 'GET',
+                    cache: false,
+                    data: { cAcctSchemaId: currentSchema.Id, search: term || '', pageNo: 1 },
+                    success: function (res) {
+                        var list = parseResponse(res) || [];
+                        var out = [];
+                        for (var i = 0; i < list.length; i++) {
+                            out.push({
+                                id: list[i].Id,
+                                label: list[i].Code + ' · ' + list[i].Name,
+                                html: '<span class="vas-qj-acct-code">' + escapeHtml(list[i].Code) + '</span> <span class="vas-qj-acct-name">' + escapeHtml(list[i].Name) + '</span>'
+                            });
+                        }
+                        cb(out);
+                    },
+                    error: function () { cb([]); }
+                });
+            }, 220);
         }
 
         /* ---------------- balance preview ---------------- */
@@ -481,10 +538,10 @@
             var $credit = $dialog.find('.vas-qj-credit');
             var $amount = $dialog.find('.vas-qj-amount-input');
 
-            req($org, Number($org.val() || 0) > 0);
+            req($org, Number($org.find('.vas-qj-combo-id').val() || 0) > 0);
             req($date, !!$date.val());
-            req($schema, Number($schema.val() || 0) > 0);
-            req($doctype, Number($doctype.val() || 0) > 0);
+            req($schema, Number($schema.find('.vas-qj-combo-id').val() || 0) > 0);
+            req($doctype, Number($doctype.find('.vas-qj-combo-id').val() || 0) > 0);
             req($desc, !!$.trim($desc.val()));
             var debitId = Number($debit.find('.vas-qj-combo-id').val() || 0);
             var creditId = Number($credit.find('.vas-qj-combo-id').val() || 0);
@@ -499,58 +556,122 @@
             $dialog.find('.vas-qj-general-err').text(msg || '').removeClass('vas-qj-hidden');
         }
 
-        function submit(action) {
-            if (submitting) { return; }
-            $dialog.find('.vas-qj-general-err').addClass('vas-qj-hidden').empty();
-            if (!validate()) {
-                showGeneralError(lbl("FillMandatory", "Please fill all mandatory fields."));
-                return;
-            }
+        /* Current field values — the create/update payload and the dirty snapshot. */
+        function collectValues() {
+            return {
+                adOrgId: Number($dialog.find('.vas-qj-org .vas-qj-combo-id').val() || 0),
+                dateAcct: $dialog.find('.vas-qj-date').val(),
+                cAcctSchemaId: Number($dialog.find('.vas-qj-schema .vas-qj-combo-id').val() || 0),
+                cDocTypeId: Number($dialog.find('.vas-qj-doctype .vas-qj-combo-id').val() || 0),
+                description: $.trim($dialog.find('.vas-qj-desc').val()),
+                debitAccountId: Number($dialog.find('.vas-qj-debit .vas-qj-combo-id').val() || 0),
+                creditAccountId: Number($dialog.find('.vas-qj-credit .vas-qj-combo-id').val() || 0),
+                amount: String(parseAmount($dialog.find('.vas-qj-amount-input').val())),
+                adOrgTrxId: Number($dialog.find('.vas-qj-costcenter .vas-qj-combo-id').val() || 0)
+            };
+        }
 
-            submitting = true;
-            var $draft = $dialog.find('.vas-qj-draft');
-            var $complete = $dialog.find('.vas-qj-post');
-            $draft.prop('disabled', true);
-            $complete.prop('disabled', true);
-            showBusy(true);
+        function isDirty() { return JSON.stringify(collectValues()) !== savedSnapshot; }
 
-            var amt = parseAmount($dialog.find('.vas-qj-amount-input').val());
+        /* Disable both buttons while a request is in flight; when idle, Complete is
+           enabled only once a draft exists. */
+        function setBusy(on) {
+            submitting = on;
+            $dialog.find('.vas-qj-draft').prop('disabled', on);
+            $dialog.find('.vas-qj-post').prop('disabled', on || currentJournalId <= 0);
+            showBusy(on);
+        }
 
+        /* Draft / status strip: "Draft · GJ-000123". */
+        function showStatus(docStatus, docNo) {
+            var label = docStatus === 'CO' ? lbl("VAS_118_Completed", "Completed")
+                : docStatus === 'CL' ? lbl("VAS_118_Closed", "Closed")
+                    : lbl("VAS_118_Draft", "Draft");
+            $dialog.find('.vas-qj-status')
+                .text(label + (docNo ? ' · ' + docNo : ''))
+                .removeClass('vas-qj-hidden');
+        }
+
+        /* Creates the draft (currentJournalId == 0) or updates it. cb(ok, data). */
+        function postSave(cb) {
+            var values = collectValues();
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/CreateQuickJournal',
                 type: 'POST',
-                data: {
-                    adOrgId: Number($dialog.find('.vas-qj-org').val() || 0),
-                    dateAcct: $dialog.find('.vas-qj-date').val(),
-                    cAcctSchemaId: Number($dialog.find('.vas-qj-schema').val() || 0),
-                    cDocTypeId: Number($dialog.find('.vas-qj-doctype').val() || 0),
-                    description: $.trim($dialog.find('.vas-qj-desc').val()),
-                    debitAccountId: Number($dialog.find('.vas-qj-debit').find('.vas-qj-combo-id').val() || 0),
-                    creditAccountId: Number($dialog.find('.vas-qj-credit').find('.vas-qj-combo-id').val() || 0),
-                    amount: String(amt),                 /* invariant decimal string */
-                    adOrgTrxId: Number($dialog.find('.vas-qj-costcenter').val() || 0),
-                    action: action
-                },
+                data: $.extend({ glJournalId: currentJournalId }, values),
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data && data.Success) {
-                        closeDialog();
-                        VIS.ADialog.info ? VIS.ADialog.info("", false, data.Message, "") : alert(data.Message);
-                        $self.refreshWidget();
+                        currentJournalId = Number(data.GL_Journal_ID || 0);
+                        savedSnapshot = JSON.stringify(values);
+                        showStatus(data.DocStatus, data.DocumentNo);
+                        cb(true, data);
                     } else {
                         applyFieldErrors(data && data.FieldErrors);
                         showGeneralError((data && data.Message) || lbl("VAS_118_JournalNotSaved", "The journal could not be saved."));
+                        cb(false, data);
                     }
                 },
                 error: function () {
                     showGeneralError(lbl("VAS_118_JournalNotSaved", "The journal could not be saved."));
-                },
-                complete: function () {
-                    submitting = false;
-                    $draft.prop('disabled', false); $complete.prop('disabled', false);
-                    showBusy(false);
+                    cb(false);
                 }
             });
+        }
+
+        /* Completes the kept draft, then closes the modal. cb() always fires. */
+        function postComplete(cb) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/CompleteQuickJournal',
+                type: 'POST',
+                data: { glJournalId: currentJournalId },
+                success: function (res) {
+                    var data = parseResponse(res);
+                    if (data && data.Success) {
+                        closeDialog();
+                        if (VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info("", false, data.Message, ""); }
+                        $self.refreshWidget();
+                    } else {
+                        showStatus(data && data.DocStatus, data && data.DocumentNo);
+                        showGeneralError((data && data.Message) || lbl("VAS_118_JournalNotCompleted", "The journal could not be completed."));
+                    }
+                    cb();
+                },
+                error: function () {
+                    showGeneralError(lbl("VAS_118_JournalNotCompleted", "The journal could not be completed."));
+                    cb();
+                }
+            });
+        }
+
+        /* Save draft: creates on the first click, updates the draft afterwards, and
+           keeps the modal open with the document number + Complete enabled. */
+        function onSaveDraft() {
+            if (submitting) { return; }
+            $dialog.find('.vas-qj-general-err').addClass('vas-qj-hidden').empty();
+            if (!validate()) { showGeneralError(lbl("FillMandatory", "Please fill all mandatory fields.")); return; }
+            setBusy(true);
+            postSave(function (ok, data) {
+                setBusy(false);
+                if (ok && VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info("", false, data.Message, ""); }
+            });
+        }
+
+        /* Complete: if the user changed anything since the last save, persist the
+           edits first, then complete; otherwise complete directly. */
+        function onComplete() {
+            if (submitting || currentJournalId <= 0) { return; }
+            $dialog.find('.vas-qj-general-err').addClass('vas-qj-hidden').empty();
+            if (!validate()) { showGeneralError(lbl("FillMandatory", "Please fill all mandatory fields.")); return; }
+            setBusy(true);
+            if (isDirty()) {
+                postSave(function (ok) {
+                    if (!ok) { setBusy(false); return; }
+                    postComplete(function () { setBusy(false); });
+                });
+            } else {
+                postComplete(function () { setBusy(false); });
+            }
         }
 
         function applyFieldErrors(fieldErrors) {
