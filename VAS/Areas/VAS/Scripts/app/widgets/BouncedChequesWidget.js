@@ -121,7 +121,7 @@
                 '</div>' +
                 '<div class="vas-bc-title-group">' +
                 '<span class="vas-bc-title">' + lbl("VIS_BouncedCheques", "Bounced cheques") + '</span>' +
-                '<span class="vas-bc-subtitle">' + lbl("VIS_ChequesDishonoured", "Cheques Dishonoured.") + '</span>' +
+                '<span class="vas-bc-subtitle">' + lbl("VAS_004_ChequesDishonoured", "Cheques Dishonoured") + '</span>' +
                 '</div>' +
                 '</div>' +
                 '</div>'

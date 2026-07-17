@@ -629,7 +629,7 @@
                 '</div>' +
                 '<div class="vas-aa-label-group">' +
                 '<span class="vas-aa-label">' + lbl("VAS_AutoAllocated", "Auto-allocated") + '</span>' +
-                '<span class="vas-aa-subtitle">' + lbl("VAS_AllocatedReceiptsLast30Days", "Allocated Receipts(Last 30 Days)") + '</span>' +
+                '<span class="vas-aa-subtitle">' + lbl("VAS_007_AllocatedReceiptsLast30Days", "Allocated Receipts(Last 30 Days)") + '</span>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +

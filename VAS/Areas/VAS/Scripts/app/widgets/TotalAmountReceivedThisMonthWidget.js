@@ -558,7 +558,7 @@
                 '</div>' +
                 '<div class="vas-tarm-label-group">' +
                 '<span class="vas-tarm-label">' + lbl("VIS_ReceivedThisMonth", "Received this month") + '</span>' +
-                '<span class="vas-tarm-subtitle">' + lbl("VIS_TotalCustomerReceipts", "Total Customer Receipts") + '</span>' +
+                '<span class="vas-tarm-subtitle">' + lbl("VAS_005_TotalCustomerReceipts", "Total Customer Receipts") + '</span>' +
                 '</div>' +
                 '</div>' +
                 '</div>' +

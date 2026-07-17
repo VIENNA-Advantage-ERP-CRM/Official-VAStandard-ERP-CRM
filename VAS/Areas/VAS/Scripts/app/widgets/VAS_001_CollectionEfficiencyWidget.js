@@ -274,7 +274,7 @@
                 $dsoText.html(
                     escapeHtml(lbl("VAS_001_DSO", "DSO")) +
                     escapeHtml(String(dsoDays)) + ' ' +
-                    escapeHtml(lbl("VAS_001_DaysTarget", "days · target")) + ' ' +
+                    escapeHtml(lbl("VAS_001_DaysTarget", " Target Days")) + ' ' +
                     escapeHtml(String(targetDays))
                 );
             }
