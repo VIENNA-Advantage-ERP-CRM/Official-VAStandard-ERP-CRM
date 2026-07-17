@@ -189,6 +189,7 @@ import "../app/widgets/TopDebtorsWidget.js";
 
 import "../app/widgets/VAS_GLJournalDetailDialog.js";
 import "../app/widgets/VAS_041_GLJournalEntriesWidget.js";
+import "../app/widgets/VAS_118_QuickJournalWidget.js";
 import "../app/widgets/VAS_036_GLJournalUnpostedWidget.js";
 import "../app/widgets/VAS_039_GLJournalPostedWidget.js";
 import "../app/widgets/VAS_037_GLJournalTotalDebitWidget.js";

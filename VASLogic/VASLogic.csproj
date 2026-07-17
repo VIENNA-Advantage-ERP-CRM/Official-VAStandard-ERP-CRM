@@ -163,6 +163,7 @@
     <Compile Include="Models\VAS_014_DailyCollectionTrendModel.cs" />
     <Compile Include="Models\VAS_015_OutstandingVsReceivedModel.cs" />
     <Compile Include="Models\VAS_035_MatchSuggestionsModel.cs" />
+    <Compile Include="Models\VAS_118_QuickJournalModel.cs" />
     <Compile Include="Models\VAS_SentEmailDocModel.cs" />
     <Compile Include="Models\VAS_LeadModel.cs" />
     <Compile Include="Models\VAS_PaymentWidgetModel.cs" />
