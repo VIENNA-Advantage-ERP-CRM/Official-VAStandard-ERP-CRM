@@ -62,6 +62,7 @@
  * 54  | Close                                             | VAS_Close
  * 55  | High-confidence — safe to apply                   | VAS_072_HighConfidenceSafe
  * 56  | Skip                                              | VAS_072_Skip
+ * 57  | Document type                                     | VAS_072_DocumentType
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1649,6 +1650,13 @@
                 ) +
                 reviewPaneRow(
                     lbl(
+                        "VAS_072_DocumentType",
+                        "Document type"
+                    ),
+                    detail.paymentDocTypeName
+                ) +
+                reviewPaneRow(
+                    lbl(
                         "VAS_072_Reference",
                         "Reference"
                     ),
@@ -1717,6 +1725,13 @@
                         "Payment terms"
                     ),
                     detail.paymentTerms
+                ) +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_072_DocumentType",
+                        "Document type"
+                    ),
+                    detail.invoiceDocTypeName
                 ) +
                 reviewPaneRow(
                     lbl(

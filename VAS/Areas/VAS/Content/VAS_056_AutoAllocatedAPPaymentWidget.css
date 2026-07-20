@@ -663,19 +663,29 @@
     color: inherit;
 }
 
-.VAS-056-AutoAllocatedAPPayment-amount-unallocated {
-    display: inline-block;
-    font-size: 0.8125em;
-    font-weight: 600;
+.VAS-056-AutoAllocatedAPPayment-th-partial,
+.VAS-056-AutoAllocatedAPPayment-td-partial {
+    width: 14em;
+    text-align: left;
+}
+
+.VAS-056-AutoAllocatedAPPayment-td-partial {
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
-    color: #b45309;
-    white-space: nowrap;
+    overflow: visible !important;
+    text-overflow: clip !important;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-partial,
 .VAS-056-AutoAllocatedAPPayment-td-partial {
-    width: 12em;
-    text-align: left;
+    display: none;
+}
+
+.VAS-056-AutoAllocatedAPPayment-filter-unallocated
+.VAS-056-AutoAllocatedAPPayment-th-partial,
+.VAS-056-AutoAllocatedAPPayment-filter-unallocated
+.VAS-056-AutoAllocatedAPPayment-td-partial {
+    display: table-cell;
 }
 
 .VAS-056-AutoAllocatedAPPayment-dialog-empty {
@@ -921,7 +931,9 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-amount,
-.VAS-056-AutoAllocatedAPPayment-td-amount {
+.VAS-056-AutoAllocatedAPPayment-td-amount,
+.VAS-056-AutoAllocatedAPPayment-th-partial,
+.VAS-056-AutoAllocatedAPPayment-td-partial {
     text-align: right !important;
 }
 

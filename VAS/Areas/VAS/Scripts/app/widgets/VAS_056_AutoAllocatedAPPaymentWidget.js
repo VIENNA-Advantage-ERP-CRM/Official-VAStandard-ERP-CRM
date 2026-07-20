@@ -461,30 +461,30 @@
                 amountHtml += escapeHtml(amountText);
 
                 var partialHtml = "";
+                var partialTitle = "";
 
                 if (row.isPartiallyAllocated) {
                     var unallocatedText = formatAmount(
                         row.unallocatedAmt
                     );
 
-                    partialHtml +=
-                        '<span class="' +
-                        classPrefix +
-                        'amount-unallocated">' +
+                    partialTitle =
                         (
                             currencySymbol
-                                ? escapeHtml(currencySymbol) + " "
+                                ? currencySymbol + " "
                                 : ""
-                        ) +
-                        escapeHtml(unallocatedText) +
-                        " - " +
-                        escapeHtml(
-                            lbl(
-                                "VAS_UnAllocatedAmount",
-                                "Partially allocated"
-                            )
-                        ) +
-                        "</span>";
+                        ) + unallocatedText;
+
+                    if (currencySymbol) {
+                        partialHtml +=
+                            '<span class="' +
+                            classPrefix +
+                            'cur-inline">' +
+                            escapeHtml(currencySymbol) +
+                            "</span>";
+                    }
+
+                    partialHtml += escapeHtml(unallocatedText);
                 }
 
                 var rowHtml =
@@ -544,6 +544,14 @@
 
                     '<td class="' +
                     classPrefix +
+                    'td-partial" title="' +
+                    escapeHtml(partialTitle) +
+                    '">' +
+                    partialHtml +
+                    "</td>" +
+
+                    '<td class="' +
+                    classPrefix +
                     'td-amount" title="' +
                     escapeHtml(
                         (
@@ -554,12 +562,6 @@
                     ) +
                     '">' +
                     amountHtml +
-                    "</td>" +
-
-                    '<td class="' +
-                    classPrefix +
-                    'td-partial">' +
-                    partialHtml +
                     "</td>" +
 
                     "</tr>";
@@ -723,6 +725,13 @@
                     ? "true"
                     : "false"
             );
+
+            if ($dialog) {
+                $dialog.toggleClass(
+                    classPrefix + "filter-unallocated",
+                    activeFilter === "unallocated"
+                );
+            }
         }
 
         function showState(show, message) {
@@ -1133,22 +1142,22 @@
 
                 '<th class="' +
                 classPrefix +
-                'th-amount">' +
+                'th-partial">' +
                 escapeHtml(
                     lbl(
-                        "VAS_Amount",
-                        "Amount"
+                        "VAS_UnAllocatedAmount",
+                        "Partially allocated"
                     )
                 ) +
                 "</th>" +
 
                 '<th class="' +
                 classPrefix +
-                'th-partial">' +
+                'th-amount">' +
                 escapeHtml(
                     lbl(
-                        "VAS_UnAllocatedAmount",
-                        "Partially allocated"
+                        "VAS_Amount",
+                        "Amount"
                     )
                 ) +
                 "</th>" +

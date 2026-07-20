@@ -230,6 +230,7 @@ namespace VAS.Controllers
                     vendorName = row.VendorName,
                     paymentMethod = row.PaymentMethodCode,
                     paymentMethodName = row.PaymentMethodName,
+                    paymentDocTypeName = row.PaymentDocTypeName,
                     reference = row.ReferenceNo,
                     bankName = row.BankName,
                     accountNo = row.AccountNo,
@@ -245,6 +246,7 @@ namespace VAS.Controllers
                     invoiceDocumentNo = row.InvoiceDocumentNo,
                     invoiceDate = FormatDate(row.InvoiceDate),
                     dueDate = FormatDate(row.DueDate),
+                    invoiceDocTypeName = row.InvoiceDocTypeName,
                     paymentTerms = row.PaymentTerms,
                     invoiceCurrencyId = row.InvoiceCurrencyId,
                     invoiceCurrencyISOCode = row.InvoiceCurrencyISOCode,
@@ -1165,7 +1167,8 @@ SELECT
     Payment.CheckNo,
     Payment.TenderType,
     Payment.C_BankAccount_ID,
-    Payment.VA009_PaymentMethod_ID
+    Payment.VA009_PaymentMethod_ID,
+    Payment.C_DocType_ID
 FROM C_Payment Payment
 WHERE Payment.IsActive='Y'
 AND Payment.Processed='Y'
@@ -1208,7 +1211,8 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.GrandTotal,
     Invoice.GrandTotalAfterWithholding,
-    Invoice.C_PaymentTerm_ID
+    Invoice.C_PaymentTerm_ID,
+    Invoice.C_DocType_ID
 FROM C_Invoice Invoice
 WHERE Invoice.IsActive='Y'
 AND Invoice.Processed='Y'
@@ -1425,6 +1429,14 @@ DetailBase AS
         TenderTypeReference.TranslatedName AS PaymentMethodTranslatedName,
 
         VA009PaymentMethod.VA009_Name AS PaymentMethodVA009Name,
+
+        Payment.C_DocType_ID AS PaymentDocTypeId,
+
+        PaymentDocType.Name AS PaymentDocTypeName,
+
+        Invoice.C_DocType_ID AS InvoiceDocTypeId,
+
+        InvoiceDocType.Name AS InvoiceDocTypeName,
 
         COALESCE
         (
@@ -1726,6 +1738,22 @@ DetailBase AS
         Payment.VA009_PaymentMethod_ID
     )
 
+    LEFT OUTER JOIN C_DocType PaymentDocType ON
+    (
+        PaymentDocType.C_DocType_ID=
+        Payment.C_DocType_ID
+
+        AND PaymentDocType.IsActive='Y'
+    )
+
+    LEFT OUTER JOIN C_DocType InvoiceDocType ON
+    (
+        InvoiceDocType.C_DocType_ID=
+        Invoice.C_DocType_ID
+
+        AND InvoiceDocType.IsActive='Y'
+    )
+
     WHERE InvoicePaySchedule.IsActive='Y'
 
     AND COALESCE
@@ -1888,6 +1916,14 @@ SELECT
     DetailScored.PaymentMethodTranslatedName,
 
     DetailScored.PaymentMethodVA009Name,
+
+    DetailScored.PaymentDocTypeId,
+
+    DetailScored.PaymentDocTypeName,
+
+    DetailScored.InvoiceDocTypeId,
+
+    DetailScored.InvoiceDocTypeName,
 
     DetailScored.ReferenceNo,
 
@@ -2106,6 +2142,32 @@ FROM DetailScored DetailScored";
                             GetSafeString(
                                 reader,
                                 "PaymentMethodCode"
+                            ),
+
+                            GetMsg(
+                                ctx,
+                                "VAS_072_NotSpecified",
+                                "Not Specified"
+                            )
+                        ),
+
+                        PaymentDocTypeName = FirstNotEmpty(
+                            GetSafeString(
+                                reader,
+                                "PaymentDocTypeName"
+                            ),
+
+                            GetMsg(
+                                ctx,
+                                "VAS_072_NotSpecified",
+                                "Not Specified"
+                            )
+                        ),
+
+                        InvoiceDocTypeName = FirstNotEmpty(
+                            GetSafeString(
+                                reader,
+                                "InvoiceDocTypeName"
                             ),
 
                             GetMsg(
@@ -4389,6 +4451,8 @@ AND
             public bool ReferenceMatch { get; set; }
             public int Score { get; set; }
             public string PaymentMethodName { get; set; }
+            public string PaymentDocTypeName { get; set; }
+            public string InvoiceDocTypeName { get; set; }
             public string Confidence { get; set; }
             public bool IsAutoApplicable { get; set; }
         }
