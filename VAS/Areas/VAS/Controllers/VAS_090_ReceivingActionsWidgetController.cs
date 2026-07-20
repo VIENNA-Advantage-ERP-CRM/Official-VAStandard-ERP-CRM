@@ -1092,29 +1092,11 @@ namespace VIS.Controllers
                 return Fail("GRN is required.");
             }
 
-            Ctx ctx = Session["ctx"] as Ctx;            
-            string sql = @"
-                SELECT DocType.Report_ID
-                FROM M_InOut InOut
-                LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=InOut.C_DocType_ID AND DocType.IsActive='Y')
-                WHERE InOut.M_InOut_ID=@GRN_ID";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter("@GRN_ID", grnId)
-            };
+            Ctx ctx = Session["ctx"] as Ctx;
 
             try
             {
-                int printProcessId = Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
-
-                // Resolve the GRN print/report process so the client can launch it via
-                // VIS.APrint against this M_InOut record. The process may not exist yet - in that case processId stays 0
-                // and the client simply shows the queued confirmation without printing.
-                if (printProcessId == 0)
-                {
-                    printProcessId = GetGRNPrintProcessId(ctx);
-                }
+                int printProcessId = GetGRNPrintProcessId(ctx);
                 int inOutTableId = GetTableId("M_InOut");
 
                 return Ok(new
