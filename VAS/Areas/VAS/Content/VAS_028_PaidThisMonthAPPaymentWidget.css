@@ -7,7 +7,7 @@
     container-type: inline-size;
     contain: layout style;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
 }
@@ -15,7 +15,7 @@
 .vas-ptm-ap-busy {
     align-items: center;
     border-radius: 14px;
-    color: #5f7283;
+    color: #41576a;
     display: none;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
@@ -76,7 +76,7 @@
 }
 
 .vas-ptm-pager-text {
-    font-size: 0.85em;
+    font-size: 0.8125em;
     font-weight: 500;
     min-width: 3.75em;
 }
@@ -101,7 +101,7 @@
     padding: 0.875em;
     border-radius: 14px;
     text-align: center;
-    color: #5f7283;
+    color: #41576a;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
     font-weight: 600;
@@ -126,7 +126,7 @@
     gap: 0.5em;
     border: 2px solid #ffffff;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
@@ -197,7 +197,7 @@
 
 .vas-ptm-ap-root .vas-ptm-arrow {
     align-items: center;
-    color: #748494;
+    color: #5f7283;
     display: flex;
     flex-shrink: 0;
     font-size: .875em;
@@ -222,7 +222,7 @@
     font-weight: 400;
     line-height: 1.3;
     letter-spacing: 0.02em;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-ptm-ap-root .vas-ptm-body {
@@ -243,7 +243,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 1.375em;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.1;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
@@ -258,7 +258,7 @@
     align-items: flex-start;
     gap: 0.375em;
     overflow: hidden;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-ptm-ap-root .vas-ptm-why-pill {
@@ -288,7 +288,7 @@
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.3;
-    color: #5f7283;
+    color: #41576a;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -420,7 +420,7 @@
     align-items: flex-start;
     gap: 0.75em;
     padding: 1.25em 2em;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     flex-shrink: 0;
 }
 
@@ -500,7 +500,7 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1.25em;
     padding: 1.25em 2em;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     background: #fbfdff;
     flex-shrink: 0;
 }
@@ -517,7 +517,7 @@
     font-size: 0.75em;
     line-height: 1.2;
     font-weight: 700;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-ptm-dialog-summary strong {
@@ -568,13 +568,13 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    padding: 1em 0.75em;
-    border-bottom: 1px solid #edf2f6;
-    background: #ffffff;
-    color: #748494;
-    font-size: 0.75em;
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid #c5d2dd;
+    background: transparent;
+    color: #41576a;
+    font-size: 0.6875em;
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 500;
     text-align: left;
     text-transform: capitalize;
     white-space: nowrap;
@@ -582,7 +582,7 @@
 
 .vas-ptm-dialog-table td {
     padding: 0.875em 0.75em;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     color: #102c3f;
     font-size: 0.875em;
     line-height: 1.2;
@@ -681,7 +681,7 @@
 .vas-ptm-dialog-empty {
     padding: 2.5em 1em !important;
     text-align: center;
-    color: #748494 !important;
+    color: #5f7283 !important;
 }
 
 .vas-ptm-dialog-footer {
@@ -690,7 +690,7 @@
     justify-content: space-between;
     gap: 1em;
     padding: 0.875em 2em;
-    border-top: 1px solid #edf2f6;
+    border-top: 1px solid #d9e2eb;
     background: #fbfdff;
     flex-shrink: 0;
 }
@@ -701,7 +701,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.8125em;
 }
 
@@ -790,7 +790,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.8125rem;
     font-weight: 400;
 }
@@ -807,7 +807,7 @@
 
 .vas-ptm-pager-text {
     min-width: 3.5rem;
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
 }
 
 .vas-ptm-th-amount,

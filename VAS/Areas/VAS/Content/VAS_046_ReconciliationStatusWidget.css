@@ -5,7 +5,7 @@
     min-height: 0;
     box-sizing: border-box;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, 1.2cqi, 20px);
     container-type: inline-size;
     contain: layout style;
     overflow: hidden;
@@ -15,7 +15,7 @@
     align-items: center;
     background: rgba(255, 255, 255, 0.55);
     border-radius: 14px;
-    color: #5f7283;
+    color: #41576a;
     display: none;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
@@ -49,7 +49,7 @@
     padding: 0.875em;
     border-radius: 14px;
     border: 2px solid #ffffff;
-    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
@@ -122,7 +122,7 @@
     font-weight: 500;
     line-height: 1.2;
     letter-spacing: 0.05em;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-reconciliation-status-body {
@@ -204,7 +204,7 @@
     font-weight: 500;
     line-height: 1.2;
     letter-spacing: 0.0938em;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-reconciliation-status-tooltip {
@@ -283,7 +283,7 @@
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.35;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-reconciliation-status-action {
@@ -324,7 +324,7 @@
     text-align: center;
     font-size: 0.75em;
     font-weight: 500;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-reconciliation-status-busy {
@@ -337,7 +337,7 @@
     padding: 0.875em;
     border-radius: 14px;
     text-align: center;
-    color: #5f7283;
+    color: #41576a;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
     font-weight: 600;

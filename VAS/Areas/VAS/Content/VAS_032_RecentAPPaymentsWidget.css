@@ -7,7 +7,7 @@
     container-type: inline-size;
     contain: layout style;
     font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
 }
@@ -30,7 +30,7 @@
     gap: 0.5em;
     border-radius: 14px;
     border: 2px solid #ffffff;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
@@ -231,7 +231,7 @@
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.25;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-recent-ap-payments-table-wrap {
@@ -247,7 +247,7 @@
     align-items: center;
     background: rgba(255, 255, 255, 0.55);
     border-radius: 14px;
-    color: #5f7283;
+    color: #41576a;
     display: none;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
@@ -274,7 +274,7 @@
     justify-content: flex-end;
     gap: 0.5em;
     padding-top: 0.625em;
-    border-top: 1px solid #edf2f6;
+    border-top: 1px solid #d9e2eb;
     overflow: hidden;
 }
 
@@ -289,10 +289,10 @@
         top: 0;
         z-index: 1;
         padding: 0.625em 0.5em;
-        border-bottom: 1px solid #edf2f6;
+        border-bottom: 1px solid #e2eaf1;
         background: rgba(255, 255, 255, 0.92);
         backdrop-filter: blur(0.375em);
-        color: #748494;
+        color: #5f7283;
         font-size: 0.75em;
         font-weight: 400;
         line-height: 1.2;
@@ -303,7 +303,7 @@
 
     .vas-recent-ap-payments-table td {
         padding: 0.625em 0.5em;
-        border-bottom: 1px solid #edf2f6;
+        border-bottom: 1px solid #e2eaf1;
         color: #102c3f;
         font-size: 0.75em;
         line-height: 1.25;
@@ -322,13 +322,13 @@
 
 .vas-recent-ap-payments-date {
     width: 9%;
-    color: #5f7283;
+    color: #41576a;
     white-space: nowrap;
 }
 
 .vas-recent-ap-payments-value {
     width: 14%;
-    color: #5f7283;
+    color: #41576a;
     font-family: "Roboto Mono", Consolas, monospace;
     font-size: 0.6875em;
 }
@@ -348,7 +348,7 @@ td.vas-recent-ap-payments-vendor {
 
 .vas-recent-ap-payments-bank-account {
     width: 15%;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-recent-ap-payments-status-col {
@@ -398,7 +398,7 @@ td.vas-recent-ap-payments-amount {
     text-overflow: ellipsis;
     white-space: nowrap;
     background: #edf2f6;
-    color: #5f7283;
+    color: #41576a;
     border: 1px solid transparent;
     font-size: 0.6875em;
     font-weight: 500;
@@ -461,7 +461,7 @@ td.vas-recent-ap-payments-amount {
 
 .vas-recent-ap-payments-status-neutral {
     background: #edf2f6;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-recent-ap-payments-state {
@@ -475,7 +475,7 @@ td.vas-recent-ap-payments-amount {
     font-size: 0.75em;
     font-weight: 500;
     line-height: 1.3;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-recent-ap-payments-busy,
@@ -489,7 +489,7 @@ td.vas-recent-ap-payments-amount {
     padding: 0.875em;
     border-radius: 14px;
     text-align: center;
-    color: #5f7283;
+    color: #41576a;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
     font-weight: 600;
@@ -679,7 +679,7 @@ td.vas-recent-ap-payments-amount {
 
 .vas-recent-ap-payments-dialog-section-label {
     padding: 1em 1.375em 0;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -696,7 +696,7 @@ td.vas-recent-ap-payments-amount {
 .vas-recent-ap-payments-dialog-field {
     min-width: 0;
     padding: 0.6875em 0 0.5625em;
-    border-bottom: 0.0625em solid #edf2f6;
+    border-bottom: 0.0625em solid #e2eaf1;
 }
 
 .vas-recent-ap-payments-dialog-label {
@@ -848,7 +848,7 @@ td.vas-recent-ap-payments-amount {
 
 .vas-recent-ap-payments-dialog-alloc-label {
     padding: 1em 0 0.625em;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -857,14 +857,14 @@ td.vas-recent-ap-payments-amount {
 
 .vas-recent-ap-payments-alloc-loading {
     padding: 1em 0;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.8125em;
     font-weight: 400;
 }
 
 .vas-recent-ap-payments-alloc-empty {
     padding: 1em 0;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.8125em;
     font-style: italic;
 }
@@ -879,12 +879,12 @@ td.vas-recent-ap-payments-amount {
         position: sticky;
         top: 0;
         z-index: 1;
-        padding: 1em 0.75em;
-        border-bottom: 1px solid #edf2f6;
-        background: #ffffff;
-        color: #748494;
-        font-size: 0.75em;
-        font-weight: 700;
+        padding: 0.5em 0.75em;
+        border-bottom: 1px solid #c5d2dd;
+        background: transparent;
+        color: #41576a;
+        font-size: 0.6875em;
+        font-weight: 500;
         line-height: 1.2;
         text-align: left;
         text-transform: capitalize;
@@ -893,7 +893,7 @@ td.vas-recent-ap-payments-amount {
 
     .vas-recent-ap-payments-alloc-table tbody td {
         padding: 0.875em 0.75em;
-        border-bottom: 1px solid #edf2f6;
+        border-bottom: 1px solid #e2eaf1;
         color: #102c3f;
         font-size: 0.875em;
         line-height: 1.2;
@@ -982,7 +982,7 @@ td.vas-recent-ap-payments-amount {
 .vas-recent-ap-payments-busy {
     align-items: center;
     border-radius: 14px;
-    color: #5f7283;
+    color: #41576a;
     display: none;
     font-family: Roboto, Arial, sans-serif;
     font-size: 0.8125em;
@@ -1020,7 +1020,7 @@ td.vas-recent-ap-payments-amount {
 
 .vas-allocation-popup-subtitle {
     font-size: 0.8125em;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-allocation-summary-card {
@@ -1049,7 +1049,7 @@ td.vas-recent-ap-payments-amount {
     font-size: 0.75em;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: #748494;
+    color: #5f7283;
     margin-bottom: 0.375em;
     text-transform: capitalize;
 }
@@ -1066,7 +1066,7 @@ td.vas-recent-ap-payments-amount {
     font-size: 0.875em;
     font-weight: 700;
     letter-spacing: 0.04em;
-    color: #748494;
+    color: #5f7283;
     text-transform: capitalize;
 }
 
@@ -1086,9 +1086,9 @@ td.vas-recent-ap-payments-amount {
         top: 0;
         z-index: 1;
         padding: 1em 0.75em;
-        border-bottom: 1px solid #edf2f6;
+        border-bottom: 1px solid #e2eaf1;
         background: #ffffff;
-        color: #748494;
+        color: #5f7283;
         font-size: 0.75em;
         font-weight: 700;
         line-height: 1.2;
@@ -1099,7 +1099,7 @@ td.vas-recent-ap-payments-amount {
 
     .vas-allocation-lines-table tbody td {
         padding: 0.875em 0.75em;
-        border-bottom: 1px solid #edf2f6;
+        border-bottom: 1px solid #e2eaf1;
         font-size: 0.875em;
         color: #102c3f;
         line-height: 1.2;
@@ -1118,7 +1118,7 @@ td.vas-recent-ap-payments-amount {
     padding: 1.25em;
     border: 1px solid #edf2f6;
     border-radius: 0.75em;
-    color: #748494;
+    color: #5f7283;
     background: #fbfdff;
     font-size: 0.8125em;
     text-align: center;
@@ -1166,7 +1166,7 @@ td.vas-recent-ap-payments-amount {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.6875em;
     font-weight: 400;
     line-height: 1.3;
