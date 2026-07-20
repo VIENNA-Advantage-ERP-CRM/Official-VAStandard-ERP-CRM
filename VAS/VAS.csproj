@@ -314,6 +314,7 @@
     <Compile Include="Areas\VAS\Controllers\RelatedProductController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_037_GLJournalTotalDebitWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_041_GLJournalEntriesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_118_QuickJournalWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_073_LowStockCountWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_PendingGRNsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_075_TotalInventoryValueWidgetController.cs" />
@@ -456,7 +457,10 @@
     <Content Include="Areas\VAS\Content\VAS_CashBalance.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateNewReceipt.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateARInvoice.css" />
+    <Content Include="Areas\VAS\Content\VAS_CreateGLJournal.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_041_GLJournalEntriesWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_118_QuickJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_045_GLJournalPendingWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_043_GLJournalTopMovementWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_042_GLJournalVolumeWidget.css" />
@@ -587,6 +591,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\PaidthismonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_GLJournalDetailDialog.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_041_GLJournalEntriesWidget.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_118_QuickJournalWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_039_GLJournalPostedWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_038_GLJournalTotalCreditWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_037_GLJournalTotalDebitWidget.js" />
@@ -619,6 +624,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_010_CashGlCashInWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_002_CreateNewReceipt.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_064_CreateARInvoice.js" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_119_CreateGLJournal.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_003_OnAccountReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_011_UnreconciledReceipts.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_012_TodayReceipts.js" />
