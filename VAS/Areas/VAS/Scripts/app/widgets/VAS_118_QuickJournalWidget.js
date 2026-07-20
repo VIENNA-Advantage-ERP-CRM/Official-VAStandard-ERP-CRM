@@ -87,6 +87,8 @@
         var acctSearchTimer = null;
         var currentJournalId = 0;   /* > 0 once saved as draft; the modal stays open on it */
         var savedSnapshot = '';     /* JSON of the field values at the last save (dirty check) */
+        var completedState = false; /* true once the journal is completed — form is frozen and
+                                       only Close + New Journal act until a fresh entry is started */
 
         /* Upper bound for the amount value — Int32.MaxValue (2,147,483,647). The
            amount is capped here inclusive of its precision digits so it never
@@ -281,6 +283,11 @@
                 '<div class="vas-qj-modal-title" id="vas-qj-title">' + escapeHtml(lbl("VAS_118_ModalTitle", "Quick Journal Entry")) + '</div>' +
                 '<div class="vas-qj-modal-sub">' + escapeHtml(lbl("VAS_118_ModalSubtitle", "Single debit / single credit · auto-balanced · stays on this dashboard")) + '</div>' +
                 '</div>' +
+                /* Shown only after completion — starts a fresh, editable entry. */
+                '<button type="button" class="vas-qj-newjournal vas-qj-hidden">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                '<span>' + escapeHtml(lbl("VAS_118_NewJournal", "New Journal")) + '</span>' +
+                '</button>' +
                 '<button type="button" class="vas-qj-close" aria-label="' + escapeHtml(lbl("VAS_118_Close", "Close")) + '">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>' +
                 '</button>' +
@@ -335,7 +342,8 @@
                 '</div>' +
                 '</div>' +
 
-                '<div class="vas-qj-busy vas-qj-hidden"><div class="vas-qj-spinner"></div></div>' +
+                /* Standard VIS widget busy indicator (core spinner styling). */
+                '<div class="vas-qj-busy vis-busyindicatorouterwrap"><div class="vis-busyindicatorinnerwrap"><i class="vis-busyindicatordiv"></i></div></div>' +
                 '</div>' +
                 '</div>'
             );
@@ -352,6 +360,7 @@
                 });
             $dialog.find('.vas-qj-draft').on('click', onSaveDraft);
             $dialog.find('.vas-qj-post').on('click', onComplete);
+            $dialog.find('.vas-qj-newjournal').on('click', onNewJournal);
 
             /* Type-to-filter comboboxes. Organization / Schema / Document Type / Cost
                center filter a pre-loaded list client-side; Debit / Credit search the
@@ -371,6 +380,7 @@
                 var dateInput = $ctrl.find('input[type="date"]')[0];
                 if (dateInput) {
                     $ctrl.on('click', function () {
+                        if (dateInput.disabled) { return; }   /* frozen after completion */
                         if (typeof dateInput.showPicker === 'function') {
                             try { dateInput.showPicker(); } catch (e) { /* unsupported */ }
                         }
@@ -406,15 +416,55 @@
             $dialog.find('.vas-qj-status').addClass('vas-qj-hidden').empty();
             currentSchema = null; precision = 2; currencySymbol = ''; currencyIso = '';
             currentJournalId = 0; savedSnapshot = '';
-            /* Fresh entry: Complete is disabled until the draft is saved. */
+            /* Fresh entry: unfreeze fields, hide the post-completion "New Journal"
+               action and re-arm the footer (Complete disabled until a draft exists). */
+            completedState = false;
+            setFormLocked(false);
+            showNewJournalLink(false);
             $dialog.find('.vas-qj-draft').prop('disabled', false);
             $dialog.find('.vas-qj-post').prop('disabled', true);
             $dialog.find('.vas-qj-cur').text('');
             updateBalance();
         }
 
+        /* Freezes / unfreezes every editable field (used to lock the form once the
+           journal is completed). The comboboxes are custom, so disabling their
+           text inputs is what stops focus/click from opening the dropdowns. */
+        function setFormLocked(locked) {
+            $dialog.find('.vas-qj-desc, .vas-qj-amount-input, .vas-qj-date, .vas-qj-combo-input')
+                .prop('disabled', !!locked);
+            $dialog.find('.vas-qj-modal').toggleClass('vas-qj-locked', !!locked);
+            if (locked) { $dialog.find('.vas-qj-combo-list').addClass('vas-qj-hidden').empty(); }
+        }
+
+        /* Header "New Journal" link — revealed once there is a persisted journal
+           (draft saved or completed) so the user can start a fresh entry. */
+        function showNewJournalLink(show) {
+            $dialog.find('.vas-qj-newjournal').toggleClass('vas-qj-hidden', !show);
+        }
+
+        /* Completion end-state: freeze the form + footer and surface "New Journal"
+           in the header. Only Close (and Cancel) still act. */
+        function setCompleted(done) {
+            completedState = !!done;
+            setFormLocked(!!done);
+            showNewJournalLink(!!done);
+            $dialog.find('.vas-qj-draft, .vas-qj-post').prop('disabled', !!done);
+        }
+
+        /* Header "New Journal": abandon the completed view and start a fresh,
+           editable entry (defaults reloaded), keeping the modal open. */
+        function onNewJournal() {
+            if (submitting) { return; }
+            resetForm();
+            loadInitData();
+            setTimeout(function () { $dialog.find('.vas-qj-desc').focus(); }, 100);
+        }
+
         function showBusy(on) {
-            $dialog.find('.vas-qj-busy').toggleClass('vas-qj-hidden', !on);
+            /* Toggle the VIS busy indicator by visibility (the framework convention). */
+            var el = $dialog.find('.vas-qj-busy')[0];
+            if (el) { el.style.visibility = on ? 'visible' : 'hidden'; }
         }
 
         /* ---------------- data loading ---------------- */
@@ -762,8 +812,9 @@
            enabled only once a draft exists. */
         function setBusy(on) {
             submitting = on;
-            $dialog.find('.vas-qj-draft').prop('disabled', on);
-            $dialog.find('.vas-qj-post').prop('disabled', on || currentJournalId <= 0);
+            /* Once completed, the footer stays frozen regardless of the busy toggle. */
+            $dialog.find('.vas-qj-draft').prop('disabled', on || completedState);
+            $dialog.find('.vas-qj-post').prop('disabled', on || completedState || currentJournalId <= 0);
             showBusy(on);
         }
 
@@ -790,6 +841,8 @@
                         currentJournalId = Number(data.GL_Journal_ID || 0);
                         savedSnapshot = JSON.stringify(values);
                         showStatus(data.DocStatus, data.DocumentNo);
+                        /* A journal now exists — offer "New Journal" (draft stays editable). */
+                        showNewJournalLink(true);
                         cb(true, data);
                     } else {
                         applyFieldErrors(data && data.FieldErrors);
@@ -804,7 +857,9 @@
             });
         }
 
-        /* Completes the kept draft, then closes the modal. cb() always fires. */
+        /* Completes the kept draft. The modal stays open showing the completed
+           (frozen) journal; the header "New Journal" starts a fresh entry.
+           cb() always fires. */
         function postComplete(cb) {
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_118_QuickJournalWidget/CompleteQuickJournal',
@@ -813,9 +868,9 @@
                 success: function (res) {
                     var data = parseResponse(res);
                     if (data && data.Success) {
-                        closeDialog();
+                        showStatus(data.DocStatus || 'CO', data.DocumentNo);
+                        setCompleted(true);   /* freeze fields + footer, reveal New Journal */
                         if (VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info("", false, data.Message, ""); }
-                        $self.refreshWidget();
                     } else {
                         showStatus(data && data.DocStatus, data && data.DocumentNo);
                         showGeneralError((data && data.Message) || lbl("VAS_118_JournalNotCompleted", "The journal could not be completed."));

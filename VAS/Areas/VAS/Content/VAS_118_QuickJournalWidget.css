@@ -149,6 +149,27 @@
 .vas-qj-close:hover { background: rgba(0, 0, 0, 0.05); color: #141414; }
 .vas-qj-close svg { width: 1.125em; height: 1.125em; }
 
+/* Header "New Journal" — revealed once a journal is drafted/completed, pushed to
+   the right next to Close. Rendered as a plain blue hyperlink (no button chrome). */
+.vas-qj-newjournal {
+    margin-left: auto;
+    align-self: center;
+    display: inline-flex; align-items: center; gap: 0.3em;
+    padding: 0;
+    border: none;
+    background: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-size: 0.9em;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.vas-qj-newjournal:hover { color: #0069AE; text-decoration: underline; }
+.vas-qj-newjournal svg { width: 1em; height: 1em; }
+/* With the New Journal link holding the auto-margin, Close hugs it. */
+.vas-qj-newjournal + .vas-qj-close { margin-left: 0; }
+
 .vas-qj-body {
     padding: 1.125em 1.5em 1.25em;
     display: flex;
@@ -192,6 +213,19 @@
 .vas-qj-control:focus-within { border-bottom-color: #0083DA; }
 .vas-qj-field.vas-qj-invalid .vas-qj-control { border-bottom-color: #ED1C24; }
 .vas-qj-field-multiline .vas-qj-control { align-items: flex-start; padding-top: 0.4em; }
+
+/* Frozen state (journal completed): fields become read-only. Values stay dark and
+   readable; only the cursor and a muted underline signal that editing is off. */
+.vas-qj-locked .vas-qj-control { border-bottom-style: dashed; border-bottom-color: #D5DEE7; cursor: not-allowed; }
+.vas-qj-locked .vas-qj-control:focus-within { border-bottom-color: #D5DEE7; }
+.vas-qj-locked .vas-qj-field input:disabled,
+.vas-qj-locked .vas-qj-field textarea:disabled,
+.vas-qj-locked .vas-qj-combo-input:disabled {
+    color: #102C3F;
+    -webkit-text-fill-color: #102C3F;   /* keep text dark on WebKit disabled inputs */
+    opacity: 1;
+    cursor: not-allowed;
+}
 
 /* Plain inline field icon (no box) — muted, sits before the input. */
 .vas-qj-field-ic { flex-shrink: 0; width: 1.15em; text-align: center; color: #8A97A6; font-size: 1em; }
@@ -328,22 +362,24 @@
 .vas-qj-btn-primary { background: #0083DA; color: #fff; box-shadow: 0 4px 12px rgba(0, 131, 218, 0.28); }
 .vas-qj-btn-primary:hover { background: #0069AE; }
 
-/* Busy overlay */
-.vas-qj-busy {
+/* Busy overlay — standard VIS widget busy indicator (core `.vis-busyindicatordiv`
+   spinner styling comes from the app shell). Scoped to overlay the modal and
+   centered, mirroring the VAS_041 GL-journal widget family. Hidden by default;
+   toggled via inline `visibility` in JS. */
+.vas-qj-modal > .vas-qj-busy.vis-busyindicatorouterwrap {
     position: absolute;
     inset: 0;
-    background: rgba(255, 255, 255, 0.6);
-    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.62);
     border-radius: 18px;
+    z-index: 999;
+    visibility: hidden;
 }
-.vas-qj-spinner {
-    width: 2em; height: 2em;
-    border: 3px solid rgba(0, 131, 218, 0.2);
-    border-top-color: #0083DA;
-    border-radius: 50%;
-    animation: vas-qj-spin 700ms linear infinite;
+.vas-qj-modal > .vas-qj-busy .vis-busyindicatorinnerwrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
-@keyframes vas-qj-spin { to { transform: rotate(360deg); } }
 
 /* RTL: mirror the auto margins that push content to the far side */
 [dir="rtl"] .vas-qj-close,
