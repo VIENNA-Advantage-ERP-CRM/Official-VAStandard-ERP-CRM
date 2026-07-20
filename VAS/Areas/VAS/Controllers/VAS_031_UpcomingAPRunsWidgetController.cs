@@ -506,7 +506,7 @@ ORDER BY
             {
                 string invalidDateMessage = GetMsg(
                     ctx,
-                    "VAS_031_MessageTransactionDateInvalid",
+                    "VAS_031_TransactionDateInvalid",
                     "Invalid due date."
                 );
 
@@ -542,7 +542,7 @@ ORDER BY
             {
                 string businessPartnerMessage = GetMsg(
                     ctx,
-                    "VAS_031_MessageBusinessPartnerRequired",
+                    "VAS_031_BusinessPartnerRequired",
                     "Business partner is required."
                 );
 
@@ -2306,7 +2306,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageSourceInvoiceRequired",
+                    "VAS_031_SourceInvoiceRequired",
                     "Source invoice is required."
                 );
             }
@@ -2315,7 +2315,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageInvoicePayScheduleRequired",
+                    "VAS_031_InvoicePayScheduleRequired",
                     "Invoice payment schedule is required."
                 );
             }
@@ -2324,7 +2324,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessagePaymentMethodRequired",
+                    "VAS_031_PaymentMethodRequired",
                     "Payment method is required."
                 );
             }
@@ -2358,7 +2358,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageTransactionDateInvalid",
+                    "VAS_031_TransactionDateInvalid",
                     "Transaction date must be in yyyy-MM-dd format."
                 );
             }
@@ -2387,7 +2387,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageSourceInvoiceNotFound",
+                            "VAS_031_SourceInvoiceNotFound",
                             "The source invoice was not found."
                         )
                     );
@@ -2398,7 +2398,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidSourceInvoice",
+                            "VAS_031_InvalidSourceInvoice",
                             "The invoice does not belong to the current client."
                         )
                     );
@@ -2458,7 +2458,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidAPInvoiceDocBaseType",
+                            "VAS_031_InvalidAPInvoiceDocBaseType",
                             "The selected document is not a normal AP Invoice. Invoice DocBaseType must be API, but it is {0}."
                         ).Replace(
                             "{0}",
@@ -2476,7 +2476,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageOrganizationInvoiceMismatch",
+                            "VAS_031_OrganizationInvoiceMismatch",
                             "Selected organization does not match the invoice."
                         )
                     );
@@ -2487,7 +2487,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageVendorInvoiceMismatch",
+                            "VAS_031_VendorInvoiceMismatch",
                             "Selected vendor does not match the invoice."
                         )
                     );
@@ -2505,7 +2505,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidInvoicePaySchedule",
+                            "VAS_031_InvalidInvoicePaySchedule",
                             "The selected invoice payment schedule is invalid, inactive, paid, or does not belong to the selected invoice."
                         )
                     );
@@ -2520,7 +2520,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageScheduleAlreadyHasPayment",
+                            "VAS_031_ScheduleAlreadyHasPayment",
                             "Invoice schedule already has an active payment."
                         )
                     );
@@ -2580,7 +2580,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessagePaymentExceedsOpenAmount",
+                            "VAS_031_PaymentExceedsOpenAmount",
                             "Payment amount and discount exceed the invoice open amount."
                         )
                     );
@@ -2601,7 +2601,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageOrganizationInactive",
+                            "VAS_031_OrganizationInactive",
                             "Organization was not found or is inactive."
                         )
                     );
@@ -2633,7 +2633,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageBankAccountInvalidClient",
+                            "VAS_031_BankAccountInvalidClient",
                             "Bank account does not belong to the current client."
                         )
                     );
@@ -2672,7 +2672,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageVendorLocationNotFound",
+                            "VAS_031_VendorLocationNotFound",
                             "No active business partner location was found for the selected vendor."
                         )
                     );
@@ -2714,7 +2714,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageConversionTypeInactive",
+                            "VAS_031_ConversionTypeInactive",
                             "Conversion type was not found or is inactive."
                         )
                     );
@@ -2735,7 +2735,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageAPPaymentDocTypeNotFound",
+                            "VAS_031_APPaymentDocTypeNotFound",
                             "AP Payment document type was not found."
                         )
                     );
@@ -2758,7 +2758,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidAPPaymentDocType",
+                            "VAS_031_InvalidAPPaymentDocType",
                             "The selected document type is not an AP Payment document type."
                         )
                     );
@@ -2821,7 +2821,7 @@ AND PaymentMethod.AD_Client_ID IN
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidPaymentMethod",
+                            "VAS_031_InvalidPaymentMethod",
                             "The selected payment method is invalid or inactive."
                         )
                     );
@@ -2887,7 +2887,7 @@ AND PaymentMethod.AD_Client_ID IN
                         throw new InvalidOperationException(
                             GetMsg(
                                 ctx,
-                                "VAS_031_MessageNoCurrencyConversion",
+                                "VAS_031_NoCurrencyConversion",
                                 "No currency conversion found for the selected currency."
                             )
                         );
@@ -2902,7 +2902,7 @@ AND PaymentMethod.AD_Client_ID IN
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessagePaymentExceedsOpenAmount",
+                            "VAS_031_PaymentExceedsOpenAmount",
                             "Payment amount and discount exceed the invoice open amount."
                         )
                     );
@@ -3047,7 +3047,7 @@ AND PaymentMethod.AD_Client_ID IN
                     throw new InvalidOperationException(
                         GetLastModelError(
                             ctx,
-                            "VAS_031_MessageCouldNotSaveAPPayment",
+                            "VAS_031_CouldNotSaveAPPayment",
                             "Could not save AP payment."
                         )
                     );
@@ -3118,7 +3118,7 @@ AND PaymentMethod.AD_Client_ID IN
                         processMessage =
                             GetMsg(
                                 ctx,
-                                "VAS_031_MessagePaymentSavedNotCompleted",
+                                "VAS_031_PaymentSavedNotCompleted",
                                 "Payment was saved but was not completed. Current status: {0}"
                             ).Replace(
                                 "{0}",
@@ -3251,7 +3251,7 @@ AND PaymentMethod.AD_Client_ID IN
 
                 string message = GetMsg(
                     ctx,
-                    "VAS_031_MessageCouldNotSaveAPPayment",
+                    "VAS_031_CouldNotSaveAPPayment",
                     "Could not save or complete AP payment."
                 );
 
@@ -3777,7 +3777,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageOrganizationRequired",
+                    "VAS_031_OrganizationRequired",
                     "Organization is required."
                 );
             }
@@ -3813,7 +3813,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageConversionTypeRequired",
+                    "VAS_031_ConversionTypeRequired",
                     "Currency type is required."
                 );
             }
@@ -3822,7 +3822,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageDocumentTypeRequired",
+                    "VAS_031_DocumentTypeRequired",
                     "Document type is required."
                 );
             }
@@ -3840,7 +3840,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageTransactionDateRequired",
+                    "VAS_031_TransactionDateRequired",
                     "Transaction date is required."
                 );
             }
@@ -3849,7 +3849,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessagePaymentAmountRequired",
+                    "VAS_031_PaymentAmountRequired",
                     "Payment amount must be greater than zero."
                 );
             }
@@ -3865,7 +3865,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageTransactionDateInvalid",
+                    "VAS_031_TransactionDateInvalid",
                     "Transaction date must be in yyyy-MM-dd format."
                 );
             }

@@ -7,7 +7,7 @@
 * # | Current Text                         | Message Key
 * ----+--------------------------------------+--------------------------------
 * 1  | Due This Week                        | VAS_029_MessageScheduled
-* 2  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
+* 2  | Scheduled for payment this week      | VAS_029_ScheduledForPaymentThisWeek
 * 3  | Loading                              | VAS_029_MessageLoading
 * 4  | No Data                              | VAS_029_MessageNoData
 * 5  | Could not load data                  | VAS_ErrorLoading
@@ -228,7 +228,7 @@
             $description.text(
                 data.description ||
                 lbl(
-                    'VAS_029_MessageScheduledForPaymentThisWeek',
+                    'VAS_029_ScheduledForPaymentThisWeek',
                     'Scheduled for payment this week'
                 )
             );

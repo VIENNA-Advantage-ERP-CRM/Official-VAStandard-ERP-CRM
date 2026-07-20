@@ -870,8 +870,8 @@
                         : accountNo;
             }
 
-            if (bankName && last4) {
-                return bankName + " - ****" + last4;
+            if (bankName) {
+                return bankName + " - " + accountNo;
             }
 
             if (bankName) {

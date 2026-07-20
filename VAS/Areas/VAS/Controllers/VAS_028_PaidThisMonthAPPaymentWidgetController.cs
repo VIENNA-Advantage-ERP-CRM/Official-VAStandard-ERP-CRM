@@ -168,7 +168,7 @@ namespace VAS.Controllers
 
                         description = GetMsg(
                             ctx,
-                            "VAS_028_MessageOutgoingPaymentsPostedSoFar",
+                            "VAS_028_OutgoingPaymentsPostedSoFar",
                             "Outgoing Payments Posted So Far"
                         ),
 

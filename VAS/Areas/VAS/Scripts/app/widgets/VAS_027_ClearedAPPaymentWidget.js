@@ -12,12 +12,12 @@
  *  4  | payments                                          | VAS_027_messagePayments
  *  5  | awaiting bank match                               | VAS_027_messageAwaitingBankMatch
  *  6  | days                                              | VAS_027_messageDays
- *  7  | No unreconciled payments                          | VAS_027_messageNoUnreconciledPayments
+ *  7  | No unreconciled payments                          | VAS_027_NoUnreconciledPayments
  *  8  | Showing                                           | VAS_Showing
  *  9  | of                                                | VAS_Of
- * 10  | Unreconciled payments                             | VAS_027_messageUnreconciledPayments
- * 11  | Auto-match process is not configured              | VAS_027_messageAutoMatchProcessNotConfigured
- * 12  | Payment reconciliation window is not configured    | VAS_027_messageReconciliationWindowNotConfigured
+ * 10  | Unreconciled payments                             | VAS_027_UnreconciledPayments
+ * 11  | Auto-match process is not configured              | VAS_027_AutoMatchProcessNotConfigured
+ * 12  | Payment reconciliation window is not configured    | VAS_027_ReconciliationWindowNotConfigured
  * 13  | Could not open action                             | VAS_ErrorLoading
  * 14  | Unreconciled (summary label)                      | VAS_027_messageUnreconciled
  * 15  | Amount (summary label)                            | VAS_027_messageAmount
@@ -838,7 +838,7 @@
                     'colspan="8">' +
                     escapeHtml(
                         lbl(
-                            'VAS_027_messageNoUnreconciledPayments',
+                            'VAS_027_NoUnreconciledPayments',
                             'No unreconciled payments'
                         )
                     ) +
@@ -1094,7 +1094,7 @@
                 '<div class="vas-cpa-dialog-title">' +
                 escapeHtml(
                     lbl(
-                        'VAS_027_messageUnreconciledPayments',
+                        'VAS_027_UnreconciledPayments',
                         'Unreconciled payments'
                     )
                 ) +
@@ -1315,7 +1315,7 @@
                     if (!started) {
                         showActionError(
                             lbl(
-                                'VAS_027_messageAutoMatchProcessNotConfigured',
+                                'VAS_027_AutoMatchProcessNotConfigured',
                                 'Auto-match process is not configured'
                             )
                         );
@@ -1337,7 +1337,7 @@
                     if (!started) {
                         showActionError(
                             lbl(
-                                'VAS_027_messageReconciliationWindowNotConfigured',
+                                'VAS_027_ReconciliationWindowNotConfigured',
                                 'Payment reconciliation window is not configured'
                             )
                         );

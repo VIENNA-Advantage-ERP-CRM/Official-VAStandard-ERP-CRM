@@ -1110,7 +1110,7 @@
                             getResponseMessage(
                                 data,
                                 lbl(
-                                    'VAS_032_MessageCouldNotLoadAllocationDetails',
+                                    'VAS_032_CouldNotLoadAllocationDetails',
                                     'Could not load allocation details.'
                                 )
                             )
@@ -1124,7 +1124,7 @@
                 error: function () {
                     VIS.ADialog.error(
                         lbl(
-                            'VAS_032_MessageCouldNotLoadAllocationDetails',
+                            'VAS_032_CouldNotLoadAllocationDetails',
                             'Could not load allocation details.'
                         )
                     );

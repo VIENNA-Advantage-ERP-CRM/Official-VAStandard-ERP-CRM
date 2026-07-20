@@ -9,7 +9,7 @@ using System;
  * ---+--------------------------------------+-----------------------------------------------
  * 1  | Due This Week                        | VAS_029_MessageScheduled
  * 2  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
- * 3  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
+ * 3  | Scheduled for payment this week      | VAS_029_ScheduledForPaymentThisWeek
  * 4  | No Data                              | VAS_ErrorLoading
  * 5  | Session Expired                      | SessionExpired
  * 6  | Not Specified                        | VAS_029_MessageNotSpecified
@@ -174,7 +174,7 @@ namespace VAS.Controllers
 
                         description = GetMsg(
                             ctx,
-                            "VAS_029_MessageScheduledForPaymentThisWeek",
+                            "VAS_029_ScheduledForPaymentThisWeek",
                             "Scheduled for payment this week"
                         ),
 

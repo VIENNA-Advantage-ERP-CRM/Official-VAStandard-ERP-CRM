@@ -20,7 +20,7 @@
  * 11  | Not Specified                        | VAS_031_MessageNotSpecified
  * 12  | Pay                                  | VAS_031_MessagePay
  * 13  | Create Payment                       | VAS_031_MessageCreatePayment
- * 14  | Pre-filled from upcoming             | VAS_031_MessagePrefilledFromUpcoming
+ * 14  | Pre-filled from upcoming             | VAS_031_PrefilledFromUpcoming
  * 15  | Loading invoice details              | VAS_031_MessageLoadingDetails
  * 16  | Invoices                             | VAS_031_MessageInvoices
  * 17  | Invoice                              | VAS_031_MessageInvoice
@@ -42,7 +42,7 @@
  * 34  | Cancel                               | VAS_Cancel
  * 35  | Close                                | VAS_Close
  * 36  | Could not load data                  | VAS_ErrorLoading
- * 37  | Could not save AP payment            | VAS_031_MessageCouldNotSaveAPPayment
+ * 37  | Could not save AP payment            | VAS_031_CouldNotSaveAPPayment
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -3247,7 +3247,7 @@
             if (cBPartnerId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageBusinessPartnerRequired',
+                        'VAS_031_BusinessPartnerRequired',
                         'Business partner is required.'
                     )
                 );
@@ -3383,7 +3383,7 @@
 
             $payDialogSub.text(
                 lbl(
-                    'VAS_031_MessagePrefilledFromUpcoming',
+                    'VAS_031_PrefilledFromUpcoming',
                     'Pre-filled from upcoming'
                 ) +
                 ' · ' +
@@ -3635,7 +3635,7 @@
             if (payload.invoiceId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageSourceInvoiceRequired',
+                        'VAS_031_SourceInvoiceRequired',
                         'Source invoice is required.'
                     )
                 );
@@ -3646,7 +3646,7 @@
             if (payload.invoicePayScheduleId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageInvoicePayScheduleRequired',
+                        'VAS_031_InvoicePayScheduleRequired',
                         'Invoice payment schedule is required.'
                     )
                 );
@@ -3657,7 +3657,7 @@
             if (payload.adOrgId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageOrganizationRequired',
+                        'VAS_031_OrganizationRequired',
                         'Organization is required.'
                     )
                 );
@@ -3701,7 +3701,7 @@
             if (payload.conversionTypeId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageConversionTypeRequired',
+                        'VAS_031_ConversionTypeRequired',
                         'Currency type is required.'
                     )
                 );
@@ -3712,7 +3712,7 @@
             if (payload.docTypeId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageDocumentTypeRequired',
+                        'VAS_031_DocumentTypeRequired',
                         'Document type is required.'
                     )
                 );
@@ -3723,7 +3723,7 @@
             if (payload.paymentMethodId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessagePaymentMethodRequired',
+                        'VAS_031_PaymentMethodRequired',
                         'Payment method is required.'
                     )
                 );
@@ -3768,7 +3768,7 @@
             if (!payload.transactionDate) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageTransactionDateRequired',
+                        'VAS_031_TransactionDateRequired',
                         'Transaction date is required.'
                     )
                 );
@@ -3796,7 +3796,7 @@
             ) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessagePaymentAmountRequired',
+                        'VAS_031_PaymentAmountRequired',
                         'Payment amount must be greater than zero.'
                     )
                 );
@@ -3822,7 +3822,7 @@
             ) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessagePaymentExceedsOpenAmount',
+                        'VAS_031_PaymentExceedsOpenAmount',
                         'Payment amount and discount exceed invoice open amount.'
                     )
                 );
@@ -3881,7 +3881,7 @@
                             getResponseMessage(
                                 data,
                                 lbl(
-                                    'VAS_031_MessageCouldNotSaveAPPayment',
+                                    'VAS_031_CouldNotSaveAPPayment',
                                     'Could not save AP payment.'
                                 )
                             )
@@ -3906,24 +3906,29 @@
 
                     loadData();
 
+
                     if (
                         VIS &&
                         VIS.ADialog &&
                         VIS.ADialog.info
                     ) {
-                        VIS.ADialog.info(
-                            String(
-                                getResponseMessage(
-                                    data,
-                                    lbl(
-                                        'VAS_031_MessagePaymentCreatedSuccessfully',
-                                        'AP payment created successfully.'
-                                    )
+
+                        var msg = String(
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_031_PaymentCreatedSuccessfully',
+                                    'AP payment created successfully.'
                                 )
                             )
-                                .replace(/[\[\]]/g, '')
-                                .replace(/\s{2,}/g, ' ')
-                                .trim()
+                        )
+                            .replace(/[\[\]]/g, '')
+                            .replace(/\s{2,}/g, ' ')
+                            .trim();
+
+
+                        VIS.ADialog.info(
+                            msg
                         );
                     }
                 },
@@ -3933,7 +3938,7 @@
                         getAjaxErrorMessage(
                             xhr,
                             lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'VAS_031_CouldNotSaveAPPayment',
                                 'Could not save AP payment.'
                             )
                         )
