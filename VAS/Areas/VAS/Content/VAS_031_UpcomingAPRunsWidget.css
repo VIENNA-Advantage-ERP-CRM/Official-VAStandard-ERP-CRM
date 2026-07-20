@@ -58,15 +58,16 @@
 
 .vas-upcoming-ap-runs-head-left {
     flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.vas-upcoming-ap-runs-title-row {
     display: flex;
     align-items: center;
     min-width: 0;
     gap: 0.625em;
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-head-text {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
 }
 
@@ -123,7 +124,6 @@
 .vas-upcoming-ap-runs-sub {
     min-width: 0;
     margin-top: 0.125em;
-    padding-left: 2.375em;
     overflow: hidden;
     color: #748494;
     font-size: 0.6875em;

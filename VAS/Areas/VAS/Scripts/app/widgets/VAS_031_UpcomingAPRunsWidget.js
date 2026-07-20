@@ -4153,7 +4153,7 @@
                 return;
             }
             var $headLeft;
-            var $titleRow;
+            var $headText;
             var $iconBox;
             var $icon;
             var $title;
@@ -4171,8 +4171,8 @@
                 '<div class="vas-upcoming-ap-runs-head-left">'
             );
 
-            $titleRow = $(
-                '<div class="vas-upcoming-ap-runs-title-row">'
+            $headText = $(
+                '<div class="vas-upcoming-ap-runs-head-text">'
             );
 
             $iconBox = $(
@@ -4217,13 +4217,13 @@
 
             $iconBox.append($icon);
 
-            $titleRow
-                .append($iconBox)
-                .append($title);
+            $headText
+                .append($title)
+                .append($sub);
 
             $headLeft
-                .append($titleRow)
-                .append($sub);
+                .append($iconBox)
+                .append($headText);
 
             $head.append($headLeft);
 
