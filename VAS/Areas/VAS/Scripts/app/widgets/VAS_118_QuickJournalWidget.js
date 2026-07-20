@@ -88,6 +88,11 @@
         var currentJournalId = 0;   /* > 0 once saved as draft; the modal stays open on it */
         var savedSnapshot = '';     /* JSON of the field values at the last save (dirty check) */
 
+        /* Upper bound for the amount value — Int32.MaxValue (2,147,483,647). The
+           amount is capped here inclusive of its precision digits so it never
+           overflows a 32-bit signed integer downstream. */
+        var AMOUNT_MAX_VALUE = 2147483647;
+
         /* ---------------- helpers ---------------- */
 
         function lbl(key, fallback) {
@@ -137,6 +142,63 @@
             if (!currencySymbol) { return text; }
             /* 3-char ISO reads better after the amount; a glyph symbol before it. */
             return currencySymbol.length === 3 ? (text + ' ' + currencySymbol) : (currencySymbol + text);
+        }
+
+        /* Active decimal separator for the current locale ('.' or ','). */
+        function decimalChar() {
+            try { return VIS.Env.isDecimalPoint() ? '.' : ','; } catch (e) { return '.'; }
+        }
+
+        /* Round a number half-up to the accounting schema's standard precision. */
+        function roundToPrecision(num) {
+            var p = precision >= 0 ? precision : 2;
+            var n = Number(num);
+            if (isNaN(n)) { return 0; }
+            var f = Math.pow(10, p);
+            return Math.round(n * f) / f;
+        }
+
+        /* Rounded value as an editable input string (locale separator, no
+           thousands grouping, exactly `precision` fraction digits). */
+        function amountToInputString(num) {
+            var p = precision >= 0 ? precision : 2;
+            var s = roundToPrecision(num).toFixed(p);   /* toFixed always uses '.' */
+            return decimalChar() === ',' ? s.replace('.', ',') : s;
+        }
+
+        /* Keep the raw amount text to digits + one decimal separator, clamp the
+           fraction to `precision` digits and the value to AMOUNT_MAX_VALUE. Runs
+           on every keystroke so an out-of-range value can never be typed. */
+        function sanitizeAmountField($input) {
+            var sep = decimalChar();
+            var raw = String($input.val() || '');
+
+            /* Strip everything but digits and the first decimal separator. */
+            var cleaned = '';
+            var seenSep = false;
+            for (var i = 0; i < raw.length; i++) {
+                var ch = raw.charAt(i);
+                if (ch >= '0' && ch <= '9') { cleaned += ch; }
+                else if (ch === sep && !seenSep) { cleaned += sep; seenSep = true; }
+            }
+
+            /* Cap the fraction to `precision` (drop the separator when precision 0). */
+            var sepIdx = cleaned.indexOf(sep);
+            if (sepIdx >= 0) {
+                var intPart = cleaned.slice(0, sepIdx);
+                if (precision > 0) {
+                    cleaned = intPart + sep + cleaned.slice(sepIdx + 1, sepIdx + 1 + precision);
+                } else {
+                    cleaned = intPart;
+                }
+            }
+
+            /* Clamp the value (integer + fraction) to Int32.MaxValue. */
+            if (parseAmount(cleaned) > AMOUNT_MAX_VALUE) {
+                cleaned = amountToInputString(AMOUNT_MAX_VALUE);
+            }
+
+            if (cleaned !== raw) { $input.val(cleaned); }
         }
 
         function markInvalid($el, on) {
@@ -280,7 +342,14 @@
 
             /* Do NOT close on scrim (outside) click — only the X and Cancel close it. */
             $dialog.find('.vas-qj-close, .vas-qj-cancel').on('click', closeDialog);
-            $dialog.find('.vas-qj-amount-input').on('input', updateBalance);
+            $dialog.find('.vas-qj-amount-input')
+                .on('input', function () { sanitizeAmountField($(this)); updateBalance(); })
+                /* On blur, snap the entry to the schema precision (e.g. 12.5 → 12.50). */
+                .on('blur', function () {
+                    var $inp = $(this);
+                    if ($.trim($inp.val()) !== '') { $inp.val(amountToInputString(parseAmount($inp.val()))); }
+                    updateBalance();
+                });
             $dialog.find('.vas-qj-draft').on('click', onSaveDraft);
             $dialog.find('.vas-qj-post').on('click', onComplete);
 
@@ -449,6 +518,11 @@
             currencySymbol = currentSchema ? (currentSchema.CurrencySymbol || '') : '';
             currencyIso = currentSchema ? (currentSchema.CurrencyIso || '') : '';
             $dialog.find('.vas-qj-cur').text(currencySymbol || currencyIso);
+            /* Re-round an already-typed amount to the new schema precision and cap
+               the input length to Int32.MaxValue's digits + the precision. */
+            var $amt = $dialog.find('.vas-qj-amount-input');
+            $amt.attr('maxlength', String(AMOUNT_MAX_VALUE).length + (precision > 0 ? 1 + precision : 0));
+            if ($.trim($amt.val()) !== '') { $amt.val(amountToInputString(parseAmount($amt.val()))); }
             /* Accounts are schema-scoped: drop the stale picks and reload for the new
                schema (an open account dropdown refreshes immediately). */
             reloadAccountCombo($dialog.find('.vas-qj-debit'));
@@ -677,7 +751,7 @@
                 description: $.trim($dialog.find('.vas-qj-desc').val()),
                 debitAccountId: Number($dialog.find('.vas-qj-debit .vas-qj-combo-id').val() || 0),
                 creditAccountId: Number($dialog.find('.vas-qj-credit .vas-qj-combo-id').val() || 0),
-                amount: String(parseAmount($dialog.find('.vas-qj-amount-input').val())),
+                amount: String(roundToPrecision(parseAmount($dialog.find('.vas-qj-amount-input').val()))),
                 adOrgTrxId: Number($dialog.find('.vas-qj-costcenter .vas-qj-combo-id').val() || 0)
             };
         }
