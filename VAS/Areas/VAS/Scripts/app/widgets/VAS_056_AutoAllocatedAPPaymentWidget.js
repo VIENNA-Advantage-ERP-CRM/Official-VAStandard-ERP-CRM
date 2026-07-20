@@ -24,6 +24,7 @@
  * 18  | Next                                              | VAS_Next
  * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
+ * 21  | Unallocated amount                                | VAS_056_UnallocatedAmount
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -52,6 +53,7 @@
  * 19 | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20 | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21 | Last 30 days                                      | VAS_Last30Days
+ * 22 | Unallocated amount                                | VAS_056_UnallocatedAmount
  */
 
 ; VAS = window.VAS || {};
@@ -457,6 +459,31 @@
                 }
 
                 amountHtml += escapeHtml(amountText);
+
+                if (row.isPartiallyAllocated) {
+                    var unallocatedText = formatAmount(
+                        row.unallocatedAmt
+                    );
+
+                    amountHtml +=
+                        '<span class="' +
+                        classPrefix +
+                        'amount-unallocated">' +
+                        escapeHtml(
+                            lbl(
+                                "VAS_056_UnallocatedAmount",
+                                "Unallocated amount"
+                            )
+                        ) +
+                        ": " +
+                        (
+                            currencySymbol
+                                ? escapeHtml(currencySymbol) + " "
+                                : ""
+                        ) +
+                        escapeHtml(unallocatedText) +
+                        "</span>";
+                }
 
                 var rowHtml =
                     "<tr>" +

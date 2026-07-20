@@ -575,7 +575,23 @@ namespace VAS.Controllers
                                Currency.ISO_Code AS Payment_Currency,
                                Currency.CurSymbol AS Payment_Currency_Symbol,
                                SecuredPayments.IsAllocated AS Is_Allocated,
-                               SecuredPayments.PayAmt AS Pay_Amount
+                               SecuredPayments.PayAmt AS Pay_Amount,
+                               COALESCE(
+                                   (
+                                       SELECT SUM(AllocationLine.Amount)
+                                       FROM C_AllocationLine AllocationLine
+                                       INNER JOIN C_AllocationHdr AllocationHdr ON
+                                       (
+                                           AllocationHdr.C_AllocationHdr_ID =
+                                           AllocationLine.C_AllocationHdr_ID
+                                       )
+                                       WHERE AllocationLine.C_Payment_ID =
+                                           SecuredPayments.C_Payment_ID
+                                       AND AllocationHdr.IsActive = 'Y'
+                                       AND AllocationLine.IsActive = 'Y'
+                                   ),
+                                   0
+                               ) AS Allocated_Amount
                         FROM SecuredPayments
                         INNER JOIN CurrentPeriod ON
                         (
@@ -619,6 +635,7 @@ namespace VAS.Controllers
                                PaymentsData.Payment_Currency_Symbol,
                                PaymentsData.Is_Allocated,
                                PaymentsData.Pay_Amount,
+                               PaymentsData.Allocated_Amount,
                                ROW_NUMBER() OVER
                                (
                                    ORDER BY PaymentsData.Date_Acct DESC,
@@ -639,6 +656,7 @@ namespace VAS.Controllers
                                NumberedPayments.Payment_Currency_Symbol,
                                NumberedPayments.Is_Allocated,
                                NumberedPayments.Pay_Amount,
+                               NumberedPayments.Allocated_Amount,
                                NumberedPayments.TotalRecords,
                                NumberedPayments.RowNumber
                         FROM NumberedPayments
@@ -665,6 +683,7 @@ namespace VAS.Controllers
                            PagedPayments.Payment_Currency_Symbol,
                            PagedPayments.Is_Allocated,
                            PagedPayments.Pay_Amount,
+                           PagedPayments.Allocated_Amount,
                            PagedPayments.TotalRecords,
                            PagedPayments.RowNumber,
                            PeriodStatus.PeriodCount,
@@ -746,6 +765,28 @@ namespace VAS.Controllers
                                 "Unallocated"
                             );
 
+                    int precision = GetStandardPrecision(ctx);
+
+                    decimal payAmount = GetSafeDecimal(
+                        dr["Pay_Amount"],
+                        precision
+                    );
+
+                    decimal allocatedAmount = GetSafeDecimal(
+                        dr["Allocated_Amount"],
+                        precision
+                    );
+
+                    decimal unallocatedAmount = Math.Max(
+                        payAmount - allocatedAmount,
+                        0
+                    );
+
+                    bool isPartiallyAllocated =
+                        isAllocated != "Y" &&
+                        allocatedAmount > 0 &&
+                        unallocatedAmount > 0;
+
                     rows.Add(
                         new
                         {
@@ -785,10 +826,11 @@ namespace VAS.Controllers
                                 isAllocated,
                             statusName =
                                 statusName,
-                            amount = GetSafeDecimal(
-                                dr["Pay_Amount"],
-                                GetStandardPrecision(ctx)
-                            )
+                            amount = payAmount,
+                            allocatedAmt = allocatedAmount,
+                            unallocatedAmt = unallocatedAmount,
+                            isPartiallyAllocated =
+                                isPartiallyAllocated
                         }
                     );
                 }
