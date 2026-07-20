@@ -59,6 +59,7 @@
 
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_CreateARInvoice.css";
+@import "../VAS_CreateGLJournal.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";

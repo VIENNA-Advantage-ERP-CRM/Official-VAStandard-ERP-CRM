@@ -159,6 +159,7 @@ import "../app/widgets/cashjournal/VAS_NewCashJournalWidget.js";
 import "../app/widgets/VAS_010_CashGlCashInWidget.js";
 import "../app/widgets/VAS_002_CreateNewReceipt.js";
 import "../app/widgets/VAS_064_CreateARInvoice.js";
+import "../app/widgets/VAS_119_CreateGLJournal.js";
 import "../app/widgets/VAS_ReceiptSearch.js";
 import "../app/widgets/TotalAmountReceivedThisMonthWidget.js";
 import "../app/widgets/ExpectedThisWeekWidget.js";
