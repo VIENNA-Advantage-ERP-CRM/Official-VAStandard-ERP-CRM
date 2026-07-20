@@ -664,12 +664,18 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-amount-unallocated {
-    display: block;
-    margin-top: 0.2em;
-    font-size: 0.78em;
+    display: inline-block;
+    font-size: 0.8125em;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: #b45309;
+    white-space: nowrap;
+}
+
+.VAS-056-AutoAllocatedAPPayment-th-partial,
+.VAS-056-AutoAllocatedAPPayment-td-partial {
+    width: 12em;
+    text-align: left;
 }
 
 .VAS-056-AutoAllocatedAPPayment-dialog-empty {

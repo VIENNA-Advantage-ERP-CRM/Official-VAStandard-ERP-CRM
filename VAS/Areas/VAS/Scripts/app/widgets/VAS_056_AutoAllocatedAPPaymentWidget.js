@@ -24,7 +24,7 @@
  * 18  | Next                                              | VAS_Next
  * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
- * 21  | Unallocated amount                                | VAS_056_UnallocatedAmount
+ * 21  | Partially allocated                               | VAS_UnAllocatedAmount
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -53,7 +53,7 @@
  * 19 | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20 | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21 | Last 30 days                                      | VAS_Last30Days
- * 22 | Unallocated amount                                | VAS_056_UnallocatedAmount
+ * 22 | Partially allocated                               | VAS_UnAllocatedAmount
  */
 
 ; VAS = window.VAS || {};
@@ -417,7 +417,7 @@
                     "<tr>" +
                     '<td class="' +
                     classPrefix +
-                    'dialog-empty" colspan="6">' +
+                    'dialog-empty" colspan="7">' +
                     escapeHtml(
                         lbl(
                             "VAS_056_NoPaymentsThisPeriod",
@@ -460,28 +460,30 @@
 
                 amountHtml += escapeHtml(amountText);
 
+                var partialHtml = "";
+
                 if (row.isPartiallyAllocated) {
                     var unallocatedText = formatAmount(
                         row.unallocatedAmt
                     );
 
-                    amountHtml +=
+                    partialHtml +=
                         '<span class="' +
                         classPrefix +
                         'amount-unallocated">' +
-                        escapeHtml(
-                            lbl(
-                                "VAS_056_UnallocatedAmount",
-                                "Unallocated amount"
-                            )
-                        ) +
-                        ": " +
                         (
                             currencySymbol
                                 ? escapeHtml(currencySymbol) + " "
                                 : ""
                         ) +
                         escapeHtml(unallocatedText) +
+                        " - " +
+                        escapeHtml(
+                            lbl(
+                                "VAS_UnAllocatedAmount",
+                                "Partially allocated"
+                            )
+                        ) +
                         "</span>";
                 }
 
@@ -552,6 +554,12 @@
                     ) +
                     '">' +
                     amountHtml +
+                    "</td>" +
+
+                    '<td class="' +
+                    classPrefix +
+                    'td-partial">' +
+                    partialHtml +
                     "</td>" +
 
                     "</tr>";
@@ -1130,6 +1138,17 @@
                     lbl(
                         "VAS_Amount",
                         "Amount"
+                    )
+                ) +
+                "</th>" +
+
+                '<th class="' +
+                classPrefix +
+                'th-partial">' +
+                escapeHtml(
+                    lbl(
+                        "VAS_UnAllocatedAmount",
+                        "Partially allocated"
                     )
                 ) +
                 "</th>" +

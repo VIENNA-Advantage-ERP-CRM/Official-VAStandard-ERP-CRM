@@ -470,7 +470,8 @@ namespace VAS.Controllers
                            Payment.C_BankAccount_ID,
                            Payment.C_Currency_ID,
                            Payment.PayAmt,
-                           Payment.IsAllocated
+                           Payment.IsAllocated,
+                           Payment.VAS_UnAllocatedAmount
                     FROM C_Payment Payment
                     WHERE Payment.IsReceipt = 'N'
                     AND Payment.IsActive = 'Y'
@@ -576,22 +577,12 @@ namespace VAS.Controllers
                                Currency.CurSymbol AS Payment_Currency_Symbol,
                                SecuredPayments.IsAllocated AS Is_Allocated,
                                SecuredPayments.PayAmt AS Pay_Amount,
-                               COALESCE(
-                                   (
-                                       SELECT SUM(AllocationLine.Amount)
-                                       FROM C_AllocationLine AllocationLine
-                                       INNER JOIN C_AllocationHdr AllocationHdr ON
-                                       (
-                                           AllocationHdr.C_AllocationHdr_ID =
-                                           AllocationLine.C_AllocationHdr_ID
-                                       )
-                                       WHERE AllocationLine.C_Payment_ID =
-                                           SecuredPayments.C_Payment_ID
-                                       AND AllocationHdr.IsActive = 'Y'
-                                       AND AllocationLine.IsActive = 'Y'
-                                   ),
-                                   0
-                               ) AS Allocated_Amount
+                               ABS(
+                                   COALESCE(
+                                       SecuredPayments.VAS_UnAllocatedAmount,
+                                       0
+                                   )
+                               ) AS Unallocated_Amount
                         FROM SecuredPayments
                         INNER JOIN CurrentPeriod ON
                         (
@@ -635,7 +626,7 @@ namespace VAS.Controllers
                                PaymentsData.Payment_Currency_Symbol,
                                PaymentsData.Is_Allocated,
                                PaymentsData.Pay_Amount,
-                               PaymentsData.Allocated_Amount,
+                               PaymentsData.Unallocated_Amount,
                                ROW_NUMBER() OVER
                                (
                                    ORDER BY PaymentsData.Date_Acct DESC,
@@ -656,7 +647,7 @@ namespace VAS.Controllers
                                NumberedPayments.Payment_Currency_Symbol,
                                NumberedPayments.Is_Allocated,
                                NumberedPayments.Pay_Amount,
-                               NumberedPayments.Allocated_Amount,
+                               NumberedPayments.Unallocated_Amount,
                                NumberedPayments.TotalRecords,
                                NumberedPayments.RowNumber
                         FROM NumberedPayments
@@ -683,7 +674,7 @@ namespace VAS.Controllers
                            PagedPayments.Payment_Currency_Symbol,
                            PagedPayments.Is_Allocated,
                            PagedPayments.Pay_Amount,
-                           PagedPayments.Allocated_Amount,
+                           PagedPayments.Unallocated_Amount,
                            PagedPayments.TotalRecords,
                            PagedPayments.RowNumber,
                            PeriodStatus.PeriodCount,
@@ -772,13 +763,13 @@ namespace VAS.Controllers
                         precision
                     );
 
-                    decimal allocatedAmount = GetSafeDecimal(
-                        dr["Allocated_Amount"],
+                    decimal unallocatedAmount = GetSafeDecimal(
+                        dr["Unallocated_Amount"],
                         precision
                     );
 
-                    decimal unallocatedAmount = Math.Max(
-                        payAmount - allocatedAmount,
+                    decimal allocatedAmount = Math.Max(
+                        payAmount - unallocatedAmount,
                         0
                     );
 
