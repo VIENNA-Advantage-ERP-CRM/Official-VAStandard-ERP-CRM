@@ -1896,7 +1896,9 @@ SELECT
 
     BankAccount.Name AS BankAccountName,
 
-    BankAccount.AccountNo
+    BankAccount.AccountNo,
+
+    Currency.ISO_Code AS CurrencyISO
 
 FROM C_BankAccount BankAccount
 
@@ -1904,6 +1906,12 @@ LEFT OUTER JOIN C_Bank Bank ON
 (
     Bank.C_Bank_ID =
     BankAccount.C_Bank_ID
+)
+
+LEFT OUTER JOIN C_Currency Currency ON
+(
+    Currency.C_Currency_ID =
+    BankAccount.C_Currency_ID
 )
 
 WHERE BankAccount.IsActive = 'Y'
@@ -1959,21 +1967,47 @@ ORDER BY
                         "AccountNo"
                     );
 
-                    string displayName = FirstNotEmpty(
-                        bankName,
-                        accountName,
-                        accountNo
+                    string currencyISO = GetString(
+                        reader,
+                        "CurrencyISO"
                     );
 
-                    if (
-                        !string.IsNullOrWhiteSpace(accountNo) &&
-                        displayName != accountNo
-                    )
+                    /*
+                     * Display format: "BankAccountName - AccountNo - Currency"
+                     * e.g. "Main USD Account - 123456789 - IQD".
+                     * The bank account name is shown first, followed by the
+                     * account number, falling back to the bank name when the
+                     * account has no name.
+                     */
+                    List<string> displayNameParts =
+                        new List<string>();
+
+                    string primaryName = FirstNotEmpty(
+                        accountName,
+                        bankName
+                    );
+
+                    if (!string.IsNullOrWhiteSpace(primaryName))
+                    {
+                        displayNameParts.Add(primaryName);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(accountNo))
+                    {
+                        displayNameParts.Add(accountNo);
+                    }
+
+                    string displayName = string.Join(
+                        " - ",
+                        displayNameParts
+                    );
+
+                    if (!string.IsNullOrWhiteSpace(currencyISO))
                     {
                         displayName =
                             displayName +
-                            " · " +
-                            accountNo;
+                            " - " +
+                            currencyISO;
                     }
 
                     rows.Add(new
@@ -3119,11 +3153,16 @@ AND PaymentMethod.AD_Client_ID IN
                 string createdPaymentDocumentNo =
                     payment.GetDocumentNo();
 
-                string msg = GetMsg(
-                    ctx,
-                    "VAS_031_MessagePaymentCreatedSuccessfully",
-                    "AP payment created and completed successfully:"
-                ) + " " + createdPaymentDocumentNo;
+                string msg = (
+                    GetMsg(
+                        ctx,
+                        "VAS_031_MessagePaymentCreatedSuccessfully",
+                        "AP payment created and completed successfully:"
+                    ) + " " + createdPaymentDocumentNo
+                )
+                    .Replace("[", string.Empty)
+                    .Replace("]", string.Empty)
+                    .Trim();
 
 
                 return Json(new

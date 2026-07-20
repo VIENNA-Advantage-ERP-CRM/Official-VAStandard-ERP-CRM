@@ -76,6 +76,10 @@
     gap: 0.625em;
 }
 
+.vas-reconciliation-status-head-text {
+    min-width: 0;
+}
+
 .vas-reconciliation-status-icon-box {
     flex: 0 0 auto;
     width: 1.75em;
@@ -110,7 +114,7 @@
 }
 
 .vas-reconciliation-status-sub {
-    margin-top: 0.375em;
+    margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -372,7 +376,7 @@
 
     .vas-reconciliation-status-sub {
         font-size: 0.75em;
-        margin-top: 0.3125em;
+        margin-top: 0.125em;
     }
 
     .vas-reconciliation-status-body {

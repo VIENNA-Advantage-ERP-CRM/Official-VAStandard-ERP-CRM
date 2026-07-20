@@ -35,7 +35,6 @@
  * 26  | Payment Amount                       | VAS_031_MessagePaymentAmount
  * 27  | Payment Document No.                 | VAS_031_MessageDocumentNo
  * 28  | pre-filled                           | VAS_031_MessagePrefilled
- * 29  | Select                               | VAS_Select
  * 30  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
  * 31  | Review and save.                     | VAS_031_MessageReviewAndSave
  * 32  | Saving                               | VAS_031_MessageSaving
@@ -453,6 +452,17 @@
                 : String(numericValue);
         }
 
+        function normalizeNumberOrEmpty(value) {
+            var numericValue = Number(value || 0);
+
+            return (
+                isNaN(numericValue) ||
+                numericValue === 0
+            )
+                ? ''
+                : String(numericValue);
+        }
+
         function normalizePrecision(value) {
             var precision = Number(value);
 
@@ -770,16 +780,11 @@
                 ) +
                 '>';
 
-            html +=
-                '<option value="">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_Select',
-                        'Select'
-                    )
-                ) +
-                '</option>';
-
+            /*
+             * All popup dropdowns are mandatory on the backend,
+             * so no empty "Select" placeholder option is rendered.
+             * The first real option becomes the default selection.
+             */
             for (
                 index = 0;
                 index < items.length;
@@ -2371,19 +2376,19 @@
                     )
                 );
 
-                getPayField('discountAmt').val('0');
+                getPayField('discountAmt').val('');
                 getPayField('payAmt').val('0');
                 return false;
             }
 
             getPayField('discountAmt').val(
-                normalizeNumber(
+                normalizeNumberOrEmpty(
                     convertedDiscountAmount
                 )
             );
 
             getPayField('writeOffAmt').val(
-                normalizeNumber(
+                normalizeNumberOrEmpty(
                     convertedWriteOffAmount
                 )
             );
@@ -2458,7 +2463,7 @@
             );
 
             getPayField('discountAmt').val(
-                normalizeNumber(
+                normalizeNumberOrEmpty(
                     roundPopupAmount(discountAmt)
                 )
             );
@@ -2468,7 +2473,7 @@
             );
 
             getPayField('writeOffAmt').val(
-                normalizeNumber(
+                normalizeNumberOrEmpty(
                     roundPopupAmount(writeOffAmt)
                 )
             );
@@ -2541,7 +2546,7 @@
             );
 
             getPayField('writeOffAmt').val(
-                normalizeNumber(
+                normalizeNumberOrEmpty(
                     roundPopupAmount(writeOffAmt)
                 )
             );
@@ -2604,7 +2609,7 @@
             );
 
             getPayField('writeOffAmt').val(
-                normalizeNumber(
+                normalizeNumberOrEmpty(
                     roundPopupAmount(writeOffAmt)
                 )
             );
@@ -2910,7 +2915,7 @@
                     inputHtml(
                         'discountAmt',
                         'number',
-                        normalizeNumber(
+                        normalizeNumberOrEmpty(
                             firstValue(
                                 row.discountAmt,
                                 row.discountAmount,
@@ -2921,7 +2926,7 @@
                         false
                     ),
 
-                    true
+                    false
                 ) +
 
                 fieldHtml(
@@ -2933,7 +2938,7 @@
                     inputHtml(
                         'writeOffAmt',
                         'number',
-                        normalizeNumber(
+                        normalizeNumberOrEmpty(
                             firstValue(
                                 row.writeOffAmt,
                                 row.writeOffAmount,
@@ -2944,7 +2949,7 @@
                         false
                     ),
 
-                    true
+                    false
                 ) +
 
                 fieldHtml(
@@ -3907,13 +3912,18 @@
                         VIS.ADialog.info
                     ) {
                         VIS.ADialog.info(
-                            getResponseMessage(
-                                data,
-                                lbl(
-                                    'VAS_031_MessagePaymentCreatedSuccessfully',
-                                    'AP payment created successfully.'
+                            String(
+                                getResponseMessage(
+                                    data,
+                                    lbl(
+                                        'VAS_031_MessagePaymentCreatedSuccessfully',
+                                        'AP payment created successfully.'
+                                    )
                                 )
                             )
+                                .replace(/[\[\]]/g, '')
+                                .replace(/\s{2,}/g, ' ')
+                                .trim()
                         );
                     }
                 },
