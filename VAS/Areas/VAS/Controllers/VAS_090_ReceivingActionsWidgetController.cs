@@ -939,7 +939,7 @@ namespace VIS.Controllers
 
         /// <summary>
         /// One page of vendor GRNs for label printing, filtered by an optional
-        /// document-number / supplier-name search, with copy count and print format.
+        /// document-number / supplier-name search.
         /// </summary>
         /// <param name="searchText">Optional GRN number or supplier name fragment.</param>
         /// <param name="pageNo">1-based page number.</param>
@@ -972,20 +972,11 @@ namespace VIS.Controllers
                            OR UPPER(BPartner.Name) LIKE UPPER(@Search_PartnerName))";
             }
 
-            string copiesSql = HasColumn("C_DocType", "DocumentCopies")
-                ? "COALESCE(DocType.DocumentCopies, 1)"
-                : "1";
-            string printFormatSql = HasColumn("C_DocType", "AD_PrintFormat_ID")
-                ? "COALESCE(DocType.AD_PrintFormat_ID, 0)"
-                : "0";
-
             string rawLabelSql = @"
                 SELECT InOut.M_InOut_ID AS GRN_ID,
                        InOut.DocumentNo AS GRN_No,
                        BPartner.Name AS Party_Name,
                        COALESCE(InOutLine.MovementQty, 0) AS Line_Qty,
-                       " + copiesSql + @" AS Copies,
-                       " + printFormatSql + @" AS Print_Format_ID,
                        COALESCE(InOut.DateReceived, InOut.MovementDate, InOut.Created) AS Sort_Date
                 FROM M_InOut InOut
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
@@ -1007,16 +998,12 @@ namespace VIS.Controllers
                        LabelData.GRN_No,
                        LabelData.Party_Name,
                        LabelData.Received_Qty,
-                       LabelData.Copies,
-                       LabelData.Print_Format_ID,
                        LabelData.TotalRecords
                 FROM (
                     SELECT RawData.GRN_ID,
                            RawData.GRN_No,
                            RawData.Party_Name,
                            COALESCE(SUM(RawData.Line_Qty), 0) AS Received_Qty,
-                           MAX(RawData.Copies) AS Copies,
-                           MAX(RawData.Print_Format_ID) AS Print_Format_ID,
                            MAX(RawData.Sort_Date) AS Sort_Date,
                            COUNT(1) OVER () AS TotalRecords
                     FROM (
@@ -1051,7 +1038,6 @@ namespace VIS.Controllers
                 while (dr != null && dr.Read())
                 {
                     totalRecords = Util.GetValueOfInt(dr["TotalRecords"]);
-                    int printFormatId = Util.GetValueOfInt(dr["Print_Format_ID"]);
 
                     rows.Add(new
                     {
@@ -1059,9 +1045,6 @@ namespace VIS.Controllers
                         grnNo = Util.GetValueOfString(dr["GRN_No"]),
                         partyName = Util.GetValueOfString(dr["Party_Name"]),
                         receivedQty = Util.GetValueOfDecimal(dr["Received_Qty"]),
-                        copies = Math.Max(1, Util.GetValueOfInt(dr["Copies"])),
-                        printFormatId = printFormatId,
-                        printFormat = GetPrintFormatText(printFormatId)
                     });
                 }
 
@@ -1093,7 +1076,7 @@ namespace VIS.Controllers
         /// a queued-label confirmation payload.
         /// </summary>
         /// <param name="grnId">M_InOut_ID of the GRN to print.</param>
-        /// <returns>JSON { success, grnId, grnNo, copies, printFormat, ... } or { error }.</returns>
+        /// <returns>JSON { success, grnId, grnNo, ... } or { error }.</returns>
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -1109,94 +1092,40 @@ namespace VIS.Controllers
                 return Fail("GRN is required.");
             }
 
-            Ctx ctx = Session["ctx"] as Ctx;
-
-            string copiesSql = HasColumn("C_DocType", "DocumentCopies")
-                ? "COALESCE(DocType.DocumentCopies, 1)"
-                : "1";
-            string printFormatSql = HasColumn("C_DocType", "AD_PrintFormat_ID")
-                ? "COALESCE(DocType.AD_PrintFormat_ID, 0)"
-                : "0";
-
+            Ctx ctx = Session["ctx"] as Ctx;            
             string sql = @"
-                SELECT InOut.M_InOut_ID AS GRN_ID,
-                       InOut.DocumentNo AS GRN_No,
-                       " + copiesSql + @" AS Copies,
-                       " + printFormatSql + @" AS Print_Format_ID
+                SELECT DocType.Report_ID
                 FROM M_InOut InOut
                 LEFT OUTER JOIN C_DocType DocType ON (DocType.C_DocType_ID=InOut.C_DocType_ID AND DocType.IsActive='Y')
-                WHERE InOut.IsActive='Y'
-                  AND InOut.MovementType='V+'
-                  AND InOut.AD_Client_ID=@AD_Client_ID
-                  AND InOut.M_InOut_ID=@GRN_ID";
-
-            sql = MRole.GetDefault(ctx).AddAccessSQL(
-                sql,
-                "InOut",
-                MRole.SQL_FULLYQUALIFIED,
-                MRole.SQL_RO
-            );
+                WHERE InOut.M_InOut_ID=@GRN_ID";
 
             SqlParameter[] parameters =
             {
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
                 new SqlParameter("@GRN_ID", grnId)
             };
 
-            IDataReader dr = null;
-
             try
             {
-                dr = DB.ExecuteReader(sql, parameters);
-                if (dr == null || !dr.Read())
-                {
-                    return Fail("GRN was not found.");
-                }
-
-                int printFormatId = Util.GetValueOfInt(dr["Print_Format_ID"]);
-                int resolvedGrnId = Util.GetValueOfInt(dr["GRN_ID"]);
-                string grnNo = Util.GetValueOfString(dr["GRN_No"]);
-                int copies = Math.Max(1, Util.GetValueOfInt(dr["Copies"]));
-
-                // Close the reader before issuing further scalar lookups on the connection.
-                dr.Close();
-                dr.Dispose();
-                dr = null;
+                int printProcessId = Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null));
 
                 // Resolve the GRN print/report process so the client can launch it via
-                // VIS.APrint against this M_InOut record. The process (Value/Name
-                // "DTD001_GRNReport") may not exist yet - in that case processId stays 0
+                // VIS.APrint against this M_InOut record. The process may not exist yet - in that case processId stays 0
                 // and the client simply shows the queued confirmation without printing.
-                int printProcessId = GetGRNPrintProcessId(ctx);
+                if (printProcessId == 0)
+                {
+                    printProcessId = GetGRNPrintProcessId(ctx);
+                }
                 int inOutTableId = GetTableId("M_InOut");
 
                 return Ok(new
                 {
-                    success = true,
-                    grnId = resolvedGrnId,
-                    grnNo = grnNo,
-                    copies = copies,
-                    printFormatId = printFormatId,
-                    printFormat = GetPrintFormatText(printFormatId),
-                    printer = "Default printer",
-                    includes = "Barcode + locator",
-                    status = "Queued",
                     AD_Process_ID = printProcessId,
-                    AD_Table_ID = inOutTableId,
-                    Record_ID = resolvedGrnId
+                    AD_Table_ID = inOutTableId
                 });
             }
             catch (Exception ex)
             {
                 return Fail(ex.Message);
-            }
-            finally
-            {
-                if (dr != null)
-                {
-                    dr.Close();
-                    dr.Dispose();
-                }
             }
         }
 
@@ -1657,39 +1586,79 @@ namespace VIS.Controllers
         }
 
         /// <summary>
-        /// Resolves the AD_Process_ID of the GRN label/report process, matched by
-        /// either Value or Name "DTD001_GRNReport". Prefers a client-specific record,
-        /// falls back to system (AD_Client_ID = 0). Returns 0 when the process has not
-        /// been created yet, so the print confirmation can still be shown.
+        /// Resolves the print AD_Process_ID from the Material Receipt (GRN) tab's
+        /// AD_Tab.AD_Process_ID - the same field the framework's tab objects expose
+        /// client-side as getAD_Process_ID() (see VAS_065_APInvoicePanel.js), instead
+        /// of a Document Type column or a hardcoded AD_Process.Value. Prefers the tab
+        /// scoped to the "VAS_MaterialReceipt" / "Material Receipt" window, then falls
+        /// back to any active window carrying an M_InOut tab. Returns 0 when no tab has
+        /// a report process configured, so the print confirmation can still be shown.
         /// </summary>
         /// <param name="ctx">Session context (for the active client).</param>
         /// <returns>AD_Process_ID, or 0 when not found.</returns>
         private int GetGRNPrintProcessId(Ctx ctx)
         {
-            const string grnProcessKey = "DTD001_GRNReport";
-
-            SqlParameter[] parameters =
-            {
-                new SqlParameter("@Key", grnProcessKey),
-                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
-            };
-
             try
             {
-                return Util.GetValueOfInt(DB.ExecuteScalar(
-                    @"SELECT AD_Process_ID
-                      FROM AD_Process
-                      WHERE (Value=@Key OR Name=@Key)
-                        AND IsActive='Y'
-                        AND AD_Client_ID IN (0, @AD_Client_ID)
-                      ORDER BY AD_Client_ID DESC
-                      FETCH FIRST 1 ROW ONLY",
-                    parameters, null));
+                int tableId = GetTableId("M_InOut");
+                if (tableId <= 0) { return 0; }
+
+                int windowId = GetReceivingWindowId(ctx);
+                if (windowId > 0)
+                {
+                    SqlParameter[] windowParameters =
+                    {
+                        new SqlParameter("@AD_Table_ID", tableId),
+                        new SqlParameter("@AD_Window_ID", windowId)
+                    };
+
+                    int processId = Util.GetValueOfInt(DB.ExecuteScalar(@"
+                        SELECT AD_Tab.AD_Process_ID
+                        FROM AD_Tab AD_Tab                        
+                        WHERE AD_Tab.AD_Table_ID = @AD_Table_ID
+                          AND AD_Tab.AD_Window_ID = @AD_Window_ID
+                          AND AD_Tab.AD_Process_ID IS NOT NULL
+                          AND AD_Tab.AD_Process_ID > 0
+                          AND AD_Tab.IsActive = 'Y'                          
+                        ORDER BY AD_Tab.SeqNo", windowParameters, null));
+
+                    if (processId > 0)
+                    {
+                        return processId;
+                    }
+                }
+                return 0;
             }
             catch
             {
                 return 0;
             }
+        }
+
+        /// <summary>Active, role-accessible AD_Window id for the Material Receipt (GRN) window, or 0.</summary>
+        /// <param name="ctx">Session context (for the active client).</param>
+        /// <returns>AD_Window_ID, or 0 when not found.</returns>
+        private int GetReceivingWindowId(Ctx ctx)
+        {
+            int windowId = GetWindowIdByName(ctx, "VAS_MaterialReceipt");
+            return windowId;
+        }
+
+        /// <summary>Active, role-accessible AD_Window id for one window name, or 0.</summary>
+        /// <param name="ctx">Session context (for the active client).</param>
+        /// <param name="windowName">AD_Window.Name to resolve.</param>
+        /// <returns>The highest matching AD_Window_ID visible to the role, or 0.</returns>
+        private int GetWindowIdByName(Ctx ctx, string windowName)
+        {
+            string sql = @"
+                SELECT GrnWindow.AD_Window_ID
+                FROM AD_Window GrnWindow
+                WHERE GrnWindow.IsActive='Y'
+                AND GrnWindow.Name=@Window_Name";
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@Window_Name", windowName),
+            }, null));
         }
 
         /// <summary>Resolves the AD_Table_ID for a physical table name (0 when missing).</summary>
@@ -1740,16 +1709,6 @@ namespace VIS.Controllers
             {
                 return 0;
             }
-        }
-
-        /// <summary>Display text for a print format id (or the default put-away label).</summary>
-        /// <param name="printFormatId">AD_PrintFormat_ID, or 0 when none.</param>
-        /// <returns>Human-readable print-format label.</returns>
-        private string GetPrintFormatText(int printFormatId)
-        {
-            return printFormatId > 0
-                ? "Print format " + printFormatId.ToString(CultureInfo.InvariantCulture)
-                : "Put-away label 4x6";
         }
 
         /// <summary>

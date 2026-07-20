@@ -1372,35 +1372,58 @@
             });
         }
 
-        /* Review #27 (follow-up): runs the DTD001_GRNReport process through the
-           same print pipeline the existing project widgets use
-           (VAS_RecentReceiptsWidget / forms/vpayprint.js): VIS.APrint(...)
-           .startPdf() opens the generated PDF in the browser's own viewer.
-           When the process is not configured the user gets a clear message
-           instead of a silent no-op. */
+        /* Runs the DTD001_GRNReport process through the framework's print
+           format pipeline (JsonData/GeneratePrint), same approach as
+           VAS_065_APInvoicePanel's downloadInvoicePDF: the PDF is written to
+           TempDownload and opened straight from there. When the process is
+           not configured the user gets a clear message instead of a silent
+           no-op. */
         function launchGRNLabelPrint(data, grnId) {
             var processId = Number((data && data.AD_Process_ID) || 0);
             var tableId = Number((data && data.AD_Table_ID) || 0);
-            var recordId = Number((data && data.Record_ID) || grnId || 0);
+            var recordId = Number(grnId || 0);
 
-            if (!window.VIS || typeof VIS.APrint !== "function"
-                || processId <= 0 || tableId <= 0 || recordId <= 0) {
-                notify(lbl("VAS_090_PrintProcessNotFound", "Print process (DTD001_GRNReport) is not configured."));
+            if (processId <= 0 || tableId <= 0 || recordId <= 0) {
+                notify(lbl("VAS_090_PrintProcessNotFound", "Print process is not configured."));
                 return;
             }
 
             var windowNo = widgetSelf && widgetSelf.windowNo ? widgetSelf.windowNo : 0;
 
-            /* Signature: new VIS.APrint(AD_Process_ID, AD_Table_ID, Record_ID, windowNo, null). */
-            var prin = new VIS.APrint(processId, tableId, recordId, windowNo, null);
-            try {
-                prin.startPdf(function () { });
-            }
-            catch (e) {
-                /* Older APrint builds may not accept a callback - same
-                   fallback the reference widget uses. */
-                try { prin.startPdf(null); } catch (e2) { /* swallow */ }
-            }
+            showBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + 'JsonData/GeneratePrint/',
+                dataType: 'json',
+                data: {
+                    AD_Process_ID: processId,
+                    Name: "Print",
+                    AD_Table_ID: tableId,
+                    Record_ID: recordId,
+                    WindowNo: windowNo,
+                    filetype: "P",
+                    actionOrigin: "W",
+                    originName: "GRN Label"
+                },
+                success: function (raw) {
+                    var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
+                    showBusy(false);
+                    if (!res) { return; }
+
+                    /* GeneratePrint writes to TempDownload and returns the file name/path. */
+                    var file = res.ReportFilePath || res.FilePath || res.FileName || res.fileName || res.path;
+                    if (!file) {
+                        var errorText = res.ErrorText || (res.ReportProcessInfo && res.ReportProcessInfo.Summary) || lbl("VAS_090_PrintFailed", "Print failed.");
+                        notify(errorText);
+                        return;
+                    }
+
+                    window.open(VIS.Application.contextUrl + file, "_blank");
+                },
+                error: function () {
+                    showBusy(false);
+                    notify(lbl("VAS_090_PrintFailed", "Print failed."));
+                }
+            });
         }
 
         this.refreshWidget = function () {
