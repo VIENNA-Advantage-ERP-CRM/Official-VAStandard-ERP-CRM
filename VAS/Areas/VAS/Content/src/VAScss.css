@@ -59,6 +59,7 @@
 
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_CreateARInvoice.css";
+@import "../VAS_CreateGLJournal.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
@@ -94,6 +95,7 @@
 @import "../VAS_042_GLJournalVolumeWidget.css";
 @import "../VAS_043_GLJournalTopMovementWidget.css";
 @import "../VAS_045_GLJournalPendingWidget.css";
+@import "../VAS_118_QuickJournalWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
 
