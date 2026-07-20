@@ -334,6 +334,8 @@
 }
 
 .vas_105_acct-contact__mailbtn {
+    -webkit-appearance: none;
+    appearance: none;
     width: 1.875em;
     height: 1.875em;
     flex-shrink: 0;
@@ -497,15 +499,13 @@
 }
 
 .vas_105_acct-dot {
-    width: 0.4375em;
-    height: 0.4375em;
+    width: 0.625em;
+    height: 0.625em;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
 .vas_105_acct-tickrow--alert {
-    border-left: 0.1875em solid #ED1C24;
-    padding-left: 0.375em;
 }
 
 .vas_105_acct-prio {
