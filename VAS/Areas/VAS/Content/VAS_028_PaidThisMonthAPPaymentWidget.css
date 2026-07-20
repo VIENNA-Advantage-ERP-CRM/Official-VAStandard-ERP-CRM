@@ -599,7 +599,7 @@
 .vas-ptm-td-doc {
     width: 10em;
     font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-ptm-td-date {
@@ -609,7 +609,7 @@
 
 .vas-ptm-td-vendor {
     width: 14em;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-ptm-td-bank {
@@ -629,7 +629,7 @@
 }
 
 .vas-ptm-td-amount {
-    font-weight: 800;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
 }
 

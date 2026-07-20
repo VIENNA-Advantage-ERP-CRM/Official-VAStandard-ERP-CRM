@@ -263,7 +263,7 @@
 
 .VAS-072-MatchSuggestionAPPayment-invoice {
     color: #0083da;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .VAS-072-MatchSuggestionAPPayment-arrow {
@@ -843,9 +843,9 @@
     .VAS-072-MatchSuggestionAPPayment-review-score span {
         margin-top: 0.25em;
         color: #5f7283;
-        font-size: 0.625em;
-        font-weight: 700;
-        letter-spacing: 0.12em;
+        font-size: 0.5625em;
+        font-weight: 600;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
     }
 
@@ -877,9 +877,9 @@
 
     .VAS-072-MatchSuggestionAPPayment-review-pane-head span {
         color: #748494;
-        font-size: 0.6875em;
-        font-weight: 700;
-        letter-spacing: 0.075em;
+        font-size: 0.625em;
+        font-weight: 600;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
     }
 
@@ -890,7 +890,7 @@
         white-space: nowrap;
         color: #102c3f;
         font-size: 0.875em;
-        font-weight: 700;
+        font-weight: 400;
         font-family: "Roboto Mono", "Roboto", monospace;
     }
 
@@ -922,7 +922,7 @@
     white-space: nowrap;
     color: #102c3f;
     font-size: 0.875em;
-    font-weight: 700;
+    font-weight: 400;
     text-align: left;
     font-variant-numeric: tabular-nums;
 }
@@ -984,7 +984,7 @@
 
     .VAS-072-MatchSuggestionAPPayment-review-balance strong {
         flex: 0 0 auto;
-        font-weight: 800;
+        font-weight: 400;
         font-variant-numeric: tabular-nums;
     }
 
@@ -993,11 +993,11 @@
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-why-title {
-    margin-bottom: 0.625em;
+    margin-bottom: 0.5em;
     color: #5f7283;
-    font-size: 0.6875em;
-    font-weight: 700;
-    letter-spacing: 0.12em;
+    font-size: 0.625em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
 }
 

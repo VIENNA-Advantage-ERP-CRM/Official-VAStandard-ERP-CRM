@@ -501,7 +501,7 @@
 
 .vas-cpa-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 700 !important;
+    font-weight: 400 !important;
 }
 
 .vas-cpa-dialog-table th:nth-child(2),
@@ -516,7 +516,7 @@
 }
 
 .vas-cpa-td-vendor {
-    font-weight: 700 !important;
+    font-weight: 400 !important;
 }
 
 .vas-cpa-dialog-table th:nth-child(4),
@@ -538,7 +538,7 @@
 }
 
 .vas-cpa-td-amount {
-    font-weight: 800 !important;
+    font-weight: 400 !important;
     font-variant-numeric: tabular-nums;
 }
 

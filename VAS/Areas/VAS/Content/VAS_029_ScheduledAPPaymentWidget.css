@@ -605,7 +605,7 @@
 
 .vas-scheduled-ap-payment-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-scheduled-ap-payment-td-invdate,
@@ -616,11 +616,11 @@
 }
 
 .vas-scheduled-ap-payment-td-vendor {
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-scheduled-ap-payment-td-amount {
-    font-weight: 800;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     overflow: visible !important;
     text-overflow: clip !important;

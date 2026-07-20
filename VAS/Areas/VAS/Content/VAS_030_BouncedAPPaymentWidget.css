@@ -544,7 +544,7 @@
 .vas-bounced-ap-payment-td-doc {
     width: 10em;
     font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-bounced-ap-payment-td-date {
@@ -554,7 +554,7 @@
 
 .vas-bounced-ap-payment-td-vendor {
     width: 14em;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-bounced-ap-payment-td-bank {
@@ -574,7 +574,7 @@
 }
 
 .vas-bounced-ap-payment-td-amount {
-    font-weight: 800;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
 }
 

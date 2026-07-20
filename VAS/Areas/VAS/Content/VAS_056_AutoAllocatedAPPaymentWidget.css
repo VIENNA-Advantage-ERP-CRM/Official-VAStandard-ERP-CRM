@@ -618,7 +618,7 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-customer {
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .VAS-056-AutoAllocatedAPPayment-th-method,
@@ -636,7 +636,7 @@
 
 .VAS-056-AutoAllocatedAPPayment-td-doc {
     font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-date,
@@ -647,11 +647,11 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-customer {
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-amount {
-    font-weight: 800;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     overflow: visible !important;
     text-overflow: clip !important;

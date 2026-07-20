@@ -338,6 +338,10 @@
     font-weight: 700;
 }
 
+td.vas-recent-ap-payments-vendor {
+    font-weight: 400;
+}
+
 .vas-recent-ap-payments-method-col {
     width: 11%;
 }
@@ -357,6 +361,10 @@
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+td.vas-recent-ap-payments-amount {
+    font-weight: 400;
 }
 
 .vas-recent-ap-payments-table th.vas-recent-ap-payments-amount {
@@ -709,7 +717,7 @@
 }
 
     .vas-recent-ap-payments-dialog-value strong {
-        font-weight: 700;
+        font-weight: 400;
     }
 
 .vas-recent-ap-payments-dialog-mono {
@@ -721,7 +729,7 @@
     display: inline-block;
     color: #102c3f;
     font-size: 0.9375em;
-    font-weight: 700;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
 }
 
