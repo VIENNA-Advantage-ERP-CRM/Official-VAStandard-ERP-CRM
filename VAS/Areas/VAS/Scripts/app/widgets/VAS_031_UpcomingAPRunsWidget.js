@@ -1807,7 +1807,11 @@
                             Number(
                                 selectedInvoiceRow.invoiceId
                             ) ===
-                            Number(row.invoiceId)
+                            Number(row.invoiceId) &&
+                            Number(
+                                selectedInvoiceRow.invoicePayScheduleId
+                            ) ===
+                            Number(row.invoicePayScheduleId)
                             ? ' is-selected'
                             : ''
                     ) +
