@@ -1973,18 +1973,18 @@ ORDER BY
                     );
 
                     /*
-                     * Display format: "BankAccountName - AccountNo - Currency"
-                     * e.g. "Main USD Account - 123456789 - IQD".
-                     * The bank account name is shown first, followed by the
-                     * account number, falling back to the bank name when the
-                     * account has no name.
+                     * Display format: "BankName - AccountNo - Currency"
+                     * e.g. "Iraqi National Bank - 123456789 - IQD".
+                     * The bank name is shown first, followed by the
+                     * account number, falling back to the account name when
+                     * the bank has no name.
                      */
                     List<string> displayNameParts =
                         new List<string>();
 
                     string primaryName = FirstNotEmpty(
-                        accountName,
-                        bankName
+                        bankName,
+                        accountName
                     );
 
                     if (!string.IsNullOrWhiteSpace(primaryName))

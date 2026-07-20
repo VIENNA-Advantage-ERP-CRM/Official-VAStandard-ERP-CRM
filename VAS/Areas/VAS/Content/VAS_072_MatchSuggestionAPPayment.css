@@ -310,7 +310,7 @@
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: 0.075em;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .VAS-072-MatchSuggestionAPPayment-confidence-high {
@@ -846,7 +846,7 @@
         font-size: 0.5625em;
         font-weight: 600;
         letter-spacing: 0.08em;
-        text-transform: uppercase;
+        text-transform: capitalize;
     }
 
 .VAS-072-MatchSuggestionAPPayment-review-compare {
@@ -880,7 +880,7 @@
         font-size: 0.625em;
         font-weight: 600;
         letter-spacing: 0.06em;
-        text-transform: uppercase;
+        text-transform: capitalize;
     }
 
     .VAS-072-MatchSuggestionAPPayment-review-pane-head strong {
@@ -998,7 +998,7 @@
     font-size: 0.625em;
     font-weight: 600;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-check {
