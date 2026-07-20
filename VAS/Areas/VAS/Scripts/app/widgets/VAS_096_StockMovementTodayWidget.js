@@ -322,7 +322,9 @@
             var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 38;
             if (rowHeight <= 0) { rowHeight = 38; }
 
-            return Math.max(3, Math.floor(listHeight / rowHeight));
+            /* At least 4 data lines on the standard card; the count still
+               grows with taller screens. */
+            return Math.max(4, Math.floor(listHeight / rowHeight));
         }
 
         function syncPageSize() {

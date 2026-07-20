@@ -443,8 +443,10 @@
 
 .vas-ra-receive-row {
     display: grid;
-    /* Review #49: sixth column carries the line-level Locator choice. */
-    grid-template-columns: minmax(0, 1fr) 6.4em 7.6em 6.4em 9em 6.8em;
+    /* Item | Attribute | PO Qty | Open Qty | Locator | Received. The
+       locator column flexes so the full locator text stays visible; qty
+       columns fit the value with its full unit name. */
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.45fr) 7em 7em minmax(8.5em, 1.15fr) 6.8em;
     gap: 0.571em;
     align-items: center;
     min-height: 3em;
@@ -454,10 +456,29 @@
 }
 
     .vas-ra-receive-row.head {
-        min-height: 2.667em;
+        /* The font-size lives on the SPANS, not the row: sizing the row
+           itself shrinks its em-based grid tracks and the header columns
+           stop lining up with the data rows. */
+        min-height: 2em;
         color: #748494;
-        font-size: 0.75em;
         font-weight: 400;
+    }
+
+    .vas-ra-receive-row.head span {
+        font-size: 0.75em;
+    }
+
+    /* Numeric columns are right-aligned in the data rows - their headers
+       (PO Qty, Open Qty, Received) align the same way. */
+    .vas-ra-receive-row.head span:nth-child(3),
+    .vas-ra-receive-row.head span:nth-child(4),
+    .vas-ra-receive-row.head span:nth-child(6) {
+        text-align: right;
+    }
+
+    /* Breathing room between the Open Qty and Locator columns. */
+    .vas-ra-receive-row > span:nth-child(5) {
+        padding-inline-start: 0.9em;
     }
 
     .vas-ra-receive-row .num {
@@ -477,9 +498,10 @@
 .vas-ra-rcv-input {
     width: 100%;
     height: 2.143em;
-    border: 0;
-    border-bottom: 1px solid #D7D7D7;
-    border-radius: 0;
+    /* Full surrounding border box - same design as the Locator select. */
+    border: 1px solid #D7D7D7;
+    border-radius: 4px;
+    background: #FFFFFF;
     color: #102C3F;
     padding: 0 0.286em;
     text-align: right;
@@ -489,7 +511,7 @@
 
     .vas-ra-rcv-input:focus {
         outline: none;
-        border-bottom-color: #1F83FF;
+        border-color: #1F83FF;
     }
 
 .vas-ra-action-footer {
@@ -785,30 +807,98 @@
 }
 
 /* Review #49: warehouse (header) and locator (line) dropdowns on the
-   Receive Against PO form. */
+   Receive Against PO form. No box outline; plain dark text with the
+   native dropdown arrow. */
 .vas-ra-field-select,
 .vas-ra-line-select {
     width: 100%;
     min-width: 0;
-    height: 2em;
-    padding: 0 0.4em;
+    height: auto;
+    padding: 0;
     color: #102C3F;
-    background: #FFFFFF;
-    border: 1px solid #D7D7D7;
-    border-radius: 6px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
     font-family: inherit;
-    font-size: 0.92em;
+    font-size: 1em;
     cursor: pointer;
 }
 
 .vas-ra-line-select {
-    font-size: 0.85em;
+    /* Identical design to the Received input: a full surrounding border
+       box, same height and size; blue border on focus. */
+    height: 2.143em;
+    font-size: 0.875em;
+    padding: 0 0.286em;
+    border: 1px solid #D7D7D7;
+    border-radius: 4px;
+    background: #FFFFFF;
 }
 
 .vas-ra-field-select:focus,
 .vas-ra-line-select:focus {
     outline: none;
+}
+
+.vas-ra-line-select:focus {
     border-color: #1F83FF;
+}
+
+/* Receive-form header fields styled like the Quality Control form fields
+   (icon tile + label + value on an underline); the editable field carries
+   the blue underline so it reads as changeable at a glance. */
+/* Receive-form header fields (Document Type / Warehouse): underline only,
+   never a surrounding border and never rounded - a straight GREY line for
+   read-only fields, BLUE (.active) for editable ones. Distinct class so the
+   boxed .vas-ra-qc-field design of the QA/confirmation screens stays intact. */
+.vas-ra-hdr-field {
+    min-height: 3.625em;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    border-bottom: 1px solid #D7D7D7;
+    padding: 0.4375em 0;
+    min-width: 0;
+}
+
+.vas-ra-hdr-field.active {
+    border-bottom-color: #1F83FF;
+}
+
+.vas-ra-qc-ico {
+    width: 2.125em;
+    height: 2.125em;
+    flex: 0 0 2.125em;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    background: rgba(0, 131, 218, 0.10);
+}
+
+.vas-ra-qc-ico svg {
+    width: 1.1em;
+    height: 1.1em;
+}
+
+.vas-ra-qc-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* The attribute is its own column beside the item name. */
+.vas-ra-line-attr {
+    color: #748494;
+    font-size: 0.85em;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Search pill for the Receive Against PO and Print GRN Label popups - same
