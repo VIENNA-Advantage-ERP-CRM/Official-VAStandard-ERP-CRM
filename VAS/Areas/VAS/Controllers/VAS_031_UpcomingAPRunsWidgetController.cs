@@ -3156,7 +3156,7 @@ AND PaymentMethod.AD_Client_ID IN
                 string msg = (
                     GetMsg(
                         ctx,
-                        "VAS_031_MessagePaymentCreatedSuccessfully",
+                        "VAS_031_PaymentCreatedSuccessfully",
                         "AP payment created and completed successfully:"
                     ) + " " + createdPaymentDocumentNo
                 )

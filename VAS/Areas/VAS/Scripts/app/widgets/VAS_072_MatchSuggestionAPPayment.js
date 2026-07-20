@@ -2922,6 +2922,21 @@
             );
 
             if (shouldReload) {
+                /*
+                 * A request kicked off with the pre-layout (wrong)
+                 * pageSize may still be in flight here. Without
+                 * aborting it first, loadData()'s isLoading guard
+                 * silently drops this corrective reload and the
+                 * widget is stuck showing the wrong row count until
+                 * the user manually refreshes.
+                 */
+                abortRequest(activeListRequest);
+                activeListRequest = null;
+
+                if (!activeActionRequest) {
+                    setBusy(false);
+                }
+
                 loadData();
             }
         }
@@ -2933,9 +2948,17 @@
 
             updateAdaptivePageSize(false);
 
-            window.setTimeout(function () {
-                updateAdaptivePageSize(true);
-            }, 0);
+            var scheduleReflow = window.requestAnimationFrame
+                ? window.requestAnimationFrame.bind(window)
+                : function (callback) {
+                    window.setTimeout(callback, 0);
+                };
+
+            scheduleReflow(function () {
+                scheduleReflow(function () {
+                    updateAdaptivePageSize(true);
+                });
+            });
 
             if (window.ResizeObserver) {
                 resizeObserver = new ResizeObserver(function () {

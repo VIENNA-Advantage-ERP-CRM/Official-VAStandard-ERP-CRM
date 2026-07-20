@@ -24,7 +24,7 @@
  * 18  | Next                                              | VAS_Next
  * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
- * 21  | Partially allocated                               | VAS_UnAllocatedAmount
+ * 21  | Un Allocated                               | VAS_UnAllocatedAmount
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -1146,7 +1146,7 @@
                 escapeHtml(
                     lbl(
                         "VAS_UnAllocatedAmount",
-                        "Partially allocated"
+                        "Un Allocated"
                     )
                 ) +
                 "</th>" +
