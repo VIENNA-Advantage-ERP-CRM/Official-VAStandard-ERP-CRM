@@ -9,6 +9,15 @@
  *               accent rails, pastel stepper, tabbed Items/Activity/Notes).
  * Chronological development:
  *   VAI163   2026-07-01  Created.
+ *   VAI163   2026-07-17  Header title strip is now untinted, matching
+ *                        VAS_106_OverviewSalesOrder. Dropped the base gradient
+ *                        and the five .tone-* status tints (status still reads
+ *                        from the pills on the right).
+ *   VAI163   2026-07-17  Header identity card aligned to the same sample:
+ *                        1.4fr/1fr columns and a divider between them (stacking
+ *                        to a bottom rule when narrow). Panel keeps its own px
+ *                        units and widget shadow, which the em-based overview
+ *                        panels do not use.
  ***********************************************************/
 
 .MPC-vasrq-root {
@@ -59,16 +68,10 @@
 .MPC-vasrq-prio.low{background:#E9EDF1;color:#5A6B79}
 
 /* ---------- Header — title strip ---------- */
-/* Soft-gradient banner carrying the title + subtitle and the priority / type /
-   status pills, per the attached reference. The banner tint is driven by
-   requisition progress (tone-* set in JS by headerTone()). */
-.MPC-vasrq-hdr { border-radius:14px; padding:14px 16px;
-    background:linear-gradient(100deg,#EFF2F5 0%,#F3F5F8 50%,#F6F8FA 100%) }
-.MPC-vasrq-hdr.tone-done      { background:linear-gradient(100deg,#ECF6EC 0%,#F4F7E3 50%,#FCF2DB 100%) }
-.MPC-vasrq-hdr.tone-sent      { background:linear-gradient(100deg,#E8F3FF 0%,#EEF6FF 50%,#F2F0FF 100%) }
-.MPC-vasrq-hdr.tone-progress  { background:linear-gradient(100deg,#FFF6E6 0%,#FFF3DC 50%,#FFEFD0 100%) }
-.MPC-vasrq-hdr.tone-draft     { background:linear-gradient(100deg,#EFF2F5 0%,#F3F5F8 50%,#F6F8FA 100%) }
-.MPC-vasrq-hdr.tone-cancelled { background:linear-gradient(100deg,#FDECEC 0%,#FCEFEF 50%,#FBF1F1 100%) }
+/* Untinted strip carrying the title + subtitle and the priority / type /
+   status pills, matching VAS_106_OverviewSalesOrder. Status reads from the
+   pills on the right rather than a banner tint. */
+.MPC-vasrq-hdr { border-radius:14px; padding:14px 16px }
 .MPC-vasrq-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
 .MPC-vasrq-hdrTitleWrap { min-width:0 }
 .MPC-vasrq-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.15 }
@@ -76,10 +79,10 @@
 .MPC-vasrq-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
 
 /* ---------- Header — details card (Source Warehouse | fields) ---------- */
-.MPC-vasrq-hdrCard { display:grid; grid-template-columns:1fr 1fr; gap:14px 28px;
+.MPC-vasrq-hdrCard { display:grid; grid-template-columns:1.4fr 1fr; gap:14px 28px;
     border:1px solid var(--rq-border); border-radius:14px; background:#fff;
     padding:14px 16px; box-shadow:var(--rq-widget-shadow); margin:10px 0 12px }
-.MPC-vasrq-hdrColL { min-width:0 }
+.MPC-vasrq-hdrColL { min-width:0; border-right:1px solid var(--rq-divider); padding-right:20px }
 .MPC-vasrq-hdrColR { min-width:0; display:flex; flex-direction:column; gap:10px }
 .MPC-vasrq-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
 .MPC-vasrq-fVal { font-size:13px; font-weight:600; color:var(--rq-text); line-height:1.35; margin-top:2px }
@@ -216,6 +219,7 @@
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
     .MPC-vasrq-hdrCard { grid-template-columns:1fr }
+    .MPC-vasrq-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
     .MPC-vasrq-stats { grid-template-columns:repeat(2,1fr) }
     .MPC-vasrq-hdrTop { flex-direction:column }
     .MPC-vasrq-hdrPills { justify-content:flex-start }
@@ -226,3 +230,8 @@
     .MPC-vasrq-stats { grid-template-columns:1fr }
     .MPC-vasrq-convert { flex-direction:column; align-items:stretch }
 }
+
+/* ---------- RTL ---------- */
+/* Mirrors the header column divider only; the rest of this panel has no RTL
+   overrides yet. */
+[dir="rtl"] .MPC-vasrq-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }

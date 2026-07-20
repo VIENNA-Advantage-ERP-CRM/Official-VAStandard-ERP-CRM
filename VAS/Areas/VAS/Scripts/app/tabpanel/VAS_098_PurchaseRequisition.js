@@ -169,15 +169,16 @@
 
         // ---------------------------- Head ------------------------------- //
 
-        // VAI163 2026-07-02  Reworked to the VAS_092 header pattern: a soft-
-        // gradient title strip (title + subtitle, with the priority / type /
-        // status pills on the right) whose tint is driven by requisition
-        // progress (headerTone()).
+        // VAI163 2026-07-02  Reworked to the VAS_092 header pattern: a title strip
+        // (title + subtitle, with the priority / type / status pills on the
+        // right).
+        // VAI163 2026-07-17  Title strip is now untinted, matching VAS_106; the
+        // status is still carried by the pills on the right.
         function renderHead() {
             var st = statusMeta();
             var pm = priorityMeta();
 
-            var $head = $('<div class="MPC-vasrq-hdr"></div>').addClass("tone-" + headerTone());
+            var $head = $('<div class="MPC-vasrq-hdr"></div>');
             var $top = $('<div class="MPC-vasrq-hdrTop"></div>');
 
             var $tl = $('<div class="MPC-vasrq-hdrTitleWrap"></div>');
@@ -200,20 +201,6 @@
 
             $head.append($top);
             $body.append($head);
-        }
-
-        // Header gradient tint by requisition progress; collapses the document
-        // status into the five banner tints defined in the stylesheet.
-        function headerTone() {
-            if (data.IsConverted) return "sent";
-            switch (data.StatusCode) {
-                case "CO": case "AP":            return "done";
-                case "CL":                       return "sent";
-                case "IP": case "WC": case "WP": return "progress";
-                case "VO": case "RE":
-                case "IN": case "NA":            return "cancelled";
-                default:                         return "draft";
-            }
         }
 
         function priorityPill(pm) {

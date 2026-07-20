@@ -2,7 +2,7 @@
  * Module Name    : VAS
  * Purpose        : Goods Receipt Note (GRN) Overview tab panel. Renders a
  *                  review-oriented overview of the selected goods receipt
- *                  (M_InOut, IsSOTrx = 'N'): header identity + supplier /
+ *                  (M_InOut, IsSOTrx = 'N'): header identity + vendor /
  *                  receipt details card, a four-card KPI snapshot (received
  *                  value, lines, received qty, quality-check applicability),
  *                  a compact receipt timeline (PO date -> expected -> received
@@ -13,6 +13,10 @@
  *                  VIS.Msg.getMsg("VAS_099_...").
  * Chronological development:
  *   VAI163   2026-07-06  Created
+ *   VAI163   2026-07-17  Reference Invoice now shows the linked AP invoice doc
+ *                        no; added Reference Sales Order (RefOrderDocNo). Both
+ *                        fall back to N/A. Supplier renamed to Vendor
+ *                        (VAS_099_Vendor msg key, data.Vendor* fields).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -207,23 +211,23 @@
             // --- Details card: supplier identity (left) + receipt fields (right) ---
             var $card = $('<section class="MPC-vasgrn-hdrCard"></section>');
 
-            // Left column: supplier name + GSTIN + address + contact bits.
+            // Left column: vendor name + GSTIN + address + contact bits.
             var $left = $('<div class="MPC-vasgrn-hdrColL"></div>');
-            $left.append($('<div class="MPC-vasgrn-fLabel"></div>').text(VIS.Msg.getMsg("VAS_099_Supplier")));
-            $left.append($('<div class="MPC-vasgrn-vendName"></div>').text(na(data.SupplierName)));
+            $left.append($('<div class="MPC-vasgrn-fLabel"></div>').text(VIS.Msg.getMsg("VAS_099_Vendor")));
+            $left.append($('<div class="MPC-vasgrn-vendName"></div>').text(na(data.VendorName)));
 
-            if (data.SupplierTaxID) {
+            if (data.VendorTaxID) {
                 var $gst = $('<div class="MPC-vasgrn-vendGst"></div>');
                 $gst.append($('<span class="MPC-vasgrn-gstLbl"></span>')
                     .text(VIS.Msg.getMsg("VAS_099_GSTIN") + " "));
-                $gst.append($('<span></span>').text(data.SupplierTaxID));
+                $gst.append($('<span></span>').text(data.VendorTaxID));
                 $left.append($gst);
             }
 
-            if (data.SupplierAddress) {
+            if (data.VendorAddress) {
                 var $addr = $('<div class="MPC-vasgrn-vendAddr"></div>');
                 $addr.append(svgIcon("pin"));
-                $addr.append($('<span></span>').text(data.SupplierAddress));
+                $addr.append($('<span></span>').text(data.VendorAddress));
                 $left.append($addr);
             }
             $left.append(headerField(VIS.Msg.getMsg("VAS_099_Posted"),
@@ -244,7 +248,9 @@
             $right.append(headerField(VIS.Msg.getMsg("VAS_099_ReceivedDate"),
                 na(formatDate(data.MovementDate)), false));
             $right.append(headerField(VIS.Msg.getMsg("VAS_099_ReferenceInvoice"),
-                na(data.ReferenceInvoice), false));            
+                na(data.ReferenceInvoice), false));
+            $right.append(headerField(VIS.Msg.getMsg("VAS_099_ReferenceSalesOrder"),
+                na(data.RefOrderDocNo), false));
             $card.append($right);
 
             $body.append($card);

@@ -1,7 +1,7 @@
 /// <summary>
 /// Module Name : VASLogic
 /// Purpose     : Goods Receipt Note (GRN) Overview tab panel data (read side).
-///               Returns header identity, supplier, linked purchase order,
+///               Returns header identity, vendor, linked purchase order,
 ///               KPI aggregates (received value / lines / received qty / QC
 ///               applicable lines), a compact receipt timeline (PO -> expected
 ///               -> received -> posted) and the material lines for a selected
@@ -11,6 +11,12 @@
 ///                        (VA010_QualityPlan_ID, CurrentCostPrice,
 ///                        VA024_UnitPrice) are guarded through AD_Column so the
 ///                        panel works whether or not those modules are installed.
+///   VAI163   2026-07-17  ReferenceInvoice now carries the linked AP invoice
+///                        document no (M_InOut -> C_Order -> C_Invoice, latest
+///                        first) instead of the free-text M_InOut.POReference.
+///                        Added RefOrderDocNo (originating sales order, read
+///                        through the linked PO's Ref_Order_ID, as VAS_092
+///                        does). Supplier* members renamed to Vendor*.
 /// </summary>
 
 using System;
@@ -67,14 +73,14 @@ namespace VASLogic.Models
                               io.MovementDate,
                               io.DateAcct,
                               io.PriorityRule,
-                              io.POReference,
                               io.C_Order_ID,
                               po.DocumentNo    AS PO_DocumentNo,
                               po.DateOrdered   AS PODate,
                               po.DatePromised  AS ExpectedDate,
-                              bp.Name          AS SupplierName,
-                              bp.TaxID         AS SupplierTaxID,
-                              bpl.Name         AS SupplierLocationName,
+                              refo.DocumentNo  AS RefOrderDocNo,
+                              bp.Name          AS VendorName,
+                              bp.TaxID         AS VendorTaxID,
+                              bpl.Name         AS VendorLocationName,
                               loc.Address1     AS Address1,
                               loc.Address2     AS Address2,
                               loc.City         AS City,
@@ -109,6 +115,7 @@ namespace VASLogic.Models
                             FROM M_InOut io
                             INNER JOIN C_BPartner bp        ON (io.C_BPartner_ID          = bp.C_BPartner_ID)
                             LEFT OUTER JOIN C_Order po       ON (io.C_Order_ID            = po.C_Order_ID)
+                            LEFT OUTER JOIN C_Order refo     ON (po.Ref_Order_ID          = refo.C_Order_ID)
                             LEFT OUTER JOIN C_BPartner_Location bpl ON (io.C_BPartner_Location_ID = bpl.C_BPartner_Location_ID)
                             LEFT OUTER JOIN C_Location loc   ON (bpl.C_Location_ID         = loc.C_Location_ID)
                             LEFT OUTER JOIN C_Country ctry   ON (loc.C_Country_ID          = ctry.C_Country_ID)
@@ -145,22 +152,27 @@ namespace VASLogic.Models
             result.MovementDate     = Util.GetValueOfDateTime(r["MovementDate"]);
             result.PostingDate      = Util.GetValueOfDateTime(r["DateAcct"]);
             result.PriorityCode     = Util.GetValueOfString(r["PriorityRule"]);
-            result.ReferenceInvoice = Util.GetValueOfString(r["POReference"]);
             result.C_Order_ID       = Util.GetValueOfInt(r["C_Order_ID"]);
             result.PONo             = Util.GetValueOfString(r["PO_DocumentNo"]);
             result.PODate           = Util.GetValueOfDateTime(r["PODate"]);
             result.ExpectedDate     = Util.GetValueOfDateTime(r["ExpectedDate"]);
+            result.RefOrderDocNo    = Util.GetValueOfString(r["RefOrderDocNo"]);
 
-            result.SupplierName         = Util.GetValueOfString(r["SupplierName"]);
-            result.SupplierTaxID        = Util.GetValueOfString(r["SupplierTaxID"]);
-            result.SupplierLocationName = Util.GetValueOfString(r["SupplierLocationName"]);
-            result.ContactName          = Util.GetValueOfString(r["ContactName"]);
-            result.ContactPhone         = Util.GetValueOfString(r["ContactPhone"]);
-            result.ContactEmail         = Util.GetValueOfString(r["ContactEmail"]);
-            result.WarehouseName        = Util.GetValueOfString(r["WarehouseName"]);
-            result.ReceivedBy           = Util.GetValueOfString(r["ReceivedBy"]);
+            // The receipt carries no invoice FK; invoices point at the order, so
+            // the link is read back through the parent PO. Empty when the receipt
+            // has no PO or the PO is not yet invoiced.
+            result.ReferenceInvoice = GetLatestInvoiceDocNo(result.C_Order_ID);
 
-            result.SupplierAddress = BuildAddress(
+            result.VendorName         = Util.GetValueOfString(r["VendorName"]);
+            result.VendorTaxID        = Util.GetValueOfString(r["VendorTaxID"]);
+            result.VendorLocationName = Util.GetValueOfString(r["VendorLocationName"]);
+            result.ContactName        = Util.GetValueOfString(r["ContactName"]);
+            result.ContactPhone       = Util.GetValueOfString(r["ContactPhone"]);
+            result.ContactEmail       = Util.GetValueOfString(r["ContactEmail"]);
+            result.WarehouseName      = Util.GetValueOfString(r["WarehouseName"]);
+            result.ReceivedBy         = Util.GetValueOfString(r["ReceivedBy"]);
+
+            result.VendorAddress = BuildAddress(
                 Util.GetValueOfString(r["Address1"]),
                 Util.GetValueOfString(r["Address2"]),
                 Util.GetValueOfString(r["City"]),
@@ -197,6 +209,47 @@ namespace VASLogic.Models
             if (hasUnitPrice)   sb.Append(", l.VA024_UnitPrice");
             sb.Append(", 0)");
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Returns the document no of the most recent AP invoice raised against
+        /// the receipt's purchase order, or an empty string when there is none.
+        /// M_InOut has no invoice FK — C_Invoice carries C_Order_ID — so the
+        /// invoice is reached through the parent PO. That link is order-scoped,
+        /// not receipt-scoped: on a part-received PO the invoice returned may
+        /// cover other receipts of the same order. Reversed and voided invoices
+        /// are excluded. A DB issue degrades to "" so the overview still renders.
+        /// </summary>
+        /// <param name="C_Order_ID">Parent purchase order id; 0 when unlinked.</param>
+        private string GetLatestInvoiceDocNo(int C_Order_ID)
+        {
+            if (C_Order_ID <= 0) return "";
+
+            try
+            {
+                string sql = @"SELECT inv.DocumentNo
+                                 FROM C_Invoice inv
+                                WHERE inv.C_Order_ID = @C_Order_ID
+                                  AND inv.IsActive   = 'Y'
+                                  AND inv.IsSOTrx    = 'N'
+                                  AND inv.DocStatus NOT IN ('RE', 'VO')
+                                ORDER BY inv.DateInvoiced DESC, inv.C_Invoice_ID DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@C_Order_ID", C_Order_ID)
+                };
+
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return "";
+
+                return Util.GetValueOfString(ds.Tables[0].Rows[0]["DocumentNo"]);
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("GetLatestInvoiceDocNo (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return "";
+            }
         }
 
         /// <summary>
@@ -359,22 +412,23 @@ namespace VASLogic.Models
             public DateTime? MovementDate     { get; set; }   // received date
             public DateTime? PostingDate      { get; set; }   // DateAcct
             public string    PriorityCode     { get; set; }   // PriorityRule code
-            public string    ReferenceInvoice { get; set; }   // POReference
+            public string    ReferenceInvoice { get; set; }   // linked AP invoice DocumentNo
 
             // Linked purchase order
             public int       C_Order_ID       { get; set; }
             public string    PONo             { get; set; }
             public DateTime? PODate           { get; set; }
             public DateTime? ExpectedDate     { get; set; }
+            public string    RefOrderDocNo    { get; set; }   // originating sales order
 
-            // Supplier
-            public string    SupplierName         { get; set; }
-            public string    SupplierTaxID        { get; set; }   // GSTIN / Tax ID
-            public string    SupplierLocationName { get; set; }
-            public string    SupplierAddress      { get; set; }
-            public string    ContactName          { get; set; }
-            public string    ContactPhone         { get; set; }
-            public string    ContactEmail         { get; set; }
+            // Vendor
+            public string    VendorName         { get; set; }
+            public string    VendorTaxID        { get; set; }   // GSTIN / Tax ID
+            public string    VendorLocationName { get; set; }
+            public string    VendorAddress      { get; set; }
+            public string    ContactName        { get; set; }
+            public string    ContactPhone       { get; set; }
+            public string    ContactEmail       { get; set; }
 
             // Receipt
             public string    WarehouseName    { get; set; }

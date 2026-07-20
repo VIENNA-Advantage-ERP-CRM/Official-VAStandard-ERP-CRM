@@ -25,6 +25,33 @@
 ///                        payments (C_Payment) and the order create / approve
 ///                        milestones (C_Order), newest-first. ActivityData gains
 ///                        Type / DocumentNo / Count.
+///   VAI163   2026-07-17  Priority now read from C_Order.PriorityRule (was
+///                        derived). Added PriceListName. Generated From reworked
+///                        to real origins only: requisition (M_Requisition) and
+///                        contract reference (VAS_ContractMaster) via LoadOrigins.
+///                        Added Notes (LoadNotes, mirrors Sales Order overview)
+///                        and line change history (LoadHistory / C_OrderLineHistory).
+///                        Landed cost: per-line distribution breakdown
+///                        (LoadDistributionLines / C_ExpectedCostDistribution) and
+///                        actuals now restricted to completed vendor invoices.
+///   VAI163   2026-07-17  Surfaced OrderCompletedDate (DocComplete workflow node)
+///                        on the payload — the value was fetched but never mapped,
+///                        so the progress stepper fell back to DateOrdered for the
+///                        Completed stage.
+///   VAI163   2026-07-17  Moved OrderCompletedDate out of the main SELECT into
+///                        GetOrderCompletedDate(). As a subselect its workflow
+///                        aliases were picked up by MRole.AddAccessSQL and emitted
+///                        as outer-WHERE access filters, so the whole overview
+///                        failed with ORA-00904 and the panel showed "no data".
+///   VAI163   2026-07-17  Added Documents (LoadDocuments): the GRNs (M_InOut) and
+///                        vendor invoices (C_Invoice) prepared from this PO, each
+///                        carrying TableName + RecordId so the client can open the
+///                        document. Includes in-progress documents, unlike the
+///                        activity feed which only reports completed ones.
+///   VAI163   2026-07-17  Landed cost: expected components now load for CO *and*
+///                        CL (reusing IsCompleted) — a closed order was silently
+///                        dropping its expected costs and distribution lines,
+///                        leaving every component actual-only.
 /// </summary>
 
 using System;
@@ -70,6 +97,7 @@ namespace VASLogic.Models
                               o.C_BPartner_ID,
                               o.Description       AS OrderDescription,
                               o.POReference,
+                              o.PriorityRule,
                               o.Ref_Order_ID,
                               bp.Name             AS VendorName,
                               bpc.Name            AS ContactName,
@@ -78,6 +106,7 @@ namespace VASLogic.Models
                               sr.Name             AS BuyerName,
                               cu.Name             AS CreatedByName,
                               pt.Name             AS PaymentTermName,
+                              pl.Name             AS PriceListName,
                               cur.CurSymbol       AS CurSymbol,
                               cur.ISO_Code        AS ISO_Code,
                               cur.StdPrecision    AS StdPrecision,
@@ -134,25 +163,47 @@ namespace VASLogic.Models
                                 WHERE io.C_Order_ID = o.C_Order_ID
                                   AND io.IsActive   = 'Y'
                                   AND io.DocStatus IN ('CO', 'CL'))             AS LastReceiptDate,
-                              (SELECT MAX(ci.DateInvoiced)
-                                 FROM C_Invoice ci
-                                WHERE ci.C_Order_ID = o.C_Order_ID
-                                  AND ci.IsActive   = 'Y'
-                                  AND ci.DocStatus IN ('CO', 'CL'))             AS LastInvoiceDate,
+                              (SELECT MAX(invoice_activity.Created)
+        FROM C_Invoice invoice_header
+        INNER JOIN AD_WF_Process invoice_process
+            ON invoice_process.Record_ID =
+               invoice_header.C_Invoice_ID
+        INNER JOIN AD_Table invoice_table
+            ON invoice_table.AD_Table_ID =
+               invoice_process.AD_Table_ID
+        INNER JOIN AD_WF_Activity invoice_activity
+            ON invoice_activity.AD_WF_Process_ID =
+               invoice_process.AD_WF_Process_ID
+        INNER JOIN AD_WF_Node invoice_node
+            ON invoice_node.AD_WF_Node_ID =
+               invoice_activity.AD_WF_Node_ID
+        WHERE invoice_header.C_Order_ID = o.C_Order_ID
+          AND invoice_header.IsActive = 'Y'
+          AND invoice_header.DocStatus IN ('CO', 'CL')
+          AND invoice_table.TableName = 'C_Invoice'
+          AND invoice_process.IsActive = 'Y'
+          AND invoice_activity.IsActive = 'Y'
+          AND invoice_node.IsActive = 'Y'
+          AND invoice_activity.WFState = 'CC'
+          AND UPPER(TRIM(invoice_node.Value)) IN (
+                'DOCCOMPLETE',
+                'COMPLETE',
+                '(DOCCOMPLETE)'
+              ))             AS LastInvoiceDate,
                               (SELECT MAX(p.DateTrx)
                                  FROM C_Payment p
                                  INNER JOIN C_AllocationLine al ON (al.C_Payment_ID = p.C_Payment_ID)
                                  INNER JOIN C_Invoice ci2       ON (al.C_Invoice_ID = ci2.C_Invoice_ID)
                                 WHERE ci2.C_Order_ID = o.C_Order_ID
                                   AND p.IsActive     = 'Y'
-                                  AND p.DocStatus IN ('CO', 'CL'))             AS LastPaymentDate,
-                              TRUNC(CURRENT_DATE) AS SystemDate
+                                  AND p.DocStatus IN ('CO', 'CL'))             AS LastPaymentDate
                             FROM C_Order o
                             INNER JOIN C_BPartner bp        ON (o.C_BPartner_ID          = bp.C_BPartner_ID)
                             LEFT OUTER JOIN AD_User bpc      ON (o.AD_User_ID             = bpc.AD_User_ID)
                             LEFT OUTER JOIN AD_User sr       ON (o.SalesRep_ID            = sr.AD_User_ID)
                             LEFT OUTER JOIN AD_User cu       ON (o.CreatedBy              = cu.AD_User_ID)
                             LEFT OUTER JOIN C_PaymentTerm pt ON (o.C_PaymentTerm_ID       = pt.C_PaymentTerm_ID)
+                            LEFT OUTER JOIN M_PriceList pl   ON (o.M_PriceList_ID         = pl.M_PriceList_ID)
                             INNER JOIN C_Currency cur        ON (o.C_Currency_ID          = cur.C_Currency_ID)
                             LEFT OUTER JOIN M_Warehouse wh   ON (o.M_Warehouse_ID         = wh.M_Warehouse_ID)
                             LEFT OUTER JOIN AD_Org org       ON (o.AD_Org_ID              = org.AD_Org_ID)
@@ -189,6 +240,7 @@ namespace VASLogic.Models
             result.C_BPartner_ID = Util.GetValueOfInt(r["C_BPartner_ID"]);
             result.OrderDescription = Util.GetValueOfString(r["OrderDescription"]);
             result.POReference   = Util.GetValueOfString(r["POReference"]);
+            result.PriorityRule  = Util.GetValueOfString(r["PriorityRule"]);
 
             result.VendorName    = Util.GetValueOfString(r["VendorName"]);
             result.ContactName   = Util.GetValueOfString(r["ContactName"]);
@@ -197,6 +249,7 @@ namespace VASLogic.Models
             result.BuyerName     = Util.GetValueOfString(r["BuyerName"]);
             result.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             result.PaymentTermName = Util.GetValueOfString(r["PaymentTermName"]);
+            result.PriceListName = Util.GetValueOfString(r["PriceListName"]);
             result.WarehouseName = Util.GetValueOfString(r["WarehouseName"]);
             result.OrgName       = Util.GetValueOfString(r["OrgName"]);
 
@@ -226,6 +279,7 @@ namespace VASLogic.Models
 
             // ----- Linked / origin documents -----
             result.RefOrderDocNo      = Util.GetValueOfString(r["RefOrderDocNo"]);
+            result.RefOrderId         = Util.GetValueOfInt(r["Ref_Order_ID"]);
             result.RequisitionLineCount = Util.GetValueOfInt(r["RequisitionLineCount"]);
 
             // ----- 7-stage progress -----
@@ -249,20 +303,30 @@ namespace VASLogic.Models
             result.CurrentStage       = ComputeCurrentStage(result);
 
             // ----- Per-stage action dates (for the progress stepper) -----
+            result.OrderCompletedDate = GetOrderCompletedDate(C_Order_ID);
             result.LastReceiptDate = Util.GetValueOfDateTime(r["LastReceiptDate"]);
             result.LastInvoiceDate = Util.GetValueOfDateTime(r["LastInvoiceDate"]);
             result.LastPaymentDate = Util.GetValueOfDateTime(r["LastPaymentDate"]);
 
-            // ----- Derived priority (no stored PO priority column) -----
-            DateTime systemDate = Util.GetValueOfDateTime(r["SystemDate"])
-                                      .GetValueOrDefault(DateTime.Today);
-            result.Priority = ComputePriority(result, systemDate);
-
             // ----- Line items -----
             result.Lines = LoadLines(C_Order_ID, result.StdPrecision);
 
-            // ----- Terms & notes / recent activity (CM_ChatEntry) -----
+            // ----- Origin documents (sales order / requisition / contract) -----
+            //        Requisition and contract reference are loaded here so the
+            //        Generated From strip only ever shows origins that exist.
+            LoadOrigins(C_Order_ID, result);
+
+            // ----- Notes (order header + per-line, mirrors Sales Order overview) -----
+            result.Notes = LoadNotes(C_Order_ID);
+
+            // ----- Recent activity (CM_ChatEntry + document milestones) -----
             result.Activity = LoadActivity(C_Order_ID);
+
+            // ----- Documents raised from this PO (openable GRNs / invoices) -----
+            result.Documents = LoadDocuments(C_Order_ID);
+
+            // ----- Line change history (C_OrderLineHistory) -----
+            result.History = LoadHistory(C_Order_ID);
 
             // ----- Landed cost (per cost-component: expected vs actual) -----
             result.LandedCostComponents = LoadLandedCostComponents(result);
@@ -286,26 +350,6 @@ namespace VASLogic.Models
             if (d.IsInvoiceRaised)    stage = 6;        // Invoice Raised
             if (d.IsPaymentDone)      stage = 7;        // Payment Done
             return stage;
-        }
-
-        /// <summary>
-        /// Derives a display priority from delivery state and promised date,
-        /// since C_Order carries no stored priority for the overview.
-        /// </summary>
-        /// <param name="d">Partly-populated overview data.</param>
-        /// <param name="systemDate">DB system date (TRUNC CURRENT_DATE).</param>
-        /// <returns>"high", "med" or "low".</returns>
-        private string ComputePriority(PurchaseOrderOverviewData d, DateTime systemDate)
-        {
-            if (d.IsFullyDelivered) return "low";
-            if (d.DatePromised.HasValue)
-            {
-                int days = (int)Math.Round(
-                    (d.DatePromised.Value.Date - systemDate.Date).TotalDays);
-                if (days < 0) return "high";            // promised date passed, not fully received
-                if (days <= 7) return "med";
-            }
-            return "low";
         }
 
         /// <summary>
@@ -416,6 +460,189 @@ namespace VASLogic.Models
                 lines.Add(ln);
             }
             return lines;
+        }
+
+        /// <summary>
+        /// Loads the PO's origin references shown in the Generated From strip so
+        /// it only ever renders origins that actually exist:
+        ///   - Requisition(s): the requisition whose lines were converted into
+        ///     this PO (M_RequisitionLine.C_OrderLine_ID -> this order's lines).
+        ///   - Contract reference: C_Order.VAS_ContractMaster_ID ->
+        ///     VAS_ContractMaster.DocumentNo. That column is module-optional, so
+        ///     it is read under its own guard.
+        /// (The sales-order origin, Ref_Order_ID, is read in the main query.)
+        /// </summary>
+        private void LoadOrigins(int C_Order_ID, PurchaseOrderOverviewData d)
+        {
+            // --- Requisition(s): first requisition + distinct requisition count. ---
+            try
+            {
+                string sql = @"SELECT r.M_Requisition_ID, r.DocumentNo
+                                 FROM M_RequisitionLine rl
+                                 INNER JOIN M_Requisition r ON (rl.M_Requisition_ID = r.M_Requisition_ID)
+                                 INNER JOIN C_OrderLine ol  ON (rl.C_OrderLine_ID   = ol.C_OrderLine_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                  AND r.IsActive    = 'Y'
+                                GROUP BY r.M_Requisition_ID, r.DocumentNo
+                                ORDER BY r.M_Requisition_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.RequisitionId    = Util.GetValueOfInt(r0["M_Requisition_ID"]);
+                    d.RequisitionDocNo = Util.GetValueOfString(r0["DocumentNo"]);
+                    d.RequisitionCount = ds.Tables[0].Rows.Count;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadOrigins/Requisition (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+
+            // --- Contract reference (module-optional VAS_ContractMaster_ID). ---
+            try
+            {
+                string sql = @"SELECT o.VAS_ContractMaster_ID AS ContractId,
+                                      cm.DocumentNo            AS ContractNo
+                                 FROM C_Order o
+                                 LEFT OUTER JOIN VAS_ContractMaster cm
+                                        ON (cm.VAS_ContractMaster_ID = o.VAS_ContractMaster_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                {
+                    DataRow r0 = ds.Tables[0].Rows[0];
+                    d.ContractMasterId = Util.GetValueOfInt(r0["ContractId"]);
+                    d.ContractMasterNo = Util.GetValueOfString(r0["ContractNo"]);
+                }
+            }
+            catch (Exception ex)
+            {
+                // A deployment without the VAS_ContractMaster_ID column reaches
+                // here; keep the overview working (no contract chip).
+                _log.Severe("LoadOrigins/Contract (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Loads notes for the Notes section, mirroring the Sales Order overview:
+        /// the order header note (C_Order.Description) followed by each line's own
+        /// note (product / charge name + line description). Composed in C# so the
+        /// SQL stays portable (no DB-specific string functions).
+        /// </summary>
+        private List<NoteData> LoadNotes(int C_Order_ID)
+        {
+            List<NoteData> notes = new List<NoteData>();
+            try
+            {
+                string sql = @"SELECT o.Description  AS OrderNote,
+                                      ol.Line        AS LineNo,
+                                      ol.Description AS LineDescription,
+                                      p.Name         AS ProductName,
+                                      ch.Name        AS ChargeName
+                                 FROM C_Order o
+                                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID = o.C_Order_ID)
+                                 LEFT OUTER JOIN M_Product p  ON (p.M_Product_ID = ol.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID  = ol.C_Charge_ID)
+                                WHERE o.C_Order_ID = @C_Order_ID
+                                  AND o.IsActive   = 'Y'
+                                  AND ol.IsActive  = 'Y'
+                                ORDER BY ol.Line";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return notes;
+
+                bool headerAdded = false;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    if (!headerAdded)
+                    {
+                        string headerNote = Util.GetValueOfString(r["OrderNote"]);
+                        if (!string.IsNullOrEmpty(headerNote))
+                            notes.Add(new NoteData { NoteType = "header", Text = headerNote.Trim() });
+                        headerAdded = true;
+                    }
+
+                    string lineDesc = Util.GetValueOfString(r["LineDescription"]);
+                    if (string.IsNullOrEmpty(lineDesc)) continue;
+
+                    string prod = Util.GetValueOfString(r["ProductName"]);
+                    if (string.IsNullOrEmpty(prod)) prod = Util.GetValueOfString(r["ChargeName"]);
+
+                    string text = string.IsNullOrEmpty(prod)
+                        ? lineDesc.Trim()
+                        : prod.Trim() + " — " + lineDesc.Trim();
+                    notes.Add(new NoteData { NoteType = "line", Text = text });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadNotes (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+            return notes;
+        }
+
+        /// <summary>
+        /// Loads the line change history (C_OrderLineHistory) for every line of
+        /// the order — the prior versions the platform snapshots when a completed
+        /// order line is re-activated / edited — newest change first per line.
+        /// Column set mirrors the platform's proven PO line-history query.
+        /// </summary>
+        private List<HistoryData> LoadHistory(int C_Order_ID)
+        {
+            List<HistoryData> history = new List<HistoryData>();
+            try
+            {
+                string sql = @"SELECT olh.C_OrderLine_ID,
+                                      ol.Line          AS LineNo,
+                                      olh.Updated      AS ChangedOn,
+                                      olh.QtyOrdered,
+                                      olh.PriceActual,
+                                      olh.LineNetAmt,
+                                      olh.Discount,
+                                      olh.Description  AS LineDescription,
+                                      p.Name           AS ProductName,
+                                      ch.Name          AS ChargeName,
+                                      uom.UOMSymbol    AS UOMSymbol,
+                                      NVL(uom.StdPrecision, 0) AS UOMPrecision,
+                                      cur.StdPrecision AS StdPrecision
+                                 FROM C_OrderLineHistory olh
+                                 INNER JOIN C_OrderLine ol ON (ol.C_OrderLine_ID = olh.C_OrderLine_ID)
+                                 INNER JOIN C_Order o      ON (o.C_Order_ID = ol.C_Order_ID)
+                                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = olh.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID = olh.C_Charge_ID)
+                                 LEFT OUTER JOIN C_UOM uom   ON (uom.C_UOM_ID = olh.C_UOM_ID)
+                                 INNER JOIN C_Currency cur   ON (cur.C_Currency_ID = o.C_Currency_ID)
+                                WHERE ol.C_Order_ID = @C_Order_ID
+                                ORDER BY ol.Line, olh.Updated DESC";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return history;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    HistoryData h = new HistoryData();
+                    h.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
+                    h.LineNo         = Util.GetValueOfInt(r["LineNo"]);
+                    h.ChangedOn      = Util.GetValueOfDateTime(r["ChangedOn"]);
+                    h.QtyOrdered     = Util.GetValueOfDecimal(r["QtyOrdered"]);
+                    h.PriceActual    = Util.GetValueOfDecimal(r["PriceActual"]);
+                    h.LineNetAmt     = Util.GetValueOfDecimal(r["LineNetAmt"]);
+                    h.Discount       = Util.GetValueOfDecimal(r["Discount"]);
+                    h.Description    = Util.GetValueOfString(r["LineDescription"]);
+                    h.ProductName    = Util.GetValueOfString(r["ProductName"]);
+                    h.ChargeName     = Util.GetValueOfString(r["ChargeName"]);
+                    h.UOMSymbol      = Util.GetValueOfString(r["UOMSymbol"]);
+                    h.UOMPrecision   = Util.GetValueOfInt(r["UOMPrecision"]);
+                    h.StdPrecision   = Util.GetValueOfInt(r["StdPrecision"]);
+                    if (string.IsNullOrEmpty(h.ProductName) && !string.IsNullOrEmpty(h.ChargeName))
+                        h.ProductName = h.ChargeName;
+                    history.Add(h);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadHistory (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+            return history;
         }
 
         /// <summary>
@@ -666,12 +893,174 @@ namespace VASLogic.Models
             return new SqlParameter[] { new SqlParameter("@C_Order_ID", C_Order_ID) };
         }
 
+        /// <summary>
+        /// Returns the moment the order was completed: the Created stamp of its
+        /// workflow DocComplete activity (AD_WF_Process -> AD_WF_Activity ->
+        /// AD_WF_Node), or null when the order has no completed workflow node.
+        ///
+        /// Deliberately a standalone query rather than a subselect in the main
+        /// SELECT. The main query is rewritten by MRole.AddAccessSQL with
+        /// SQL_FULLYQUALIFIED, whose parser walks every FROM/JOIN it can read —
+        /// including inside subselects — and appends private-access filters for
+        /// those tables to the OUTER WHERE. Aliases that live only inside a
+        /// subselect are out of scope there, so the rewritten SQL died with
+        /// ORA-00904 ("ADT"."AD_TABLE_ID": invalid identifier) and the whole
+        /// overview returned no rows. Run separately, this SQL never reaches
+        /// that rewriter.
+        /// </summary>
+        /// <param name="C_Order_ID">Selected purchase order id.</param>
+        private DateTime? GetOrderCompletedDate(int C_Order_ID)
+        {
+            try
+            {
+                string sql = @"SELECT MAX(wfa.Created) AS OrderCompletedDate
+                                 FROM AD_WF_Process wfp
+                                 INNER JOIN AD_WF_Activity wfa
+                                         ON (wfa.AD_WF_Process_ID = wfp.AD_WF_Process_ID)
+                                 INNER JOIN AD_WF_Node wfn
+                                         ON (wfn.AD_WF_Node_ID = wfa.AD_WF_Node_ID)
+                                 INNER JOIN AD_Table adt
+                                         ON (adt.AD_Table_ID = wfp.AD_Table_ID)
+                                WHERE wfp.Record_ID = @C_Order_ID
+                                  AND adt.TableName = 'C_Order'
+                                  AND wfp.IsActive  = 'Y'
+                                  AND wfa.IsActive  = 'Y'
+                                  AND wfn.IsActive  = 'Y'
+                                  AND wfa.WFState   = 'CC'
+                                  AND UPPER(TRIM(wfn.Value)) IN ('DOCCOMPLETE', 'COMPLETE', '(DOCCOMPLETE)')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return null;
+                return Util.GetValueOfDateTime(ds.Tables[0].Rows[0]["OrderCompletedDate"]);
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: the stepper falls back to DateOrdered.
+                _log.Severe("GetOrderCompletedDate (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+                return null;
+            }
+        }
+
+        // ----------------------------------------------------------------- //
+        //  Documents raised against the order (read side)                    //
+        // ----------------------------------------------------------------- //
+
+        /// <summary>
+        /// Loads the documents prepared from this purchase order — goods receipts
+        /// (M_InOut) and vendor invoices (C_Invoice) — newest first. Unlike the
+        /// activity feed these carry the table name + record id so the client can
+        /// open the document, and they include in-progress documents (drafted /
+        /// in-review), not just completed ones, so a receipt awaiting completion
+        /// is still reachable. Reversed and voided documents are excluded. Each
+        /// side is guarded so a DB issue degrades to a partial list rather than
+        /// breaking the overview.
+        /// </summary>
+        /// <param name="C_Order_ID">Owning purchase order id.</param>
+        /// <returns>Document rows ordered newest-first (may be empty).</returns>
+        private List<DocumentData> LoadDocuments(int C_Order_ID)
+        {
+            List<DocumentData> docs = new List<DocumentData>();
+            LoadReceiptDocuments(C_Order_ID, docs);
+            LoadInvoiceDocuments(C_Order_ID, docs);
+
+            // Newest first; entries with no document date sink to the bottom.
+            docs.Sort((a, b) =>
+                b.DocDate.GetValueOrDefault(DateTime.MinValue)
+                 .CompareTo(a.DocDate.GetValueOrDefault(DateTime.MinValue)));
+            return docs;
+        }
+
+        /// <summary>
+        /// Adds the goods receipts (M_InOut, IsSoTrx = 'N') raised against this
+        /// order, carrying the receipt's active line count.
+        /// </summary>
+        private void LoadReceiptDocuments(int C_Order_ID, List<DocumentData> list)
+        {
+            try
+            {
+                string sql = @"SELECT io.M_InOut_ID,
+                                      io.DocumentNo,
+                                      io.DocStatus,
+                                      io.MovementDate,
+                                      (SELECT COUNT(*)
+                                         FROM M_InOutLine iol
+                                        WHERE iol.M_InOut_ID = io.M_InOut_ID
+                                          AND iol.IsActive   = 'Y') AS LineCnt
+                                 FROM M_InOut io
+                                WHERE io.C_Order_ID = @C_Order_ID
+                                  AND io.IsActive   = 'Y'
+                                  AND io.IsSoTrx    = 'N'
+                                  AND io.DocStatus NOT IN ('RE', 'VO')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new DocumentData
+                    {
+                        Type       = "grn",
+                        TableName  = "M_InOut",
+                        RecordId   = Util.GetValueOfInt(r["M_InOut_ID"]),
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        DocStatus  = Util.GetValueOfString(r["DocStatus"]),
+                        DocDate    = Util.GetValueOfDateTime(r["MovementDate"]),
+                        LineCount  = Util.GetValueOfInt(r["LineCnt"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadReceiptDocuments (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Adds the vendor invoices (C_Invoice, IsSoTrx = 'N') raised against this
+        /// order, carrying the invoice total and paid flag.
+        /// </summary>
+        private void LoadInvoiceDocuments(int C_Order_ID, List<DocumentData> list)
+        {
+            try
+            {
+                string sql = @"SELECT inv.C_Invoice_ID,
+                                      inv.DocumentNo,
+                                      inv.DocStatus,
+                                      inv.DateInvoiced,
+                                      NVL(inv.GrandTotal, 0) AS GrandTotal,
+                                      inv.IsPaid
+                                 FROM C_Invoice inv
+                                WHERE inv.C_Order_ID = @C_Order_ID
+                                  AND inv.IsActive   = 'Y'
+                                  AND inv.IsSoTrx    = 'N'
+                                  AND inv.DocStatus NOT IN ('RE', 'VO')";
+                DataSet ds = DB.ExecuteDataset(sql, OrderParam(C_Order_ID), null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    list.Add(new DocumentData
+                    {
+                        Type       = "invoice",
+                        TableName  = "C_Invoice",
+                        RecordId   = Util.GetValueOfInt(r["C_Invoice_ID"]),
+                        DocumentNo = Util.GetValueOfString(r["DocumentNo"]),
+                        DocStatus  = Util.GetValueOfString(r["DocStatus"]),
+                        DocDate    = Util.GetValueOfDateTime(r["DateInvoiced"]),
+                        Amount     = Util.GetValueOfDecimal(r["GrandTotal"]),
+                        IsPaid     = Util.GetValueOfString(r["IsPaid"]) == "Y"
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadInvoiceDocuments (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
         // ----------------------------------------------------------------- //
         //  Landed cost (read side)                                           //
         // ----------------------------------------------------------------- //
         //  Rendered per cost-component (one row per cost element + distribution
         //  method): the expected budget (C_ExpectedCost, available once the PO
-        //  is completed) collapsed onto the matching invoice-linked actual
+        //  is completed — CO or CL) collapsed onto the matching invoice-linked actual
         //  (C_LandedCostAllocation -> C_LandedCost -> vendor invoice, reached
         //  through the GRN line M_InOutLine back to this PO). Each side is
         //  loaded under its own guard so a DB-level issue degrades to a hidden
@@ -685,8 +1074,10 @@ namespace VASLogic.Models
         /// Builds the per-component landed-cost list for the order and rolls up
         /// the section totals (expected, actual-to-date, open/not-invoiced,
         /// landed value, component / invoiced counts) onto <paramref name="d"/>.
-        /// Expected components are only considered once the PO is completed
-        /// (DocStatus = 'CO'); actual components are always considered.
+        /// Expected components are only considered once the PO is completed —
+        /// completed meaning CO *or* CL (<see cref="PurchaseOrderOverviewData.IsCompleted"/>),
+        /// so a closed order keeps its expected costs and distribution breakdown;
+        /// actual components are always considered.
         /// </summary>
         private List<LandedCostComponentData> LoadLandedCostComponents(PurchaseOrderOverviewData d)
         {
@@ -697,8 +1088,14 @@ namespace VASLogic.Models
             Dictionary<string, LandedCostComponentData> map =
                 new Dictionary<string, LandedCostComponentData>();
 
-            if (d.DocStatus == "CO")
+            // CO or CL — a closed order is still completed, and dropping its
+            // expected costs would collapse every component to actual-only.
+            if (d.IsCompleted)
+            {
                 LoadExpectedComponents(d.C_Order_ID, map);
+                // Per-line distribution breakdown for each expected component.
+                LoadDistributionLines(d.C_Order_ID, map);
+            }
 
             LoadActualComponents(d.C_Order_ID, map);
 
@@ -807,6 +1204,65 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Loads the per-line distribution breakdown for each expected cost
+        /// component. Every C_ExpectedCost (one component + distribution method)
+        /// carries C_ExpectedCostDistribution rows recording exactly how much of
+        /// that cost was distributed onto each order line (Amt), plus the base /
+        /// quantity the distribution was computed against. Rows are attached to
+        /// the matching component (cost element + distribution).
+        /// </summary>
+        private void LoadDistributionLines(
+            int C_Order_ID, Dictionary<string, LandedCostComponentData> map)
+        {
+            try
+            {
+                string sql = @"SELECT ec.M_CostElement_ID       AS CostElementId,
+                                      ec.LandedCostDistribution  AS DistCode,
+                                      ol.Line                    AS LineNo,
+                                      NVL(p.Name, NVL(ch.Name, ol.Description)) AS LineLabel,
+                                      NVL(ecd.Amt, 0)            AS Amt,
+                                      NVL(ecd.Base, 0)           AS Base,
+                                      NVL(ecd.Qty, 0)            AS Qty
+                                 FROM C_ExpectedCostDistribution ecd
+                                 INNER JOIN C_ExpectedCost ec
+                                        ON (ec.C_ExpectedCost_ID = ecd.C_ExpectedCost_ID)
+                                 INNER JOIN C_OrderLine ol
+                                        ON (ol.C_OrderLine_ID = ecd.C_OrderLine_ID)
+                                 LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ol.M_Product_ID)
+                                 LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID = ol.C_Charge_ID)
+                                WHERE ec.C_Order_ID = @C_Order_ID
+                                  AND ecd.IsActive  = 'Y'
+                                ORDER BY ec.M_CostElement_ID, ol.Line";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@C_Order_ID", C_Order_ID)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0) return;
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    LandedCostComponentData c = GetOrAddComponent(
+                        map, Util.GetValueOfInt(r["CostElementId"]),
+                        Util.GetValueOfString(r["DistCode"]));
+                    if (c.DistributionLines == null)
+                        c.DistributionLines = new List<DistributionLineData>();
+                    c.DistributionLines.Add(new DistributionLineData
+                    {
+                        LineNo    = Util.GetValueOfInt(r["LineNo"]),
+                        LineLabel = Util.GetValueOfString(r["LineLabel"]),
+                        Amt       = Util.GetValueOfDecimal(r["Amt"]),
+                        Base      = Util.GetValueOfDecimal(r["Base"]),
+                        Qty       = Util.GetValueOfDecimal(r["Qty"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("LoadDistributionLines (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// Loads the actual landed-cost components from invoice-linked
         /// C_LandedCostAllocation rows, reached through the GRN line
         /// (M_InOutLine) back to this PO's order lines and grouped by cost
@@ -848,10 +1304,11 @@ namespace VASLogic.Models
                                         ON (il.C_InvoiceLine_ID = NVL(lca.C_InvoiceLine_ID,
                                                                       NVL(lc.C_InvoiceLine_ID, lc.Ref_InvoiceLine_ID))
                                             AND il.IsActive = 'Y')
-                                 LEFT OUTER JOIN C_Invoice inv
+                                 INNER JOIN C_Invoice inv
                                         ON (inv.C_Invoice_ID = il.C_Invoice_ID
                                             AND inv.IsActive = 'Y'
-                                            AND inv.IsSoTrx = 'N')
+                                            AND inv.IsSoTrx = 'N'
+                                            AND inv.DocStatus IN ('CO', 'CL'))
                                  LEFT OUTER JOIN C_BPartner bp
                                         ON (bp.C_BPartner_ID = inv.C_BPartner_ID)
                                  LEFT OUTER JOIN M_CostElement ce
@@ -859,7 +1316,6 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN C_Charge ch
                                         ON (ch.C_Charge_ID = il.C_Charge_ID)
                                 WHERE lca.IsActive = 'Y'
-                                  AND il.C_InvoiceLine_ID IS NOT NULL
                                 GROUP BY lc.M_CostElement_ID, lc.LandedCostDistribution";
                 SqlParameter[] param = new SqlParameter[]
                 {
@@ -920,6 +1376,23 @@ namespace VASLogic.Models
         //  Data carriers                                                     //
         // ----------------------------------------------------------------- //
 
+        /// <summary>
+        /// A document prepared from the order (goods receipt or vendor invoice).
+        /// TableName + RecordId are what the client opens the document with.
+        /// </summary>
+        public class DocumentData
+        {
+            public string    Type       { get; set; }   // grn | invoice
+            public string    TableName  { get; set; }   // M_InOut | C_Invoice
+            public int       RecordId   { get; set; }   // M_InOut_ID | C_Invoice_ID
+            public string    DocumentNo { get; set; }
+            public string    DocStatus  { get; set; }   // DocStatus code
+            public DateTime? DocDate    { get; set; }   // MovementDate | DateInvoiced
+            public decimal?  Amount     { get; set; }   // invoice grand total
+            public int       LineCount  { get; set; }   // receipt line count
+            public bool      IsPaid     { get; set; }   // invoice only
+        }
+
         public class PurchaseOrderLineData
         {
             public int      C_OrderLine_ID { get; set; }
@@ -957,6 +1430,40 @@ namespace VASLogic.Models
             public string   InvoiceNo          { get; set; }
             public string   InvoiceReference   { get; set; }
             public DateTime? LatestInvoiceDate { get; set; }
+            // Per-line distribution breakdown (C_ExpectedCostDistribution).
+            public List<DistributionLineData> DistributionLines { get; set; }
+        }
+
+        public class DistributionLineData
+        {
+            public int      LineNo    { get; set; }   // C_OrderLine.Line
+            public string   LineLabel { get; set; }   // product / charge / description
+            public decimal  Amt       { get; set; }   // distributed amount for this line
+            public decimal  Base      { get; set; }   // base value the split was computed on
+            public decimal  Qty       { get; set; }   // quantity the split was computed on
+        }
+
+        public class NoteData
+        {
+            public string NoteType { get; set; }   // header | line
+            public string Text     { get; set; }
+        }
+
+        public class HistoryData
+        {
+            public int      C_OrderLine_ID { get; set; }
+            public int      LineNo         { get; set; }
+            public DateTime? ChangedOn     { get; set; }
+            public decimal  QtyOrdered     { get; set; }
+            public decimal  PriceActual    { get; set; }
+            public decimal  LineNetAmt     { get; set; }
+            public decimal  Discount       { get; set; }
+            public string   Description    { get; set; }
+            public string   ProductName    { get; set; }
+            public string   ChargeName     { get; set; }
+            public string   UOMSymbol      { get; set; }
+            public int      UOMPrecision   { get; set; }
+            public int      StdPrecision   { get; set; }
         }
 
         public class ActivityData
@@ -983,6 +1490,7 @@ namespace VASLogic.Models
             public int       C_BPartner_ID   { get; set; }
             public string    OrderDescription { get; set; }
             public string    POReference     { get; set; }
+            public string    PriorityRule    { get; set; }   // C_Order.PriorityRule (1/3/5/7)
 
             // Vendor
             public string    VendorName      { get; set; }
@@ -995,6 +1503,7 @@ namespace VASLogic.Models
             public string    BuyerName       { get; set; }
             public string    CreatedByName   { get; set; }
             public string    PaymentTermName { get; set; }
+            public string    PriceListName   { get; set; }
             public string    WarehouseName   { get; set; }   // Ship To
             public string    OrgName         { get; set; }   // Bill To
 
@@ -1015,9 +1524,15 @@ namespace VASLogic.Models
             public int       LineCount              { get; set; }
             public int       FullyReceivedLineCount { get; set; }
 
-            // Linked / origin documents
-            public string    RefOrderDocNo       { get; set; }   // originating sales order
+            // Linked / origin documents (Generated From strip)
+            public string    RefOrderDocNo        { get; set; }   // originating sales order
+            public int       RefOrderId           { get; set; }   // C_Order.Ref_Order_ID
             public int       RequisitionLineCount { get; set; }
+            public int       RequisitionId        { get; set; }   // first M_Requisition
+            public string    RequisitionDocNo     { get; set; }
+            public int       RequisitionCount     { get; set; }   // distinct requisitions
+            public int       ContractMasterId     { get; set; }   // C_Order.VAS_ContractMaster_ID
+            public string    ContractMasterNo     { get; set; }
 
             // 7-stage progress
             public bool      IsCompleted        { get; set; }
@@ -1030,16 +1545,17 @@ namespace VASLogic.Models
             public int       CurrentStage       { get; set; }    // 1..7
 
             // Per-stage action dates (progress stepper sub-line)
+            public DateTime? OrderCompletedDate { get; set; }    // DocComplete workflow node
             public DateTime? LastReceiptDate    { get; set; }    // latest goods receipt
             public DateTime? LastInvoiceDate    { get; set; }    // latest vendor invoice
             public DateTime? LastPaymentDate    { get; set; }    // latest payment allocated
 
-            // Derived priority
-            public string    Priority           { get; set; }    // high | med | low
-
             // Collections
-            public List<PurchaseOrderLineData> Lines    { get; set; }
-            public List<ActivityData>          Activity { get; set; }
+            public List<PurchaseOrderLineData> Lines     { get; set; }
+            public List<NoteData>              Notes     { get; set; }
+            public List<ActivityData>          Activity  { get; set; }
+            public List<HistoryData>           History   { get; set; }
+            public List<DocumentData>          Documents { get; set; }
 
             // Landed cost (per-component list + section roll-ups)
             public List<LandedCostComponentData> LandedCostComponents { get; set; }
