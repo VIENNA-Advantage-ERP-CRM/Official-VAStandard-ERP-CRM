@@ -188,13 +188,15 @@ namespace VIS.Controllers
                            CASE WHEN DueSchedules.IsReturnTrx='Y' THEN -1 ELSE 1 END * DueSchedules.DueAmt_Converted AS TotalDueAmount,
                            SUM(CASE WHEN InvoiceAllocations.AllocationDate <= " + DateValueSql("DueSchedules.DueDate") + @"
                                     THEN CASE WHEN DueSchedules.GrandTotal=0 THEN 0
-                                              ELSE InvoiceAllocations.AllocatedAmt_Converted * DueSchedules.DueAmt / DueSchedules.GrandTotal
+                                              ELSE InvoiceAllocations.AllocatedAmt_Converted 
                                          END
                                     ELSE 0
                                END) AS OnTimeCollectedAmount
                     FROM InvoiceAllocations InvoiceAllocations
-                    LEFT OUTER JOIN DueSchedules DueSchedules ON (InvoiceAllocations.C_Invoice_ID=DueSchedules.C_Invoice_ID)
-                    GROUP BY DueSchedules.C_Invoice_ID, DueSchedules.C_InvoicePaySchedule_ID, DueSchedules.IsReturnTrx, DueSchedules.DueAmt, DueSchedules.DueAmt_Converted, DueSchedules.GrandTotal
+                    INNER JOIN DueSchedules DueSchedules ON (InvoiceAllocations.C_Invoice_ID=DueSchedules.C_Invoice_ID
+                                            AND DueSchedules.C_InvoicePaySchedule_ID = InvoiceAllocations.C_InvoicePaySchedule_ID)
+                    GROUP BY DueSchedules.C_Invoice_ID, DueSchedules.C_InvoicePaySchedule_ID, DueSchedules.IsReturnTrx, 
+                             DueSchedules.DueAmt, DueSchedules.DueAmt_Converted, DueSchedules.GrandTotal
                 ),
                 EfficiencyCalc AS (
                     SELECT ROUND(SUM(ScheduleCollection.OnTimeCollectedAmount) * 100 / NULLIF(SUM(ScheduleCollection.TotalDueAmount), 0), 2) AS CollectionEfficiencyPercent
