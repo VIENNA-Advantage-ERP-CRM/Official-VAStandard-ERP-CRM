@@ -3932,7 +3932,7 @@
 
 
                         VIS.ADialog.info(
-                            msg
+                          null , null ,    msg
                         );
                     }
                 },

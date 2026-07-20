@@ -1632,6 +1632,13 @@
                 "</div>" +
                 reviewPaneRow(
                     lbl(
+                        "VAS_072_DocumentType",
+                        "Document type"
+                    ),
+                    detail.paymentDocTypeName
+                ) +
+                reviewPaneRow(
+                    lbl(
                         "VAS_PaymentDate",
                         "Payment date"
                     ),
@@ -1647,13 +1654,6 @@
                         "Payment method"
                     ),
                     detail.paymentMethodName
-                ) +
-                reviewPaneRow(
-                    lbl(
-                        "VAS_072_DocumentType",
-                        "Document type"
-                    ),
-                    detail.paymentDocTypeName
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -1710,6 +1710,13 @@
                 "</div>" +
                 reviewPaneRow(
                     lbl(
+                        "VAS_072_DocumentType",
+                        "Document type"
+                    ),
+                    detail.invoiceDocTypeName
+                ) +
+                reviewPaneRow(
+                    lbl(
                         "VAS_072_InvoiceDate",
                         "Invoice date"
                     ),
@@ -1725,13 +1732,6 @@
                         "Payment terms"
                     ),
                     detail.paymentTerms
-                ) +
-                reviewPaneRow(
-                    lbl(
-                        "VAS_072_DocumentType",
-                        "Document type"
-                    ),
-                    detail.invoiceDocTypeName
                 ) +
                 reviewPaneRow(
                     lbl(
@@ -1958,6 +1958,8 @@
                 payScheduleId <= 0
             ) {
                 VIS.ADialog.error(
+                    null,
+                    null,
                     lbl(
                         "VAS_072_ApplyError",
                         "Could not complete allocation"
@@ -2025,6 +2027,8 @@
                         );
 
                         VIS.ADialog.error(
+                            null,
+                            null,
                             message
                         );
 
@@ -2032,6 +2036,8 @@
                     }
 
                     VIS.ADialog.info(
+                        null,
+                        null,
                         getServerMessage(
                             data,
                             lbl(
@@ -2081,6 +2087,8 @@
                     );
 
                     VIS.ADialog.error(
+                        null,
+                        null,
                         message
                     );
                 },
@@ -2157,6 +2165,8 @@
                         );
 
                         VIS.ADialog.error(
+                            null,
+                            null,
                             message
                         );
 
@@ -2164,6 +2174,8 @@
                     }
 
                     VIS.ADialog.info(
+                        null,
+                        null,
                         getServerMessage(
                             data,
                             lbl(
@@ -2205,6 +2217,8 @@
                     );
 
                     VIS.ADialog.error(
+                        null,
+                        null,
                         message
                     );
                 },
@@ -2340,6 +2354,8 @@
 
             if (!opened) {
                 VIS.ADialog.error(
+                    null,
+                    null,
                     lbl(
                         "VAS_072_OpenFormError",
                         "Could not open allocation form"
