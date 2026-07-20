@@ -175,6 +175,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_065_APInvoicePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_AttributeControlController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
@@ -371,6 +372,7 @@
     <Content Include="Areas\VAS\Content\VAS_103_MaterialTransfer.css" />
     <Content Include="Areas\VAS\Content\VAS_104_OverviewShipGRNConfirmation.css" />
     <Content Include="Areas\VAS\Content\VAS_105_AccountRightPanel.css" />
+    <Content Include="Areas\VAS\Content\VAS_106_OverviewSalesOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
     <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
@@ -383,6 +385,7 @@
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_103_MaterialTransfer.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_104_OverviewShipGRNConfirmation.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_105_AccountRightPanel.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_106_OverviewSalesOrder.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_InvoiceOverview.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_PaymentVoucherPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_028_PaidThisMonthAPPaymentWidget.js" />

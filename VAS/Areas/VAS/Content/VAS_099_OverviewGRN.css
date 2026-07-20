@@ -10,6 +10,11 @@
  *               with VAS_092_OverviewPurchaseOrder.
  * Chronological development:
  *   VAI163   2026-07-06  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
  ***********************************************************/
 
 .MPC-vasgrn-root {
@@ -99,7 +104,6 @@
 .MPC-vasgrn-hdr {
     border-radius: 14px;
     padding: 0.875em 1em;
-    background: linear-gradient(100deg, #E3F2FF 0%, #EFF6E9 55%, #FCF2DB 100%);
 }
 
 .MPC-vasgrn-hdrTop {
@@ -167,7 +171,7 @@
 /* ----------------------------------------------------------- */
 .MPC-vasgrn-hdrCard {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1.4fr 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--grn-card-bd);
     border-radius: var(--grn-card-radius);
@@ -175,7 +179,7 @@
     padding: 0.875em 1em;
 }
 
-.MPC-vasgrn-hdrColL { min-width: 0; }
+.MPC-vasgrn-hdrColL { min-width: 0; border-right: 1px solid var(--grn-row-div); padding-right: 1.25em; }
 
 .MPC-vasgrn-hdrColR {
     min-width: 0;
@@ -209,12 +213,13 @@
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
     .MPC-vasgrn-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasgrn-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--grn-row-div); padding-bottom: 0.75em; }
     .MPC-vasgrn-hdrTop  { flex-direction: column; }
     .MPC-vasgrn-hdrPills { justify-content: flex-start; }
 }
 
 /* ----------------------------------------------------------- */
-/*  Supplier identity                                           */
+/*  Vendor identity                                             */
 /* ----------------------------------------------------------- */
 .MPC-vasgrn-vendName {
     font-size: 0.9375em;
@@ -571,6 +576,7 @@
 /* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasgrn-hdrColL { border-right: none; border-left: 1px solid var(--grn-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .MPC-vasgrn-table .ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .MPC-vasgrn-recv { justify-content: flex-start; }
 [dir="rtl"] .MPC-vasgrn-tFoot { justify-content: flex-start; }
