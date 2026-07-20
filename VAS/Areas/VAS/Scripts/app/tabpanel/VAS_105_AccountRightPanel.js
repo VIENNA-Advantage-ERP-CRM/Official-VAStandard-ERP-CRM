@@ -499,9 +499,9 @@
                           : '') +
                       '</div>' +
                       (c.email
-                        ? '<a class="vas_105_acct-contact__mailbtn" href="mailto:' + esc(c.email) + '" aria-label="' + esc(msg('VAS_Email') + ' ' + (c.name || '')) + '" title="' + esc(c.email) + '">' +
+                        ? '<button type="button" class="vas_105_acct-contact__mailbtn" data-action="contactEmail" data-email="' + esc(c.email) + '" aria-label="' + esc(msg('VAS_Email') + ' ' + (c.name || '')) + '" title="' + esc(c.email) + '">' +
                             SVG_MAIL +
-                          '</a>'
+                          '</button>'
                         : '') +
                     '</div>';
             }
@@ -615,17 +615,24 @@
 
         // ── renderContracts ───────────────────────────────────────────────────
         function contractStatusClass(code) {
-            // C_Contract DocStatus: CO=Completed(Active), DR=Draft
+            // C_Contract Processed: Y=Completed, N=In Progress
+            if (code === 'Y')                      return 'vas_105_acct-ctstatus--active';
+            if (code === 'N')                      return 'vas_105_acct-ctstatus--draft';
             // VAS_ContractMaster VAS_Status: ARD=Approved(Active), DFT=Drafted, SFA=Sent For Approval, EXP=Expired, TRM=Terminated
-            if (code === 'CO' || code === 'ARD') return 'vas_105_acct-ctstatus--active';
-            if (code === 'DR' || code === 'DFT' || code === 'SFA') return 'vas_105_acct-ctstatus--draft';
+            if (code === 'ARD')                    return 'vas_105_acct-ctstatus--active';
+            if (code === 'DFT' || code === 'SFA')  return 'vas_105_acct-ctstatus--draft';
             return 'vas_105_acct-ctstatus--expired';
         }
         function contractStatusLabel(code) {
-            if (code === 'CO'  || code === 'ARD') return msg('Active');
-            if (code === 'DR'  || code === 'DFT') return msg('VIS_StatusDraft');
-            if (code === 'CL')                    return msg('Closed');
-            if (code === 'EXP')                   return msg('VIS_OverDue');
+            // C_Contract Processed field
+            if (code === 'Y') return msg('VAS_105_Completed');
+            if (code === 'N') return msg('VAS_105_InProgress');
+            // VAS_ContractMaster VAS_Status
+            if (code === 'ARD') return msg('VAS_105_Approved');
+            if (code === 'DFT') return msg('VIS_StatusDraft');
+            if (code === 'SFA') return msg('VAS_105_SentForApproval');
+            if (code === 'EXP') return msg('VIS_OverDue');
+            if (code === 'TRM') return msg('VAS_105_Terminated');
             return code || '—';
         }
 
@@ -637,15 +644,15 @@
 
             var cntEl = document.getElementById(secId('contracts') + '_cnt');
             if (cntEl) {
-                // Active: C_Contract CO or VAS_ContractMaster ARD, not yet past end date
+                // Completed/Active: C_Contract Processed=Y or VAS_ContractMaster ARD, not yet past end date
                 var active = items.filter(function(c){
-                    return (c.statusCode === 'CO' || c.statusCode === 'ARD') && !(c.endDate && c.endDate < today);
+                    return (c.statusCode === 'Y' || c.statusCode === 'ARD') && !(c.endDate && c.endDate < today);
                 }).length;
-                // Draft: C_Contract DR or VAS_ContractMaster DFT
-                var draft  = items.filter(function(c){ return c.statusCode === 'DR' || c.statusCode === 'DFT'; }).length;
+                // In Progress/Draft: C_Contract Processed=N or VAS_ContractMaster DFT
+                var inProg = items.filter(function(c){ return c.statusCode === 'N' || c.statusCode === 'DFT'; }).length;
                 var parts  = [];
                 if (active) parts.push(String(active) + ' ' + msg('Active'));
-                if (draft)  parts.push(String(draft)  + ' ' + msg('VIS_StatusDraft'));
+                if (inProg) parts.push(String(inProg) + ' ' + msg('VAS_105_InProgress'));
                 cntEl.textContent = parts.join(' · ');
             }
 
@@ -655,8 +662,8 @@
             var html = '';
             for (var i = 0; i < items.length; i++) {
                 var c = items[i];
-                // A contract whose status is "active" (CO or ARD) but whose end date has passed is Overdue.
-                var isOverdue    = (c.statusCode === 'CO' || c.statusCode === 'ARD') && c.endDate && c.endDate < today;
+                // A completed/active contract whose end date has passed is shown as Overdue.
+                var isOverdue    = (c.statusCode === 'Y' || c.statusCode === 'ARD') && c.endDate && c.endDate < today;
                 var statusCls    = isOverdue ? 'vas_105_acct-ctstatus--expired' : contractStatusClass(c.statusCode);
                 var statusLabel  = isOverdue ? msg('VIS_OverDue')                 : contractStatusLabel(c.statusCode);
                 var term = [fmtDate(c.startDate), c.endDate ? fmtDate(c.endDate) : 'Perpetual'].filter(Boolean).join(' – ');
@@ -669,6 +676,7 @@
                           '<span class="vas_105_acct-ctstatus ' + statusCls + '">' + esc(statusLabel) + '</span>' +
                         '</div>' +
                         '<div style="margin-top:0.25em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.typeCode || '') + ' · ' + esc(term) + '</div>' +
+                        (c.productName ? '<div style="margin-top:0.1em;font-size:0.75em;color:var(--acct-text-2);">' + esc(c.productName) + '</div>' : '') +
                       '</div>' +
                       '<div style="font-size:0.875em;font-weight:700;color:var(--acct-text);white-space:nowrap;">' + esc(fmtFull(toNum(c.value), sym, prec)) + '</div>' +
                     '</div>';
@@ -1319,7 +1327,8 @@
                        detailRow(msg('StartDate'), fmtDate(c.startDate)) +
                        detailRow(msg('EndDate'), c.endDate ? fmtDate(c.endDate) : 'Perpetual') +
                        detailRow(msg('VAS_Value'), fmtFull(toNum(c.value), sym, prec)) +
-                       detailRow(msg('VAS_105_RenewalType'), c.renewalCode);
+                       detailRow(msg('VAS_105_RenewalType'), c.renewalCode) +
+                       (c.productName ? detailRow(msg('Product'), c.productName) : '');
             var foot = '<button class="vas_105_acct-btn vas_105_acct-btn--secondary" onclick="(function(){document.getElementById(\'vas_105_overlay_' + widgetID + '\').classList.remove(\'vas_105_acct-overlay--open\');})();">' + esc(msg('VIS_Close')) + '</button>';
             showModal(c.name || c.contractNo || msg('VAS_105_Contract'), msg('VAS_105_ContractDetail'), body, foot, false);
         }
@@ -2103,6 +2112,20 @@
             email.initializeComponent();
         }
 
+        // Opens the standard VIS Email compose window pre-addressed to a contact
+        function openContactEmailCompose(toAddr) {
+            if (!window.VIS || typeof VIS.Email !== 'function' || typeof VIS.CFrame !== 'function') return;
+            var tableId = $self.table_ID || 0;
+            var email   = new VIS.Email(toAddr || '', null, null, currentBpId, true, true, tableId, null, '', null);
+            var c       = new VIS.CFrame();
+            c.setName(msg('EMail'));
+            c.setTitle(msg('EMail'));
+            c.hideHeader(true);
+            c.setContent(email);
+            c.show();
+            email.initializeComponent();
+        }
+
         function openEngagementEmailReply(emailId) {
             if (!window.VIS || typeof VIS.Email !== 'function' || typeof VIS.CFrame !== 'function') return;
             fetchModal('GetEmailDetail', { emailId: emailId }, function (err, data) {
@@ -2717,6 +2740,16 @@
             currentBpId = 0;
         };
 
+        // Reset all state and show the no-selection placeholder (mirrors VAS_065 clear pattern)
+        this.clear = function () {
+            abortAll();
+            currentBpId = 0;
+            for (var si = 0; si < SECTIONS.length; si++) {
+                sectionState[SECTIONS[si]] = { loading: false, error: null, data: null, loaded: false };
+            }
+            if ($root) renderNoSelectionState();
+        };
+
         // ── Public: load a specific account ──────────────────────────────────
         this.loadAccount = function (bPartnerId) {
             var newId = parseInt(bPartnerId, 10) || 0;
@@ -2829,6 +2862,12 @@
                 openSendEmailModal();
             });
 
+            // Wire contact mail button → open standard VIS Email compose pre-addressed to the contact
+            $root.on('click', '[data-action="contactEmail"]', function (e) {
+                e.stopPropagation(); e.stopImmediatePropagation();
+                openContactEmailCompose($(this).data('email') || '');
+            });
+
             // Wire make-call action → initiate call via VA048 or tel: fallback
             $root.on('click', '[data-action="makeCall"]', function (e) {
                 e.stopPropagation(); e.stopImmediatePropagation();
@@ -2880,7 +2919,7 @@
 
     /** Tab panel interface — called when the user navigates to a record */
     VAS.VAS_105_AccountRightPanel.prototype.refreshPanelData = function (recordID, selectedRow) {
-        if (selectedRow === undefined || recordID <= 0) return;
+        if (selectedRow == undefined || recordID <= 0) { this.clear(); return; }
         this.record_ID   = recordID;
         this.selectedRow = selectedRow;
         this.loadAccount(recordID);
@@ -2897,6 +2936,9 @@
     };
 
     VAS.VAS_105_AccountRightPanel.prototype.refreshWidget = function () {
+        if (selectedRow == undefined || recordID <= 0) { this.clear(); return; }
+        this.record_ID = recordID;
+        this.selectedRow = selectedRow;
         this.refreshWidget();
     };
 
