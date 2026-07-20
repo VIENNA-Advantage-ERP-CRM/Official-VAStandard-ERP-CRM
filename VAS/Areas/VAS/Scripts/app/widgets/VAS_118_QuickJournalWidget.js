@@ -14,20 +14,20 @@
  *  3  | Quick Journal Entry                              | VAS_118_ModalTitle
  *  4  | Single debit / single credit - auto-balanced     | VAS_118_ModalSubtitle
  *  5  | Organization                                     | VAS_118_Organization
- *  6  | Journal date                                     | VAS_118_JournalDate
+ *  6  | Journal Date                                     | VAS_118_JournalDate
  *  7  | Accounting Schema                                | VAS_118_AccountingSchema
  *  8  | Document Type                                    | VAS_118_DocumentType
- *  9  | Description / narration                          | VAS_118_Description
- * 10  | Debit account                                    | VAS_118_DebitAccount
- * 11  | Credit account                                   | VAS_118_CreditAccount
+ *  9  | Description                                      | VAS_118_Description
+ * 10  | Debit Account                                    | VAS_118_DebitAccount
+ * 11  | Credit Account                                   | VAS_118_CreditAccount
  * 12  | Amount                                           | VAS_118_Amount
- * 13  | Cost center                                      | VAS_118_CostCenter
+ * 13  | Cost Center                                      | VAS_118_CostCenter
  * 14  | Debit                                            | VAS_118_Debit
  * 15  | Credit                                           | VAS_118_Credit
  * 16  | Balanced                                         | VAS_118_Balanced
  * 17  | Cancel                                           | VAS_118_Cancel
- * 18  | Save draft                                       | VAS_118_SaveDraft
- * 19  | Complete journal                                 | VAS_118_CompleteJournal
+ * 18  | Save Draft                                       | VAS_118_SaveDraft
+ * 19  | Complete Journal                                 | VAS_118_CompleteJournal
  * 20  | Select...                                        | VAS_118_SelectPlaceholder
  * 21  | Search account by code or name                   | VAS_118_SearchAccount
  * 22  | None                                             | VAS_118_None
@@ -229,30 +229,30 @@
                 '<div class="vas-qj-general-err vas-qj-hidden"></div>' +
 
                 '<div class="vas-qj-row">' +
-                fieldCombo('org', 'vas-qj-org', escapeHtml(lbl("VAS_118_Organization", "Organization")), lbl("VAS_118_SearchOrg", "Search organization"), true) +
-                fieldWrap(ICON.calendar, escapeHtml(lbl("VAS_118_JournalDate", "Journal date")) + reqStar(true),
+                fieldCombo('org', 'vas-qj-org', escapeHtml(lbl("VAS_118_Organization", "Organization")), lbl("VAS_118_SearchOrg", "Search Organization"), true) +
+                fieldWrap(ICON.calendar, escapeHtml(lbl("VAS_118_JournalDate", "Journal Date")) + reqStar(true),
                     '<input type="date" class="vas-qj-date" />') +
                 '</div>' +
 
                 '<div class="vas-qj-row">' +
-                fieldCombo('book', 'vas-qj-schema', escapeHtml(lbl("VAS_118_AccountingSchema", "Accounting Schema")), lbl("VAS_118_SearchSchema", "Search accounting schema"), true) +
-                fieldCombo('file', 'vas-qj-doctype', escapeHtml(lbl("VAS_118_DocumentType", "Document Type")), lbl("VAS_118_SearchDocType", "Search document type"), true) +
+                fieldCombo('book', 'vas-qj-schema', escapeHtml(lbl("VAS_118_AccountingSchema", "Accounting Schema")), lbl("VAS_118_SearchSchema", "Search Accounting Schema"), true) +
+                fieldCombo('file', 'vas-qj-doctype', escapeHtml(lbl("VAS_118_DocumentType", "Document Type")), lbl("VAS_118_SearchDocType", "Search Document Type"), true) +
                 '</div>' +
 
-                fieldWrap(ICON.note, escapeHtml(lbl("VAS_118_Description", "Description / narration")) + reqStar(true),
-                    '<textarea class="vas-qj-desc" maxlength="255" rows="3" placeholder="' + escapeHtml(lbl("VAS_118_DescPlaceholder", "What is this entry for?")) + '"></textarea>',
+                fieldWrap(ICON.note, escapeHtml(lbl("VAS_118_Description", "Description")) + reqStar(true),
+                    '<textarea class="vas-qj-desc" maxlength="255" rows="3" placeholder=""></textarea>',
                     'vas-qj-field-multiline') +
 
                 '<div class="vas-qj-row">' +
-                fieldCombo('money', 'vas-qj-debit', '<span class="vas-qj-dr-dot"></span> ' + escapeHtml(lbl("VAS_118_DebitAccount", "Debit account")), lbl("VAS_118_SearchAccount", "Search account by code or name"), true) +
-                fieldCombo('money', 'vas-qj-credit', '<span class="vas-qj-cr-dot"></span> ' + escapeHtml(lbl("VAS_118_CreditAccount", "Credit account")), lbl("VAS_118_SearchAccount", "Search account by code or name"), true) +
+                fieldCombo('money', 'vas-qj-debit', '<span class="vas-qj-dr-dot"></span> ' + escapeHtml(lbl("VAS_118_DebitAccount", "Debit Account")), lbl("VAS_118_SearchAccount", "Search account by code or name"), true) +
+                fieldCombo('money', 'vas-qj-credit', '<span class="vas-qj-cr-dot"></span> ' + escapeHtml(lbl("VAS_118_CreditAccount", "Credit Account")), lbl("VAS_118_SearchAccount", "Search account by code or name"), true) +
                 '</div>' +
 
                 '<div class="vas-qj-row">' +
                 fieldWrap(ICON.calc, escapeHtml(lbl("VAS_118_Amount", "Amount")) + reqStar(true),
                     '<span class="vas-qj-cur"></span>' +
                     '<input type="text" class="vas-qj-amount-input" inputmode="decimal" placeholder="0.00" />') +
-                fieldCombo('costcenter', 'vas-qj-costcenter', escapeHtml(lbl("VAS_118_CostCenter", "Cost center")), lbl("VAS_118_SearchCostCenter", "Search cost center"), false) +
+                fieldCombo('costcenter', 'vas-qj-costcenter', escapeHtml(lbl("VAS_118_CostCenter", "Cost Center")), lbl("VAS_118_SearchCostCenter", "Search cost center"), false) +
                 '</div>' +
 
                 '<div class="vas-qj-preview">' +
@@ -268,8 +268,8 @@
                 '<div class="vas-qj-foot">' +
                 '<button type="button" class="vas-qj-btn vas-qj-btn-ghost vas-qj-cancel">' + escapeHtml(lbl("VAS_118_Cancel", "Cancel")) + '</button>' +
                 '<div class="vas-qj-foot-actions">' +
-                '<button type="button" class="vas-qj-btn vas-qj-btn-secondary vas-qj-draft">' + escapeHtml(lbl("VAS_118_SaveDraft", "Save draft")) + '</button>' +
-                '<button type="button" class="vas-qj-btn vas-qj-btn-primary vas-qj-post" disabled>' + escapeHtml(lbl("VAS_118_CompleteJournal", "Complete journal")) + '</button>' +
+                '<button type="button" class="vas-qj-btn vas-qj-btn-secondary vas-qj-draft">' + escapeHtml(lbl("VAS_118_SaveDraft", "Save Draft")) + '</button>' +
+                '<button type="button" class="vas-qj-btn vas-qj-btn-primary vas-qj-post" disabled>' + escapeHtml(lbl("VAS_118_CompleteJournal", "Complete Journal")) + '</button>' +
                 '</div>' +
                 '</div>' +
 
@@ -435,8 +435,9 @@
             var orgId = selectedOrgId();
             clearCombo($dialog.find('.vas-qj-doctype'));
             clearCombo($dialog.find('.vas-qj-costcenter'));
-            clearCombo($dialog.find('.vas-qj-debit'));
-            clearCombo($dialog.find('.vas-qj-credit'));
+            /* Accounts are also org-scoped — reset + reload them for the new org. */
+            reloadAccountCombo($dialog.find('.vas-qj-debit'));
+            reloadAccountCombo($dialog.find('.vas-qj-credit'));
             loadDocTypes(orgId, true);
             loadCostCenters(orgId);
         }
@@ -448,10 +449,25 @@
             currencySymbol = currentSchema ? (currentSchema.CurrencySymbol || '') : '';
             currencyIso = currentSchema ? (currentSchema.CurrencyIso || '') : '';
             $dialog.find('.vas-qj-cur').text(currencySymbol || currencyIso);
-            /* Accounts depend on the schema - clear stale picks. */
-            clearCombo($dialog.find('.vas-qj-debit'));
-            clearCombo($dialog.find('.vas-qj-credit'));
+            /* Accounts are schema-scoped: drop the stale picks and reload for the new
+               schema (an open account dropdown refreshes immediately). */
+            reloadAccountCombo($dialog.find('.vas-qj-debit'));
+            reloadAccountCombo($dialog.find('.vas-qj-credit'));
             updateBalance();
+        }
+
+        /* Clears an account combo's selection and reloads its list for the current
+           schema — refreshing it in place when it is open / focused, else closing it
+           so the next focus loads fresh. */
+        function reloadAccountCombo($combo) {
+            var $input = $combo.find('.vas-qj-combo-input');
+            var $list = $combo.find('.vas-qj-combo-list');
+            var live = !$list.hasClass('vas-qj-hidden') || document.activeElement === $input[0];
+            $input.val('');
+            $combo.find('.vas-qj-combo-id').val('');
+            var reload = $combo.data('vasReload');
+            if (live && reload) { reload(); }
+            else { $list.addClass('vas-qj-hidden').empty(); }
         }
 
         /* ---------------- combobox (type-to-filter) ---------------- */
@@ -471,6 +487,8 @@
                         (items[i].html || escapeHtml(items[i].label)) + '</div>';
                 }
                 $list.html(html).removeClass('vas-qj-hidden');
+                /* Highlight the first row so Enter picks it and Down/Up navigate from there. */
+                $list.find('.vas-qj-combo-item').first().addClass('vas-qj-combo-item-active');
                 positionList();
             }
 
@@ -486,20 +504,60 @@
                 $list.toggleClass('vas-qj-combo-list-up', spaceBelow < listEl.offsetHeight + 8);
             }
 
+            /* Commits a picked row (the "None" row — empty id — clears the field). */
+            function selectItem($item) {
+                if (!$item || !$item.length) { return; }
+                var id = $item.attr('data-id') || '';
+                $id.val(id);
+                $input.val(id ? $item.attr('data-label') : '');
+                $list.addClass('vas-qj-hidden').empty();
+                if (onSelect) { onSelect(); }
+            }
+
+            /* Moves the keyboard highlight and keeps the active row in view. */
+            function moveActive(delta) {
+                var $items = $list.find('.vas-qj-combo-item');
+                if (!$items.length) { return; }
+                var idx = $items.index($list.find('.vas-qj-combo-item-active')) + delta;
+                if (idx < 0) { idx = 0; }
+                if (idx > $items.length - 1) { idx = $items.length - 1; }
+                $items.removeClass('vas-qj-combo-item-active');
+                var el = $items.eq(idx).addClass('vas-qj-combo-item-active')[0];
+                if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'nearest' }); }
+            }
+
             /* Click / focus opens the list (empty term => all / first page). */
             $input.on('focus click', function () { provider($input.val(), render); });
             /* Typing invalidates a prior pick and re-filters. */
             $input.on('input', function () { $id.val(''); markInvalid($combo, false); provider($input.val(), render); });
 
+            /* Keyboard: Down/Up navigate, Enter selects the highlighted row, Esc closes. */
+            $input.on('keydown', function (e) {
+                var key = e.key;
+                if (key === 'ArrowDown' || key === 'Down') {
+                    e.preventDefault();
+                    if ($list.hasClass('vas-qj-hidden')) { provider($input.val(), render); }
+                    else { moveActive(1); }
+                } else if (key === 'ArrowUp' || key === 'Up') {
+                    e.preventDefault();
+                    moveActive(-1);
+                } else if (key === 'Enter') {
+                    var $active = $list.find('.vas-qj-combo-item-active');
+                    if (!$list.hasClass('vas-qj-hidden') && $active.length) { e.preventDefault(); selectItem($active); }
+                } else if (key === 'Escape' || key === 'Esc') {
+                    /* Close the dropdown first (don't let the modal's Escape close it). */
+                    if (!$list.hasClass('vas-qj-hidden')) { e.stopPropagation(); $list.addClass('vas-qj-hidden'); }
+                }
+            });
+
             $list.on('mousedown', '.vas-qj-combo-item', function (e) {
                 e.preventDefault();
-                var $item = $(this);
-                var id = $item.attr('data-id') || '';
-                $id.val(id);
-                /* The "None" row (empty id) clears the field. */
-                $input.val(id ? $item.attr('data-label') : '');
-                $list.addClass('vas-qj-hidden').empty();
-                if (onSelect) { onSelect(); }
+                selectItem($(this));
+            });
+            /* Keep hover and keyboard highlight in sync. */
+            $list.on('mousemove', '.vas-qj-combo-item', function () {
+                $list.find('.vas-qj-combo-item-active').removeClass('vas-qj-combo-item-active');
+                $(this).addClass('vas-qj-combo-item-active');
             });
 
             $input.on('blur', function () {
@@ -510,6 +568,10 @@
                     if (!$id.val()) { $input.val(''); }
                 }, 150);
             });
+
+            /* Lets callers re-run the provider (e.g. reload accounts when the schema
+               changes) without reaching into this closure. */
+            $combo.data('vasReload', function () { provider($input.val(), render); });
         }
 
         function clearCombo($combo) {

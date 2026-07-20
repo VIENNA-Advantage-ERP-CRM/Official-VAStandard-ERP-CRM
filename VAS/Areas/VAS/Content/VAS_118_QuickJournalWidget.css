@@ -103,7 +103,9 @@
     width: 100%;
     max-width: 48em;
     max-height: calc(100vh - 3em);
-    overflow-y: auto;
+    /* Modal itself does not scroll — header/footer stay pinned; only .vas-qj-body
+       scrolls (overflow:hidden also clips the rounded corners). */
+    overflow: hidden;
     background: #FFFFFF;
     border: 1px solid #E4EDF4;
     border-radius: 18px;
@@ -119,6 +121,7 @@
     gap: 0.875em;
     padding: 1.375em 1.5em 1em;
     border-bottom: 1px solid #EDF2F6;
+    flex-shrink: 0;
 }
 .vas-qj-modal-ico {
     width: 2.625em; height: 2.625em;
@@ -146,7 +149,16 @@
 .vas-qj-close:hover { background: rgba(0, 0, 0, 0.05); color: #141414; }
 .vas-qj-close svg { width: 1.125em; height: 1.125em; }
 
-.vas-qj-body { padding: 1.125em 1.5em 1.25em; display: flex; flex-direction: column; gap: 0.9em; }
+.vas-qj-body {
+    padding: 1.125em 1.5em 1.25em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9em;
+    /* Only region that scrolls; header/footer stay pinned. */
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
 .vas-qj-row { display: flex; gap: 1.5em; }
 
 /* Field (VAS_065 pattern): label on top, then a .vas-qj-control row that holds a
@@ -241,7 +253,8 @@
     font-size: 0.8em;
     display: flex; gap: 0.5em; align-items: baseline;
 }
-.vas-qj-combo-item:hover { background: #EEF6FF; }
+.vas-qj-combo-item:hover,
+.vas-qj-combo-item.vas-qj-combo-item-active { background: #EEF6FF; }
 .vas-qj-none { color: #8A97A6; font-style: italic; }
 .vas-qj-acct-code { font-family: 'Roboto Mono', monospace; font-weight: 600; color: #0069AE; }
 .vas-qj-acct-name { color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -295,6 +308,7 @@
     display: flex; align-items: center; gap: 0.5em;
     padding: 1em 1.5em 1.25em;
     border-top: 1px solid #EDF2F6;
+    flex-shrink: 0;
 }
 .vas-qj-foot-actions { margin-left: auto; display: flex; gap: 0.5em; }
 .vas-qj-btn {
