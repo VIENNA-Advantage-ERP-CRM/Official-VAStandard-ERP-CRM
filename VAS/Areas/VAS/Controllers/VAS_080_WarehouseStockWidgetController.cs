@@ -25,6 +25,9 @@ namespace VAS.Controllers
     ///                          category's MMPolicy - FIFO keeps the newest layers, LIFO the oldest
     ///   VAI154      2026-07-06 Review #15: per-user default warehouse (AD_Preference) with
     ///                          GetWarehouses returning it and SetDefaultWarehouse saving it
+    ///   VAI154      2026-07-18 Fixed PostgreSQL 42804 (UNION types interval and integer):
+    ///                          Age_Days now uses date_part('epoch',...)/86400 on PostgreSQL,
+    ///                          where date subtraction yields an INTERVAL, not a day count
     /// </summary>
     public class VAS_080_WarehouseStockWidgetController : Controller
     {
@@ -334,6 +337,16 @@ namespace VAS.Controllers
 
             policySql = AddAccessSql(ctx, policySql, "PolicyProduct");
 
+            // rule 4: on PostgreSQL this schema's DATE behaves as a timestamp, so
+            // date subtraction yields an INTERVAL and the AgedSlices UNION against
+            // the integer 99999 branch fails with 42804 ("UNION types interval and
+            // integer cannot be matched"). Compute the age in days with
+            // date_part('epoch', ...) / 86400 there; Oracle keeps date - date,
+            // which is already a day count (same pattern as VAS_016).
+            string ageDaysSql = DB.IsPostgreSQL()
+                ? "CAST(date_part('epoch', (CAST(CURRENT_DATE AS TIMESTAMP)-CAST(InboundLayers.MovementDate AS TIMESTAMP))) / 86400 AS NUMERIC)"
+                : "CAST(CURRENT_DATE AS DATE)-CAST(InboundLayers.MovementDate AS DATE)";
+
             warehouseSql = AddAccessSql(ctx, warehouseSql, "Warehouse");
             locatorSql = AddAccessSql(ctx, locatorSql, "Locator");
             storageSql = AddAccessSql(ctx, storageSql, "Storage");
@@ -467,7 +480,7 @@ namespace VAS.Controllers
                                ELSE LineCosts.Qty_On_Hand-(InboundLayers.Running_In_Qty-InboundLayers.MovementQty)
                            END AS Slice_Qty,
                            LineCosts.Unit_Cost,
-                           CAST(CURRENT_DATE AS DATE)-CAST(InboundLayers.MovementDate AS DATE) AS Age_Days
+                           " + ageDaysSql + @" AS Age_Days
                     FROM LineCosts
                     INNER JOIN InboundLayers ON (InboundLayers.Locator_ID=LineCosts.Locator_ID AND InboundLayers.Product_ID=LineCosts.Product_ID AND InboundLayers.ASI_ID=LineCosts.ASI_ID)
                     WHERE LineCosts.Qty_On_Hand>0

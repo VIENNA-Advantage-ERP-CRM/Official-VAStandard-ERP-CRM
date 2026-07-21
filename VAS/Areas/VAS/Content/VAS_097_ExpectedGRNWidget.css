@@ -437,13 +437,28 @@
         height: 1.25em;
     }
 
+/* Correction 2026-07-18: the modal never scrolls - the body is a flex column
+   whose line-list viewport clips, and the widget JS pages the rows to fit
+   the available height (fitModalLines) instead of showing a scrollbar. */
 .vas-egrn-modal-body {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
-    padding: 1.375em 1.5em;
+    overflow: hidden;
+    padding: 1em 1.5em 1.125em;
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
+
+    .vas-egrn-modal-body > * {
+        flex: 0 0 auto;
+    }
+
+    .vas-egrn-modal-body > .vas-egrn-rcv-viewport {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
 
 .vas-egrn-form-grid {
     display: grid;
@@ -452,7 +467,7 @@
 }
 
 .vas-egrn-field {
-    padding: 0.5em 0.75em;
+    padding: 0.375em 0 0.5em;
     border-bottom: 1px solid #D9E1E8;
     min-width: 0;
 }
@@ -478,7 +493,7 @@
 .vas-egrn-note {
     font-size: .78em;
     color: #748494;
-    margin: 1.12em 0 0.8em;
+    margin: 0.9em 0 0.55em;
     display: flex;
     align-items: center;
     gap: 0.48em;
@@ -494,24 +509,33 @@
 .vas-egrn-lines {
     display: flex;
     flex-direction: column;
-    gap: 0.5em;
+    gap: 0;
 }
 
+/* Correction 2026-07-18 (reference design): flat divider rows instead of
+   boxed cards - shorter lines, managed column gaps, and the attribute column
+   is flexible so it sits right next to the item name.
+   Item | Attribute | PO Qty | Received | UOM */
 .vas-egrn-rcv-line {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr) 5.5em 7em 4.25em;
-    gap: 0.75em;
+    grid-template-columns: minmax(0, 1.1fr) minmax(6.5em, 1.3fr) 4.25em 4.75em 3.25em;
+    gap: 0 0.75em;
     align-items: center;
-    padding: 0.625em 0.875em;
-    border: 1px solid #E4EDF4;
-    border-radius: 10px;
-    background: #fff;
+    padding: 0.4em 0;
+    border: 0;
+    border-bottom: 1px solid #EDF2F6;
+    border-radius: 0;
+    background: transparent;
+}
+
+.vas-egrn-lines .vas-egrn-rcv-line:last-child {
+    border-bottom: none;
 }
 
 .vas-egrn-rcv-head {
     background: transparent;
-    border: 0;
-    padding: 0.25em 0.875em;
+    padding: 0.3em 0;
+    border-bottom: 1px solid #E4EDF4;
     color: #748494;
 }
 
@@ -545,6 +569,23 @@
     white-space: nowrap;
 }
 
+/* Attribute value rendered as a small chip next to the item (reference
+   design .attr-chip). */
+.vas-egrn-attr-chip {
+    display: inline-block;
+    max-width: 100%;
+    font-size: .78em;
+    color: #5F7283;
+    background: #EEF8FF;
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    padding: 0.08em 0.65em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+}
+
 .vas-egrn-rcv-po,
 .vas-egrn-rcv-uom {
     font-size: .9em;
@@ -556,40 +597,45 @@
     white-space: nowrap;
 }
 
+/* Compact bordered quantity input (reference design .qty-input). */
 .vas-egrn-rcv-in {
     width: 100%;
+    height: 1.9em;
     font-family: inherit;
     font-size: .9em;
     text-align: right;
-    border: 0;
-    border-bottom: 1px solid #D7D7D7;
-    background: transparent;
-    border-radius: 0;
-    padding: 0.49em 0.28em;
+    border: 1px solid #E4EDF4;
+    background: #fff;
+    border-radius: 0.5em;
+    padding: 0 0.6em;
     outline: none;
     box-shadow: none;
     color: #102C3F;
 }
 
+    .vas-egrn-rcv-in:hover {
+        border-color: #0083DA;
+    }
+
     .vas-egrn-rcv-in:focus {
         outline: none;
-        box-shadow: none;
-        border-bottom-color: #1F83FF;
+        border-color: #0083DA;
+        box-shadow: 0 0 0 2px rgba(0, 131, 218, .12);
     }
 
 .vas-egrn-rcv-line.invalid {
-    border-color: #ED1C24;
+    border-bottom-color: #ED1C24;
     background: #FDF3F3;
 }
 
 .vas-egrn-error {
-    margin-top: 0.76em;
+    margin-top: 0.6em;
     color: #D14545;
     font-size: .82em;
 }
 
 .vas-egrn-action {
-    margin-top: 1.125em;
+    margin-top: 0.75em;
     display: flex;
     justify-content: flex-end;
 }
@@ -642,8 +688,8 @@
     }
 
     .vas-egrn-rcv-line {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr) 4.5em 5.25em 3.5em;
-        gap: 0.5em;
-        padding: 0.5625em 0.625em;
+        grid-template-columns: minmax(0, 1.1fr) minmax(5em, 1.2fr) 3.5em 4.25em 2.75em;
+        gap: 0 0.5em;
+        padding: 0.4em 0;
     }
 }
