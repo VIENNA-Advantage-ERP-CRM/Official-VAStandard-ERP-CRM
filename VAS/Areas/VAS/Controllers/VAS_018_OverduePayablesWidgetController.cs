@@ -188,7 +188,7 @@ namespace VAS.Areas.VAS.Controllers
                      AND bp.IsVendor = 'Y'
                      AND bp.AD_Client_ID = @ClientID
                    GROUP BY bp.Name
-                  HAVING SUM(inv.OpenAmt) > 0
+                  /*HAVING SUM(inv.OpenAmt) > 0*/
                    ORDER BY OverdueAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);

@@ -110,25 +110,55 @@
             return (decSep !== ".") ? s.replace(".", decSep) : s;
         }
 
-        function sanitizeAmount(s) {
-            s = String(s);
+        /* Upper bound for an amount MAGNITUDE - Int32.MaxValue (2,147,483,647), matching
+           VAS_118 QuickJournal. Capped inclusive of its precision digits so a value can
+           never overflow a 32-bit signed integer downstream. Negative amounts ARE allowed
+           (credit memos / treat-as-discount), so only the magnitude is clamped - the sign
+           is preserved. */
+        var AMOUNT_MAX_VALUE = 2147483647;
+
+        /* Clean an amount input's raw text: an optional leading '-' (only when allowNeg),
+           digits and one decimal separator, the fraction capped to `prec` digits and the
+           magnitude clamped to AMOUNT_MAX_VALUE. A lone '-' / '' is preserved so the user
+           can keep typing. */
+        function sanitizeAmount(raw, prec, allowNeg) {
+            raw = String(raw == null ? "" : raw);
+            var neg = !!allowNeg && raw.charAt(0) === "-";
             var out = "", seenDec = false;
-            for (var i = 0; i < s.length; i++) {
-                var c = s.charAt(i);
+            for (var i = 0; i < raw.length; i++) {
+                var c = raw.charAt(i);
                 if (c >= "0" && c <= "9") out += c;
                 else if (c === decSep && !seenDec) { out += decSep; seenDec = true; }
             }
-            return out;
+            var p = prec >= 0 ? prec : precision();
+            var sepIdx = out.indexOf(decSep);
+            if (sepIdx >= 0) out = (p > 0) ? out.slice(0, sepIdx + 1 + p) : out.slice(0, sepIdx);
+            // Clamp the magnitude to Int32.MaxValue (parseNum ignores the sign for this test).
+            if (out !== "" && out !== decSep && Math.abs(parseNum(out)) > AMOUNT_MAX_VALUE) out = fmtAmtInput(AMOUNT_MAX_VALUE, p);
+            return (neg ? "-" : "") + out;
         }
 
-        function bindAmountInput($inp) {
+        function bindAmountInput($inp, prec, allowNeg) {
             $inp.attr({ inputmode: "decimal", autocomplete: "off" });
             $inp.on("keypress", function (e) {
                 if (e.ctrlKey || e.metaKey || e.which === 0 || e.which === 8) return;
                 var ch = String.fromCharCode(e.which);
+                // Leading minus only, and only when negatives are allowed (e.g. price).
+                if (ch === "-") { if (!allowNeg || this.selectionStart !== 0 || this.value.indexOf("-") !== -1) e.preventDefault(); return; }
                 if (ch === decSep) { if (this.value.indexOf(decSep) !== -1) e.preventDefault(); return; }
                 if (ch === grpSep) return;
-                if (!/[0-9.]/.test(ch)) e.preventDefault();
+                if (!/[0-9]/.test(ch)) e.preventDefault();
+            });
+            // Enforce precision + Int32 magnitude cap on every input event (typing, paste,
+            // autofill) so an out-of-range value can never survive a keystroke.
+            $inp.on("input", function () {
+                var before = this.value, caret = this.selectionStart;
+                var after = sanitizeAmount(before, prec, allowNeg);
+                if (after !== before) {
+                    $inp.val(after);
+                    var np = Math.max(0, (caret == null ? after.length : caret) - (before.length - after.length));
+                    try { this.setSelectionRange(np, np); } catch (e2) { }
+                }
             });
         }
 
@@ -655,7 +685,16 @@
            the VAS_InvoiceSummary design, right-aligned in the totals row. */
         function renderTotals() {
             $totalsRow.empty();
-            var html = '<div class="vas-cil-summary">';
+            // On a treat-as-discount invoice, the product/qty/uom are driven by the referenced
+            // original line (picked in the "..." Additional Info modal), so show a left-side
+            // hint telling the user where to select it.
+            var html = "";
+            if (isTreatAsDiscount()) {
+                html += '<div class="vas-cil-totals-note">' +
+                    esc(lbl("VAS_074_TreatAsDiscountHint", "Please select the Original Invoice details in the Additional Info section to select the product")) +
+                    '</div>';
+            }
+            html += '<div class="vas-cil-summary">';
             if (taxSummary && taxSummary.length) {
                 var h = taxSummary[0];
                 var sym = h.CurSymbol || "";
@@ -767,8 +806,10 @@
             $row.append(renderTaxCell(line));
 
             var amt = lineAmount(line);
+            // Show any NON-ZERO amount (negative amounts are valid on credit / treat-as-
+            // discount lines); only a genuine 0 stays blank. `amt` is truthy for negatives.
             $row.append($('<div class="vas-cil-cell vas-cil-cell--right" role="cell"></div>')
-                .append('<span class="vas-cil-amt">' + (amt > 0 ? esc(fmtMoney(amt)) : "") + "</span>"));
+                .append('<span class="vas-cil-amt">' + (amt ? esc(fmtMoney(amt)) : "") + "</span>"));
 
             $row.append(renderMoreCell(line));
             // Per-row inline validation error (set by validateUnsaved on Save) - shown as a
@@ -864,7 +905,7 @@
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
                 var pv = primaryValue(line);
-                wrap.append(dispInput(line, pField, pv, { placeholder: lbl("VAS_074_AddProductCharge", "Add product / charge…") }));
+                wrap.append(dispInput(line, pField, pv, { placeholder: lbl("VAS_074_AddProductCharge", "Add product / charge…"), readOnly: isTreatAsDiscount() }));
                 // For a product carrying (or able to carry) an attribute set, show the
                 // attribute-set-instance description as a clickable sub-line under the
                 // product. Clicking it opens the attribute control instead of editing
@@ -880,7 +921,7 @@
                     // set was removed after the line was created but the old ASI description
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline).
-                    if (editable && productHasAttributeSet(line)) {
+                    if (editable && productHasAttributeSet(line) && !isTreatAsDiscount()) {
                         // Open on mousedown + preventDefault (like Undo/Save): a plain click
                         // while a cell editor is focused blurs -> commits -> re-renders the row,
                         // destroying this element before mouseup so the FIRST click is eaten
@@ -912,7 +953,9 @@
                 $inp.attr("placeholder", placeholder || "");
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
-                if (opts.amount) bindAmountInput($inp);
+                // Amount inputs: cap magnitude to Int32.MaxValue; allow a negative value for
+                // everything except quantity (qty is coerced non-negative in commitField).
+                if (opts.amount) bindAmountInput($inp, field === "quantity" ? 2 : precision(), field !== "quantity");
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
@@ -944,7 +987,7 @@
             if (editQty) {
                 var $q = $('<input type="text" class="vas-cil-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
                 var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
-                bindAmountInput($q);
+                bindAmountInput($q, 2, false);   // quantity: precision 2, non-negative, Int32 cap
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
                     e.stopPropagation();
@@ -957,7 +1000,7 @@
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
                 wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
-                    { align: "right", placeholder: lbl("VAS_074_Qty", "Qty"), cls: "vas-cil-qtyval" }));
+                    { align: "right", placeholder: lbl("VAS_074_Qty", "Qty"), cls: "vas-cil-qtyval", readOnly: isColumnReadOnly(line, "QtyEntered") }));
             }
 
             // UOM (bottom) — real editable C_UOM dropdown, options filtered to this
@@ -1171,6 +1214,9 @@
         function startEdit(line, field) {
             if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
             if (line._saving) return;                 // row is being saved - locked until it returns
+            // Product / Charge cell has no FIELD_COL mapping, so gate the treat-as-discount
+            // lock here (Qty / UOM go through fieldReadOnly below via isColumnReadOnly).
+            if ((field === "product" || field === "charge") && isTreatAsDiscount()) return;
             if (fieldReadOnly(line, field)) return;   // AD_Column.ReadOnlyLogic / IsReadOnly
             commitMorePopover(); morePopoverFor = null;
             editing = { rowId: line.rowId, field: field };
@@ -1377,6 +1423,19 @@
             };
             seedAllColumns(line.values);
             lines.unshift(line);
+            // On a treat-as-discount invoice the product / qty / uom are locked and populated
+            // from the referenced line (picked via the "..." modal), so do NOT auto-open the
+            // product search editor - just render the new (locked) row and focus its "..."
+            // button so the reference modal is one keystroke away.
+            if (isTreatAsDiscount()) {
+                editing = null;
+                render();
+                setTimeout(function () {
+                    var $b = $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-cil-more-btn');
+                    if ($b.length) $b.focus();
+                }, 0);
+                return;
+            }
             editing = { rowId: line.rowId, field: "product" };
             catalog.term = ""; catalog.highlight = 0;
             render();
@@ -1913,7 +1972,20 @@
          * mirrors the framework Evaluator: comparison tuples "@token@<op>value"
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the invoice header / document context. */
+        /* On a "treat as discount" invoice (header C_Invoice.TreatAsDiscount) EVERY line's
+           product / attribute set / UOM / quantity are driven by the referenced original
+           line (picked via Ref_InvoiceLineOrg_ID in the "..." modal) and must NOT be
+           selected / changed directly on the grid - they are copied and locked. */
+        var REF_DISCOUNT_LOCKED_COLS = { M_Product_ID: 1, QtyEntered: 1, C_UOM_ID: 1, M_AttributeSetInstance_ID: 1 };
+        function isTreatAsDiscount() {
+            return !!(parent && parent.TreatAsDiscount);
+        }
+
         function isColumnReadOnly(line, col) {
+            // Treat-as-discount invoice: product / ASI / UOM / qty come from the referenced
+            // line and are read-only on the grid (checked first so it holds even without
+            // column meta).
+            if (REF_DISCOUNT_LOCKED_COLS[col] && isTreatAsDiscount()) return true;
             // C_UOM_ID is locked once the line is saved (C_InvoiceLine_ID > 0): the unit of
             // measure must not change on an existing invoice line. Checked before the meta
             // lookup so it holds even when column meta is absent.
@@ -1976,6 +2048,10 @@
                 case "AD_Client_ID": return String((parent && parent.AD_Client_ID) || 0);
                 case "IsSOTrx": return (parent && parent.IsSOTrx) ? "Y" : "N";
                 case "IsTaxIncluded": return (parent && parent.IsTaxIncluded) ? "Y" : "N";
+                // Header flag kept in context so a line field's DisplayLogic / ReadOnlyLogic
+                // (e.g. @TreatAsDiscount@='Y' on the reference group) resolves correctly - it
+                // is NOT a C_InvoiceLine column, so it never comes from line.values.
+                case "TreatAsDiscount": return (parent && parent.TreatAsDiscount) ? "Y" : "N";
                 case "Processed": return (parent && parent.Processed) ? "Y" : "N";
                 case "DocStatus": return (parent && parent.DocStatus) || "";
                 default: return "";
@@ -2138,7 +2214,14 @@
             { col: "VAFAM_CapitalExpense", when: "vafam" },
             { col: "A_Asset_ID", when: "vafam" },
             { col: "VA106_TaxCollectedAtSource_ID", when: "va106_" },
-            { col: "VA106_TCSAmount", when: "va106_" }
+            { col: "VA106_TCSAmount", when: "va106_" },
+            // "Treat as Discount Reference" group - only when the invoice header's
+            // TreatAsDiscount flag is set (AP credit-memo treated as a discount). Picking
+            // Ref_InvoiceLineOrg_ID copies the referenced line's product / ASI / UOM / qty
+            // onto this line (see setDyn -> applyRefLineDetail).
+            { col: "Ref_InvoiceOrg_ID", when: "treatasdiscount" },
+            { col: "Ref_InvoiceLineOrg_ID", when: "treatasdiscount" },
+            { col: "M_Warehouse_ID", when: "treatasdiscount" }
         ];
 
         /* Whether a conditional group applies to this line. */
@@ -2150,6 +2233,10 @@
                 return pt === "S" || pt === "E";                        // Service / Expense product
             }
             if (when === "vafam") return !!columnMeta["VAFAM_IsAssetRelated"];   // module installed
+            // Treat-as-discount reference group: gated by the invoice header flag (kept in
+            // parent context on load). The columns must also exist in the dictionary
+            // (additionalInfoColumns already drops any missing column meta).
+            if (when === "treatasdiscount") return !!(parent && parent.TreatAsDiscount);
             // VA106 (Tax Collected at Source) - shown only when the module is installed
             // (the TCS column is present in the dictionary). The field's own
             // AD_Field.DisplayLogic (e.g. sales-only) is still applied separately.
@@ -2249,7 +2336,8 @@
            title (AD_Message key + English fallback), `collapsed` = initial state. */
         var MORE_FIELD_GROUPS = [
             { anchor: "AD_OrgTrx_ID", key: "VAS_074_GrpDimension", def: "Dimension", collapsed: false },
-            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false }
+            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false },
+            { anchor: "Ref_InvoiceOrg_ID", key: "VAS_074_GrpTreatAsDiscount", def: "Treat as Discount Reference", collapsed: false }
         ];
         // Per-anchor collapsed state; persists across refreshMoreDialog and re-opens so a
         // user's expand/collapse choice survives value-change reconciles within the session.
@@ -2439,12 +2527,19 @@
                 stage("DateInvoiced", parent.DateInvoiced);
                 stage("IsSOTrx", !!parent.IsSOTrx);
                 stage("IsTaxIncluded", !!parent.IsTaxIncluded);
+                stage("TreatAsDiscount", !!parent.TreatAsDiscount);   // treat-as-discount ref pickers' val rules
                 stage("Processed", !!parent.Processed);
                 stage("DocStatus", parent.DocStatus || "");
             }
             // Current line's own C_InvoiceLine columns (current-row context) - staged last.
             var v = line.values || {};
             for (var k in v) { if (v.hasOwnProperty(k)) stage(k, v[k]); }
+            // Organization for a line's lookups / AD_Val_Rule must be the INVOICE's org, not
+            // the login org. A new/unsaved line carries AD_Org_ID = null (seedAllColumns),
+            // which the loop above would stage as "" - clobbering the header org and making a
+            // validated framework lookup fall back to the login organization. Re-assert the
+            // invoice org last so @AD_Org_ID@ resolves to the invoice's org.
+            if (parent && (parent.AD_Org_ID || 0) > 0) stage("AD_Org_ID", parent.AD_Org_ID);
             // Write each column once.
             for (var key in bag) {
                 if (!bag.hasOwnProperty(key)) continue;
@@ -2677,6 +2772,13 @@
             // VAFAM asset-related rule: toggling Asset Related makes Capital Expense mandatory
             // (asterisk) or clears Capital Expense + Asset. Runs regardless of any column callout.
             if (String(col).toLowerCase() === VAFAM_ASSET_RELATED_COL.toLowerCase()) applyAssetRelatedRule(line);
+            // Treat-as-discount: picking the referenced original invoice line copies its
+            // product / ASI / UOM / qty onto this line (then locks them). Fires on a genuine
+            // change to a real line id, independent of any AD_Column.Callout on the column.
+            if (!sameVal(prev, value) && String(col).toLowerCase() === "ref_invoicelineorg_id") {
+                var refLineId = parseInt(value, 10) || 0;
+                if (refLineId > 0) fetchRefLineDetail(line, refLineId);
+            }
             clearMoreDialogError();   // any field change dismisses the blocking close-error banner
             var m = columnMeta[col];
             if (m && m.Callout) {
@@ -2691,6 +2793,53 @@
                 return;
             }
             if (refresh) refreshIfAffectsLogic(line, col);
+        }
+
+        /* ---------- treat-as-discount reference sync ----------
+           When the user picks Ref_InvoiceLineOrg_ID, fetch the referenced original invoice
+           line and copy its product / attribute-set / UOM / entered quantity onto this line
+           so the discount line stays consistent with the line it references. On a treat-as-
+           discount invoice these fields are read-only anyway (isTreatAsDiscount -> isColumnReadOnly). */
+        function fetchRefLineDetail(line, refLineId) {
+            showBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetRefInvoiceLineDetail",
+                type: "GET", dataType: "json", data: { C_InvoiceLine_ID: refLineId },
+                success: function (raw) {
+                    showBusy(false);
+                    // still on the same reference the user just picked?
+                    if ((parseInt(lineVal(line, "Ref_InvoiceLineOrg_ID"), 10) || 0) !== refLineId) return;
+                    var d = (typeof raw === "string") ? (raw ? jQuery.parseJSON(raw) : null) : raw;
+                    if (!d) { showToast(lbl("VAS_074_RefLineNotFound", "Referenced invoice line not found")); return; }
+                    applyRefLineDetail(line, d);
+                },
+                error: function (e) { console.log(e); showBusy(false); }
+            });
+        }
+
+        /* Copy the referenced line's product / ASI / UOM / qty onto this line (values +
+           display), mark dirty, and repaint the grid row + open modal. Pricing is NOT
+           recomputed - the user enters the discount amount manually. The core columns
+           (M_Product_ID / M_AttributeSetInstance_ID / C_UOM_ID / QtyEntered) persist via
+           buildRowPayload's top-level fields, so no _dynTouched flag is needed for them. */
+        function applyRefLineDetail(line, d) {
+            var v = line.values, disp = line.display || (line.display = {});
+            var asi = parseInt(d.M_AttributeSetInstance_ID, 10) || 0;
+            v.M_Product_ID = parseInt(d.M_Product_ID, 10) || 0;
+            v.C_Charge_ID = 0;
+            v.M_AttributeSetInstance_ID = asi;
+            var uom = parseInt(d.C_UOM_ID, 10) || 0;
+            if (uom > 0) v.C_UOM_ID = uom;
+            v.QtyEntered = parseNum(d.QtyEntered);
+            disp.productName = d.ProductName || "";
+            disp.chargeName = "";
+            disp.attrName = d.AttrName || "";
+            disp.hasAttributeSet = asi > 0;
+            if (d.UomName) disp.uomName = d.UomName;
+            line._productType = d.ProductType || "";
+            markDirty(line);
+            render();   // product / qty / uom now shown locked
+            if (morePopoverFor === line.rowId) refreshMoreDialog(line);
         }
 
         /* Snapshot the current value of every curated modal field (case-insensitive). */

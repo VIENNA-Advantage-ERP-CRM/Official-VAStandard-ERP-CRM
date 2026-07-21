@@ -791,6 +791,21 @@
             $dialog.find('.vas-qj-general-err').text(msg || '').removeClass('vas-qj-hidden');
         }
 
+        /* Transient toast for save / complete confirmations (replaces the blocking
+           VIS.ADialog). Uses the framework notification when present, else a self-mounted
+           toast; mirrors VAS_074's showToast. */
+        function showToast(message) {
+            if (!message) { return; }
+            if (VIS && VIS.ADD && typeof VIS.ADD.Notification === 'function') { VIS.ADD.Notification(message); return; }
+            var $t = $('<div class="vas-qj-toast"></div>').text(message);
+            $('body').append($t);
+            window.setTimeout(function () { $t.addClass('vas-qj-toast--show'); }, 10);
+            window.setTimeout(function () {
+                $t.removeClass('vas-qj-toast--show');
+                window.setTimeout(function () { $t.remove(); }, 300);
+            }, 2600);
+        }
+
         /* Current field values — the create/update payload and the dirty snapshot. */
         function collectValues() {
             return {
@@ -870,7 +885,7 @@
                     if (data && data.Success) {
                         showStatus(data.DocStatus || 'CO', data.DocumentNo);
                         setCompleted(true);   /* freeze fields + footer, reveal New Journal */
-                        if (VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info("", false, data.Message, ""); }
+                        showToast(data.Message);
                     } else {
                         showStatus(data && data.DocStatus, data && data.DocumentNo);
                         showGeneralError((data && data.Message) || lbl("VAS_118_JournalNotCompleted", "The journal could not be completed."));
@@ -893,7 +908,7 @@
             setBusy(true);
             postSave(function (ok, data) {
                 setBusy(false);
-                if (ok && VIS.ADialog && VIS.ADialog.info) { VIS.ADialog.info("", false, data.Message, ""); }
+                if (ok) { showToast(data && data.Message); }
             });
         }
 

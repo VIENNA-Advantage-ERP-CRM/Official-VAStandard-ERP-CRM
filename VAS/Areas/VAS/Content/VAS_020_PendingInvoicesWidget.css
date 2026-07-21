@@ -521,6 +521,18 @@
     line-height: 1.25;
 }
 
+/* DocumentNo rendered as a zoom hyperlink (opens the invoice record). */
+a.vas-piawdg-pop-docno-link {
+    color: #2563EB;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+a.vas-piawdg-pop-docno-link:hover,
+a.vas-piawdg-pop-docno-link:focus {
+    text-decoration: underline;
+}
+
 .vas-piawdg-pop-status {
     font-size: 0.62rem;
     font-weight: 700;

@@ -10,12 +10,16 @@
  * Created by     : Claude (VAS widget pattern)
  *
  * AD_Message keys used (add via System Messages):
- *   VAS_067_Placeholder       => "Search AP invoices by no., vendor, invoice ref, PO ref, doc type..."
+ *   VAS_067_Placeholder       => "Search Invoices by Vendor, Document No., Reference No., Document Type, Amount, Status, Paid"
  *   VAS_067_Kind              => "AP Invoice"
  *   VAS_DocSearch_TypeToSearch=> "Type at least 2 characters to search"
  *   VAS_DocSearch_NoResults   => "No matching documents"
  *   VAS_DocSearch_Error       => "Search failed. Please try again."
  *   VAS_DocSearch_Results     => "results"
+ *   VAS_067_Paid              => "Paid"
+ *   VAS_067_Unpaid            => "Unpaid"
+ *   VAS_067_Rep               => "Representative"
+ *   VAS_067_Ref               => "Reference No"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -26,7 +30,7 @@
         var ZOOM_TABLE    = 'C_Invoice';
         var CHIP_CLASS    = 'invoice';
         var PLACEHOLDER_K = 'VAS_067_Placeholder';
-        var PLACEHOLDER_D = 'Search AP invoices by no., vendor, invoice ref, PO ref, doc type...';
+        var PLACEHOLDER_D = 'Search Invoices by Vendor, Document No., Reference No., Document Type, Amount, Status, Paid';
         var KIND_K        = 'VAS_067_Kind';
         var KIND_D        = 'AP Invoice';
 
@@ -158,7 +162,7 @@
                     }
                     var items = data ? (data.Items || []) : [];
                     loadedCount = items.length;
-                    hasMore = items.length === PAGE_SIZE;
+                    hasMore = data ? !!data.HasMore : (items.length === PAGE_SIZE);
                     renderResults(items);
                 },
                 error: function () {
@@ -196,7 +200,7 @@
                     var items = data ? (data.Items || []) : [];
                     appendResults(items);
                     loadedCount += items.length;
-                    hasMore = items.length === PAGE_SIZE;
+                    hasMore = data ? !!data.HasMore : (items.length === PAGE_SIZE);
                     isLoadingMore = false;
                     showMoreSpinner(false);
                     updateCount();
@@ -271,6 +275,7 @@
 
         function buildRow(item, label) {
             var hasZoom = item.RecordId > 0;
+            var sub = buildSubline(item);
             return (
                 '<div class="vas-dssrch-row' + (hasZoom ? '' : ' vas-dssrch-nozoom') + '" data-id="' + VIS.Utility.Util.getValueOfInt(item.RecordId) + '">' +
                     '<span class="vas-dssrch-chip vas-dssrch-chip-' + CHIP_CLASS + '">' + dsEsc(label) + '</span>' +
@@ -278,8 +283,10 @@
                         '<div class="vas-dssrch-docline">' +
                             '<span class="vas-dssrch-docno">' + dsEsc(item.DocumentNo || '') + '</span>' +
                             statusPill(item.DocStatus) +
+                            paidPill(item.IsPaid) +
                         '</div>' +
                         '<div class="vas-dssrch-title">' + dsEsc(item.Title || '') + '</div>' +
+                        (sub ? '<div class="vas-dssrch-subline">' + sub + '</div>' : '') +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
                         '<div class="vas-dssrch-amount">' + formatAmount(item.Amount) + '</div>' +
@@ -287,6 +294,22 @@
                     '</div>' +
                 '</div>'
             );
+        }
+
+        /* Muted detail line: document type · sales rep · invoice reference (only present parts). */
+        function buildSubline(item) {
+            var parts = [];
+            if (item.DocType)    { parts.push(dsEsc(item.DocType)); }
+            if (item.SalesRep) { parts.push(dsEsc(msg('VAS_067_Rep', 'Representative') + ': ' + item.SalesRep)); }
+            if (item.InvoiceRef) { parts.push(dsEsc(msg('VAS_067_Ref', 'Reference No') + ': ' + item.InvoiceRef)); }
+            return parts.join(' &middot; ');
+        }
+
+        /* Paid / Unpaid pill (green when paid, muted otherwise). */
+        function paidPill(isPaid) {
+            var paid = (isPaid === true) || String(isPaid).toUpperCase() === 'Y' || String(isPaid) === 'true';
+            return '<span class="vas-dssrch-status vas-dssrch-status-' + (paid ? 'ok' : 'muted') + '">' +
+                dsEsc(paid ? msg('VAS_067_Paid', 'Paid') : msg('VAS_067_Unpaid', 'Unpaid')) + '</span>';
         }
 
         // The framework navigates IN-PLACE (no new window) only when the payload's
@@ -339,8 +362,11 @@
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
             var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
-            return (curSymbol ? curSymbol + ' ' : '') + formatted;
+            // Sign BEFORE the currency symbol, and NO space between symbol and amount
+            // (e.g. -$28,000.000, not $ -28,000.000).
+            var sign = n < 0 ? '-' : '';
+            var formatted = Math.abs(n).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return sign + (curSymbol || '') + formatted;
         }
         function formatDate(iso) {
             if (!iso) { return ''; }

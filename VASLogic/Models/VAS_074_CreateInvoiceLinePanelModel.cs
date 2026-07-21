@@ -666,6 +666,54 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Detail of a referenced original invoice line (Ref_InvoiceLineOrg_ID) for the
+        /// "Treat as Discount" flow: the discount line must carry the SAME product,
+        /// attribute-set instance, unit of measure and entered quantity as the line it
+        /// references. Returns the copied values plus display labels, or null when the id
+        /// is invalid or the line is not accessible to the role.
+        /// </summary>
+        /// <param name="ctx">session context</param>
+        /// <param name="C_InvoiceLine_ID">referenced original invoice line</param>
+        /// <returns>the product / ASI / UOM / qty to copy (+ labels), or null</returns>
+        public RefLineDetail GetRefInvoiceLineDetail(Ctx ctx, int C_InvoiceLine_ID)
+        {
+            if (C_InvoiceLine_ID <= 0) return null;
+            string sql = @"SELECT il.C_InvoiceLine_ID,
+                                  COALESCE(il.M_Product_ID, 0)              AS M_Product_ID,
+                                  COALESCE(il.M_AttributeSetInstance_ID, 0) AS M_AttributeSetInstance_ID,
+                                  COALESCE(il.C_UOM_ID, 0)                  AS C_UOM_ID,
+                                  COALESCE(il.QtyEntered, 0)                AS QtyEntered,
+                                  p.Name                          AS ProductName,
+                                  p.ProductType                   AS ProductType,
+                                  COALESCE(u.UOMSymbol, u.Name)   AS UomName,
+                                  asi.Description                 AS AttrName
+                           FROM C_InvoiceLine il
+                           LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
+                           LEFT JOIN C_UOM u ON (il.C_UOM_ID = u.C_UOM_ID)
+                           LEFT JOIN M_AttributeSetInstance asi
+                                  ON (il.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+                           WHERE il.C_InvoiceLine_ID = @id AND il.IsActive = 'Y'";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql, "il", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            DataSet ds = DB.ExecuteDataset(sql,
+                new SqlParameter[] { new SqlParameter("@id", C_InvoiceLine_ID) }, null);
+            if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
+            DataRow r = ds.Tables[0].Rows[0];
+            return new RefLineDetail
+            {
+                C_InvoiceLine_ID = Util.GetValueOfInt(r["C_InvoiceLine_ID"]),
+                M_Product_ID = Util.GetValueOfInt(r["M_Product_ID"]),
+                M_AttributeSetInstance_ID = Util.GetValueOfInt(r["M_AttributeSetInstance_ID"]),
+                C_UOM_ID = Util.GetValueOfInt(r["C_UOM_ID"]),
+                QtyEntered = Util.GetValueOfDecimal(r["QtyEntered"]),
+                ProductName = Util.GetValueOfString(r["ProductName"]),
+                ProductType = Util.GetValueOfString(r["ProductType"]),
+                UomName = Util.GetValueOfString(r["UomName"]),
+                AttrName = Util.GetValueOfString(r["AttrName"])
+            };
+        }
+
+        /// <summary>
         /// Non-standard TableDir FK columns whose lookup table / key is NOT the column
         /// name minus "_ID" (columnName -> { table, keyColumn }). Add entries here when a
         /// curated FK field doesn't follow the convention.
@@ -673,7 +721,12 @@ namespace VASLogic.Models
         private static readonly Dictionary<string, string[]> TableDirOverrides =
             new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
             {
-                { "AD_OrgTrx_ID", new string[] { "AD_Org", "AD_Org_ID" } }
+                { "AD_OrgTrx_ID", new string[] { "AD_Org", "AD_Org_ID" } },
+                // Treat-as-discount reference FKs: the column name minus "_ID" is not a
+                // table, so map them explicitly (only used when the column is a TableDir;
+                // a Table / Search reference resolves via AD_Ref_Table instead).
+                { "Ref_InvoiceOrg_ID", new string[] { "C_Invoice", "C_Invoice_ID" } },
+                { "Ref_InvoiceLineOrg_ID", new string[] { "C_InvoiceLine", "C_InvoiceLine_ID" } }
             };
 
         private Dictionary<string, RefLookupDef> _refDefByColumn;
@@ -848,6 +901,10 @@ namespace VASLogic.Models
         /// <param name="data">view model being populated</param>
         private void LoadParentContext(Ctx ctx, int C_Invoice_ID, CreateInvoiceLinePanelData data)
         {
+            // TreatAsDiscount (AP credit-memo "treat as discount") is an optional C_Invoice
+            // column - guard so the header load never breaks on a schema without it.
+            string treatDiscExpr = ColumnExists("C_Invoice", "TreatAsDiscount")
+                ? "COALESCE(i.TreatAsDiscount, 'N')" : "'N'";
             string sql = @"SELECT
                               i.C_Invoice_ID,
                               i.AD_Client_ID,
@@ -860,6 +917,7 @@ namespace VASLogic.Models
                               i.DateAcct,
                               i.IsSOTrx,
                               COALESCE(i.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                              " + treatDiscExpr + @" AS TreatAsDiscount,
                               i.DocStatus,
                               COALESCE(i.Processed, 'N') AS Processed,
                               cur.StdPrecision     AS StdPrecision,
@@ -890,6 +948,7 @@ namespace VASLogic.Models
             data.DateAcct = Util.GetValueOfDateTime(r["DateAcct"]);
             data.IsSOTrx = Util.GetValueOfString(r["IsSOTrx"]) == "Y";
             data.IsTaxIncluded = Util.GetValueOfString(r["IsTaxIncluded"]) == "Y";
+            data.TreatAsDiscount = Util.GetValueOfString(r["TreatAsDiscount"]) == "Y";
             data.DocStatus = Util.GetValueOfString(r["DocStatus"]);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.StdPrecision = Util.GetValueOfInt(r["StdPrecision"]);
@@ -1491,9 +1550,13 @@ namespace VASLogic.Models
         {
             if (_invVars != null) return _invVars;
             _invVars = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            // TreatAsDiscount is optional on C_Invoice - only reference it when present.
+            string treatDiscExpr = ColumnExists("C_Invoice", "TreatAsDiscount")
+                ? "COALESCE(TreatAsDiscount, 'N')" : "'N'";
             DataSet ds = DB.ExecuteDataset(
                 @"SELECT AD_Client_ID, AD_Org_ID, C_BPartner_ID, C_BPartner_Location_ID,
-                         M_PriceList_ID, C_Currency_ID, COALESCE(IsSOTrx, 'N') AS IsSOTrx
+                         M_PriceList_ID, C_Currency_ID, COALESCE(IsSOTrx, 'N') AS IsSOTrx,
+                         " + treatDiscExpr + @" AS TreatAsDiscount
                   FROM C_Invoice WHERE C_Invoice_ID = @id",
                 new SqlParameter[] { new SqlParameter("@id", C_Invoice_ID) }, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -1507,6 +1570,9 @@ namespace VASLogic.Models
                 _invVars["C_Currency_ID"] = Util.GetValueOfInt(r["C_Currency_ID"]).ToString();
                 _invVars["C_Invoice_ID"] = C_Invoice_ID.ToString();
                 _invVars["IsSOTrx"] = "'" + (Util.GetValueOfString(r["IsSOTrx"]) == "Y" ? "Y" : "N") + "'";
+                // Keep TreatAsDiscount in the header context so a line FK's AD_Val_Rule
+                // (e.g. the Ref_Invoice / Ref_InvoiceLine reference pickers) can gate on it.
+                _invVars["TreatAsDiscount"] = "'" + (Util.GetValueOfString(r["TreatAsDiscount"]) == "Y" ? "Y" : "N") + "'";
             }
             return _invVars;
         }
@@ -2405,6 +2471,10 @@ namespace VASLogic.Models
         public DateTime? DateAcct { get; set; }
         public bool IsSOTrx { get; set; }
         public bool IsTaxIncluded { get; set; }
+        /// <summary>C_Invoice.TreatAsDiscount - header flag that reveals the "Treat as
+        /// Discount Reference" modal group (Ref_InvoiceOrg_ID / Ref_InvoiceLineOrg_ID /
+        /// M_Warehouse_ID) on each line.</summary>
+        public bool TreatAsDiscount { get; set; }
         public string DocStatus { get; set; }
         public bool Processed { get; set; }
         public bool IsEditable { get; set; }
@@ -2499,6 +2569,24 @@ namespace VASLogic.Models
     {
         public int Id { get; set; }
         public string Name { get; set; }
+    }
+
+    /// <summary>
+    /// Product / attribute-set / UOM / quantity copied from a referenced original invoice
+    /// line for the "Treat as Discount" flow (Ref_InvoiceLineOrg_ID). Labels are included
+    /// so the client can update the grid display without a follow-up lookup.
+    /// </summary>
+    public class RefLineDetail
+    {
+        public int C_InvoiceLine_ID { get; set; }
+        public int M_Product_ID { get; set; }
+        public int M_AttributeSetInstance_ID { get; set; }
+        public int C_UOM_ID { get; set; }
+        public decimal QtyEntered { get; set; }
+        public string ProductName { get; set; }
+        public string ProductType { get; set; }
+        public string UomName { get; set; }
+        public string AttrName { get; set; }
     }
 
     /// <summary>A unit of measure for the UOM dropdown.</summary>
