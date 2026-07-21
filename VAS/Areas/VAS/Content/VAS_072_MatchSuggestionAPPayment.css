@@ -220,6 +220,28 @@
     background: linear-gradient(180deg, #d78b10, #9a6500);
 }
 
+.VAS-072-MatchSuggestionAPPayment-row-return
+.VAS-072-MatchSuggestionAPPayment-rail {
+    background: linear-gradient(180deg, #8b7cff, #5f4aa6);
+}
+
+.VAS-072-MatchSuggestionAPPayment-return-tag {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.3125em 0.625em;
+    border-radius: 999px;
+    background: #efeeff;
+    color: #5f4aa6;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
 .VAS-072-MatchSuggestionAPPayment-info {
     flex: 1 1 auto;
     min-width: 0;

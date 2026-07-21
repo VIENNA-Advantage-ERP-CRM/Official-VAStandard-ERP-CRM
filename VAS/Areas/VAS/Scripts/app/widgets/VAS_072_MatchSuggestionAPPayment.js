@@ -63,6 +63,7 @@
  * 55  | High-confidence — safe to apply                   | VAS_072_HighConfidenceSafe
  * 56  | Skip                                              | VAS_072_Skip
  * 57  | Document type                                     | VAS_072_DocumentType
+ * 58  | Return                                            | VAS_072_ReturnCycle
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -565,6 +566,9 @@
                 var isHigh =
                     confidence === "HIGH";
 
+                var isReturnCycle =
+                    !!row.isReturnCycle;
+
                 var rowClass =
                     classPrefix +
                     "row" +
@@ -574,7 +578,28 @@
                             : " " +
                             classPrefix +
                             "row-review"
+                    ) +
+                    (
+                        isReturnCycle
+                            ? " " +
+                            classPrefix +
+                            "row-return"
+                            : ""
                     );
+
+                var returnTagHtml =
+                    isReturnCycle
+                        ? '<span class="' +
+                        classPrefix +
+                        'return-tag">' +
+                        escapeHtml(
+                            lbl(
+                                "VAS_072_ReturnCycle",
+                                "Return"
+                            )
+                        ) +
+                        "</span>"
+                        : "";
 
                 var confidenceClass =
                     classPrefix +
@@ -716,6 +741,8 @@
                     '<div class="' +
                     classPrefix +
                     'actions">' +
+
+                    returnTagHtml +
 
                     '<span class="' +
                     confidenceClass +
@@ -1376,29 +1403,18 @@
                     ? String(detail.accountNo).trim()
                     : "";
 
-            var last4 =
-                accountNo
-                    ? (
-                        accountNo.length > 4
-                            ? accountNo.slice(-4)
-                            : accountNo
-                    )
-                    : "";
-
             if (
                 bankName &&
-                last4
+                accountNo
             ) {
-                return bankName + " · ****" + last4;
+                return bankName + " · " + accountNo;
             }
 
             if (bankName) {
                 return bankName;
             }
 
-            return last4
-                ? "****" + last4
-                : "";
+            return accountNo;
         }
 
         function reviewPaneRow(
@@ -1605,7 +1621,9 @@
             var balanceText =
                 formatDetailAmount(
                     detail,
-                    Math.abs(balance),
+                    detail.isReturnCycle
+                        ? -Math.abs(balance)
+                        : Math.abs(balance),
                     "payment"
                 );
 
@@ -1898,7 +1916,7 @@
             if ($reviewApply) {
                 $reviewApply
                     .text(
-                        balance > 0
+                        Math.abs(balance) > 0
                             ? lbl(
                                 "VAS_072_ApplyPartPayment",
                                 "Apply as part-payment"

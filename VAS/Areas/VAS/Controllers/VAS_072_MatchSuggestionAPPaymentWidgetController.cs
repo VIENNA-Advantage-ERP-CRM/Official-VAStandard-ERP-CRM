@@ -107,13 +107,14 @@ namespace VAS.Controllers
                             paymentDate = FormatDate(row.PaymentDate),
                             invoiceDate = FormatDate(row.InvoiceDate),
                             dueDate = FormatDate(row.DueDate),
-                            paymentAmount = row.PaymentOpenAmount,
-                            paymentAllocatedAmount = row.PaymentAllocatedAmount,
-                            paymentOpenAmount = row.PaymentOpenAmount,
-                            invoiceAmount = row.InvoiceOriginalAmount,
-                            invoiceAllocatedAmount = row.InvoiceAllocatedAmount,
-                            invoiceOpenAmount = row.InvoiceOpenAmount,
-                            readyAmount = row.ReadyAmount,
+                            isReturnCycle = row.IsReturnCycle,
+                            paymentAmount = ApplyCycleSign(row.PaymentOpenAmount, row.IsReturnCycle),
+                            paymentAllocatedAmount = ApplyCycleSign(row.PaymentAllocatedAmount, row.IsReturnCycle),
+                            paymentOpenAmount = ApplyCycleSign(row.PaymentOpenAmount, row.IsReturnCycle),
+                            invoiceAmount = ApplyCycleSign(row.InvoiceOriginalAmount, row.IsReturnCycle),
+                            invoiceAllocatedAmount = ApplyCycleSign(row.InvoiceAllocatedAmount, row.IsReturnCycle),
+                            invoiceOpenAmount = ApplyCycleSign(row.InvoiceOpenAmount, row.IsReturnCycle),
+                            readyAmount = ApplyCycleSign(row.ReadyAmount, row.IsReturnCycle),
                             accountingAmount = row.AccountingAmount,
                             confidence = row.Confidence,
                             score = row.Score,
@@ -224,6 +225,7 @@ namespace VAS.Controllers
                 object detail = new
                 {
                     paymentId = row.PaymentId,
+                    isReturnCycle = row.IsReturnCycle,
                     paymentDocumentNo = row.PaymentDocumentNo,
                     paymentDate = FormatDate(row.PaymentDate),
                     vendorId = row.VendorId,
@@ -238,9 +240,9 @@ namespace VAS.Controllers
                     paymentCurrencyISOCode = row.PaymentCurrencyISOCode,
                     paymentCurrencySymbol = row.PaymentCurrencySymbol,
                     paymentPrecision = row.PaymentPrecision,
-                    paymentOriginalAmount = row.PaymentOriginalAmount,
-                    paymentAllocatedAmount = row.PaymentAllocatedAmount,
-                    paymentOpenAmount = row.PaymentOpenAmount,
+                    paymentOriginalAmount = ApplyCycleSign(row.PaymentOriginalAmount, row.IsReturnCycle),
+                    paymentAllocatedAmount = ApplyCycleSign(row.PaymentAllocatedAmount, row.IsReturnCycle),
+                    paymentOpenAmount = ApplyCycleSign(row.PaymentOpenAmount, row.IsReturnCycle),
                     invoiceId = row.InvoiceId,
                     invoicePayScheduleId = row.InvoicePayScheduleId,
                     invoiceDocumentNo = row.InvoiceDocumentNo,
@@ -252,13 +254,13 @@ namespace VAS.Controllers
                     invoiceCurrencyISOCode = row.InvoiceCurrencyISOCode,
                     invoiceCurrencySymbol = row.InvoiceCurrencySymbol,
                     invoicePrecision = row.InvoicePrecision,
-                    invoiceOriginalAmount = row.InvoiceOriginalAmount,
-                    invoiceAllocatedAmount = row.InvoiceAllocatedAmount,
-                    invoiceOpenAmount = row.InvoiceOpenAmount,
-                    invoiceOpenAmountPaymentCurrency = row.InvoiceOpenAmount,
-                    readyAmount = row.ReadyAmount,
-                    accountingAmount = row.ReadyAmount,
-                    balanceAfterApply = balanceAfterApply,
+                    invoiceOriginalAmount = ApplyCycleSign(row.InvoiceOriginalAmount, row.IsReturnCycle),
+                    invoiceAllocatedAmount = ApplyCycleSign(row.InvoiceAllocatedAmount, row.IsReturnCycle),
+                    invoiceOpenAmount = ApplyCycleSign(row.InvoiceOpenAmount, row.IsReturnCycle),
+                    invoiceOpenAmountPaymentCurrency = ApplyCycleSign(row.InvoiceOpenAmount, row.IsReturnCycle),
+                    readyAmount = ApplyCycleSign(row.ReadyAmount, row.IsReturnCycle),
+                    accountingAmount = ApplyCycleSign(row.ReadyAmount, row.IsReturnCycle),
+                    balanceAfterApply = ApplyCycleSign(balanceAfterApply, row.IsReturnCycle),
                     partnerOk = row.PaymentVendorId == row.InvoiceVendorId,
                     amountOk = row.DifferenceAmount <= ExactTolerance,
                     referenceOk = row.ReferenceMatch,
@@ -497,12 +499,12 @@ SELECT
     Invoice.DateInvoiced,
     Invoice.C_Currency_ID,
     Invoice.GrandTotal,
-    Invoice.GrandTotalAfterWithholding
+    Invoice.GrandTotalAfterWithholding,
+    Invoice.IsReturnTrx
 FROM C_Invoice Invoice
 WHERE Invoice.IsActive='Y'
 AND Invoice.Processed='Y'
 AND Invoice.IsSOTrx='N'
-AND COALESCE(Invoice.IsReturnTrx,'N')='N'
 AND Invoice.DocStatus IN ('CO','CL')
 AND COALESCE(Invoice.IsPaid,'N')='N'
 AND Invoice.C_BPartner_ID IS NOT NULL
@@ -651,6 +653,7 @@ InvoiceRows AS
         Invoice.DateInvoiced AS InvoiceDate,
         COALESCE(InvoicePaySchedule.DueDate,Invoice.DateInvoiced) AS DueDate,
         Invoice.C_Currency_ID AS InvoiceCurrencyId,
+        COALESCE(Invoice.IsReturnTrx,'N') AS InvoiceIsReturn,
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
         ABS(COALESCE(Invoice.GrandTotalAfterWithholding,Invoice.GrandTotal,0)) AS InvoiceOriginalAmount,
         COALESCE(InvoiceScheduleAllocated.AllocatedAmount,0) AS InvoiceAllocatedAmount,
@@ -702,6 +705,7 @@ CandidateMatches AS
         InvoiceRows.InvoiceDocumentNo,
         InvoiceRows.InvoiceDate,
         InvoiceRows.DueDate,
+        InvoiceRows.InvoiceIsReturn,
         InvoiceRows.InvoiceOriginalAmount,
         InvoiceRows.InvoiceAllocatedAmount,
         InvoiceRows.InvoiceOpenAmount,
@@ -758,7 +762,8 @@ CandidateScores AS
             WHEN CandidateMatches.ReferenceMatch=1 THEN 5
             ELSE 0
         END AS MatchScore,
-        CASE
+        CASE WHEN CandidateMatches.InvoiceIsReturn='Y' THEN -1 ELSE 1 END
+        *CASE
             WHEN CandidateMatches.PaymentCurrencyId=CandidateMatches.SchemaCurrencyId THEN CandidateMatches.ReadyAmount
             ELSE COALESCE(
                 CurrencyConvert(
@@ -868,6 +873,7 @@ SELECT
     NumberedRows.MatchScore,
     NumberedRows.MatchConfidence,
     NumberedRows.IsAutoApplicable,
+    NumberedRows.InvoiceIsReturn,
     NumberedRows.SchemaCurrencyId,
     NumberedRows.SchemaCurrencyISOCode,
     NumberedRows.SchemaCurrencySymbol,
@@ -1052,6 +1058,15 @@ ORDER BY NumberedRows.PageRowNo";
                             ),
                             "Y",
                             StringComparison.OrdinalIgnoreCase
+                        ),
+
+                        IsReturnCycle = string.Equals(
+                            GetSafeString(
+                                reader,
+                                "InvoiceIsReturn"
+                            ),
+                            "Y",
+                            StringComparison.OrdinalIgnoreCase
                         )
                     };
 
@@ -1212,12 +1227,12 @@ SELECT
     Invoice.GrandTotal,
     Invoice.GrandTotalAfterWithholding,
     Invoice.C_PaymentTerm_ID,
-    Invoice.C_DocType_ID
+    Invoice.C_DocType_ID,
+    Invoice.IsReturnTrx
 FROM C_Invoice Invoice
 WHERE Invoice.IsActive='Y'
 AND Invoice.Processed='Y'
 AND Invoice.IsSOTrx='N'
-AND COALESCE(Invoice.IsReturnTrx,'N')='N'
 AND Invoice.DocStatus IN ('CO','CL')
 AND COALESCE(Invoice.IsPaid,'N')='N'
 AND Invoice.AD_Client_ID=
@@ -1310,7 +1325,7 @@ TenderTypeReference AS
 
     WHERE TableInfo.TableName='C_Payment'
 
-    AND ColumnInfo.ColumnName='C_Payment Tender Type'
+    AND ColumnInfo.ColumnName='TenderType'
 
     AND TableInfo.IsActive='Y'
 
@@ -1650,7 +1665,13 @@ DetailBase AS
             )
 
             ELSE 0
-        END AS InvoiceOpenAmount
+        END AS InvoiceOpenAmount,
+
+        COALESCE
+        (
+            Invoice.IsReturnTrx,
+            'N'
+        ) AS InvoiceIsReturn
 
     FROM AccessiblePayment Payment
 
@@ -1983,6 +2004,8 @@ SELECT
 
     DetailScored.MatchScore,
 
+    DetailScored.InvoiceIsReturn,
+
     CASE
         WHEN DetailScored.MatchScore>=
         (
@@ -2118,10 +2141,12 @@ FROM DetailScored DetailScored";
 
                         /*
                          * Display value:
-                         * 1. translated name
-                         * 2. base name
-                         * 3. stored code
+                         * 1. VA009 payment method name
+                         * 2. translated tender-type name
+                         * 3. base tender-type name
                          * 4. translated Not Specified message
+                         * The raw stored code (for example 'K') is never
+                         * shown to the user.
                          */
                         PaymentMethodName = FirstNotEmpty(
                             GetSafeString(
@@ -2137,11 +2162,6 @@ FROM DetailScored DetailScored";
                             GetSafeString(
                                 reader,
                                 "PaymentMethodBaseName"
-                            ),
-
-                            GetSafeString(
-                                reader,
-                                "PaymentMethodCode"
                             ),
 
                             GetMsg(
@@ -2341,6 +2361,15 @@ FROM DetailScored DetailScored";
                             ),
                             "Y",
                             StringComparison.OrdinalIgnoreCase
+                        ),
+
+                        IsReturnCycle = string.Equals(
+                            GetSafeString(
+                                reader,
+                                "InvoiceIsReturn"
+                            ),
+                            "Y",
+                            StringComparison.OrdinalIgnoreCase
                         )
                     };
 
@@ -2435,12 +2464,12 @@ SELECT
     Invoice.DateInvoiced,
     Invoice.C_Currency_ID,
     Invoice.GrandTotal,
-    Invoice.GrandTotalAfterWithholding
+    Invoice.GrandTotalAfterWithholding,
+    Invoice.IsReturnTrx
 FROM C_Invoice Invoice
 WHERE Invoice.IsActive = 'Y'
 AND Invoice.Processed = 'Y'
 AND Invoice.IsSOTrx = 'N'
-AND COALESCE(Invoice.IsReturnTrx,'N') = 'N'
 AND Invoice.DocStatus IN ('CO','CL')
 AND COALESCE(Invoice.IsPaid,'N') = 'N'
 AND Invoice.C_BPartner_ID IS NOT NULL
@@ -2726,6 +2755,7 @@ InvoiceRowsBase AS
         ) AS DueDate,
 
         Invoice.C_Currency_ID AS InvoiceCurrencyId,
+        COALESCE(Invoice.IsReturnTrx,'N') AS InvoiceIsReturn,
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
 
         CASE
@@ -3112,7 +3142,6 @@ FROM C_Invoice Invoice
 WHERE Invoice.IsActive='Y'
 AND Invoice.Processed='Y'
 AND Invoice.IsSOTrx='N'
-AND COALESCE(Invoice.IsReturnTrx,'N')='N'
 AND Invoice.DocStatus IN ('CO','CL')
 AND COALESCE(Invoice.IsPaid,'N')='N'
 AND Invoice.AD_Client_ID=(SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
@@ -3440,8 +3469,14 @@ AND InvoiceRow.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM Que
                     0,
                     invoiceOpenAmount - appliedAmount
                 );
-                decimal allocationLineAmount = -appliedAmount;
-                decimal overUnderAmount = -remainingInvoiceAmount;
+
+                // Return cycle (negative refund payment allocated against an
+                // APC purchase-return credit memo) flips the allocation-line
+                // sign, mirroring the standard allocation form's MultiplierAP
+                // convention: API -> negative line, APC -> positive line.
+                decimal cycleSign = invoice.IsReturnTrx() ? 1M : -1M;
+                decimal allocationLineAmount = cycleSign * appliedAmount;
+                decimal overUnderAmount = cycleSign * remainingInvoiceAmount;
 
                 MAllocationLine allocationLine = new MAllocationLine(
                     allocation,
@@ -3547,6 +3582,20 @@ AND InvoiceRow.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM Que
 
 
         #region Helpers
+
+        /// <summary>
+        /// Return-cycle amounts (negative refund payment allocated against an
+        /// APC purchase-return credit memo) display as negative values while
+        /// the matching and allocation math stays on absolute values.
+        /// </summary>
+        private static decimal ApplyCycleSign(
+            decimal amount,
+            bool isReturnCycle)
+        {
+            return isReturnCycle
+                ? -Math.Abs(amount)
+                : amount;
+        }
 
         private string FirstNotEmpty(
     params string[] values)
@@ -4409,6 +4458,7 @@ AND
             public int Score { get; set; }
             public string Confidence { get; set; }
             public bool IsAutoApplicable { get; set; }
+            public bool IsReturnCycle { get; set; }
         }
 
         private sealed class MatchDetailRow
@@ -4455,6 +4505,7 @@ AND
             public string InvoiceDocTypeName { get; set; }
             public string Confidence { get; set; }
             public bool IsAutoApplicable { get; set; }
+            public bool IsReturnCycle { get; set; }
         }
 
         private sealed class HighConfidenceCandidateRow
