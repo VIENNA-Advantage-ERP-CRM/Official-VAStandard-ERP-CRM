@@ -132,6 +132,27 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// "Treat as Discount" reference resolver: returns the product / attribute-set /
+        /// UOM / entered quantity (+ labels) of the referenced original invoice line so the
+        /// discount line can mirror it when Ref_InvoiceLineOrg_ID is selected.
+        /// </summary>
+        /// <param name="C_InvoiceLine_ID">referenced original invoice line</param>
+        /// <returns>serialized RefLineDetail (or serialized null)</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetRefInvoiceLineDetail(int C_InvoiceLine_ID)
+        {
+            string retJSON = "";
+            if (Session["ctx"] != null)
+            {
+                Ctx ctx = Session["ctx"] as Ctx;
+                VAS_074_CreateInvoiceLinePanelModel model = new VAS_074_CreateInvoiceLinePanelModel();
+                retJSON = JsonConvert.SerializeObject(model.GetRefInvoiceLineDetail(ctx, C_InvoiceLine_ID));
+            }
+            return Json(retJSON, JsonRequestBehavior.AllowGet);
+        }
+
+        /// <summary>
         /// Server-side line callout: recomputes UOM / price / tax / amounts for
         /// the current product-charge-qty-price-tax selection.
         /// </summary>

@@ -362,6 +362,27 @@
     color: var(--cil-danger);
 }
 
+/* Blocking validation message shown in the "..." (Additional Info) modal when a
+   conditionally-mandatory field (e.g. Capital/Expense on an Asset-Related line) is empty -
+   the modal refuses to close until it's set. Sits just above the footer, spanning its width. */
+.vas-cil-more-error {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--cil-r-sm);
+    background: var(--cil-danger-bg);
+    box-shadow: inset 0.1875em 0 0 var(--cil-danger);
+    color: var(--cil-danger);
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Mandatory curated ("...") modal field: colour its label with the framework mandatory
+   colour (dictionary-mandatory fields AND conditional Capital/Expense-on-Asset-Related). */
+.vas-cil-dyn-mandatory label {
+    color: rgba(var(--v-c-mandatory), 1) !important;
+}
+
 .vas-cil-row--totals {
     border-top: 0.0625em solid var(--cil-divider-strong);
     border-bottom: none;
@@ -370,6 +391,17 @@
     justify-content: flex-end;
     align-items: baseline;
     gap: 1.5em;
+}
+
+/* Left-side hint on a treat-as-discount invoice (margin-right:auto keeps the summary
+   pinned to the right while this sits on the far left). */
+.vas-cil-totals-note {
+    margin-right: auto;
+    align-self: start;
+    max-width: 41em;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    color: var(--cil-text-muted);
 }
 
 /* Vertical invoice summary (Sub Total / per-tax lines / Grand Total) rendered inside the
@@ -1025,6 +1057,13 @@
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
 
+/* "..." modal: small left padding on the field controls (aligns with the floating label). */
+.vas-cil-more-body .vis-input-wrap .vis-control-wrap input:not([type=button]):not([type="checkbox"]):not([type="radio"]),
+.vas-cil-more-body .vis-input-wrap .vis-control-wrap select,
+.vas-cil-more-body .vis-input-wrap .vis-control-wrap textarea {
+    padding-left: 10px !important;
+}
+
 .vas-cil-dialog .vis-input-wrap {
     position: relative;
     flex-wrap: nowrap;
@@ -1156,6 +1195,11 @@
 /* (3) "..." modal only: float the field label a touch higher (top: -11px). */
 .vas-cil-more-body .vis-input-wrap input:focus ~ label, .vas-cil-more-body .vis-input-wrap input:not(:placeholder-shown) ~ label, .vas-cil-more-body .vis-input-wrap textarea:not(:placeholder-shown) ~ label, .vas-cil-more-body .vis-input-wrap select:focus ~ label, .vas-cil-more-body .vis-input-wrap textarea:focus ~ label, .vas-cil-more-body .vis-input-wrap select ~ label {
     top: -11px;
+}
+/* "..." modal only: align the field label's left inset with the control text (matches the
+   px-based framework label positioning; scoped so it never touches the global vis-input-wrap). */
+.vas-cil-more-body .vis-input-wrap label {
+    left: 5px !important;
 }
 /* "..." modal only: the checkbox's own caption (the static first-child label, not a
    floating label) stays at top: 0 so it sits inline with the checkbox. */

@@ -369,10 +369,10 @@ namespace VAdvantage.Model
                         {
                             amt = Env.ZERO;
                         }
-                        else if (Env.Signum(amt) != 0 && !isSOTrx)  //	manually entered
-                        {
-                            ;
-                        }
+                        //else if (Env.Signum(amt) != 0 && !isSOTrx)  //	manually entered
+                        //{
+                        //    ;
+                        //}
                         else    // calculate line tax
                         {
                             amt = tax.CalculateTax(TaxableAmt,
@@ -632,10 +632,10 @@ namespace VAdvantage.Model
                     {
 
                     }
-                    else if (Env.Signum(taxAmt) != 0 && !isSOTrx)	//	manually entered
-                    {
-                        ;
-                    }
+                    //else if (Env.Signum(taxAmt) != 0 && !isSOTrx)	//	manually entered
+                    //{
+                    //    ;
+                    //}
                     else	// calculate line tax
                     {
                         taxAmt = surTax.CalculateTax(baseAmt, false, GetPrecision());

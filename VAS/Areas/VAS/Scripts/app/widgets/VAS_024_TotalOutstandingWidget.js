@@ -300,7 +300,7 @@
                 html += '<div class="vas-towdg-drill-row">'
                     + '<div class="vas-towdg-drill-row-head">'
                     +   '<span class="vas-towdg-drill-row-name">' + toEsc(vendor.VendorName || '-') + '</span>'
-                    +   '<span class="vas-towdg-drill-row-val" title="' + toEsc(rowTip) + '">' + toEsc(sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision)) + '</span>'
+                    +   '<span class="vas-towdg-drill-row-val" title="' + toEsc(rowTip) + '">' + toEsc((amount < 0 ? '-' : '') + sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision)) + '</span>'
                     + '</div>'
                     + '<div class="vas-towdg-drill-track">'
                     +   '<div class="vas-towdg-drill-fill" style="width:' + barWidth.toFixed(1) + '%"></div>'
