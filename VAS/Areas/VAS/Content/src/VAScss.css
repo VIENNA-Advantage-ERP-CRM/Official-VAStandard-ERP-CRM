@@ -113,6 +113,13 @@
 @import "../VAS_095_QuickOperationsWidget.css";
 @import "../VAS_096_StockMovementTodayWidget.css";
 @import "../VAS_117_MovingAnalysisWidget.css";
+@import "../VAS_128_IncompleteRecordsWidget.css";
+@import "../VAS_129_ProductsByTypeWidget.css";
+@import "../VAS_130_TopVendorsWidget.css";
+@import "../VAS_131_TopCustomersWidget.css";
+@import "../VAS_132_OutOfStockWidget.css";
+@import "../VAS_133_UpdatedThisMonthWidget.css";
+@import "../VAS_134_BillOfMaterialsWidget.css";
 @import "../VAS_108_NewItemWidget.css";
 @import "../VAS_109_ActiveItemsWidget.css";
 @import "../VAS_110_CategoriesWidget.css";

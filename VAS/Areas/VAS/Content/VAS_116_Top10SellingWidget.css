@@ -440,3 +440,12 @@
     .MPC-t10-field-value.MPC-t10-strong {
         font-weight: 700;
     }
+
+/* Correction 2026-07-18: the product click opens the VAS_094 Product
+   Performance modal (MPC-hsp-* styles come from the VAS_094 stylesheet).
+   Only the Low-series rank badge needs a warn variant that VAS_094 does
+   not define. */
+.MPC-hsp-pill-warn {
+    background: #FCF1DD;
+    color: #9A6500;
+}

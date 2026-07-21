@@ -36,21 +36,28 @@ namespace VIS.Controllers
     ///   VAI147   2026-06-29 Rebuilt on the Onfinity GRN-dashboard pattern with a
     ///                       dedicated controller, MRole, parameterized SQL and the
     ///                       shared GRN line-entry create flow.
+    ///   VAI147   2026-07-18 Correction round: added the 'PG' (Pending GRN) list
+    ///                       mode serving the VAS_093 widget (promised before
+    ///                       today), and open quantity is now purely
+    ///                       QtyOrdered - QtyDelivered so a purchase order stays
+    ///                       listed until every line is fully received or the PO
+    ///                       is closed (draft GRN quantities no longer hide it).
     /// </summary>
     public class VAS_097_ExpectedGRNWidgetController : Controller
     {
         /// <summary>
-        /// One page of completed vendor purchase orders whose promised date is
-        /// today or later and that still have open (un-received, not already on
-        /// an unposted GRN) quantity - same rules as the existing
-        /// VAS.VAS_ExpectedGRNWidget, newest promise date first (review #26).
+        /// One page of completed vendor purchase orders that still have open
+        /// (un-received) quantity, newest promise date first (review #26).
+        /// type 'EG' (default) lists POs promised today or later (Expected GRN);
+        /// type 'PG' lists overdue POs promised before today (Pending GRN).
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page (default 5, max 50).</param>
+        /// <param name="type">'EG' promised today/later, 'PG' promised before today.</param>
         /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetExpectedPurchaseOrders(int pageNo = 1, int pageSize = 5)
+        public JsonResult GetExpectedPurchaseOrders(int pageNo = 1, int pageSize = 5, string type = "EG")
         {
             if (Session["ctx"] == null)
             {
@@ -66,12 +73,19 @@ namespace VIS.Controllers
             int offset = (pageNo - 1) * pageSize;
 
             // Review #26 (follow-up): same SQL semantics as the existing
-            // VAS.VAS_ExpectedGRNWidget (Product/GetExpectedDelivery, Type 'EG'):
-            // completed vendor POs promised TODAY OR LATER, no returns /
-            // quotations / blanket orders, open qty also nets off quantities
-            // already sitting on unposted GRNs, item products only unless the
-            // tenant allows non-item lines, newest promise date first.
+            // VAS.VAS_ExpectedGRNWidget (Product/GetExpectedDelivery): completed
+            // vendor POs, no returns / quotations / blanket orders, item
+            // products only unless the tenant allows non-item lines, newest
+            // promise date first. 'PG' flips the promise-date filter to overdue
+            // POs for the Pending GRN widget.
+            // Correction 2026-07-18: open quantity is QtyOrdered - QtyDelivered
+            // only. Quantities sitting on draft / in-progress GRNs are NOT
+            // netted off any more - a GRN saved with less quantity than the PO
+            // used to hide the PO from this list even though nothing had been
+            // received. The PO must stay until every line is fully delivered or
+            // the PO itself is closed (DocStatus filter keeps only 'CO').
             bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
+            bool pendingMode = "PG".Equals(type, StringComparison.OrdinalIgnoreCase);
 
             string rawSql = @"
                 SELECT o.C_Order_ID AS PO_ID,
@@ -91,34 +105,19 @@ namespace VIS.Controllers
                 INNER JOIN C_BPartner_Location l ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)
                 WHERE o.AD_Client_ID=@AD_Client_ID
                   AND o.DocStatus='CO'
-                  AND o.DatePromised>=@Promised_From
+                  AND o.DatePromised" + (pendingMode ? "<" : ">=") + @"@Promised_From
                   AND o.IsSOTrx='N'
                   AND o.IsReturnTrx='N'
                   AND o.IsSalesQuotation='N'
                   AND o.IsBlanketTrx='N'
-                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) > 0";
 
-            // MRole must not see the unposted-GRN netting subquery: on roles
-            // with record-access rules AddAccessSQL appends a predicate for
-            // every table it finds - including the subquery's M_InOutLine
-            // alias - to the OUTER where-clause, where the alias is out of
-            // scope (ORA-00904 "il"."M_InOutLine_ID"). The subquery is
-            // injected after the access SQL is applied.
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
                 "o",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
-
-            rawSql = rawSql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
-                      SELECT COALESCE(SUM(il.MovementQty), 0)
-                      FROM M_InOut i
-                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
-                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
-                        AND il.IsActive='Y'
-                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
-                  )");
 
             string sql = @"
                 SELECT ExpectedPO.PO_ID,
@@ -256,8 +255,10 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
-            // Review #26 (follow-up): open quantity nets off quantities already on
-            // unposted GRNs, exactly like the existing VAS.VAS_ExpectedGRNWidget.
+            // Correction 2026-07-18: the line's open quantity is
+            // QtyOrdered - QtyDelivered, matching the list and the create-time
+            // validation (GetOpenLineInfo). Draft GRN quantities are not
+            // netted off - the line stays receivable until actually delivered.
             bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
 
             string lineSql = @"
@@ -266,7 +267,7 @@ namespace VIS.Controllers
                        asi.Description AS Attribute_Name,
                        COALESCE(ol.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(ol.QtyDelivered, 0) AS Already_Received_Qty,
-                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Default_Received_Qty,
+                       COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Default_Received_Qty,
                        u.Name AS UOM
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
@@ -277,25 +278,14 @@ namespace VIS.Controllers
                   AND o.DocStatus='CO'
                   AND o.AD_Client_ID=@AD_Client_ID
                   AND ol.C_Order_ID=@PO_ID
-                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__) > 0";
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) > 0";
 
-            // Same ORA-00904 guard as the list query: the netting subquery is
-            // injected only after MRole has added its access predicates.
             lineSql = MRole.GetDefault(ctx).AddAccessSQL(
                 lineSql,
                 "o",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
-
-            lineSql = lineSql.Replace("__VAS_UNPOSTED_GRN_QTY__", @"(
-                      SELECT COALESCE(SUM(il.MovementQty), 0)
-                      FROM M_InOut i
-                      INNER JOIN M_InOutLine il ON (i.M_InOut_ID=il.M_InOut_ID)
-                      WHERE il.C_OrderLine_ID=ol.C_OrderLine_ID
-                        AND il.IsActive='Y'
-                        AND i.DocStatus NOT IN ('RE','VO','CL','CO')
-                  )");
 
             string sql = lineSql + @"
                 ORDER BY ol.Line";

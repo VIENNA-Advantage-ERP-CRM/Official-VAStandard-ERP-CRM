@@ -1,0 +1,71 @@
+/* Out of Stock Widget (VAS_000) - 2x1 Product Master KPI tile. Display-only
+   (no click, no modal). Widget size: 2 columns x 1 row (grid owns the outer
+   size). Internals in em on the dashboard-width lever; borders/radii/shadows
+   in px. The danger border color is the ONLY chrome difference from a
+   neutral KPI card - never a tinted/red background fill. */
+
+.MPC-oos-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-oos-root,
+.MPC-oos-root * {
+    box-sizing: border-box;
+}
+
+.MPC-oos-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    text-align: left;
+    padding: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #F0B9B9;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
+}
+
+.MPC-oos-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.3;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-oos-body {
+    margin-top: auto;
+}
+
+.MPC-oos-value {
+    font-size: 1.75em;
+    font-weight: 500;
+    line-height: 1.1;
+    color: #D14545;
+}
+
+/* Loading state: neutral color, no red flash before real data arrives. */
+.MPC-oos-value.MPC-oos-neutral {
+    color: #102C3F;
+}
+
+.MPC-oos-meta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 0.25em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

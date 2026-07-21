@@ -1,0 +1,654 @@
+/* Incomplete Records Widget (VAS_000) - 5x3 Product Master data-hygiene
+   worklist with a gear-toggled in-widget settings view and a detail modal.
+   Widget size: 5 columns x 3 rows (grid owns the outer size). Internals in em
+   on the dashboard-width lever; modal chrome in em (scales with the modal font-size); borders/radii/shadows px. */
+
+.MPC-ir-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-ir-root,
+.MPC-ir-root *,
+.MPC-ir-overlay,
+.MPC-ir-overlay * {
+    box-sizing: border-box;
+}
+
+/* ---- Glass card ---- */
+.MPC-ir-card {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
+}
+
+/* ---- Header ---- */
+.MPC-ir-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.MPC-ir-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    background: #EAF8FF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.MPC-ir-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-ir-titles {
+    min-width: 0;
+}
+
+.MPC-ir-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-subtitle {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-gear {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.MPC-ir-gear:hover {
+    background: #EAF8FF;
+}
+
+.MPC-ir-gear svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* ---- List state ---- */
+.MPC-ir-list {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.MPC-ir-row {
+    display: grid;
+    grid-template-columns: 1.6fr 2.1fr 0.9fr 1.1fr;
+    gap: 0.75em;
+    align-items: center;
+    padding: 0 0.5em;
+}
+
+.MPC-ir-ghead {
+    font-size: 0.75em;
+    color: #748494;
+    text-transform: capitalize;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid #EDF2F6;
+    margin-top: 0.625em;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-ghead span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Rows region: fills remaining height, never scrolls (fit-to-height pager). */
+.MPC-ir-rows {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-ir-grow {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid #EDF2F6;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    padding-top: 0.5em;
+    padding-bottom: 0.5em;
+    transition: background 0.12s ease;
+}
+
+.MPC-ir-rows .MPC-ir-grow:last-child {
+    border-bottom: 0;
+}
+
+.MPC-ir-grow:hover {
+    background: rgba(234, 248, 255, 0.6);
+}
+
+.MPC-ir-grow:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: -2px;
+    border-radius: 8px;
+}
+
+.MPC-ir-c-item {
+    min-width: 0;
+    display: block;
+}
+
+.MPC-ir-name {
+    display: block;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-code {
+    display: block;
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Missing-data chip strip: single-line, truncates to keep row height stable. */
+.MPC-ir-c-chips {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-chip {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 0.6875em;
+    font-weight: 500;
+    line-height: 1.6;
+    background: #FDECEC;
+    color: #A33F3F;
+    margin: 1px 3px 1px 0;
+    white-space: nowrap;
+}
+
+.MPC-ir-c-cat {
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-c-upd {
+    min-width: 0;
+    display: block;
+}
+
+.MPC-ir-upd-date {
+    display: block;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-upd-by {
+    display: block;
+    font-size: 0.6875em;
+    color: #748494;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Loading / empty / error state inside the rows region. */
+.MPC-ir-state {
+    padding: 1.5em 0.5em;
+    font-size: 0.75em;
+    color: #748494;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    text-align: center;
+}
+
+.MPC-ir-retry {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.35em 0.9em;
+    cursor: pointer;
+}
+
+.MPC-ir-retry:hover {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+/* ---- Footer pager ---- */
+.MPC-ir-foot {
+    margin-top: 0.5em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-helper {
+    font-size: 0.8125rem;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-pgtext {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.MPC-ir-pgbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.7);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s;
+}
+
+.MPC-ir-pgbtn:hover:not(:disabled) {
+    background: #EAF8FF;
+}
+
+.MPC-ir-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.MPC-ir-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ---- Settings state ---- */
+.MPC-ir-settings {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.MPC-ir-set-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-top: 0.5em;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-set-explain {
+    font-size: 0.75em;
+    color: #748494;
+    min-width: 0;
+}
+
+.MPC-ir-set-links {
+    display: flex;
+    gap: 1em;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-link {
+    border: 0;
+    background: none;
+    color: #106AB0;
+    font-size: 0.75em;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+}
+
+.MPC-ir-link:hover {
+    text-decoration: underline;
+}
+
+.MPC-ir-set-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.125em 0.625em;
+    align-content: start;
+    margin-top: 0.375em;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-ir-set-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.3125em 0.375em;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.75em;
+    color: #102C3F;
+}
+
+.MPC-ir-set-row:hover {
+    background: rgba(234, 248, 255, 0.7);
+}
+
+.MPC-ir-set-row input {
+    accent-color: #0083DA;
+    width: 14px;
+    height: 14px;
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.MPC-ir-set-note {
+    font-size: 0.85em;
+    color: #748494;
+}
+
+.MPC-ir-set-foot {
+    justify-content: flex-end;
+    gap: 0.75em;
+}
+
+.MPC-ir-set-err {
+    font-size: 0.75em;
+    color: #A33F3F;
+    margin-right: auto;
+}
+
+.MPC-ir-done {
+    font-family: inherit;
+    font-size: 0.75em;
+    font-weight: 500;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    background: #1F83FF;
+    color: #FFFFFF;
+    padding: 0.6em 1.4em;
+    transition: background 0.15s;
+}
+
+.MPC-ir-done:hover {
+    background: #0069AE;
+}
+
+/* ---- Detail modal (em window-family chrome, fluid font-size) ---- */
+.MPC-ir-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-ir-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(15, 61, 97, 0.30);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-ir-overlay.MPC-ir-open {
+    display: flex;
+}
+
+/* Same technique already proven in this app's VAS_097_ExpectedGRNWidget
+   dialog: font-size is a fluid clamp against --dash-inline-size (the same
+   variable the widget's own card uses), width is em against that fluid
+   font-size (with a vw fallback for very narrow viewports), and there is NO
+   fixed height - only max-height. The body (overflow:auto) scrolls if its
+   content is ever taller than the available space. */
+.MPC-ir-modal {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0117), 30px);
+    width: min(44em, calc(100vw - 2em));
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(15, 61, 97, 0.18);
+}
+
+/* The whole modal interior is sized in em (like VAS_097_ExpectedGRNWidget),
+   so it scales together with the modal's fluid font-size - the box AND its
+   contents grow/shrink with the dashboard width, not just the outer box. */
+.MPC-ir-m-head {
+    height: 3.5em;
+    flex: 0 0 auto;
+    padding: 0 1.25em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+.MPC-ir-m-headtext {
+    min-width: 0;
+}
+
+.MPC-ir-m-title {
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-m-sub {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-ir-m-close {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.MPC-ir-m-close:hover {
+    background: #EEF6FF;
+}
+
+.MPC-ir-m-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.MPC-ir-m-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1.375em;
+}
+
+.MPC-ir-m-caption {
+    font-size: 0.8125em;
+    color: #748494;
+    margin-bottom: 0.625em;
+}
+
+.MPC-ir-m-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.625em 0;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-ir-m-row:last-of-type {
+    border-bottom: 0;
+}
+
+.MPC-ir-m-field {
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.MPC-ir-m-body .MPC-ir-chip {
+    font-size: 0.6875em;
+}
+
+.MPC-ir-m-note {
+    font-size: 0.75em;
+    color: #748494;
+    margin-top: 0.75em;
+}
+
+.MPC-ir-m-foot {
+    flex: 0 0 auto;
+    border-top: 1px solid #E4EDF4;
+    padding: 0.625em 1.25em;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.625em;
+}
+
+.MPC-ir-btn-ghost {
+    border: 1px solid #E4EDF4;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    background: #FFFFFF;
+    color: #102C3F;
+    font-size: 0.875em;
+    padding: 0.5em 1.125em;
+}
+
+.MPC-ir-btn-ghost:hover {
+    background: #EEF6FF;
+}
+
+.MPC-ir-btn-primary {
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    background: #1F83FF;
+    color: #FFFFFF;
+    font-size: 0.875em;
+    font-weight: 500;
+    padding: 0.5em 1.125em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    transition: background 0.15s;
+}
+
+.MPC-ir-btn-primary:hover {
+    background: #0069AE;
+}
+
+.MPC-ir-btn-primary svg {
+    width: 1em;
+    height: 1em;
+}

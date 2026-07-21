@@ -1,12 +1,63 @@
-﻿/************************************************************
- * Module Name    : VAS
- * Purpose        :Get the details of PO and Create GRN
+/************************************************************
+ * Module Name    : VAS
+ * Purpose        : Pending GRN dashboard - overdue vendor purchase orders
+ *                  (promised before today) that still have quantity to
+ *                  receive. A row click opens the shared GRN modal where
+ *                  order lines are picked with checkboxes, the received
+ *                  quantity is edited per line and the GRN is generated.
+ * Backend        : VAS_097_ExpectedGRNWidget/GetExpectedPurchaseOrders (type PG)
+ *                  VAS_097_ExpectedGRNWidget/GetPurchaseOrderLines
+ *                  VAS_097_ExpectedGRNWidget/CreateGRN
  * chronological  : Development
  * Created Date   : 20 Sep 2024
  * Created by     : VAI050
+ * Correction     : 2026-07-18 - purchase orders stay listed until every line
+ *                  is fully delivered or the PO is closed (draft GRN qty no
+ *                  longer hides them), the modal never scrolls (line rows fit
+ *                  the available space and page instead), tightened line
+ *                  grid, no navigation to the created GRN, and the modal
+ *                  document field is labelled "Purchase Order".
+ *
+ * Labels / Message Keys
+ *  #  | Current Text                                     | Message Key
+ * ----+--------------------------------------------------+---------------------------
+ *  1  | Pending GRN                                      | VAS_PendingGRN
+ *  2  | GRN Count                                        | VAS_GRNCount
+ *  3  | Purchase Order                                   | PurchaseOrder
+ *  4  | Vendor                                           | Vendor
+ *  5  | Vendor Location                                  | VAS_VendorLocation
+ *  6  | No of Lines                                      | VAS_NoOfLines
+ *  7  | Item                                             | VAS_Item
+ *  8  | Attribute                                        | VAS_Attribute
+ *  9  | Remaining Qty                                    | VAS_RemianingQty
+ * 10  | UOM                                              | VAS_Uom
+ * 11  | Select the order lines to receive, then create.. | VAS_SelectLinesThenGRN
+ * 12  | Generate GRN                                     | VAS_GenerateGRN
+ * 13  | Showing / of                                     | VAS_Showing / VAS_Of
+ * 14  | No data available                                | VAS_NoDataAvailable
+ * 15  | Back / Close                                     | VAS_Back / VAS_Close
+ * 16  | Document No / Total Amount / Product Location    | Document_No / TotalAmount / VAS_ProductLocation
+ * 17  | Received quantity must be between 0 and the ...  | VAS_ReceivedQtyInvalid
+ * 18  | GRN could not be generated.                      | VAS_DeliveryOrderNotGenerated
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
+
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VAS.VAS_093_PendingGRNWidget = function () {
         this.frame;
@@ -20,22 +71,24 @@
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0;
-        // Create a map to store child records by document number
-        var childRecordsMap = {};
         var pageSize = 4;
         var isLoading = false;
         var rowResizeObserver = null;
+        var rowsByPoId = {}; // poId -> list row (feeds the drill-down modal)
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
-        /* Line list is paged (4 rows/page). Checkbox picks live in
-           selectedOrderLineIDs and typed quantities in lineQtyById
-           (C_OrderLine_ID -> value) so both survive page switches. */
-        var LINE_PAGE_SIZE = 4;
+        /* The modal line list is paged, never scrolled: linePageSize adapts to
+           the height the modal can give the list (fitModalLines). Checkbox
+           picks live in selectedOrderLineIDs and typed quantities in
+           lineQtyById (poLineId -> value) so both survive page switches. */
+        var LINE_PAGE_MAX = 4;
+        var linePageSize = LINE_PAGE_MAX;
         var linePageNo = 1;
         var lineQtyById = {};
-        var AD_Window_ID = 0;
         // Review #25 (follow-up): the drill-down opens the same modal shell the
         // Expected GRN widget uses instead of the old inline panel.
         var $dialog, $dialogBody, $dialogTitle, $dialogBadge, $dialogBusy;
+        var modalResizeObserver = null;
+        var modalFitRaf = null;
         var currentOrder = null;
         var currentChildRecords = [];
 
@@ -51,6 +104,13 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        function parseResponse(res) {
+            var data = res;
+            if (typeof data === 'string') { data = JSON.parse(data); }
+            if (typeof data === 'string') { data = JSON.parse(data); }
+            return data || {};
         }
 
         // Review #8 (common): currencies of Indian-numbering countries get Indian
@@ -73,6 +133,12 @@
                 minimumFractionDigits: p,
                 maximumFractionDigits: p
             });
+        }
+
+        function toInputValue(value) {
+            var num = Number(value || 0);
+            if (!isFinite(num)) { return "0"; }
+            return String(Math.round(num * 1000000) / 1000000);
         }
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
@@ -103,101 +169,85 @@
             $root.append(orderContainer);
             createDialog();
             bindResizeObserver();
-            //    buildPagination();
+
+            // Attach click event listener to delivery rows (delegated once).
+            $root.on('click', '.vas-pgrn-row', function () {
+                openOrderDialog(rowsByPoId[Number($(this).data('poid') || 0)]);
+            });
         };
 
 
-        /* This function will load data in widget */
+        /* This function will load data in widget.
+           Correction 2026-07-18: the list is served by the widget-owned
+           VAS_097_ExpectedGRNWidget controller (type 'PG' = promised before
+           today) whose open quantity is QtyOrdered - QtyDelivered, so a
+           purchase order stays listed until every line is fully received or
+           the PO is closed - a GRN saved with less quantity than the PO no
+           longer removes it. */
         this.intialLoad = function (pageNo) {
             // Show busy indicator
             isLoading = true;
             $bsyDiv.css('visibility', 'visible');
-            $root.find('#VAS_ProductContainer_' + widgetID).remove();
-            $root.find('#VAS_DeliveryContainer_' + widgetID).show();
             $.ajax({
-                url: VIS.Application.contextUrl + "Product/GetExpectedDelivery",
-                data: { pageNo: pageNo, pageSize: pageSize, Type: "PG" },
+                url: VIS.Application.contextUrl + "VAS_097_ExpectedGRNWidget/GetExpectedPurchaseOrders",
+                data: { pageNo: pageNo, pageSize: pageSize, type: "PG" },
                 dataType: 'json',
+                cache: false,
                 success: function (response) {
-                    var response = JSON.parse(response);
-                    $root.find('#VAS_DeliveryBox_' + widgetID).empty();
-                    $root.find('#VAS_OrderContainer').remove;
-                    if (response != null && response.Orders != null && response.Orders.length > 0) {
+                    var data = parseResponse(response);
+                    var rows = (data && !data.error && data.rows) ? data.rows : [];
+                    var $box = $root.find('#VAS_DeliveryBox_' + widgetID);
+                    $box.empty();
+                    rowsByPoId = {};
+                    if (rows.length > 0) {
                         // Review #25: rows use the Expected GRN row layout -
                         // doc no + line-count pill / supplier + value / locations.
-                        for (i = 0; i < response.Orders.length; i++) {
-                            var order = response.Orders[i];
-                            var amountText = order["Symbol"] + ' ' + formatMoney(order["GrandTotal"], order["Symbol"], order["StdPrecision"]);
+                        for (var i = 0; i < rows.length; i++) {
+                            var order = rows[i];
+                            rowsByPoId[order.poId] = order;
+                            var amountText = (order.curSymbol ? order.curSymbol + ' ' : '')
+                                + formatMoney(order.poValue, order.currencyIso || order.curSymbol, order.stdPrecision);
                             var boxHtml = (
-                                '<button type="button" class="vas-egrn-row vas-pgrn-row"' +
-                                ' data-doc-no="' + escapeHtml(order["DocumentNo"]) + '"' +
-                                ' data-customer-name="' + escapeHtml(order["CustomerName"]) + '"' +
-                                ' data-address="' + escapeHtml(order["DeliveryLocation"]) + '"' +
-                                ' data-orderid="' + escapeHtml(order["C_Order_ID"]) + '">' +
+                                '<button type="button" class="vas-egrn-row vas-pgrn-row" data-poid="' + escapeHtml(order.poId) + '">' +
                                 '<span class="vas-egrn-fi">' +
                                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
                                 '</span>' +
                                 '<div class="vas-egrn-main">' +
                                 '<div class="vas-egrn-top">' +
-                                '<span class="vas-egrn-no" title="' + VIS.Msg.getMsg("Document_No") + '">' + order["DocumentNo"] + '</span>' +
-                                '<span class="vas-egrn-qty" title="' + VIS.Msg.getMsg("VAS_NoOfLines") + '">' + order["LineCount"] + '</span>' +
+                                '<span class="vas-egrn-no" title="' + escapeHtml(VIS.Msg.getMsg("Document_No")) + '">' + escapeHtml(order.poNo) + '</span>' +
+                                '<span class="vas-egrn-qty" title="' + escapeHtml(VIS.Msg.getMsg("VAS_NoOfLines")) + '">' + escapeHtml(order.lineCount) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-egrn-mid">' +
-                                '<span class="vas-egrn-party" title="' + VIS.Msg.getMsg("Vendor") + '">' + order["CustomerName"] + '</span>' +
-                                '<span class="vas-egrn-val" title="' + VIS.Msg.getMsg("TotalAmount") + '">' + amountText + '</span>' +
+                                '<span class="vas-egrn-party" title="' + escapeHtml(VIS.Msg.getMsg("Vendor")) + '">' + escapeHtml(order.supplier) + '</span>' +
+                                '<span class="vas-egrn-val" title="' + escapeHtml(VIS.Msg.getMsg("TotalAmount")) + '">' + escapeHtml(amountText) + '</span>' +
                                 '</div>' +
                                 '<div class="vas-egrn-sub">' +
-                                '<span class="vas-egrn-addr" title="' + VIS.Msg.getMsg("VAS_VendorLocation") + '">' + order["DeliveryLocation"] + '</span>' +
-                                '<span class="vas-egrn-wh" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + order["ProductLocation"] + '</span>' +
+                                '<span class="vas-egrn-addr" title="' + escapeHtml(VIS.Msg.getMsg("VAS_VendorLocation")) + '">' + escapeHtml(order.addressLine || '-') + '</span>' +
+                                '<span class="vas-egrn-wh" title="' + escapeHtml(VIS.Msg.getMsg("VAS_ProductLocation")) + '">' + escapeHtml(order.warehouseName || '-') + '</span>' +
                                 '</div>' +
                                 '</div>' +
                                 '</button>');
-                            $root.find('#VAS_DeliveryBox_' + widgetID).append(boxHtml);
+                            $box.append(boxHtml);
                         }
-                        childRecordsMap = [];
-                        // Populate the childRecordsMap with child records
-                        response.Orders.forEach(function (order) {
-                            if (order.OrderLines && order.OrderLines.length > 0) {
-                                childRecordsMap[order.DocumentNo] = order.OrderLines;
-                            }
-                        });
-                        /* Add Pagination div on first tym data load*/
-                        if (response.RecordCount != null) {
-                            $root.find('#VAS_DeliveryCount_' + widgetID).text(response.RecordCount);
-                            $self.recordCount = response.RecordCount;
-                            buildPagination(response.RecordCount);
-                            AD_Window_ID = response.AD_Window_ID;
-                        }
+                        $self.recordCount = Number(data.totalRecords || rows.length);
+                        $root.find('#VAS_DeliveryCount_' + widgetID).text($self.recordCount);
+                        buildPagination($self.recordCount);
                         $root.find('#VAS_PaginationText_' + widgetID).text($self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages);
                         // Review #25: "Showing x-y of N" footer info like Expected GRN.
                         var fromRecord = ($self.currentPage - 1) * pageSize + 1;
-                        var toRecord = fromRecord + response.Orders.length - 1;
+                        var toRecord = fromRecord + rows.length - 1;
                         $root.find('#VAS_FootInfo_' + widgetID).text(
                             VIS.Msg.getMsg("VAS_Showing") + ' ' + fromRecord + '-' + toRecord + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + ($self.recordCount || toRecord)
                         );
-                        // Attach click event listener to delivery rows
-                        $root.off('click', '.vas-pgrn-row');
-                        $root.on('click', '.vas-pgrn-row', function () {
-                            openOrderDialog({
-                                docNo: $(this).data('doc-no'),
-                                customerName: $(this).data('customer-name'),
-                                address: $(this).data('address'),
-                                orderId: $(this).data('orderid')
-                            });
-                        });
                     }
                     else {
-                        $root.find('#VAS_DeliveryBox_' + widgetID).html(
+                        $box.html(
                             '<div class="vas-egrn-empty">' + VIS.Msg.getMsg("VAS_NoDataAvailable") + '</div>'
                         );
+                        $root.find('#VAS_DeliveryCount_' + widgetID).text('0');
                         $root.find('#VAS_FootInfo_' + widgetID).text('');
+                        $root.find('.VAS-pagination-container').empty();
                     }
-                    //else {
-
-                    //    // Display "No data available" message
-                    //    const message = $('<div class="VAS-data-message">' + VIS.Msg.getMsg("VAS_NoDataAvailable") + '</div>');
-                    //    $root.find('.VAS-height-container').append(message);
-                    //}
                     window.setTimeout(syncPageSize, 0);
                     isLoading = false;
                     $bsyDiv.css('visibility', 'hidden');
@@ -252,8 +302,8 @@
 
         /* Review #25 (follow-up): the drill-down uses the same modal shell,
            form grid, line table and primary action as the Expected GRN widget.
-           Behaviour is unchanged - order lines are selected with checkboxes and
-           the GRN is generated for the selection. */
+           Order lines are selected with checkboxes and the GRN is generated
+           for the selection. */
         function createDialog() {
             $dialog = $(
                 '<div class="vas-egrn-dialog vas-egrn-hidden" role="dialog" aria-modal="true">' +
@@ -301,10 +351,20 @@
                 updateGenerateState();
             });
             $dialogBody.on('click', '.vas-egrn-create-btn', function () {
-                if (currentOrder) { generateGRN(currentOrder.orderId); }
+                if (currentOrder) { generateGRN(currentOrder.poId); }
             });
             $dialogBody.on('click', '.vas-egrn-rcv-prev', function () { if (linePageNo > 1) { linePageNo--; renderOrderLines(); } });
             $dialogBody.on('click', '.vas-egrn-rcv-next', function () { linePageNo++; renderOrderLines(); });
+
+            /* The modal never scrolls: whenever its size changes (window
+               resize, browser zoom), refit how many line rows are shown. */
+            if (typeof ResizeObserver !== 'undefined') {
+                modalResizeObserver = new ResizeObserver(function () {
+                    if (modalFitRaf) { window.cancelAnimationFrame(modalFitRaf); }
+                    modalFitRaf = window.requestAnimationFrame(fitModalLines);
+                });
+                modalResizeObserver.observe($dialogBody[0]);
+            }
 
             $(document).on('keydown.vas-pgrn-' + widgetID, function (e) {
                 if (e.key === 'Escape' && $dialog && !$dialog.hasClass('vas-egrn-hidden')) { closeDialog(); }
@@ -322,6 +382,7 @@
             currentChildRecords = [];
             lineQtyById = {};
             linePageNo = 1;
+            linePageSize = LINE_PAGE_MAX;
             showDialogBusy(false);
         }
 
@@ -339,7 +400,7 @@
            holds the visible page. */
         function childLineById(orderLineId) {
             for (var i = 0; i < currentChildRecords.length; i++) {
-                if (Number(currentChildRecords[i].C_OrderLine_ID) === Number(orderLineId)) { return currentChildRecords[i]; }
+                if (Number(currentChildRecords[i].poLineId) === Number(orderLineId)) { return currentChildRecords[i]; }
             }
             return null;
         }
@@ -352,7 +413,7 @@
             if (raw == null) { return null; }
             var qty = Number(String(raw).replace(/,/g, ""));
             var line = childLineById(orderLineId);
-            var max = line ? Number(String(line.QtyEntered || "").replace(/,/g, "")) : 0;
+            var max = line ? Number(line.openQty) : 0;
             if (!isFinite(qty) || qty <= 0) { return null; }
             if (isFinite(max) && max > 0 && qty > max + 0.000001) { return null; }
             return qty;
@@ -374,15 +435,26 @@
                 '</div>';
         }
 
+        /* Empty attribute-set instances carry dash-only descriptions ("-",
+           "---"): those render as a plain dash; real values render as a chip
+           sitting right next to the item name, per the reference design. */
+        function attrCellHtml(attributeName) {
+            var text = (attributeName && !/^-+$/.test(String(attributeName).trim())) ? String(attributeName) : '';
+            if (!text) {
+                return '<div class="vas-egrn-rcv-attr">-</div>';
+            }
+            return '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(text) + '"><span class="vas-egrn-attr-chip">' + escapeHtml(text) + '</span></div>';
+        }
+
         /* Footer pager matching the widget's own pagination design: "Showing
            X-Y of Z" on the left, the ‹ X of Y › pager on the right (same
            vas-egrn-foot / vas-egrn-pager markup and text). */
-        function linePagerHtml(pageNo, totalPages, totalRows, pageSize) {
+        function linePagerHtml(pageNo, totalPages, totalRows, pageSizeUsed) {
             if (totalPages <= 1) { return ''; }
             var chevL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
             var chevR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
-            var from = (pageNo - 1) * pageSize + 1;
-            var to = Math.min(pageNo * pageSize, totalRows);
+            var from = (pageNo - 1) * pageSizeUsed + 1;
+            var to = Math.min(pageNo * pageSizeUsed, totalRows);
             return '<div class="vas-egrn-foot">' +
                 '<span class="vas-egrn-foot-info">' + escapeHtml(VIS.Msg.getMsg("VAS_Showing") + ' ' + from + '-' + to + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + totalRows) + '</span>' +
                 '<div class="vas-egrn-pager">' +
@@ -399,25 +471,45 @@
             currentOrder = order;
             selectedOrderLineIDs = [];
             linePageNo = 1;
+            linePageSize = LINE_PAGE_MAX;
             lineQtyById = {};
-            currentChildRecords = childRecordsMap[order.docNo] || [];
-            for (var i = 0; i < currentChildRecords.length; i++) {
-                lineQtyById[currentChildRecords[i].C_OrderLine_ID] = String(currentChildRecords[i].QtyEntered);
-            }
+            currentChildRecords = [];
 
-            $dialogTitle.text(order.docNo || '');
+            $dialogTitle.text(order.poNo || '');
             $dialogBadge
                 .removeClass('vas-egrn-hidden')
-                .html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLines", "No of Lines") + ' ' + currentChildRecords.length) + '</span>');
+                .html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLines", "No of Lines") + ' ' + order.lineCount) + '</span>');
 
             $dialog.removeClass('vas-egrn-hidden');
             $('body').addClass('vas-egrn-body-lock');
-            renderOrderLines();
+            $dialogBody.html('');
+            showDialogBusy(true);
+
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_097_ExpectedGRNWidget/GetPurchaseOrderLines",
+                type: 'GET',
+                cache: false,
+                data: { poId: order.poId },
+                success: function (res) {
+                    var data = parseResponse(res);
+                    showDialogBusy(false);
+                    currentChildRecords = (data && !data.error && data.rows) ? data.rows : [];
+                    for (var i = 0; i < currentChildRecords.length; i++) {
+                        lineQtyById[currentChildRecords[i].poLineId] = toInputValue(currentChildRecords[i].openQty);
+                    }
+                    $dialogBadge.html('<span class="vas-egrn-pill info">' + escapeHtml(lbl("VAS_NoOfLines", "No of Lines") + ' ' + currentChildRecords.length) + '</span>');
+                    renderOrderLines();
+                },
+                error: function () {
+                    showDialogBusy(false);
+                    renderOrderLines();
+                }
+            });
         }
 
-        /* Paginated line render (4 rows/page). Checkbox picks and typed
-           quantities are restored from state so switching pages never loses
-           them; the action button stays pinned below the pager. */
+        /* Paginated line render. Checkbox picks and typed quantities are
+           restored from state so switching pages never loses them; the action
+           button stays pinned below the pager. */
         function renderOrderLines() {
             if (!currentOrder) { return; }
 
@@ -429,35 +521,37 @@
                 return;
             }
 
+            /* Correction 2026-07-18: the document field is labelled "Purchase
+               Order" (core message key), not "Pending GRN". */
             var fields =
                 '<div class="vas-egrn-form-grid">' +
-                fieldHtml(lbl("VAS_PendingGRN", "Pending GRN"), order.docNo, true) +
-                fieldHtml(lbl("Vendor", "Supplier"), order.customerName) +
-                fieldHtml(lbl("VAS_VendorLocation", "Address"), order.address) +
+                fieldHtml(lbl("PurchaseOrder", "Purchase Order"), order.poNo, true) +
+                fieldHtml(lbl("Vendor", "Vendor"), order.supplier) +
+                fieldHtml(lbl("VAS_VendorLocation", "Vendor Location"), order.addressLine) +
                 fieldHtml(lbl("VAS_NoOfLines", "No of Lines"), String(childRecords.length)) +
                 '</div>';
 
-            var totalPages = Math.max(1, Math.ceil(childRecords.length / LINE_PAGE_SIZE));
+            var totalPages = Math.max(1, Math.ceil(childRecords.length / linePageSize));
             if (linePageNo > totalPages) { linePageNo = totalPages; }
             if (linePageNo < 1) { linePageNo = 1; }
-            var start = (linePageNo - 1) * LINE_PAGE_SIZE;
-            var end = Math.min(start + LINE_PAGE_SIZE, childRecords.length);
+            var start = (linePageNo - 1) * linePageSize;
+            var end = Math.min(start + linePageSize, childRecords.length);
 
             var rows = '';
             for (var i = start; i < end; i++) {
                 var line = childRecords[i];
-                var checked = selectedOrderLineIDs.indexOf(Number(line.C_OrderLine_ID)) >= 0 ? ' checked' : '';
-                var qtyValue = lineQtyById[line.C_OrderLine_ID] != null ? lineQtyById[line.C_OrderLine_ID] : line.QtyEntered;
+                var checked = selectedOrderLineIDs.indexOf(Number(line.poLineId)) >= 0 ? ' checked' : '';
+                var qtyValue = lineQtyById[line.poLineId] != null ? lineQtyById[line.poLineId] : toInputValue(line.openQty);
                 rows +=
                     '<div class="vas-egrn-rcv-line vas-pgrn-line">' +
-                    '<label class="vas-egrn-rcv-name vas-pgrn-name" title="' + escapeHtml(line.ProductName) + '">' +
-                    '<input type="checkbox" class="vas-pgrn-check" data-orderlineid="' + escapeHtml(line.C_OrderLine_ID) + '"' + checked + '/>' +
-                    '<span>' + escapeHtml(line.ProductName) + '</span>' +
+                    '<label class="vas-egrn-rcv-name vas-pgrn-name" title="' + escapeHtml(line.itemName) + '">' +
+                    '<input type="checkbox" class="vas-pgrn-check" data-orderlineid="' + escapeHtml(line.poLineId) + '"' + checked + '/>' +
+                    '<span>' + escapeHtml(line.itemName) + '</span>' +
                     '</label>' +
-                    '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(line.AttributeName || '-') + '">' + escapeHtml(line.AttributeName || '-') + '</div>' +
+                    attrCellHtml(line.attributeName) +
                     /* Editable received quantity, defaulting to the remaining qty. */
-                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.QtyEntered) + '" step="any" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.C_OrderLine_ID) + '" aria-label="' + escapeHtml(lbl("VAS_RemianingQty", "Remaining Qty")) + '"/>' +
-                    '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.UOM) + '">' + escapeHtml(line.UOM) + '</div>' +
+                    '<input class="vas-egrn-rcv-in vas-pgrn-qty" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" data-orderlineid="' + escapeHtml(line.poLineId) + '" aria-label="' + escapeHtml(lbl("VAS_RemianingQty", "Remaining Qty")) + '"/>' +
+                    '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
                     '</div>';
             }
 
@@ -473,8 +567,8 @@
                 '<div>' + escapeHtml(lbl("VAS_RemianingQty", "Remaining Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
                 '</div>' +
-                '<div class="vas-egrn-lines">' + rows + '</div>' +
-                linePagerHtml(linePageNo, totalPages, childRecords.length, LINE_PAGE_SIZE) +
+                '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
+                linePagerHtml(linePageNo, totalPages, childRecords.length, linePageSize) +
                 '<div class="vas-egrn-error vas-egrn-hidden"></div>' +
                 '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn" disabled>' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>' +
@@ -483,17 +577,53 @@
             );
 
             updateGenerateState();
+            window.setTimeout(fitModalLines, 0);
         }
 
-        function generateGRN(orderId) {
+        /* The modal never scrolls: the line rows live in a clipped viewport
+           and linePageSize is recomputed to the largest row count that fits
+           the space the modal can give it before hitting its height cap -
+           zooming in or shrinking the window pages the rows instead of
+           showing a scrollbar (reference design behaviour). */
+        function fitModalLines() {
+            if (!$dialog || $dialog.hasClass('vas-egrn-hidden') || currentChildRecords.length === 0) { return; }
+            var $vp = $dialogBody.find('.vas-egrn-rcv-viewport');
+            var $row = $vp.find('.vas-egrn-rcv-line').first();
+            if (!$vp.length || !$row.length) { return; }
+            var rowHeight = $row.outerHeight(true);
+            if (!rowHeight || rowHeight <= 0) { return; }
+
+            /* Space the list may use = its current height plus whatever the
+               modal can still grow before reaching its 88vh cap (matches the
+               CSS max-height on .vas-egrn-modal). */
+            var $modal = $dialog.find('.vas-egrn-modal');
+            var slack = Math.max(0, Math.floor(window.innerHeight * 0.88) - Math.ceil($modal.outerHeight()));
+            var fit = Math.max(1, Math.min(LINE_PAGE_MAX, Math.floor(($vp[0].clientHeight + slack) / rowHeight)));
+
+            if (fit !== linePageSize) {
+                var firstIndex = (linePageNo - 1) * linePageSize;
+                linePageSize = fit;
+                linePageNo = Math.floor(firstIndex / linePageSize) + 1;
+                renderOrderLines();
+                return;
+            }
+
+            /* Widget-development-rules #15: the viewport must not resize
+               with the number of lines on the CURRENT page. renderOrderLines
+               rebuilds $dialogBody's innerHTML on every call (wiping any
+               inline style on $vp), so this has to be reapplied on every
+               settled render, not just when linePageSize changes above. */
+            $vp.css('min-height', Math.ceil(rowHeight * linePageSize) + 'px');
+        }
+
+        function generateGRN(poId) {
             if (selectedOrderLineIDs.length === 0) { return; }
 
-            /* The quantity fields are editable: send each selected line with
-               its entered quantity to the quantity-aware create endpoint
-               (VAS_090_ReceivingActionsWidget/CreateGRN) instead of the legacy
-               id-only Product/CreateGRN. That endpoint creates AND completes the
-               receipt with the plain "MM Receipt" doc type, so the GRN lands
-               Completed rather than In Progress. */
+            /* Each selected line is sent with its entered quantity to the
+               widget-owned VAS_097_ExpectedGRNWidget/CreateGRN endpoint, which
+               validates against the live open quantity
+               (QtyOrdered - QtyDelivered), then creates AND completes the
+               receipt with the plain "MM Receipt" doc type. */
             var lines = [];
             for (var i = 0; i < selectedOrderLineIDs.length; i++) {
                 var qty = selectedLineQty(selectedOrderLineIDs[i]);
@@ -509,35 +639,23 @@
             $dialogBody.find('.vas-egrn-create-btn').prop('disabled', true);
 
             $.ajax({
-                url: VIS.Application.contextUrl + "VAS_090_ReceivingActionsWidget/CreateGRN",
+                url: VIS.Application.contextUrl + "VAS_097_ExpectedGRNWidget/CreateGRN",
                 type: 'POST',
                 cache: false,
-                data: { poId: orderId, linesJson: JSON.stringify(lines) },
+                data: { poId: poId, linesJson: JSON.stringify(lines) },
                 success: function (response) {
-                    var data = response;
-                    if (typeof data === 'string' && data) { data = JSON.parse(data); }
-                    if (typeof data === 'string' && data) { data = JSON.parse(data); }
-                    data = data || {};
-                    /* Normalize: legacy shape used Shipment_ID; the new endpoint
+                    var data = parseResponse(response);
+                    /* Normalize: legacy shape used Shipment_ID; the endpoint
                        returns shipmentId/grnId (+ error text on failure). */
                     data.Shipment_ID = Number(data.shipmentId || data.grnId || data.Shipment_ID || 0);
                     if (data.error && !data.message) { data.message = data.error; }
                     showDialogBusy(false);
                     if (data.Shipment_ID > 0) {
+                        /* Correction 2026-07-18: stay on the dashboard after
+                           the GRN completes - no navigation to the created
+                           document; the list simply refreshes. */
                         closeDialog();
-                        try {
-                            if (AD_Window_ID > 0) {
-                                var windowParam = {
-                                    "TabWhereClause": "M_InOut.M_InOut_ID=" + data.Shipment_ID + "",
-                                    "TabLayout": "Y",  // 'N'[Grid],'Y'[Single],'C'[Card]
-                                    "TabIndex": "0"
-                                };
-                                $self.widgetFirevalueChanged(windowParam);
-                            }
-                        }
-                        catch (e) {
-                            console.log(e);
-                        }
+                        $(document).trigger('VAS_GRNCreated', [data]);
                         $self.currentPage = 1;
                         $self.intialLoad($self.currentPage);
                     }
@@ -619,7 +737,6 @@
 
         /* This function is used to refresh the widget data */
         this.refreshWidget = function () {
-            chartInstance = null;
             $self.currentPage = 1;
             $self.totalPages = 0;
             $self.intialLoad($self.currentPage);
@@ -630,6 +747,14 @@
             if (rowResizeObserver) {
                 rowResizeObserver.disconnect();
                 rowResizeObserver = null;
+            }
+            if (modalResizeObserver) {
+                modalResizeObserver.disconnect();
+                modalResizeObserver = null;
+            }
+            if (modalFitRaf) {
+                window.cancelAnimationFrame(modalFitRaf);
+                modalFitRaf = null;
             }
             $(document).off('keydown.vas-pgrn-' + widgetID);
             $('body').removeClass('vas-egrn-body-lock');
@@ -654,6 +779,7 @@
         this.windowNo = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        ensureDashInlineSizeVar(this.getRoot());
         var ssef = this;
         window.setTimeout(function () {
             ssef.intialLoad(1);
