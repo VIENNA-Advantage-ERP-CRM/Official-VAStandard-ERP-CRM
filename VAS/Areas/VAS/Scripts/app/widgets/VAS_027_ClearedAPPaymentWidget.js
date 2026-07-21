@@ -168,22 +168,18 @@
         }
 
         function formatPercent(
-            value,
-            precision
+            value
         ) {
-            var stdPrecision =
-                normalizePrecision(precision);
-
             return Number(
                 value || 0
             ).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits:
-                        stdPrecision,
+                        2,
 
                     maximumFractionDigits:
-                        stdPrecision
+                        2
                 }
             ) + '%';
         }

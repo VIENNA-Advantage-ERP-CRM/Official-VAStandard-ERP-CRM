@@ -304,10 +304,10 @@
         function createMethodRow(method) {
             var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
             var percentage = Number(method.percentage || 0);
-            var amountText = formatCurrencyAmount(
+            var amountText = formatWidgetCompactAmount(
                 method.paymentAmount,
                 method.currencySymbol || method.symbol,
-                method.currencyISO,
+                method.currencyISO || method.currencyISOCode || method.isoCode,
                 method.stdPrecision
             );
 
@@ -372,11 +372,10 @@
 
         function formatPercentage(value) {
             var numericValue = Number(value || 0);
-            var stdPrecision = getStdPrecision();
 
             return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             }) + '%';
         }
 
@@ -390,6 +389,31 @@
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function formatWidgetCompactAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = normalizePrecision(precision);
+            var sign = numericValue < 0 ? '-' : '';
+            var amount =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        stdPrecision
+                    )
+                    : Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                        minimumFractionDigits: stdPrecision,
+                        maximumFractionDigits: stdPrecision
+                    });
 
             if (currencySymbol) {
                 return sign + currencySymbol + amount;

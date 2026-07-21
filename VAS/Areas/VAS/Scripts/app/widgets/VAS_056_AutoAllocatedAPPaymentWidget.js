@@ -781,8 +781,8 @@
             ).toLocaleString(
                 window.navigator.language,
                 {
-                    minimumFractionDigits: getStdPrecision(),
-                    maximumFractionDigits: getStdPrecision()
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                 }
             ) + "%";
         }

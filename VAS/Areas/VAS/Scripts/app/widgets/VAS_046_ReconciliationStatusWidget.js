@@ -301,11 +301,10 @@
 
         function formatPercentage(value) {
             var numericValue = Number(value || 0);
-            var stdPrecision = getStdPrecision();
 
             return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             }) + '%';
         }
 

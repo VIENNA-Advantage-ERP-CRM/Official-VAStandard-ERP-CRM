@@ -452,13 +452,37 @@
         ) {
             var numericValue = Number(value || 0);
             var sign = numericValue < 0 ? '-' : '';
+            var precision = Number(stdPrecision);
+            var amountText;
 
-            return sign + formatCurrencyAmount(
-                Math.abs(numericValue),
-                currencySymbol,
-                currencyISO,
-                stdPrecision
-            ).replace(/^(\S+)\s+/, '$1');
+            if (
+                isNaN(precision) ||
+                precision < 0
+            ) {
+                precision = 2;
+            }
+
+            amountText =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        precision
+                    )
+                    : formatCurrencyAmount(
+                        Math.abs(numericValue),
+                        '',
+                        '',
+                        precision
+                    );
+
+            return currencySymbol
+                ? sign + currencySymbol + amountText
+                : currencyISO
+                    ? sign + amountText + ' ' + currencyISO
+                    : sign + amountText;
         }
 
         function normalizeNumber(value) {
@@ -1034,7 +1058,7 @@
             amountText = formatWidgetCurrencyAmount(
                 amount,
                 run.currencySymbol,
-                run.currencyISO,
+                run.currencyISO || run.currencyISOCode || run.isoCode,
                 run.stdPrecision
             );
 

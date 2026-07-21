@@ -218,10 +218,10 @@
 
             showState(false, '');
 
-            $value.text(formatCurrencyAmount(
+            $value.text(formatWidgetCompactAmount(
                 totalAmount,
                 data.currencySymbol || data.symbol,
-                data.currencyISO,
+                data.currencyISO || data.currencyISOCode || data.isoCode,
                 data.precision
             ));
 
@@ -624,6 +624,31 @@
             var sign = numericValue < 0 ? '-' : '';
             var absValue = Math.abs(numericValue);
             var amount = formatAmount(absValue, normalizePrecision(precision));
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function formatWidgetCompactAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+            var stdPrecision = normalizePrecision(precision);
+            var amount =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        stdPrecision
+                    )
+                    : formatAmount(
+                        Math.abs(numericValue),
+                        stdPrecision
+                    );
 
             if (currencySymbol) {
                 return sign + currencySymbol + amount;

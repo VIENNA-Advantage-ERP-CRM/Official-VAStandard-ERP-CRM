@@ -362,6 +362,11 @@
             var precision = normalizePrecision(
                 data.precision
             );
+            var currencyISO =
+                data.currencyISO ||
+                data.currencyISOCode ||
+                data.isoCode ||
+                '';
 
             /*
              * The current controller returns customerCount.
@@ -379,6 +384,7 @@
                     formatMetric(
                         amount,
                         symbol,
+                        currencyISO,
                         precision
                     )
                 );
@@ -438,18 +444,28 @@
             );
         }
 
-        function formatMetric(value, symbol, precision) {
+        function formatMetric(value, symbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var sign = numericValue < 0 ? '-' : '';
             var absoluteValue = Math.abs(numericValue);
+            var amountText =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        absoluteValue,
+                        currencyISO,
+                        precision
+                    )
+                    : formatAmount(
+                        absoluteValue,
+                        precision
+                    );
 
             return (
                 sign +
                 symbol +
-                formatAmount(
-                    absoluteValue,
-                    precision
-                )
+                amountText
             );
         }
 

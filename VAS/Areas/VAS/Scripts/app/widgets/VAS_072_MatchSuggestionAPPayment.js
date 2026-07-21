@@ -1411,7 +1411,7 @@
                 );
 
             return symbol
-                ? sign + symbol + " " + amount
+                ? symbol + " " + sign + amount
                 : sign + amount;
         }
 
