@@ -407,7 +407,7 @@
             var bankAccountText = getBankAccountText(payment);
             var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', '-');
             var paymentMethodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', '-');
-            var amountText = formatCurrencyAmount(
+            var amountText = formatWidgetCurrencyAmount(
                 payment.amount,
                 payment.currencySymbol,
                 payment.currencyISO,
@@ -480,17 +480,53 @@
         function getBankAccountText(payment) {
             var accountName = String(payment.bankAccountName || '').trim();
             var bankName = String(payment.bankName || '').trim();
-            var accountTail = last4(payment.bankAccountNo);
+            var accountTail = last4(
+                payment.bankAccountNo ||
+                payment.accountNo ||
+                payment.AccountNo
+            );
+            var parsedAccount = parseBankAccountLabel(accountName);
+            var accountLabel = parsedAccount.label || bankName;
 
-            if (accountName) {
-                return accountName;
+            if (!accountTail) {
+                accountTail = parsedAccount.tail;
             }
 
-            if (bankName) {
-                return bankName;
+            if (accountLabel && accountTail) {
+                return accountLabel + ' ****' + accountTail;
+            }
+
+            if (accountLabel) {
+                return accountLabel;
             }
 
             return accountTail ? '****' + accountTail : '';
+        }
+
+        function parseBankAccountLabel(value) {
+            var text = String(value || '').trim();
+            var match;
+
+            if (!text) {
+                return {
+                    label: '',
+                    tail: ''
+                };
+            }
+
+            match = /^(\d+)\s*[-–—]\s*(.+)$/.exec(text);
+
+            if (match) {
+                return {
+                    label: match[2].trim(),
+                    tail: last4(match[1])
+                };
+            }
+
+            return {
+                label: text,
+                tail: ''
+            };
         }
 
         function fieldHtml(label, valueHtml, extraClass, title) {
@@ -929,6 +965,18 @@
             }
 
             return currencyISO ? amount + ' ' + currencyISO : amount;
+        }
+
+        function formatWidgetCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+
+            return sign + formatCurrencyAmount(
+                Math.abs(numericValue),
+                currencySymbol,
+                currencyISO,
+                stdPrecision
+            );
         }
         function renderAllocationLinesTable(
             lines,

@@ -444,6 +444,23 @@
                 : amountText;
         }
 
+        function formatWidgetCurrencyAmount(
+            value,
+            currencySymbol,
+            currencyISO,
+            stdPrecision
+        ) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+
+            return sign + formatCurrencyAmount(
+                Math.abs(numericValue),
+                currencySymbol,
+                currencyISO,
+                stdPrecision
+            ).replace(/^(\S+)\s+/, '$1');
+        }
+
         function normalizeNumber(value) {
             var numericValue = Number(value || 0);
 
@@ -1014,7 +1031,7 @@
                 ' ' +
                 getInvoiceLabel(paymentCount);
 
-            amountText = formatCurrencyAmount(
+            amountText = formatWidgetCurrencyAmount(
                 amount,
                 run.currencySymbol,
                 run.currencyISO,

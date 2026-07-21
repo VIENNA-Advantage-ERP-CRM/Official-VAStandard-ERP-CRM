@@ -529,7 +529,7 @@
                 );
 
             return symbol
-                ? sign + symbol + " " + amount
+                ? sign + symbol + amount
                 : sign + amount;
         }
 
@@ -925,7 +925,7 @@
                 ) +
                 (
                     symbol
-                        ? symbol + " "
+                        ? symbol
                         : ""
                 ) +
                 formatAmount(
@@ -1426,18 +1426,29 @@
                     ? String(detail.accountNo).trim()
                     : "";
 
+            var last4 =
+                accountNo
+                    ? (
+                        accountNo.length > 4
+                            ? accountNo.slice(-4)
+                            : accountNo
+                    )
+                    : "";
+
             if (
                 bankName &&
-                accountNo
+                last4
             ) {
-                return bankName + " · " + accountNo;
+                return bankName + " ****" + last4;
             }
 
             if (bankName) {
                 return bankName;
             }
 
-            return accountNo;
+            return last4
+                ? "****" + last4
+                : "";
         }
 
         function reviewPaneRow(
