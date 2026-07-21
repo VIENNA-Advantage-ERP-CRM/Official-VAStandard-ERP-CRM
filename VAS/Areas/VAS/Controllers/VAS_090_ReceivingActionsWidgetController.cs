@@ -23,6 +23,10 @@ namespace VIS.Controllers
     ///               for the QA inspection load/save.
     /// Chronological development:
     ///   &lt;EmpCode&gt;   2026-06-20 Created
+    ///   &lt;EmpCode&gt;   2026-07-18 Receive Against PO shows only item products
+    ///               (ProductType 'I'): the PO list keeps only orders with at
+    ///               least one open item line, the line list and the create
+    ///               validation exclude non-item lines.
     /// </summary>
     public class VAS_090_ReceivingActionsWidgetController : Controller
     {
@@ -77,6 +81,11 @@ namespace VIS.Controllers
                        OrderLine.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
+                /* Correction 2026-07-18: only ITEM products are receivable -
+                   the join keeps only ProductType 'I' lines, so a PO appears
+                   only when at least one open line is an item, and the open
+                   line count counts item lines only. */
+                INNER JOIN M_Product ItemProduct ON (ItemProduct.M_Product_ID=OrderLine.M_Product_ID AND ItemProduct.IsActive='Y' AND ItemProduct.ProductType='I')
                 INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=PurchaseOrder.C_BPartner_ID AND BPartner.IsActive='Y')
                 LEFT OUTER JOIN M_Warehouse Warehouse ON (Warehouse.M_Warehouse_ID=PurchaseOrder.M_Warehouse_ID AND Warehouse.IsActive='Y')
                 LEFT OUTER JOIN M_Locator ReceiveLocator ON (ReceiveLocator.M_Locator_ID=Warehouse.M_RcvLocator_ID AND ReceiveLocator.IsActive='Y')
@@ -241,7 +250,9 @@ namespace VIS.Controllers
                        UOM.Name AS Uom
                 FROM C_Order PurchaseOrder
                 INNER JOIN C_OrderLine OrderLine ON (OrderLine.C_Order_ID=PurchaseOrder.C_Order_ID AND OrderLine.IsActive='Y')
-                LEFT OUTER JOIN M_Product Product ON (Product.M_Product_ID=OrderLine.M_Product_ID AND Product.IsActive='Y')
+                /* Correction 2026-07-18: only ITEM products (ProductType 'I')
+                   are listed for receiving - charge / service lines are out. */
+                INNER JOIN M_Product Product ON (Product.M_Product_ID=OrderLine.M_Product_ID AND Product.IsActive='Y' AND Product.ProductType='I')
                 LEFT OUTER JOIN M_AttributeSetInstance AttributeInstance ON (AttributeInstance.M_AttributeSetInstance_ID=OrderLine.M_AttributeSetInstance_ID)
                 LEFT OUTER JOIN C_UOM UOM ON (UOM.C_UOM_ID=OrderLine.C_UOM_ID AND UOM.IsActive='Y')
                 WHERE PurchaseOrder.IsActive='Y'
@@ -815,7 +826,9 @@ namespace VIS.Controllers
                        COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) - __VAS_UNPOSTED_GRN_QTY__ AS Open_Qty
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
-                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')
+                /* Correction 2026-07-18: create-time validation mirrors the
+                   display - only ITEM product lines are receivable. */
+                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y' AND p.ProductType='I')
                 WHERE o.IsActive='Y'
                   AND ol.IsActive='Y'
                   AND o.IsSOTrx='N'

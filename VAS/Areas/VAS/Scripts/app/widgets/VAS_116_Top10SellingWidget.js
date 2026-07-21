@@ -2,9 +2,15 @@
  * Top 10 Selling Widget (Highest / Lowest)
  * Widget number 116 - reassign on hand-off.
  * Ranked bar list of the ten best (or worst) selling products by current
- * accounting-year revenue, 5 rows per page, with a High/Low toggle and a
- * sales-detail modal. Same sales/accounting-year/currency logic as VAS_094.
+ * accounting-year revenue, 5 rows per page, with a High/Low toggle. Same
+ * sales/accounting-year/currency logic as VAS_094.
+ * Correction 2026-07-18: clicking a product opens the Product Performance
+ * modal that already exists on the VAS_094 Highest Selling Products widget
+ * (same MPC-hsp-* markup/styles, same
+ * VAS_094_HighestSellingProductsWidget/GetProductPerformance endpoint and
+ * the same VAS_094_* message keys), replacing the old sales-detail modal.
  * Backend - VAS_116_Top10SellingWidget/GetTop10Selling
+ *           VAS_094_HighestSellingProductsWidget/GetProductPerformance
  * Summary Message Table
  *  # | Current Text                          | Message Key
  * ---+---------------------------------------+--------------------------------
@@ -16,15 +22,13 @@
  *  6 | Showing / of                          | VAS_Showing / VAS_Of
  *  7 | No completed sales found.             | VAS_116_NoSales
  *  8 | Couldn't load                         | VAS_CouldntLoad
- *  9 | Sales Detail                          | VAS_116_SalesDetail
- * 10 | Rank                                  | VAS_116_Rank
- * 11 | Product                               | VAS_116_Product
- * 12 | SKU                                   | VAS_116_SKU
- * 13 | Units (current yr)                    | VAS_116_UnitsCurrentYr
- * 14 | Revenue                               | VAS_116_Revenue
- * 15 | Ea                                    | VAS_116_UnitEa
- * 16 | Previous page / Next page             | VAS_PreviousPage / VAS_NextPage
- * 17 | Close                                 | Close
+ *  9 | Rank                                  | VAS_116_Rank
+ * 10 | Previous page / Next page             | VAS_PreviousPage / VAS_NextPage
+ * 11 | Close                                 | Close
+ * 12 | Product Performance modal texts       | reused VAS_094_* keys (see the
+ *    |                                       | VAS_094 widget's message table)
+ *    |                                       | + VAS_017_LastYear /
+ *    |                                       | VAS_CurrentYear
  */
 ; VAS = window.VAS || {};
 
@@ -62,6 +66,12 @@
         var currencySymbol = '';
         var currencyIso = '';
         var stdPrecision = 0;
+        /* VAS_094 Product Performance modal state (correction 2026-07-18). */
+        var modalRequest;
+        var $modalBusy;
+        var modalStockRows = [];
+        var modalStockPage = 0;
+        var MODAL_STOCK_PER_PAGE = 5;
 
         function label(key, fallback) {
             var translated = VIS.Msg.getMsg(key);
@@ -88,22 +98,25 @@
             return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
         }
 
-        function formatCompactAmount(value) {
+        /* Compact number body (Indian Lakh/Crore or K/M/B) without the currency
+           symbol - shared by the compact amount and the modal's compact units. */
+        function compactNumber(value) {
             var number = Number(value || 0);
             var abs = Math.abs(number);
-            var body;
             if (usesIndianNumbering(currencyIso)) {
-                if (abs >= 10000000) { body = trimZeros((number / 10000000).toFixed(2)) + ' Cr'; }
-                else if (abs >= 100000) { body = trimZeros((number / 100000).toFixed(2)) + ' L'; }
-                else if (abs >= 1000) { body = trimZeros((number / 1000).toFixed(1)) + 'K'; }
-                else { body = number.toLocaleString('en-IN', { maximumFractionDigits: 2 }); }
-            } else {
-                if (abs >= 1000000000) { body = trimZeros((number / 1000000000).toFixed(1)) + 'B'; }
-                else if (abs >= 1000000) { body = trimZeros((number / 1000000).toFixed(1)) + 'M'; }
-                else if (abs >= 1000) { body = trimZeros((number / 1000).toFixed(1)) + 'K'; }
-                else { body = number.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+                if (abs >= 10000000) { return trimZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimZeros((number / 100000).toFixed(2)) + ' L'; }
+                if (abs >= 1000) { return trimZeros((number / 1000).toFixed(1)) + 'K'; }
+                return number.toLocaleString('en-IN', { maximumFractionDigits: 2 });
             }
-            return (currencySymbol || currencyIso) + ' ' + body;
+            if (abs >= 1000000000) { return trimZeros((number / 1000000000).toFixed(1)) + 'B'; }
+            if (abs >= 1000000) { return trimZeros((number / 1000000).toFixed(1)) + 'M'; }
+            if (abs >= 1000) { return trimZeros((number / 1000).toFixed(1)) + 'K'; }
+            return number.toLocaleString('en-US', { maximumFractionDigits: 2 });
+        }
+
+        function formatCompactAmount(value) {
+            return (currencySymbol || currencyIso) + ' ' + compactNumber(value);
         }
 
         function formatFullAmount(value) {
@@ -227,8 +240,19 @@
             });
         }
 
+        /* ============ VAS_094 Product Performance modal ============
+           Correction 2026-07-18: a product click opens the SAME modal the
+           VAS_094 Highest Selling Products widget already has - identical
+           MPC-hsp-* markup/styles, the same GetProductPerformance endpoint
+           and the same VAS_094_* message keys. */
         function modalIcon(name) {
-            var paths = { close: '<line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>' };
+            var paths = {
+                trend: '<polyline points="3 17 9 11 13 15 21 7"></polyline><polyline points="15 7 21 7 21 13"></polyline>',
+                close: '<line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line>',
+                clock: '<circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline>',
+                chevronL: '<path d="m15 18-6-6 6-6"></path>',
+                chevronR: '<path d="m9 18 6-6-6-6"></path>'
+            };
             return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (paths[name] || '') + '</svg>';
         }
 
@@ -236,72 +260,276 @@
             if ($modal) { return; }
 
             $modal = $(
-                '<div class="MPC-t10-modal" aria-hidden="true">' +
-                    '<div class="MPC-t10-modal-scrim"></div>' +
-                    '<div class="MPC-t10-modal-dialog" role="dialog" aria-modal="true" tabindex="-1">' +
-                        '<div class="MPC-t10-modal-head">' +
-                            '<span class="MPC-t10-modal-title-wrap">' +
-                                '<span class="MPC-t10-modal-title"></span>' +
-                                '<span class="MPC-t10-modal-badge"></span>' +
+                '<div class="MPC-hsp-modal" aria-hidden="true">' +
+                    '<div class="MPC-hsp-modal-scrim"></div>' +
+                    '<div class="MPC-hsp-modal-dialog" role="dialog" aria-modal="true" tabindex="-1">' +
+                        '<div class="MPC-hsp-modal-head">' +
+                            '<span class="MPC-hsp-modal-title-wrap">' +
+                                '<span class="MPC-hsp-modal-title"></span>' +
+                                '<span class="MPC-hsp-modal-badge"></span>' +
                             '</span>' +
-                            '<button type="button" class="MPC-t10-modal-close">' + modalIcon('close') + '</button>' +
+                            '<button type="button" class="MPC-hsp-modal-close">' + modalIcon('close') + '</button>' +
                         '</div>' +
-                        '<div class="MPC-t10-modal-body"></div>' +
+                        '<div class="MPC-hsp-modal-body"></div>' +
+                        '<div class="MPC-hsp-modal-busy MPC-hsp-hidden"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
                     '</div>' +
                 '</div>'
             );
 
-            $modalTitle = $modal.find('.MPC-t10-modal-title');
-            $modalBadge = $modal.find('.MPC-t10-modal-badge');
-            $modalBody = $modal.find('.MPC-t10-modal-body');
+            $modalTitle = $modal.find('.MPC-hsp-modal-title');
+            $modalBadge = $modal.find('.MPC-hsp-modal-badge');
+            $modalBody = $modal.find('.MPC-hsp-modal-body');
+            $modalBusy = $modal.find('.MPC-hsp-modal-busy');
 
             var closeText = label('Close', 'Close');
-            $modal.find('.MPC-t10-modal-close').attr({ 'aria-label': closeText, title: closeText });
+            $modal.find('.MPC-hsp-modal-close').attr({ 'aria-label': closeText, title: closeText });
             $('body').append($modal);
 
-            $modal.on('click' + modalEventNamespace, '.MPC-t10-modal-close, .MPC-t10-modal-scrim', closeModal);
+            $modal.on('click' + modalEventNamespace, '.MPC-hsp-modal-close, .MPC-hsp-modal-scrim', closeModal);
             $(document).on('keydown' + modalEventNamespace, function (event) {
                 if (event.key === 'Escape') { closeModal(); }
             });
         }
 
         function closeModal() {
+            if (modalRequest && modalRequest.readyState !== 4) { modalRequest.abort(); }
             if (!$modal) { return; }
-            $modal.removeClass('MPC-t10-modal-open').attr('aria-hidden', 'true');
-            $('body').removeClass('MPC-t10-body-lock');
-        }
-
-        function fieldHtml(labelText, valueText, strong) {
-            return '<div class="MPC-t10-field">' +
-                '<div class="MPC-t10-field-label">' + escapeHtml(labelText) + '</div>' +
-                '<div class="MPC-t10-field-value' + (strong ? ' MPC-t10-strong' : '') + '">' + escapeHtml(valueText || '-') + '</div>' +
-            '</div>';
+            $modal.removeClass('MPC-hsp-modal-open').attr('aria-hidden', 'true');
+            $('body').removeClass('MPC-hsp-body-lock');
         }
 
         function openModal(index) {
             var rows = currentRows();
             var row = rows[index];
             if (!row) { return; }
+            var productId = Number(row.product_id) || 0;
+            if (productId <= 0) { return; }
 
             createModal();
             var low = state.series === 'low';
+            var rank = index + 1;
 
-            $modalTitle.text((row.product_name || '') + ' - ' + label('VAS_116_SalesDetail', 'Sales Detail'));
-            $modalBadge.html('<span class="MPC-t10-pill ' + (low ? 'MPC-t10-pill-warn' : 'MPC-t10-pill-ok') + '">' +
-                escapeHtml(label('VAS_116_Rank', 'Rank') + ' #' + (index + 1)) + '</span>');
+            $modalTitle.text(row.product_name || '');
+            $modalBadge.html(low
+                ? '<span class="MPC-hsp-pill MPC-hsp-pill-warn">' + escapeHtml(label('VAS_116_Rank', 'Rank') + ' #' + rank) + '</span>'
+                : '<span class="MPC-hsp-pill MPC-hsp-pill-ok">' + escapeHtml(label('VAS_094_TopSeller', 'Top Seller') + ' · #' + rank) + '</span>');
+            $modalBody.empty();
+            $modalBusy.removeClass('MPC-hsp-hidden');
+            $modal.addClass('MPC-hsp-modal-open').attr('aria-hidden', 'false');
+            $('body').addClass('MPC-hsp-body-lock');
+            $modal.find('.MPC-hsp-modal-close').trigger('focus');
+
+            if (modalRequest && modalRequest.readyState !== 4) { modalRequest.abort(); }
+            modalRequest = $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_094_HighestSellingProductsWidget/GetProductPerformance',
+                type: 'GET',
+                cache: false,
+                data: { productId: productId },
+                success: function (response) {
+                    var result = response;
+                    if (typeof result === 'string' && result) { result = JSON.parse(result); }
+                    if (typeof result === 'string' && result) { result = JSON.parse(result); }
+
+                    if (!result || result.error) {
+                        var reason = (result && result.error) ? result.error : label('VAS_CouldntLoad', "Couldn't load");
+                        $modalBody.html('<div class="MPC-hsp-modal-state">' + escapeHtml(reason) + '</div>');
+                        return;
+                    }
+                    renderPerformanceModal(result);
+                },
+                error: function (xhr, status) {
+                    if (status !== 'abort') {
+                        var detail = label('VAS_CouldntLoad', "Couldn't load") + ' (HTTP ' + (xhr && xhr.status ? xhr.status : 0) + ')';
+                        $modalBody.html('<div class="MPC-hsp-modal-state">' + escapeHtml(detail) + '</div>');
+                    }
+                },
+                complete: function () {
+                    if ($modalBusy) { $modalBusy.addClass('MPC-hsp-hidden'); }
+                }
+            });
+        }
+
+        function performanceGrowth(data) {
+            var lastRevenue = Number(data.last_year_revenue || 0);
+            var currentRevenue = Number(data.current_year_revenue || 0);
+            if (lastRevenue === 0 && currentRevenue > 0) {
+                return { text: label('VAS_094_New', 'New'), tone: 'info' };
+            }
+            if (lastRevenue === 0) {
+                return { text: '0%', tone: 'ok' };
+            }
+            var pct = Math.round((currentRevenue - lastRevenue) / lastRevenue * 100);
+            return { text: (pct >= 0 ? '+' : '') + pct + '%', tone: pct >= 0 ? 'ok' : 'bad' };
+        }
+
+        function performanceSourcingChip(data) {
+            if (data.product_type === 'S' || data.is_stocked !== 'Y') {
+                return label('VAS_094_NonStockService', 'Non-Stock Service');
+            }
+            if (data.has_bom === 'Y') {
+                return label('VAS_094_ManufacturedHasBOM', 'Manufactured · Has BOM');
+            }
+            return label('VAS_094_PurchasedItem', 'Purchased Item');
+        }
+
+        function performanceStockRowHtml(row, uomName) {
+            return '<div class="MPC-hsp-stock-row">' +
+                '<span class="MPC-hsp-stock-name" title="' + escapeHtml(row.warehouse_name || '') + '">' + escapeHtml(row.warehouse_name || '') + '</span>' +
+                '<span class="MPC-hsp-stock-qty">' + escapeHtml(formatUnits(row.qty_on_hand) + ' ' + uomName) + '</span>' +
+            '</div>';
+        }
+
+        function renderPerformanceStockPage(uomName) {
+            var pages = Math.max(1, Math.ceil(modalStockRows.length / MODAL_STOCK_PER_PAGE));
+            if (modalStockPage > pages - 1) { modalStockPage = pages - 1; }
+            if (modalStockPage < 0) { modalStockPage = 0; }
+
+            var start = modalStockPage * MODAL_STOCK_PER_PAGE;
+            var end = Math.min(start + MODAL_STOCK_PER_PAGE, modalStockRows.length);
+            var html = '';
+            for (var index = start; index < end; index++) {
+                html += performanceStockRowHtml(modalStockRows[index], uomName);
+            }
+
+            $modalBody.find('.MPC-hsp-stock-rows').html(html);
+            $modalBody.find('.MPC-hsp-stock-helper').text(
+                label('VAS_Showing', 'Showing') + ' ' + (start + 1) + '–' + end + ' ' + label('VAS_Of', 'of') + ' ' + modalStockRows.length
+            );
+            $modalBody.find('.MPC-hsp-stock-pgtext').text((modalStockPage + 1) + ' ' + label('VAS_Of', 'of') + ' ' + pages);
+            $modalBody.find('.MPC-hsp-stock-prev').prop('disabled', modalStockPage === 0);
+            $modalBody.find('.MPC-hsp-stock-next').prop('disabled', modalStockPage >= pages - 1);
+        }
+
+        function renderPerformanceModal(data) {
+            var uomName = data.uom_name || label('VAS_094_Unit', 'Unit');
+            var growth = performanceGrowth(data);
+            var averagePrice = Number(data.current_year_units || 0) !== 0 ? formatFullAmount(data.avg_selling_price) : '-';
+
+            var chips =
+                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_094_StrongPerformer', 'Strong performer')) + '</span>' +
+                '<span class="MPC-hsp-chip">' + escapeHtml(label('VAS_094_UoM', 'UoM') + ' · ' + uomName) + '</span>' +
+                '<span class="MPC-hsp-chip">' + escapeHtml(performanceSourcingChip(data)) + '</span>';
+
+            var stats =
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_RevenueThisYear', 'Revenue (This Year)')) + '</span><span class="MPC-hsp-pstat-value" title="' + escapeHtml(formatFullAmount(data.current_year_revenue)) + '">' + escapeHtml(formatCompactAmount(data.current_year_revenue)) + '</span></div>' +
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_UnitsSold', 'Units Sold')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(formatUnits(data.current_year_units) + ' ' + uomName) + '</span></div>' +
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_AvgSellingPrice', 'Avg Selling Price')) + '</span><span class="MPC-hsp-pstat-value">' + escapeHtml(averagePrice) + '</span></div>' +
+                '<div class="MPC-hsp-pstat"><span class="MPC-hsp-pstat-label">' + escapeHtml(label('VAS_094_YoYGrowth', 'YoY Growth')) + '</span><span class="MPC-hsp-pstat-value MPC-hsp-tone-' + growth.tone + '">' + escapeHtml(growth.text) + '</span></div>';
+
+            var hero =
+                '<div class="MPC-hsp-phero">' +
+                    '<span class="MPC-hsp-phero-ico">' + modalIcon('trend') + '</span>' +
+                    '<span class="MPC-hsp-phero-main">' +
+                        '<span class="MPC-hsp-phero-name" title="' + escapeHtml(data.product_name || '') + '">' + escapeHtml(data.product_name || '') + '</span>' +
+                        '<span class="MPC-hsp-phero-chips">' + chips + '</span>' +
+                    '</span>' +
+                    '<span class="MPC-hsp-phero-stats">' + stats + '</span>' +
+                '</div>';
+
+            var attributesBlock = '';
+            var attributeRows = data.attributes || [];
+            if (attributeRows.length) {
+                var attributeChips = '';
+                attributeRows.forEach(function (attributeRow) {
+                    attributeChips += '<span class="MPC-hsp-attr-chip"><span class="MPC-hsp-attr-label">' + escapeHtml(attributeRow.label || '') + '</span><span class="MPC-hsp-attr-value">' + escapeHtml(attributeRow.value || '') + '</span></span>';
+                });
+                attributesBlock =
+                    '<div class="MPC-hsp-msection">' +
+                        '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_Attributes', 'Attributes')) + '</div>' +
+                        '<div class="MPC-hsp-attr-wrap">' + attributeChips + '</div>' +
+                    '</div>';
+            }
+
+            var lastRevenue = Number(data.last_year_revenue || 0);
+            var currentRevenue = Number(data.current_year_revenue || 0);
+            var maxRevenue = Math.max(lastRevenue, currentRevenue, 1);
+            var lastWidth = Math.max(4, Math.round(lastRevenue / maxRevenue * 100));
+            var currentWidth = Math.max(4, Math.round(currentRevenue / maxRevenue * 100));
+
+            function yoyBarHtml(labelText, width, colorClass, revenue, units) {
+                return '<div class="MPC-hsp-yoy-row">' +
+                    '<span class="MPC-hsp-yoy-label">' + escapeHtml(labelText) + '</span>' +
+                    '<span class="MPC-hsp-yoy-track"><span class="MPC-hsp-yoy-fill ' + colorClass + '" style="width:' + width + '%"></span></span>' +
+                    '<span class="MPC-hsp-yoy-value" title="' + escapeHtml(formatFullAmount(revenue)) + '">' + escapeHtml(formatCompactAmount(revenue)) + '<small>' + escapeHtml(compactNumber(units) + ' ' + uomName) + '</small></span>' +
+                '</div>';
+            }
+
+            var yoyBlock =
+                '<div class="MPC-hsp-msection">' +
+                    '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_YearOverYear', 'Year Over Year')) + '</div>' +
+                    yoyBarHtml(label('VAS_017_LastYear', 'Last Year'), lastWidth, 'MPC-hsp-yoy-last', data.last_year_revenue, data.last_year_units) +
+                    yoyBarHtml(label('VAS_CurrentYear', 'Current Year'), currentWidth, 'MPC-hsp-yoy-current', data.current_year_revenue, data.current_year_units) +
+                '</div>';
+
+            modalStockRows = data.stock || [];
+            modalStockPage = 0;
+            var stockBlock;
+            var isStockedProduct = data.is_stocked === 'Y' && data.product_type !== 'S';
+            if (!isStockedProduct || !modalStockRows.length) {
+                stockBlock =
+                    '<div class="MPC-hsp-msection">' +
+                        '<div class="MPC-hsp-msection-title">' + escapeHtml(label('VAS_094_StockOnHand', 'Stock On Hand')) + '</div>' +
+                        '<div class="MPC-hsp-stock-empty">' + escapeHtml(!isStockedProduct
+                            ? label('VAS_094_NonStockNoInventory', 'Non-stock item — no inventory held.')
+                            : label('VAS_094_NoStockOnHand', 'No stock on hand.')) + '</div>' +
+                    '</div>';
+            } else {
+                var totalQty = 0;
+                modalStockRows.forEach(function (stockRow) { totalQty += Number(stockRow.qty_on_hand || 0); });
+
+                var locationsText = label('VAS_094_StockOnHand', 'Stock On Hand') + ' · ' + modalStockRows.length + ' ' +
+                    (modalStockRows.length === 1 ? label('VAS_094_Location', 'Location') : label('VAS_094_Locations', 'Locations'));
+                var pagerBlock = '';
+                if (modalStockRows.length > MODAL_STOCK_PER_PAGE) {
+                    pagerBlock =
+                        '<div class="MPC-hsp-stock-foot">' +
+                            '<span class="MPC-hsp-stock-helper"></span>' +
+                            '<span class="MPC-hsp-stock-pager">' +
+                                '<button type="button" class="MPC-hsp-stock-pgbtn MPC-hsp-stock-prev" aria-label="' + escapeHtml(label('VAS_PreviousPage', 'Previous page')) + '">' + modalIcon('chevronL') + '</button>' +
+                                '<span class="MPC-hsp-stock-pgtext"></span>' +
+                                '<button type="button" class="MPC-hsp-stock-pgbtn MPC-hsp-stock-next" aria-label="' + escapeHtml(label('VAS_NextPage', 'Next page')) + '">' + modalIcon('chevronR') + '</button>' +
+                            '</span>' +
+                        '</div>';
+                }
+
+                stockBlock =
+                    '<div class="MPC-hsp-msection">' +
+                        '<div class="MPC-hsp-msection-title">' + escapeHtml(locationsText) + '</div>' +
+                        '<div class="MPC-hsp-stock-rows"></div>' +
+                        '<div class="MPC-hsp-stock-row MPC-hsp-stock-total">' +
+                            '<span class="MPC-hsp-stock-name">' + escapeHtml(label('VAS_094_TotalOnHand', 'Total On Hand')) + '</span>' +
+                            '<span class="MPC-hsp-stock-qty MPC-hsp-stock-qty-total">' + escapeHtml(formatUnits(totalQty) + ' ' + uomName) + '</span>' +
+                        '</div>' +
+                        pagerBlock +
+                    '</div>';
+            }
+
+            var note =
+                '<div class="MPC-hsp-mnote">' + modalIcon('clock') +
+                    '<span>' + escapeHtml(label('VAS_094_TopSellerNote', 'Consider raising stock levels to avoid missed sales during peak demand.')) + '</span>' +
+                '</div>';
 
             $modalBody.html(
-                '<div class="MPC-t10-form-grid">' +
-                    fieldHtml(label('VAS_116_Product', 'Product'), row.product_name, true) +
-                    fieldHtml(label('VAS_116_SKU', 'SKU'), row.sku) +
-                    fieldHtml(label('VAS_116_UnitsCurrentYr', 'Units (current yr)'), formatUnits(row.units) + ' ' + label('VAS_116_UnitEa', 'Ea')) +
-                    fieldHtml(label('VAS_116_Revenue', 'Revenue'), formatFullAmount(row.revenue), true) +
-                '</div>'
+                hero +
+                '<div class="MPC-hsp-mcols">' +
+                    '<div class="MPC-hsp-mcol">' + attributesBlock + yoyBlock + '</div>' +
+                    '<div class="MPC-hsp-mcol">' + stockBlock + '</div>' +
+                '</div>' +
+                note
             );
 
-            $modal.addClass('MPC-t10-modal-open').attr('aria-hidden', 'false');
-            $('body').addClass('MPC-t10-body-lock');
-            $modal.find('.MPC-t10-modal-close').trigger('focus');
+            if (isStockedProduct && modalStockRows.length) {
+                renderPerformanceStockPage(uomName);
+                if (modalStockRows.length > MODAL_STOCK_PER_PAGE) {
+                    $modalBody.find('.MPC-hsp-stock-prev').on('click' + modalEventNamespace, function () {
+                        if (modalStockPage > 0) { modalStockPage--; renderPerformanceStockPage(uomName); }
+                    });
+                    $modalBody.find('.MPC-hsp-stock-next').on('click' + modalEventNamespace, function () {
+                        modalStockPage++;
+                        renderPerformanceStockPage(uomName);
+                    });
+                }
+            }
         }
 
         this.Initalize = function () {
@@ -406,6 +634,7 @@
             $root.remove();
             state.high = [];
             state.low = [];
+            modalStockRows = [];
         };
     };
 

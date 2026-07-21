@@ -1,0 +1,532 @@
+/* Products by Type Widget (VAS_000) - 3x2 Product Master catalog-composition
+   donut with a legend and a drill-down products modal. Widget size: 3 columns
+   x 2 rows (grid owns the outer size). Internals in em on the dashboard-width
+   lever; modal chrome in em (scales with the modal font-size); borders/radii/shadows px. */
+
+.MPC-pt-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-pt-root,
+.MPC-pt-root *,
+.MPC-pt-overlay,
+.MPC-pt-overlay * {
+    box-sizing: border-box;
+}
+
+/* ---- Glass card ---- */
+.MPC-pt-card {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
+}
+
+/* ---- Header ---- */
+.MPC-pt-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    flex: 0 0 auto;
+}
+
+.MPC-pt-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.MPC-pt-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    background: #EAF8FF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.MPC-pt-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-pt-titles {
+    min-width: 0;
+}
+
+.MPC-pt-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-subtitle {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: 2px;
+    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .009625), 13px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Body: donut (fixed) + legend (flexible), side by side ---- */
+.MPC-pt-body {
+    flex: 1;
+    min-height: 0;
+    margin-top: 0.375em;
+    display: flex;
+    align-items: center;
+    gap: 1em;
+}
+
+.MPC-pt-donut-wrap {
+    flex: 0 0 auto;
+    position: relative;
+    width: 8.5em;
+    height: 8.5em;
+}
+
+.MPC-pt-donut {
+    width: 8.5em;
+    height: 8.5em;
+    display: block;
+}
+
+.MPC-pt-donut-seg {
+    cursor: pointer;
+    transition: stroke-width 0.15s;
+}
+
+.MPC-pt-donut-seg:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: 2px;
+}
+
+.MPC-pt-donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    text-align: center;
+}
+
+.MPC-pt-donut-total {
+    font-size: 1.375em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.1;
+}
+
+.MPC-pt-donut-label {
+    font-size: 0.6875em;
+    color: #748494;
+}
+
+.MPC-pt-legend {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-pt-legend-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    border-bottom: 1px solid #EDF2F6;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+    padding: 0.5em 0.25em;
+    transition: background 0.12s ease;
+}
+
+.MPC-pt-legend-row:last-child {
+    border-bottom: 0;
+}
+
+.MPC-pt-legend-row:hover {
+    background: rgba(234, 248, 255, 0.6);
+}
+
+.MPC-pt-legend-row:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: -2px;
+    border-radius: 8px;
+}
+
+.MPC-pt-legend-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.MPC-pt-swatch {
+    width: 0.625em;
+    height: 0.625em;
+    border-radius: 4px;
+    flex: 0 0 auto;
+}
+
+.MPC-pt-legend-name {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-legend-right {
+    flex: 0 0 auto;
+    font-size: 0.75em;
+}
+
+.MPC-pt-legend-pct {
+    font-weight: 700;
+}
+
+.MPC-pt-legend-count {
+    margin-left: 0.5em;
+    color: #748494;
+}
+
+/* ---- Footer helper line ---- */
+.MPC-pt-helper {
+    margin-top: 0.5em;
+    flex: 0 0 auto;
+    font-size: 0.8125rem;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Loading / empty / error state inside the body region. */
+.MPC-pt-state {
+    padding: 1.5em 0.5em;
+    font-size: 0.75em;
+    color: #748494;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    text-align: center;
+    width: 100%;
+}
+
+.MPC-pt-retry {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.35em 0.9em;
+    cursor: pointer;
+}
+
+.MPC-pt-retry:hover {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+/* ---- Detail modal (em window-family chrome, fluid font-size) ---- */
+.MPC-pt-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-pt-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(15, 61, 97, 0.30);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-pt-overlay.MPC-pt-open {
+    display: flex;
+}
+
+/* Same technique already proven in this app's VAS_097_ExpectedGRNWidget
+   dialog: font-size is a fluid clamp against --dash-inline-size (the same
+   variable the widget's own card uses), width is em against that fluid
+   font-size (with a vw fallback for very narrow viewports), and there is NO
+   fixed height - only max-height. The box is content-driven up to that cap,
+   and fitModalRows() (JS) computes how many rows converge into the
+   remaining "slack" instead of measuring against a pre-fixed height. */
+.MPC-pt-modal {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0117), 30px);
+    width: min(60em, calc(100vw - 2em));
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 16px;
+    box-shadow: 0 24px 48px rgba(15, 61, 97, 0.18);
+}
+
+/* The whole modal interior is sized in em (like VAS_097_ExpectedGRNWidget),
+   so it scales together with the modal's fluid font-size - the box AND its
+   contents grow/shrink with the dashboard width, not just the outer box. */
+.MPC-pt-m-head {
+    height: 3.5em;
+    flex: 0 0 auto;
+    padding: 0 1.25em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+.MPC-pt-m-headtext {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+}
+
+.MPC-pt-m-swatch {
+    width: 0.625em;
+    height: 0.625em;
+    border-radius: 3px;
+    flex: 0 0 auto;
+    margin-right: 0.5em;
+}
+
+.MPC-pt-m-titlewrap {
+    min-width: 0;
+}
+
+.MPC-pt-m-title {
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-m-sub {
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-m-close {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: #141414;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.MPC-pt-m-close:hover {
+    background: #EEF6FF;
+}
+
+.MPC-pt-m-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.MPC-pt-m-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1.375em;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-pt-m-body > * {
+    flex: 0 0 auto;
+}
+
+.MPC-pt-m-row {
+    display: grid;
+    grid-template-columns: 1.8fr 0.8fr 0.9fr 0.55fr 1.5fr 0.7fr;
+    gap: 0.75em;
+    align-items: center;
+}
+
+.MPC-pt-m-ghead {
+    font-size: 0.8125em;
+    color: #748494;
+    text-transform: capitalize;
+    padding-bottom: 0.375em;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+/* UoM keeps its literal casing - exempt from the header capitalize rule. */
+.MPC-pt-m-ghead .MPC-pt-uom-label {
+    text-transform: none;
+}
+
+.MPC-pt-m-datarow {
+    padding: 0.625em 0;
+    border-bottom: 1px solid #EDF2F6;
+    font-size: 0.875em;
+    color: #5F7283;
+}
+
+.MPC-pt-m-datarow:last-child {
+    border-bottom: 0;
+}
+
+.MPC-pt-m-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-m-primary {
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-m-attrs {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-pt-chip {
+    display: inline-block;
+    padding: 0.0625em 0.4375em;
+    border-radius: 999px;
+    font-size: 0.6875em;
+    font-weight: 500;
+    line-height: 1.6;
+    background: #EEF6FF;
+    color: #106AB0;
+    margin: 0.0625em 0.1875em 0.0625em 0;
+    white-space: nowrap;
+}
+
+.MPC-pt-status {
+    font-weight: 700;
+}
+
+.MPC-pt-status-active {
+    color: #0B6B45;
+}
+
+.MPC-pt-status-inactive {
+    color: #748494;
+}
+
+.MPC-pt-em-dash {
+    color: #B8C6D2;
+}
+
+.MPC-pt-m-foot {
+    flex: 0 0 auto;
+    border-top: 1px solid #E4EDF4;
+    padding: 0.625em 1.25em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+/* Modal-scoped helper override so the pop-up's footer text scales with the
+   modal font-size (the widget-body copy of .MPC-pt-helper keeps its rem). */
+.MPC-pt-m-foot .MPC-pt-helper {
+    font-size: 0.8125em;
+}
+
+/* Pager lives only in the modal for this widget (the card body is a donut),
+   so it is sized in em to scale with the modal font-size. */
+.MPC-pt-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex: 0 0 auto;
+}
+
+.MPC-pt-pgtext {
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+.MPC-pt-pgbtn {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 0.5em;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.7);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s;
+}
+
+.MPC-pt-pgbtn:hover:not(:disabled) {
+    background: #EAF8FF;
+}
+
+.MPC-pt-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.MPC-pt-pgbtn svg {
+    width: 0.875em;
+    height: 0.875em;
+}
