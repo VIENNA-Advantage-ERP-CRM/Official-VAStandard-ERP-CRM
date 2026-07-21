@@ -60,7 +60,7 @@ namespace VAS.Areas.VAS.Controllers
 
             // Round-trip 1 — functional currency from accounting schema
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision, c.ISO_Code
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -77,6 +77,7 @@ namespace VAS.Areas.VAS.Controllers
                 schemaCurrencyId    = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol    = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+                result.CurIso       = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
             }
 
             if (schemaCurrencyId == 0) { return result; }
@@ -138,6 +139,7 @@ namespace VAS.Areas.VAS.Controllers
         {
             public string            CurSymbol    { get; set; }
             public int               StdPrecision { get; set; }
+            public string            CurIso       { get; set; }
             public List<CategorySpend> Categories { get; set; }
         }
 

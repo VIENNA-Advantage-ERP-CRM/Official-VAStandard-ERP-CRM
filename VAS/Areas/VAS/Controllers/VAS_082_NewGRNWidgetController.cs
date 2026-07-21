@@ -601,6 +601,60 @@ namespace VIS.Controllers
             return string.IsNullOrEmpty(error) ? fallback : error;
         }
 
+        /// <summary>
+        /// Review #17: resolves the Material Receipt (GRN) window so the widget
+        /// navigates straight to it instead of opening a modal.
+        /// </summary>
+        /// <returns>JSON { windowId }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetGrnWindowId()
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            try
+            {
+                int windowId = GetWindowIdByName(ctx, "VAS_MaterialReceipt");
+                if (windowId <= 0) { windowId = GetWindowIdByName(ctx, "Material Receipt"); }
+                return Ok(new { windowId = windowId });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>Active, role-accessible AD_Window id for one window name, or 0.</summary>
+        private int GetWindowIdByName(Ctx ctx, string windowName)
+        {
+            string sql = @"
+                SELECT GrnWindow.AD_Window_ID
+                FROM AD_Window GrnWindow
+                WHERE GrnWindow.IsActive='Y'
+                  AND GrnWindow.Name=@Window_Name
+                  AND GrnWindow.AD_Client_ID IN (0,@Window_Client_ID)";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql,
+                "GrnWindow",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+            sql += " ORDER BY GrnWindow.AD_Window_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY";
+
+            // Parameter order matches placeholder appearance (positional binding).
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@Window_Name", windowName),
+                new SqlParameter("@Window_Client_ID", ctx.GetAD_Client_ID())
+            }, null));
+        }
+
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>
         /// <param name="result">Anonymous payload object to serialize.</param>
         /// <returns>JSON result.</returns>

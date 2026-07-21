@@ -940,13 +940,13 @@ namespace VASLogic.Models
                 cols.Append("il.C_InvoiceLine_ID, il.Line, il.M_Product_ID, il.C_Charge_ID, il.QtyEntered, il.C_UOM_ID, il.PriceEntered, il.C_Tax_ID, il.TaxAmt, il.LineNetAmt, il.LineTotalAmt, il.M_AttributeSetInstance_ID, il.Description, ");
 
             string sql = "SELECT " + cols.ToString() +
-                @"COALESCE(p.Name, N'')        AS VASCILDISP_ProductName,
-                  COALESCE(ch.Name, N'')       AS VASCILDISP_ChargeName,
+                @"COALESCE(p.Name, N'') AS VASCILDISP_ProductName,
+                  COALESCE(ch.Name, N'') AS VASCILDISP_ChargeName,
                   COALESCE(uom.UOMSymbol, uom.Name, N'') AS VASCILDISP_UOMName,
-                  COALESCE(t.Name, N'')        AS VASCILDISP_TaxName,
+                  COALESCE(t.Name, N'') AS VASCILDISP_TaxName,
                   COALESCE(asi.Description, N'') AS VASCILDISP_AttrName,
                   COALESCE(p.M_AttributeSet_ID, 0) AS VASCILDISP_HasAttrSet,
-                  COALESCE(p.ProductType, N'') AS VASCILDISP_ProductType
+                  COALESCE(p.ProductType, '') AS VASCILDISP_ProductType
                FROM C_InvoiceLine il
                LEFT JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
                LEFT JOIN C_Charge ch ON (il.C_Charge_ID = ch.C_Charge_ID)
@@ -1199,14 +1199,14 @@ namespace VASLogic.Models
                                       p.Value AS SearchKey, p.Name AS DisplayName,
                                       COALESCE(p.Description, N'') AS Description,
                                       p.M_AttributeSet_ID AS AttributeSetId,
-                                      COALESCE(p.ProductType, N'') AS ProductType
+                                      COALESCE(p.ProductType, '') AS ProductType
                                FROM M_Product p
                                WHERE p.IsActive = 'Y'
                                  AND p.IsSummary = 'N'
                                  AND p.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                 AND (LOWER(p.Value) LIKE @kwP
-                                   OR LOWER(p.Name) LIKE @kwP
-                                   OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwP)";
+                                 AND (LOWER(p.Value) LIKE @kwPV
+                                   OR LOWER(p.Name) LIKE @kwPN
+                                   OR LOWER(COALESCE(p.UPC, N'')) LIKE @kwPU)";
             // Enforce the M_Product_ID column's AD_Val_Rule (if any) in line context.
             string prodPred = GetValRulePredicate(ctx, "M_Product_ID", "M_Product", "p", C_Invoice_ID, rowVars);
             if (prodPred.Length > 0) prodSql += " AND (" + prodPred + ")";
@@ -1218,12 +1218,12 @@ namespace VASLogic.Models
                                         COALESCE(ch.Name, N'') AS SearchKey, ch.Name AS DisplayName,
                                         COALESCE(ch.Description, N'') AS Description,
                                         0 AS AttributeSetId,
-                                        N'' AS ProductType
+                                        '' AS ProductType
                                  FROM C_Charge ch
                                  WHERE ch.IsActive = 'Y'
                                    AND ch.AD_Client_ID = " + ctx.GetAD_Client_ID() + @"
-                                   AND (LOWER(ch.Name) LIKE @kwC
-                                     OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwC)";
+                                   AND (LOWER(ch.Name) LIKE @kwCN
+                                     OR LOWER(COALESCE(ch.Description, N'')) LIKE @kwCD)";
             // Enforce the C_Charge_ID column's AD_Val_Rule (if any) in line context.
             string chargePred = GetValRulePredicate(ctx, "C_Charge_ID", "C_Charge", "ch", C_Invoice_ID, rowVars);
             if (chargePred.Length > 0) chargeSql += " AND (" + chargePred + ")";
@@ -1238,10 +1238,17 @@ namespace VASLogic.Models
                 + " ORDER BY x.Kind, x.DisplayName" + PagingSuffix(pageSize, offset);
 
             DataSet ds = DB.ExecuteDataset(combined, new SqlParameter[] {
-                new SqlParameter("@kwP", like),
-                new SqlParameter("@kwC", like)
+                new SqlParameter("@kwPV", like),
+                new SqlParameter("@kwPN", like),
+                new SqlParameter("@kwPU", like),
+                new SqlParameter("@kwCN", like),
+                new SqlParameter("@kwCD", like)
             }, null);
-            if (ds == null || ds.Tables.Count == 0) return items;
+            if (ds == null || ds.Tables.Count == 0)
+            {
+                log.Severe($"Create Invoice Line Bottom Panel -> Prodict/Charge SQL: {DB.ConvertSqlQuery(combined)}, Parameter are : {like}");
+                return items;
+            }
 
             foreach (DataRow r in ds.Tables[0].Rows)
             {
@@ -1813,14 +1820,19 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="line">invoice line being saved</param>
         /// <param name="values">full column bag from the client</param>
-        private void ApplyExtraColumns(MInvoiceLine line, Dictionary<string, object> values)
+        private void ApplyExtraColumns(MInvoiceLine line, Dictionary<string, object> values, HashSet<string> touched)
         {
             if (values == null || values.Count == 0) return;
             HashSet<string> updateable = GetUpdateableColumns();
             foreach (KeyValuePair<string, object> kv in values)
             {
                 string col = kv.Key;
-                if (kv.Value == null) continue;
+                // A column the user explicitly edited in the "..." modal (including a clear).
+                // Its null / 0 is INTENTIONAL and must persist, so it bypasses the no-clobber
+                // skips below. An untouched null stays skipped (the bag carries every column,
+                // most naturally empty - we must not wipe them or re-touch every field).
+                bool isTouched = touched != null && touched.Contains(col);
+                if (kv.Value == null && !isTouched) continue;
                 if (CORE_OR_SYSTEM_COLUMNS.Contains(col)) continue;
                 if (updateable.Count > 0 && !updateable.Contains(col)) continue;
                 try
@@ -1831,11 +1843,13 @@ namespace VASLogic.Models
                         ? (object)CoerceYesNo(kv.Value)
                         : CoerceJsonValue(kv.Value);
                     // Table / TableDirect / Search (FK) columns hold a record ID; a null or
-                    // <= 0 value means "no selection" - leave the column untouched rather
-                    // than clobbering it with an invalid foreign key.
+                    // <= 0 value means "no selection". Leave it untouched (don't clobber a valid
+                    // FK with 0/null from the bag) UNLESS the user explicitly cleared the field -
+                    // then persist NULL so the dimension/reference is actually removed.
                     if (GetReferenceColumns().Contains(col) &&
                         (val == null || (decimal.TryParse(val.ToString(), out decimal number) && number == 0)))
                     {
+                        if (isTouched) line.Set_Value(col, null);
                         continue;
                     }
                     line.Set_Value(col, val);
@@ -2184,8 +2198,12 @@ namespace VASLogic.Models
                     // the callout / panel set (e.g. PriceList, PriceLimit, C_Currency_ID,
                     // PrintDescription, HSN, TCS, revenue recognition) is applied through
                     // PO.Set_Value so the full VO is saved - the core financial columns
-                    // above keep their business-rule values (denylist below).
-                    ApplyExtraColumns(line, input.Values);
+                    // above keep their business-rule values (denylist below). TouchedCols
+                    // carries the modal fields the user explicitly cleared so those persist as null.
+                    HashSet<string> touchedCols = (input.TouchedCols != null && input.TouchedCols.Count > 0)
+                        ? new HashSet<string>(input.TouchedCols, StringComparer.OrdinalIgnoreCase)
+                        : null;
+                    ApplyExtraColumns(line, input.Values, touchedCols);
 
                     // QtyInvoiced (base UOM). SetQty() set QtyInvoiced = QtyEntered (raw); the
                     // framework only converts it to the product base UOM in MInvoiceLine.beforeSave
@@ -2710,7 +2728,15 @@ namespace VASLogic.Models
         /// / panel touched). Non-core updateable columns are persisted generically.
         /// </summary>
         public Dictionary<string, object> Values { get; set; }
-        public InvoiceLineInput() { Values = new Dictionary<string, object>(); }
+        /// <summary>
+        /// Column names the user explicitly edited in the "..." modal (including clears).
+        /// The Values bag carries EVERY column, so the server can't tell a user-cleared
+        /// FK / reference / list from a naturally-empty one; TouchedCols marks the nulls /
+        /// zeros that are intentional so ApplyExtraColumns force-applies them (bypassing the
+        /// no-clobber skips) instead of leaving the old value in place.
+        /// </summary>
+        public List<string> TouchedCols { get; set; }
+        public InvoiceLineInput() { Values = new Dictionary<string, object>(); TouchedCols = new List<string>(); }
     }
 
     /// <summary>POST body for the batch line save.</summary>

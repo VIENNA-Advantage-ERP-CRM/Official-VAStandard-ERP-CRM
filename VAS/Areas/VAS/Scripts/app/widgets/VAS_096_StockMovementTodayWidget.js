@@ -16,7 +16,10 @@
  * VAS_096_InventoryDecrease        Inventory Decrease
  * VAS_096_ProductionIn             Production In
  * VAS_096_ProductionOut            Production Out
- * VAS_096_ShowingLatestMovements   Showing latest 5 movements
+ * VAS_Showing                      Showing
+ * VAS_Of                           of
+ * VAS_PreviousPage                 Previous page
+ * VAS_NextPage                     Next page
  * VAS_096_MovementDetail           Stock Movement Detail
  * MovementType                     Movement Type
  * Quantity                         Quantity
@@ -26,6 +29,7 @@
  * VAS_096_NoMovementsToday         No stock movements today.
  * Close                            Close
  * VAS_CouldntLoad                  Couldn't load
+ * VAS_Attribute                    Attribute
  */
 
 ; (function (VAS, $) {
@@ -61,6 +65,11 @@
         var $busy;
         var $modal;
         var request = null;
+        var pageSize = 5;
+        var pageNo = 1;
+        var totalRecords = 0;
+        var loading = false;
+        var rowResizeObserver = null;
         var rows = [];
         var eventNamespace = '.MPCStockMovementToday';
 
@@ -88,16 +97,15 @@
             return text;
         }
 
+        // Review #11: the modal shows the movement date only - no time part.
         function formatDate(value) {
             if (!value) { return ''; }
             var date = new Date(value);
             if (isNaN(date.getTime())) { return value; }
-            return date.toLocaleString(window.navigator.language, {
+            return date.toLocaleDateString(window.navigator.language, {
                 year: 'numeric',
                 month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
+                day: 'numeric'
             });
         }
 
@@ -157,10 +165,13 @@
                 .text(movementType.text);
             var $details = $modal.find('.MPC-smt-modal-details').empty();
             addDetail($details, label('Item', 'Item'), row.item_name, true);
+            if (row.attribute) {
+                addDetail($details, label('VAS_Attribute', 'Attribute'), row.attribute);
+            }
             addDetail($details, label('MovementType', 'Movement'), movementType.text);
             addDetail($details, label('Quantity', 'Quantity'), formatQuantity(row.movement_qty));
             addDetail($details, label('Locator', 'Location'), row.locator_value || '');
-            addDetail($details, label('MovementDate', 'Posted'), formatDate(row.movement_date));
+            addDetail($details, label('Date', 'Date'), formatDate(row.movement_date));
             addDetail($details, label('Warehouse', 'Warehouse'), row.warehouse_name || '');
 
             var $effect = $modal.find('.MPC-smt-stock-effect').empty().addClass('MPC-smt-hidden');
@@ -198,6 +209,50 @@
             $modal.find('.MPC-smt-modal-dialog').trigger('focus');
         }
 
+        function chevronIcon(direction) {
+            var path = direction === 'left' ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6';
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + path + '"></path></svg>';
+        }
+
+        /* Review #37: footer pager over today's transactions (max 50). */
+        function renderFooter(total) {
+            var totalPages = Math.max(1, Math.ceil(total / pageSize));
+            if (pageNo > totalPages) { pageNo = totalPages; }
+
+            var first = total ? ((pageNo - 1) * pageSize) + 1 : 0;
+            var last = total ? Math.min(first + rows.length - 1, total) : 0;
+
+            $footer.removeClass('MPC-smt-hidden').empty();
+            $footer.append(
+                $('<span class="MPC-smt-foot-info"></span>').text(
+                    label('VAS_Showing', 'Showing') + ' ' + first + '–' + last + ' ' + label('VAS_Of', 'of') + ' ' + total
+                )
+            );
+
+            if (totalPages > 1) {
+                var $pager = $('<span class="MPC-smt-pager"></span>');
+                var $previous = $('<button type="button" class="MPC-smt-pgbtn"></button>')
+                    .attr('aria-label', label('VAS_PreviousPage', 'Previous page'))
+                    .prop('disabled', pageNo <= 1)
+                    .html(chevronIcon('left'))
+                    .on('click' + eventNamespace, function () {
+                        if (!loading && pageNo > 1) { loadMovements(pageNo - 1); }
+                    });
+                var $next = $('<button type="button" class="MPC-smt-pgbtn"></button>')
+                    .attr('aria-label', label('VAS_NextPage', 'Next page'))
+                    .prop('disabled', pageNo >= totalPages)
+                    .html(chevronIcon('right'))
+                    .on('click' + eventNamespace, function () {
+                        if (!loading && pageNo < totalPages) { loadMovements(pageNo + 1); }
+                    });
+                var $pageText = $('<strong class="MPC-smt-pgtext"></strong>')
+                    .text(pageNo + ' ' + label('VAS_Of', 'of') + ' ' + totalPages);
+
+                $pager.append($previous, $pageText, $next);
+                $footer.append($pager);
+            }
+        }
+
         function renderRows(totalRecords) {
             $list.empty();
             if (!rows.length) {
@@ -209,17 +264,22 @@
 
             $empty.addClass('MPC-smt-hidden');
             $list.removeClass('MPC-smt-hidden');
-            $footer.toggleClass('MPC-smt-hidden', totalRecords <= 5);
-            $footer.text(label('VAS_096_ShowingLatestMovements', 'Showing latest 5 movements'));
+            renderFooter(totalRecords);
 
             rows.forEach(function (row, index) {
                 var movementType = typeInfo(row.movement_type);
                 var quantity = Number(row.movement_qty || 0);
                 var $row = $('<button type="button" class="MPC-smt-row MPC-smt-grid"></button>')
                     .attr('data-row-index', index);
+                // Review #38: attribute (batch / serial / variant) under the item.
+                var attribute = row.attribute || '';
+                var itemTitle = (row.item_name || '') + (attribute ? ' · ' + attribute : '');
                 var $item = $('<span class="MPC-smt-cell MPC-smt-item"></span>')
-                    .text(row.item_name || '')
-                    .attr('title', row.item_name || '');
+                    .attr('title', itemTitle)
+                    .append($('<span class="MPC-smt-item-name"></span>').text(row.item_name || ''));
+                if (attribute) {
+                    $item.append($('<span class="MPC-smt-item-attr"></span>').text(attribute));
+                }
                 var $type = $('<span class="MPC-smt-cell MPC-smt-type"></span>')
                     .addClass('MPC-smt-type-' + movementType.tone)
                     .text(movementType.text)
@@ -236,9 +296,12 @@
                 $row.append($item, $type, $quantity, $location);
                 $list.append($row);
             });
+
+            window.setTimeout(syncPageSize, 0);
         }
 
         function showError() {
+            loading = false;
             rows = [];
             $list.addClass('MPC-smt-hidden').empty();
             $footer.addClass('MPC-smt-hidden');
@@ -249,14 +312,51 @@
             if ($busy) { $busy.toggleClass('MPC-smt-busy-hidden', !visible); }
         }
 
-        function loadMovements() {
+        function measurePageSize() {
+            if (!$list || !$list.length) { return pageSize; }
+
+            var listHeight = Math.floor($list.innerHeight());
+            if (listHeight <= 0) { return pageSize; }
+
+            var $sample = $list.find('.MPC-smt-row:first');
+            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 38;
+            if (rowHeight <= 0) { rowHeight = 38; }
+
+            return Math.max(3, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            if (!$list || !$list.length) { return; }
+
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            // Keep the first visible record in place when the page grows or
+            // shrinks with the widget height (review #33 + #37).
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            if (!loading) { loadMovements(Math.max(1, Math.ceil(firstRecord / pageSize))); }
+        }
+
+        function bindResizeObserver() {
+            if (!$list || !$list.length || typeof ResizeObserver === 'undefined') { return; }
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); }
+
+            rowResizeObserver = new ResizeObserver(syncPageSize);
+            rowResizeObserver.observe($list[0]);
+        }
+
+        function loadMovements(page) {
             if (request && request.readyState !== 4) { request.abort(); }
 
+            if (page) { pageNo = Math.max(1, page); }
+            loading = true;
             setBusy(true);
             request = $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_096_StockMovementTodayWidget/GetStockMovements',
                 type: 'GET',
                 cache: false,
+                data: { pageNo: pageNo, pageSize: pageSize },
                 success: function (response) {
                     var result = response;
                     if (typeof result === 'string' && result) { result = JSON.parse(result); }
@@ -266,14 +366,29 @@
                         return;
                     }
 
+                    pageNo = Number(result.page_no || pageNo);
                     rows = result.rows || [];
-                    renderRows(Number(result.total_records || rows.length));
+                    totalRecords = Number(result.total_records || rows.length);
+
+                    // The page emptied (data shrank or zoom grew the page):
+                    // step back onto the last page that still has rows.
+                    if (!rows.length && pageNo > 1 && totalRecords > 0) {
+                        loadMovements(Math.max(1, Math.ceil(totalRecords / pageSize)));
+                        return;
+                    }
+
+                    renderRows(totalRecords);
                 },
                 error: function (xhr, status) {
                     if (status !== 'abort') { showError(); }
                 },
-                complete: function () {
-                    setBusy(false);
+                complete: function (xhr) {
+                    // A page-correction reload may already be in flight; only
+                    // the current request clears the busy state.
+                    if (xhr === request) {
+                        loading = false;
+                        setBusy(false);
+                    }
                 }
             });
         }
@@ -355,12 +470,13 @@
             $root.append($card);
             ensureDashInlineSizeVar($root);
             createModal();
+            bindResizeObserver();
             loadMovements();
         };
 
         this.refreshWidget = function () {
             closeModal();
-            loadMovements();
+            loadMovements(1);
         };
 
         this.getRoot = function () {
@@ -369,6 +485,10 @@
 
         this.disposeComponent = function () {
             if (request && request.readyState !== 4) { request.abort(); }
+            if (rowResizeObserver) {
+                rowResizeObserver.disconnect();
+                rowResizeObserver = null;
+            }
             closeModal();
             $root.off(eventNamespace);
             $(document).off(eventNamespace);

@@ -14,42 +14,70 @@
         this.widgetInfo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg">'); // Root container
+        // Review #25: the root carries the Expected GRN design scope so this
+        // widget renders with the same glass card / rows / pager styling.
+        var $root = $('<div class="h-100 w-100 vas-egrn-root">'); // Root container
         this.currentPage = 1;
         this.totalPages = 0;
         var widgetID = 0;
         // Create a map to store child records by document number
         var childRecordsMap = {};
         var pageSize = 5;
+        var isLoading = false;
+        var rowResizeObserver = null;
         var selectedOrderLineIDs = []; // Array to keep track of selected order line IDs
         var AD_Window_ID = 0;
+
+        // Review #8 (common): currencies of Indian-numbering countries get Indian
+        // digit grouping; all others get international grouping. The backend sends
+        // the currency symbol (which is the ISO code when no symbol is configured)
+        // and the standard precision - nothing is hardcoded here.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+        var INDIAN_CURRENCY_SYMBOLS = ['₹', 'Rs', 'Rs.', '₨', '৳', 'Nu.', 'रू'];
+
+        function usesIndianNumbering(symbolOrIso) {
+            var value = String(symbolOrIso || '').trim();
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(value.toUpperCase()) >= 0
+                || INDIAN_CURRENCY_SYMBOLS.indexOf(value) >= 0;
+        }
+
+        function formatMoney(value, symbolOrIso, precision) {
+            var p = Number(precision);
+            if (!isFinite(p) || p < 0) { p = 2; }
+            return Number(value || 0).toLocaleString(usesIndianNumbering(symbolOrIso) ? 'en-IN' : 'en-US', {
+                minimumFractionDigits: p,
+                maximumFractionDigits: p
+            });
+        }
         this.initalize = function () {
             widgetID = this.widgetInfo.AD_UserHomeWidgetID;
+            // Review #25: same structure and classes as the Expected GRN widget
+            // (glass card, icon+title head, count pill, flat rows, footer pager).
             const orderContainer =
-                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="VAS-grn-container-pending">' +
-                '    <div class="VAS-deliveries-heading">' +
-                '        <div>' + VIS.Msg.getMsg("VAS_PendingGRN") + '</div>' +
-                ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span> '+
-                '    </div>' +
-                //'    <div class="VAS-delivery-count">' +
-                //'        <div class="VAS-count-lbl">' + VIS.Msg.getMsg("VAS_GRNCount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></div>' +
-                //'    </div>' +
-                '    <div class="VAS-delivery-detail">' +
-                '        <div class="VAS-box-heading">' +
+                '<div id="VAS_DeliveryContainer_' + widgetID + '" class="vas-egrn-card vas-widget-bg">' +
+                '    <div class="vas-egrn-head">' +
+                '        <span class="vas-egrn-ico">' +
+                '            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>' +
+                '        </span>' +
+                '        <div class="vas-egrn-titles">' +
+                '            <div class="vas-egrn-title">' + VIS.Msg.getMsg("VAS_PendingGRN") + '</div>' +
                 '        </div>' +
+                '        <span class="vas-egrn-count">' + VIS.Msg.getMsg("VAS_GRNCount") + ' <span id="VAS_DeliveryCount_' + widgetID + '">0</span></span>' +
                 '    </div>' +
-                '    <div class="VAS-height-container">' +
-                '        <div id="VAS_DeliveryBox_' + widgetID + '" class="VAS-deliveries-listing">' +
-                '        </div>' +
-                '        <div id="VAS_ProductDetail_' + widgetID + '" class="VAS-deliveries-listing">' +
-                '        </div>' +
+                '    <div class="vas-egrn-body">' +
+                '        <div id="VAS_DeliveryBox_' + widgetID + '" class="vas-egrn-rows"></div>' +
+                '        <div id="VAS_ProductDetail_' + widgetID + '" class="VAS-deliveries-listing"></div>' +
                 '    </div>' +
-                '<div class="VAS-pagination-container"></div>' +
+                '    <div class="vas-egrn-foot">' +
+                '        <span class="vas-egrn-foot-info" id="VAS_FootInfo_' + widgetID + '"></span>' +
+                '        <div class="VAS-pagination-container"></div>' +
+                '    </div>' +
                 '</div>';
             // Create busy indicator
             createBusyIndicator();
 
             $root.append(orderContainer);
+            bindResizeObserver();
             //    buildPagination();
         };
 
@@ -57,6 +85,7 @@
         /* This function will load data in widget */
         this.intialLoad = function (pageNo) {
             // Show busy indicator
+            isLoading = true;
             $bsyDiv.css('visibility', 'visible');
             $root.find('#VAS_ProductContainer_' + widgetID).remove();
             $root.find('#VAS_DeliveryContainer_' + widgetID).show();
@@ -69,32 +98,34 @@
                     $root.find('#VAS_DeliveryBox_' + widgetID).empty();
                     $root.find('#VAS_OrderContainer').remove;
                     if (response != null && response.Orders != null && response.Orders.length > 0) {
+                        // Review #25: rows use the Expected GRN row layout -
+                        // doc no + line-count pill / supplier + value / locations.
                         for (i = 0; i < response.Orders.length; i++) {
-                            var boxHtml = ('<div id="VAS_OrderContainer_' + widgetID + '" class="VAS-delivery-box" >' +
-                                '    <div class="VAS-box-heading">' +
-                                '        <div class="VAS-icon-w-name">' +
-                                '            <i class="fa fa-file-text" aria-hidden="true"></i>' +
-                                '            <div id="VAS_DocumentNo_' + widgetID + '" class="VAS-doc-no VAS-pointer-cursor" ' +
-                                '                title="' + VIS.Msg.getMsg("Document_No") + '" ' +
-                                '                data-doc-no="' + response.Orders[i]["DocumentNo"] + '" ' +
-                                '                data-customer-name="' + response.Orders[i]["CustomerName"] + '" ' +
-                                '                data-orderid="' + response.Orders[i]["C_Order_ID"] + '">' + // Add data-orderid attribute here
-                                '                ' + response.Orders[i]["DocumentNo"] +
-                                '            </div>' +
-                                '        </div>' +
-                                '        <div class="VAS-total-items-count" title="' + VIS.Msg.getMsg("VAS_NoOfLines") + '">' + response.Orders[i]["LineCount"] + '</div>' +
-                                '    </div>' +
-                                '    <div class="VAS-spaceBetween-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("Vendor") + '">' + response.Orders[i]["CustomerName"] + '</div>' +
-                                '    </div>' +
-                                '    <div class="VAS-spaceBetween-col grid-2-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("VAS_VendorLocation") + '">' + response.Orders[i]["DeliveryLocation"] + '</div>' +
-                                '        <div class="VAS-lbl-text text-right" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + response.Orders[i]["ProductLocation"] + '</div>' +
-                                '    </div>' +
-                                '    <div class="VAS-spaceBetween-col">' +
-                                '        <div class="VAS-lbl-text" title="' + VIS.Msg.getMsg("TotalAmount") + '"><span>' + response.Orders[i]["Symbol"] + '</span>' + ' ' + (response.Orders[i]["GrandTotal"]).toLocaleString() + '</div>' +
-                                '    </div>' +
-                                '</div>');
+                            var order = response.Orders[i];
+                            var amountText = order["Symbol"] + ' ' + formatMoney(order["GrandTotal"], order["Symbol"], order["StdPrecision"]);
+                            var boxHtml = (
+                                '<button type="button" class="vas-egrn-row vas-pgrn-row"' +
+                                ' data-doc-no="' + order["DocumentNo"] + '"' +
+                                ' data-customer-name="' + order["CustomerName"] + '"' +
+                                ' data-orderid="' + order["C_Order_ID"] + '">' +
+                                '<span class="vas-egrn-fi">' +
+                                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' +
+                                '</span>' +
+                                '<div class="vas-egrn-main">' +
+                                '<div class="vas-egrn-top">' +
+                                '<span class="vas-egrn-no" title="' + VIS.Msg.getMsg("Document_No") + '">' + order["DocumentNo"] + '</span>' +
+                                '<span class="vas-egrn-qty" title="' + VIS.Msg.getMsg("VAS_NoOfLines") + '">' + order["LineCount"] + '</span>' +
+                                '</div>' +
+                                '<div class="vas-egrn-mid">' +
+                                '<span class="vas-egrn-party" title="' + VIS.Msg.getMsg("Vendor") + '">' + order["CustomerName"] + '</span>' +
+                                '<span class="vas-egrn-val" title="' + VIS.Msg.getMsg("TotalAmount") + '">' + amountText + '</span>' +
+                                '</div>' +
+                                '<div class="vas-egrn-sub">' +
+                                '<span class="vas-egrn-addr" title="' + VIS.Msg.getMsg("VAS_VendorLocation") + '">' + order["DeliveryLocation"] + '</span>' +
+                                '<span class="vas-egrn-wh" title="' + VIS.Msg.getMsg("VAS_ProductLocation") + '">' + order["ProductLocation"] + '</span>' +
+                                '</div>' +
+                                '</div>' +
+                                '</button>');
                             $root.find('#VAS_DeliveryBox_' + widgetID).append(boxHtml);
                         }
                         childRecordsMap = [];
@@ -105,20 +136,33 @@
                             }
                         });
                         /* Add Pagination div on first tym data load*/
-                        if (pageNo == 1) {
+                        if (response.RecordCount != null) {
                             $root.find('#VAS_DeliveryCount_' + widgetID).text(response.RecordCount);
+                            $self.recordCount = response.RecordCount;
                             buildPagination(response.RecordCount);
                             AD_Window_ID = response.AD_Window_ID;
                         }
                         $root.find('#VAS_PaginationText_' + widgetID).text($self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages);
-                        // Attach click event listener to delivery boxes
-                        $root.off('click', '#VAS_DocumentNo_' + widgetID);
-                        $root.on('click', '#VAS_DocumentNo_' + widgetID, function () {
+                        // Review #25: "Showing x-y of N" footer info like Expected GRN.
+                        var fromRecord = ($self.currentPage - 1) * pageSize + 1;
+                        var toRecord = fromRecord + response.Orders.length - 1;
+                        $root.find('#VAS_FootInfo_' + widgetID).text(
+                            VIS.Msg.getMsg("VAS_Showing") + ' ' + fromRecord + '-' + toRecord + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + ($self.recordCount || toRecord)
+                        );
+                        // Attach click event listener to delivery rows
+                        $root.off('click', '.vas-pgrn-row');
+                        $root.on('click', '.vas-pgrn-row', function () {
                             var docNo = $(this).data('doc-no');
                             var customerName = $(this).data('customer-name');
                             var orderid = $(this).data('orderid');
                             displayOrderDetails(docNo, customerName, orderid);
                         });
+                    }
+                    else {
+                        $root.find('#VAS_DeliveryBox_' + widgetID).html(
+                            '<div class="vas-egrn-empty">' + VIS.Msg.getMsg("VAS_NoDataAvailable") + '</div>'
+                        );
+                        $root.find('#VAS_FootInfo_' + widgetID).text('');
                     }
                     //else {
 
@@ -126,16 +170,55 @@
                     //    const message = $('<div class="VAS-data-message">' + VIS.Msg.getMsg("VAS_NoDataAvailable") + '</div>');
                     //    $root.find('.VAS-height-container').append(message);
                     //}
+                    window.setTimeout(syncPageSize, 0);
+                    isLoading = false;
                     $bsyDiv.css('visibility', 'hidden');
 
                 },
                 error: function (xhr, status, error) {
                     // Handle errors
                     console.log('Failed to fetch data:', status, error);
+                    isLoading = false;
                     $bsyDiv[0].style.visibility = "hidden";
                 }
             });
         };
+
+        function measurePageSize() {
+            var $list = $root.find('#VAS_DeliveryBox_' + widgetID);
+            if (!$list.length || !$list.is(':visible')) { return pageSize; }
+
+            var listHeight = Math.floor($list.innerHeight());
+            if (listHeight <= 0) { return pageSize; }
+
+            var $sample = $list.find('.vas-egrn-row:first');
+            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 58;
+            if (rowHeight <= 0) { rowHeight = 58; }
+
+            return Math.max(2, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = (($self.currentPage - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            $self.currentPage = Math.max(1, Math.ceil(firstRecord / pageSize));
+
+            if (!isLoading) {
+                $self.intialLoad($self.currentPage);
+            }
+        }
+
+        function bindResizeObserver() {
+            var $list = $root.find('#VAS_DeliveryBox_' + widgetID);
+            if (!$list.length || typeof ResizeObserver === 'undefined') { return; }
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); }
+
+            rowResizeObserver = new ResizeObserver(syncPageSize);
+            rowResizeObserver.observe($list[0]);
+        }
 
         function displayOrderDetails(docNo, customerName, orderid) {
             // Hide and remove existing elements
@@ -366,10 +449,13 @@
             var $paginationContainer = $root.find('.VAS-pagination-container');
             $paginationContainer.empty(); // Clear existing pagination
             $self.totalPages = Math.ceil(recordCount / pageSize); // Update totalPages
-            var $pagination = $('<div class="VAS-slider-arrows VAS-orders-text-white">' +
-                '        <i id="VAS_Prev_Page_' + widgetID + '" class="fa fa-arrow-circle-left" aria-hidden="true"></i>' +
-                '        <span id="VAS_PaginationText_' + widgetID + '">' + $self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages + '</span>' +
-                '        <i id="VAS_Next_Page_' + widgetID + '" class="fa fa-arrow-circle-right" aria-hidden="true"></i>' +
+            // Review #25: pager styled like the Expected GRN footer pager.
+            var chevL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+            var chevR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            var $pagination = $('<div class="vas-egrn-pager">' +
+                '        <button type="button" id="VAS_Prev_Page_' + widgetID + '" class="vas-egrn-pgbtn">' + chevL + '</button>' +
+                '        <span id="VAS_PaginationText_' + widgetID + '" class="vas-egrn-pgtext">' + $self.currentPage + VIS.Msg.getMsg("VAS_Of") + $self.totalPages + '</span>' +
+                '        <button type="button" id="VAS_Next_Page_' + widgetID + '" class="vas-egrn-pgbtn">' + chevR + '</button>' +
                 '    </div>');
 
             // Add event listeners for arrows
@@ -410,6 +496,15 @@
             $self.intialLoad($self.currentPage);
 
         };
+
+        this.disposeComponent = function () {
+            if (rowResizeObserver) {
+                rowResizeObserver.disconnect();
+                rowResizeObserver = null;
+            }
+            $root.off();
+            $root.remove();
+        };
     };
 
     VAS.VAS_093_PendingGRNWidget.prototype.widgetFirevalueChanged = function (value) {
@@ -442,12 +537,9 @@
     };
 
     VAS.VAS_093_PendingGRNWidget.prototype.dispose = function () {
+        this.disposeComponent();
         this.frame = null;
         this.windowNo = null;
-        $bsyDiv = null;
-        $self = null;
-        $root = null;
-        $contentContainer = null;
     };
 
 })(VAS, jQuery);

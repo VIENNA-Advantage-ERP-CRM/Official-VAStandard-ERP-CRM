@@ -74,6 +74,7 @@
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
+        var rowResizeObserver = null;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -100,11 +101,19 @@
             return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
-        /* Format a currency amount using the precision read from the system (never hard-coded). */
-        function formatMoney(value, precision, symbol) {
+        /* Review #8 (common): digit grouping follows the currency's ISO 4217 family -
+           Indian grouping for INR/PKR/BDT/NPR/BTN/LKR, international otherwise.
+           Precision and symbol are read from the system (never hard-coded). */
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function currencyLocale(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0 ? 'en-IN' : 'en-US';
+        }
+
+        function formatMoney(value, precision, symbol, isoCode) {
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
-            var num = Number(value || 0).toLocaleString(window.navigator.language, {
+            var num = Number(value || 0).toLocaleString(currencyLocale(isoCode), {
                 minimumFractionDigits: p,
                 maximumFractionDigits: p
             });
@@ -136,6 +145,27 @@
             $dialogBadge
                 .html('<span class="vas-egrn-pill ' + escapeHtml(cls || "info") + '">' + escapeHtml(text) + '</span>')
                 .removeClass('vas-egrn-hidden');
+        }
+
+        function measurePageSize() {
+            if (!$body || !$body[0]) { return pageSize; }
+
+            var $rows = $body.find('.vas-egrn-rows');
+            var listHeight = $rows.innerHeight();
+            var rowHeight = $rows.find('.vas-egrn-row').first().outerHeight(true) || 58;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            return Math.max(2, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadExpected(pageNo); }
         }
 
         this.initalize = function () {
@@ -199,6 +229,13 @@
             $nextBtn.on('click', function () {
                 if (!loading && pageNo < totalPages) { loadExpected(pageNo + 1); }
             });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($body.find('.vas-egrn-rows')[0]);
+            }
         }
 
         function loadExpected(page) {
@@ -268,7 +305,7 @@
                 var r = ROWS[i];
                 rowsById[r.poId] = r;
 
-                var valueText = formatMoney(r.poValue, r.stdPrecision, r.curSymbol);
+                var valueText = formatMoney(r.poValue, r.stdPrecision, r.curSymbol, r.currencyIso);
 
                 $rows.append(
                     '<button type="button" class="vas-egrn-row" data-poid="' + escapeHtml(r.poId) + '">' +
@@ -292,6 +329,7 @@
             }
 
             updatePager();
+            window.setTimeout(syncPageSize, 0);
         }
 
         function updatePager() {
@@ -555,6 +593,7 @@
         this.disposeComponent = function () {
             $(document).off('keydown.vas-egrn');
             $('body').removeClass('vas-egrn-body-lock');
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();
         };

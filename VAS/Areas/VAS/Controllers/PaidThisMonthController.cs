@@ -44,10 +44,12 @@ namespace VIS.Controllers
                        CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ci
                 INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
-                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)";
+                INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)
+                WHERE ci.AD_Client_ID=" + ctx.GetAD_Client_ID();
 
             string paidThisMonthDataSql = @"
-                SELECT i.C_BPartner_ID,
+                SELECT i.AD_Client_ID,
+                       i.C_BPartner_ID,
                        CurrencyConvert(
                            al.Amount,
                            ah.C_Currency_ID,
@@ -99,12 +101,17 @@ namespace VIS.Controllers
                 PaidThisMonthData AS (
                     " + paidThisMonthDataSql + @"
                 )
-                SELECT ROUND(COALESCE(SUM(PaidAmount), 0), MAX(StdPrecision)) AS Total_Paid_Amount_This_Month,
-                       COUNT(DISTINCT C_BPartner_ID) AS Customers_Paid_This_Month,
-                       MAX(Cur_Symbol) AS Cur_Symbol,
-                       MAX(ISO_Code) AS ISO_Code,
-                       MAX(StdPrecision) AS Std_Precision
-                FROM PaidThisMonthData";
+                SELECT ROUND(COALESCE(SUM(d.PaidAmount), 0), sc.StdPrecision) AS Total_Paid_Amount_This_Month,
+                       COUNT(DISTINCT d.C_BPartner_ID) AS Customers_Paid_This_Month,
+                       sc.Cur_Symbol AS Cur_Symbol,
+                       sc.ISO_Code AS ISO_Code,
+                       sc.StdPrecision AS Std_Precision
+                /* Drive FROM the single-row SchemaCurrency CTE and LEFT JOIN the month's
+                   payments so the base-currency symbol/precision are always returned - even in
+                   a month with zero receipts. Mirrors OutstandingSalesOrderController. */
+                FROM SchemaCurrency sc
+                LEFT OUTER JOIN PaidThisMonthData d ON (d.AD_Client_ID=sc.AD_Client_ID)
+                GROUP BY sc.Cur_Symbol, sc.ISO_Code, sc.StdPrecision";
 
             decimal totalPaidAmount = 0;
             int customerCount = 0;

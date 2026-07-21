@@ -39,6 +39,11 @@
  * 28 | Next page                                     | VAS_NextPage
  * 29 | Showing                                       | VAS_Showing
  * 30 | of                                            | VAS_Of
+ * 31 | Discontinued From                             | VAS_DiscontinuedFrom
+ * 32 | Attribute                                     | VAS_Attribute
+ * 33 | Delivered                                     | VAS_StatusDelivered
+ * 34 | Partial                                       | VAS_StatusPartial
+ * 35 | Discontinued                                  | VAS_StatusDiscontinued
  */
 ; VAS = window.VAS || {};
 
@@ -64,6 +69,10 @@
         var suggestions = [];
         var suggestionIndex = -1;
         var productDetail = null;
+        var currentProductId = 0;
+        var currentProductName = '';
+        var currentProductCode = '';
+        var detailLoading = false;
         var activeTab = 'overview';
         var searchCurrency = { symbol: '', iso: '', precision: 0 };
         var tabPages = {};
@@ -108,19 +117,56 @@
             return parsed || {};
         }
 
+        // Currencies whose countries use the Indian numbering system (ISO 4217) -
+        // these get Indian digit grouping and Lakh/Crore compact notation; every
+        // other currency gets international grouping and K/M/B compact notation.
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : 'en-US';
+        }
+
+        function detailIso() {
+            return (productDetail && productDetail.CurrencyIso) || searchCurrency.iso || '';
+        }
+
         function formatQty(value) {
             var number = Number(value || 0);
-            return number.toLocaleString(window.navigator.language || 'en-IN', {
+            return number.toLocaleString(currencyLocale(detailIso()), {
                 maximumFractionDigits: 2
             });
         }
 
-        function formatCompactQty(value) {
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        function formatCompactNumber(value, isoCode) {
             var number = Number(value || 0);
-            if (Math.abs(number) >= 10000000) { return (number / 10000000).toFixed(2).replace(/\.00$/, '') + 'Cr'; }
-            if (Math.abs(number) >= 100000) { return (number / 100000).toFixed(2).replace(/\.00$/, '') + 'L'; }
-            if (Math.abs(number) >= 1000) { return (number / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; }
-            return formatQty(number);
+            var abs = Math.abs(number);
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { return trimTrailingZeros((number / 10000000).toFixed(2)) + ' Cr'; }
+                if (abs >= 100000) { return trimTrailingZeros((number / 100000).toFixed(2)) + ' Lakh'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            } else {
+                if (abs >= 1000000000) { return trimTrailingZeros((number / 1000000000).toFixed(1)) + 'B'; }
+                if (abs >= 1000000) { return trimTrailingZeros((number / 1000000).toFixed(1)) + 'M'; }
+                if (abs >= 1000) { return trimTrailingZeros((number / 1000).toFixed(1)) + 'K'; }
+            }
+            return number.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 });
+        }
+
+        function formatCompactQty(value) {
+            return formatCompactNumber(value, detailIso());
+        }
+
+        function formatCompactAmount(value, symbol, isoCode) {
+            var currency = symbol || isoCode || '';
+            return currency + formatCompactNumber(value, isoCode);
         }
 
         function getPrecision(value) {
@@ -136,7 +182,7 @@
             var number = Number(value || 0);
             var currency = symbol || isoCode || '';
             var stdPrecision = getPrecision(precision);
-            var formatted = number.toLocaleString(window.navigator.language, {
+            var formatted = number.toLocaleString(currencyLocale(isoCode), {
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
@@ -185,6 +231,27 @@
                 VO: label('VAS_StatusVoided', 'Voided')
             };
             return statuses[code] || code || '-';
+        }
+
+        // Review #5: a purchase order that ran (Completed/Closed) reports its delivery
+        // progress - Delivered when everything arrived, Partial when some quantity
+        // arrived, Completed while no GRN is made. Other documents keep their status.
+        function purchaseOrderStatusLabel(order) {
+            var code = order.DocumentStatus;
+            if (code !== 'CO' && code !== 'CL') { return documentStatusLabel(code); }
+            var ordered = Number(order.QuantityOrdered || 0);
+            var delivered = Number(order.QuantityDelivered || 0);
+            if (ordered > 0 && delivered >= ordered) { return label('VAS_StatusDelivered', 'Delivered'); }
+            if (delivered > 0) { return label('VAS_StatusPartial', 'Partial'); }
+            return label('VAS_StatusCompleted', 'Completed');
+        }
+
+        // Review #6: the status reads Active for every product unless the product
+        // is flagged Discontinued (controller sends Status 'D').
+        function productStatusLabel() {
+            return productDetail.Status === 'D'
+                ? label('VAS_StatusDiscontinued', 'Discontinued')
+                : label('Active', 'Active');
         }
 
         function movementTypeLabel(code) {
@@ -314,6 +381,7 @@
             $(window).on('scroll' + eventNamespace, closeSuggestions);
             $(window).on('resize' + eventNamespace, function () {
                 if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
+                syncTablePageSize();
             });
 
             $dashboardScroll = $root.closest('.vis-widget-container, [data-dashboard-container]');
@@ -454,29 +522,38 @@
             loadProductDetail(product.ProductId, product.ProductName, product.ProductCode);
         }
 
-        function loadProductDetail(productId, productName, productCode) {
-            openLoadingDialog(productName, productCode);
+        function loadProductDetail(productId, productName, productCode, keepDialog) {
+            currentProductId = productId;
+            currentProductName = productName || '';
+            currentProductCode = productCode || '';
+            var nextActiveTab = keepDialog ? activeTab : 'overview';
 
+            if (!keepDialog) { openLoadingDialog(productName, productCode); }
+
+            detailLoading = true;
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS_078_ProductSearchWidget/GetProductDetail',
                 type: 'GET',
                 dataType: 'json',
                 data: {
-                    M_Product_ID: productId
+                    M_Product_ID: productId,
+                    pageSize: tablePageSize
                 },
                 success: function (response) {
                     var parsed = parseResponse(response);
+                    detailLoading = false;
                     if (!parsed || parsed.Error || !parsed.Overview) {
                         renderDialogError(parsed.Error || label('VAS_ProductDetailLoadError', 'Unable to load product detail.'));
                         return;
                     }
 
                     productDetail = parsed;
-                    activeTab = 'overview';
-                    tabPages = {};
+                    activeTab = nextActiveTab;
+                    if (!keepDialog) { tabPages = {}; }
                     renderProductDialog();
                 },
                 error: function () {
+                    detailLoading = false;
                     renderDialogError(label('VAS_ProductDetailLoadError', 'Unable to load product detail.'));
                 }
             });
@@ -496,9 +573,7 @@
 
         function renderProductDialog() {
             var overview = productDetail.Overview;
-            var status = productDetail.Status === 'Y'
-                ? label('Active', 'Active')
-                : label('Inactive', 'Inactive');
+            var status = productStatusLabel();
 
             $dialogTitle.text(overview.ProductName);
             $dialogBadge.text(overview.ProductCode || '').toggle(!!overview.ProductCode);
@@ -512,17 +587,33 @@
                 return '<span class="MPC-product-search-chip">' + escapeHtml(value) + '</span>';
             }).join('');
 
+            var imageUrl = overview.ImageUrl;
+            if (imageUrl && imageUrl.indexOf('http') !== 0 && imageUrl.indexOf('data:') !== 0) {
+                var contextUrl = VIS.Application.contextUrl || '';
+                if (contextUrl && contextUrl.lastIndexOf('/') !== contextUrl.length - 1 && imageUrl.indexOf('/') !== 0) {
+                    imageUrl = contextUrl + '/' + imageUrl;
+                } else if (contextUrl && contextUrl.lastIndexOf('/') === contextUrl.length - 1 && imageUrl.indexOf('/') === 0) {
+                    imageUrl = contextUrl + imageUrl.substring(1);
+                } else {
+                    imageUrl = contextUrl + imageUrl;
+                }
+            }
+
+            var heroIconContent = imageUrl
+                ? '<img class="MPC-product-search-hero-img" src="' + escapeHtml(imageUrl) + '" alt="">'
+                : icon('product');
+
             var hero = '<section class="MPC-product-search-hero">' +
-                '<span class="MPC-product-search-hero-icon">' + icon('product') + '</span>' +
+                '<span class="MPC-product-search-hero-icon' + (overview.ImageUrl ? ' has-image' : '') + '">' + heroIconContent + '</span>' +
                 '<div class="MPC-product-search-hero-main">' +
                     '<div class="MPC-product-search-hero-name">' + escapeHtml(overview.ProductName) + '</div>' +
                     '<div class="MPC-product-search-chips">' + chips + '</div>' +
                 '</div>' +
                 '<div class="MPC-product-search-stats">' +
                     statTile(label('VAS_OnHandQty', 'On Hand Qty'), formatCompactQty(productDetail.OnHandQty), '') +
-                    statTile(label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), '') +
+                    statTile(label('VAS_StockValue', 'Stock Value'), formatCompactAmount(productDetail.StockValue, productDetail.CurrencySymbol, productDetail.CurrencyIso), '') +
                     statTile(label('VAS_ReorderPoint', 'Reorder Pt'), formatQty(productDetail.ReorderPoint), 'is-warning') +
-                    statTile(label('Status', 'Status'), status, productDetail.Status === 'Y' ? 'is-success' : '') +
+                    statTile(label('Status', 'Status'), status, productDetail.Status === 'D' ? 'is-warning' : 'is-success') +
                 '</div>' +
             '</section>';
 
@@ -538,6 +629,13 @@
             }).join('');
 
             $dialogBody.html(hero + '<nav class="MPC-product-search-tabs">' + tabs + '</nav><div class="MPC-product-search-tab-body"></div>');
+
+            // A hero image that fails to load (file removed from the server, dead URL)
+            // degrades to the product icon instead of a broken-image glyph.
+            $dialogBody.find('.MPC-product-search-hero-img').on('error', function () {
+                $(this).closest('.MPC-product-search-hero-icon').removeClass('has-image').html(icon('product'));
+            });
+
             renderTab();
         }
 
@@ -573,6 +671,8 @@
             else if (activeTab === 'requisitions') {
                 $tabBody.html(renderRequisitions());
             }
+
+            window.setTimeout(syncTablePageSize, 0);
         }
 
         function renderOverview() {
@@ -588,7 +688,8 @@
                 [label('VAS_OnHandQty', 'On Hand Qty'), formatQty(productDetail.OnHandQty), true],
                 [label('VAS_StockValue', 'Stock Value'), formatBaseAmount(productDetail.StockValue), true],
                 [label('VAS_ReorderPoint', 'Reorder Point'), formatQty(productDetail.ReorderPoint)],
-                [label('Status', 'Status'), productDetail.Status === 'Y' ? label('Active', 'Active') : label('Inactive', 'Inactive')]
+                [label('Status', 'Status'), productStatusLabel()],
+                [label('VAS_DiscontinuedFrom', 'Discontinued From'), formatDate(overview.DiscontinuedFrom)]
             ];
 
             return '<div class="MPC-product-search-form-grid">' + fields.map(function (field) {
@@ -605,15 +706,16 @@
                 return [
                     stock.WarehouseName,
                     stock.LocatorValue,
+                    stock.Attribute,
                     formatQty(stock.Quantity),
                     formatBaseAmount(stock.StockValue)
                 ];
             });
 
             return renderTable(
-                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
+                [label('Warehouse', 'Warehouse'), label('Locator', 'Locator'), label('VAS_Attribute', 'Attribute'), label('VAS_OnHandQty', 'On Hand Qty'), label('Amount', 'Amount')],
                 rows,
-                [2, 3],
+                [3, 4],
                 'stock'
             );
         }
@@ -623,6 +725,7 @@
                 isSales ? label('SalesOrder', 'SO #') : label('PurchaseOrder', 'PO #'),
                 label('DateOrdered', 'Ordered'),
                 label('DatePromised', 'Promised'),
+                label('VAS_Attribute', 'Attribute'),
                 label('VAS_OrderedQty', 'Ordered Qty'),
                 label('VAS_DeliveredQty', 'Delivered Qty'),
                 label('Amount', 'Amount'),
@@ -634,14 +737,15 @@
                     order.DocumentNo,
                     formatDate(order.DateOrdered),
                     formatDate(order.DatePromised),
+                    order.Attribute,
                     formatQty(order.QuantityOrdered),
                     formatQty(order.QuantityDelivered),
                     formatAmount(order.LineNetAmount, order.CurrencySymbol, order.CurrencyIso, order.StdPrecision),
-                    documentStatusLabel(order.DocumentStatus)
+                    isSales ? documentStatusLabel(order.DocumentStatus) : purchaseOrderStatusLabel(order)
                 ];
             });
 
-            return latestRecordsNote() + renderTable(headers, rows, [3, 4, 5], isSales ? 'salesOrders' : 'purchaseOrders');
+            return latestRecordsNote() + renderTable(headers, rows, [4, 5, 6], isSales ? 'salesOrders' : 'purchaseOrders');
         }
 
         function renderMovements() {
@@ -649,6 +753,7 @@
                 return [
                     formatDate(movement.MovementDate),
                     movementTypeLabel(movement.MovementType),
+                    movement.Attribute,
                     (Number(movement.MovementQuantity) > 0 ? '+' : '') + formatQty(movement.MovementQuantity),
                     movement.WarehouseName,
                     movement.LocatorValue
@@ -656,9 +761,9 @@
             });
 
             return latestRecordsNote() + renderTable(
-                [label('MovementDate', 'Date'), label('MovementType', 'Type'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
+                [label('MovementDate', 'Date'), label('MovementType', 'Type'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
                 rows,
-                [2],
+                [3],
                 'movements'
             );
         }
@@ -669,6 +774,7 @@
                     requisition.DocumentNo,
                     formatDate(requisition.DocumentDate),
                     formatDate(requisition.RequiredDate),
+                    requisition.Attribute,
                     formatQty(requisition.Quantity),
                     formatQty(requisition.QuantityOrdered),
                     documentStatusLabel(requisition.DocumentStatus)
@@ -676,15 +782,49 @@
             });
 
             return latestRecordsNote() + renderTable(
-                [label('Requisition', 'Requisition #'), label('VAS_DocumentDate', 'Document Date'), label('VAS_RequiredDate', 'Required Date'), label('Qty', 'Qty'), label('VAS_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
+                [label('Requisition', 'Requisition #'), label('VAS_DocumentDate', 'Document Date'), label('VAS_RequiredDate', 'Required Date'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('VAS_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
                 rows,
-                [3, 4],
+                [4, 5],
                 'requisitions'
             );
         }
 
         function latestRecordsNote() {
-            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_ShowingLatest5Records', 'Showing latest 5 records.')) + '</span></div>';
+            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + tablePageSize + ' ' + label('VAS_LatestRecords', 'latest records')) + '</span></div>';
+        }
+
+        function measureTablePageSize() {
+            if (!$dialog || !$dialog.hasClass('is-open')) { return tablePageSize; }
+
+            var $tbody = $dialogBody.find('.MPC-product-search-table tbody');
+            if (!$tbody.length) { return tablePageSize; }
+
+            var bodyHeight = Math.floor($tbody.innerHeight());
+            if (bodyHeight <= 0) { return tablePageSize; }
+
+            var $row = $tbody.find('tr:first');
+            var rowHeight = $row.length ? Math.ceil($row.outerHeight(true)) : 34;
+            if (rowHeight <= 0) { rowHeight = 34; }
+
+            return Math.max(3, Math.floor(bodyHeight / rowHeight));
+        }
+
+        function syncTablePageSize() {
+            if (detailLoading || !productDetail) { return; }
+
+            var nextPageSize = measureTablePageSize();
+            if (nextPageSize === tablePageSize) { return; }
+
+            var currentPage = tabPages[activeTab] || 1;
+            var firstRecord = ((currentPage - 1) * tablePageSize) + 1;
+            tablePageSize = nextPageSize;
+            tabPages[activeTab] = Math.max(1, Math.ceil(firstRecord / tablePageSize));
+
+            if (currentProductId > 0) {
+                loadProductDetail(currentProductId, currentProductName, currentProductCode, true);
+            } else {
+                renderTab();
+            }
         }
 
         function renderTable(headers, rows, rightAlignedColumns, pageKey) {
@@ -726,6 +866,9 @@
 
         function closeDialog() {
             if (!$dialog) { return; }
+            if (document.activeElement && $dialog[0].contains(document.activeElement)) {
+                if ($input && $input.length) { $input.focus(); } else { document.activeElement.blur(); }
+            }
             $dialog.removeClass('is-open').attr('aria-hidden', 'true');
             $('body').removeClass('MPC-product-search-modal-open');
             productDetail = null;

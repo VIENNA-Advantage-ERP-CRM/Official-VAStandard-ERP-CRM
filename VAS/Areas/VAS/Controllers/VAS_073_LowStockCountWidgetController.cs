@@ -53,12 +53,15 @@ namespace VAS.Controllers
         {
             if (ctx == null) { return 0; }
 
+            /* Review #43: plain ASCII literals only - the previous N'...'
+               literals fail against CHAR columns on Oracle (ORA-12704) and are
+               invalid syntax on PostgreSQL, so the widget returned no data. */
             string storageSql = @"
                 SELECT Storage.M_Product_ID,
                        Storage.M_Locator_ID,
                        Storage.QtyOnHand
                 FROM M_Storage Storage
-                WHERE Storage.IsActive=N'Y'
+                WHERE Storage.IsActive='Y'
                   AND Storage.AD_Client_ID=@Storage_Client_ID
                   AND Storage.AD_Org_ID IN (0,COALESCE(NULLIF(@Storage_Org_ID,0),Storage.AD_Org_ID))";
 
@@ -73,7 +76,7 @@ namespace VAS.Controllers
                 SELECT Locator.M_Locator_ID,
                        Locator.M_Warehouse_ID
                 FROM M_Locator Locator
-                WHERE Locator.IsActive=N'Y'
+                WHERE Locator.IsActive='Y'
                   AND Locator.AD_Client_ID=@Locator_Client_ID
                   AND Locator.AD_Org_ID IN (0,COALESCE(NULLIF(@Locator_Org_ID,0),Locator.AD_Org_ID))";
 
@@ -91,8 +94,8 @@ namespace VAS.Controllers
                        Replenish.Level_Min,
                        Replenish.Level_Max
                 FROM M_Replenish Replenish
-                WHERE Replenish.IsActive=N'Y'
-                  AND Replenish.ReplenishType IN (N'1',N'2')
+                WHERE Replenish.IsActive='Y'
+                  AND Replenish.ReplenishType IN ('1','2')
                   AND Replenish.AD_Client_ID=@Replenish_Client_ID
                   AND Replenish.AD_Org_ID IN (0,COALESCE(NULLIF(@Replenish_Org_ID,0),Replenish.AD_Org_ID))";
 
@@ -119,8 +122,8 @@ namespace VAS.Controllers
                            SUM(StorageRows.QtyOnHand) AS Qty_On_Hand,
                            MAX(
                                CASE
-                                   WHEN ReplenishRows.ReplenishType=N'1' THEN ReplenishRows.Level_Min
-                                   WHEN ReplenishRows.ReplenishType=N'2' THEN ReplenishRows.Level_Max
+                                   WHEN ReplenishRows.ReplenishType='1' THEN ReplenishRows.Level_Min
+                                   WHEN ReplenishRows.ReplenishType='2' THEN ReplenishRows.Level_Max
                                    ELSE NULL
                                END
                            ) AS Reorder_Point

@@ -192,6 +192,9 @@
             $root.append($body).append($emptyState);
             createBusyIndicator();
             buildShell();
+            // Start hidden: the tab only appears once refreshPanelData loads a real invoice
+            // (record_ID > 0). A new/unsaved parent never flashes the empty box.
+            applyTabVisibility(false);
             $(document).on("mousedown.vascil", onDocMouseDown);
         };
 
@@ -202,6 +205,31 @@
             $root.append($busy);
         }
         function showBusy(show) { if ($busy && $busy[0]) $busy[0].style.visibility = show ? "visible" : "hidden"; }
+
+        /* Hide/show the WHOLE tab (framework "Invoice Lines" title bar + our root) when no
+           invoice is selected. The live framework build appends
+           <div class="vis-ad-w-p-ap-tp-body-head"> immediately BEFORE getRoot() into a
+           shared content div, so the title bar is our root's IMMEDIATE PREVIOUS sibling -
+           target only ours (other panels append their own head+root pairs in the same div).
+           Toggling a class (display:none !important, not inline display) so the framework's
+           own setSize()/.show() on resize / panel switch can't override it and flash the
+           empty tab back. In the VIS2_0 tab path refreshPanelData fires on every record
+           change (no :visible guard), so the tab reappears when a real record loads. */
+        function applyTabVisibility(show) {
+            if (!$root || !$root.length) return;
+            $root.toggleClass("vas-cil-tab-hidden", !show);
+            // The framework "Invoice Lines" title bar (our root's previous sibling) is
+            // redundant with the panel's own header - hide it PERMANENTLY, regardless of
+            // record/lines (never re-shown). The CSS :has() rule covers this too; this is
+            // the fallback for browsers without :has support. Re-asserted on every render.
+            var $head = $root.prev(".vis-ad-w-p-ap-tp-body-head");
+            if (!$head.length) {
+                // Older build fallback: head lives under .vis-ad-w-p-ap-tp-outerwrap.
+                var $host = $root.closest(".vis-ad-w-p-ap-tp-outerwrap");
+                if ($host.length) $head = $host.find(".vis-ad-w-p-ap-tp-o-b-head");
+            }
+            $head.addClass("vas-cil-tab-hidden");
+        }
 
         this.fetchData = function (recordID, page) {
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
@@ -251,8 +279,10 @@
                     lines = [];
                     if (parent && parent.Lines) for (var j = 0; j < parent.Lines.length; j++) lines.push(fromServerRow(parent.Lines[j]));
                     editing = null; morePopoverFor = null;
+                    taxSummary = null;   // drop the prior record's breakdown -> fallback shows first
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
+                    refreshSummary();    // then load this invoice's server tax breakdown
                 },
                 error: function (err) { console.log(err); }
             });
@@ -342,6 +372,23 @@
             render();
         }
 
+        /* Panel-level Undo (Ctrl+Alt+Z): revert the "active" line - the row being edited,
+           else the first selected unsaved row, else the newest unsaved row. Saved+dirty ->
+           revert to the pristine snapshot; new (never-saved) -> remove the row. Same rule as
+           the per-row ↺ affordance (renderMoreCell). */
+        function undoActive() {
+            if (!panelEditable()) return;
+            var target = (editing && lineById(editing.rowId)) || null;
+            if (!target || !(target.status === "new" || target.dirty)) {
+                target = selectedLines().filter(function (l) { return l.status === "new" || l.dirty; })[0] || null;
+            }
+            if (!target) {
+                for (var i = 0; i < lines.length; i++) if (lines[i].status === "new" || lines[i].dirty) { target = lines[i]; break; }
+            }
+            if (!target) { showToast(lbl("VAS_074_NothingToUndo", "Nothing to undo")); return; }
+            if (target.status === "saved" && target._saved) undoLine(target); else discardNewLine(target);
+        }
+
         /* Seed every C_InvoiceLine column (from the cached columnMeta) on a new
            line so the VO carries all columns; explicit defaults already set are
            preserved. */
@@ -367,10 +414,12 @@
             // dropping the vas-cil-is-hidden class).
             var $scanBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline vas-cil-is-hidden" data-action="open-scan">' + icon("scan-line", "▭") +
                 "<span>" + esc(lbl("VAS_074_Scan", "Scan")) + "</span></button>");
-            $addBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="add-line">' + icon("plus", "+") +
+            $addBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="add-line" title="' + esc(lbl("VAS_074_AddLine", "Add line")) + ' (Ctrl+Alt+N)">' + icon("plus", "+") +
                 "<span>" + esc(lbl("VAS_074_AddLine", "Add line")) + "</span></button>");
-            $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows"></button>');
-            $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" disabled>' +
+            // Icon + label span built ONCE here; renderHeaderButtons only updates the label
+            // span's TEXT (never rebuilds innerHTML) so the label can't momentarily blank out.
+            $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-cil-save-lbl"></span></button>');
+            $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" title="' + esc(lbl("Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("Delete", "Delete")) + ' <span class="vas-cil-sel-count"></span></span></button>');
             $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn);
             $header.append($actions);
@@ -425,7 +474,14 @@
 
         /* ---------- render ---------- */
         function render() {
-            if (!parent || !parent.C_Invoice_ID) { $body.hide(); $emptyState.show(); return; }
+            if (!parent || !parent.C_Invoice_ID) {
+                // No invoice selected (record_ID <= 0): hide the whole tab - title bar and
+                // content box - so there's no empty prompt or stray scrollbar.
+                $emptyState.show(); $body.hide();
+                applyTabVisibility(false);
+                return;
+            }
+            applyTabVisibility(true);
             $emptyState.hide(); $body.show();
             // Read-only invoice: mark the panel so disabled controls (checkbox, "...")
             // show a not-allowed cursor via their (enabled) parent cell - a disabled
@@ -488,29 +544,64 @@
             $self.fetchData(parent.C_Invoice_ID, p);
         }
 
+        // Cached server tax breakdown for the CURRENT invoice (from VAS/PoReceipt/GetTaxData,
+        // the same contract VAS_InvoiceSummary uses). null until loaded / on a fresh record;
+        // renderTotals() then falls back to a client-computed subtotal+tax so an unsaved
+        // invoice still shows live totals. Refreshed on load, save and delete (refreshSummary).
+        var taxSummary = null;
+
+        /* Vertical invoice summary (Sub Total / per-tax lines / [TCS] / Grand Total), mirroring
+           the VAS_InvoiceSummary design, right-aligned in the totals row. */
         function renderTotals() {
-            // Base = saved totals of every OTHER page (server), plus the live sum of the
-            // current page below, so the row shows the WHOLE invoice's grand total.
-            var sub = otherSub, tax = otherTax, tcs = otherTcs;
-            // Subtotal = SUM(TaxBaseAmt), Tax = SUM(TaxAmt + SurchargeAmt) - both from the SAVED
-            // line columns (server supplies the other pages; these add the current page). No live
-            // recompute, so the row is exact and refreshes on save.
-            for (var i = 0; i < lines.length; i++) { sub += lineTaxBaseSaved(lines[i]); tax += lineTaxTotalSaved(lines[i]); tcs += lineTcs(lines[i]); }
             $totalsRow.empty();
-            $totalsRow.append(totalItem(lbl("VAS_074_Subtotal", "Subtotal"), fmtMoney(sub), false));
-            $totalsRow.append(totalItem(lbl("Tax", "Tax"), fmtMoney(tax), false));
-            // TCS (Tax Collected at Source, VA106) - shown only when the module is in use
-            // and a line carries an amount; it must roll into the grand total.
-            if (tcs) $totalsRow.append(totalItem(lbl("VA106_TaxCollectedAtSource", "TCS"), fmtMoney(tcs), false));
-            $totalsRow.append(totalItem(lbl("VAS_074_Total", "Total"), fmtMoney(sub + tax + tcs), true));
+            var html = '<div class="vas-cil-summary">';
+            if (taxSummary && taxSummary.length) {
+                var h = taxSummary[0];
+                var sym = h.CurSymbol || "";
+                var prec = (h.stdPrecision != null && h.stdPrecision >= 0) ? h.stdPrecision : precision();
+                html += summaryRow(lbl("VAS_SubTotal", "Sub Total"), sym, h.TotalLines, prec, false);
+                for (var i = 0; i < taxSummary.length; i++) {
+                    if (!taxSummary[i].TaxName) continue;
+                    html += summaryRow(taxSummary[i].TaxName, sym, taxSummary[i].TaxAmt, prec, false);
+                }
+                if (+h.TCSAmount) html += summaryRow(lbl("VAS_TCSTotal", "TCS Total"), sym, h.TCSAmount, prec, false);
+                html += summaryRow(lbl("GrandTotal", "Grand Total"), sym, h.GrandTotal, prec, true);
+            } else {
+                // Fallback (no server breakdown yet): saved totals of the OTHER pages + the live
+                // sum of this page, so a new/unsaved invoice still shows a grand total.
+                var sub = otherSub, tax = otherTax, tcs = otherTcs, p = precision();
+                for (var j = 0; j < lines.length; j++) { sub += lineTaxBaseSaved(lines[j]); tax += lineTaxTotalSaved(lines[j]); tcs += lineTcs(lines[j]); }
+                html += summaryRow(lbl("VAS_SubTotal", "Sub Total"), "", sub, p, false);
+                html += summaryRow(lbl("Tax", "Tax"), "", tax, p, false);
+                if (tcs) html += summaryRow(lbl("VA106_TaxCollectedAtSource", "TCS"), "", tcs, p, false);
+                html += summaryRow(lbl("GrandTotal", "Grand Total"), "", sub + tax + tcs, p, true);
+            }
+            $totalsRow.html(html + "</div>");
+        }
+        // One "Label: value" line of the summary. sym is the currency symbol ("" -> none).
+        function summaryRow(label, sym, amount, prec, grand) {
+            var val = (sym ? sym + " " : "") + (+amount || 0).toLocaleString(window.navigator.language,
+                { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return '<div class="vas-cil-summary-row' + (grand ? " vas-cil-summary-row--grand" : "") + '">' +
+                '<span class="vas-cil-summary-label">' + esc(label) + ":</span>" +
+                '<span class="vas-cil-summary-val">' + esc(val) + "</span></div>";
+        }
+        /* (Re)load the server tax breakdown for the current invoice and repaint the summary.
+           Same endpoint/contract as VAS_InvoiceSummary; called on load, save and delete. */
+        function refreshSummary() {
+            var id = parent && parent.C_Invoice_ID;
+            if (!(id > 0)) { taxSummary = null; renderTotals(); return; }
+            try {
+                VIS.dataContext.getJSONData(VIS.Application.contextUrl + "VAS/PoReceipt/GetTaxData",
+                    { InvoiceID: id }, function (data) {
+                        taxSummary = (data && data.length) ? data : null;
+                        renderTotals();
+                    });
+            } catch (e) { if (window.console) console.log(e); }
         }
         /* Per-line TCS amount (VA106_TCSAmount) - 0 when the module isn't installed or
            the column isn't set; read case-insensitively (PG lowercases the key). */
         function lineTcs(line) { return +lineVal(line, "VA106_TCSAmount") || 0; }
-        function totalItem(label, value, grand) {
-            return '<span class="vas-cil-total-item' + (grand ? " vas-cil-total-item--grand" : "") + '">' +
-                '<span class="vas-cil-total-item__label">' + esc(label) + '</span><span class="vas-cil-total-item__value">' + esc(value) + "</span></span>";
-        }
 
         /* The panel is editable only while the invoice can still take line changes -
            server-computed IsEditable = !Processed && DocStatus NOT IN (CO, CL, VO, RE).
@@ -528,9 +619,14 @@
             // fully disabled (native `disabled` blocks the mousedown/click handlers).
             $addBtn.removeClass("vas-cil-is-hidden").prop("disabled", locked).toggleClass("vas-cil-is-disabled", locked);
             $saveBtn.removeClass("vas-cil-is-hidden").prop("disabled", locked).toggleClass("vas-cil-is-disabled", locked || n === 0);
-            var plural = n > 1 ? lbl("VAS_074_PluralS", "s") : "";
-            var countTxt = n > 0 ? " (" + n + ")" : "";
-            $saveBtn.html(icon("hard-drive", "💾") + "<span>" + esc(lbl("VAS_074_SaveRow", "Save row")) + plural + countTxt + "</span>");
+            // Update ONLY the label text (icon span stays put). Guard against a blank/space
+            // message so the label never renders empty (the "Save button text disappears" bug -
+            // VIS.Msg.getMsg can return a blank string once the message cache loads).
+            var saveLbl = lbl("VAS_074_SaveRow", "Save row");
+            if (!saveLbl || !saveLbl.trim()) saveLbl = "Save row";
+            if (n > 1) saveLbl += lbl("VAS_074_PluralS", "s");
+            if (n > 0) saveLbl += " (" + n + ")";
+            $saveBtn.find(".vas-cil-save-lbl").text(saveLbl);
             var sc = selectedCount();
             $deleteBtn.prop("disabled", sc === 0 || locked).toggleClass("vas-cil-is-disabled", sc === 0 || locked);
             $deleteBtn.find(".vas-cil-sel-count").text(sc > 0 ? "(" + sc + ")" : "");
@@ -671,7 +767,16 @@
                     // set was removed after the line was created but the old ASI description
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline).
-                    if (editable && productHasAttributeSet(line)) $attr.on("click", function (e) { e.stopPropagation(); openAttrDialog(line); });
+                    if (editable && productHasAttributeSet(line)) {
+                        // Open on mousedown + preventDefault (like Undo/Save): a plain click
+                        // while a cell editor is focused blurs -> commits -> re-renders the row,
+                        // destroying this element before mouseup so the FIRST click is eaten
+                        // (the two-clicks-to-open bug). preventDefault keeps focus so the row
+                        // isn't rebuilt; the click(detail===0) branch preserves keyboard/synthetic
+                        // activation without double-firing on a real mouse click.
+                        $attr.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openAttrDialog(line); });
+                        $attr.on("click", function (e) { if (e.detail === 0) { e.stopPropagation(); openAttrDialog(line); } });
+                    }
                     else $attr.addClass("vas-cil-attr-link--disabled");
                     wrap.append($attr);
                 }
@@ -827,9 +932,17 @@
             }
             var $btn = $('<button type="button" class="vas-cil-more-btn" title="' + esc(lbl("VAS_074_More", "More")) + '">' + icon("more-horizontal", "⋯") + "</button>");
             if (morePopoverFor === line.rowId) $btn.addClass("is-open");
-            $btn.prop("disabled", !editable);
-            // Open the additional-fields MODAL.
-            $btn.on("click", function (e) { e.stopPropagation(); openMoreDialog(line); });
+            // Blue "..." when the line already has additional-info values (visual cue).
+            if (hasAdditionalInfo(line)) $btn.addClass("has-values");
+            // Keep the "..." enabled even on a read-only invoice so the blue "has values" cue
+            // shows and the user can still OPEN the modal to VIEW the additional info (its
+            // fields render read-only per the framework's column read-only logic).
+            $btn.prop("disabled", false);
+            // Open the additional-fields MODAL. mousedown + preventDefault (like Undo/Save): a
+            // plain click while a cell editor is focused blurs -> commits -> re-renders the row
+            // and destroys this button before mouseup, eating the first click (two-clicks bug).
+            // Keyboard is handled by the keydown below (Enter/Space), so no click branch here.
+            $btn.on("mousedown", function (e) { e.preventDefault(); e.stopPropagation(); openMoreDialog(line); });
             // Keyboard: Tab continues the row's tab chain (forward -> save,
             // Shift+Tab -> Tax). Enter / Space open the modal explicitly - relying on the
             // button's native click-on-Enter was unreliable inside the grid (the keypress
@@ -856,7 +969,9 @@
             var dialog = $('<div class="vas-cil-dialog"></div>');
             dialog.html(
                 '<header class="vas-cil-dialog__header"><div class="vas-cil-dialog__header-row">' +
-                '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3></div></header>" +
+                '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3>" +
+                '<button type="button" class="vas-cil-dialog__close" data-act="close-more" aria-label="' + esc(lbl("VAS_074_Close", "Close")) + '" title="' + esc(lbl("VAS_074_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
+                "</div></header>" +
                 '<div class="vas-cil-dialog__body vas-cil-more-body vas-cil-more-grid" id="vasCilMoreBody"></div>' +
                 '<footer class="vas-cil-dialog__footer vas-cil-dialog__footer--end">' +
                 '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="close-more">' + esc(lbl("VAS_074_Done", "Done")) + "</button></footer>");
@@ -881,6 +996,11 @@
                     e.preventDefault(); e.stopPropagation(); done();
                 }
             });
+            // Field-group Show More/Less: collapse/expand the fields under a section header.
+            dialog.on("click", "[data-act=fldgrp-toggle]", function (e) {
+                e.preventDefault(); e.stopPropagation();
+                toggleFieldGroup($(this).closest(".vas-cil-fldgrp"));
+            });
 
             // Building the curated fields is heavy (each FK builds a native Vienna
             // control + lookup, synchronously). Paint the dialog with a spinner FIRST,
@@ -898,6 +1018,7 @@
                 // Curated "Additional Info" fields (callout / read-only / validation / val-rule
                 // honoured per control); shown 2-up via the .vas-cil-more-grid layout.
                 appendDynFields(line, $body);
+                applyFieldGroups($body);   // inject the collapsible section headers
                 if (!$body.children("[data-col]:not(.vas-cil-dyn-hidden)").length)
                     $body.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
                 $body.find("[data-col]:not(.vas-cil-dyn-hidden)").find("input,select,textarea").first().focus();
@@ -1394,8 +1515,11 @@
         }
 
         /* Parse "Ns.Class.Method;Ns2.Class2.Method2" into resolvable callout
-           instances + methods from the VIS.Model registry. Method match is
-           case-insensitive (AD_Column may store product / Product). */
+           instances + methods. Each token's namespace decides WHERE its class is
+           resolved (see resolveCalloutCtor): ViennaAdvantage / VAdvantage map to the
+           client VIS runtime, every OTHER Area prefix (VAS, VAFAM, VA###, ...) resolves
+           in that module's own global registry. Method match is case-insensitive
+           (AD_Column may store product / Product). */
         function resolveCallouts(calloutStr) {
             var out = [];
             var parts = String(calloutStr).split(";");
@@ -1406,7 +1530,7 @@
                 if (seg.length < 2) continue;
                 var method = seg.pop();
                 var cls = seg.pop();
-                var ctor = (VIS && VIS.Model) ? VIS.Model[cls] : null;
+                var ctor = resolveCalloutCtor(seg, cls);   // seg = the namespace before the class
                 if (typeof ctor !== "function") continue;
                 var inst;
                 try { inst = new ctor(); } catch (e) { continue; }
@@ -1417,6 +1541,26 @@
                 if (typeof fn === "function") out.push({ inst: inst, fn: fn });
             }
             return out;
+        }
+
+        /* Resolve a callout class constructor HONOURING its declared namespace, mirroring
+           the framework GridTab.processCallout / Utility.getFunctionByName.
+           ns = the dotted segments before the class name (e.g. ["VAFAM","Model"]).
+           ViennaAdvantage / VAdvantage are the .NET names for the client VIS runtime, so
+           their first segment is remapped to VIS (-> VIS.Model.*). Any OTHER prefix is a
+           separate module Area whose callout classes live under its OWN global - e.g. VAS
+           registers VAS.Model.* (VAS_CalloutOpportunity.js), VAFAM registers
+           VAFAM.Model.VAFAM_CalloutAsset - so we must look THERE, not in VIS.Model. A bare
+           "Class.Method" (no namespace) defaults to the VIS.Model registry. */
+        function resolveCalloutCtor(ns, cls) {
+            if (!ns || ns.length === 0) {
+                return (VIS && VIS.Model && typeof VIS.Model[cls] === "function") ? VIS.Model[cls] : null;
+            }
+            var path = ns.slice();
+            if (path[0] === "VAdvantage" || path[0] === "ViennaAdvantage") path[0] = "VIS";
+            var scope = (typeof window !== "undefined") ? window : null;
+            for (var j = 0; j < path.length && scope; j++) scope = scope[path[j]];
+            return (scope && typeof scope[cls] === "function") ? scope[cls] : null;
         }
 
         function runRealCallout(line, column, chain) {
@@ -1801,6 +1945,26 @@
             return out;
         }
 
+        /* Does any curated "Additional Info" field carry a value? Used to tint the row's
+           "..." button blue so the user can see a line has extra data without opening the
+           modal. Empty FK/number = 0, blank text/date, No checkbox all count as "no value". */
+        function hasAdditionalInfo(line) {
+            var cols = additionalInfoColumns(line);
+            for (var i = 0; i < cols.length; i++) {
+                var m = cols[i], v = lineVal(line, m.ColumnName);
+                if (v == null) continue;
+                var s = String(v).trim();
+                if (!s) continue;
+                switch (dynFieldKind(m)) {
+                    case "fk": case "int": if (parseInt(s, 10) > 0) return true; break;
+                    case "number":         if (parseFloat(s) !== 0) return true; break;
+                    case "yesno":          if (s === "Y" || s === "true" || s === "1") return true; break;
+                    default:               return true;   // string / memo / date / list with any text
+                }
+            }
+            return false;
+        }
+
         /* Whether a built field is visible per its AD_Field.DisplayLogic. Default SHOW when
            the logic is empty or a token can't be resolved ($Element_record tokens). */
         function dynFieldVisible(line, m) {
@@ -1844,6 +2008,62 @@
             for (var i = 0; i < cols.length; i++) $body.append(buildDynField(line, cols[i]));
             applyDynDisplay(line, $body);
             // No overflow clip on the body - an FK dropdown would be cut off.
+        }
+
+        /* ---------- collapsible field groups (Additional Info modal) ----------
+           Reusable full-row section headers injected before an anchor field. A group owns
+           the sibling fields between its header and the next header; the header's
+           Show More/Less toggle collapses/expands them. Add an object here to place another
+           group anywhere in the modal: `anchor` = the ColumnName of the group's first field
+           (the header is inserted before its [data-col] wrapper), `key`/`def` = the group
+           title (AD_Message key + English fallback), `collapsed` = initial state. */
+        var MORE_FIELD_GROUPS = [
+            { anchor: "AD_OrgTrx_ID",     key: "VAS_074_GrpDimension",  def: "Dimension",  collapsed: false },
+            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false }
+        ];
+        // Per-anchor collapsed state; persists across refreshMoreDialog and re-opens so a
+        // user's expand/collapse choice survives value-change reconciles within the session.
+        var moreGroupCollapsed = {};
+
+        // Idempotently (re)insert every group header before its anchor field, then apply the
+        // collapse state. Safe to call after any (re)build of #vasCilMoreBody.
+        function applyFieldGroups($body) {
+            if (!$body || !$body.length) return;
+            $body.children(".vas-cil-fldgrp").remove();   // drop prior headers first
+            for (var g = 0; g < MORE_FIELD_GROUPS.length; g++) {
+                var grp = MORE_FIELD_GROUPS[g];
+                var $anchor = $body.children('[data-col="' + grp.anchor + '"]');
+                if (!$anchor.length) continue;            // group's lead field absent -> skip
+                var collapsed = (grp.anchor in moreGroupCollapsed) ? moreGroupCollapsed[grp.anchor] : !!grp.collapsed;
+                $anchor.before(
+                    '<div class="vas-cil-fldgrp" data-grp="' + grp.anchor + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
+                    '<span class="vas-cil-fldgrp-name">' + esc(lbl(grp.key, grp.def)) + "</span>" +
+                    '<button type="button" class="vas-cil-fldgrp-toggle" data-act="fldgrp-toggle">' +
+                    '<span class="vas-cil-fldgrp-txt">' + esc(collapsed ? lbl("VAS_074_ShowMore", "Show More") : lbl("VAS_074_ShowLess", "Show Less")) + "</span>" +
+                    '<svg class="vas-cil-fldgrp-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg>' +
+                    "</button></div>");
+            }
+            applyGroupCollapse($body);
+        }
+
+        // Hide/show each group's members (the wrappers between its header and the next
+        // header) per the header's collapsed state. Never force-shows a DisplayLogic-hidden
+        // field - .vas-cil-dyn-hidden stays authoritative; we only add/remove our own class.
+        function applyGroupCollapse($body) {
+            $body.children(".vas-cil-fldgrp").each(function () {
+                var $hdr = $(this);
+                $hdr.nextUntil(".vas-cil-fldgrp").toggleClass("vas-cil-grp-collapsed", $hdr.attr("data-collapsed") === "1");
+            });
+        }
+
+        // Flip one group's collapsed state (from its Show More/Less button).
+        function toggleFieldGroup($hdr) {
+            if (!$hdr || !$hdr.length) return;
+            var collapsed = $hdr.attr("data-collapsed") !== "1";
+            $hdr.attr("data-collapsed", collapsed ? "1" : "0");
+            moreGroupCollapsed[$hdr.attr("data-grp")] = collapsed;
+            $hdr.find(".vas-cil-fldgrp-txt").text(collapsed ? lbl("VAS_074_ShowMore", "Show More") : lbl("VAS_074_ShowLess", "Show Less"));
+            applyGroupCollapse($hdr.closest("#vasCilMoreBody"));
         }
 
         function buildDynField(line, m) {
@@ -2210,7 +2430,15 @@
             // Keep the window context current so a dependent FK's val rule (and any control
             // built by a following refreshMoreDialog) resolves against the new value.
             primeLineContext(line);
-            if (!sameVal(prev, value)) markDirty(line);   // genuine change only
+            if (!sameVal(prev, value)) {
+                markDirty(line);   // genuine change only
+                // Remember every modal field the user actually edited so a CLEAR (null / 0 /
+                // empty) persists on save. The save bag carries the whole column set, so the
+                // server can't tell a user-cleared FK/dimension from a naturally-empty column;
+                // TouchedCols tells it which nulls/zeros are intentional (see ApplyExtraColumns).
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[col] = true;
+            }
             var m = columnMeta[col];
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
@@ -2298,6 +2526,7 @@
             $b.children(".vas-cil-empty-message").remove();
             if (!visible)
                 $b.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
+            applyFieldGroups($b);   // re-place headers after the nodes were reordered
         }
 
         /* Resolve and cache an FK value's display label (existing value caption). */
@@ -2467,6 +2696,13 @@
                     editing = { rowId: line.rowId, field: "description" };
                     if (asi > 0) runCallout(line, "M_AttributeSetInstance_ID");
                     else render();
+                },
+                // Picker dismissed without choosing an attribute -> don't leave focus stranded
+                // on the removed dialog; continue the row's tab chain on the next column (the
+                // description field - the same landing spot as a product with no attribute set).
+                onClose: function () {
+                    editing = { rowId: line.rowId, field: "description" };
+                    render();
                 }
             });
         }
@@ -3070,7 +3306,7 @@
             return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                 M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
-                Values: v };
+                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : [] };
         }
 
         /* Save the currently-unsaved lines as a non-blocking batch. Each saved row shows
@@ -3093,7 +3329,7 @@
                 success: function (raw) {
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); if (done) done(true); }
+                    if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
                 },
                 error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
@@ -3201,7 +3437,7 @@
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
-                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); }
+                    if (res && res.Success) { applyLinePaging(res); reloadLinesKeepingUnsaved(res.Lines); showToast(lbl("VAS_074_LinesDeleted", "Lines deleted")); refreshSummary(); }
                     else showToast(lbl((res && res.ErrorKey) || "VAS_074_DeleteFailed", "Delete failed"));
                 },
                 error: function (err) { console.log(err); showBusy(false); showToast(lbl("VAS_074_DeleteFailed", "Delete failed")); }
@@ -3224,13 +3460,43 @@
             // inline popover to dismiss here anymore.
         }
 
-        // Escape closes the top-most open dialog / popover.
+        // Escape closes the top-most open dialog / popover (bubble phase).
         $(document).on("keydown.vascil", function (e) {
             if (e.key !== "Escape") return;
             if (scanState) { closeDialogs(); return; }
             if (attrState) { closeDialogs(); return; }
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
+
+        // Ctrl+Alt+ N/S/D/Z action shortcuts. Bound in the CAPTURE phase (3rd arg true) so they
+        // fire BEFORE the grid cell editors' own keydown handlers, which stopPropagation() to
+        // keep keys from the framework - otherwise the shortcut is swallowed while a product /
+        // qty / price / UOM / tax control has focus (e.g. right after Add line focuses the
+        // product cell). Matching is case-INSENSITIVE (e.key lowered, e.code fallback) so Caps
+        // Lock / Shift / keyboard layout don't matter. Fires only while this panel is the
+        // visible/active tab, an invoice is loaded, and no dialog is open (finish it first).
+        function panelShortcutKeydown(e) {
+            if (!e.ctrlKey || !e.altKey || e.shiftKey || e.metaKey) return;
+            if (!parent || !$root || !$root.is(":visible")) return;
+            if (attrState || scanState || morePopoverFor) return;
+            // Also bail while any vas-cil dialog is open in the DOM - covers VIS.AttributeControl
+            // (#vasCilAttr), which keeps its own state, not the panel's attrState.
+            if (document.getElementById("vasCilAttr") || document.getElementById("vasCilScan") || document.getElementById("vasCilMore")) return;
+            var k = (e.key || "").toLowerCase(), code = e.code, act = null;
+            if (k === "n" || code === "KeyN") act = function () { addLine(); };
+            else if (k === "s" || code === "KeyS") act = function () { flushActiveEdit(); saveRows(); };
+            else if (k === "d" || code === "KeyD") act = function () {
+                if (!selectedCount()) { showToast(lbl("VAS_074_SelectRowToDelete", "Select a row to delete")); return; }
+                deleteSelected();
+            };
+            else if (k === "z" || code === "KeyZ") act = function () { undoActive(); };
+            else return;   // not one of ours - let it through
+            e.preventDefault();
+            e.stopPropagation();
+            act();
+        }
+        this._shortcutFn = panelShortcutKeydown;
+        document.addEventListener("keydown", panelShortcutKeydown, true);
 
         this.getRoot = function () { return $root; };
     };
@@ -3254,6 +3520,7 @@
 
     VAS.VAS_074_CreateInvoiceLinePanel.prototype.dispose = function () {
         $(document).off("mousedown.vascil").off("keydown.vascil");
+        if (this._shortcutFn) { document.removeEventListener("keydown", this._shortcutFn, true); this._shortcutFn = null; }
         $("#vasCilAttr, #vasCilScan, .vas-cil-toast").remove();
         this.record_ID = 0; this.table_ID = 0; this.windowNo = 0;
         this.curTab = null; this.selectedRow = null; this.panelWidth = null;

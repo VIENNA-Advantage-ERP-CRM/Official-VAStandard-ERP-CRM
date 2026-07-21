@@ -44,12 +44,33 @@
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the title / subtitle / metric / why clamps resolve against the
+       dashboard's visible width, not the viewport. One document-level ResizeObserver
+       serves every widget; without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. (Mirrors VIS.OutstandingSalesOrderWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_024_TotalOutstandingWidget = function () {
         this.frame;
         this.windowNo;
         var $bsyDiv;
         var $self = this;
-        var $root = $('<div class="h-100 w-100 vas-widget-bg vas-towdg-root">');
+        var $root = $('<div class="h-100 w-100 vas-towdg-root">');
         var $container;
         var $outstandingDialog = null;
         var widgetID = null;
@@ -94,6 +115,15 @@
                 e.stopPropagation();
                 openOutstandingDialog();
             });
+            // The clickable overlay is a <div role="button">, so it has no native
+            // keyboard activation — wire Enter / Space up manually.
+            $container.on('keydown', '.vas-towdg-open', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openOutstandingDialog();
+                }
+            });
             $root.append($container);
         }
 
@@ -101,52 +131,43 @@
         function renderKpi(data) {
             $container.empty();
 
-            var sym = data.CurSymbol || '';
-            var outstandingFormatted = formatAmount(data.OutstandingTotal, data.StdPrecision);
+            var count = data.InvoiceCount || 0;
+            var vendorCount = data.VendorCount || 0;
+            var invoicesLabel = count !== 1
+                ? msg('VAS_024_InvoicesLower', 'invoices')
+                : msg('VAS_024_InvoiceLower', 'invoice');
+            var vendorsLabel = vendorCount !== 1
+                ? msg('VAS_024_VendorsLower', 'vendors')
+                : msg('VAS_024_VendorLower', 'vendor');
+            var whyText = count > 0
+                ? count + ' ' + invoicesLabel + ' ' + msg('VAS_024_RemainUnpaid', 'remain unpaid across')
+                    + ' ' + vendorCount + ' ' + vendorsLabel + '.'
+                : msg('VAS_024_NoOutstanding', 'No outstanding payables.');
 
-            var trendPct = 0;
-            if (data.LastMonthOutstanding && data.LastMonthOutstanding !== 0) {
-                trendPct = ((data.CurrentMonthOutstanding - data.LastMonthOutstanding) / Math.abs(data.LastMonthOutstanding)) * 100;
-            } else if (data.CurrentMonthOutstanding > 0) {
-                trendPct = 100;
-            }
-
-            // For outstanding: positive (more owed) = worsening; negative (less owed) = improving.
-            // Arrow direction reflects financial health, not raw amount: worsening = down arrow.
-            var isWorsening = trendPct >= 0;
-            var trendClass = isWorsening ? 'vas-towdg-trend-down' : 'vas-towdg-trend-up';
-            var trendSign = trendPct >= 0 ? '+' : '';
-            var trendWord = isWorsening ? msg('VAS_024_Worsening', 'worsening') : msg('VAS_024_Improving', 'improving');
-            var arrowPoints = isWorsening ? '6 9 12 15 18 9' : '18 15 12 9 6 15';
-
-            var sparkSvg = buildSparklineSvg(data.SparklineData || []);
-
-            var html = '<div class="vas-towdg-label">' + msg('VAS_024_TotalOutstanding', 'Total Outstanding') + '</div>'
-                + '<div class="vas-towdg-value" id="vas_towdg_val_' + widgetID + '">'
-                +   sym + outstandingFormatted
-                + '</div>'
-                + '<div class="vas-towdg-pills-row">'
-                +   '<div class="vas-towdg-pill">'
-                +     '<span class="vas-towdg-pill-label">' + msg('VAS_024_Invoices', 'Invoices') + '</span>'
-                +     '<span class="vas-towdg-pill-value">' + data.InvoiceCount + '</span>'
-                +   '</div>'
-                +   '<div class="vas-towdg-pill">'
-                +     '<span class="vas-towdg-pill-label">' + msg('VAS_024_Vendors', 'Vendors') + '</span>'
-                +     '<span class="vas-towdg-pill-value">' + data.VendorCount + '</span>'
-                +   '</div>'
-                + '</div>'
-                + '<div class="vas-towdg-trend-row ' + trendClass + '">'
-                +   '<svg class="vas-towdg-trend-icon" viewBox="0 0 24 24" fill="none"'
-                +       ' stroke="currentColor" stroke-width="2.5"'
+            // Structure mirrors VIS.OutstandingSalesOrderWidget: header (tinted icon +
+            // title + subtitle), large metric, and a WHY explanatory line. No pills /
+            // trend rows.
+            var html = '<div class="vas-towdg-header">'
+                +   '<div class="vas-towdg-icon">'
+                +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
                 +       ' stroke-linecap="round" stroke-linejoin="round">'
-                +     '<polyline points="' + arrowPoints + '"/>'
-                +   '</svg>'
-                +   trendSign + Math.abs(trendPct).toFixed(1) + '% ' + trendWord
+                +       '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'
+                +     '</svg>'
+                +   '</div>'
+                +   '<div class="vas-towdg-head-text">'
+                +     '<div class="vas-towdg-label">' + msg('VAS_024_TotalOutstanding', 'Total Outstanding') + '</div>'
+                +     '<div class="vas-towdg-subtitle">' + msg('VAS_024_Subtitle', 'Owed to vendors') + '</div>'
+                +   '</div>'
                 + '</div>'
-                + sparkSvg
-                + '<button type="button" class="vas-towdg-open" aria-label="'
+                + '<div class="vas-towdg-value" id="vas_towdg_val_' + widgetID + '">'
+                +   formatMetric(data.OutstandingTotal, data.CurSymbol, data.CurIso, data.StdPrecision)
+                + '</div>'
+                + '<div class="vas-towdg-why-wrap">'
+                +   '<span class="vas-towdg-why-text">' + toEsc(whyText) + '</span>'
+                + '</div>'
+                + '<div class="vas-towdg-open" role="button" tabindex="0" aria-label="'
                 +   toEsc(msg('VAS_024_OpenDrilldown', 'Open outstanding payables breakdown'))
-                + '"></button>';
+                + '"></div>';
 
             $container.append(html);
         }
@@ -188,7 +209,10 @@
         }
 
         function loadOutstandingDrilldown() {
-            $outstandingDialog.html('<div class="vas-towdg-drill-state">' + toEsc(msg('VAS_024_Loading', 'Loading...')) + '</div>');
+            // Open the dialog immediately with the core busy spinner so the user sees
+            // a loading state while the drill-down data is fetched.
+            $outstandingDialog.html('<div class="vas-towdg-drill-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
+            showOutstandingDialog();
 
             $.ajax({
                 url: VIS.Application.contextUrl + 'VAS/VAS_024_TotalOutstandingWidget/GetOutstandingDrilldown',
@@ -236,16 +260,7 @@
             var sym = data.CurSymbol || '';
             var precision = data.StdPrecision != null ? data.StdPrecision : 2;
             var total = data.OutstandingTotal ? data.OutstandingTotal : 0;
-            var trendPct = 0;
-            if (data.LastMonthOutstanding && data.LastMonthOutstanding !== 0) {
-                trendPct = ((data.CurrentMonthOutstanding - data.LastMonthOutstanding) / Math.abs(data.LastMonthOutstanding)) * 100;
-            } else if (data.CurrentMonthOutstanding > 0) {
-                trendPct = 100;
-            }
 
-            var isWorsening = trendPct >= 0;
-            var trendWord = isWorsening ? msg('VAS_024_Worsening', 'worsening') : msg('VAS_024_Improving', 'improving');
-            var trendClass = isWorsening ? 'vas-towdg-drill-trend-bad' : 'vas-towdg-drill-trend-good';
             var summaryText = formatQty(data.InvoiceCount || 0) + ' ' + msg('VAS_024_InvoicesLower', 'invoices')
                 + ' ' + msg('VAS_024_RemainUnpaid', 'remain unpaid across') + ' '
                 + formatQty(data.VendorCount || 0) + ' ' + msg('VAS_024_VendorsLower', 'vendors') + '. ';
@@ -268,9 +283,7 @@
             var html = '<div class="vas-towdg-drill">'
                 + '<div class="vas-towdg-drill-card">'
                 +   '<span class="vas-towdg-drill-card-label">' + toEsc(msg('VAS_024_TotalOutstanding', 'Total Outstanding')) + '</span>'
-                +   '<strong class="vas-towdg-drill-card-value" title="' + toEsc(totalTip) + '">' + toEsc(sym + formatAmount(total, precision)) + '</strong>'
-                +   '<em class="vas-towdg-drill-card-trend ' + trendClass + '">' + (trendPct >= 0 ? '+' : '')
-                +     Math.abs(trendPct).toFixed(1) + '% ' + toEsc(trendWord) + '</em>'
+                +   '<strong class="vas-towdg-drill-card-value" title="' + toEsc(totalTip) + '">' + toEsc(sym + VIS.Util.formatCompactAmount(total, data.CurIso, precision)) + '</strong>'
                 + '</div>'
                 + '<div class="vas-towdg-drill-copy">'
                 +   '<p class="vas-towdg-drill-desc">' + toEsc(summaryText) + '</p>'
@@ -287,7 +300,7 @@
                 html += '<div class="vas-towdg-drill-row">'
                     + '<div class="vas-towdg-drill-row-head">'
                     +   '<span class="vas-towdg-drill-row-name">' + toEsc(vendor.VendorName || '-') + '</span>'
-                    +   '<span class="vas-towdg-drill-row-val" title="' + toEsc(rowTip) + '">' + toEsc(sym + formatAmount(amount, precision)) + '</span>'
+                    +   '<span class="vas-towdg-drill-row-val" title="' + toEsc(rowTip) + '">' + toEsc(sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision)) + '</span>'
                     + '</div>'
                     + '<div class="vas-towdg-drill-track">'
                     +   '<div class="vas-towdg-drill-fill" style="width:' + barWidth.toFixed(1) + '%"></div>'
@@ -362,59 +375,6 @@
             });
         }
 
-        /* ---- Number formatter: Trillion / Billion / Crore / Lakh / Thousand / raw ---- */
-        function formatAmount(number, stdPrecision) {
-            var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var isNegative = number < 0;
-            var absNumber = Math.abs(number);
-            var formatted;
-            var unit = '';
-            var opts2 = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-            var optsRaw = { minimumFractionDigits: prec, maximumFractionDigits: prec };
-
-            if (absNumber >= 1000000000000) {
-                unit = msg('VAS_024_Trillion', 'T');
-                formatted = (absNumber / 1000000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000000000) {
-                unit = msg('VAS_024_Billion', 'B');
-                formatted = (absNumber / 1000000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 10000000) {
-                unit = msg('VAS_024_Crore', 'Cr');
-                formatted = (absNumber / 10000000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 100000) {
-                unit = msg('VAS_024_Lakh', 'L');
-                formatted = (absNumber / 100000).toLocaleString(window.navigator.language, opts2);
-            } else if (absNumber >= 1000) {
-                unit = msg('VAS_024_Thousand', 'K');
-                formatted = (absNumber / 1000).toLocaleString(window.navigator.language, opts2);
-            } else {
-                formatted = absNumber.toLocaleString(window.navigator.language, optsRaw);
-            }
-
-            return (isNegative ? '-' : '') + formatted + unit;
-        }
-
-        /* ---- Build sparkline SVG from monthly data array ---- */
-        function buildSparklineSvg(data) {
-            if (!data || data.length < 2) { return ''; }
-            var W = 90, H = 48, pad = 3;
-            var maxVal = Math.max.apply(null, data);
-            var minVal = Math.min.apply(null, data);
-            if (maxVal === minVal) { maxVal = minVal + 1; }
-            var xStep = (W - pad * 2) / (data.length - 1);
-            var pts = [];
-            for (var i = 0; i < data.length; i++) {
-                var x = pad + i * xStep;
-                var y = H - pad - ((data[i] - minVal) / (maxVal - minVal)) * (H - pad * 2);
-                pts.push(x.toFixed(1) + ',' + y.toFixed(1));
-            }
-            return '<svg class="vas-towdg-sparkline" width="' + W + '" height="' + H
-                + '" viewBox="0 0 ' + W + ' ' + H + '">'
-                + '<polyline points="' + pts.join(' ') + '" fill="none"'
-                + ' stroke="#D14545" stroke-width="2.2" stroke-linecap="round"/>'
-                + '</svg>';
-        }
-
         function formatQty(value) {
             return Number(value || 0).toLocaleString(window.navigator.language, {
                 maximumFractionDigits: 2
@@ -450,6 +410,18 @@
             }
         };
 
+        /* Compose the KPI metric via the shared CurrencyFormat util
+           (VIS.Util.formatCompactAmount): sign, then the currency-symbol span, then
+           the compact magnitude (Indian vs international per the base-currency ISO).
+           Mirrors VIS.OutstandingSalesOrderWidget.formatMetric. */
+        function formatMetric(value, symbol, isoCode, precision) {
+            value = Number(value || 0);
+            var sign = value < 0 ? '-' : '';
+            var absStr = VIS.Util.formatCompactAmount(value, isoCode, precision);
+            var symHtml = symbol ? '<span class="vas-towdg-cur">' + toEsc(symbol) + '</span>' : '';
+            return sign + symHtml + absStr;
+        }
+
         /* ---- Busy indicator ---- */
         function createBusyIndicator() {
             $bsyDiv = $('<div class="vis-busyindicatorouterwrap vas-widget-busy-wrap"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
@@ -476,6 +448,8 @@
         this.windowNo = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () {
             self.intialLoad();

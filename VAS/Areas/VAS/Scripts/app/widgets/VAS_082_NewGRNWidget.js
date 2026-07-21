@@ -30,6 +30,7 @@
  * 19  | Enter received quantity for at least one line.   | VAS_082_ReceivedQtyRequired
  * 20  | Received quantity cannot be greater than open... | VAS_082_ReceivedQtyTooHigh
  * 21  | GRN could not be created.                        | VAS_082_GRNCouldNotBeCreated
+ * 22  | Unable to open the GRN window.                   | VAS_082_CouldntOpenWindow
  */
 ; VAS = window.VAS || {};
 
@@ -68,8 +69,9 @@
         var purchaseOrdersById = {};
         var currentPO = null;
         var currentLines = [];
+        var grnWindowId = 0;
         var pageNo = 1;
-        var pageSize = 20;
+        var pageSize = 8;
         var totalPages = 0;
         var loading = false;
 
@@ -123,7 +125,55 @@
         this.Initalize = function () {
             createWidget();
             createDialog();
+            loadGrnWindowId(null);
         };
+
+        // Review #17: clicking New GRN navigates straight to the Material Receipt
+        // (GRN) window - no modal is opened.
+        function loadGrnWindowId(onReady) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/GetGrnWindowId',
+                type: 'GET',
+                cache: false,
+                success: function (response) {
+                    var result = parseResponse(response);
+                    grnWindowId = Number((result && result.windowId) || 0);
+                    if (onReady) { onReady(grnWindowId); }
+                },
+                error: function () {
+                    if (onReady) { onReady(0); }
+                }
+            });
+        }
+
+        function startWindowById(windowId) {
+            if (VIS.viewManager && VIS.viewManager.startWindow) {
+                VIS.viewManager.startWindow(windowId, null);
+            }
+            else if (VIS.AEnv && VIS.AEnv.startWindow) {
+                VIS.AEnv.startWindow(windowId, null);
+            }
+        }
+
+        function openGrnWindow() {
+            if (grnWindowId > 0) {
+                startWindowById(grnWindowId);
+                return;
+            }
+            loadGrnWindowId(function (windowId) {
+                if (windowId > 0) {
+                    startWindowById(windowId);
+                }
+                else {
+                    VIS.ADialog.error(
+                        'VAS_082_CouldntOpenWindow',
+                        true,
+                        '',
+                        lbl('VAS_082_CouldntOpenWindow', 'Unable to open the GRN window.')
+                    );
+                }
+            });
+        }
 
         function createWidget() {
             var $card = $(
@@ -140,7 +190,8 @@
                 '</button>'
             );
 
-            $card.on('click', function () { openDialog(); });
+            // Review #17: navigate to the GRN window; the PO-pick modal stays unused.
+            $card.on('click', function () { openGrnWindow(); });
             $root.append($card);
         }
 
@@ -191,6 +242,7 @@
             $(document).on('keydown.vas-ngrn', function (e) {
                 if (e.key === 'Escape' && !$dialog.hasClass('vas-ngrn-hidden')) { closeDialog(); }
             });
+            $(window).on('resize.vas-ngrn', syncPOPageSize);
 
             $('body').append($dialog);
         }
@@ -218,6 +270,35 @@
             $dialogTitle.text(lbl("VAS_082_NewGRN", "New GRN"));
             setBadge("", "");
             renderPOList();
+        }
+
+        function measurePOPageSize() {
+            if (!$dialog || $dialog.hasClass('vas-ngrn-hidden') || currentPO) { return pageSize; }
+
+            var $list = $dialogBody.find('.vas-ngrn-po-list');
+            if (!$list.length) { return pageSize; }
+
+            var available = Math.floor($dialogBody.innerHeight());
+            available -= Math.ceil($dialogBody.find('.vas-ngrn-step-hint:first').outerHeight(true) || 0);
+            available -= Math.ceil($dialogBody.find('.vas-ngrn-pager:first').outerHeight(true) || 0);
+            available -= 12;
+
+            var $sample = $list.find('.vas-ngrn-po-row:first');
+            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 56;
+            if (rowHeight <= 0) { rowHeight = 56; }
+
+            return Math.max(3, Math.floor(available / rowHeight));
+        }
+
+        function syncPOPageSize() {
+            if (loading || currentPO) { return; }
+
+            var nextPageSize = measurePOPageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            loadPOs(Math.max(1, Math.ceil(firstRecord / pageSize)));
         }
 
         function loadPOs(targetPage) {
@@ -300,6 +381,7 @@
                 '<div class="vas-ngrn-po-list">' + rows + '</div>' +
                 paging
             );
+            window.setTimeout(syncPOPageSize, 0);
         }
 
         function selectPO(poId) {
@@ -506,6 +588,7 @@
 
         this.disposeComponent = function () {
             $(document).off('keydown.vas-ngrn');
+            $(window).off('resize.vas-ngrn');
             $('body').removeClass('vas-ngrn-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

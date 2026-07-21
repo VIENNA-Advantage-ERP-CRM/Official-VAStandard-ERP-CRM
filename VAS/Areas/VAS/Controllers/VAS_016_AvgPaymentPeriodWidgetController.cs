@@ -82,6 +82,58 @@ namespace VAS.Areas.VAS.Controllers
             };
         }
 
+        /// <summary>
+        /// Current fiscal-year START date from the client's configured accounting calendar
+        /// (AD_ClientInfo -> C_Calendar -> C_Year -> C_Period): the year whose span contains
+        /// today. Falls back to Apr 1 (Indian FY) when no calendar/periods are configured.
+        /// Mirrors the fiscal-year resolution used in VAS_023.
+        /// </summary>
+        private DateTime GetCurrentFyStart(Ctx ctx)
+        {
+            DateTime today = DateTime.Today;
+            string sql = @"SELECT MIN(p.StartDate) AS YrStart, MAX(p.EndDate) AS YrEnd
+                   FROM AD_ClientInfo ci
+                  INNER JOIN C_Calendar cal ON (ci.C_Calendar_ID = cal.C_Calendar_ID)
+                  INNER JOIN C_Year yr      ON (yr.C_Calendar_ID = cal.C_Calendar_ID)
+                  INNER JOIN C_Period p     ON (p.C_Year_ID = yr.C_Year_ID)
+                  WHERE ci.AD_Client_ID = @ClientID
+                    AND ci.IsActive = 'Y'
+                    AND yr.IsActive = 'Y'
+                    AND p.IsActive = 'Y'
+                    AND p.PeriodType = 'S'
+                  GROUP BY yr.C_Year_ID
+                  ORDER BY MIN(p.StartDate)";
+            SqlParameter[] prm = { new SqlParameter("@ClientID", ctx.GetAD_Client_ID()) };
+
+            DataSet ds = DB.ExecuteDataset(sql, prm, null);
+            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                DataRowCollection rows = ds.Tables[0].Rows;
+                int curIdx = -1;
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    DateTime s = Util.GetValueOfDateTime(rows[i]["YrStart"]).Value  .Date;
+                    DateTime e = Util.GetValueOfDateTime(rows[i]["YrEnd"]).Value.Date;
+                    if (today >= s && today <= e) { curIdx = i; break; }
+                }
+                if (curIdx < 0)
+                {
+                    for (int i = rows.Count - 1; i >= 0; i--)
+                    {
+                        if (today >= Util.GetValueOfDateTime(rows[i]["YrStart"]).Value.Date) { curIdx = i; break; }
+                    }
+                }
+                if (curIdx >= 0)
+                {
+                    return Util.GetValueOfDateTime(rows[curIdx]["YrStart"]).Value.Date;
+                }
+            }
+
+            // Fallback — Apr 1 Indian fiscal year.
+            int y = today.Month >= 4 ? today.Year : today.Year - 1;
+            return new DateTime(y, 4, 1);
+        }
+
         private DpoDrilldownResult BuildDpoDrilldown(Ctx ctx)
         {
             var result = new DpoDrilldownResult
@@ -124,9 +176,23 @@ namespace VAS.Areas.VAS.Controllers
 
             baseInvoiceQuery = MRole.GetDefault(ctx).AddAccessSQL(baseInvoiceQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
-            string dayDiffSql = @"(EXTRACT(YEAR FROM ah.DateAcct) - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365
-                                + (EXTRACT(MONTH FROM ah.DateAcct) - EXTRACT(MONTH FROM inv.DateInvoiced)) * 30
-                                + (EXTRACT(DAY FROM ah.DateAcct) - EXTRACT(DAY FROM inv.DateInvoiced))";
+            // Settlement instrument = an AP payment (C_Payment) OR a cash-journal line
+            // (C_CashLine -> C_Cash), mirroring AvgDaysToPayController. The settlement date
+            // is the payment's DateAcct, or the parent cash journal's DateAcct for cash
+            // settlements. Both are LEFT-joined so an invoice settled either way contributes;
+            // receipt-side / non-completed payments and voided cash journals are excluded in
+            // the ON, so such rows yield NULL and are dropped by the "settlement date IS NOT
+            // NULL" guard. (This ADDS the non-voided cash rows to the payment-only behaviour.)
+            string settleJoins = @"
+     LEFT JOIN C_Payment pay ON (pay.C_Payment_ID = al.C_Payment_ID AND pay.IsActive = 'Y' AND pay.IsReceipt = 'N' AND pay.DocStatus IN ('CO', 'CL'))
+     LEFT JOIN C_CashLine cl ON (cl.C_CashLine_ID = al.C_CashLine_ID AND cl.IsActive = 'Y')
+     LEFT JOIN C_Cash csh ON (csh.C_Cash_ID = cl.C_Cash_ID AND csh.IsActive = 'Y' AND csh.DocStatus NOT IN ('VO'))";
+            string settleDate = "COALESCE(pay.DateAcct, csh.DateAcct)";
+            string settleGuard = " AND (al.C_Payment_ID IS NOT NULL OR al.C_CashLine_ID IS NOT NULL) AND " + settleDate + " IS NOT NULL ";
+
+            string dayDiffSql = DB.IsPostgreSQL()
+                ? "CAST(date_part('epoch', (CAST(" + settleDate + " AS TIMESTAMP) - CAST(inv.DateInvoiced AS TIMESTAMP))) / 86400 AS NUMERIC)"
+                : "(CAST(" + settleDate + " AS DATE) - CAST(inv.DateInvoiced AS DATE))";
 
             // Target days — same dynamic, weighted contracted payment period the KPI uses.
             strQuery = @"WITH RecentAllocated AS (
@@ -135,19 +201,14 @@ namespace VAS.Areas.VAS.Controllers
            SUM(al.Amount) AS AllocatedAmount
       FROM (" + baseInvoiceQuery + @") inv
      INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
-     INNER JOIN C_Payment p ON (p.C_Payment_ID = al.C_Payment_ID)
+     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
      WHERE al.IsActive = 'Y'
        AND ah.IsActive = 'Y'
        AND ah.DocStatus IN ('CO', 'CL')
        AND ah.AD_Client_ID = @ClientID
-       AND CAST(ah.DateAcct AS DATE) >= " + recentPaymentStartSql + @"
-       AND CAST(ah.DateAcct AS DATE) <= " + recentPaymentEndSql + @"
-       AND p.IsReceipt = 'N'
-       AND p.DocStatus IN ('CO', 'CL')
-       AND p.IsActive = 'Y'
-       AND al.C_Invoice_ID IS NOT NULL
-       AND al.C_Payment_ID IS NOT NULL
+       AND CAST(" + settleDate + @" AS DATE) >= " + recentPaymentStartSql + @"
+       AND CAST(" + settleDate + @" AS DATE) <= " + recentPaymentEndSql + @"
+       AND al.C_Invoice_ID IS NOT NULL" + settleGuard + @"
      GROUP BY inv.C_Invoice_ID, inv.DateInvoiced
 ),
 InvoiceTarget AS (
@@ -181,12 +242,12 @@ SELECT ROUND(
             strQuery = @"SELECT ROUND(AVG(" + dayDiffSql + @")) AS CurrentMonthDpo
                     FROM (" + baseInvoiceQuery + @") inv
                     INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus IN ('CO', 'CL')
                      AND ah.AD_Client_ID = @ClientID
-                     AND CAST(ah.DateAcct AS DATE) BETWEEN DATE '" + w.MonthStart + "' AND DATE '" + w.MonthEnd + @"' ";
+                     AND CAST(" + settleDate + @" AS DATE) BETWEEN DATE '" + w.MonthStart + "' AND DATE '" + w.MonthEnd + @"' " + settleGuard;
 
             DataSet dsCur = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsCur != null && dsCur.Tables.Count > 0 && dsCur.Tables[0].Rows.Count > 0)
@@ -198,12 +259,12 @@ SELECT ROUND(
             strQuery = @"SELECT ROUND(AVG(" + dayDiffSql + @")) AS LastMonthDpo
                     FROM (" + baseInvoiceQuery + @") inv
                     INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus IN ('CO', 'CL')
                      AND ah.AD_Client_ID = @ClientID
-                     AND CAST(ah.DateAcct AS DATE) BETWEEN DATE '" + w.PrevMonthStart + "' AND DATE '" + w.PrevMonthEnd + @"' ";
+                     AND CAST(" + settleDate + @" AS DATE) BETWEEN DATE '" + w.PrevMonthStart + "' AND DATE '" + w.PrevMonthEnd + @"' " + settleGuard;
 
             DataSet dsLast = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsLast != null && dsLast.Tables.Count > 0 && dsLast.Tables[0].Rows.Count > 0)
@@ -221,12 +282,12 @@ SELECT ROUND(
            AVG(" + dayDiffSql + @") AS DpoDays
       FROM (" + baseInvoiceQuery + @") inv
      INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
      WHERE al.IsActive = 'Y'
        AND ah.IsActive = 'Y'
        AND ah.DocStatus IN ('CO', 'CL')
        AND ah.AD_Client_ID = @ClientID
-       AND CAST(ah.DateAcct AS DATE) >= DATE '" + win12Start + @"'
+       AND CAST(" + settleDate + @" AS DATE) >= DATE '" + win12Start + @"'" + settleGuard + @"
      GROUP BY inv.C_Invoice_ID
 )
 SELECT pc.Name AS CategoryName,
@@ -295,6 +356,23 @@ HAVING COUNT(DISTINCT idp.C_Invoice_ID) > 0
 
             baseInvoiceQuery = MRole.GetDefault(ctx).AddAccessSQL(baseInvoiceQuery, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // Settlement instrument = an AP payment (C_Payment) OR a cash-journal line
+            // (C_CashLine -> C_Cash), mirroring AvgDaysToPayController. Settlement date is the
+            // payment's DateAcct, or the parent cash journal's DateAcct for cash settlements.
+            // LEFT-joined so an invoice settled either way contributes; receipt-side /
+            // non-completed payments and voided cash journals fall out via the guard.
+            string settleJoins = @"
+                    LEFT JOIN C_Payment pay ON (pay.C_Payment_ID = al.C_Payment_ID AND pay.IsActive = 'Y' AND pay.IsReceipt = 'N' AND pay.DocStatus IN ('CO', 'CL'))
+                    LEFT JOIN C_CashLine cl ON (cl.C_CashLine_ID = al.C_CashLine_ID AND cl.IsActive = 'Y')
+                    LEFT JOIN C_Cash csh ON (csh.C_Cash_ID = cl.C_Cash_ID AND csh.IsActive = 'Y' AND csh.DocStatus NOT IN ('VO'))";
+            string settleDate = "COALESCE(pay.DateAcct, csh.DateAcct)";
+            string settleGuard = " AND (al.C_Payment_ID IS NOT NULL OR al.C_CashLine_ID IS NOT NULL) AND " + settleDate + " IS NOT NULL ";
+            // Y/M/D day-diff (settlement date - invoice date) reused by the month/sparkline queries.
+            string extractDayDiff =
+                  "(EXTRACT(YEAR FROM " + settleDate + ") - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365"
+                + " + (EXTRACT(MONTH FROM " + settleDate + ") - EXTRACT(MONTH FROM inv.DateInvoiced)) * 30"
+                + " + (EXTRACT(DAY FROM " + settleDate + ") - EXTRACT(DAY FROM inv.DateInvoiced))";
+
             // Step 0 — Dynamic target days: weighted-average contracted payment period
             // for AP invoices actually paid in the last 30 days.
             // Formula: SUM(DueAmt × (DueDate − DateInvoiced)) / SUM(DueAmt) per invoice,
@@ -307,19 +385,14 @@ HAVING COUNT(DISTINCT idp.C_Invoice_ID) > 0
            SUM(al.Amount) AS AllocatedAmount
       FROM (" + baseInvoiceQuery + @") inv
      INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
-     INNER JOIN C_Payment p ON (p.C_Payment_ID = al.C_Payment_ID)
+     INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
      WHERE al.IsActive = 'Y'
        AND ah.IsActive = 'Y'
        AND ah.DocStatus IN ('CO', 'CL')
        AND ah.AD_Client_ID = @ClientID
-       AND CAST(ah.DateAcct AS DATE) >= TRUNC(CURRENT_DATE) - 30
-       AND CAST(ah.DateAcct AS DATE) <= TRUNC(CURRENT_DATE)
-       AND p.IsReceipt = 'N'
-       AND p.DocStatus IN ('CO', 'CL')
-       AND p.IsActive = 'Y'
-       AND al.C_Invoice_ID IS NOT NULL
-       AND al.C_Payment_ID IS NOT NULL
+       AND CAST(" + settleDate + @" AS DATE) >= TRUNC(CURRENT_DATE) - 30
+       AND CAST(" + settleDate + @" AS DATE) <= TRUNC(CURRENT_DATE)
+       AND al.C_Invoice_ID IS NOT NULL" + settleGuard + @"
      GROUP BY inv.C_Invoice_ID, inv.DateInvoiced
 ),
 InvoiceTarget AS (
@@ -351,20 +424,16 @@ SELECT ROUND(
 
             // Step 1a — Current month DPO.
             // Wraps the secured inline view; allocation tables joined outside MRole scope.
-            strQuery = @"SELECT ROUND(AVG(
-                             (EXTRACT(YEAR FROM ah.DateAcct) - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365
-                           + (EXTRACT(MONTH FROM ah.DateAcct) - EXTRACT(MONTH FROM inv.DateInvoiced)) * 30
-                           + (EXTRACT(DAY FROM ah.DateAcct) - EXTRACT(DAY FROM inv.DateInvoiced))
-                         )) AS CurrentMonthDpo
+            strQuery = @"SELECT ROUND(AVG(" + extractDayDiff + @")) AS CurrentMonthDpo
                     FROM (" + baseInvoiceQuery + @") inv
                     INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus IN ('CO', 'CL')
                      AND ah.AD_Client_ID = @ClientID
-                     AND EXTRACT(YEAR FROM ah.DateAcct) = " + currentYear + @"
-                     AND EXTRACT(MONTH FROM ah.DateAcct) = " + currentMonth + @" ";
+                     AND EXTRACT(YEAR FROM " + settleDate + @") = " + currentYear + @"
+                     AND EXTRACT(MONTH FROM " + settleDate + @") = " + currentMonth + @" " + settleGuard;
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
             if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -373,20 +442,16 @@ SELECT ROUND(
             }
 
             // Step 1b — Last month DPO.
-            strQuery = @"SELECT ROUND(AVG(
-                             (EXTRACT(YEAR FROM ah.DateAcct) - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365
-                           + (EXTRACT(MONTH FROM ah.DateAcct) - EXTRACT(MONTH FROM inv.DateInvoiced)) * 30
-                           + (EXTRACT(DAY FROM ah.DateAcct) - EXTRACT(DAY FROM inv.DateInvoiced))
-                         )) AS LastMonthDpo
+            strQuery = @"SELECT ROUND(AVG(" + extractDayDiff + @")) AS LastMonthDpo
                     FROM (" + baseInvoiceQuery + @") inv
                     INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus IN ('CO', 'CL')
                      AND ah.AD_Client_ID = @ClientID
-                     AND EXTRACT(YEAR FROM ah.DateAcct) = " + lastMonthYear + @"
-                     AND EXTRACT(MONTH FROM ah.DateAcct) = " + lastMonthNum + @" ";
+                     AND EXTRACT(YEAR FROM " + settleDate + @") = " + lastMonthYear + @"
+                     AND EXTRACT(MONTH FROM " + settleDate + @") = " + lastMonthNum + @" " + settleGuard;
 
             DataSet dsLast = DB.ExecuteDataset(strQuery, dataParams, null);
             if (dsLast != null && dsLast.Tables.Count > 0 && dsLast.Tables[0].Rows.Count > 0)
@@ -396,38 +461,41 @@ SELECT ROUND(
 
             result.GapDays = result.CurrentMonthDpo - result.TargetDpo;
 
-            // Step 2 — Sparkline: monthly avg DPO for last 7 months (grouped by allocation month).
-            // Reuses baseInvoiceQuery — MRole already applied in Step 2; not called again here.
-            DateTime sevenMonthsAgo = now.AddMonths(-6);
-            int sparkYear = sevenMonthsAgo.Year;
-            int sparkMonth = sevenMonthsAgo.Month;
-            strQuery = @"SELECT EXTRACT(YEAR FROM ah.DateAcct) AS PaidYear,
-                         EXTRACT(MONTH FROM ah.DateAcct) AS PaidMonth,
-                         ROUND(AVG(
-                             (EXTRACT(YEAR FROM ah.DateAcct) - EXTRACT(YEAR FROM inv.DateInvoiced)) * 365
-                           + (EXTRACT(MONTH FROM ah.DateAcct) - EXTRACT(MONTH FROM inv.DateInvoiced)) * 30
-                           + (EXTRACT(DAY FROM ah.DateAcct) - EXTRACT(DAY FROM inv.DateInvoiced))
-                         )) AS MonthlyDpo
+            // Step 2 — Sparkline: monthly avg DPO for the CURRENT FISCAL YEAR (12 months from
+            // the FY start taken from the client's accounting calendar — same logic as VAS_023),
+            // aligned to FY month order (index 0 = FY start month) with 0 for months that have
+            // no settled invoices. Reuses baseInvoiceQuery (MRole already applied above).
+            DateTime fyStart = GetCurrentFyStart(ctx);
+            int fyStartAbs = fyStart.Year * 12 + fyStart.Month;
+
+            strQuery = @"SELECT (EXTRACT(YEAR FROM " + settleDate + @") * 12 + EXTRACT(MONTH FROM " + settleDate + @")) AS MonAbs,
+                         ROUND(AVG(" + extractDayDiff + @")) AS MonthlyDpo
                     FROM (" + baseInvoiceQuery + @") inv
                     INNER JOIN C_AllocationLine al ON (al.C_Invoice_ID = inv.C_Invoice_ID)
-                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)
+                    INNER JOIN C_AllocationHdr ah ON (al.C_AllocationHdr_ID = ah.C_AllocationHdr_ID)" + settleJoins + @"
                    WHERE al.IsActive = 'Y'
                      AND ah.IsActive = 'Y'
                      AND ah.DocStatus = 'CO'
                      AND ah.AD_Client_ID = @ClientID
-                     AND (EXTRACT(YEAR FROM ah.DateAcct) * 12 + EXTRACT(MONTH FROM ah.DateAcct))
-                         >= (" + sparkYear + @" * 12 + " + sparkMonth + @")
-                   GROUP BY EXTRACT(YEAR FROM ah.DateAcct), EXTRACT(MONTH FROM ah.DateAcct)
-                   ORDER BY EXTRACT(YEAR FROM ah.DateAcct), EXTRACT(MONTH FROM ah.DateAcct)";
+                     AND (EXTRACT(YEAR FROM " + settleDate + @") * 12 + EXTRACT(MONTH FROM " + settleDate + @"))
+                         BETWEEN " + fyStartAbs + @" AND " + (fyStartAbs + 11) + @"" + settleGuard + @"
+                   GROUP BY (EXTRACT(YEAR FROM " + settleDate + @") * 12 + EXTRACT(MONTH FROM " + settleDate + @"))
+                   ORDER BY MonAbs";
 
+            decimal[] spark = new decimal[12];
             DataSet sparkDs = DB.ExecuteDataset(strQuery, dataParams, null);
-            if (sparkDs != null && sparkDs.Tables.Count > 0 && sparkDs.Tables[0].Rows.Count > 0)
+            if (sparkDs != null && sparkDs.Tables.Count > 0)
             {
-                for (int i = 0; i < sparkDs.Tables[0].Rows.Count; i++)
+                foreach (DataRow row in sparkDs.Tables[0].Rows)
                 {
-                    result.SparklineData.Add(Util.GetValueOfDecimal(sparkDs.Tables[0].Rows[i]["MonthlyDpo"]));
+                    int idx = Util.GetValueOfInt(row["MonAbs"]) - fyStartAbs;
+                    if (idx >= 0 && idx < 12)
+                    {
+                        spark[idx] = Util.GetValueOfDecimal(row["MonthlyDpo"]);
+                    }
                 }
             }
+            for (int i = 0; i < 12; i++) { result.SparklineData.Add(spark[i]); }
 
             return result;
         }

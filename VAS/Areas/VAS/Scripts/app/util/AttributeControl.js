@@ -84,7 +84,11 @@
                 getInstanceValues: ep.getInstanceValues || "VAS_AttributeControl/GetInstanceValues",
                 saveAttribute: ep.saveAttribute || "VAS_AttributeControl/SaveAttribute"
             },
-            onApply: (typeof opts.onApply === "function") ? opts.onApply : function () { }
+            onApply: (typeof opts.onApply === "function") ? opts.onApply : function () { },
+            // Fired when the user DISMISSES the picker without choosing/creating an instance
+            // (Cancel / ✕) so the host can restore focus. NOT fired on apply or on the
+            // programmatic VIS.AttributeControl.close().
+            onClose: (typeof opts.onClose === "function") ? opts.onClose : function () { }
         };
         closeDialog();
         st = {
@@ -138,6 +142,10 @@
     /* close + dispose the control's own dialog */
     function closeDialog() { $("#vasCilAttr").remove(); st = null; }
     VIS.AttributeControl.close = closeDialog;
+
+    /* User dismissed the picker WITHOUT applying (Cancel / ✕): close, then notify the host
+       via onClose so it can restore focus. Read onClose before closeDialog (cfg survives). */
+    function dismiss() { var fn = cfg && cfg.onClose; closeDialog(); if (fn) fn(); }
 
     // Stable selection identity for a list row - unique PER ROW (rowKey), so two rows of
     // the same ASI (different locators) don't select together.
@@ -213,8 +221,13 @@
         var dialog = $('<div class="vas-cil-dialog vas-cil-dialog--wide"></div>');
         dialog.html(
             '<header class="vas-cil-dialog__header">' +
-            '<div class="vas-cil-dialog__header-row"><h3 class="vas-cil-dialog__title" id="vasCilAttrTitle">' + E(L("VAS_074_SelectAttribute", "Select attribute")) + "</h3>" +
-            '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill vas-cil-is-hidden" data-act="attr-back">' + IC("arrow-left", "←") + "<span>" + E(L("VAS_074_Back", "Back")) + "</span></button>" +
+            '<div class="vas-cil-dialog__header-row">' +
+            // Title text is set per mode in renderAttr: "Select attribute" in the list,
+            // "Product Attribute" in create/edit. No header Back button — the create form's
+            // footer "Select Existing Record" pill is the way back to the list.
+            '<div class="vas-cil-dialog__title-block">' +
+            '<h3 class="vas-cil-dialog__title" id="vasCilAttrTitle">' + E(L("VAS_074_SelectAttribute", "Select attribute")) + "</h3>" +
+            "</div>" +
             (st.info && st.info.IsCanCreate ?
                 '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-create">' + IC("plus", "+") + "<span>" + E(L("VAS_074_NewAttribute", "New attribute")) + "</span></button>" : "") +
             // Close (dismiss the whole picker). Shown only in create/edit mode (where there is
@@ -245,20 +258,38 @@
             '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-ok">' + E(L("VAS_074_OK", "OK")) + "</button></div></div>" +
             // No Cancel in create mode - the header "Back" button already returns to the list.
             '<div id="vasCilAttrCreateFoot" class="vas-cil-is-hidden">' +
+            // Pill styled like the header Back button; returns to the attribute-details list.
+            '<button type="button" class="vas-cil-btn vas-cil-btn--outline-pill" data-act="attr-back">' + IC("arrow-left", "←") + "<span>" + E(L("VAS_074_ShowAttributeDetails", "Select Existing Record")) + "</span></button>" +
             '<span class="vas-cil-foot-error"></span>' +
             '<div class="vas-cil-dialog__actions">' +
             '<button type="button" class="vas-cil-btn vas-cil-btn--primary" data-act="attr-submit" disabled>' + E(L("VAS_074_AddAttribute", "Add attribute")) + "</button></div></div></footer>");
         backdrop.append(dialog);
         $("body").append(backdrop);
 
+        // Keyboard shielding: the modal lives on <body> inside the framework window, whose
+        // global keydown handler (grid / field navigation, Enter = default action, custom Tab)
+        // was CANCELLING the browser's native behaviour - so Enter/Space didn't activate the
+        // focused button and Tab didn't move focus to the next control. stopPropagation (NOT
+        // preventDefault) keeps those key events from reaching the framework while letting the
+        // browser perform its native defaults INSIDE the dialog. Escape dismisses the picker
+        // (the event no longer reaches an outer Escape handler). Inner handlers (grid row
+        // Enter/Space at renderAttrRows, the search input) are bound on descendants, so they
+        // bubble up to here and run FIRST - unaffected. keypress/keyup shielded too so button
+        // activation (Space fires on keyup) and framework key-repeat handling stay clean.
+        backdrop.on("keydown", function (e) {
+            if (e.key === "Escape" || e.keyCode === 27) { e.preventDefault(); e.stopPropagation(); dismiss(); return; }
+            e.stopPropagation();
+        });
+        backdrop.on("keypress keyup", function (e) { e.stopPropagation(); });
+
         // Do NOT close on outside/backdrop click; only OK / Cancel close.
         dialog.on("click", "[data-act=attr-create]", function () { openCreateForm(null); });
         dialog.on("click", "[data-act=attr-back],[data-act=attr-cancel]", function () { st.mode = "list"; st.editAsi = null; st.error = ""; renderAttr(); });
         dialog.on("click", "[data-act=attr-ok]", commit);
         // List-mode Cancel closes the whole control (there is no backdrop-click close).
-        dialog.on("click", "[data-act=attr-listclose]", function () { closeDialog(); });
+        dialog.on("click", "[data-act=attr-listclose]", dismiss);
         // Create/edit-mode Close (header ✕) dismisses the whole picker.
-        dialog.on("click", "[data-act=attr-formclose]", function () { closeDialog(); });
+        dialog.on("click", "[data-act=attr-formclose]", dismiss);
         dialog.on("click", "[data-act=attr-submit]", submitNew);
         dialog.on("click", "[data-act=attr-edit]", function (e) {
             e.stopPropagation();
@@ -383,8 +414,10 @@
         var d = $("#vasCilAttr");
         var isCreate = st.mode === "create";
         d.find("#vasCilAttrListCtrls").toggleClass("vas-cil-is-hidden", isCreate);
-        d.find("#vasCilAttrTitle").toggleClass("vas-cil-is-hidden", isCreate);
-        d.find("[data-act=attr-back]").toggleClass("vas-cil-is-hidden", !isCreate);
+        // Title stays visible in both modes; only the text changes: the create/edit form
+        // (Back-button state) shows "Product Attribute", the list shows "Select attribute".
+        d.find("#vasCilAttrTitle").removeClass("vas-cil-is-hidden")
+            .text(isCreate ? L("VAS_074_ProductAttribute", "Product Attribute") : L("VAS_074_SelectAttribute", "Select attribute"));
         d.find("[data-act=attr-formclose]").toggleClass("vas-cil-is-hidden", !isCreate);
         d.find("[data-act=attr-create]").toggleClass("vas-cil-is-hidden", isCreate);
         d.find("#vasCilAttrList").toggleClass("vas-cil-is-hidden", isCreate);
