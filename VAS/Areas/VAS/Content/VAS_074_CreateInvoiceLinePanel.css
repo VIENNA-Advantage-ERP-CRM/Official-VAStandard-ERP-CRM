@@ -362,6 +362,27 @@
     color: var(--cil-danger);
 }
 
+/* Blocking validation message shown in the "..." (Additional Info) modal when a
+   conditionally-mandatory field (e.g. Capital/Expense on an Asset-Related line) is empty -
+   the modal refuses to close until it's set. Sits just above the footer, spanning its width. */
+.vas-cil-more-error {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--cil-r-sm);
+    background: var(--cil-danger-bg);
+    box-shadow: inset 0.1875em 0 0 var(--cil-danger);
+    color: var(--cil-danger);
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Mandatory curated ("...") modal field: colour its label with the framework mandatory
+   colour (dictionary-mandatory fields AND conditional Capital/Expense-on-Asset-Related). */
+.vas-cil-dyn-mandatory label {
+    color: rgba(var(--v-c-mandatory), 1) !important;
+}
+
 .vas-cil-row--totals {
     border-top: 0.0625em solid var(--cil-divider-strong);
     border-bottom: none;

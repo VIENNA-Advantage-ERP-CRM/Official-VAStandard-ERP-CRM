@@ -17,9 +17,9 @@
  *                  price / tax / amounts resolve through the server callout and
  *                  every line is persisted through MInvoiceLine.
  * chronological  : Development
- *   VAI_XXX        Created  25 June 2026
+ *   VAI_145       Created  25 June 2026
  ************************************************************/
-// NOTE: Replace VAI_XXX with your own Employee Code before committing.
+// NOTE: Replace VAI_145 with your own Employee Code before committing.
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
@@ -363,9 +363,12 @@
                 _productType: r.ProductType || "",
                 values: vals,
                 display: {
-                    productName: r.ProductName || "", chargeName: r.ChargeName || "",
-                    uomName: r.UOMName || "", taxName: r.TaxName || "",
-                    attrName: r.AttrName || "", hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName || !!r.HasAttributeSet)
+                    productName: r.ProductName || "",
+                    chargeName: r.ChargeName || "",
+                    uomName: r.UOMName || "",
+                    taxName: r.TaxName || "",
+                    attrName: r.AttrName || "",
+                    hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName && !!r.HasAttributeSet)
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -1094,7 +1097,14 @@
             // click, e.g. on the framework lookup popup, doesn't dismiss the modal).
             // Return focus to the row's "..." button so Tab continues the row's chain
             // (Tab off "..." saves the row) without the user re-grabbing the mouse.
-            function done() { commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line); }
+            function done() {
+                // Block close while a conditionally-mandatory curated field (e.g. Capital/Expense
+                // on an Asset-Related line) is still empty - show the message in the modal and
+                // keep it open until the required value is set.
+                var miss = firstMissingDynMandatory(line);
+                if (miss) { showMoreDialogError(miss); return; }
+                commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
+            }
             dialog.on("click", "[data-act=close-more]", done);
             // Enter / Space on the focused Done button must close the dialog. A native
             // <button> would do this itself, but the framework shell swallows Enter (its
@@ -1133,6 +1143,28 @@
                     $body.append('<p class="vas-cil-empty-message">' + esc(lbl("VAS_074_NoAdditionalInfo", "No additional info for this line")) + "</p>");
                 $body.find("[data-col]:not(.vas-cil-dyn-hidden)").find("input,select,textarea").first().focus();
             }, 0);
+        }
+
+        /* Show a blocking validation message in the open "..." modal (above the footer) and
+           focus the offending field, so the modal refuses to close until it's set. */
+        function showMoreDialogError(miss) {
+            var $dialog = $("#vasCilMore .vas-cil-dialog");
+            if (!$dialog.length) return;
+            var $err = $dialog.find(".vas-cil-more-error");
+            if (!$err.length) {
+                $err = $('<div class="vas-cil-more-error" role="alert"></div>');
+                $dialog.find(".vas-cil-dialog__footer").before($err);
+            }
+            $err.text(miss.msg);
+            var $fld = $("#vasCilMoreBody").children('[data-col="' + miss.col + '"]');
+            if ($fld.length && $fld[0].scrollIntoView) $fld[0].scrollIntoView({ block: "nearest" });
+            setTimeout(function () { $fld.find("input,select,textarea").first().focus(); }, 0);
+        }
+
+        /* Dismiss the "..." modal's blocking validation message (on any value change - it
+           re-validates on the next close attempt). */
+        function clearMoreDialogError() {
+            $("#vasCilMore .vas-cil-dialog").find(".vas-cil-more-error").remove();
         }
 
         /* ---------- edit / commit ---------- */
@@ -1337,8 +1369,10 @@
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
                 rowId: "r" + (++rowCounter), status: "new", dirty: true, _priceOverride: false,
-                values: { C_InvoiceLine_ID: 0, Line: maxLine + 10, M_Product_ID: 0, C_Charge_ID: 0, M_AttributeSetInstance_ID: 0,
-                    QtyEntered: 0, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
+                values: {
+                    C_InvoiceLine_ID: 0, Line: maxLine + 10, M_Product_ID: 0, C_Charge_ID: 0, M_AttributeSetInstance_ID: 0,
+                    QtyEntered: 0, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: ""
+                },
                 display: { productName: "", chargeName: "", uomName: "", taxName: "", attrName: "", hasAttributeSet: false }
             };
             seedAllColumns(line.values);
@@ -1529,7 +1563,7 @@
             // Blur: only act while still editing THIS row's primary. If a catalog pick has
             // already advanced focus (e.g. to Description), leave that state untouched.
             if (!(editing && editing.rowId === line.rowId &&
-                  (editing.field === "product" || editing.field === "charge"))) return;
+                (editing.field === "product" || editing.field === "charge"))) return;
             editing = null;
             render();   // repaint the cell from the committed value (revert the typed text)
         }
@@ -1728,9 +1762,9 @@
                 getAD_Reference_ID: function () { return (m && m.AD_Reference_ID) || 0; },
                 isMandatory: function () { return !!(m && m.IsMandatory); },
                 isReadOnly: function () { return m ? !m.IsUpdateable : false; },
-                setError: function () {}, setMandatory: function () {}, setReadOnly: function () {},
-                setDisplayed: function () {}, setDisplayLength: function () {},
-                setBackgroundColor: function () {}, setInputMandatory: function () {}
+                setError: function () { }, setMandatory: function () { }, setReadOnly: function () { },
+                setDisplayed: function () { }, setDisplayLength: function () { },
+                setBackgroundColor: function () { }, setInputMandatory: function () { }
             };
         }
 
@@ -2001,6 +2035,92 @@
          * when one is configured, enforces AD_Val_Rule (FK lookups, server-side) and is
          * covered by the mandatory check in validateLine. Values live in line.values and
          * persist through the existing generic column save. */
+        /* ---------- VAFAM asset-related business rule (VAFAM module) ----------
+         * When a line is flagged Asset Related (VAFAM_IsAssetRelated = Y):
+         *   - Capital Expense (VAFAM_CapitalExpense) becomes MANDATORY (red asterisk +
+         *     enforced in validateLine).
+         * When the flag is cleared back to N:
+         *   - Capital Expense AND Asset (A_Asset_ID) are cleared (and marked touched so the
+         *     nulls persist on save), and their controls are rebuilt to show the cleared state.
+         */
+        var VAFAM_ASSET_RELATED_COL = "VAFAM_IsAssetRelated";
+        var VAFAM_CAPITAL_EXPENSE_COL = "VAFAM_CapitalExpense";
+        var VAFAM_ASSET_ID_COL = "A_Asset_ID";
+
+        /* Is this line currently flagged Asset Related? (YesNo, read case-insensitively.) */
+        function isAssetRelated(line) {
+            var v = lineVal(line, VAFAM_ASSET_RELATED_COL);
+            return (v === true || v === "Y" || v === "true" || v === 1 || v === "1");
+        }
+
+        /* Effective mandatory flag for a curated modal field: the dictionary IsMandatory,
+           OR the conditional rule that Capital Expense is mandatory while the line is Asset
+           Related. Used both for the control's asterisk and for validateLine. */
+        function dynMandatory(line, m) {
+            if (m.IsMandatory) return true;
+            if (m.ColumnName === VAFAM_CAPITAL_EXPENSE_COL) return isAssetRelated(line);
+            return false;
+        }
+
+        /* Clear a curated modal field's value (to null), drop its cached FK label, and mark
+           it dirty + touched so the intentional null persists on save (ApplyExtraColumns). */
+        function clearDynValue(line, col) {
+            if (!columnMeta[col]) return;
+            var prev = lineVal(line, col);
+            setLineVal(line, col, null);
+            if (line._dynDisp) delete line._dynDisp[col];
+            if (!sameVal(prev, null)) {
+                markDirty(line);
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[col] = true;
+            }
+        }
+
+        /* Rebuild one curated field's control in the open modal (preserving field order) so a
+           value clear / mandatory-asterisk toggle shows immediately. No-op when the field's
+           modal isn't open or the column isn't present. */
+        function rebuildDynField(line, col) {
+            var $b = $("#vasCilMoreBody");
+            if (!$b.length || morePopoverFor !== line.rowId) return;
+            var m = columnMeta[col];
+            if (!m) return;
+            var $old = $b.children('[data-col="' + col + '"]');
+            if (!$old.length) return;
+            $old.replaceWith(buildDynField(line, m));
+            applyDynDisplay(line, $b);
+        }
+
+        /* Apply the asset-related rule after VAFAM_IsAssetRelated changes: clear the dependent
+           fields when no longer related, then rebuild both dependent controls (Capital Expense's
+           asterisk toggles with the flag; Asset may have just been cleared). */
+        function applyAssetRelatedRule(line) {
+            if (!isAssetRelated(line)) {
+                clearDynValue(line, VAFAM_CAPITAL_EXPENSE_COL);
+                clearDynValue(line, VAFAM_ASSET_ID_COL);
+            }
+            rebuildDynField(line, VAFAM_CAPITAL_EXPENSE_COL);
+            rebuildDynField(line, VAFAM_ASSET_ID_COL);
+        }
+
+        /* First visible, editable, (conditionally-)mandatory curated field that is still empty -
+           {col, name, msg} or null. Covers dictionary-mandatory fields AND the conditional rule
+           (Capital/Expense on an Asset-Related line). Shared by validateLine (Save) and the
+           "..." modal's close guard so both enforce the same requirement. */
+        function firstMissingDynMandatory(line) {
+            var dyn = additionalInfoColumns(line);
+            for (var d = 0; d < dyn.length; d++) {
+                var dm = dyn[d];
+                // A field hidden by DisplayLogic can't be set by the user - don't require it.
+                if (!dynFieldVisible(line, dm)) continue;
+                if (!dynMandatory(line, dm) || isColumnReadOnly(line, dm.ColumnName)) continue;
+                var dv = lineVal(line, dm.ColumnName);
+                var isFk = (dm.AD_Reference_ID === 18 || dm.AD_Reference_ID === 19 || dm.AD_Reference_ID === 30 || dm.AD_Reference_ID === 13);
+                var empty = isFk ? !(+dv > 0) : (dv == null || String(dv).trim() === "");
+                if (empty) return { col: dm.ColumnName, name: dm.Name || dm.ColumnName, msg: lbl("VAS_074_FieldRequired", "Required") + ": " + (dm.Name || dm.ColumnName) };
+            }
+            return null;
+        }
+
         /* Curated "Additional Info" columns shown in the "..." modal, in this order.
            To add a field, append its column name here (with an optional `when`
            condition). A column missing from the dictionary (e.g. a module's columns
@@ -2067,9 +2187,9 @@
                 if (!s) continue;
                 switch (dynFieldKind(m)) {
                     case "fk": case "int": if (parseInt(s, 10) > 0) return true; break;
-                    case "number":         if (parseFloat(s) !== 0) return true; break;
-                    case "yesno":          if (s === "Y" || s === "true" || s === "1") return true; break;
-                    default:               return true;   // string / memo / date / list with any text
+                    case "number": if (parseFloat(s) !== 0) return true; break;
+                    case "yesno": if (s === "Y" || s === "true" || s === "1") return true; break;
+                    default: return true;   // string / memo / date / list with any text
                 }
             }
             return false;
@@ -2128,7 +2248,7 @@
            (the header is inserted before its [data-col] wrapper), `key`/`def` = the group
            title (AD_Message key + English fallback), `collapsed` = initial state. */
         var MORE_FIELD_GROUPS = [
-            { anchor: "AD_OrgTrx_ID",     key: "VAS_074_GrpDimension",  def: "Dimension",  collapsed: false },
+            { anchor: "AD_OrgTrx_ID", key: "VAS_074_GrpDimension", def: "Dimension", collapsed: false },
             { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false }
         ];
         // Per-anchor collapsed state; persists across refreshMoreDialog and re-opens so a
@@ -2216,6 +2336,11 @@
                 }
                 $field.prepend($prep);
             }
+            // Mandatory field (dictionary IsMandatory OR the conditional Capital/Expense-on-
+            // Asset-Related rule): colour its label with the framework mandatory colour so the
+            // requirement reads at a glance. Recomputed on every (re)build, so it toggles with
+            // the Asset-Related flag.
+            $field.toggleClass("vas-cil-dyn-mandatory", dynMandatory(line, m));
             return $field.attr("data-col", m.ColumnName);
         }
 
@@ -2384,7 +2509,7 @@
             if (!viennaAvailable() || kind === "ro") return null;
             var col = m.ColumnName, dt = m.AD_Reference_ID, ctrl;
             try {
-                ctrl = makeViennaCtrl(dt, col, m.Name || col, m.AD_Reference_Value_ID, !!m.IsMandatory, ro, m.AD_Column_ID);
+                ctrl = makeViennaCtrl(dt, col, m.Name || col, m.AD_Reference_Value_ID, dynMandatory(line, m), ro, m.AD_Column_ID);
                 ctrl.getControl().css("width", "100%");
             }
             catch (e) { if (window.console) console.log("VAS_074 vienna ctrl error " + col, e); return null; }
@@ -2549,6 +2674,10 @@
                 if (!line._dynTouched) line._dynTouched = {};
                 line._dynTouched[col] = true;
             }
+            // VAFAM asset-related rule: toggling Asset Related makes Capital Expense mandatory
+            // (asterisk) or clears Capital Expense + Asset. Runs regardless of any column callout.
+            if (String(col).toLowerCase() === VAFAM_ASSET_RELATED_COL.toLowerCase()) applyAssetRelatedRule(line);
+            clearMoreDialogError();   // any field change dismisses the blocking close-error banner
             var m = columnMeta[col];
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
@@ -2652,7 +2781,7 @@
                     var rows = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw; rows = rows || [];
                     if (rows.length) { setDynDisplay(line, col, rows[0].Name); if ($input && $input.closest("body").length) $input.val(rows[0].Name); }
                 },
-                error: function () {}
+                error: function () { }
             });
         }
 
@@ -2733,19 +2862,10 @@
             // Qty must be positive whenever a line carries a product/charge.
             if (!(v.QtyEntered > 0))
                 return { col: "QtyEntered", msg: lbl("VAS_074_QtyRequired", "Quantity must be greater than zero") };
-            // Mandatory dynamic ("...") fields (skip read-only - the user can't set them).
-            var dyn = additionalInfoColumns(line);
-            for (var d = 0; d < dyn.length; d++) {
-                var dm = dyn[d];
-                // A field hidden by DisplayLogic can't be set by the user - don't require it.
-                if (!dynFieldVisible(line, dm)) continue;
-                if (!dm.IsMandatory || isColumnReadOnly(line, dm.ColumnName)) continue;
-                var dv = lineVal(line, dm.ColumnName);
-                var isFk = (dm.AD_Reference_ID === 18 || dm.AD_Reference_ID === 19 || dm.AD_Reference_ID === 30 || dm.AD_Reference_ID === 13);
-                var empty = isFk ? !(+dv > 0) : (dv == null || String(dv).trim() === "");
-                if (empty)
-                    return { col: dm.ColumnName, msg: lbl("VAS_074_FieldRequired", "Required") + ": " + (dm.Name || dm.ColumnName) };
-            }
+            // Mandatory dynamic ("...") fields (skip read-only / hidden - the user can't set
+            // them). Includes the conditional Capital/Expense-on-Asset-Related rule.
+            var miss = firstMissingDynMandatory(line);
+            if (miss) return { col: miss.col, msg: miss.msg };
             return null;
         }
 
@@ -2826,8 +2946,10 @@
                     var attr = info.Attributes[a];
                     if (attr.Values) for (var i = 0; i < attr.Values.length; i++) {
                         var val = attr.Values[i];
-                        out.push({ code: val.Code || val.Name, label: val.Name, spec: attr.Name, priceDelta: "—", availability: "—",
-                            M_Attribute_ID: attr.M_Attribute_ID, M_AttributeValue_ID: val.M_AttributeValue_ID });
+                        out.push({
+                            code: val.Code || val.Name, label: val.Name, spec: attr.Name, priceDelta: "—", availability: "—",
+                            M_Attribute_ID: attr.M_Attribute_ID, M_AttributeValue_ID: val.M_AttributeValue_ID
+                        });
                     }
                 }
             }
@@ -3204,8 +3326,12 @@
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveAttribute",
                 type: "POST", dataType: "json",
-                data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
-                    Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }] }) },
+                data: {
+                    payload: JSON.stringify({
+                        M_Product_ID: line.values.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
+                        Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }]
+                    })
+                },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -3265,9 +3391,13 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveAttribute",
                 type: "POST", dataType: "json",
                 // editAsi set -> UPDATE that instance in place; else create a new one.
-                data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID,
-                    M_AttributeSetInstance_ID: (attrState.editAsi && attrState.editAsi.M_AttributeSetInstance_ID) || 0,
-                    Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values }) },
+                data: {
+                    payload: JSON.stringify({
+                        M_Product_ID: line.values.M_Product_ID,
+                        M_AttributeSetInstance_ID: (attrState.editAsi && attrState.editAsi.M_AttributeSetInstance_ID) || 0,
+                        Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values
+                    })
+                },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -3380,8 +3510,10 @@
                 var line = {
                     rowId: "r" + (++rowCounter), status: "new", dirty: true, _priceOverride: false,
                     _productType: r.item.Kind === "C" ? "" : (r.item.ProductType || ""),
-                    values: { C_InvoiceLine_ID: 0, Line: maxLine, M_Product_ID: r.item.Kind === "C" ? 0 : r.item.RecordId, C_Charge_ID: r.item.Kind === "C" ? r.item.RecordId : 0,
-                        M_AttributeSetInstance_ID: 0, QtyEntered: parseInt(r.qty || "1", 10) || 1, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
+                    values: {
+                        C_InvoiceLine_ID: 0, Line: maxLine, M_Product_ID: r.item.Kind === "C" ? 0 : r.item.RecordId, C_Charge_ID: r.item.Kind === "C" ? r.item.RecordId : 0,
+                        M_AttributeSetInstance_ID: 0, QtyEntered: parseInt(r.qty || "1", 10) || 1, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: ""
+                    },
                     display: { productName: r.item.Kind === "C" ? "" : r.item.DisplayName, chargeName: r.item.Kind === "C" ? r.item.DisplayName : "", uomName: "", taxName: "", attrName: "", hasAttributeSet: !!r.item.HasAttributeSet }
                 };
                 seedAllColumns(line.values);
@@ -3415,10 +3547,12 @@
             var v = l.values;
             // Core fields drive the business setters; Values carries the full column
             // bag so every callout-set column is persisted server-side.
-            return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
+            return {
+                C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                 M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
-                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : [] };
+                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : []
+            };
         }
 
         /* Save the currently-unsaved lines as a non-blocking batch. Each saved row shows
