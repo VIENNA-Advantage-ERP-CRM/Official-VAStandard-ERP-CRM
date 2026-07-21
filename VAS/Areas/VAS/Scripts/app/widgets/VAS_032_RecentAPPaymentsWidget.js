@@ -247,12 +247,13 @@
             });
         }
 
+
         function renderData(data) {
             paymentsData = $.isArray(data.payments)
                 ? $.grep(data.payments, function (payment) {
                     var amount = Number(payment.amount || 0);
 
-                    return !isNaN(amount) && amount > 0;
+                    return !isNaN(amount);
                 })
                 : [];
 
@@ -265,6 +266,7 @@
             totalPages = Math.ceil(paymentsData.length / pageSize);
             renderPage();
         }
+
 
         function renderPage() {
             if (!paymentsData || paymentsData.length === 0) {
