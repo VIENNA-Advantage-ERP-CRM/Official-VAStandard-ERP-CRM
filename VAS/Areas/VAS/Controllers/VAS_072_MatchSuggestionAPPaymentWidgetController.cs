@@ -34,7 +34,7 @@ namespace VAS.Controllers
     /// </summary>
     public class VAS_072_MatchSuggestionAPPaymentWidgetController : Controller
     {
-        private const int DefaultPageSize = 5;
+        private const int DefaultPageSize = 6;
         private const int MaximumPageSize = 25;
         private const decimal ExactTolerance = 0.01M;
         private const decimal MaximumDifferencePercentage = 20M;
@@ -119,7 +119,7 @@ namespace VAS.Controllers
                             confidence = row.Confidence,
                             score = row.Score,
                             differenceAmount = row.DifferenceAmount,
-                            differencePercentage = row.DifferencePercentage,
+                            differencePercentage = Math.Round(row.DifferencePercentage, 2),
                             dateGapDays = row.DateGapDays,
                             referenceMatch = row.ReferenceMatch,
                             isRecommended = true,
@@ -270,7 +270,7 @@ namespace VAS.Controllers
                     confidenceValue = row.Confidence,
                     confidenceName = GetConfidenceName(ctx, row.Confidence),
                     differenceAmount = row.DifferenceAmount,
-                    differencePercentage = row.DifferencePercentage,
+                    differencePercentage = Math.Round(row.DifferencePercentage, 2),
                     dateGapDays = row.DateGapDays,
                     isRecommended = true,
                     isAutoApplicable = row.IsAutoApplicable,
@@ -500,7 +500,7 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.GrandTotal,
     Invoice.GrandTotalAfterWithholding,
-    Invoice.IsReturnTrx
+    Invoice.C_DocType_ID
 FROM C_Invoice Invoice
 WHERE Invoice.IsActive='Y'
 AND Invoice.Processed='Y'
@@ -653,7 +653,7 @@ InvoiceRows AS
         Invoice.DateInvoiced AS InvoiceDate,
         COALESCE(InvoicePaySchedule.DueDate,Invoice.DateInvoiced) AS DueDate,
         Invoice.C_Currency_ID AS InvoiceCurrencyId,
-        COALESCE(Invoice.IsReturnTrx,'N') AS InvoiceIsReturn,
+        COALESCE(InvoiceDocType.IsReturnTrx,'N') AS InvoiceIsReturn,
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
         ABS(COALESCE(Invoice.GrandTotalAfterWithholding,Invoice.GrandTotal,0)) AS InvoiceOriginalAmount,
         COALESCE(InvoiceScheduleAllocated.AllocatedAmount,0) AS InvoiceAllocatedAmount,
@@ -666,6 +666,10 @@ InvoiceRows AS
     INNER JOIN C_InvoicePaySchedule InvoicePaySchedule ON
     (
         InvoicePaySchedule.C_Invoice_ID=Invoice.C_Invoice_ID
+    )
+    LEFT OUTER JOIN C_DocType InvoiceDocType ON
+    (
+        InvoiceDocType.C_DocType_ID=Invoice.C_DocType_ID
     )
     LEFT OUTER JOIN InvoiceScheduleAllocated InvoiceScheduleAllocated ON
     (
@@ -1669,7 +1673,7 @@ DetailBase AS
 
         COALESCE
         (
-            Invoice.IsReturnTrx,
+            InvoiceDocType.IsReturnTrx,
             'N'
         ) AS InvoiceIsReturn
 
@@ -3470,11 +3474,20 @@ AND InvoiceRow.InvoiceOpenAmount>(SELECT QueryParameters.ExactTolerance FROM Que
                     invoiceOpenAmount - appliedAmount
                 );
 
-                // Return cycle (negative refund payment allocated against an
-                // APC purchase-return credit memo) flips the allocation-line
+                // Return cycle (negative refund payment allocated against a
+                // purchase-return credit memo) flips the allocation-line
                 // sign, mirroring the standard allocation form's MultiplierAP
-                // convention: API -> negative line, APC -> positive line.
-                decimal cycleSign = invoice.IsReturnTrx() ? 1M : -1M;
+                // convention: purchase invoice -> negative line, purchase
+                // return -> positive line. The cycle is classified by the
+                // invoice DOCUMENT TYPE flag (same source as the displayed
+                // type name), not the invoice-header IsReturnTrx column,
+                // which can disagree with the document type in legacy data.
+                bool invoiceIsReturn = MDocType.Get(
+                    ctx,
+                    invoice.GetC_DocType_ID()
+                ).IsReturnTrx();
+
+                decimal cycleSign = invoiceIsReturn ? 1M : -1M;
                 decimal allocationLineAmount = cycleSign * appliedAmount;
                 decimal overUnderAmount = cycleSign * remainingInvoiceAmount;
 

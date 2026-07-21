@@ -110,7 +110,7 @@
         var $reviewApply = null;
 
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 6;
         var totalPages = 0;
         var totalRecords = 0;
         var totalReadyAmount = 0;
@@ -514,15 +514,23 @@
                 row.currencyISOCode ||
                 "";
 
+            var numericValue =
+                toNumber(value, 0);
+
+            var sign =
+                numericValue < 0
+                    ? "-"
+                    : "";
+
             var amount =
                 formatAmount(
-                    value,
+                    Math.abs(numericValue),
                     getAmountPrecision(row)
                 );
 
             return symbol
-                ? symbol + " " + amount
-                : amount;
+                ? sign + symbol + " " + amount
+                : sign + amount;
         }
 
         function renderRows(rows) {
@@ -911,12 +919,19 @@
 
             var displayAmount =
                 (
+                    Number(totalReadyAmount || 0) < 0
+                        ? "-"
+                        : ""
+                ) +
+                (
                     symbol
                         ? symbol + " "
                         : ""
                 ) +
                 formatAmount(
-                    totalReadyAmount,
+                    Math.abs(
+                        Number(totalReadyAmount || 0)
+                    ),
                     serverStdPrecision
                 );
 
@@ -1381,15 +1396,23 @@
                     ? detail.invoicePrecision
                     : detail.paymentPrecision;
 
+            var numericValue =
+                toNumber(value, 0);
+
+            var sign =
+                numericValue < 0
+                    ? "-"
+                    : "";
+
             var amount =
                 formatAmount(
-                    value,
+                    Math.abs(numericValue),
                     normalizePrecision(precision)
                 );
 
             return symbol
-                ? symbol + " " + amount
-                : amount;
+                ? sign + symbol + " " + amount
+                : sign + amount;
         }
 
         function formatBankAccount(detail) {
