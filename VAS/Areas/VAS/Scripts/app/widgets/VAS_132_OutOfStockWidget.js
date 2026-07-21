@@ -15,7 +15,7 @@
  *  # | Current Text                          | Message Key
  * ---+----------------------------------------+------------------------
  *  1 | Out of Stock                          | VAS_132_OOS_Title
- *  2 | {0} in open SOs · {1} in open POs     | VAS_132_OOS_Meta
+ *  2 | in open SOs / in open POs (counts prepended in code) | VAS_132_OOS_MetaSO / VAS_132_OOS_MetaPO
  *  3 | Data unavailable                      | VAS_132_OOS_DataUnavailable
  */
 ; VAS = window.VAS || {};
@@ -54,14 +54,6 @@
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
-        }
-
-        function format(key, fallback) {
-            var text = lbl(key, fallback);
-            for (var i = 2; i < arguments.length; i++) {
-                text = text.replace('{' + (i - 2) + '}', arguments[i]);
-            }
-            return text;
         }
 
         function el(tag, className, text) {
@@ -129,7 +121,8 @@
 
             els.value.classList.remove('MPC-oos-neutral');
             els.value.textContent = String(outOfStock);
-            els.meta.textContent = format('VAS_132_OOS_Meta', '{0} in open SOs · {1} in open POs', inOpenSO, inOpenPO);
+            els.meta.textContent = inOpenSO + ' ' + lbl('VAS_132_OOS_MetaSO', 'in open SOs') + ' · ' +
+                inOpenPO + ' ' + lbl('VAS_132_OOS_MetaPO', 'in open POs');
         }
 
         function showError() {

@@ -25,15 +25,16 @@
  *  4 | Products in BOM                                     | VAS_134_BOM_ProductsTitle
  *  5 | Products used as active components in at least one active bill of materials. | VAS_134_BOM_ProductsIntro
  *  6 | Products                                            | VAS_134_BOM_ProductsSection
- *  7 | {0} products                                        | VAS_134_BOM_ProductsSummary
- *  8 | {0} BOM / {0} BOMs                                  | VAS_134_BOM_BomCount / VAS_134_BOM_BomCountPlural
+ *  7 | products (count prepended in code)                  | VAS_134_BOM_ProductsSummary
+ *  8 | BOM / BOMs (count prepended in code)                | VAS_134_BOM_BomCount / VAS_134_BOM_BomCountPlural
  *  9 | No active products are used as BOM components.      | VAS_134_BOM_ProductsEmpty
  * 10 | BOM Verification                                    | VAS_134_BOM_VerifyTitle
  * 11 | Verification status across active BOMs · not verified listed first. | VAS_134_BOM_VerifyIntro
  * 12 | BOMs                                                | VAS_134_BOM_VerifySection
- * 13 | {0} BOMs · {1} not verified                         | VAS_134_BOM_VerifySummary
+ * 13 | BOMs / not verified (counts prepended in code)      | VAS_134_BOM_VerifySummaryBoms / VAS_134_BOM_VerifySummaryNotVerified
  * 14 | Verified / Not verified                             | VAS_134_BOM_Verified / VAS_134_BOM_NotVerified
- * 15 | Rev {0} · {1} components · updated by {2} · updated {3} | VAS_134_BOM_VerifyMeta
+ * 15 | Rev / components / updated by / updated             | VAS_134_BOM_VerifyMetaRev / VAS_134_BOM_VerifyMetaComponents /
+ *    | (numbers/names/dates assembled in code)             | VAS_134_BOM_VerifyMetaUpdatedBy / VAS_134_BOM_VerifyMetaUpdated
  * 16 | Unknown user                                        | VAS_134_BOM_UnknownUser
  * 17 | No active BOMs were found.                          | VAS_134_BOM_VerifyEmpty
  * 18 | Retry                                                | VAS_134_BOM_Retry
@@ -94,14 +95,6 @@
             return (t && t.charAt(0) !== '[') ? t : fallback;
         }
 
-        function format(key, fallback) {
-            var text = lbl(key, fallback);
-            for (var i = 2; i < arguments.length; i++) {
-                text = text.replace('{' + (i - 2) + '}', arguments[i]);
-            }
-            return text;
-        }
-
         function el(tag, className, text) {
             var node = document.createElement(tag);
             if (className) { node.className = className; }
@@ -132,12 +125,12 @@
             var diffMs = Date.now() - date.getTime();
             var diffMin = Math.max(0, Math.floor(diffMs / 60000));
             if (diffMin < 1) { return lbl('VAS_134_BOM_JustNow', 'Just now'); }
-            if (diffMin < 60) { return format('VAS_134_BOM_MinsAgo', '{0}m ago', diffMin); }
+            if (diffMin < 60) { return diffMin + lbl('VAS_134_BOM_MinsAgo', 'm ago'); }
             var diffHour = Math.floor(diffMin / 60);
-            if (diffHour < 24) { return format('VAS_134_BOM_HoursAgo', '{0}h ago', diffHour); }
+            if (diffHour < 24) { return diffHour + lbl('VAS_134_BOM_HoursAgo', 'h ago'); }
             var diffDay = Math.max(0, Math.floor(diffHour / 24));
             var dayWord = diffDay === 1 ? lbl('VAS_134_BOM_DayWord', 'day') : lbl('VAS_134_BOM_DaysWord', 'days');
-            return format('VAS_134_BOM_DaysAgo', '{0} {1} ago', diffDay, dayWord);
+            return diffDay + ' ' + dayWord + ' ' + lbl('VAS_134_BOM_DaysAgo', 'ago');
         }
 
         /* ---- Build the static DOM once ---- */
@@ -324,7 +317,7 @@
                 emptyText: lbl('VAS_134_BOM_ProductsEmpty', 'No active products are used as BOM components.'),
                 buildRow: buildProductRow,
                 summaryText: function (st) {
-                    return format('VAS_134_BOM_ProductsSummary', '{0} products', st.total);
+                    return st.total + ' ' + lbl('VAS_134_BOM_ProductsSummary', 'products');
                 }
             },
             verify: {
@@ -333,7 +326,8 @@
                 emptyText: lbl('VAS_134_BOM_VerifyEmpty', 'No active BOMs were found.'),
                 buildRow: buildVerifyRow,
                 summaryText: function (st) {
-                    return format('VAS_134_BOM_VerifySummary', '{0} BOMs · {1} not verified', st.total, st.notVerifiedCount);
+                    return st.total + ' ' + lbl('VAS_134_BOM_VerifySummaryBoms', 'BOMs') + ' · ' +
+                        st.notVerifiedCount + ' ' + lbl('VAS_134_BOM_VerifySummaryNotVerified', 'not verified');
                 }
             }
         };
@@ -349,9 +343,9 @@
 
             var right = el('div', 'MPC-bom-row-right');
             var bomCount = row.bomCount || 0;
-            var bomWord = bomCount === 1
-                ? format('VAS_134_BOM_BomCount', '{0} BOM', bomCount)
-                : format('VAS_134_BOM_BomCountPlural', '{0} BOMs', bomCount);
+            var bomWord = bomCount + ' ' + (bomCount === 1
+                ? lbl('VAS_134_BOM_BomCount', 'BOM')
+                : lbl('VAS_134_BOM_BomCountPlural', 'BOMs'));
             right.appendChild(el('span', 'MPC-bom-row-value', bomWord));
             rowEl.appendChild(right);
             return rowEl;
@@ -367,8 +361,10 @@
             var updatedByName = row.updatedByName && String(row.updatedByName).trim()
                 ? row.updatedByName
                 : lbl('VAS_134_BOM_UnknownUser', 'Unknown user');
-            var metaText = format('VAS_134_BOM_VerifyMeta', 'Rev {0} · {1} components · updated by {2} · updated {3}',
-                revision, row.componentCount || 0, updatedByName, formatRelativeTime(row.updatedAt));
+            var metaText = lbl('VAS_134_BOM_VerifyMetaRev', 'Rev') + ' ' + revision +
+                ' · ' + (row.componentCount || 0) + ' ' + lbl('VAS_134_BOM_VerifyMetaComponents', 'components') +
+                ' · ' + lbl('VAS_134_BOM_VerifyMetaUpdatedBy', 'updated by') + ' ' + updatedByName +
+                ' · ' + lbl('VAS_134_BOM_VerifyMetaUpdated', 'updated') + ' ' + formatRelativeTime(row.updatedAt);
             left.appendChild(el('div', 'MPC-bom-row-meta', metaText));
             rowEl.appendChild(left);
 

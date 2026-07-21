@@ -20,7 +20,7 @@
  *  3 | Last receipt                              | VAS_130_TV_DateMeta
  *  4 | No material receipts in this fiscal year. | VAS_130_TV_EmptyState
  *  5 | product / code / attributes / qty (UoM)    | VAS_130_TV_ColProduct / VAS_130_TV_ColCode / VAS_130_TV_ColAttributes / VAS_130_TV_ColQty
- *  6 | {0} products · {1} · {2} {3}               | VAS_130_TV_ModalSub
+ *  6 | products (count/year/date assembled in code) | VAS_130_TV_ModalSub
  *  7 | Retry                                      | VAS_130_TV_Retry
  *  8 | Showing / of                               | VAS_Showing / VAS_Of (shared global keys)
  *  9 | Couldn't load / Close                      | VAS_CouldntLoad / Close (shared global keys)
@@ -90,14 +90,6 @@
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
-        }
-
-        function format(key, fallback) {
-            var text = lbl(key, fallback);
-            for (var i = 2; i < arguments.length; i++) {
-                text = text.replace('{' + (i - 2) + '}', arguments[i]);
-            }
-            return text;
         }
 
         function el(tag, className, text) {
@@ -506,8 +498,8 @@
                 state.modalItems = data.items || [];
                 state.modalMeta = data;
                 var yearLabel = (state.years.filter(function (y) { return y.yearId === state.yearId; })[0] || {}).label || data.label || '';
-                els.mSub.textContent = format('VAS_130_TV_ModalSub', '{0} products · {1} · {2} {3}',
-                    state.modalItems.length, yearLabel, lbl('VAS_130_TV_DateMeta', 'Last receipt'), formatDate(data.lastDate));
+                els.mSub.textContent = state.modalItems.length + ' ' + lbl('VAS_130_TV_ModalSub', 'products') + ' · ' + yearLabel +
+                    ' · ' + lbl('VAS_130_TV_DateMeta', 'Last receipt') + ' ' + formatDate(data.lastDate);
                 sizeAndPaginateModal(0);
             }).catch(function (err) {
                 if (myToken !== detailToken) { return; }

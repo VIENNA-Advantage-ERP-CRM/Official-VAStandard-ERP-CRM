@@ -21,14 +21,15 @@
  *  1 | Incomplete Records                               | VAS_128_Title
  *  2 | Items missing master data · tap a row for detail | VAS_128_Subtitle
  *  3 | item / missing data / category / last updated    | VAS_128_ColItem / VAS_128_ColMissing / VAS_128_ColCategory / VAS_128_ColUpdated
- *  4 | by                                               | VAS_128_By
+ *  4 | by / Updated                                     | VAS_128_By / VAS_128_Updated
  *  5 | Showing / of / incomplete                        | VAS_Showing / VAS_Of / VAS_128_Incomplete
  *  6 | fields tracked                                   | VAS_128_FieldsTracked
  *  7 | No items are missing the selected data...        | VAS_128_EmptyState
  *  8 | Records are filtered to items missing...         | VAS_128_SettingsExplainer
  *  9 | Select all / Clear / Done                        | VAS_128_SelectAll / VAS_128_Clear / VAS_128_Done
  * 10 | (BOM only)                                       | VAS_128_BomOnly
- * 11 | Missing data ({0} of {1} tracked fields)         | VAS_128_MissingCaption
+ * 11 | Missing data (plain text - count/of/tracked      | VAS_128_MissingCaption
+ *    | fields/parens assembled in code from keys 5+6)   |
  * 12 | Missing                                          | VAS_128_Missing
  * 13 | Only fields selected in the widget's preference. | VAS_128_ModalNote
  * 14 | Close / Open Record                              | Close / VAS_128_OpenRecord
@@ -111,14 +112,6 @@
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
             return (t && t.charAt(0) !== '[') ? t : fallback;
-        }
-
-        function format(key, fallback) {
-            var text = lbl(key, fallback);
-            for (var i = 2; i < arguments.length; i++) {
-                text = text.replace('{' + (i - 2) + '}', arguments[i]);
-            }
-            return text;
         }
 
         function fieldLabel(key) {
@@ -576,12 +569,14 @@
 
             els.mTitle.textContent = item.name || '';
             els.mSub.textContent = (item.code || '') + ' · ' + (item.category && String(item.category).trim() ? item.category : '—') +
-                ' · Updated ' + formatDate(item.updatedAt) + ' ' + lbl('VAS_128_By', 'by') + ' ' + (item.updatedBy || '');
+                ' · ' + lbl('VAS_128_Updated', 'Updated') + ' ' + formatDate(item.updatedAt) + ' ' + lbl('VAS_128_By', 'by') + ' ' + (item.updatedBy || '');
 
             var body = els.mBody;
             body.innerHTML = '';
             var missing = item.missingKeys || [];
-            body.appendChild(el('div', 'MPC-ir-m-caption', format('VAS_128_MissingCaption', 'Missing data ({0} of {1} tracked fields)', missing.length, selectedCount())));
+            body.appendChild(el('div', 'MPC-ir-m-caption',
+                lbl('VAS_128_MissingCaption', 'Missing data') + ' (' + missing.length + ' ' + lbl('VAS_Of', 'of') + ' ' +
+                selectedCount() + ' ' + lbl('VAS_128_FieldsTracked', 'fields tracked') + ')'));
 
             missing.forEach(function (key) {
                 var mrow = el('div', 'MPC-ir-m-row');

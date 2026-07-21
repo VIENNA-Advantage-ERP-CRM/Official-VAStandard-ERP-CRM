@@ -20,13 +20,14 @@
  *  # | Current Text                                     | Message Key
  * ---+---------------------------------------------------+------------------------
  *  1 | Updated This Month                               | VAS_133_UTM_Title
- *  2 | Updates by {0} users · {1} today                 | VAS_133_UTM_Meta
- *  3 | Item master changes recorded since {0} · {1} products · {2} users. | VAS_133_UTM_Intro
+ *  2 | Updates by / users / today (count assembled in code) | VAS_133_UTM_Meta / VAS_133_UTM_UsersWord / VAS_133_UTM_TodayWord
+ *  3 | Item master changes recorded since / products / users. (dates/counts assembled in code) | VAS_133_UTM_Intro / VAS_133_UTM_ProductsWord / VAS_133_UTM_UsersWord
  *  4 | Recent updates                                   | VAS_133_UTM_SectionTitle
- *  5 | {0} updates                                      | VAS_133_UTM_SectionSummary
+ *  5 | updates (count prepended in code)                | VAS_133_UTM_SectionSummary
  *  6 | Unknown user                                     | VAS_133_UTM_UnknownUser
  *  7 | No product or price records were updated this month. | VAS_133_UTM_EmptyState
- *  8 | Just now / {0}m ago / {0}h ago / {0} day(s) ago  | VAS_133_UTM_JustNow / VAS_133_UTM_MinsAgo / VAS_133_UTM_HoursAgo / VAS_133_UTM_DayAgo / VAS_133_UTM_DaysAgo
+ *  8 | Just now / m ago / h ago / day / days / ago      | VAS_133_UTM_JustNow / VAS_133_UTM_MinsAgo / VAS_133_UTM_HoursAgo / VAS_133_UTM_DayWord / VAS_133_UTM_DaysWord / VAS_133_UTM_DaysAgo
+ *    | (all numbers prepended in code, e.g. "5" + "m ago") |
  *  9 | Retry                                             | VAS_133_UTM_Retry
  * 10 | Showing / of                                     | VAS_Showing / VAS_Of (shared global keys)
  * 11 | Couldn't load / Close                             | VAS_CouldntLoad / Close (shared global keys)
@@ -88,14 +89,6 @@
             return (t && t.charAt(0) !== '[') ? t : fallback;
         }
 
-        function format(key, fallback) {
-            var text = lbl(key, fallback);
-            for (var i = 2; i < arguments.length; i++) {
-                text = text.replace('{' + (i - 2) + '}', arguments[i]);
-            }
-            return text;
-        }
-
         function pluralize(n, singularKey, singularFallback, pluralKey, pluralFallback) {
             return n === 1 ? lbl(singularKey, singularFallback) : lbl(pluralKey, pluralFallback);
         }
@@ -130,12 +123,12 @@
             var diffMs = Date.now() - date.getTime();
             var diffMin = Math.floor(diffMs / 60000);
             if (diffMin < 1) { return lbl('VAS_133_UTM_JustNow', 'Just now'); }
-            if (diffMin < 60) { return format('VAS_133_UTM_MinsAgo', '{0}m ago', diffMin); }
+            if (diffMin < 60) { return diffMin + lbl('VAS_133_UTM_MinsAgo', 'm ago'); }
             var diffHour = Math.floor(diffMin / 60);
-            if (diffHour < 24) { return format('VAS_133_UTM_HoursAgo', '{0}h ago', diffHour); }
+            if (diffHour < 24) { return diffHour + lbl('VAS_133_UTM_HoursAgo', 'h ago'); }
             var diffDay = Math.floor(diffHour / 24);
             var dayWord = pluralize(diffDay, 'VAS_133_UTM_DayWord', 'day', 'VAS_133_UTM_DaysWord', 'days');
-            return format('VAS_133_UTM_DaysAgo', '{0} {1} ago', diffDay, dayWord);
+            return diffDay + ' ' + dayWord + ' ' + lbl('VAS_133_UTM_DaysAgo', 'ago');
         }
 
         /* ---- Build the static DOM once ---- */
@@ -278,7 +271,8 @@
 
         function renderSummary() {
             els.value.textContent = String(state.updateCount);
-            els.meta.textContent = format('VAS_133_UTM_Meta', 'Updates by {0} users · {1} today', state.userCount, state.todayCount);
+            els.meta.textContent = lbl('VAS_133_UTM_Meta', 'Updates by') + ' ' + state.userCount + ' ' + lbl('VAS_133_UTM_UsersWord', 'users') +
+                ' · ' + state.todayCount + ' ' + lbl('VAS_133_UTM_TodayWord', 'today');
         }
 
         function showSummaryError() {
@@ -300,8 +294,9 @@
             lastFocusedEl = triggerEl || null;
             state.offset = 0;
 
-            els.intro.textContent = format('VAS_133_UTM_Intro', 'Item master changes recorded since {0} · {1} products · {2} users.',
-                formatDate(state.monthStart), state.productCount, state.userCount);
+            els.intro.textContent = lbl('VAS_133_UTM_Intro', 'Item master changes recorded since') + ' ' + formatDate(state.monthStart) +
+                ' · ' + state.productCount + ' ' + lbl('VAS_133_UTM_ProductsWord', 'products') +
+                ' · ' + state.userCount + ' ' + lbl('VAS_133_UTM_UsersWord', 'users') + '.';
 
             els.overlay.classList.add('MPC-utm-open');
             els.overlay.setAttribute('aria-hidden', 'false');
@@ -404,7 +399,7 @@
             if (!total) {
                 els.list.innerHTML = '';
                 els.list.appendChild(el('div', 'MPC-utm-state', lbl('VAS_133_UTM_EmptyState', 'No product or price records were updated this month.')));
-                els.summary.textContent = format('VAS_133_UTM_SectionSummary', '{0} updates', 0);
+                els.summary.textContent = 0 + ' ' + lbl('VAS_133_UTM_SectionSummary', 'updates');
                 els.helper.textContent = '';
                 els.pageText.textContent = '1 ' + lbl('VAS_Of', 'of') + ' 1';
                 els.prev.disabled = true;
@@ -420,7 +415,7 @@
             var from = state.offset + 1;
             var to = Math.min(state.offset + state.rows.length, total);
 
-            els.summary.textContent = format('VAS_133_UTM_SectionSummary', '{0} updates', total);
+            els.summary.textContent = total + ' ' + lbl('VAS_133_UTM_SectionSummary', 'updates');
             els.helper.textContent = lbl('VAS_Showing', 'Showing') + ' ' + from + '–' + to + ' ' + lbl('VAS_Of', 'of') + ' ' + total;
             els.pageText.textContent = currentPage + ' ' + lbl('VAS_Of', 'of') + ' ' + pages;
             els.prev.disabled = state.offset <= 0;

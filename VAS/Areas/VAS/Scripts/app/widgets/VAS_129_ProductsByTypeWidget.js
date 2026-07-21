@@ -18,9 +18,9 @@
  *  2 | Tap a type to view its products       | VAS_129_PBT_Subtitle
  *  3 | Item / Service / Resource / Expense   | VAS_129_PBT_TypeItem / VAS_129_PBT_TypeService / VAS_129_PBT_TypeResource / VAS_129_PBT_TypeExpense
  *  4 | Products                              | VAS_129_PBT_ProductsLabel
- *  5 | {total} products across 4 types       | VAS_129_PBT_Helper
+ *  5 | products across 4 types (count prepended in code) | VAS_129_PBT_Helper
  *  6 | product / code / category / UoM / attributes / status | VAS_129_PBT_ColProduct / VAS_129_PBT_ColCode / VAS_129_PBT_ColCategory / VAS_129_PBT_ColUom / VAS_129_PBT_ColAttributes / VAS_129_PBT_ColStatus
- *  7 | {n} products                          | VAS_129_PBT_ModalSub
+ *  7 | products (count prepended in code)    | VAS_129_PBT_ModalSub
  *  8 | Active / Inactive                     | VAS_129_PBT_Active / VAS_129_PBT_Inactive
  *  9 | Showing / of                          | VAS_Showing / VAS_Of
  * 10 | No products of this type.             | VAS_129_PBT_EmptyState
@@ -304,7 +304,7 @@
             var total = state.total;
 
             els.donutTotal.textContent = total;
-            els.helper.textContent = format('VAS_129_PBT_Helper', '{0} products across 4 types', total);
+            els.helper.textContent = total + ' ' + lbl('VAS_129_PBT_Helper', 'products across 4 types');
 
             var svgHtml = '<circle cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="none" stroke="#EDF2F6" stroke-width="' + STROKE + '"/>';
             var offset = 0;
@@ -365,14 +365,6 @@
             });
         }
 
-        function format(key, fallback) {
-            var text = lbl(key, fallback);
-            for (var i = 2; i < arguments.length; i++) {
-                text = text.replace('{' + (i - 2) + '}', arguments[i]);
-            }
-            return text;
-        }
-
         /* ---- Modal ---- */
         function openModal(typeKey, originEl) {
             state.modalType = typeKey;
@@ -425,7 +417,7 @@
                 var data = parseResponse(text);
                 if (!data || data.error) { showModalError(typeKey); return; }
                 state.modalItems = data.items || [];
-                els.mSub.textContent = format('VAS_129_PBT_ModalSub', '{0} products', state.modalItems.length);
+                els.mSub.textContent = state.modalItems.length + ' ' + lbl('VAS_129_PBT_ModalSub', 'products');
                 sizeAndPaginateModal(0);
             }).catch(function (err) {
                 if (myToken !== detailToken) { return; }
