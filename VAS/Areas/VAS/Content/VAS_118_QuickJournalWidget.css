@@ -337,6 +337,29 @@
     font-size: 0.8em;
 }
 
+/* Transient save / complete confirmation toast (body-mounted; sits above the modal). */
+.vas-qj-toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(1rem);
+    background: #102C3F;
+    color: #fff;
+    padding: 0.7rem 1.2rem;
+    border-radius: 9px;
+    font-size: 0.85rem;
+    box-shadow: 0 12px 28px rgba(15, 61, 97, 0.28);
+    opacity: 0;
+    transition: opacity .25s, transform .25s;
+    z-index: 10002;
+    max-width: 90vw;
+}
+
+.vas-qj-toast--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 /* Footer */
 .vas-qj-foot {
     display: flex; align-items: center; gap: 0.5em;

@@ -1313,6 +1313,8 @@ namespace VAdvantage.Model
                     else
                         SetLineTotalAmt(Decimal.Add(GetLineNetAmt(), TaxAmt));
                     base.SetTaxAmt(TaxAmt);
+                    /*VAS_145: 20-July-2026, when we change the tax from surcharge to other than surcharge amount is not clearing*/
+                    SetSurchargeAmt(0);
                 }
             }
             catch (Exception ex)
