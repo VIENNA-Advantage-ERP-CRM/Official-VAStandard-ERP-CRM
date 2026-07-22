@@ -3093,6 +3093,9 @@
                 M_Product_ID: line.values.M_Product_ID,
                 M_AttributeSetInstance_ID: line.values.M_AttributeSetInstance_ID,
                 productName: line.display.productName,
+                // Purchase invoice (IsSOTrx = false) -> the control shows a "Select Lot" dropdown of
+                // the product's existing M_Lots; picking one fills the Lot field.
+                IsSOTrx: !!(parent && parent.IsSOTrx),
                 // true -> open straight on the New-attribute form; false -> instance list.
                 // Set this per your own requirement.
                 newAttribute: true,
