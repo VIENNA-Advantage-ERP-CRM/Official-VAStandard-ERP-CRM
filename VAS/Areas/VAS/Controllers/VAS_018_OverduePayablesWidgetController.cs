@@ -184,11 +184,8 @@ namespace VAS.Areas.VAS.Controllers
                     FROM (" + baseQuery + @") inv
                     INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = inv.C_BPartner_ID)
                    WHERE " + overdueCondition + @"
-                     AND bp.IsActive = 'Y'
-                     AND bp.IsVendor = 'Y'
                      AND bp.AD_Client_ID = @ClientID
                    GROUP BY bp.Name
-                  /*HAVING SUM(inv.OpenAmt) > 0*/
                    ORDER BY OverdueAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);

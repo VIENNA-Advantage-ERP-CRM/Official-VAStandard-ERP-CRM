@@ -149,9 +149,15 @@
             // trend rows.
             var html = '<div class="vas-towdg-header">'
                 +   '<div class="vas-towdg-icon">'
-                +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
-                +       ' stroke-linecap="round" stroke-linejoin="round">'
-                +       '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'
+                /* Self-contained rising-bars + up-trend tile (ported from
+                   VIS.OutstandingSalesOrderWidget), recolored to this widget's red semantic. */
+                +     '<svg viewBox="0 0 40 40" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">'
+                +       '<rect width="40" height="40" rx="10" fill="#FDECEC"/>'
+                +       '<rect x="9" y="26" width="5" height="8" rx="1" fill="#D14545" opacity="0.4"/>'
+                +       '<rect x="17" y="20" width="5" height="14" rx="1" fill="#D14545" opacity="0.7"/>'
+                +       '<rect x="25" y="15" width="5" height="19" rx="1" fill="#D14545"/>'
+                +       '<polyline points="23,12 27,7 31,12" fill="none" stroke="#D14545" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>'
+                +       '<line x1="27" y1="7" x2="27" y2="15" stroke="#D14545" stroke-width="1.6" stroke-linecap="round"/>'
                 +     '</svg>'
                 +   '</div>'
                 +   '<div class="vas-towdg-head-text">'

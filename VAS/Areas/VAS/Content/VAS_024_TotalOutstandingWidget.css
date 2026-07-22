@@ -89,18 +89,18 @@
     min-width: 2em;
     flex-shrink: 0;
     border-radius: 0.5625em;
-    /* Red tint to match this widget's semantic (outstanding AP exposure = danger);
-       the SVG stroke inherits this color via currentColor. */
-    background: linear-gradient(180deg, #FFFFFF, #FDECEC);
-    color: #D14545;
+    /* Self-contained SVG tile (its own red-tinted well + bars, ported from
+       VIS.OutstandingSalesOrderWidget) fills the well; overflow clips the tile's
+       corners to the family radius. No competing gradient/currentColor here. */
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .vas-towdg-icon svg {
-    width: 1.125em;
-    height: 1.125em;
+    width: 100%;
+    height: 100%;
 }
 
 .vas-towdg-head-text {
@@ -463,4 +463,36 @@
     .vas-towdg-drill-copy {
         width: 100%;
     }
+}
+
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-towdg-dialog-shell .vas-towdg-dialog-close {
+    right: auto;
+    left: 0.875em;
+}
+
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-towdg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-towdg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-towdg-drill-pager-btn svg {
+    transform: scaleX(-1);
 }

@@ -179,7 +179,7 @@
 .vas-inv-row {
     display: grid;
     align-items: center;
-    padding: 0.505em 1em;
+    padding: 0.3em 1em;
     transition: background 0.15s;
 }
 
