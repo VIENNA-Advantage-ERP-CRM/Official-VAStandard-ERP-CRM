@@ -543,11 +543,26 @@
             $row.append('<div class="vas-cil-cell" role="columnheader">' + esc(lbl("VAS_074_ProductCharge", "Product / Charge")) + "</div>");
             $row.append('<div class="vas-cil-cell" role="columnheader">' + esc(lbl("Description", "Description")) + "</div>");
             $row.append('<div class="vas-cil-cell vas-cil-cell--right" role="columnheader">' + esc(lbl("VAS_074_QtyUom", "Quantity / UOM")) + "</div>");
-            $row.append('<div class="vas-cil-cell vas-cil-cell--right" role="columnheader">' + esc(lbl("Price", "Price")) + "</div>");
+            $row.append('<div class="vas-cil-cell vas-cil-cell--right vas-cil-hdr-price" role="columnheader">' + priceHeaderHtml() + "</div>");
             $row.append('<div class="vas-cil-cell" role="columnheader">' + esc(lbl("Tax", "Tax")) + "</div>");
             $row.append('<div class="vas-cil-cell vas-cil-cell--right" role="columnheader">' + esc(lbl("VAS_074_LineAmount", "Line Amount")) + "</div>");
             $row.append('<div class="vas-cil-cell vas-cil-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_074_More", "More")) + '"></div>');
             return $row;
+        }
+
+        /* Price header markup: "Price", with a smaller second line "Incl. Tax" beneath it when the
+           price list is tax-inclusive. Returns already-escaped (safe) HTML. */
+        function priceHeaderHtml() {
+            var main = esc(lbl("Price", "Price"));
+            if (parent && parent.IsTaxIncluded)
+                main += '<span class="vas-cil-hdr-price-sub">' + esc(lbl("VAS_074_InclTax", "(Incl. Tax)")) + "</span>";
+            return main;
+        }
+
+        /* Re-render the (once-built) Price header cell for the current parent tax mode. Called from
+           render() so the header tracks the invoice/price-list data that loads AFTER buildHeadRow ran. */
+        function updatePriceHeader() {
+            if ($body) $body.find(".vas-cil-hdr-price").html(priceHeaderHtml());
         }
 
         /* ---------- render ---------- */
@@ -561,6 +576,9 @@
             }
             applyTabVisibility(true);
             $emptyState.hide(); $body.show();
+            // The head row was built before the invoice data arrived, so refresh the Price header
+            // now that parent.IsTaxIncluded (price-list tax mode) is known.
+            updatePriceHeader();
             // Read-only invoice: mark the panel so disabled controls (checkbox, "...")
             // show a not-allowed cursor via their (enabled) parent cell - a disabled
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
@@ -2122,6 +2140,13 @@
         var VAFAM_ASSET_RELATED_COL = "VAFAM_IsAssetRelated";
         var VAFAM_CAPITAL_EXPENSE_COL = "VAFAM_CapitalExpense";
         var VAFAM_ASSET_ID_COL = "A_Asset_ID";
+        /* Revenue recognition start date: mandatory whenever it is on-screen (service / expense /
+           charge line + its AD_Field DisplayLogic passes), mirroring the Capital-Expense rule. */
+        var REVENUE_START_DATE_COL = "RevenueStartDate";
+        /* Treat-as-discount reference fields: mandatory whenever shown (only surfaced while the
+           invoice header's TreatAsDiscount is set), mirroring the Capital-Expense rule. */
+        var REF_INVOICE_ORG_COL = "Ref_InvoiceOrg_ID";
+        var REF_INVOICE_LINE_ORG_COL = "Ref_InvoiceLineOrg_ID";
 
         /* Is this line currently flagged Asset Related? (YesNo, read case-insensitively.) */
         function isAssetRelated(line) {
@@ -2135,6 +2160,14 @@
         function dynMandatory(line, m) {
             if (m.IsMandatory) return true;
             if (m.ColumnName === VAFAM_CAPITAL_EXPENSE_COL) return isAssetRelated(line);
+            // RevenueStartDate is required whenever it is shown. Its visibility (svcExpenseOrCharge
+            // candidacy + AD_Field DisplayLogic) is enforced by the callers - firstMissingDynMandatory
+            // skips non-visible fields and applyDynDisplay hides the control - so returning true here
+            // makes it mandatory exactly when on-screen, like Capital Expense on an Asset-Related line.
+            if (m.ColumnName === REVENUE_START_DATE_COL) return true;
+            // Treat-as-discount reference fields are required whenever shown - they are only candidates
+            // while the header's TreatAsDiscount is set, and the callers enforce actual visibility.
+            if (m.ColumnName === REF_INVOICE_ORG_COL || m.ColumnName === REF_INVOICE_LINE_ORG_COL) return true;
             return false;
         }
 
@@ -3060,6 +3093,9 @@
                 M_Product_ID: line.values.M_Product_ID,
                 M_AttributeSetInstance_ID: line.values.M_AttributeSetInstance_ID,
                 productName: line.display.productName,
+                // Purchase invoice (IsSOTrx = false) -> the control shows a "Select Lot" dropdown of
+                // the product's existing M_Lots; picking one fills the Lot field.
+                IsSOTrx: !!(parent && parent.IsSOTrx),
                 // true -> open straight on the New-attribute form; false -> instance list.
                 // Set this per your own requirement.
                 newAttribute: true,

@@ -287,7 +287,7 @@
     display: grid;
     grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
     gap: 0.75em;
-    align-items: center;
+    align-items: start;
     padding: 0.5em 0;
     border-bottom: 0.0625em solid var(--cil-divider);
     transition: background .12s;
@@ -302,6 +302,17 @@
         font-size: 0.9125em;
         font-weight: 400;
         color: var(--cil-text);
+    }
+
+    /* "Incl. Tax" second line under the Price header - smaller + muted, stacks below
+       "Price" in the flex-column header cell and right-aligns with it. */
+    .vas-cil-hdr-price-sub {
+        display: block;
+        font-size: 0.75em;
+        font-weight: 400;
+        line-height: 1.1;
+        margin-top: 0.05em;
+        color: var(--cil-text-subtle, #5F7283);
     }
 
 .vas-cil-row--line {
@@ -463,6 +474,7 @@
 .vas-cil-cell--check {
     align-items: center;
     justify-content: center;
+    padding-top: 4px;
 }
 
 .vas-cil-cell--right {

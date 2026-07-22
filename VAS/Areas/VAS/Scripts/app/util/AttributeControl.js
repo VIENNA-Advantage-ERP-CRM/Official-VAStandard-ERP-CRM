@@ -95,6 +95,9 @@
             M_Product_ID: parseInt(opts.M_Product_ID, 10) || 0,
             M_AttributeSetInstance_ID: parseInt(opts.M_AttributeSetInstance_ID, 10) || 0,
             productName: opts.productName || "",
+            // Sales (true) vs purchase (false). Purchase side gets an M_Lot search lookup in the
+            // create/edit form; picking (or creating) a lot fills + locks #vasCilAttrLot.
+            IsSOTrx: !!opts.IsSOTrx,
             // opts.newAttribute === true -> open straight on the "New attribute" create form;
             // false / omitted -> the existing-instance list (default). Caller decides the rule.
             newAttribute: !!opts.newAttribute,
@@ -346,7 +349,16 @@
             }
             html += attrField(ctrl, a.Name, null, a.IsMandatory);
         }
-        if (info.IsLot) { any = true; html += attrField(attrTextInput("vasCilAttrLot", true), L("VAS_074_Lot", "Lot"), attrFieldBtn("attr-newlot", L("VAS_074_NewLot", "New")), false); }
+        if (info.IsLot) {
+            any = true;
+            // Purchase side (IsSOTrx = false): a framework Search lookup on M_Lot (text box + search
+            // button opening the paged info window), so it scales to any number of lots. Built into
+            // this slot by buildLotSearch() after the form renders; picking a lot fills the Lot value
+            // field (#vasCilAttrLot). Sales side keeps just the text + "New" (lots generated there).
+            if (!st.IsSOTrx)
+                html += '<div id="vasCilAttrLotSearchSlot" class="input-group vis-input-wrap vas-cil-attr-lotsearch"></div>';
+            html += attrField(attrTextInput("vasCilAttrLot", true), L("VAS_074_Lot", "Lot"), attrFieldBtn("attr-newlot", L("VAS_074_NewLot", "New")), false);
+        }
         if (info.IsSerNo) { any = true; html += attrField(attrTextInput("vasCilAttrSerNo", true), L("VAS_074_SerialNo", "Serial No"), attrFieldBtn("attr-genserno", L("VAS_074_Generate", "Generate")), false); }
         if (info.IsGuaranteeDate) {
             any = true;
@@ -385,7 +397,18 @@
             success: function (res) {
                 cfg.BUSY(false);
                 var r = (res && typeof res.result !== "undefined") ? res.result : res;
-                if (r && r.Name != null) { $("#vasCilAttrLot").val(r.Name); st.newLotId = r.Key; }
+                if (r && r.Name != null) {
+                    $("#vasCilAttrLot").val(r.Name);
+                    st.newLotId = r.Key;
+                    // Req 2 (purchase side): reflect the newly created lot in the existing-lot search
+                    // control and lock the Lot text, so both controls stay in sync.
+                    if (!st.IsSOTrx) {
+                        setLotReadOnly(true);
+                        if (st.lotSearch && typeof st.lotSearch.setValue === "function") {
+                            try { st.lotSearch.setValue(r.Key); } catch (e) { console.log(e); }
+                        }
+                    }
+                }
                 else cfg.TOAST(cfg.L("VAS_074_LotFailed", "Could not create lot"));
             },
             error: function (e) { console.log(e); cfg.BUSY(false); cfg.TOAST(cfg.L("VAS_074_LotFailed", "Could not create lot")); }
@@ -407,6 +430,61 @@
             },
             error: function (e) { console.log(e); cfg.BUSY(false); cfg.TOAST(cfg.L("VAS_074_SerNoFailed", "Could not generate serial number")); }
         });
+    }
+
+    /* Toggle the Lot value field (#vasCilAttrLot) read-only. Used when a lot is chosen from (or
+       created into) the existing-lot search control, so the picked value can't be hand-edited. */
+    function setLotReadOnly(ro) {
+        var $lot = $("#vasCilAttrLot");
+        if (!$lot.length) return;
+        if (ro) {
+            $lot.attr("readonly", true);
+        }
+        else {
+            $lot.removeAttr("readonly");
+        }
+    }
+
+    /* Purchase-side lot picker: a framework Search lookup on M_Lot (text box + search button that
+       opens the paged info window), so it scales to any number of lots - unlike a fixed dropdown.
+       Mirrors the reference PAttributesForm lot search. Built into #vasCilAttrLotSearchSlot after
+       the create form renders; picking a lot writes its name into #vasCilAttrLot. No-op when the
+       slot isn't present (sales side / no lot) or the framework lookup classes are unavailable. */
+    function buildLotSearch() {
+        var $slot = $("#vasCilAttrLotSearchSlot");
+        if (!$slot.length || $slot.children().length) return;   // absent, or already built
+        if (!(window.VIS && VIS.MLookupFactory && VIS.Controls && VIS.Controls.VTextBoxButton && VIS.Env)) return;
+        var L = cfg.L, E = cfg.E, DT = VIS.DisplayType;
+        try {
+            // Lots of THIS product only. The id is inlined (no window-context @tokens), so a
+            // windowNo of 0 is fine for MLookupFactory. Table-qualified to match the M_Lot lookup.
+            var whereClause = " M_Lot.M_Product_ID = " + (parseInt(st.M_Product_ID, 10) || 0) + " ";
+            var lookup = VIS.MLookupFactory.get(VIS.Env.getCtx(), 0, 0, DT.Search, "M_Lot_ID", 0, false, whereClause);
+            var ctrl = new VIS.Controls.VTextBoxButton("M_Lot_ID", false, false, true, DT.Search, lookup);
+            st.lotSearch = ctrl;
+
+            // Same borderless floating-label structure as attrField (the slot IS the input-group).
+            var $wrap = $('<div class="vis-control-wrap"></div>');
+            $wrap.append(ctrl.getControl().attr("placeholder", " ").attr("data-placeholder", "").attr("data-hasbtn", " ").css("width", "100%"))
+                .append("<label>" + E(L("VAS_074_ExistingLot", "Existing Lot")) + "</label>");
+            $slot.append($wrap).append($('<div class="input-group-append"></div>').append(ctrl.getBtn(0)));
+
+            // On pick, the lookup display is "<product>_<lot>"; take the part after the last "_"
+            // (else the whole display) and write it into the Lot value field. Mirrors the reference.
+            ctrl.fireValueChanged = function () {
+                var disp = (ctrl.getDisplay ? ctrl.getDisplay() : "") || "";
+                var lotName = disp.lastIndexOf("_") >= 0 ? disp.substring(disp.lastIndexOf("_") + 1) : disp;
+                if (lotName && lotName.length) {
+                    // Req 1: a lot chosen from the existing-lot control -> fill + lock the Lot text.
+                    $("#vasCilAttrLot").val(lotName);
+                    setLotReadOnly(true);
+                } else {
+                    // Selection cleared -> release the Lot text so the user can type / use New again.
+                    $("#vasCilAttrLot").val("");
+                    setLotReadOnly(false);
+                }
+            };
+        } catch (e) { console.log(e); }
     }
 
     function renderAttr() {
@@ -485,6 +563,7 @@
         st.error = "";
         $("#vasCilAttrCreate").html(attrCreateForm());
         renderAttr();
+        buildLotSearch();               // purchase-side M_Lot search lookup (no-op otherwise)
         if (editAsi) prefillCreateForm(editAsi);
     }
     function editExistingInstance(o) {
@@ -552,8 +631,12 @@
         $.ajax({
             url: cfg.contextUrl + cfg.ep.saveAttribute,
             type: "POST", dataType: "json",
-            data: { payload: JSON.stringify({ M_Product_ID: st.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
-                Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }] }) },
+            data: {
+                payload: JSON.stringify({
+                    M_Product_ID: st.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
+                    Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }]
+                })
+            },
             success: function (raw) {
                 cfg.BUSY(false);
                 var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -610,9 +693,13 @@
         $.ajax({
             url: cfg.contextUrl + cfg.ep.saveAttribute,
             type: "POST", dataType: "json",
-            data: { payload: JSON.stringify({ M_Product_ID: st.M_Product_ID,
-                M_AttributeSetInstance_ID: (st.editAsi && st.editAsi.M_AttributeSetInstance_ID) || 0,
-                Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values }) },
+            data: {
+                payload: JSON.stringify({
+                    M_Product_ID: st.M_Product_ID,
+                    M_AttributeSetInstance_ID: (st.editAsi && st.editAsi.M_AttributeSetInstance_ID) || 0,
+                    Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values
+                })
+            },
             success: function (raw) {
                 cfg.BUSY(false);
                 var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
