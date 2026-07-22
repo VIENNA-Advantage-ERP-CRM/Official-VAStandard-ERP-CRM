@@ -79,10 +79,14 @@
         var $root = $('<div class="vas-inv-root">');
 
         var $tableBody;
+        /* Scroll region (holds the sticky head + body) and the head itself — both measured by the
+           adaptive capacity sync, so they are widget-scoped (not locals of createWidget). */
+        var $tableWrap;
+        var $tableHead;
         var $alertBanner;
         /* Busy/loading overlay shown while the attention rows are being fetched. */
         var $busy;
-        /* Footer pager (server-side paging, 5 rows per page) — design.md "Widget Footer Pager":
+        /* Footer pager (server-side paging) — design.md "Widget Footer Pager":
            left result-range helper + right compact pager control. */
         var $footer;
         var $pageInfo;
@@ -90,9 +94,20 @@
         var $prevBtn;
         var $nextBtn;
         var pageNo = 1;
-        var pageSize = 5;
+        /* Adaptive server-side paging (mirrors VAS_021_RealTimeAlertsWidget): the client measures how
+           many invoice rows physically fit the list region and sends that as pageSize; the server
+           clamps + echoes it back. A ResizeObserver re-measures and re-pages on resize, so the list
+           never grows an inner scrollbar (design.md "Internal Content Must Not Resize The Widget"). */
+        var pageSize = 5;        // initial guess; replaced by the adaptive measure + server echo
         var totalPages = 0;
         var totalRecords = 0;
+        var measuredRowH = 0;    // last measured invoice-row height (px)
+        var loading = false;     // a fetch is in flight — suppress re-entrant capacity syncs
+        var bodyObserver = null;
+        var needsCapacitySync = true; // measure capacity on first load only; resize is the observer's job
+        var pendingSync = false; // a resize arrived mid-fetch — re-measure once the fetch finishes
+        var MIN_ROWS = 1;        // never force more rows than physically fit (no clipping)
+        var ROW_H_FALLBACK = 44; // px, used only before a real row is measured
         /* Base-currency symbol from the backend; rendered before every amount. */
         var currencySymbol = '';
         /* Duplicate sets (grouped by customer) and the open review-dialog overlay. */
@@ -178,6 +193,7 @@
 
         /* ── Load the attention rows (Overdue / Due soon / Sent), one page at a time ── */
         function loadAttention() {
+            loading = true;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'Invoices/GetAttentionInvoices',
@@ -192,6 +208,7 @@
                         renderRows();
                         updatePager();
                         showBusy(false);
+                        loading = false;
                         return;
                     }
                     /* Symbol from whichever endpoint answers first; both report the same base currency. */
@@ -199,6 +216,16 @@
                     pageNo = Number(data.pageNo || pageNo);
                     totalPages = Number(data.totalPages || 0);
                     totalRecords = Number(data.totalRecords || 0);
+
+                    /* Requested a page past the last one (e.g. a zoom-out enlarged the page after the
+                       measure used a stale count): the server returns an empty slice rather than
+                       clamping. Step back to the real last page and re-fetch instead of flashing "No
+                       data". pageNo is now <= totalPages, so this can run at most once. */
+                    if (totalRecords > 0 && pageNo > totalPages) {
+                        pageNo = totalPages;
+                        loadAttention();
+                        return;
+                    }
 
                     var rows = data.rows || [];
                     INVOICES = $.map(rows, function (r) {
@@ -218,6 +245,16 @@
                     renderRows();
                     updatePager();
                     showBusy(false);
+                    loading = false;
+
+                    /* Measure capacity on the first load (adapt from the initial guess of 5) or when a
+                       resize arrived while this fetch was in flight (pendingSync). Manual paging alone
+                       does not re-measure — that would flip pageSize mid-navigation; genuine size
+                       changes come through the ResizeObserver. */
+                    if (needsCapacitySync || pendingSync) {
+                        pendingSync = false;
+                        scheduleCapacitySync();
+                    }
                 },
                 error: function () {
                     INVOICES = [];
@@ -226,6 +263,8 @@
                     renderRows();
                     updatePager();
                     showBusy(false);
+                    loading = false;
+                    pendingSync = false;
                 }
             });
         }
@@ -314,10 +353,10 @@
             );
 
             /* Table wrapper */
-            var $tableWrap = $('<div class="vas-inv-table-wrap">');
+            $tableWrap = $('<div class="vas-inv-table-wrap">');
 
             /* Table header row — frozen above the scrolling body (CSS sticky). */
-            var $tableHead = $(
+            $tableHead = $(
                 '<div class="vas-inv-table-head" style="grid-template-columns:' + COL_TMPL + ';">' +
                 '<span class="vas-inv-th">' + lbl("VAS_062_Invoice", 'Invoice') + '</span>' +
                 '<span class="vas-inv-th-customer">' + lbl("VAS_062_Customer", 'Customer') + '</span>' +
@@ -361,12 +400,74 @@
             $busy = $('<div class="vas-inv-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $busy[0].style.visibility = 'hidden';
             $root.append($busy);
+
+            /* Watch the scroll region so a resize re-measures how many rows fit and re-pages. */
+            observeBody();
         }
 
         /* Toggle the busy/loading overlay. */
         function showBusy(show) {
             if (!$busy || !$busy[0]) { return; }
             $busy[0].style.visibility = show ? 'visible' : 'hidden';
+        }
+
+        /* ── Adaptive row count (No-Inner-Scrollbars rule, mirrors VAS_021) ── */
+
+        function scheduleCapacitySync() {
+            var raf = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
+            raf(function () { syncCapacity(); });
+        }
+
+        /* Measure how many invoice rows physically fit the list region (the scroll wrapper minus its
+           sticky header) and, when that differs from the page size we last requested, adopt it and
+           reload the current page. Converges in one step (a re-render yields the same fit). */
+        function syncCapacity() {
+            if (loading || !$tableWrap || !$tableWrap[0]) { return; }
+            if (totalRecords <= 0) { return; }  // no real data row to size from yet
+
+            var headH = ($tableHead && $tableHead[0]) ? $tableHead[0].offsetHeight : 0;
+            var avail = $tableWrap[0].clientHeight - headH;
+            if (avail <= 0) {
+                // Layout not settled yet — retry next frame while an initial sync is pending.
+                if (needsCapacitySync) { scheduleCapacitySync(); }
+                return;
+            }
+
+            // Rows are variable-height (the customer cell wraps to 1–2 lines), so size capacity off the
+            // TALLEST rendered row — sizing off the shortest row would let a two-line row overflow and
+            // clip. Guarantees the whole page fits, never scrolls.
+            var rows = $tableBody[0].querySelectorAll('.vas-inv-row');
+            var maxH = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > maxH) { maxH = rows[i].offsetHeight; }
+            }
+            if (maxH > 0) { measuredRowH = maxH; }
+            var rowH = measuredRowH > 0 ? measuredRowH : ROW_H_FALLBACK;
+
+            needsCapacitySync = false;  // measurement succeeded — stop the initial one-shot
+            var capacity = Math.max(MIN_ROWS, Math.floor(avail / rowH));
+            if (capacity !== pageSize) {
+                pageSize = capacity;
+                /* A larger page (zoom-out) can leave the current page past the new last page. The
+                   server does not clamp pageNo, so step back to the last page that still has data
+                   before reloading (totalRecords is from the last load; the load handler backstops
+                   any residual mismatch). */
+                var newTotalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+                if (pageNo > newTotalPages) { pageNo = newTotalPages; }
+                loadAttention();
+            }
+        }
+
+        function observeBody() {
+            if (typeof ResizeObserver === 'undefined' || !$tableWrap || !$tableWrap[0]) { return; }
+            bodyObserver = new ResizeObserver(function () {
+                /* A resize that lands mid-fetch (e.g. the widget reaching its final size while the
+                   first page is still loading) must not be dropped, or the capacity stays stuck at the
+                   intermediate measure. Defer it and re-measure when the load finishes. */
+                if (loading) { pendingSync = true; return; }
+                syncCapacity();
+            });
+            bodyObserver.observe($tableWrap[0]);
         }
 
         /* Human-readable due value: "Today" for the current day, "Mon DD" otherwise, em dash when no
@@ -1071,6 +1172,7 @@
         };
 
         this.disposeComponent = function () {
+            if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
             closeReview();
             $root.remove();
         };

@@ -283,11 +283,8 @@ namespace VAS.Areas.VAS.Controllers
                    WHERE ips.IsActive = 'Y'
                      AND ips.VA009_IsPaid = 'N'
                      AND ips.DueAmt > 0
-                     AND bp.IsActive = 'Y'
-                     AND bp.IsVendor = 'Y'
                      AND bp.AD_Client_ID = @ClientID
                    GROUP BY bp.Name
-                  /*HAVING SUM(" + amountSql + @") > 0*/
                    ORDER BY OutstandingAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);

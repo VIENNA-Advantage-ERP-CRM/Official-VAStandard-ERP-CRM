@@ -251,10 +251,7 @@ namespace VAS.Areas.VAS.Controllers
                     INNER JOIN M_Product p ON (il.M_Product_ID = p.M_Product_ID)
                     INNER JOIN M_Product_Category pc ON (p.M_Product_Category_ID = pc.M_Product_Category_ID)
                    WHERE il.IsActive = 'Y'
-                     AND p.IsActive = 'Y'
-                     AND pc.IsActive = 'Y'
                    GROUP BY pc.Name
-                  HAVING SUM(" + amountSql + @") > 0
                    ORDER BY TotalAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
