@@ -485,3 +485,35 @@
         width: 100%;
     }
 }
+
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close {
+    right: auto;
+    left: 0.875em;
+}
+
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-tpwidg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-tpwidg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-tpwidg-drill-pager-btn svg {
+    transform: scaleX(-1);
+}
