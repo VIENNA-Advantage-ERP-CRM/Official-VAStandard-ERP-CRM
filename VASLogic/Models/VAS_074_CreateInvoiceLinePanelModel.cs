@@ -916,7 +916,7 @@ namespace VASLogic.Models
                               i.DateInvoiced,
                               i.DateAcct,
                               i.IsSOTrx,
-                              COALESCE(i.IsTaxIncluded, 'N') AS IsTaxIncluded,
+                              COALESCE(pl.IsTaxIncluded, i.IsTaxIncluded, 'N') AS IsTaxIncluded,
                               " + treatDiscExpr + @" AS TreatAsDiscount,
                               i.DocStatus,
                               COALESCE(i.Processed, 'N') AS Processed,
@@ -925,6 +925,10 @@ namespace VASLogic.Models
                               cur.ISO_Code         AS CurrencyISOCode
                            FROM C_Invoice i
                            INNER JOIN C_Currency cur ON (i.C_Currency_ID = cur.C_Currency_ID)
+                           /* Tax-inclusive pricing is a PRICE LIST condition (M_PriceList.IsTaxIncluded);
+                              use it as the source of truth so the panel (Price header + tax math) tracks
+                              the price list. Fall back to the invoice flag when no price list is set. */
+                           INNER JOIN M_PriceList pl ON (i.M_PriceList_ID = pl.M_PriceList_ID)
                            WHERE i.C_Invoice_ID = @C_Invoice_ID
                              AND i.IsActive = 'Y'";
 
@@ -2230,15 +2234,17 @@ namespace VASLogic.Models
                     if (input.C_UOM_ID > 0)
                         line.SetC_UOM_ID(input.C_UOM_ID);
 
-                    if (input.PriceEntered != 0 || input.M_Product_ID <= 0)
-                    {
-                        line.SetPriceEntered(input.PriceEntered);
-                        line.SetPriceActual(input.PriceEntered);
-                    }
-                    else
-                    {
-                        //  SetLinePriceWithAttribute(line, inv, input.M_AttributeSetInstance_ID);
-                    }
+                    // The panel already prices every line server-side via CalcLine
+                    // (SetLinePriceWithAttribute, which is attribute-aware), so the client-sent
+                    // PriceEntered is authoritative — persist exactly what the UI shows. This MUST
+                    // include a legitimate 0: when the chosen attribute has no M_ProductPrice entry the
+                    // priced value is 0, and the old `PriceEntered != 0` guard skipped the set in that
+                    // case, leaving the attribute-blind price that SetM_Product_ID(, true) had computed
+                    // (the product's base / prior price) — so the UI's 0 was silently replaced by the
+                    // previous price on save. Always applying the input price keeps save == UI for both
+                    // computed prices and manual overrides (charge lines carry their entered amount).
+                    line.SetPriceEntered(input.PriceEntered);
+                    line.SetPriceActual(input.PriceEntered);
 
                     // Line discount percent reduces the actual price.
                     // ApplyDiscount(line, input.Discount);
