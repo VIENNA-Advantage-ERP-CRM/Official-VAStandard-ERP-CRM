@@ -25,7 +25,6 @@
  * 14  | Debit                                            | VAS_118_Debit
  * 15  | Credit                                           | VAS_118_Credit
  * 16  | Balanced                                         | VAS_118_Balanced
- * 17  | Cancel                                           | VAS_118_Cancel
  * 18  | Save Draft                                       | VAS_118_SaveDraft
  * 19  | Complete Journal                                 | VAS_118_CompleteJournal
  * 20  | Select...                                        | VAS_118_SelectPlaceholder
@@ -34,12 +33,13 @@
  * 23  | What is this entry for?                          | VAS_118_DescPlaceholder
  * 24  | Close                                            | VAS_118_Close
  * 25  | The journal could not be saved.                  | VAS_118_JournalNotSaved
- * 26  | Journal {0} saved as draft.                      | VAS_118_JournalSavedDraft
- * 27  | Journal {0} Complete successfully.               | VAS_118_JournalComplete
+ * 26  | Journal record saved as draft.                   | VAS_118_JournalSavedDraft
+ * 27  | Journal record completed successfully.           | VAS_118_JournalComplete
  * 28  | Search organization                              | VAS_118_SearchOrg
  * 29  | Search accounting schema                         | VAS_118_SearchSchema
  * 30  | Search document type                             | VAS_118_SearchDocType
  * 31  | Search cost center                               | VAS_118_SearchCostCenter
+ * 35  | Debit and Credit accounts must be different.     | VAS_118_SameAccounts
  * 32  | Draft                                            | VAS_118_Draft
  * 33  | Completed                                        | VAS_118_Completed
  * 34  | Closed                                           | VAS_118_Closed
@@ -295,7 +295,6 @@
 
                 '<div class="vas-qj-body">' +
                 '<div class="vas-qj-status vas-qj-hidden"></div>' +
-                '<div class="vas-qj-general-err vas-qj-hidden"></div>' +
 
                 '<div class="vas-qj-row">' +
                 fieldCombo('org', 'vas-qj-org', escapeHtml(lbl("VAS_118_Organization", "Organization")), lbl("VAS_118_SearchOrg", "Search Organization"), true) +
@@ -335,7 +334,9 @@
                 '</div>' +
 
                 '<div class="vas-qj-foot">' +
-                '<button type="button" class="vas-qj-btn vas-qj-btn-ghost vas-qj-cancel">' + escapeHtml(lbl("VAS_118_Cancel", "Cancel")) + '</button>' +
+                /* Validation / save errors surface here, beside the actions that
+                   triggered them, instead of at the top of the scrolling body. */
+                '<div class="vas-qj-general-err vas-qj-hidden" role="alert"></div>' +
                 '<div class="vas-qj-foot-actions">' +
                 '<button type="button" class="vas-qj-btn vas-qj-btn-secondary vas-qj-draft">' + escapeHtml(lbl("VAS_118_SaveDraft", "Save Draft")) + '</button>' +
                 '<button type="button" class="vas-qj-btn vas-qj-btn-primary vas-qj-post" disabled>' + escapeHtml(lbl("VAS_118_CompleteJournal", "Complete Journal")) + '</button>' +
@@ -348,8 +349,8 @@
                 '</div>'
             );
 
-            /* Do NOT close on scrim (outside) click — only the X and Cancel close it. */
-            $dialog.find('.vas-qj-close, .vas-qj-cancel').on('click', closeDialog);
+            /* Do NOT close on scrim (outside) click — only the header X closes it. */
+            $dialog.find('.vas-qj-close').on('click', closeDialog);
             $dialog.find('.vas-qj-amount-input')
                 .on('input', function () { sanitizeAmountField($(this)); updateBalance(); })
                 /* On blur, snap the entry to the schema precision (e.g. 12.5 → 12.50). */
@@ -444,7 +445,7 @@
         }
 
         /* Completion end-state: freeze the form + footer and surface "New Journal"
-           in the header. Only Close (and Cancel) still act. */
+           in the header. Only Close and New Journal still act. */
         function setCompleted(done) {
             completedState = !!done;
             setFormLocked(!!done);
@@ -606,14 +607,23 @@
             function render(items) {
                 if (!items || !items.length) { $list.addClass('vas-qj-hidden').empty(); return; }
                 var html = '';
+                var picked = String($id.val() || '');
                 for (var i = 0; i < items.length; i++) {
-                    html += '<div class="vas-qj-combo-item" data-id="' + escapeHtml(items[i].id) + '" data-label="' + escapeHtml(items[i].label) + '">' +
+                    var isPicked = picked !== '' && String(items[i].id) === picked;
+                    html += '<div class="vas-qj-combo-item' + (isPicked ? ' vas-qj-combo-item-picked' : '') +
+                        '" data-id="' + escapeHtml(items[i].id) + '" data-label="' + escapeHtml(items[i].label) + '">' +
                         (items[i].html || escapeHtml(items[i].label)) + '</div>';
                 }
                 $list.html(html).removeClass('vas-qj-hidden');
-                /* Highlight the first row so Enter picks it and Down/Up navigate from there. */
-                $list.find('.vas-qj-combo-item').first().addClass('vas-qj-combo-item-active');
+                /* Highlight the current selection when the full list is shown (so the
+                   user sees where they are among all records); otherwise the first row,
+                   so Enter picks it and Down/Up navigate from there. */
+                var $start = $list.find('.vas-qj-combo-item-picked').first();
+                if (!$start.length) { $start = $list.find('.vas-qj-combo-item').first(); }
+                $start.addClass('vas-qj-combo-item-active');
                 positionList();
+                var startEl = $start[0];
+                if (startEl && startEl.scrollIntoView) { startEl.scrollIntoView({ block: 'nearest' }); }
             }
 
             /* Open the list upward when there isn't room below inside the modal — a
@@ -650,8 +660,19 @@
                 if (el && el.scrollIntoView) { el.scrollIntoView({ block: 'nearest' }); }
             }
 
-            /* Click / focus opens the list (empty term => all / first page). */
-            $input.on('focus click', function () { provider($input.val(), render); });
+            /* Click / focus opens the list (empty term => all / first page).
+               When a record is already selected the input holds that record's label,
+               so filtering by it would show ONLY that row — open the FULL list instead
+               (the current pick is highlighted by render) so another record can be
+               chosen without clearing the field first. */
+            function openList() { provider($id.val() ? '' : $input.val(), render); }
+            $input.on('click', openList);
+            $input.on('focus', function () {
+                /* Pre-select the text so typing replaces the committed label rather
+                   than appending to it (which would filter on "OldLabelX"). */
+                if ($id.val()) { try { this.select(); } catch (e) { } }
+                openList();
+            });
             /* Typing invalidates a prior pick and re-filters. */
             $input.on('input', function () { $id.val(''); markInvalid($combo, false); provider($input.val(), render); });
 
@@ -660,7 +681,7 @@
                 var key = e.key;
                 if (key === 'ArrowDown' || key === 'Down') {
                     e.preventDefault();
-                    if ($list.hasClass('vas-qj-hidden')) { provider($input.val(), render); }
+                    if ($list.hasClass('vas-qj-hidden')) { openList(); }
                     else { moveActive(1); }
                 } else if (key === 'ArrowUp' || key === 'Up') {
                     e.preventDefault();
@@ -695,7 +716,7 @@
 
             /* Lets callers re-run the provider (e.g. reload accounts when the schema
                changes) without reaching into this closure. */
-            $combo.data('vasReload', function () { provider($input.val(), render); });
+            $combo.data('vasReload', openList);
         }
 
         function clearCombo($combo) {
@@ -760,9 +781,18 @@
 
         /* ---------------- submit ---------------- */
 
+        /* Marks every offending field and returns what is wrong:
+             missing   — labels of the empty mandatory fields, named in the footer
+                         message so the user knows WHICH ones to fill
+             conflicts — problems that aren't about emptiness (same debit/credit)
+           Valid form => both lists empty. */
         function validate() {
-            var ok = true;
-            function req($f, cond) { markInvalid($f, !cond); if (!cond) { ok = false; } }
+            var missing = [];
+            var conflicts = [];
+            function req($f, cond, label) {
+                markInvalid($f, !cond);
+                if (!cond) { missing.push(label); }
+            }
 
             var $org = $dialog.find('.vas-qj-org');
             var $date = $dialog.find('.vas-qj-date');
@@ -773,18 +803,33 @@
             var $credit = $dialog.find('.vas-qj-credit');
             var $amount = $dialog.find('.vas-qj-amount-input');
 
-            req($org, Number($org.find('.vas-qj-combo-id').val() || 0) > 0);
-            req($date, !!$date.val());
-            req($schema, Number($schema.find('.vas-qj-combo-id').val() || 0) > 0);
-            req($doctype, Number($doctype.find('.vas-qj-combo-id').val() || 0) > 0);
-            req($desc, !!$.trim($desc.val()));
+            /* Labels are the same message keys the fields are rendered with, so the
+               message always names the column exactly as it appears on screen. */
+            req($org, Number($org.find('.vas-qj-combo-id').val() || 0) > 0, lbl("VAS_118_Organization", "Organization"));
+            req($date, !!$date.val(), lbl("VAS_118_JournalDate", "Journal Date"));
+            req($schema, Number($schema.find('.vas-qj-combo-id').val() || 0) > 0, lbl("VAS_118_AccountingSchema", "Accounting Schema"));
+            req($doctype, Number($doctype.find('.vas-qj-combo-id').val() || 0) > 0, lbl("VAS_118_DocumentType", "Document Type"));
+            req($desc, !!$.trim($desc.val()), lbl("VAS_118_Description", "Description"));
             var debitId = Number($debit.find('.vas-qj-combo-id').val() || 0);
             var creditId = Number($credit.find('.vas-qj-combo-id').val() || 0);
-            req($debit, debitId > 0);
-            req($credit, creditId > 0);
-            req($amount, parseAmount($amount.val()) > 0);
-            if (debitId > 0 && debitId === creditId) { markInvalid($credit, true); ok = false; }
-            return ok;
+            req($debit, debitId > 0, lbl("VAS_118_DebitAccount", "Debit Account"));
+            req($credit, creditId > 0, lbl("VAS_118_CreditAccount", "Credit Account"));
+            req($amount, parseAmount($amount.val()) > 0, lbl("VAS_118_Amount", "Amount"));
+            if (debitId > 0 && debitId === creditId) {
+                markInvalid($credit, true);
+                conflicts.push(lbl("VAS_118_SameAccounts", "Debit and Credit accounts must be different."));
+            }
+            return { missing: missing, conflicts: conflicts };
+        }
+
+        /* Footer message for a validate() result — "" when the form is valid. */
+        function validationMessage(result) {
+            var parts = [];
+            if (result.missing.length) {
+                parts.push(lbl("FillMandatory", "Fill mandatory field(s):") + ' ' + result.missing.join(', '));
+            }
+            for (var i = 0; i < result.conflicts.length; i++) { parts.push(result.conflicts[i]); }
+            return parts.join(' ');
         }
 
         function showGeneralError(msg) {
@@ -904,7 +949,8 @@
         function onSaveDraft() {
             if (submitting) { return; }
             $dialog.find('.vas-qj-general-err').addClass('vas-qj-hidden').empty();
-            if (!validate()) { showGeneralError(lbl("FillMandatory", "Please fill all mandatory fields.")); return; }
+            var draftErr = validationMessage(validate());
+            if (draftErr) { showGeneralError(draftErr); return; }
             setBusy(true);
             postSave(function (ok, data) {
                 setBusy(false);
@@ -917,7 +963,8 @@
         function onComplete() {
             if (submitting || currentJournalId <= 0) { return; }
             $dialog.find('.vas-qj-general-err').addClass('vas-qj-hidden').empty();
-            if (!validate()) { showGeneralError(lbl("FillMandatory", "Please fill all mandatory fields.")); return; }
+            var completeErr = validationMessage(validate());
+            if (completeErr) { showGeneralError(completeErr); return; }
             setBusy(true);
             if (isDirty()) {
                 postSave(function (ok) {

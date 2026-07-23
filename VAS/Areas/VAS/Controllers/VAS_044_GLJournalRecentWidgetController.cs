@@ -92,40 +92,26 @@ namespace VAS.Controllers
                  * Apply MRole only to the physical GL_Journal query.
                  * Do not apply MRole to the final WITH query.
                  */
-                string protectedJournalSql = @"
-SELECT
-    GL_Journal.GL_Journal_ID,
-    GL_Journal.AD_Client_ID,
-    GL_Journal.AD_Org_ID,
-    GL_Journal.C_AcctSchema_ID,
-    GL_Journal.DocumentNo,
-    GL_Journal.DateAcct,
-    GL_Journal.Description,
-    GL_Journal.DocStatus,
-    GL_Journal.Posted,
-    GL_Journal.Processed,
-    GL_Journal.Created,
-    GL_Journal.CreatedBy
-FROM GL_Journal GL_Journal
-WHERE GL_Journal.IsActive = 'Y'
-AND GL_Journal.AD_Client_ID =
-@RecentClientID
-AND GL_Journal.Created >= @RecentCreatedFrom";
+                string protectedJournalSql = @"SELECT
+                                                GL_Journal.GL_Journal_ID,
+                                                GL_Journal.AD_Client_ID,
+                                                GL_Journal.AD_Org_ID,
+                                                GL_Journal.C_AcctSchema_ID,
+                                                GL_Journal.DocumentNo,
+                                                GL_Journal.DateAcct,
+                                                GL_Journal.Description,
+                                                GL_Journal.DocStatus,
+                                                GL_Journal.Posted,
+                                                GL_Journal.Processed,
+                                                GL_Journal.Created,
+                                                GL_Journal.CreatedBy
+                                            FROM GL_Journal GL_Journal
+                                            WHERE GL_Journal.IsActive = 'Y'
+                                            AND GL_Journal.AD_Client_ID =
+                                            @RecentClientID
+                                            AND GL_Journal.Created >= @RecentCreatedFrom";
 
-                protectedJournalSql = MRole.GetDefault(ctx)
-                    .AddAccessSQL(
-                        protectedJournalSql,
-                        "GL_Journal",
-                        MRole.SQL_FULLYQUALIFIED,
-                        MRole.SQL_RO
-                    );
-
-                /*
-                 * ANSI SQL query compatible with Oracle and PostgreSQL.
-                 *
-                 * ROW_NUMBER is used instead of ROWNUM or LIMIT.
-                 * COALESCE is supported by both databases.
-                 */
+                protectedJournalSql = MRole.GetDefault(ctx).AddAccessSQL(protectedJournalSql, "GL_Journal", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
                 string sql = @"
 WITH ProtectedJournal AS
 (
@@ -141,11 +127,7 @@ SchemaCurrency AS
         Currency.ISO_Code AS ISOCode,
         Currency.CurSymbol AS CurSymbol
     FROM C_AcctSchema AcctSchema
-    INNER JOIN C_Currency Currency ON
-    (
-        AcctSchema.C_Currency_ID =
-        Currency.C_Currency_ID
-    )
+    INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
     WHERE AcctSchema.IsActive = 'Y'
     AND Currency.IsActive = 'Y'
     AND AcctSchema.AD_Client_ID =
@@ -154,40 +136,14 @@ SchemaCurrency AS
 DocumentStatusReference AS
 (
     SELECT DISTINCT
-        CAST(
-            RefList.Value AS " + castType + @"
-        ) AS StatusValue,
-
-        CAST(
-            RefList.Name AS " + castType + @"
-        ) AS BaseName,
-
-        CAST(
-            RefListTrl.Name AS " + castType + @"
-        ) AS TranslatedName
-
+        CAST(RefList.Value AS " + castType + @" ) AS StatusValue,
+        CAST(RefList.Name AS " + castType + @" ) AS BaseName,
+        CAST(RefListTrl.Name AS " + castType + @" ) AS TranslatedName
     FROM AD_Reference ReferenceInfo
-
-    INNER JOIN AD_Ref_List RefList ON
-    (
-        ReferenceInfo.AD_Reference_ID =
-        RefList.AD_Reference_ID
-    )
-
-    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
-    (
-        RefList.AD_Ref_List_ID =
-        RefListTrl.AD_Ref_List_ID
-
-        AND RefListTrl.AD_Language =
-        @RecentLanguage
-    )
-
-    WHERE ReferenceInfo.Name =
-    @RecentStatusReferenceName
-
-    AND ReferenceInfo.IsActive = 'Y'
-    AND RefList.IsActive = 'Y'
+    INNER JOIN AD_Ref_List RefList ON (ReferenceInfo.AD_Reference_ID = RefList.AD_Reference_ID)
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON (RefList.AD_Ref_List_ID = RefListTrl.AD_Ref_List_ID AND RefListTrl.AD_Language = @RecentLanguage)
+    WHERE ReferenceInfo.Name = @RecentStatusReferenceName
+    AND ReferenceInfo.IsActive = 'Y' AND RefList.IsActive = 'Y'
 ),
 JournalTotals AS
 (
@@ -200,76 +156,17 @@ JournalTotals AS
         ProtectedJournal.Posted,
         ProtectedJournal.Processed,
         ProtectedJournal.Created,
-
-        DocumentStatusReference.BaseName
-            AS StatusBaseName,
-
-        DocumentStatusReference.TranslatedName
-            AS StatusTranslatedName,
-
-        COALESCE(
-            SUM(
-                COALESCE(
-                    GL_JournalLine.AmtAcctDr,
-                    0
-                )
-            ),
-            0
-        ) AS TotalDebit,
-
-        COALESCE(
-            SUM(
-                COALESCE(
-                    GL_JournalLine.AmtAcctCr,
-                    0
-                )
-            ),
-            0
-        ) AS TotalCredit,
-
-        MAX(
-            SchemaCurrency.CurSymbol
-        ) AS CurSymbol,
-
-        MAX(
-            SchemaCurrency.ISOCode
-        ) AS ISOCode,
-
-        COALESCE(
-            MAX(
-                SchemaCurrency.StdPrecision
-            ),
-            2
-        ) AS StdPrecision
-
+        DocumentStatusReference.BaseName AS StatusBaseName,
+        DocumentStatusReference.TranslatedName AS StatusTranslatedName,
+        COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr,0)),0) AS TotalDebit,
+        COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr,0)),0) AS TotalCredit,
+        SchemaCurrency.CurSymbol AS CurSymbol,
+        SchemaCurrency.ISOCode AS ISOCode,
+        SchemaCurrency.StdPrecision AS StdPrecision
     FROM ProtectedJournal ProtectedJournal
-
-    INNER JOIN SchemaCurrency SchemaCurrency ON
-    (
-        SchemaCurrency.AD_Client_ID =
-        ProtectedJournal.AD_Client_ID
-
-        AND SchemaCurrency.C_AcctSchema_ID =
-        ProtectedJournal.C_AcctSchema_ID
-    )
-
-    LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON
-    (
-        ProtectedJournal.GL_Journal_ID =
-        GL_JournalLine.GL_Journal_ID
-
-        AND GL_JournalLine.IsActive = 'Y'
-    )
-
-    LEFT OUTER JOIN DocumentStatusReference
-        DocumentStatusReference ON
-    (
-        CAST(
-            ProtectedJournal.DocStatus AS " + castType + @"
-        ) =
-        DocumentStatusReference.StatusValue
-    )
-
+    INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
+    LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID AND GL_JournalLine.IsActive = 'Y' )
+    LEFT OUTER JOIN DocumentStatusReference DocumentStatusReference ON (CAST(ProtectedJournal.DocStatus AS " + castType + @" ) = DocumentStatusReference.StatusValue)
     GROUP BY
         ProtectedJournal.GL_Journal_ID,
         ProtectedJournal.DocumentNo,
@@ -280,7 +177,7 @@ JournalTotals AS
         ProtectedJournal.Processed,
         ProtectedJournal.Created,
         DocumentStatusReference.BaseName,
-        DocumentStatusReference.TranslatedName
+        DocumentStatusReference.TranslatedName, SchemaCurrency.CurSymbol, SchemaCurrency.ISOCode,SchemaCurrency.StdPrecision
 ),
 OrderedJournals AS
 (
@@ -299,18 +196,8 @@ OrderedJournals AS
         JournalTotals.CurSymbol,
         JournalTotals.ISOCode,
         JournalTotals.StdPrecision,
-
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                JournalTotals.Created DESC,
-                JournalTotals.GL_Journal_ID DESC
-        ) AS RowNumber,
-
-        COUNT(1) OVER
-        (
-        ) AS TotalCount
-
+        ROW_NUMBER() OVER ( ORDER BY JournalTotals.Created DESC, JournalTotals.GL_Journal_ID DESC ) AS RowNumber,
+        COUNT(1) OVER ( ) AS TotalCount
     FROM JournalTotals JournalTotals
 )
 SELECT
@@ -329,16 +216,9 @@ SELECT
     OrderedJournals.ISOCode,
     OrderedJournals.StdPrecision,
     OrderedJournals.TotalCount
-
 FROM OrderedJournals OrderedJournals
-
-WHERE OrderedJournals.RowNumber BETWEEN
-    @PageRowStart
-    AND
-    @PageRowEnd
-
-ORDER BY
-    OrderedJournals.RowNumber";
+WHERE OrderedJournals.RowNumber BETWEEN @PageRowStart AND @PageRowEnd
+ORDER BY OrderedJournals.RowNumber";
 
                 /*
                  * Parameter order matches the placeholder order.
@@ -390,73 +270,70 @@ ORDER BY
 
                         DateTime? dateAcct = Util.GetValueOfDateTime(row["DateAcct"]);
 
-                        stdPrecision = NormalizePrecision(Util.GetValueOfInt(row["StdPrecision"]));
+                        /* Currency is a property of the row's ACCOUNTING SCHEMA, so it
+                           varies from row to row. These must stay row-scoped: the
+                           response-level CurSymbol/ISOCode/StdPrecision below are only a
+                           default for callers that render one currency, and reusing them
+                           per row made every journal display the last row's symbol. */
+                        int rowPrecision = NormalizePrecision(Util.GetValueOfInt(row["StdPrecision"]));
 
                         decimal totalDebit = Decimal.Round(
                             Util.GetValueOfDecimal(row["TotalDebit"]),
-                            stdPrecision,
+                            rowPrecision,
                             MidpointRounding.AwayFromZero
                         );
 
                         decimal totalCredit = Decimal.Round(
                             Util.GetValueOfDecimal(row["TotalCredit"]),
-                            stdPrecision,
+                            rowPrecision,
                             MidpointRounding.AwayFromZero
                         );
 
-                        curSymbol = Util.GetValueOfString(row["CurSymbol"]);
+                        string rowIsoCode = Util.GetValueOfString(row["ISOCode"]);
 
-                        isoCode = Util.GetValueOfString(row["ISOCode"]);
+                        string rowCurSymbol = Util.GetValueOfString(row["CurSymbol"]);
 
-                        if (string.IsNullOrWhiteSpace(curSymbol))
+                        if (string.IsNullOrWhiteSpace(rowCurSymbol))
                         {
-                            curSymbol = isoCode;
+                            rowCurSymbol = rowIsoCode;
+                        }
+
+                        /* Response-level defaults come from the FIRST row (a stable
+                           choice) instead of being overwritten by every row. */
+                        if (entries.Count == 0)
+                        {
+                            curSymbol = rowCurSymbol;
+
+                            isoCode = rowIsoCode;
+
+                            stdPrecision = rowPrecision;
                         }
 
                         entries.Add(
                             new
                             {
                                 GL_Journal_ID = Util.GetValueOfInt(row["GL_Journal_ID"]),
-
                                 DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
-
-                                DateAcct = dateAcct.HasValue
-                                    ? dateAcct.Value.ToString("dd MMM yyyy")
-                                    : string.Empty,
-
+                                DateAcct = dateAcct.HasValue ? dateAcct.Value.ToString("dd MMM yyyy") : string.Empty,
                                 Description = Util.GetValueOfString(row["Description"]),
-
-                                /*
-                                 * Existing compatibility field.
-                                 */
                                 DocStatus = statusValue,
-
-                                /*
-                                 * Separate status fields.
-                                 */
                                 StatusValue = statusValue,
-
                                 StatusName = statusName,
-
-                                /*
-                                 * Requested Status Value / Name object.
-                                 */
                                 Status = new
                                 {
                                     Value = statusValue,
-
                                     Name = statusName
                                 },
-
                                 Posted = Util.GetValueOfString(row["Posted"]),
-
                                 Processed = Util.GetValueOfString(row["Processed"]),
-
                                 TotalDebit = totalDebit,
-
                                 TotalCredit = totalCredit,
+                                IsUnbalanced = totalDebit != totalCredit,
 
-                                IsUnbalanced = totalDebit != totalCredit
+                                /* Per-row currency of the journal's accounting schema. */
+                                CurSymbol = rowCurSymbol,
+                                ISOCode = rowIsoCode,
+                                StdPrecision = rowPrecision
                             }
                         );
                     }

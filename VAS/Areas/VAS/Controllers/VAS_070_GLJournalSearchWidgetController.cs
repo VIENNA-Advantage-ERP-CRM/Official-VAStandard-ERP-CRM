@@ -105,17 +105,28 @@ namespace VAS.Areas.VAS.Controllers
             // MRole scope and feed the searchable text so the user can search by
             // document-type name, GL category, or the parent batch no./description.
             string core = @"SELECT b.GL_Journal_ID AS RecordId, b.DocumentNo AS DocumentNo, b.Description AS Title,
-                       COALESCE(currencyConvert(b.TotalDr, b.C_Currency_ID, " + schemaCurrencyId + @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0) AS Amount,
+                       COALESCE(currencyConvert(b.TotalDr, b.C_Currency_ID, " + schemaCurrencyId + 
+                       @", b.DateAcct, b.C_ConversionType_ID, b.AD_Client_ID, b.AD_Org_ID), 0) AS Amount,
                        b.DateDoc AS DocDate, b.DocStatus AS DocStatus,
                        CASE WHEN LOWER(b.DocumentNo) = @QExact THEN 4
                             WHEN LOWER(b.DocumentNo) LIKE @QStart THEN 3
                             WHEN LOWER(b.DocumentNo) LIKE @QDoc THEN 2
                             ELSE 1 END AS Relevance
                   FROM (" + baseSql + @") b
-                 LEFT OUTER JOIN C_DocType dt ON (dt.C_DocType_ID = b.C_DocType_ID)
-                 LEFT OUTER JOIN GL_Category gc ON (gc.GL_Category_ID = b.GL_Category_ID)
+                 INNER JOIN C_DocType dt ON (dt.C_DocType_ID = b.C_DocType_ID)
+                INNER JOIN GL_Category gc ON (gc.GL_Category_ID = b.GL_Category_ID)
                  LEFT OUTER JOIN GL_JournalBatch jb ON (jb.GL_JournalBatch_ID = b.GL_JournalBatch_ID)
-                 WHERE LOWER(b.DocumentNo || " + sep + " || COALESCE(b.Description, " + empty + ") || " + sep + " || COALESCE(b.GLReference, " + empty + ") || " + sep + " || COALESCE(b.Combination, " + empty + ") || " + sep + " || COALESCE(b.CombinationName, " + empty + ") || " + sep + " || COALESCE(b.VAS_Label, " + empty + ") || " + sep + " || COALESCE(dt.Name, " + empty + ") || " + sep + " || COALESCE(dt.PrintName, " + empty + ") || " + sep + " || COALESCE(gc.Name, " + empty + ") || " + sep + " || COALESCE(jb.DocumentNo, " + empty + ") || " + sep + " || COALESCE(jb.Description, " + empty + @")) LIKE @Q1
+                 WHERE LOWER(b.DocumentNo || " + sep + 
+                 " || COALESCE(b.Description, " + empty + ") || " + sep + 
+                 " || COALESCE(b.GLReference, " + empty + ") || " + sep + 
+                 " || COALESCE(b.Combination, " + empty + ") || " + sep + 
+                 " || COALESCE(b.CombinationName, " + empty + ") || " + sep + 
+                 " || COALESCE(b.VAS_Label, " + empty + ") || " + sep + 
+                 " || COALESCE(dt.Name, " + empty + ") || " + sep + 
+                 " || COALESCE(dt.PrintName, " + empty + ") || " + sep + 
+                 " || COALESCE(gc.Name, " + empty + ") || " + sep + 
+                 " || COALESCE(jb.DocumentNo, " + empty + ") || " + sep + 
+                 " || COALESCE(jb.Description, " + empty + @")) LIKE @Q1
                     OR EXISTS (SELECT 1 FROM GL_JournalLine jl
                                 INNER JOIN C_BPartner lbp ON (lbp.C_BPartner_ID = jl.C_BPartner_ID)
                                 WHERE jl.GL_Journal_ID = b.GL_Journal_ID AND jl.IsActive = 'Y'

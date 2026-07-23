@@ -399,6 +399,8 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     cursor: pointer;
 }
 
+/* Columns: 1 Journal No · 2 Accounting Schema · 3 Date · 4 Description ·
+   5 Status · 6 Total Debit · 7 Total Credit. Description takes the slack. */
 .VAS-glju-dialog-table th:nth-child(1),
 .VAS-glju-dialog-table td:nth-child(1) {
     width: 8.5em;
@@ -406,25 +408,37 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 
 .VAS-glju-dialog-table th:nth-child(2),
 .VAS-glju-dialog-table td:nth-child(2) {
+    width: 22em;
+}
+
+.VAS-glju-dialog-table th:nth-child(3),
+.VAS-glju-dialog-table td:nth-child(3) {
     width: 8.5em;
 }
 
-.VAS-glju-dialog-table th:nth-child(4),
-.VAS-glju-dialog-table td:nth-child(4) {
+.VAS-glju-dialog-table th:nth-child(5),
+.VAS-glju-dialog-table td:nth-child(5) {
     width: 8em;
 }
 
-.VAS-glju-dialog-table th:nth-child(5),
 .VAS-glju-dialog-table th:nth-child(6),
-.VAS-glju-dialog-table td:nth-child(5),
-.VAS-glju-dialog-table td:nth-child(6) {
+.VAS-glju-dialog-table th:nth-child(7),
+.VAS-glju-dialog-table td:nth-child(6),
+.VAS-glju-dialog-table td:nth-child(7) {
     width: 10em;
     text-align: right;
 }
 
 .VAS-glju-doc,
-.VAS-glju-date {
+.VAS-glju-date,
+.VAS-glju-schema {
     color: #5F7283;
+}
+
+.VAS-glju-schema {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Document number acts as a zoom link to the GL Journal record */
@@ -499,37 +513,85 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     font-size: 0.75em;
 }
 
+/* Footer band: range text on the left, pager controls on the right. */
 .VAS-glju-dialog-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1em;
     padding: 0.75em 1.125em;
-    border-top: 0.0625em solid #EDF2F6;
-    background: #FAFCFE;
+    border-top: 0.0625em solid #E6EEF5;
+    background: #F4F9FD;
     flex-shrink: 0;
 }
 
-.VAS-glju-dialog-total {
-    font-size: 0.8125em;
-    color: #748494;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
+/* Footer slot — holds the pager only (no totals strip, no action buttons). It
+   spans the whole band so the pager's own "margin-right:auto" on the range text
+   pushes the buttons to the far right (design.md widget footer pager). */
 .VAS-glju-dialog-actions {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.5em;
-    flex-shrink: 0;
+    flex: 1 1 auto;
+    min-width: 0;
 }
+
+    .VAS-glju-dialog-actions .VAS-glju-dialog-pager {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+    }
 
 .VAS-glju-detail-footer-spacer {
     flex: 1 1 auto;
     min-width: 0;
+}
+
+/* ── Header Export link ──────────────────────────────────────────────────────
+   Export sits in the dialog header as a plain hyperlink, not a button: it is a
+   secondary utility next to the close affordance. The button rules below still
+   serve the detail dialog's own footer buttons, so this override is scoped to
+   the header and wins on specificity (element + class + ancestor). */
+.VAS-glju-dialog-head a.VAS-glju-export {
+    height: auto;
+    min-width: 0;
+    padding: 0;
+    margin-right: 0.25em;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: #0083DA;
+    font-size: 0.8125em;
+    font-weight: 400;
+    /* Underline the LABEL only — an underlined glyph reads as a broken icon. */
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+    .VAS-glju-dialog-head a.VAS-glju-export span {
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+    }
+
+    /* Vienna icon font glyph (vis-doc-excel) — sized against the link text. */
+    .VAS-glju-dialog-head a.VAS-glju-export .vis {
+        font-size: 1.15em;
+        line-height: 1;
+        text-decoration: none;
+    }
+
+.VAS-glju-dialog-head a.VAS-glju-export:hover,
+.VAS-glju-dialog-head a.VAS-glju-export:focus-visible {
+    background: transparent;
+    color: #005FA3;
 }
 
 .VAS-glju-export,
@@ -966,10 +1028,10 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     border-bottom: 0;
 }
 
-.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(5),
 .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(6),
-.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(5),
-.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(6) {
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(7),
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(6),
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(7) {
     text-align: right;
 }
 
@@ -1020,10 +1082,10 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
 /* Table amount columns only */
 .VAS-glju-dialog-table .VAS-glju-amt,
 .VAS-glju-detail-lines .VAS-glju-amt,
-.VAS-glju-dialog-table th:nth-child(5),
 .VAS-glju-dialog-table th:nth-child(6),
-.VAS-glju-dialog-table td:nth-child(5),
+.VAS-glju-dialog-table th:nth-child(7),
 .VAS-glju-dialog-table td:nth-child(6),
+.VAS-glju-dialog-table td:nth-child(7),
 .VAS-glju-detail-lines th:nth-child(2),
 .VAS-glju-detail-lines th:nth-child(3),
 .VAS-glju-detail-lines td:nth-child(2),
@@ -1201,4 +1263,30 @@ html[dir="rtl"] .VAS-glju-root .kpi-why {
     letter-spacing: 0;
     line-height: 1.3;
     margin-top: 4px;
+}
+
+/* ── List-dialog footer band (design.md widget footer pager) ─────────────────
+   "Showing x-y of N" on the left, the compact pager on the right, on a tinted
+   band. Scoped away from any detail-dialog variant, whose footer keeps its own
+   button group. Appended last so it wins over the earlier
+   .VAS-glju-dialog-footer / -actions declarations in this file. */
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-footer {
+    justify-content: space-between;
+    background: #F4F9FD;
+    border-top: 1px solid #E6EEF5;
+    padding: 0.75em 1.5em;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-actions {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-pager {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
 }
