@@ -237,6 +237,24 @@
         return data;
     }
 
+    /* Money label with the sign OUTSIDE the currency symbol — "-$220.00", not
+       "$-220.00": the symbol belongs to the number, the minus to the value. The
+       amount is formatted from its absolute value so toLocaleString can't
+       reintroduce its own minus after the symbol. */
+    function formatMoney(symbol, amount, precision) {
+        var numericAmount = Number(amount || 0);
+
+        if (isNaN(numericAmount)) {
+            numericAmount = 0;
+        }
+
+        return (
+            (numericAmount < 0 ? "-" : "") +
+            (symbol || "") +
+            formatAmount(Math.abs(numericAmount), precision)
+        );
+    }
+
     function formatAmount(
         amount,
         precision
@@ -549,7 +567,7 @@
             var $dialogBody =
                 null;
 
-            var $dialogFooterText =
+            var $dialogPagerWrap =
                 null;
 
             var $dialogBusy =
@@ -561,6 +579,7 @@
             var dialogPageNo =
                 1;
 
+            /* Initial guess — replaced by the adaptive measure (see syncDialogCapacity). */
             var dialogPageSize =
                 9;
 
@@ -570,10 +589,32 @@
             var dialogTotalCount =
                 0;
 
+            /* Adaptive paging state: the page size is derived from how many rows fit
+               the dialog body at its current height (mirrors VAS_020 / VAS_036). */
+            var dialogRowHeight =
+                0;
+
+            var dialogResizeObserver =
+                null;
+
+            var dialogSyncPending =
+                false;
+
+            var dialogPrevPageSize =
+                0;   /* guards A→B→A capacity ping-pong */
+
+            var DIALOG_MIN_ROWS = 3;
+            var DIALOG_MAX_ROWS = 50;         /* server cap for the paged list */
+            var DIALOG_ROW_FALLBACK = 44;     /* px, used before a row has been measured */
+            var EXPORT_PAGE_SIZE = 5000;      /* server cap for an export-all request */
+
             var countRequest =
                 null;
 
             var listRequest =
+                null;
+
+            var exportRequest =
                 null;
 
             var isDisposed =
@@ -975,6 +1016,21 @@
 
                         "</div>" +
 
+                        /* Export lives in the header as a link (not a button): it is a
+                           secondary utility, so it must not compete with the dialog's
+                           primary chrome. It always exports the FULL result set. */
+                        '<a href="#" class="VAS-glje-export" role="button">' +
+                        '<i class="vis vis-doc-excel" aria-hidden="true"></i>' +
+                        "<span>" +
+                        esc(
+                            lbl(
+                                "VAS_Export",
+                                "Export"
+                            )
+                        ) +
+                        "</span>" +
+                        "</a>" +
+
                         '<button type="button" ' +
                         'class="VAS-glje-dialog-close" ' +
                         'aria-label="' +
@@ -1021,40 +1077,16 @@
 
                         "</div>" +
 
+                        /* Footer carries the pager only (design.md widget footer pager).
+                           No totals strip and no action buttons: Export moved to the
+                           header and the dialog closes from the header X / Escape. */
                         '<div class="VAS-glje-dialog-footer">' +
 
-                        '<span class="VAS-glje-dialog-total" ' +
-                        'id="VAS-glje-dialog-total-' +
+                        '<div class="VAS-glje-dialog-actions" ' +
+                        'id="VAS-glje-dialog-pagerwrap-' +
                         id +
-                        '"></span>' +
+                        '"></div>' +
 
-                        '<div class="VAS-glje-dialog-actions">' +
-
-                        '<button type="button" ' +
-                        'class="VAS-glje-export">' +
-
-                        esc(
-                            lbl(
-                                "VAS_Export",
-                                "Export"
-                            )
-                        ) +
-
-                        "</button>" +
-
-                        '<button type="button" ' +
-                        'class="VAS-glje-close-primary">' +
-
-                        esc(
-                            lbl(
-                                "VAS_Close",
-                                "Close"
-                            )
-                        ) +
-
-                        "</button>" +
-
-                        "</div>" +
                         "</div>" +
                         "</div>" +
                         "</div>"
@@ -1066,9 +1098,9 @@
                         id
                     );
 
-                $dialogFooterText =
+                $dialogPagerWrap =
                     $dialog.find(
-                        "#VAS-glje-dialog-total-" +
+                        "#VAS-glje-dialog-pagerwrap-" +
                         id
                     );
 
@@ -1083,7 +1115,6 @@
 
                 $dialog.find(
                     ".VAS-glje-dialog-close, " +
-                    ".VAS-glje-close-primary, " +
                     ".VAS-glje-dialog-scrim"
                 ).on(
                     "click",
@@ -1094,7 +1125,10 @@
                     ".VAS-glje-export"
                 ).on(
                     "click",
-                    exportDialogRows
+                    function (event) {
+                        event.preventDefault();
+                        exportDialogRows();
+                    }
                 );
 
                 /*
@@ -1185,8 +1219,9 @@
                         }
                     );
 
-                $dialogBody
-                    .parent()
+                /* Delegated on the dialog itself — the pager now renders in the footer,
+                   outside the body element. */
+                $dialog
                     .off(
                         "click.VAS041DialogPager",
                         ".VAS-glje-dialog-page"
@@ -1258,9 +1293,14 @@
                     "VAS-glje-body-lock"
                 );
 
-                if (!dialogLoaded) {
-                    loadDialogRows();
-                }
+                /* Always reopen on the FIRST page — the page the user happened to be on
+                   when they closed it is not where they expect to land next time. */
+                dialogPageNo = 1;
+                dialogLoaded = false;
+                dialogPrevPageSize = 0;
+
+                loadDialogRows();
+                observeDialogBody();
             }
 
             function closeDialog() {
@@ -1273,11 +1313,162 @@
 
                 VAS.GLJournalDetailDialog.close();
 
+                if (dialogResizeObserver) {
+                    dialogResizeObserver.disconnect();
+                    dialogResizeObserver = null;
+                }
+
+                /* Next open starts clean on page 1. */
+                dialogPageNo = 1;
+                dialogLoaded = false;
+
                 $dialog.hide();
 
                 $("body").removeClass(
                     "VAS-glje-body-lock"
                 );
+            }
+
+            /* Re-measure the row capacity whenever the dialog body is resized
+               (window resize / zoom), so paging stays adaptive while it is open. */
+            function observeDialogBody() {
+                if (
+                    typeof ResizeObserver === "undefined" ||
+                    !$dialog
+                ) {
+                    return;
+                }
+
+                var element =
+                    $dialog.find(
+                        ".VAS-glje-table-wrap"
+                    )[0];
+
+                if (!element) {
+                    return;
+                }
+
+                if (dialogResizeObserver) {
+                    dialogResizeObserver.disconnect();
+                }
+
+                dialogResizeObserver =
+                    new ResizeObserver(
+                        function () {
+                            /* A real resize re-opens the question of capacity, so drop
+                               the anti-oscillation memory before measuring again. */
+                            dialogPrevPageSize = 0;
+                            syncDialogCapacity();
+                        }
+                    );
+
+                dialogResizeObserver.observe(element);
+            }
+
+            function scheduleDialogCapacitySync() {
+                var raf =
+                    window.requestAnimationFrame ||
+                    function (callback) {
+                        return window.setTimeout(callback, 16);
+                    };
+
+                raf(function () {
+                    syncDialogCapacity();
+                });
+            }
+
+            /* Adaptive page size: rows that fit the visible table area. Measures the
+               tallest rendered row (descriptions can wrap) and reloads the page when
+               the capacity actually changed — the server re-clamps the page number. */
+            function syncDialogCapacity() {
+                if (
+                    isDisposed ||
+                    !$dialog ||
+                    !$dialog.is(":visible") ||
+                    (listRequest && listRequest.readyState !== 4)
+                ) {
+                    return;
+                }
+
+                var wrap =
+                    $dialog.find(
+                        ".VAS-glje-table-wrap"
+                    )[0];
+
+                if (!wrap || dialogTotalCount <= 0) {
+                    return;
+                }
+
+                var head =
+                    wrap.querySelector("thead");
+
+                var available =
+                    wrap.clientHeight -
+                    (head ? head.offsetHeight : 0);
+
+                if (available <= 0) {
+                    /* Layout not settled yet (dialog just shown) — retry next frame. */
+                    if (!dialogSyncPending) {
+                        dialogSyncPending = true;
+                        scheduleDialogCapacitySync();
+                    }
+
+                    return;
+                }
+
+                dialogSyncPending = false;
+
+                var rows =
+                    wrap.querySelectorAll(
+                        ".VAS-glje-entry-row"
+                    );
+
+                var maxHeight = 0;
+
+                for (
+                    var index = 0;
+                    index < rows.length;
+                    index++
+                ) {
+                    if (rows[index].offsetHeight > maxHeight) {
+                        maxHeight = rows[index].offsetHeight;
+                    }
+                }
+
+                if (maxHeight > 0) {
+                    dialogRowHeight = maxHeight;
+                }
+
+                var rowHeight =
+                    dialogRowHeight > 0
+                        ? dialogRowHeight
+                        : DIALOG_ROW_FALLBACK;
+
+                var capacity =
+                    Math.min(
+                        DIALOG_MAX_ROWS,
+                        Math.max(
+                            DIALOG_MIN_ROWS,
+                            Math.floor(available / rowHeight)
+                        )
+                    );
+
+                if (capacity === dialogPageSize) {
+                    return;
+                }
+
+                /* A row that wraps on one page but not the next can make the measured
+                   capacity alternate between two values; refuse to bounce back to the
+                   size we just left. */
+                if (capacity === dialogPrevPageSize) {
+                    return;
+                }
+
+                dialogPrevPageSize = dialogPageSize;
+                dialogPageSize = capacity;
+                dialogLoaded = false;
+
+                loadDialogRows();
             }
 
             /* Detail view is the shared VAS.GLJournalDetailDialog singleton.
@@ -1513,15 +1704,7 @@
                         "</div>"
                     );
 
-                    $dialogFooterText.text(
-                        ""
-                    );
-
-                    $dialogBody
-                        .siblings(
-                            ".VAS-glje-dialog-pager"
-                        )
-                        .remove();
+                    if ($dialogPagerWrap) { $dialogPagerWrap.empty(); }
 
                     return;
                 }
@@ -1537,6 +1720,15 @@
                         lbl(
                             "VAS_041_JournalNo",
                             "Journal No."
+                        )
+                    ) +
+                    "</th>" +
+
+                    "<th>" +
+                    esc(
+                        lbl(
+                            "VAS_041_AccountingSchema",
+                            "Accounting Schema"
                         )
                     ) +
                     "</th>" +
@@ -1625,18 +1817,36 @@
                         ] ||
                         "VAS-glje-pill-draft";
 
+                    /* Currency belongs to the journal's ACCOUNTING SCHEMA, so it
+                       differs row by row — format with the row's own symbol /
+                       precision and fall back to the response-level values only
+                       when the row doesn't carry them. */
+                    var rowSymbol =
+                        row.CurSymbol ||
+                        row.ISOCode ||
+                        symbol;
+
+                    var rowPrecision =
+                        (
+                            row.StdPrecision !== undefined &&
+                            row.StdPrecision !== null &&
+                            !isNaN(Number(row.StdPrecision))
+                        )
+                            ? Number(row.StdPrecision)
+                            : precision;
+
                     var debit =
-                        symbol +
-                        formatAmount(
+                        formatMoney(
+                            rowSymbol,
                             row.TotalDebit,
-                            precision
+                            rowPrecision
                         );
 
                     var credit =
-                        symbol +
-                        formatAmount(
+                        formatMoney(
+                            rowSymbol,
                             row.TotalCredit,
-                            precision
+                            rowPrecision
                         );
 
                     html +=
@@ -1670,6 +1880,14 @@
                         '<td class="VAS-glje-doc">' +
                         esc(
                             row.DocumentNo
+                        ) +
+                        "</td>" +
+
+                        '<td class="VAS-glje-schema" title="' +
+                        esc(row.AcctSchemaName) +
+                        '">' +
+                        esc(
+                            row.AcctSchemaName
                         ) +
                         "</td>" +
 
@@ -1724,28 +1942,16 @@
                     html
                 );
 
-                $dialogBody
-                    .siblings(
-                        ".VAS-glje-dialog-pager"
-                    )
-                    .remove();
+                /* Pager lives in the dialog footer (design.md footer pager), not
+                   under the table. */
+                if ($dialogPagerWrap) {
+                    $dialogPagerWrap.html(
+                        renderDialogPager()
+                    );
+                }
 
-                $dialogBody.after(
-                    renderDialogPager()
-                );
-
-                $dialogFooterText.text(
-                    rows.length +
-
-                    " journals \u00B7 total " +
-
-                    symbol +
-
-                    formatAmount(
-                        data.TotalDebit,
-                        precision
-                    )
-                );
+                /* Rows are laid out now \u2014 re-measure the fitting row count. */
+                scheduleDialogCapacitySync();
             }
 
             function renderDialogPager() {
@@ -1803,15 +2009,143 @@
                 return html;
             }
 
+            /* Export downloads EVERY entry, not the page on screen: it re-queries the
+               server with exportAll (single un-paged response) and builds the workbook
+               from that data. */
             function exportDialogRows() {
-                var $table =
-                    $dialogBody.find(
-                        ".VAS-glje-dialog-table"
-                    );
-
-                if (!$table.length) {
+                if (
+                    isDisposed ||
+                    (exportRequest && exportRequest.readyState !== 4)
+                ) {
                     return;
                 }
+
+                showDialogBusy(true);
+
+                exportRequest = $.ajax({
+                    url:
+                        baseUrl +
+                        "VAS/VAS_041_GLJournalEntriesWidget/GetMonthlyEntries",
+
+                    type: "GET",
+                    data: {
+                        pageNo: 1,
+                        pageSize: EXPORT_PAGE_SIZE,
+                        exportAll: true
+                    },
+                    dataType: "json",
+                    cache: false,
+
+                    success: function (result) {
+                        var data =
+                            normalizeResponse(result);
+
+                        if (
+                            !data ||
+                            data.error ||
+                            data.success === false
+                        ) {
+                            renderDialogError(
+                                data &&
+                                (
+                                    data.errorText ||
+                                    data.error
+                                )
+                            );
+
+                            return;
+                        }
+
+                        downloadEntriesWorkbook(data);
+                    },
+
+                    error: function (xhr, textStatus) {
+                        if (textStatus === "abort") {
+                            return;
+                        }
+
+                        renderDialogError(
+                            getAjaxErrorMessage(xhr)
+                        );
+                    },
+
+                    complete: function () {
+                        exportRequest = null;
+
+                        if (!isDisposed) {
+                            showDialogBusy(false);
+                        }
+                    }
+                });
+            }
+
+            /* Builds the export table from the raw rows (independent of what the
+               dialog currently renders) and pushes it as an .xls download. */
+            function downloadEntriesWorkbook(data) {
+                var rows =
+                    Array.isArray(data.Entries)
+                        ? data.Entries
+                        : [];
+
+                if (!rows.length) {
+                    return;
+                }
+
+                var fallbackSymbol =
+                    data.CurSymbol ||
+                    data.ISOCode ||
+                    "";
+
+                var fallbackPrecision =
+                    Number(data.StdPrecision);
+
+                var table =
+                    "<table>" +
+                    "<thead><tr>" +
+                    "<th>" + esc(lbl("VAS_041_JournalNo", "Journal No.")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_AccountingSchema", "Accounting Schema")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_Date", "Date")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_Description", "Description")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_Status", "Status")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_TotalDebit", "Total Debit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_041_TotalCredit", "Total Credit")) + "</th>" +
+                    "</tr></thead><tbody>";
+
+                for (
+                    var index = 0;
+                    index < rows.length;
+                    index++
+                ) {
+                    var row = rows[index] || {};
+
+                    /* Each journal prints in its own accounting-schema currency. */
+                    var rowSymbol =
+                        row.CurSymbol ||
+                        row.ISOCode ||
+                        fallbackSymbol;
+
+                    var rowPrecision =
+                        (
+                            row.StdPrecision !== undefined &&
+                            row.StdPrecision !== null &&
+                            !isNaN(Number(row.StdPrecision))
+                        )
+                            ? Number(row.StdPrecision)
+                            : fallbackPrecision;
+
+                    table +=
+                        "<tr>" +
+                        "<td>" + esc(row.DocumentNo) + "</td>" +
+                        "<td>" + esc(row.AcctSchemaName) + "</td>" +
+                        "<td>" + esc(row.DateAcct) + "</td>" +
+                        "<td>" + esc(row.Description) + "</td>" +
+                        "<td>" + esc(row.StatusName || row.DocStatus) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision)) + "</td>" +
+                        "</tr>";
+                }
+
+                table += "</tbody></table>";
 
                 var excelHtml =
                     '<html xmlns:o="urn:schemas-microsoft-com:office:office"' +
@@ -1824,8 +2158,7 @@
 
                     "<body>" +
 
-                    $table[0]
-                        .outerHTML +
+                    table +
 
                     "</body>" +
                     "</html>";
@@ -1892,9 +2225,7 @@
                     "</div>"
                 );
 
-                $dialogFooterText.text(
-                    ""
-                );
+                if ($dialogPagerWrap) { $dialogPagerWrap.empty(); }
             }
 
             function refreshData() {
@@ -1948,6 +2279,18 @@
                         listRequest.abort();
                     }
 
+                    if (
+                        exportRequest &&
+                        exportRequest.readyState !== 4
+                    ) {
+                        exportRequest.abort();
+                    }
+
+                    if (dialogResizeObserver) {
+                        dialogResizeObserver.disconnect();
+                        dialogResizeObserver = null;
+                    }
+
                     $(document).off(
                         "keydown.VAS-glje-" +
                         $self.AD_UserHomeWidgetID
@@ -1986,7 +2329,7 @@
                     $dialogBody =
                         null;
 
-                    $dialogFooterText =
+                    $dialogPagerWrap =
                         null;
 
                     $dialogBusy =

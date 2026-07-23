@@ -289,6 +289,9 @@
 }
 .vas-qj-combo-item:hover,
 .vas-qj-combo-item.vas-qj-combo-item-active { background: #EEF6FF; }
+/* The row matching the committed selection — the full list is shown on re-open,
+   so this marks where the user currently is among all records. */
+.vas-qj-combo-item.vas-qj-combo-item-picked { color: #0069AE; font-weight: 500; }
 .vas-qj-none { color: #8A97A6; font-style: italic; }
 .vas-qj-acct-code { font-family: 'Roboto Mono', monospace; font-weight: 600; color: #0069AE; }
 .vas-qj-acct-name { color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -327,14 +330,20 @@
     padding: 0.5em 0.75em;
 }
 
-/* General error banner */
+/* General error message — lives in the footer, left of the action buttons, so a
+   "fill the mandatory fields" prompt appears next to the button that triggered it
+   instead of at the top of a body the user may have scrolled past. */
 .vas-qj-general-err {
     color: #A33F3F;
     background: #FAE7E7;
     border: 1px solid rgba(163, 63, 63, 0.2);
     border-radius: 9px;
-    padding: 0.625em 0.75em;
+    padding: 0.5em 0.75em;
     font-size: 0.8em;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 55%;
+    line-height: 1.35;
 }
 
 /* Transient save / complete confirmation toast (body-mounted; sits above the modal). */

@@ -704,7 +704,7 @@ namespace VASLogic.Models
             int orgTrxId, decimal amtDr, decimal amtCr, string description, QuickJournalResponse result)
         {
             line.SetLine(lineNo);
-            line.SetDescription(description);
+            /*line.SetDescription(description);*/
             line.SetAD_Org_ID(orgId);
             line.Set_ValueNoCheck("Account_ID", accountId);
             line.SetAD_OrgTrx_ID(orgTrxId);   /* 0 clears any prior cost center */

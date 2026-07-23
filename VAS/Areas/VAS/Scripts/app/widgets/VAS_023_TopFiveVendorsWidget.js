@@ -52,6 +52,26 @@
     /* Vibrant segment colours for the donut chart */
     var DONUT_COLORS = ['#1F83FF', '#7B68EE', '#FF9500', '#E84040', '#00B894'];
 
+    /* Chart.js registers every chart against its canvas ELEMENT. Constructing a
+       second chart on a canvas that still owns a live instance throws
+       "Canvas is already in use. Chart with ID 'n' must be destroyed before the
+       canvas can be reused." A widget's own _chartInst only tracks charts THIS
+       instance created — one left behind by a previous instance (disposed without
+       destroy, or a widget id that repeats across dashboards) is invisible to it.
+       So ask Chart.js which instance owns the canvas and destroy that one too. */
+    function releaseCanvas(el) {
+        if (!el || typeof Chart === 'undefined') { return; }
+        var owner = null;
+        if (typeof Chart.getChart === 'function') {
+            owner = Chart.getChart(el);                       // Chart.js v3 / v4
+        } else if (Chart.instances) {                          // v2 fallback
+            for (var k in Chart.instances) {
+                if (Chart.instances[k] && Chart.instances[k].canvas === el) { owner = Chart.instances[k]; break; }
+            }
+        }
+        if (owner) { try { owner.destroy(); } catch (e) { } }
+    }
+
     VAS.VAS_023_TopFiveVendorsWidget = function () {
         this.frame;
         this.windowNo;
@@ -61,9 +81,25 @@
         var $container;
         var widgetID  = null;
         var _chartInst = null;
+        var _drawTimer = null;
 
         $self._kpiData   = null;
         $self._drawChart = null;
+        $self._disposed  = false;
+
+        /* Always resolve the canvas inside THIS widget's root. document.getElementById
+           returns the first match in the document, so two widget instances that end up
+           with the same widgetID would otherwise both draw onto the first canvas — the
+           other classic trigger of the "canvas is already in use" error. */
+        function canvasEl() { return $root.find('.vas-t5vwdg-canvas')[0] || null; }
+
+        /* Tear down this widget's chart plus any instance still holding its canvas,
+           and cancel a deferred draw so it cannot fire after the canvas is gone. */
+        function destroyChart() {
+            if (_drawTimer) { window.clearTimeout(_drawTimer); _drawTimer = null; }
+            if (_chartInst) { try { _chartInst.destroy(); } catch (e) { } _chartInst = null; }
+            releaseCanvas(canvasEl());
+        }
 
         /* ---- Initialise ---- */
         this.initalize = function () {
@@ -99,7 +135,7 @@
 
         /* ---- Render HTML + trigger Chart.js donut ---- */
         function renderWidget(data) {
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // release the OLD canvas before it is removed
             $container.empty();
 
             var vendors = (data && data.Vendors)   ? data.Vendors   : [];
@@ -169,7 +205,7 @@
                 '</div>';
 
             $container.html(html);
-            window.setTimeout(function () { drawDonut(data); }, 80);
+            _drawTimer = window.setTimeout(function () { _drawTimer = null; drawDonut(data); }, 80);
         }
 
         /* ---- Custom HTML legend (full CSS control: name is regular weight and
@@ -192,11 +228,11 @@
 
         /* ---- Chart.js Donut ---- */
         function drawDonut(data) {
-            if (typeof Chart === 'undefined') { return; }
-            var el = document.getElementById('vas_t5vwdg_cv_' + widgetID);
+            if (typeof Chart === 'undefined' || $self._disposed) { return; }
+            var el = canvasEl();
             if (!el) { return; }
 
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // own instance + whoever else owns this canvas
 
             var vendors = (data && data.Vendors)   ? data.Vendors   : [];
             var sym     = (data && data.CurSymbol) ? data.CurSymbol : '';
@@ -307,7 +343,7 @@
 
         /* ---- Refresh ---- */
         this.refreshWidget = function () {
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();
             $self._kpiData = null;
             $bsyDiv[0].style.visibility = 'visible';
             $container.empty();
@@ -316,7 +352,8 @@
 
         this.getRoot = function () { return $root; };
 
-        $self._drawChart = drawDonut;
+        $self._drawChart    = drawDonut;
+        $self._destroyChart = destroyChart;
     };
 
     /* ---- Prototype ---- */
@@ -340,11 +377,18 @@
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
-            window.setTimeout(function () { self._drawChart(self._kpiData); }, 100);
+            window.setTimeout(function () {
+                if (!self._disposed) { self._drawChart(self._kpiData); }
+            }, 100);
         }
     };
 
     VAS.VAS_023_TopFiveVendorsWidget.prototype.dispose = function () {
+        // Destroy the chart BEFORE the frame drops the DOM: a chart left registered
+        // against a removed canvas keeps that canvas "in use", so the next widget
+        // that reuses it fails with "Canvas is already in use".
+        this._disposed = true;
+        if (this._destroyChart) { this._destroyChart(); }
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;
