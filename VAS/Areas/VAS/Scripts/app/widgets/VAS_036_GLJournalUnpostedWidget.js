@@ -145,6 +145,24 @@
         );
     }
 
+    /* Money label with the sign OUTSIDE the currency symbol — "-$220.00", not
+       "$-220.00": the symbol belongs to the number, the minus to the value. The
+       amount is formatted from its absolute value so toLocaleString can't
+       reintroduce its own minus after the symbol. */
+    function formatMoney(symbol, amount, precision) {
+        var numericAmount = Number(amount || 0);
+
+        if (isNaN(numericAmount)) {
+            numericAmount = 0;
+        }
+
+        return (
+            (numericAmount < 0 ? "-" : "") +
+            (symbol || "") +
+            formatAmount(Math.abs(numericAmount), precision)
+        );
+    }
+
     /* Currency belongs to the journal's ACCOUNTING SCHEMA, so it differs row by
        row. Always format an amount with the row's own symbol / precision and fall
        back to the response-level values only when a row doesn't carry them. */
@@ -1249,12 +1267,10 @@
                         rowCurrencyPrecision(row, precision);
 
                     var debitText =
-                        rowSymbol +
-                        formatAmount(row.TotalDebit, rowPrecision);
+                        formatMoney(rowSymbol, row.TotalDebit, rowPrecision);
 
                     var creditText =
-                        rowSymbol +
-                        formatAmount(row.TotalCredit, rowPrecision);
+                        formatMoney(rowSymbol, row.TotalCredit, rowPrecision);
 
                     html +=
                         '<tr class="VAS-glju-entry-row" ' +
@@ -1522,8 +1538,8 @@
                         "<td>" + esc(row.DateAcct) + "</td>" +
                         "<td>" + esc(row.Description) + "</td>" +
                         "<td>" + esc(row.StatusName || row.DocStatus) + "</td>" +
-                        "<td>" + esc(rowSymbol + formatAmount(row.TotalDebit, rowPrecision)) + "</td>" +
-                        "<td>" + esc(rowSymbol + formatAmount(row.TotalCredit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision)) + "</td>" +
                         "</tr>";
                 }
 

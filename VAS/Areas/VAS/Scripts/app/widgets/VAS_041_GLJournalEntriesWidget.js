@@ -237,6 +237,24 @@
         return data;
     }
 
+    /* Money label with the sign OUTSIDE the currency symbol — "-$220.00", not
+       "$-220.00": the symbol belongs to the number, the minus to the value. The
+       amount is formatted from its absolute value so toLocaleString can't
+       reintroduce its own minus after the symbol. */
+    function formatMoney(symbol, amount, precision) {
+        var numericAmount = Number(amount || 0);
+
+        if (isNaN(numericAmount)) {
+            numericAmount = 0;
+        }
+
+        return (
+            (numericAmount < 0 ? "-" : "") +
+            (symbol || "") +
+            formatAmount(Math.abs(numericAmount), precision)
+        );
+    }
+
     function formatAmount(
         amount,
         precision
@@ -1818,15 +1836,15 @@
                             : precision;
 
                     var debit =
-                        rowSymbol +
-                        formatAmount(
+                        formatMoney(
+                            rowSymbol,
                             row.TotalDebit,
                             rowPrecision
                         );
 
                     var credit =
-                        rowSymbol +
-                        formatAmount(
+                        formatMoney(
+                            rowSymbol,
                             row.TotalCredit,
                             rowPrecision
                         );
@@ -2122,8 +2140,8 @@
                         "<td>" + esc(row.DateAcct) + "</td>" +
                         "<td>" + esc(row.Description) + "</td>" +
                         "<td>" + esc(row.StatusName || row.DocStatus) + "</td>" +
-                        "<td>" + esc(rowSymbol + formatAmount(row.TotalDebit, rowPrecision)) + "</td>" +
-                        "<td>" + esc(rowSymbol + formatAmount(row.TotalCredit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalDebit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(formatMoney(rowSymbol, row.TotalCredit, rowPrecision)) + "</td>" +
                         "</tr>";
                 }
 

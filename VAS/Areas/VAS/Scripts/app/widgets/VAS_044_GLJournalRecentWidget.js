@@ -175,6 +175,24 @@
         return data;
     }
 
+    /* Money label with the sign OUTSIDE the currency symbol — "-$220.00", not
+       "$-220.00": the symbol belongs to the number, the minus to the value. The
+       amount is formatted from its absolute value so toLocaleString can't
+       reintroduce its own minus after the symbol. */
+    function formatMoney(symbol, amount, precision) {
+        var numericAmount = Number(amount || 0);
+
+        if (isNaN(numericAmount)) {
+            numericAmount = 0;
+        }
+
+        return (
+            (numericAmount < 0 ? "-" : "") +
+            (symbol || "") +
+            formatAmount(Math.abs(numericAmount), precision)
+        );
+    }
+
     function formatAmount(
         amount,
         precision
@@ -1173,26 +1191,22 @@
                     var debitText =
                         Number(
                             entry.TotalDebit || 0
-                        ) > 0
-                            ? (
-                                rowSymbol +
-                                formatAmount(
-                                    entry.TotalDebit,
-                                    rowPrecision
-                                )
+                        ) !== 0
+                            ? formatMoney(
+                                rowSymbol,
+                                entry.TotalDebit,
+                                rowPrecision
                             )
                             : "—";
 
                     var creditText =
                         Number(
                             entry.TotalCredit || 0
-                        ) > 0
-                            ? (
-                                rowSymbol +
-                                formatAmount(
-                                    entry.TotalCredit,
-                                    rowPrecision
-                                )
+                        ) !== 0
+                            ? formatMoney(
+                                rowSymbol,
+                                entry.TotalCredit,
+                                rowPrecision
                             )
                             : "—";
 
