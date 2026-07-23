@@ -1,0 +1,924 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_138 Delayed Payments — 3x2 glass triage list (Customers dashboard) + modals.
+ * Design: delayed-payments.html (attached) + Design Specs/dashboard-widgets.md
+ * "Grid Data Widget". Glass surface, icon-well header, ranked overdue rows (paged
+ * 7) with the outstanding amount in danger red, circular pager; "All" full-list
+ * modal + customer detail + log popup (reused from VAS_126/127). Widget scales in
+ * em against the widget root; modals are overlays in px. Borders/radii/shadows in
+ * px. All selectors MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas138-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+}
+
+    .vas138-root,
+    .vas138-root * {
+        box-sizing: border-box;
+    }
+
+.vas138-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em 1em 1.125em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header. */
+.vas138-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas138-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas138-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #E8F2FB;                  /* px */
+    color: #0083DA;
+}
+
+    .vas138-iconwell svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas138-head-txt {
+    min-width: 0;
+}
+
+.vas138-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas138-sub {
+    font-size: 0.7em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas138-alllink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;                                   /* px */
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.78em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas138-alllink svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+/* Body + rows. */
+.vas138-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas138-list {
+    flex: 1;
+    min-height: 0;
+}
+
+    /* Widget body: split the available height into `pageSize` equal rows so the
+     * records fill the card top-to-bottom (grid-template-rows set inline in JS).
+     * Partial pages leave empty tracks at the bottom rather than stretching. */
+    .vas138-body > .vas138-list {
+        display: grid;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+
+    /* Modal list: a normal flowing column of natural-height rows. */
+    .vas138-pbody .vas138-list {
+        display: flex;
+        flex-direction: column;
+    }
+
+.vas138-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    width: 100%;
+    padding: 0.4em 0.25em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    min-height: 0;
+    overflow: hidden;
+}
+
+    .vas138-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas138-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+    .vas138-pbody .vas138-row {
+        overflow: visible;
+    }
+
+.vas138-row-ic {
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 9px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #ED1C24;
+    background: rgba(237, 28, 36, 0.12);
+}
+
+    .vas138-row-ic svg {
+        width: 0.95em;
+        height: 0.95em;
+    }
+
+.vas138-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas138-row-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas138-row-meta {
+    font-size: 0.72em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Outstanding amount (danger red) + "overdue" caption, right-aligned. */
+.vas138-row-amt {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    min-width: 0;
+}
+
+.vas138-amt-val {
+    font-size: 0.82em;
+    font-weight: 700;
+    color: #8F2D2D;
+    white-space: nowrap;
+}
+
+.vas138-amt-lab {
+    font-size: 0.72em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas138-open {
+    flex-shrink: 0;
+    border-radius: 999px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.72em;
+    padding: 0.28em 0.7em;
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas138-open:hover {
+        background: #EAF8FF;
+    }
+
+/* Tier tags (customer detail). */
+.vas138-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875em;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas138-tag-violet { background: #EFEAFF; color: #5F4AA6; }
+.vas138-tag-amber { background: #FCEBD3; color: #9A6500; }
+.vas138-tag-info { background: #DFF1FF; color: #0E5DA8; }
+.vas138-tag-neutral { background: #EEF2F6; color: #5F7283; }
+
+/* Pager (widget + modals). */
+.vas138-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.5em;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas138-pglabel {
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+.vas138-pgbtn {
+    width: 2.1em;
+    height: 2.1em;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: none;
+    background: #1F83FF;
+    color: #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
+}
+
+    .vas138-pgbtn:disabled {
+        background: #C7D6E2;
+        box-shadow: none;
+        cursor: default;
+    }
+
+    .vas138-pgbtn svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas138-state {
+    padding: 0.9em 0.25em;
+    font-size: 0.82em;
+    color: #748494;
+}
+
+.vas138-retry {
+    margin-left: 6px;                           /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 2px 10px;                          /* px */
+    cursor: pointer;
+}
+
+/* Temporary diagnostic: raw server error under the error state. */
+.vas138-errdetail {
+    margin-top: 0.5em;
+    font-size: 0.72em;
+    color: #8F2D2D;
+    word-break: break-word;
+    white-space: normal;
+}
+
+/* ── Shared modal chrome ──────────────────────────────────────────────────── */
+
+.vas138-dialog,
+.vas138-detail,
+.vas138-proj-modal,
+.vas138-log {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+.vas138-dialog { z-index: 5000; }
+.vas138-detail { z-index: 5100; }
+.vas138-proj-modal { z-index: 5150; }
+.vas138-log { z-index: 5200; }
+
+    .vas138-dialog.is-open,
+    .vas138-detail.is-open,
+    .vas138-proj-modal.is-open,
+    .vas138-log.is-open {
+        display: flex;
+    }
+
+    .vas138-dialog *, .vas138-detail *, .vas138-proj-modal *, .vas138-log *,
+    .vas138-dialog, .vas138-detail, .vas138-proj-modal, .vas138-log {
+        box-sizing: border-box;
+    }
+
+.vas138-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas138-panel,
+.vas138-dpanel,
+.vas138-ppanel,
+.vas138-lpanel {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+    max-height: 86vh;
+}
+
+.vas138-panel { max-width: 640px; }         /* px */
+.vas138-dpanel { max-width: 760px; }        /* px */
+.vas138-ppanel { max-width: 720px; }        /* px */
+.vas138-lpanel { max-width: 560px; }        /* px */
+
+.vas138-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas138-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas138-phead-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas138-pcount,
+.vas138-dsummary,
+.vas138-psummary,
+.vas138-lcust {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;                           /* px */
+}
+
+.vas138-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas138-close:hover {
+        background: #F2F6FA;
+    }
+
+    .vas138-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas138-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas138-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.vas138-btn-ghost {
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas138-btn-ghost:hover {
+        background: #EAF8FF;
+    }
+
+.vas138-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas138-btn-primary:hover {
+        background: #1675E6;
+    }
+
+/* ── All (full list) modal ────────────────────────────────────────────────── */
+
+.vas138-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 20px 8px;                      /* px */
+    font-size: 16px;                            /* px — modal rows use fixed sizing */
+}
+
+.vas138-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+    .vas138-pfoot .vas138-pager {
+        justify-content: center;
+        gap: 14px;                              /* px */
+        padding-top: 0;
+        margin-top: 0;
+    }
+
+    .vas138-pbody .vas138-row {
+        padding: 0.7em 0.5em;
+    }
+
+/* ── Customer detail modal ────────────────────────────────────────────────── */
+
+.vas138-dbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 24px;                         /* px */
+}
+
+.vas138-dfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas138-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+    margin-bottom: 18px;                        /* px */
+}
+
+.vas138-id-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;                        /* px */
+    display: grid;
+    place-items: center;
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.vas138-id-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas138-id-name {
+    font-size: 22px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas138-id-sub {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+    margin-top: 2px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas138-id-tier {
+    flex-shrink: 0;
+}
+
+.vas138-factgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 18px;                             /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas138-fl {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;                      /* px */
+}
+
+.vas138-fv {
+    font-size: 15px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-top: 3px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas138-signals {
+    padding-top: 16px;                          /* px */
+}
+
+.vas138-sig-title {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 6px;                         /* px */
+}
+
+.vas138-signal {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    padding: 11px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas138-signal:last-child {
+        border-bottom: none;
+    }
+
+.vas138-sig-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas138-sig-ic svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas138-sig-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas138-sig-detail {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    margin-top: 1px;                            /* px */
+}
+
+/* ── Log activity popup ───────────────────────────────────────────────────── */
+
+.vas138-lbody {
+    padding: 18px 24px 8px;                     /* px */
+}
+
+.vas138-ltypes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas138-ltype {
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 6px 16px;                          /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas138-ltype:hover {
+        background: #EAF8FF;
+    }
+
+    .vas138-ltype.is-active {
+        background: #1F83FF;
+        border-color: #1F83FF;
+        color: #FFFFFF;
+    }
+
+.vas138-llabel {
+    display: block;
+    font-size: 12px;                            /* px */
+    color: #141414;
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas138-ltext {
+    width: 100%;
+    min-height: 84px;                           /* px */
+    resize: vertical;
+    border: none;
+    border-bottom: 1px solid #D7D7D7;           /* px */
+    background: #FFFFFF;
+    font-family: inherit;
+    font-size: 16px;                            /* px */
+    color: #000000;
+    padding: 8px 2px;                           /* px */
+    outline: none;
+}
+
+    .vas138-ltext:focus {
+        border-bottom-color: #0083DA;
+    }
+
+.vas138-lerror {
+    margin-top: 10px;                           /* px */
+    font-size: 13px;                            /* px */
+    color: #ED1C24;
+}
+
+/* ── Projects modal (reused VAS_135 project endpoints) ────────────────────── */
+
+/* Project status tags. */
+.vas138-tag-delayed { background: #FAD7D7; color: #8F2D2D; }
+.vas138-tag-ontime { background: #D9F2E5; color: #0B6B45; }
+.vas138-tag-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.vas138-tag-upcoming { background: #EFEAFF; color: #5F4AA6; }
+
+.vas138-projbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 18px 24px;                         /* px */
+}
+
+/* Five activity-state cells. */
+.vas138-statgrid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas138-astat {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 9px;                               /* px */
+    text-align: center;
+    cursor: pointer;
+    background: #FFFFFF;
+    font-family: inherit;
+}
+
+    .vas138-astat:hover {
+        border-color: #BFE4FF;
+    }
+
+    .vas138-astat.is-active {
+        border-color: #1F83FF;
+        box-shadow: 0 0 0 1px #1F83FF inset;
+    }
+
+    .vas138-astat b {
+        display: block;
+        font-size: 20px;                        /* px */
+        line-height: 1;
+    }
+
+    .vas138-astat span {
+        font-size: 11px;                        /* px */
+        color: #5F7283;
+    }
+
+.vas138-astat-delayed b { color: #ED1C24; }
+.vas138-astat-ontime b { color: #20A464; }
+.vas138-astat-ongoing b { color: #0083DA; }
+.vas138-astat-upcoming b { color: #5F4AA6; }
+.vas138-astat-completed b { color: #20A464; }
+
+/* Activity-detail list (state filter). */
+.vas138-actdetail:empty {
+    display: none;
+}
+
+.vas138-actlist {
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 10px;                        /* px */
+    padding: 4px 12px;                          /* px */
+    margin-bottom: 16px;                        /* px */
+    background: #FBFDFF;
+}
+
+.vas138-act {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;                                  /* px */
+    padding: 9px 0;                             /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas138-act:last-child {
+        border-bottom: none;
+    }
+
+.vas138-act-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas138-act-name {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas138-act-proj {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas138-act-due {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Projects section. */
+.vas138-projtitle {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 4px;                         /* px */
+}
+
+.vas138-proj {
+    padding: 12px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas138-proj:last-child {
+        border-bottom: none;
+    }
+
+.vas138-proj-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas138-proj-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas138-proj-bd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;                                   /* px */
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas138-bd {
+    font-size: 11px;                            /* px */
+    font-weight: 600;
+    padding: 2px 7px;                           /* px */
+    border-radius: 6px;                         /* px */
+    white-space: nowrap;
+}
+
+.vas138-bd-delayed { background: #FAD7D7; color: #8F2D2D; }
+.vas138-bd-ontime { background: #D9F2E5; color: #0B6B45; }
+.vas138-bd-ongoing { background: #DFF1FF; color: #0E5DA8; }
+.vas138-bd-upcoming { background: #EFEAFF; color: #5F4AA6; }
+.vas138-bd-completed { background: #D9F2E5; color: #0B6B45; }
+
+.vas138-bar {
+    height: 8px;                                /* px */
+    border-radius: 999px;
+    background: rgba(15, 61, 97, 0.07);
+    overflow: hidden;
+}
+
+    .vas138-bar > div {
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0083DA, #1F83FF);
+    }
+
+.vas138-proj-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;                                  /* px */
+    margin-top: 6px;                            /* px */
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+}
+
+body.vas138-modal-open {
+    overflow: hidden;
+}

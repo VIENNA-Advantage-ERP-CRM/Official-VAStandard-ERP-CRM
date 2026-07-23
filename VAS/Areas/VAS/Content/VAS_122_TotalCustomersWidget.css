@@ -1,0 +1,84 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_122 Total Customers — 2x1 static glass KPI tile (Customers dashboard).
+ * Design: kpi-total-customers.html (attached) + Design Specs/dashboard-widgets.md
+ * "KPI And Summary Widget". Matches the shipped Total-Value KPI tile (VAS_075):
+ * title-style label, 1.75em SemiBold value, muted meta sub-line. Internal type /
+ * spacing in em against the widget-root font-size; borders / radii / shadows in
+ * px (physical edges). All classes carry the module MPC prefix (vas122-*).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas122-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    /* Widget root anchor — one lever; internal em values scale from this. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+    .vas122-root,
+    .vas122-root * {
+        box-sizing: border-box;
+    }
+
+/* Glass KPI surface (emphasis via text only; no tinted background).
+   space-between pins the muted label to the top and pushes the value + meta
+   group to the bottom, matching the reference kpi-total-customers.html tile. */
+.vas122-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.875em 1em 1em;
+    overflow: hidden;
+    border: 2px solid #FFFFFF;                  /* px — physical edge */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Stat label — muted, top of the tile (reference .kpi-label). */
+.vas122-label {
+    color: #748494;
+    font-size: 0.8em;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Bottom group holds the big value and its meta sub-line together. */
+.vas122-group {
+    min-width: 0;
+}
+
+/* Value — 2.4em Roboto Bold, tight line-height (reference .kpi-val). */
+.vas122-value {
+    overflow: hidden;
+    color: #102C3F;
+    font-size: 2.4em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Meta sub-line — muted sub tone (reference .kpi-sub). */
+.vas122-meta {
+    margin-top: 0.4em;                          /* value/meta stack gap */
+    overflow: hidden;
+    color: #5F7283;
+    font-size: 0.74em;
+    font-weight: 400;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

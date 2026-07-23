@@ -1,0 +1,723 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_127 Open Tickets — 3x2 glass triage list (Customers dashboard) + modals.
+ * Design: open-tickets.html (attached) + Design Specs/dashboard-widgets.md
+ * "Grid Data Widget". Glass surface, icon-well header, ranked rows (paged 7),
+ * circular pager; "All" full-list modal + customer detail + log popup. Widget
+ * scales in em against the widget root; modals are overlays in px/rem. Borders/
+ * radii/shadows in px. All selectors MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas127-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+}
+
+    .vas127-root,
+    .vas127-root * {
+        box-sizing: border-box;
+    }
+
+.vas127-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em 1em 1.125em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header. */
+.vas127-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas127-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas127-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #E8F2FB;                  /* px */
+    color: #0083DA;
+}
+
+    .vas127-iconwell svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas127-head-txt {
+    min-width: 0;
+}
+
+.vas127-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas127-sub {
+    font-size: 0.7em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas127-alllink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;                                   /* px */
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.78em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas127-alllink svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+/* Body + rows. */
+.vas127-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas127-list {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+    /* Widget body: split the available height into `pageSize` equal rows so the
+     * records fill the card top-to-bottom (grid-template-rows set inline in JS).
+     * Partial pages leave empty tracks at the bottom rather than stretching. */
+    .vas127-body > .vas127-list {
+        display: grid;
+        grid-auto-rows: minmax(0, 1fr);
+    }
+
+.vas127-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    width: 100%;
+    padding: 0.4em 0.25em;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    min-height: 0;
+    overflow: hidden;
+}
+
+    .vas127-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas127-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.vas127-row-ic {
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 9px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    color: #ED1C24;
+    background: rgba(237, 28, 36, 0.12);
+}
+
+    .vas127-row-ic svg {
+        width: 0.95em;
+        height: 0.95em;
+    }
+
+.vas127-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas127-row-title {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas127-row-meta {
+    font-size: 0.72em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas127-view {
+    flex-shrink: 0;
+    border-radius: 999px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.72em;
+    padding: 0.28em 0.7em;
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas127-view:hover {
+        background: #EAF8FF;
+    }
+
+/* Tags. */
+.vas127-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875em;
+    font-weight: 600;
+    padding: 0.1875em 0.5em;
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas127-tag-delayed { background: #FAD7D7; color: #8F2D2D; }
+.vas127-tag-warn { background: #FCEBD3; color: #9A6500; }
+.vas127-tag-key { background: #FBE9D2; color: #9A5B00; }
+.vas127-tag-violet { background: #EFEAFF; color: #5F4AA6; }
+.vas127-tag-amber { background: #FCEBD3; color: #9A6500; }
+.vas127-tag-info { background: #DFF1FF; color: #0E5DA8; }
+.vas127-tag-neutral { background: #EEF2F6; color: #5F7283; }
+
+/* Pager (widget + modals). */
+.vas127-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.5em;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.vas127-pglabel {
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+.vas127-pgbtn {
+    width: 2.1em;
+    height: 2.1em;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: none;
+    background: #1F83FF;
+    color: #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
+}
+
+    .vas127-pgbtn:disabled {
+        background: #C7D6E2;
+        box-shadow: none;
+        cursor: default;
+    }
+
+    .vas127-pgbtn svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas127-state {
+    padding: 0.9em 0.25em;
+    font-size: 0.82em;
+    color: #748494;
+}
+
+.vas127-retry {
+    margin-left: 6px;                           /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 2px 10px;                          /* px */
+    cursor: pointer;
+}
+
+/* ── Shared modal chrome ──────────────────────────────────────────────────── */
+
+.vas127-dialog,
+.vas127-detail,
+.vas127-log {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+.vas127-dialog { z-index: 5000; }
+.vas127-detail { z-index: 5100; }
+.vas127-log { z-index: 5200; }
+
+    .vas127-dialog.is-open,
+    .vas127-detail.is-open,
+    .vas127-log.is-open {
+        display: flex;
+    }
+
+    .vas127-dialog *, .vas127-detail *, .vas127-log *,
+    .vas127-dialog, .vas127-detail, .vas127-log {
+        box-sizing: border-box;
+    }
+
+.vas127-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas127-panel,
+.vas127-dpanel,
+.vas127-lpanel {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+    max-height: 86vh;
+}
+
+.vas127-panel { max-width: 640px; }         /* px */
+.vas127-dpanel { max-width: 760px; }        /* px */
+.vas127-lpanel { max-width: 640px; }        /* px */
+
+.vas127-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas127-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas127-phead-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas127-pcount,
+.vas127-dsummary,
+.vas127-lcust {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;                           /* px */
+}
+
+.vas127-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas127-close:hover {
+        background: #F2F6FA;
+    }
+
+    .vas127-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas127-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas127-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.vas127-btn-ghost {
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas127-btn-ghost:hover {
+        background: #EAF8FF;
+    }
+
+.vas127-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas127-btn-primary:hover {
+        background: #1675E6;
+    }
+
+/* ── All (full list) modal ────────────────────────────────────────────────── */
+
+.vas127-search {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;                                  /* px */
+    margin: 12px 20px 4px;                      /* px */
+    padding: 8px 14px;                          /* px */
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;                  /* px */
+    border-radius: 999px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.05);
+}
+
+.vas127-search-ic {
+    color: #0083DA;
+    display: inline-grid;
+    place-items: center;
+}
+
+    .vas127-search-ic svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas127-search-in {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 14px;                            /* px */
+    color: #102C3F;
+}
+
+.vas127-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 20px 8px;                      /* px */
+    font-size: 16px;                            /* px — modal rows use fixed sizing */
+}
+
+.vas127-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+    .vas127-pfoot .vas127-pager {
+        justify-content: center;
+        gap: 14px;                              /* px */
+        padding-top: 0;
+        margin-top: 0;
+    }
+
+    .vas127-pbody .vas127-row {
+        flex: none;
+    }
+
+/* ── Customer detail modal ────────────────────────────────────────────────── */
+
+.vas127-dbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 24px;                         /* px */
+}
+
+.vas127-dfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas127-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+    margin-bottom: 18px;                        /* px */
+}
+
+.vas127-id-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;                        /* px */
+    display: grid;
+    place-items: center;
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.vas127-id-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas127-id-name {
+    font-size: 22px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas127-id-sub {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+    margin-top: 2px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas127-id-tier {
+    flex-shrink: 0;
+}
+
+.vas127-factgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 18px;                             /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas127-fl {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;                      /* px */
+}
+
+.vas127-fv {
+    font-size: 15px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-top: 3px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas127-signals {
+    padding-top: 16px;                          /* px */
+}
+
+.vas127-sig-title {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 6px;                         /* px */
+}
+
+.vas127-signal {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    padding: 11px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas127-signal:last-child {
+        border-bottom: none;
+    }
+
+.vas127-sig-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas127-sig-ic svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas127-sig-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas127-sig-detail {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    margin-top: 1px;                            /* px */
+}
+
+/* ── Log activity popup ───────────────────────────────────────────────────── */
+
+.vas127-lbody {
+    padding: 18px 24px 8px;                     /* px */
+}
+
+.vas127-ltypes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas127-ltype {
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 6px 16px;                          /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas127-ltype:hover {
+        background: #EAF8FF;
+    }
+
+    .vas127-ltype.is-active {
+        background: #1F83FF;
+        border-color: #1F83FF;
+        color: #FFFFFF;
+    }
+
+.vas127-llabel {
+    display: block;
+    font-size: 12px;                            /* px */
+    color: #141414;
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas127-ltext {
+    width: 100%;
+    min-height: 84px;                           /* px */
+    resize: vertical;
+    border: none;
+    border-bottom: 1px solid #D7D7D7;           /* px */
+    background: #FFFFFF;
+    font-family: inherit;
+    font-size: 16px;                            /* px */
+    color: #000000;
+    padding: 8px 2px;                           /* px */
+    outline: none;
+}
+
+    .vas127-ltext:focus {
+        border-bottom-color: #0083DA;
+    }
+
+.vas127-lerror {
+    margin-top: 10px;                           /* px */
+    font-size: 13px;                            /* px */
+    color: #ED1C24;
+}
+
+body.vas127-modal-open {
+    overflow: hidden;
+}
