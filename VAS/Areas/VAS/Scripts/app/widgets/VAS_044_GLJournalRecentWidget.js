@@ -1152,15 +1152,33 @@
                         ] ||
                         "VAS-gljr-pill-draft";
 
+                    /* Currency belongs to the journal's ACCOUNTING SCHEMA, so it
+                       differs row by row — format with the row's own symbol /
+                       precision and fall back to the response-level values only
+                       when the row doesn't carry them. */
+                    var rowSymbol =
+                        entry.CurSymbol ||
+                        entry.ISOCode ||
+                        symbol;
+
+                    var rowPrecision =
+                        (
+                            entry.StdPrecision !== undefined &&
+                            entry.StdPrecision !== null &&
+                            !isNaN(Number(entry.StdPrecision))
+                        )
+                            ? Number(entry.StdPrecision)
+                            : precision;
+
                     var debitText =
                         Number(
                             entry.TotalDebit || 0
                         ) > 0
                             ? (
-                                symbol +
+                                rowSymbol +
                                 formatAmount(
                                     entry.TotalDebit,
-                                    precision
+                                    rowPrecision
                                 )
                             )
                             : "—";
@@ -1170,10 +1188,10 @@
                             entry.TotalCredit || 0
                         ) > 0
                             ? (
-                                symbol +
+                                rowSymbol +
                                 formatAmount(
                                     entry.TotalCredit,
-                                    precision
+                                    rowPrecision
                                 )
                             )
                             : "—";

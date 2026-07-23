@@ -344,6 +344,8 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     cursor: pointer;
 }
 
+/* Columns: 1 Journal No · 2 Accounting Schema · 3 Date · 4 Description ·
+   5 Status · 6 Total Debit · 7 Total Credit. Description takes the slack. */
 .VAS-glje-dialog-table th:nth-child(1),
 .VAS-glje-dialog-table td:nth-child(1) {
     width: 11em;
@@ -354,23 +356,35 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     width: 10em;
 }
 
-.VAS-glje-dialog-table th:nth-child(4),
-.VAS-glje-dialog-table td:nth-child(4) {
-    width: 12em;
+.VAS-glje-dialog-table th:nth-child(3),
+.VAS-glje-dialog-table td:nth-child(3) {
+    width: 10em;
 }
 
 .VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(5) {
+    width: 12em;
+}
+
 .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-table td:nth-child(5),
-.VAS-glje-dialog-table td:nth-child(6) {
+.VAS-glje-dialog-table th:nth-child(7),
+.VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(7) {
     width: 11em;
     text-align: right;
 }
 
 .VAS-glje-doc,
-.VAS-glje-date {
+.VAS-glje-date,
+.VAS-glje-schema {
     color: #5F7283;
     font-variant-numeric: tabular-nums;
+}
+
+.VAS-glje-schema {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .VAS-glje-desc {
@@ -444,18 +458,56 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     flex-shrink: 0;
 }
 
-.VAS-glje-dialog-total {
-    color: #718398;
-    font-size: 1.05em;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
 .VAS-glje-dialog-actions {
     display: inline-flex;
     align-items: center;
     gap: 0.75em;
 }
+
+/* ── Header Export link ──────────────────────────────────────────────────────
+   Export sits in the dialog header as a plain hyperlink, not a button: it is a
+   secondary utility next to the close affordance. The button rules elsewhere in
+   this file still serve the detail dialog's own footer buttons, so this override
+   is scoped to the header and wins on specificity (element + class + ancestor). */
+.VAS-glje-dialog-head a.VAS-glje-export {
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    margin-right: 0.5em;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: #0083DA;
+    font-size: 0.8125em;
+    font-weight: 400;
+    /* Underline the LABEL only — an underlined glyph reads as a broken icon. */
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+    .VAS-glje-dialog-head a.VAS-glje-export span {
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+    }
+
+    /* Vienna icon font glyph (vis-doc-excel) — sized against the link text. */
+    .VAS-glje-dialog-head a.VAS-glje-export .vis {
+        font-size: 1.15em;
+        line-height: 1;
+        text-decoration: none;
+    }
+
+    .VAS-glje-dialog-head a.VAS-glje-export:hover,
+    .VAS-glje-dialog-head a.VAS-glje-export:focus-visible {
+        background: transparent;
+        color: #005FA3;
+    }
 
 .VAS-glje-export,
 .VAS-glje-close-primary {
@@ -723,18 +775,23 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-dialog-table th:nth-child(2),
 .VAS-glje-dialog-table td:nth-child(2) {
-    width: 8em;
+    width: 22em;
 }
 
-.VAS-glje-dialog-table th:nth-child(4),
-.VAS-glje-dialog-table td:nth-child(4) {
+.VAS-glje-dialog-table th:nth-child(3),
+.VAS-glje-dialog-table td:nth-child(3) {
     width: 8em;
 }
 
 .VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(5) {
+    width: 8em;
+}
+
 .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-table td:nth-child(5),
-.VAS-glje-dialog-table td:nth-child(6) {
+.VAS-glje-dialog-table th:nth-child(7),
+.VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(7) {
     width: 9.5em;
     text-align: right;
 }
@@ -802,16 +859,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     flex-shrink: 0;
 }
 
-.VAS-glje-dialog-total {
-    font-size: 0.8125em;
-    color: #748494;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
 .VAS-glje-dialog-actions {
     display: inline-flex;
     align-items: center;
@@ -873,14 +920,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
         gap: 0.625em;
     }
 
-    .VAS-glje-dialog-total {
-        flex: 1 1 100%;
-        order: 2;
-        text-align: center;
-    }
-
     .VAS-glje-dialog-actions {
-        order: 1;
         margin: 0 auto;
     }
 }
@@ -1501,10 +1541,10 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     border-bottom: 0;
 }
 
-.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(5),
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(5),
-.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6) {
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(7),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(7) {
     text-align: right;
 }
 
@@ -1628,10 +1668,10 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 /* Table amount columns only */
 .VAS-glje-dialog-table .VAS-glje-amt,
 .VAS-glje-detail-lines .VAS-glje-amt,
-.VAS-glje-dialog-table th:nth-child(5),
 .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-table td:nth-child(5),
+.VAS-glje-dialog-table th:nth-child(7),
 .VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(7),
 .VAS-glje-detail-lines th:nth-child(2),
 .VAS-glje-detail-lines th:nth-child(3),
 .VAS-glje-detail-lines td:nth-child(2),
@@ -1809,4 +1849,31 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     letter-spacing: 0;
     line-height: 1.3;
     margin-top: 4px;
+}
+
+/* ── List-dialog footer band (design.md widget footer pager) ─────────────────
+   "Showing x-y of N" on the left, the compact pager on the right, on a tinted
+   band. Scoped away from the shared detail dialog (.VAS-glje-detail-dialog),
+   whose footer still holds Download / Post journal / Close buttons and must
+   keep them grouped at the trailing edge. Appended last so it wins over the
+   earlier .VAS-glje-dialog-footer / -actions declarations in this file. */
+.VAS-glje-dialog:not(.VAS-glje-detail-dialog) .VAS-glje-dialog-footer {
+    justify-content: space-between;
+    background: #F4F9FD;
+    border-top: 1px solid #E6EEF5;
+    padding: 0.75em 1.5em;
+}
+
+.VAS-glje-dialog:not(.VAS-glje-detail-dialog) .VAS-glje-dialog-actions {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-glje-dialog:not(.VAS-glje-detail-dialog) .VAS-glje-dialog-pager {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
 }

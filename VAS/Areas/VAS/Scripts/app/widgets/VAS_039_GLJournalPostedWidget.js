@@ -98,6 +98,24 @@
             $kpiValue = $root.find('#VAS-gljp-val-' + id);
         }
 
+        /* Always two decimals, with the user's locale decimal separator (87.50 % /
+           87,50 %) — the same toLocaleString convention the amount widgets use. */
+        function formatPercentage(value) {
+            var number = Number(value);
+
+            if (isNaN(number)) {
+                number = 0;
+            }
+
+            return number.toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+            ) + '%';
+        }
+
         function loadData() {
             showBusy(true);
             $.ajax({
@@ -122,7 +140,7 @@
                         percentage = 0;
                     }
 
-                    $kpiValue.text(percentage + '%');
+                    $kpiValue.text(formatPercentage(percentage));
                     showBusy(false);
                 },
                 error: function () {

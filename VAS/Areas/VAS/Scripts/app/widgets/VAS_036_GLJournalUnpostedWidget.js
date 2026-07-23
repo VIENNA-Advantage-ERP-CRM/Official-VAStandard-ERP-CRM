@@ -145,6 +145,34 @@
         );
     }
 
+    /* Currency belongs to the journal's ACCOUNTING SCHEMA, so it differs row by
+       row. Always format an amount with the row's own symbol / precision and fall
+       back to the response-level values only when a row doesn't carry them. */
+    function rowCurrencySymbol(row, fallbackSymbol) {
+        var symbol =
+            row &&
+            (
+                row.CurSymbol ||
+                row.ISOCode
+            );
+
+        return symbol || fallbackSymbol || "";
+    }
+
+    function rowCurrencyPrecision(row, fallbackPrecision) {
+        var precision =
+            row
+                ? Number(row.StdPrecision)
+                : NaN;
+
+        return (
+            !isNaN(precision) &&
+            precision >= 0
+        )
+            ? precision
+            : fallbackPrecision;
+    }
+
     function isPosted(value) {
         var text =
             String(
@@ -189,18 +217,31 @@
 
             var $dialog = null;
             var $dialogBody = null;
-            var $dialogFooterText = null;
+            var $dialogPagerWrap = null;
             var $dialogBusy = null;
 
             var dialogLoaded = false;
 
             var dialogPageNo = 1;
-            var dialogPageSize = 9;
+            var dialogPageSize = 9;   /* initial guess — replaced by the adaptive measure */
             var dialogTotalPages = 1;
             var dialogTotalCount = 0;
 
+            /* Adaptive paging state: the page size is derived from how many rows fit
+               the dialog body at its current height (mirrors VAS_020 / VAS_021). */
+            var dialogRowHeight = 0;
+            var dialogResizeObserver = null;
+            var dialogSyncPending = false;
+            var dialogPrevPageSize = 0;   /* guards A→B→A capacity ping-pong */
+
+            var DIALOG_MIN_ROWS = 3;
+            var DIALOG_MAX_ROWS = 50;         /* server cap for the paged list */
+            var DIALOG_ROW_FALLBACK = 44;     /* px, used before a row has been measured */
+            var EXPORT_PAGE_SIZE = 5000;      /* server cap for an export-all request */
+
             var countRequest = null;
             var listRequest = null;
+            var exportRequest = null;
 
             var isDisposed = false;
 
@@ -453,6 +494,21 @@
 
                         "</div>" +
 
+                        /* Export lives in the header as a link (not a button): it is a
+                           secondary utility, so it must not compete with the dialog's
+                           primary chrome. It always exports the FULL result set. */
+                        '<a href="#" class="VAS-glju-export" role="button">' +
+                        '<i class="vis vis-doc-excel" aria-hidden="true"></i>' +
+                        "<span>" +
+                        esc(
+                            lbl(
+                                "VAS_Export",
+                                "Export"
+                            )
+                        ) +
+                        "</span>" +
+                        "</a>" +
+
                         '<button type="button" ' +
                         'class="VAS-glju-dialog-close">' +
                         `<svg viewBox="0 0 24 24"" fill="none"" stroke="currentColor"" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>` +
@@ -475,36 +531,16 @@
 
                         "</div>" +
 
+                        /* Footer carries the pager only (design.md widget footer pager).
+                           No totals strip and no action buttons: Export moved to the
+                           header and the dialog closes from the header X / Escape. */
                         '<div class="VAS-glju-dialog-footer">' +
 
-                        '<span class="VAS-glju-dialog-total" ' +
-                        'id="VAS-glju-dialog-total-' +
+                        '<div class="VAS-glju-dialog-actions" ' +
+                        'id="VAS-glju-dialog-pagerwrap-' +
                         id +
-                        '"></span>' +
+                        '"></div>' +
 
-                        '<div class="VAS-glju-dialog-actions">' +
-
-                        '<button type="button" ' +
-                        'class="VAS-glju-export">' +
-                        esc(
-                            lbl(
-                                "VAS_Export",
-                                "Export"
-                            )
-                        ) +
-                        "</button>" +
-
-                        '<button type="button" ' +
-                        'class="VAS-glju-close-primary">' +
-                        esc(
-                            lbl(
-                                "VAS_Close",
-                                "Close"
-                            )
-                        ) +
-                        "</button>" +
-
-                        "</div>" +
                         "</div>" +
                         "</div>" +
                         "</div>"
@@ -516,9 +552,9 @@
                         id
                     );
 
-                $dialogFooterText =
+                $dialogPagerWrap =
                     $dialog.find(
-                        "#VAS-glju-dialog-total-" +
+                        "#VAS-glju-dialog-pagerwrap-" +
                         id
                     );
 
@@ -531,7 +567,6 @@
 
                 $dialog.find(
                     ".VAS-glju-dialog-close, " +
-                    ".VAS-glju-close-primary, " +
                     ".VAS-glju-dialog-scrim"
                 ).on(
                     "click",
@@ -542,7 +577,10 @@
                     ".VAS-glju-export"
                 ).on(
                     "click",
-                    exportDialogRows
+                    function (event) {
+                        event.preventDefault();
+                        exportDialogRows();
+                    }
                 );
 
                 /*
@@ -630,8 +668,9 @@
                         }
                     );
 
-                $dialogBody
-                    .parent()
+                /* Delegated on the dialog itself — the pager now renders in the footer,
+                   outside the body element. */
+                $dialog
                     .off(
                         "click.VAS036DialogPager",
                         ".VAS-glju-dialog-page"
@@ -787,9 +826,156 @@
                     "VAS-glju-body-lock"
                 );
 
-                if (!dialogLoaded) {
-                    loadDialogRows();
+                /* Always reopen on the FIRST page — the page the user happened to be on
+                   when they closed it is not where they expect to land next time. */
+                dialogPageNo = 1;
+                dialogLoaded = false;
+                dialogPrevPageSize = 0;
+
+                loadDialogRows();
+                observeDialogBody();
+            }
+
+            /* Re-measure the row capacity whenever the dialog body is resized
+               (window resize / zoom), so paging stays adaptive while it is open. */
+            function observeDialogBody() {
+                if (
+                    typeof ResizeObserver === "undefined" ||
+                    !$dialog
+                ) {
+                    return;
                 }
+
+                var element =
+                    $dialog.find(
+                        ".VAS-glju-table-wrap"
+                    )[0];
+
+                if (!element) {
+                    return;
+                }
+
+                if (dialogResizeObserver) {
+                    dialogResizeObserver.disconnect();
+                }
+
+                dialogResizeObserver =
+                    new ResizeObserver(
+                        function () {
+                            /* A real resize re-opens the question of capacity, so drop
+                               the anti-oscillation memory before measuring again. */
+                            dialogPrevPageSize = 0;
+                            syncDialogCapacity();
+                        }
+                    );
+
+                dialogResizeObserver.observe(element);
+            }
+
+            function scheduleDialogCapacitySync() {
+                var raf =
+                    window.requestAnimationFrame ||
+                    function (callback) {
+                        return window.setTimeout(callback, 16);
+                    };
+
+                raf(function () {
+                    syncDialogCapacity();
+                });
+            }
+
+            /* Adaptive page size: rows that fit the visible table area. Measures the
+               tallest rendered row (descriptions can wrap) and reloads the page when
+               the capacity actually changed — the server re-clamps the page number. */
+            function syncDialogCapacity() {
+                if (
+                    isDisposed ||
+                    !$dialog ||
+                    !$dialog.is(":visible") ||
+                    (listRequest && listRequest.readyState !== 4)
+                ) {
+                    return;
+                }
+
+                var wrap =
+                    $dialog.find(
+                        ".VAS-glju-table-wrap"
+                    )[0];
+
+                if (!wrap || dialogTotalCount <= 0) {
+                    return;
+                }
+
+                var head =
+                    wrap.querySelector("thead");
+
+                var available =
+                    wrap.clientHeight -
+                    (head ? head.offsetHeight : 0);
+
+                if (available <= 0) {
+                    /* Layout not settled yet (dialog just shown) — retry next frame. */
+                    if (!dialogSyncPending) {
+                        dialogSyncPending = true;
+                        scheduleDialogCapacitySync();
+                    }
+
+                    return;
+                }
+
+                dialogSyncPending = false;
+
+                var rows =
+                    wrap.querySelectorAll(
+                        ".VAS-glju-entry-row"
+                    );
+
+                var maxHeight = 0;
+
+                for (
+                    var index = 0;
+                    index < rows.length;
+                    index++
+                ) {
+                    if (rows[index].offsetHeight > maxHeight) {
+                        maxHeight = rows[index].offsetHeight;
+                    }
+                }
+
+                if (maxHeight > 0) {
+                    dialogRowHeight = maxHeight;
+                }
+
+                var rowHeight =
+                    dialogRowHeight > 0
+                        ? dialogRowHeight
+                        : DIALOG_ROW_FALLBACK;
+
+                var capacity =
+                    Math.min(
+                        DIALOG_MAX_ROWS,
+                        Math.max(
+                            DIALOG_MIN_ROWS,
+                            Math.floor(available / rowHeight)
+                        )
+                    );
+
+                if (capacity === dialogPageSize) {
+                    return;
+                }
+
+                /* A row that wraps on one page but not the next can make the measured
+                   capacity alternate between two values; refuse to bounce back to the
+                   size we just left. */
+                if (capacity === dialogPrevPageSize) {
+                    return;
+                }
+
+                dialogPrevPageSize = dialogPageSize;
+                dialogPageSize = capacity;
+                dialogLoaded = false;
+
+                loadDialogRows();
             }
 
             function closeDialog() {
@@ -798,6 +984,15 @@
                 }
 
                 VAS.GLJournalDetailDialog.close();
+
+                if (dialogResizeObserver) {
+                    dialogResizeObserver.disconnect();
+                    dialogResizeObserver = null;
+                }
+
+                /* Next open starts clean on page 1. */
+                dialogPageNo = 1;
+                dialogLoaded = false;
 
                 if ($dialog) {
                     $dialog.hide();
@@ -856,13 +1051,17 @@
                 return "";
             }
 
-            /* Zoom to the GL Journal record (opens the GL Journal window). */
+            /* Zoom to the GL Journal record (opens the GL Journal window). The list
+               dialog (and any open detail popup) is dismissed first — leaving a modal
+               over the record the user just navigated to hides that record. */
             function zoomToJournal(recordId) {
                 recordId = parseInt(recordId, 10);
 
                 if (isNaN(recordId) || recordId <= 0) {
                     return;
                 }
+
+                closeDialog();
 
                 try {
                     $self.widgetFirevalueChanged({
@@ -1007,13 +1206,8 @@
                         "</div>"
                     );
 
-                    $dialogBody
-                        .siblings(
-                            ".VAS-glju-dialog-pager"
-                        )
-                        .remove();
+                    if ($dialogPagerWrap) { $dialogPagerWrap.empty(); }
 
-                    $dialogFooterText.text("");
                     return;
                 }
 
@@ -1022,6 +1216,7 @@
                     "<thead><tr>" +
 
                     "<th>" + esc(lbl("VAS_036_JournalNo", "Journal No.")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_AccountingSchema", "Accounting Schema")) + "</th>" +
                     "<th>" + esc(lbl("VAS_Date", "Date")) + "</th>" +
                     "<th>" + esc(lbl("Description", "Description")) + "</th>" +
                     "<th>" + esc(lbl("Status", "Status")) + "</th>" +
@@ -1046,6 +1241,21 @@
                         PILL_CLASS[row.DocStatus] ||
                         "VAS-glju-pill-draft";
 
+                    /* Each journal prints in its own schema currency. */
+                    var rowSymbol =
+                        rowCurrencySymbol(row, symbol);
+
+                    var rowPrecision =
+                        rowCurrencyPrecision(row, precision);
+
+                    var debitText =
+                        rowSymbol +
+                        formatAmount(row.TotalDebit, rowPrecision);
+
+                    var creditText =
+                        rowSymbol +
+                        formatAmount(row.TotalCredit, rowPrecision);
+
                     html +=
                         '<tr class="VAS-glju-entry-row" ' +
                         'role="button" tabindex="0" ' +
@@ -1061,6 +1271,12 @@
                         '">' +
                         esc(row.DocumentNo) +
                         "</span>" +
+                        "</td>" +
+
+                        '<td class="VAS-glju-schema" title="' +
+                        esc(row.AcctSchemaName) +
+                        '">' +
+                        esc(row.AcctSchemaName) +
                         "</td>" +
 
                         '<td class="VAS-glju-date">' +
@@ -1080,12 +1296,12 @@
                         "</span>" +
                         "</td>" +
 
-                        '<td class="VAS-glju-amt" title="' + esc(symbol + formatAmount(row.TotalDebit, precision)) + '">' +
-                        esc(symbol + formatAmount(row.TotalDebit, precision)) +
+                        '<td class="VAS-glju-amt" title="' + esc(debitText) + '">' +
+                        esc(debitText) +
                         "</td>" +
 
-                        '<td class="VAS-glju-amt" title="' + esc(symbol + formatAmount(row.TotalCredit, precision)) + '">' +
-                        esc(symbol + formatAmount(row.TotalCredit, precision)) +
+                        '<td class="VAS-glju-amt" title="' + esc(creditText) + '">' +
+                        esc(creditText) +
                         "</td>" +
 
                         "</tr>";
@@ -1096,29 +1312,16 @@
 
                 $dialogBody.html(html);
 
-                $dialogBody
-                    .siblings(
-                        ".VAS-glju-dialog-pager"
-                    )
-                    .remove();
+                /* Pager lives in the dialog footer (design.md footer pager), not
+                   under the table. */
+                if ($dialogPagerWrap) {
+                    $dialogPagerWrap.html(
+                        renderDialogPager()
+                    );
+                }
 
-                $dialogBody.after(
-                    renderDialogPager()
-                );
-
-                $dialogFooterText.text(
-                    rows.length +
-                    " " +
-                    lbl("VAS_036_Journals", "journals") +
-                    " \u00B7 " +
-                    lbl("Total", "total") +
-                    " " +
-                    symbol +
-                    formatAmount(
-                        data.TotalDebit,
-                        precision
-                    )
-                );
+                /* Rows are laid out now \u2014 re-measure the fitting row count. */
+                scheduleDialogCapacitySync();
             }
 
             function renderDialogPager() {
@@ -1193,18 +1396,138 @@
                     "</div>"
                 );
 
-                $dialogFooterText.text("");
+                if ($dialogPagerWrap) { $dialogPagerWrap.empty(); }
             }
 
+            /* Export downloads EVERY unposted journal, not the page on screen: it
+               re-queries the server with exportAll (single un-paged response) and
+               builds the workbook from that data. */
             function exportDialogRows() {
-                var $table =
-                    $dialogBody.find(
-                        ".VAS-glju-dialog-table"
-                    );
-
-                if (!$table.length) {
+                if (
+                    isDisposed ||
+                    (exportRequest && exportRequest.readyState !== 4)
+                ) {
                     return;
                 }
+
+                showDialogBusy(true);
+
+                exportRequest = $.ajax({
+                    url:
+                        baseUrl +
+                        "VAS/VAS_041_GLJournalEntriesWidget/GetUnpostedEntries",
+
+                    type: "GET",
+                    data: {
+                        pageNo: 1,
+                        pageSize: EXPORT_PAGE_SIZE,
+                        exportAll: true
+                    },
+                    dataType: "json",
+                    cache: false,
+
+                    success: function (result) {
+                        var data =
+                            normalizeResponse(result);
+
+                        if (
+                            !data ||
+                            data.error ||
+                            data.success === false
+                        ) {
+                            renderDialogError(
+                                data &&
+                                (
+                                    data.errorText ||
+                                    data.error
+                                )
+                            );
+
+                            return;
+                        }
+
+                        downloadEntriesWorkbook(data);
+                    },
+
+                    error: function (xhr, textStatus) {
+                        if (textStatus === "abort") {
+                            return;
+                        }
+
+                        renderDialogError(
+                            getAjaxErrorMessage(xhr)
+                        );
+                    },
+
+                    complete: function () {
+                        exportRequest = null;
+
+                        if (!isDisposed) {
+                            showDialogBusy(false);
+                        }
+                    }
+                });
+            }
+
+            /* Builds the export table from the raw rows (independent of what the
+               dialog currently renders) and pushes it as an .xls download. */
+            function downloadEntriesWorkbook(data) {
+                var rows =
+                    Array.isArray(data.Entries)
+                        ? data.Entries
+                        : [];
+
+                if (!rows.length) {
+                    return;
+                }
+
+                var symbol =
+                    data.CurSymbol ||
+                    data.ISOCode ||
+                    "";
+
+                var precision =
+                    Number(data.StdPrecision);
+
+                var table =
+                    "<table>" +
+                    "<thead><tr>" +
+                    "<th>" + esc(lbl("VAS_036_JournalNo", "Journal No.")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_AccountingSchema", "Accounting Schema")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_Date", "Date")) + "</th>" +
+                    "<th>" + esc(lbl("Description", "Description")) + "</th>" +
+                    "<th>" + esc(lbl("Status", "Status")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_TotalDebit", "Total Debit")) + "</th>" +
+                    "<th>" + esc(lbl("VAS_036_TotalCredit", "Total Credit")) + "</th>" +
+                    "</tr></thead><tbody>";
+
+                for (
+                    var index = 0;
+                    index < rows.length;
+                    index++
+                ) {
+                    var row = rows[index];
+
+                    /* Export prints each journal in its own schema currency too. */
+                    var rowSymbol =
+                        rowCurrencySymbol(row, symbol);
+
+                    var rowPrecision =
+                        rowCurrencyPrecision(row, precision);
+
+                    table +=
+                        "<tr>" +
+                        "<td>" + esc(row.DocumentNo) + "</td>" +
+                        "<td>" + esc(row.AcctSchemaName) + "</td>" +
+                        "<td>" + esc(row.DateAcct) + "</td>" +
+                        "<td>" + esc(row.Description) + "</td>" +
+                        "<td>" + esc(row.StatusName || row.DocStatus) + "</td>" +
+                        "<td>" + esc(rowSymbol + formatAmount(row.TotalDebit, rowPrecision)) + "</td>" +
+                        "<td>" + esc(rowSymbol + formatAmount(row.TotalCredit, rowPrecision)) + "</td>" +
+                        "</tr>";
+                }
+
+                table += "</tbody></table>";
 
                 var html =
                     '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
@@ -1212,7 +1535,7 @@
                     'xmlns="http://www.w3.org/TR/REC-html40">' +
                     '<head><meta charset="utf-8"></head>' +
                     "<body>" +
-                    $table[0].outerHTML +
+                    table +
                     "</body></html>";
 
                 var blob =
@@ -1280,6 +1603,18 @@
                         listRequest.readyState !== 4
                     ) {
                         listRequest.abort();
+                    }
+
+                    if (
+                        exportRequest &&
+                        exportRequest.readyState !== 4
+                    ) {
+                        exportRequest.abort();
+                    }
+
+                    if (dialogResizeObserver) {
+                        dialogResizeObserver.disconnect();
+                        dialogResizeObserver = null;
                     }
 
                     $(document).off(
