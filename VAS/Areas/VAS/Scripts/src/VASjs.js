@@ -202,6 +202,21 @@ import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+import "../app/widgets/VAS_KpiDrillThrough.js";
+import "../app/widgets/VAS_120_CustomerSearchWidget.js";
+import "../app/widgets/VAS_121_NewCustomerWidget.js";
+import "../app/widgets/VAS_122_TotalCustomersWidget.js";
+import "../app/widgets/VAS_124_DelayedPaymentsWidget.js";
+import "../app/widgets/VAS_125_OpenPipelineWidget.js";
+import "../app/widgets/VAS_126_OpenTicketsWidget.js";
+import "../app/widgets/VAS_127_OpenTicketsListWidget.js";
+import "../app/widgets/VAS_135_ActiveProjectsWidget.js";
+import "../app/widgets/VAS_136_OnboardingStatusWidget.js";
+import "../app/widgets/VAS_137_NeedsAttentionWidget.js";
+import "../app/widgets/VAS_138_DelayedPaymentsListWidget.js";
+import "../app/widgets/VAS_139_HighValuePipelineWidget.js";
+import "../app/widgets/VAS_140_ContractsExpiringWidget.js";
+import "../app/widgets/VAS_141_CustomersBySegmentWidget.js";
 
 import "../app/widgets/VAS_073_LowStockCountWidget.js";
 import "../app/widgets/VAS_074_PendingGRNsWidget.js";
