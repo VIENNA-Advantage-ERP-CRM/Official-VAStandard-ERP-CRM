@@ -1,0 +1,783 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_126 Open Tickets — clickable 2x1 amber-tint KPI tile + triage dialog.
+ * Design: kpi-open-tickets.html (attached) + Design Specs/dashboard-widgets.md.
+ * KPI: reference clickable kpiWidget (muted label + tap arrow, big bold value,
+ * foot row with sub + "triage" CTA, amber tint). Drill-down: reference customer
+ * grid (avatar + name/contact, Tier, Owner, ARR, Segment) with an "N customers"
+ * count, a circular pager, and Close / Open-in-browser actions. The KPI scales in
+ * em against the widget root; the dialog is an overlay sized in px/rem.
+ * All selectors carry the module MPC prefix.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas126-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+    .vas126-root,
+    .vas126-root * {
+        box-sizing: border-box;
+    }
+
+/* Clickable amber KPI surface (attention tint + hover lift + pointer). */
+.vas126-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 0.875em 1em 1em;
+    overflow: hidden;
+    border: 2px solid #FFFFFF;                  /* px — physical edge */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(252, 235, 211, 0.7), rgba(255, 255, 255, 0.5));
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+    .vas126-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
+    }
+
+    .vas126-card:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+.vas126-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    color: #748494;
+    font-size: 0.8em;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-tap {
+    display: inline-grid;
+    place-items: center;
+    color: #1F83FF;
+    flex-shrink: 0;
+}
+
+    .vas126-tap svg {
+        width: 0.7em;
+        height: 0.7em;
+    }
+
+.vas126-group {
+    min-width: 0;
+}
+
+.vas126-value {
+    overflow: hidden;
+    color: #102C3F;
+    font-size: 2.4em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-top: 0.4em;
+}
+
+.vas126-sub {
+    color: #5F7283;
+    font-size: 0.74em;
+    font-weight: 400;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.vas126-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    color: #ED1C24;
+    font-size: 0.74em;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+    .vas126-cta svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+/* ── Triage drill-down dialog (overlay on <body>) ─────────────────────────── */
+
+.vas126-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .vas126-dialog.is-open {
+        display: flex;
+    }
+
+    .vas126-dialog *,
+    .vas126-dialog {
+        box-sizing: border-box;
+    }
+
+.vas126-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas126-panel {
+    position: relative;
+    width: 100%;
+    max-width: 900px;                           /* px */
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.vas126-panel-head {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas126-panel-title {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas126-head-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas126-count {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas126-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .vas126-close:hover {
+        background: #F2F6FA;
+    }
+
+    .vas126-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas126-panel-body {
+    flex: 1;
+    min-height: 0;
+    padding: 6px 20px 8px;                      /* px */
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Shared grid template across header + every body row (Grid Data Widget rule). */
+.vas126-grid-head,
+.vas126-grid-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 1fr);
+    gap: 12px;                                  /* px */
+    align-items: center;
+}
+
+.vas126-grid-head {
+    padding: 8px 8px;                           /* px */
+    border-bottom: 1px solid #C5D2DD;           /* px */
+}
+
+    .vas126-grid-head span {
+        font-size: 12px;                        /* px */
+        font-weight: 500;
+        color: #41576A;
+        text-transform: capitalize;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas126-grid-row {
+    width: 100%;
+    padding: 10px 8px;                          /* px */
+    border: none;
+    border-bottom: 1px solid #E2EAF1;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+
+    .vas126-grid-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas126-grid-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.is-right {
+    text-align: right;
+    justify-self: end;
+}
+
+/* Customer cell — avatar + name + contact. */
+.vas126-c-cust {
+    display: flex;
+    align-items: center;
+    gap: 10px;                                  /* px */
+    min-width: 0;
+}
+
+.vas126-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    font-size: 12px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.vas126-c-cust-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas126-c-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-c-contact {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-c-tier {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas126-c-owner {
+    font-size: 13px;                            /* px */
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-c-arr {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-c-seg {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Tier tags. */
+.vas126-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;                            /* px */
+    font-weight: 600;
+    padding: 3px 8px;                           /* px */
+    border-radius: 6px;                         /* px */
+    line-height: 1.2;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas126-tag-violet { background: #EFEAFF; color: #5F4AA6; }
+.vas126-tag-amber { background: #FCEBD3; color: #9A6500; }
+.vas126-tag-info { background: #DFF1FF; color: #0E5DA8; }
+.vas126-tag-neutral { background: #EEF2F6; color: #5F7283; }
+.vas126-tag-key { background: #FBE9D2; color: #9A5B00; }
+
+/* Footer — pager row + action buttons. */
+.vas126-panel-foot {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;                                  /* px */
+    padding: 12px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas126-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas126-pglabel {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+}
+
+.vas126-pgbtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: none;
+    background: #1F83FF;
+    color: #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
+}
+
+    .vas126-pgbtn:disabled {
+        background: #C7D6E2;
+        box-shadow: none;
+        cursor: default;
+    }
+
+    .vas126-pgbtn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas126-foot-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+}
+
+.vas126-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;                                   /* px */
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 8px 16px;                          /* px */
+    border: none;
+    cursor: pointer;
+}
+
+    .vas126-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.vas126-btn-ghost {
+    background: #FFFFFF;
+    border: 1px solid #BFE4FF;                  /* px */
+    color: #0083DA;
+}
+
+    .vas126-btn-ghost:hover {
+        background: #EAF8FF;
+    }
+
+.vas126-btn-primary {
+    background: #1F83FF;
+    color: #FFFFFF;
+}
+
+    .vas126-btn-primary:hover {
+        background: #1675E6;
+    }
+
+.vas126-list-state {
+    padding: 28px 8px;                          /* px */
+    font-size: 14px;                            /* px */
+    color: #748494;
+    text-align: center;
+}
+
+/* ── Customer detail modal (overlay above the triage list) ────────────────── */
+
+.vas126-detail {
+    position: fixed;
+    inset: 0;
+    z-index: 5100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .vas126-detail.is-open {
+        display: flex;
+    }
+
+    .vas126-detail *,
+    .vas126-detail {
+        box-sizing: border-box;
+    }
+
+.vas126-dpanel {
+    position: relative;
+    width: 100%;
+    max-width: 760px;                           /* px */
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.vas126-dhead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas126-dhead-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas126-dsummary {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas126-dbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 24px;                         /* px */
+}
+
+.vas126-dfoot {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;                                  /* px */
+    padding: 14px 24px;                         /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+/* Identity block. */
+.vas126-id {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+    margin-bottom: 18px;                        /* px */
+}
+
+.vas126-id-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;                        /* px */
+    display: grid;
+    place-items: center;
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.vas126-id-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.vas126-id-name {
+    font-size: 22px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-id-sub {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+    margin-top: 2px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas126-id-tier {
+    flex-shrink: 0;
+}
+
+/* Fact grid (4 columns). */
+.vas126-factgrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px 18px;                             /* px */
+    padding-bottom: 18px;                       /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas126-fl {
+    font-size: 11px;                            /* px */
+    color: #748494;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;                      /* px */
+}
+
+.vas126-fv {
+    font-size: 15px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-top: 3px;                            /* px */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Signals. */
+.vas126-signals {
+    padding-top: 16px;                          /* px */
+}
+
+.vas126-sig-title {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    margin-bottom: 6px;                         /* px */
+}
+
+.vas126-signal {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    padding: 11px 0;                            /* px */
+    border-bottom: 1px solid #EDF2F6;           /* px */
+}
+
+    .vas126-signal:last-child {
+        border-bottom: none;
+    }
+
+.vas126-sig-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas126-sig-ic svg {
+        width: 16px;
+        height: 16px;
+    }
+
+.vas126-sig-name {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas126-sig-detail {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    margin-top: 1px;                            /* px */
+}
+
+/* ── Log activity popup (overlay above the detail modal) ──────────────────── */
+
+.vas126-log {
+    position: fixed;
+    inset: 0;
+    z-index: 5200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .vas126-log.is-open {
+        display: flex;
+    }
+
+    .vas126-log *,
+    .vas126-log {
+        box-sizing: border-box;
+    }
+
+.vas126-lpanel {
+    position: relative;
+    width: 100%;
+    max-width: 640px;                           /* px */
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.vas126-lcust {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;                           /* px */
+}
+
+.vas126-lbody {
+    padding: 18px 24px 8px;                     /* px */
+}
+
+/* Activity type chips (Call / Note / Meeting / Email). */
+.vas126-ltypes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;                                   /* px */
+    margin-bottom: 16px;                        /* px */
+}
+
+.vas126-ltype {
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 13px;                            /* px */
+    font-weight: 600;
+    padding: 6px 16px;                          /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    cursor: pointer;
+}
+
+    .vas126-ltype:hover {
+        background: #EAF8FF;
+    }
+
+    .vas126-ltype.is-active {
+        background: #1F83FF;
+        border-color: #1F83FF;
+        color: #FFFFFF;
+    }
+
+.vas126-llabel {
+    display: block;
+    font-size: 12px;                            /* px */
+    color: #141414;
+    margin-bottom: 8px;                         /* px */
+}
+
+.vas126-ltext {
+    width: 100%;
+    min-height: 84px;                           /* px */
+    resize: vertical;
+    border: none;
+    border-bottom: 1px solid #D7D7D7;           /* px */
+    background: #FFFFFF;
+    font-family: inherit;
+    font-size: 16px;                            /* px */
+    color: #000000;
+    padding: 8px 2px;                           /* px */
+    outline: none;
+}
+
+    .vas126-ltext:focus {
+        border-bottom-color: #0083DA;
+    }
+
+.vas126-lerror {
+    margin-top: 10px;                           /* px */
+    font-size: 13px;                            /* px */
+    color: #ED1C24;
+}
+
+body.vas126-modal-open {
+    overflow: hidden;
+}

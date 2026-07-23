@@ -100,6 +100,21 @@
 @import "../VAS_118_QuickJournalWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
+@import "../VAS_KpiDrillThrough.css";
+@import "../VAS_120_CustomerSearchWidget.css";
+@import "../VAS_121_NewCustomerWidget.css";
+@import "../VAS_122_TotalCustomersWidget.css";
+@import "../VAS_124_DelayedPaymentsWidget.css";
+@import "../VAS_125_OpenPipelineWidget.css";
+@import "../VAS_126_OpenTicketsWidget.css";
+@import "../VAS_127_OpenTicketsListWidget.css";
+@import "../VAS_135_ActiveProjectsWidget.css";
+@import "../VAS_136_OnboardingStatusWidget.css";
+@import "../VAS_137_NeedsAttentionWidget.css";
+@import "../VAS_138_DelayedPaymentsListWidget.css";
+@import "../VAS_139_HighValuePipelineWidget.css";
+@import "../VAS_140_ContractsExpiringWidget.css";
+@import "../VAS_141_CustomersBySegmentWidget.css";
 
 @import "../VAS_073_LowStockCountWidget.css";
 @import "../VAS_074_PendingGRNsWidget.css";
