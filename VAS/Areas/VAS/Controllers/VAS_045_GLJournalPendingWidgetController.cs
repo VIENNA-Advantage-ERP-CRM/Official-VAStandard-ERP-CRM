@@ -106,15 +106,10 @@ namespace VAS.Controllers
             try
             {
                 pageNo = Math.Max(1, pageNo);
-
                 pageSize = Math.Max(1, Math.Min(pageSize, 25));
-
                 int rowStart = ((pageNo - 1) * pageSize) + 1;
-
                 int rowEnd = pageNo * pageSize;
-
                 string language = ctx.GetAD_Language();
-
                 if (string.IsNullOrWhiteSpace(language))
                 {
                     language = "en_US";
@@ -155,13 +150,7 @@ FROM GL_Journal GL_Journal
 WHERE GL_Journal.IsActive = 'Y'
 AND GL_Journal.AD_Client_ID =
 @PendingClientID
-AND GL_Journal.DocStatus IN
-(
-    'DR',
-    'IP',
-    'AP',
-    'NA'
-)";
+AND GL_Journal.DocStatus IN ('DR','IP','AP','NA')";
 
                 protectedJournalSql = MRole.GetDefault(ctx).AddAccessSQL(
                     protectedJournalSql,
@@ -184,27 +173,14 @@ AND GL_Journal.DocStatus IN
 WITH SchemaCurrency AS
 (
     SELECT
-        ClientInfo.AD_Client_ID,
+        AcctSchema.AD_Client_ID,
         AcctSchema.C_AcctSchema_ID,
         Currency.CurSymbol,
         Currency.ISO_Code,
         Currency.StdPrecision
-    FROM AD_ClientInfo ClientInfo
-    INNER JOIN C_AcctSchema AcctSchema ON
-    (
-        ClientInfo.C_AcctSchema1_ID =
-        AcctSchema.C_AcctSchema_ID
-    )
-    INNER JOIN C_Currency Currency ON
-    (
-        AcctSchema.C_Currency_ID =
-        Currency.C_Currency_ID
-    )
-    WHERE ClientInfo.IsActive = 'Y'
-    AND AcctSchema.IsActive = 'Y'
-    AND Currency.IsActive = 'Y'
-    AND ClientInfo.AD_Client_ID =
-    @SchemaClientID
+    FROM C_AcctSchema AcctSchema 
+    INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+    WHERE Currency.IsActive = 'Y' AND AcctSchema.AD_Client_ID = @SchemaClientID
 ),
 ProtectedJournal AS
 (
@@ -214,94 +190,26 @@ JournalLineTotals AS
 (
     SELECT
         GL_JournalLine.GL_Journal_ID,
-
-        COALESCE(
-            SUM(
-                COALESCE(
-                    GL_JournalLine.AmtAcctDr,
-                    0
-                )
-            ),
-            0
-        ) AS TotalDebit
-
+        COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr,0)),0) AS TotalDebit
     FROM GL_JournalLine GL_JournalLine
-
     WHERE GL_JournalLine.IsActive = 'Y'
-
-    GROUP BY
-        GL_JournalLine.GL_Journal_ID
+    GROUP BY GL_JournalLine.GL_Journal_ID
 ),
 DocumentStatusReferenceSource AS
 (
     SELECT
-        CAST
-        (
-            RefList.Value AS " + textCastType + @"
-        ) AS StatusValue,
-
-        CAST
-        (
-            RefList.Name AS " + textCastType + @"
-        ) AS StatusBaseName,
-
-        CAST
-        (
-            RefListTrl.Name AS " + textCastType + @"
-        ) AS StatusTranslatedName,
-
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY
-                CAST
-                (
-                    RefList.Value AS " + textCastType + @"
-                )
-
-            ORDER BY
-                CASE
-                    WHEN RefListTrl.Name IS NOT NULL
-                    THEN 0
-                    ELSE 1
-                END,
-                RefList.AD_Ref_List_ID
-        ) AS ReferenceRowNumber
-
+        CAST (RefList.Value AS " + textCastType + @") AS StatusValue,
+        CAST (RefList.Name AS " + textCastType + @") AS StatusBaseName,
+        CAST (RefListTrl.Name AS " + textCastType + @") AS StatusTranslatedName,
+        ROW_NUMBER() OVER (PARTITION BY CAST(RefList.Value AS " + textCastType + @")
+            ORDER BY CASE WHEN RefListTrl.Name IS NOT NULL THEN 0 ELSE 1 END, RefList.AD_Ref_List_ID ) AS ReferenceRowNumber
     FROM AD_Table TableInfo
-
-    INNER JOIN AD_Column ColumnInfo ON
-    (
-        ColumnInfo.AD_Table_ID =
-        TableInfo.AD_Table_ID
-    )
-
-    INNER JOIN AD_Reference ReferenceInfo ON
-    (
-        ReferenceInfo.AD_Reference_ID =
-        ColumnInfo.AD_Reference_Value_ID
-    )
-
-    INNER JOIN AD_Ref_List RefList ON
-    (
-        RefList.AD_Reference_ID =
-        ReferenceInfo.AD_Reference_ID
-    )
-
-    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
-    (
-        RefListTrl.AD_Ref_List_ID =
-        RefList.AD_Ref_List_ID
-
-        AND RefListTrl.AD_Language =
-        @StatusLanguage
-    )
-
-    WHERE TableInfo.TableName =
-        'GL_Journal'
-
-    AND ColumnInfo.ColumnName =
-        'DocStatus'
-
+    INNER JOIN AD_Column ColumnInfo ON (ColumnInfo.AD_Table_ID =TableInfo.AD_Table_ID)
+    INNER JOIN AD_Reference ReferenceInfo ON (ReferenceInfo.AD_Reference_ID = ColumnInfo.AD_Reference_Value_ID)
+    INNER JOIN AD_Ref_List RefList ON (RefList.AD_Reference_ID = ReferenceInfo.AD_Reference_ID)
+    LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON (RefListTrl.AD_Ref_List_ID = RefList.AD_Ref_List_ID AND RefListTrl.AD_Language = @StatusLanguage)
+    WHERE TableInfo.TableName = 'GL_Journal'
+    AND ColumnInfo.ColumnName = 'DocStatus'
     AND TableInfo.IsActive = 'Y'
     AND ColumnInfo.IsActive = 'Y'
     AND ReferenceInfo.IsActive = 'Y'
@@ -313,9 +221,7 @@ DocumentStatusReference AS
         DocumentStatusReferenceSource.StatusValue,
         DocumentStatusReferenceSource.StatusBaseName,
         DocumentStatusReferenceSource.StatusTranslatedName
-
     FROM DocumentStatusReferenceSource DocumentStatusReferenceSource
-
     WHERE DocumentStatusReferenceSource.ReferenceRowNumber = 1
 ),
 PendingRows AS
@@ -328,65 +234,20 @@ PendingRows AS
         ProtectedJournal.Posted,
         ProtectedJournal.Processed,
         ProtectedJournal.Created,
-
         StatusReference.StatusBaseName,
         StatusReference.StatusTranslatedName,
-
         CreatedUser.Name AS UserName,
-
-        COALESCE(
-            JournalLineTotals.TotalDebit,
-            0
-        ) AS TotalDebit,
-
+        COALESCE(JournalLineTotals.TotalDebit,0) AS TotalDebit,
         SchemaCurrency.CurSymbol,
         SchemaCurrency.ISO_Code,
         SchemaCurrency.StdPrecision,
-
-        COUNT(1) OVER
-        (
-        ) AS TotalCount,
-
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                ProtectedJournal.Created ASC,
-                ProtectedJournal.GL_Journal_ID ASC
-        ) AS RowNumber
-
+        COUNT(1) OVER () AS TotalCount,
+        ROW_NUMBER() OVER (ORDER BY ProtectedJournal.Created ASC, ProtectedJournal.GL_Journal_ID ASC) AS RowNumber
     FROM ProtectedJournal ProtectedJournal
-
-    INNER JOIN SchemaCurrency SchemaCurrency ON
-    (
-        SchemaCurrency.AD_Client_ID =
-        ProtectedJournal.AD_Client_ID
-
-        AND SchemaCurrency.C_AcctSchema_ID =
-        ProtectedJournal.C_AcctSchema_ID
-    )
-
-    LEFT OUTER JOIN JournalLineTotals JournalLineTotals ON
-    (
-        ProtectedJournal.GL_Journal_ID =
-        JournalLineTotals.GL_Journal_ID
-    )
-
-    LEFT OUTER JOIN AD_User CreatedUser ON
-    (
-        ProtectedJournal.CreatedBy =
-        CreatedUser.AD_User_ID
-
-        AND CreatedUser.IsActive = 'Y'
-    )
-
-    LEFT OUTER JOIN DocumentStatusReference StatusReference ON
-    (
-        CAST(
-            ProtectedJournal.DocStatus AS " + textCastType + @"
-        ) =
-        StatusReference.StatusValue
-    )
-)
+    INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
+    LEFT OUTER JOIN JournalLineTotals JournalLineTotals ON (ProtectedJournal.GL_Journal_ID =JournalLineTotals.GL_Journal_ID)
+    LEFT OUTER JOIN AD_User CreatedUser ON (ProtectedJournal.CreatedBy = CreatedUser.AD_User_ID AND CreatedUser.IsActive = 'Y')
+    LEFT OUTER JOIN DocumentStatusReference StatusReference ON (CAST(ProtectedJournal.DocStatus AS " + textCastType + @") = StatusReference.StatusValue))
 SELECT
     PendingRows.GL_Journal_ID,
     PendingRows.DocumentNo,
@@ -404,16 +265,10 @@ SELECT
     PendingRows.StdPrecision,
     PendingRows.TotalCount,
     PendingRows.RowNumber
-
 FROM PendingRows PendingRows
-
 WHERE PendingRows.RowNumber BETWEEN
-    @PageRowStart
-    AND
-    @PageRowEnd
-
-ORDER BY
-    PendingRows.RowNumber";
+    @PageRowStart AND @PageRowEnd
+ORDER BY PendingRows.RowNumber";
 
                 /*
                  * Placeholder order:
@@ -426,47 +281,26 @@ ORDER BY
                 SqlParameter[] parameters =
                 {
                     new SqlParameter("@SchemaClientID", ctx.GetAD_Client_ID()),
-
                     new SqlParameter("@PendingClientID", ctx.GetAD_Client_ID()),
-
                     new SqlParameter("@StatusLanguage", language),
-
                     new SqlParameter("@PageRowStart", rowStart),
-
                     new SqlParameter("@PageRowEnd", rowEnd)
                 };
 
                 reader = CoreLibrary.DataBase.DB.ExecuteReader(sql, parameters, null);
 
                 List<object> queue = new List<object>();
-
                 int totalCount = 0;
-
                 string curSymbol = string.Empty;
-
                 string isoCode = string.Empty;
-
                 int stdPrecision = 2;
-
                 DateTime now = DateTime.Now;
 
                 while (reader.Read())
                 {
                     int journalId = Util.GetValueOfInt(reader["GL_Journal_ID"]);
-
                     string documentNo = Util.GetValueOfString(reader["DocumentNo"]);
-
                     string description = Util.GetValueOfString(reader["Description"]);
-
-                    /*
-                     * Original stored reference value.
-                     * Example:
-                     *
-                     * DR
-                     * IP
-                     * AP
-                     * NA
-                     */
                     string statusValue = Util.GetValueOfString(reader["DocStatus"]);
 
                     /*
@@ -477,11 +311,9 @@ ORDER BY
                      * 3. Original DocStatus value
                      */
                     string translatedStatusName = Util.GetValueOfString(reader["StatusTranslatedName"]);
-
                     string baseStatusName = Util.GetValueOfString(reader["StatusBaseName"]);
 
                     string statusName;
-
                     if (!string.IsNullOrWhiteSpace(translatedStatusName))
                     {
                         statusName = translatedStatusName;
@@ -496,20 +328,13 @@ ORDER BY
                     }
 
                     string userName = Util.GetValueOfString(reader["UserName"]);
-
                     if (string.IsNullOrWhiteSpace(userName))
                     {
                         userName = "-";
                     }
 
                     stdPrecision = (Util.GetValueOfInt(reader["StdPrecision"]));
-
-                    decimal totalDebit =
-                        Decimal.Round(
-                            Util.GetValueOfDecimal(reader["TotalDebit"]),
-                            stdPrecision,
-                            MidpointRounding.AwayFromZero
-                        );
+                    decimal totalDebit = Decimal.Round(Util.GetValueOfDecimal(reader["TotalDebit"]), stdPrecision, MidpointRounding.AwayFromZero);
 
                     totalCount = Util.GetValueOfInt(reader["TotalCount"]);
 
@@ -523,19 +348,15 @@ ORDER BY
                     }
 
                     DateTime created =
-                        reader["Created"] != DBNull.Value
-                            ? Convert.ToDateTime(reader["Created"])
-                            : now;
+                        reader["Created"] != DBNull.Value ? Convert.ToDateTime(reader["Created"]) : now;
 
                     double totalHours = (now - created).TotalHours;
-
                     if (totalHours < 0)
                     {
                         totalHours = 0;
                     }
 
                     string ageText;
-
                     if (totalHours < 1)
                     {
                         ageText = "< 1h";
@@ -569,21 +390,17 @@ ORDER BY
                     }
 
                     string actionLabel;
-
                     switch (statusValue.ToUpperInvariant())
                     {
                         case "IP":
                             actionLabel = GetMsg(ctx, "VAS_045_Approval", "Approval");
                             break;
-
                         case "AP":
                             actionLabel = GetMsg(ctx, "VAS_045_Post", "Post");
                             break;
-
                         case "NA":
                             actionLabel = GetMsg(ctx, "VAS_045_Resubmit", "Resubmit");
                             break;
-
                         default:
                             actionLabel = GetMsg(ctx, "VAS_045_Draft", "Draft");
                             break;
@@ -593,47 +410,26 @@ ORDER BY
                         new
                         {
                             GL_Journal_ID = journalId,
-
                             DocumentNo = documentNo,
-
                             Description = description,
-
-                            /*
-                             * Existing field retained for compatibility.
-                             */
                             DocStatus = statusValue,
-
-                            /*
-                             * Separate value and name fields.
-                             */
                             StatusValue = statusValue,
-
                             StatusName = statusName,
-
-                            /*
-                             * Requested reference object.
-                             */
-                            Status = new
-                            {
-                                Value = statusValue,
-
-                                Name = statusName
-                            },
-
+                            Status = new { Value = statusValue, Name = statusName },
                             Posted = Util.GetValueOfString(reader["Posted"]),
-
                             Processed = Util.GetValueOfString(reader["Processed"]),
-
                             ActionLabel = actionLabel,
-
                             MarkerType = markerType,
-
                             AgeStr = ageText,
-
                             IsOverdue = totalHours >= 48,
-
                             TotalDebit = totalDebit,
-
+                            // Carry the journal's own currency on EACH record so the correct
+                            // symbol/precision renders per row (clients with several accounting
+                            // schemas can mix currencies across the pending queue - the single
+                            // top-level CurSymbol would otherwise be wrong for some rows).
+                            CurSymbol = curSymbol,
+                            ISOCode = isoCode,
+                            StdPrecision = stdPrecision,
                             UserName = userName
                         }
                     );
