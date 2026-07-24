@@ -162,7 +162,8 @@ JournalTotals AS
         COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr,0)),0) AS TotalCredit,
         SchemaCurrency.CurSymbol AS CurSymbol,
         SchemaCurrency.ISOCode AS ISOCode,
-        SchemaCurrency.StdPrecision AS StdPrecision
+        SchemaCurrency.StdPrecision AS StdPrecision,
+        SchemaCurrency.AcctSchemaName AS AcctSchemaName
     FROM ProtectedJournal ProtectedJournal
     INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.C_AcctSchema_ID = ProtectedJournal.C_AcctSchema_ID)
     LEFT OUTER JOIN GL_JournalLine GL_JournalLine ON (ProtectedJournal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID AND GL_JournalLine.IsActive = 'Y' )
@@ -177,7 +178,7 @@ JournalTotals AS
         ProtectedJournal.Processed,
         ProtectedJournal.Created,
         DocumentStatusReference.BaseName,
-        DocumentStatusReference.TranslatedName, SchemaCurrency.CurSymbol, SchemaCurrency.ISOCode,SchemaCurrency.StdPrecision
+        DocumentStatusReference.TranslatedName, SchemaCurrency.CurSymbol, SchemaCurrency.ISOCode,SchemaCurrency.StdPrecision, SchemaCurrency.AcctSchemaName
 ),
 OrderedJournals AS
 (
@@ -196,6 +197,7 @@ OrderedJournals AS
         JournalTotals.CurSymbol,
         JournalTotals.ISOCode,
         JournalTotals.StdPrecision,
+        JournalTotals.AcctSchemaName,
         ROW_NUMBER() OVER ( ORDER BY JournalTotals.Created DESC, JournalTotals.GL_Journal_ID DESC ) AS RowNumber,
         COUNT(1) OVER ( ) AS TotalCount
     FROM JournalTotals JournalTotals
@@ -215,6 +217,7 @@ SELECT
     OrderedJournals.CurSymbol,
     OrderedJournals.ISOCode,
     OrderedJournals.StdPrecision,
+    OrderedJournals.AcctSchemaName,
     OrderedJournals.TotalCount
 FROM OrderedJournals OrderedJournals
 WHERE OrderedJournals.RowNumber BETWEEN @PageRowStart AND @PageRowEnd
@@ -333,7 +336,10 @@ ORDER BY OrderedJournals.RowNumber";
                                 /* Per-row currency of the journal's accounting schema. */
                                 CurSymbol = rowCurSymbol,
                                 ISOCode = rowIsoCode,
-                                StdPrecision = rowPrecision
+                                StdPrecision = rowPrecision,
+
+                                /* Accounting schema name (shown in the row meta). */
+                                AcctSchema = Util.GetValueOfString(row["AcctSchemaName"])
                             }
                         );
                     }

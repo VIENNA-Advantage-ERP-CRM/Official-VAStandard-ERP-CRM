@@ -23,6 +23,10 @@
  * VAS_044_Status                       Status                               الحالة
  * VAS_044_Debit                        Debit                                مدين
  * VAS_044_Credit                       Credit                               دائن
+ * VAS_044_Unbalanced                   Unbalanced                           غير متوازن
+ * VAS_044_DrShort                      Dr                                   مدين
+ * VAS_044_CrShort                      Cr                                   دائن
+ * VAS_044_OpenRecord                   Open record                          فتح السجل
  * VAS_044_JournalNo                    Journal No.                          رقم القيد
  * VAS_044_AccountingBook               Accounting Book                      الدفتر المحاسبي
  * VAS_044_TotalDebit                   Total Debit                          إجمالي المدين
@@ -515,6 +519,28 @@
             "VAS-gljr-pill-closed"
     };
 
+    /* Left-stripe tone by document state. Unbalanced (debit≠credit) is the
+       loudest signal → amber warn; not-approved → red; posted/approved/closed
+       → green; everything else (draft, in-process) → neutral blue. */
+    function markerFor(statusValue, isUnbalanced) {
+        if (isUnbalanced) {
+            return "warn";
+        }
+
+        switch (String(statusValue || "").toUpperCase()) {
+            case "NA":
+                return "danger";
+
+            case "CO":
+            case "AP":
+            case "CL":
+                return "ok";
+
+            default:
+                return "info";
+        }
+    }
+
     VAS.VAS_044_GLJournalRecentWidget =
         function () {
             this.frame =
@@ -675,89 +701,19 @@
 
                     "</div>" +
 
-                    '<div class="VAS-gljr-table-wrap">' +
-
-                    '<table class="VAS-gljr-table">' +
-
-                    "<thead>" +
-
-                    "<tr>" +
-
-                    "<th>" +
-                    esc(
-                        lbl(
-                            "VAS_044_Hash",
-                            "#"
-                        )
-                    ) +
-                    "</th>" +
-
-                    "<th>" +
-                    esc(
-                        lbl(
-                            "VAS_044_Date",
-                            "Date"
-                        )
-                    ) +
-                    "</th>" +
-
-                    "<th>" +
-                    esc(
-                        lbl(
-                            "VAS_044_Description",
-                            "Description"
-                        )
-                    ) +
-                    "</th>" +
-
-                    "<th>" +
-                    esc(
-                        lbl(
-                            "VAS_044_Status",
-                            "Status"
-                        )
-                    ) +
-                    "</th>" +
-
-                    '<th class="VAS-gljr-num">' +
-                    esc(
-                        lbl(
-                            "VAS_044_Debit",
-                            "Debit"
-                        )
-                    ) +
-                    "</th>" +
-
-                    '<th class="VAS-gljr-num">' +
-                    esc(
-                        lbl(
-                            "VAS_044_Credit",
-                            "Credit"
-                        )
-                    ) +
-                    "</th>" +
-
-                    "</tr>" +
-
-                    "</thead>" +
-
-                    '<tbody id="VAS-gljr-tbody-' +
+                    '<div class="VAS-gljr-body" id="VAS-gljr-body-' +
                     id +
                     '">' +
 
-                    '<tr>' +
+                    '<div class="VAS-gljr-list" id="VAS-gljr-list-' +
+                    id +
+                    '">' +
 
-                    '<td colspan="6" class="VAS-gljr-empty">' +
-
+                    '<div class="VAS-gljr-empty">' +
                     "&mdash;" +
+                    "</div>" +
 
-                    "</td>" +
-
-                    "</tr>" +
-
-                    "</tbody>" +
-
-                    "</table>" +
+                    "</div>" +
 
                     "</div>" +
 
@@ -815,7 +771,7 @@
 
                 /*
                  * Delegated event.
-                 * It remains active after tbody HTML is rebuilt.
+                 * It remains active after the list HTML is rebuilt.
                  */
                 $root.on(
                     "click.VAS044Row",
@@ -876,6 +832,44 @@
 
                         openDetailDialog(
                             journalId
+                        );
+                    }
+                );
+
+                /*
+                 * Clicking the document number zooms to the GL Journal record
+                 * (opens the window). stopPropagation keeps the row's detail
+                 * dialog from also opening.
+                 */
+                $root.on(
+                    "click.VAS044Zoom",
+                    ".VAS-gljr-doc-zoom",
+                    function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        zoomToJournal(
+                            $(this).attr("data-id")
+                        );
+                    }
+                );
+
+                $root.on(
+                    "keydown.VAS044Zoom",
+                    ".VAS-gljr-doc-zoom",
+                    function (event) {
+                        if (
+                            event.key !== "Enter" &&
+                            event.key !== " "
+                        ) {
+                            return;
+                        }
+
+                        event.preventDefault();
+                        event.stopPropagation();
+
+                        zoomToJournal(
+                            $(this).attr("data-id")
                         );
                     }
                 );
@@ -1043,23 +1037,21 @@
                         data.StdPrecision
                     );
 
-                var $tableBody =
+                var $list =
                     $root.find(
-                        "#VAS-gljr-tbody-" +
+                        "#VAS-gljr-list-" +
                         id
                     );
 
                 if (!entries.length) {
                     $root.find(
-                        ".VAS-gljr-table-wrap"
+                        ".VAS-gljr-body"
                     ).addClass(
                         "is-empty"
                     );
 
-                    $tableBody.html(
-                        '<tr class="VAS-gljr-empty-row">' +
-
-                        '<td colspan="6" class="VAS-gljr-empty">' +
+                    $list.html(
+                        '<div class="VAS-gljr-empty">' +
 
                         esc(
                             lbl(
@@ -1068,9 +1060,7 @@
                             )
                         ) +
 
-                        "</td>" +
-
-                        "</tr>"
+                        "</div>"
                     );
 
                     totalPages =
@@ -1085,7 +1075,7 @@
                 }
 
                 $root.find(
-                    ".VAS-gljr-table-wrap"
+                    ".VAS-gljr-body"
                 ).removeClass(
                     "is-empty"
                 );
@@ -1210,12 +1200,10 @@
                             )
                             : "—";
 
-                    var rowClass =
-                        "VAS-gljr-row" +
-                        (
+                    var markerType =
+                        markerFor(
+                            statusValue,
                             entry.IsUnbalanced
-                                ? " VAS-gljr-row-unbal"
-                                : ""
                         );
 
                     var rowInformation =
@@ -1253,12 +1241,20 @@
                         );
 
                     html +=
-                        '<tr class="' +
-                        rowClass +
+                        '<div class="VAS-gljr-item VAS-gljr-row' +
+                        (
+                            entry.IsUnbalanced
+                                ? " VAS-gljr-row-unbal"
+                                : ""
+                        ) +
                         '" ' +
 
                         'data-id="' +
                         journalId +
+                        '" ' +
+
+                        'data-status-value="' +
+                        esc(statusValue) +
                         '" ' +
 
                         'role="button" ' +
@@ -1269,60 +1265,103 @@
                         rowInformation +
                         '">' +
 
-                        '<td class="VAS-gljr-col-id">' +
-                        esc(
-                            entry.DocumentNo
-                        ) +
-                        "</td>" +
+                        '<div class="VAS-gljr-mrk VAS-gljr-mrk-' +
+                        esc(markerType) +
+                        '"></div>' +
 
-                        '<td class="VAS-gljr-col-date">' +
-                        esc(
-                            entry.DateAcct
-                        ) +
-                        "</td>" +
+                        '<div class="VAS-gljr-body-row">' +
 
-                        '<td class="VAS-gljr-col-desc">' +
-                        esc(
+                        '<div class="VAS-gljr-title">' +
+
+                        '<span class="VAS-gljr-doc-zoom" ' +
+                        'data-id="' +
+                        journalId +
+                        '" role="link" tabindex="0" ' +
+                        'title="' +
+                        esc(lbl("VAS_044_OpenRecord", "Open record")) +
+                        '">' +
+                        esc(entry.DocumentNo || "") +
+                        "</span>" +
+
+                        (
                             entry.Description
+                                ? (" · " + esc(entry.Description))
+                                : ""
                         ) +
-                        "</td>" +
 
-                        "<td>" +
+                        "</div>" +
+
+                        '<div class="VAS-gljr-meta">' +
 
                         '<span class="VAS-gljr-pill ' +
                         pillClass +
-                        '" ' +
-
-                        'data-status-value="' +
-                        esc(
-                            statusValue
-                        ) +
                         '">' +
-
-                        esc(
-                            statusName
-                        ) +
-
+                        esc(statusName) +
                         "</span>" +
 
-                        "</td>" +
-
-                        '<td class="VAS-gljr-col-num">' +
-                        esc(
-                            debitText
+                        (
+                            entry.DateAcct
+                                ? (
+                                    '<span class="VAS-gljr-meta-date">· ' +
+                                    esc(entry.DateAcct) +
+                                    "</span>"
+                                )
+                                : ""
                         ) +
-                        "</td>" +
 
-                        '<td class="VAS-gljr-col-num">' +
-                        esc(
-                            creditText
+                        (
+                            entry.AcctSchema
+                                ? (
+                                    '<span class="VAS-gljr-meta-schema">· ' +
+                                    esc(entry.AcctSchema) +
+                                    "</span>"
+                                )
+                                : ""
                         ) +
-                        "</td>" +
 
-                        "</tr>";
+                        (
+                            entry.IsUnbalanced
+                                ? (
+                                    '<span class="VAS-gljr-meta-unbal">· ' +
+                                    esc(
+                                        lbl(
+                                            "VAS_044_Unbalanced",
+                                            "Unbalanced"
+                                        )
+                                    ) +
+                                    "</span>"
+                                )
+                                : ""
+                        ) +
+
+                        "</div>" +
+
+                        "</div>" +
+
+                        /* Right side shows BOTH totals stacked: debit over credit,
+                           each with a short muted Dr/Cr label. */
+                        '<div class="VAS-gljr-amounts">' +
+
+                        '<span class="VAS-gljr-amt VAS-gljr-amt-dr">' +
+                        '<span class="VAS-gljr-amt-lbl">' +
+                        esc(lbl("VAS_044_DrShort", "Dr")) +
+                        "</span> " +
+                        esc(debitText) +
+                        "</span>" +
+
+                        '<span class="VAS-gljr-amt VAS-gljr-amt-cr">' +
+                        '<span class="VAS-gljr-amt-lbl">' +
+                        esc(lbl("VAS_044_CrShort", "Cr")) +
+                        "</span> " +
+                        esc(creditText) +
+                        "</span>" +
+
+                        "</div>" +
+
+                        "</div>";
                 }
 
-                $tableBody.html(
+                $list.html(
                     html
                 );
 
@@ -1349,23 +1388,21 @@
 
                 var el =
                     $root.find(
-                        ".VAS-gljr-table-wrap"
+                        ".VAS-gljr-body"
                     )[0];
 
                 if (!el) { return; }
 
-                /* Body rows share the wrap with the sticky header — subtract the
-                   thead so capacity counts only the space the rows can occupy. */
-                var thead = el.querySelector("thead");
-                var theadH = thead ? thead.offsetHeight : 0;
-                var avail = el.clientHeight - theadH;
+                /* The row list fills the whole body (no sticky header now), so the
+                   full client height is available for rows. */
+                var avail = el.clientHeight;
 
                 if (avail <= 0) {
                     if (_needsSync) { scheduleSync(); }   // layout not settled — retry
                     return;
                 }
 
-                var rows = el.querySelectorAll("tbody .VAS-gljr-row");
+                var rows = el.querySelectorAll(".VAS-gljr-row");
                 var maxH = 0;
 
                 for (var i = 0; i < rows.length; i++) {
@@ -1396,7 +1433,7 @@
 
                 var el =
                     $root.find(
-                        ".VAS-gljr-table-wrap"
+                        ".VAS-gljr-body"
                     )[0];
 
                 if (!el) { return; }
@@ -1508,10 +1545,36 @@
                 );
             }
 
+            /* Zoom to the GL Journal record (opens the GL Journal window at that
+               record). Relayed to the host via the widget listener. */
+            function zoomToJournal(recordId) {
+                recordId =
+                    parseInt(
+                        recordId,
+                        10
+                    );
+
+                if (
+                    isNaN(recordId) ||
+                    recordId <= 0
+                ) {
+                    return;
+                }
+
+                try {
+                    $self.widgetFirevalueChanged({
+                        "TabWhereClause": "GL_Journal.GL_Journal_ID=" + recordId,
+                        "TabLayout": "Y", /* 'N' Grid, 'Y' Single, 'C' Card */
+                        "TabIndex": "0"
+                    });
+                }
+                catch (e) { /* zoom is best-effort */ }
+            }
+
             function showEmpty(message) {
-                var $tableBody =
+                var $list =
                     $root.find(
-                        "#VAS-gljr-tbody-" +
+                        "#VAS-gljr-list-" +
                         $self.AD_UserHomeWidgetID
                     );
 
@@ -1525,15 +1588,13 @@
                     0;
 
                 $root.find(
-                    ".VAS-gljr-table-wrap"
+                    ".VAS-gljr-body"
                 ).addClass(
                     "is-empty"
                 );
 
-                $tableBody.html(
-                    '<tr class="VAS-gljr-empty-row">' +
-
-                    '<td colspan="6" class="VAS-gljr-empty">' +
+                $list.html(
+                    '<div class="VAS-gljr-empty">' +
 
                     esc(
                         message ||
@@ -1544,9 +1605,7 @@
                         )
                     ) +
 
-                    "</td>" +
-
-                    "</tr>"
+                    "</div>"
                 );
 
                 totalPages =
@@ -1649,6 +1708,23 @@
             height,
             width
         ) {
+        };
+
+    /* The widget host registers itself here so the widget can drive the host
+       (in-place tab navigation / zoom to record). */
+    VAS.VAS_044_GLJournalRecentWidget
+        .prototype.addChangeListener =
+        function (listener) {
+            this.listener = listener;
+        };
+
+    /* Relay a fired value (e.g. zoom TabWhereClause) to the registered host. */
+    VAS.VAS_044_GLJournalRecentWidget
+        .prototype.widgetFirevalueChanged =
+        function (value) {
+            if (this.listener) {
+                this.listener.widgetFirevalueChanged(value);
+            }
         };
 
     VAS.VAS_044_GLJournalRecentWidget
