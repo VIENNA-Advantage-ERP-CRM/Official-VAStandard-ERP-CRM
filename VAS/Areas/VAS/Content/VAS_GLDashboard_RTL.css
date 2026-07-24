@@ -1,0 +1,254 @@
+/* ==========================================================================
+   GL dashboard widget family — RTL (Arabic) handling
+   File  : VAS_GLDashboard_RTL.css
+
+   Covers: VAS_036 (glju) · VAS_039 (gljp) · VAS_041 (glje) · VAS_042 (gljv) ·
+           VAS_043 (gljtm) · VAS_044 (gljr) · VAS_045 (gljpq), plus the shared
+           GL journal detail dialog (glje classes).
+
+   Imported AFTER the per-widget stylesheets, so equal-specificity rules here
+   win. Every rule is gated on html[dir="rtl"] and therefore inert in LTR.
+
+   Three classes of problem are handled:
+
+   1. DOUBLE FLIP. `dir="rtl"` already reverses a flex row's main axis, so the
+      `flex-direction: row-reverse` overrides the widgets shipped mirror the
+      layout a second time — putting header icons, urgency stripes and legends
+      back on the LTR side. They are reset to `row`.
+
+   2. BIDI REORDERING of machine-formatted values. A string like "23 Jul 2026",
+      "-$220.00" or "1 of 4" is bidi-neutral at its edges, so an RTL paragraph
+      direction re-orders it ("Jul 2026 23", "$220.00-", "of 4 1"). Those nodes
+      get `direction: ltr; unicode-bidi: isolate` so the value keeps its own
+      internal order without affecting the surrounding line. Free text instead
+      gets `unicode-bidi: plaintext`, which resolves each string's direction
+      from its first strong character — that is what stops an untranslated
+      English sentence from rendering as ".Posted documents".
+
+   3. PHYSICAL OFFSETS that carry meaning: auto margins, tooltip anchors and
+      the pager chevrons, which must point the other way once the pager's flex
+      row is mirrored.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Undo the double flip — RTL mirrors flex rows on its own.
+   -------------------------------------------------------------------------- */
+html[dir="rtl"] .VAS-glju-root .w-head,
+html[dir="rtl"] .VAS-gljp-root .w-head,
+html[dir="rtl"] .VAS-glje-root .w-head,
+html[dir="rtl"] .VAS-gljv-root .w-head,
+html[dir="rtl"] .VAS-gljtm-root .w-head,
+html[dir="rtl"] .VAS-gljr-root .w-head,
+html[dir="rtl"] .VAS-gljpq-root .w-head,
+html[dir="rtl"] .VAS-glju-root .kpi-why,
+html[dir="rtl"] .VAS-gljp-root .kpi-why,
+html[dir="rtl"] .VAS-glje-root .kpi-why,
+html[dir="rtl"] .VAS-gljv-legend,
+html[dir="rtl"] .VAS-gljtm-row-head,
+html[dir="rtl"] .VAS-gljpq-item {
+    flex-direction: row;
+}
+
+/* --------------------------------------------------------------------------
+   2a. Machine-formatted values — keep their own LTR order, isolated from the
+       surrounding RTL line. Document numbers, dates, amounts, counters.
+   -------------------------------------------------------------------------- */
+html[dir="rtl"] .VAS-glju-doc,
+html[dir="rtl"] .VAS-glju-doc-zoom,
+html[dir="rtl"] .VAS-glju-date,
+html[dir="rtl"] .VAS-glju-amt,
+html[dir="rtl"] .VAS-glje-doc,
+html[dir="rtl"] .VAS-glje-doc-zoom,
+html[dir="rtl"] .VAS-glje-date,
+html[dir="rtl"] .VAS-glje-amt,
+html[dir="rtl"] .VAS-glje-schema,
+html[dir="rtl"] .VAS-glju-schema,
+html[dir="rtl"] .VAS-gljr-col-id,
+html[dir="rtl"] .VAS-gljr-col-date,
+html[dir="rtl"] .VAS-gljr-col-num,
+html[dir="rtl"] .VAS-gljpq-doc-zoom,
+html[dir="rtl"] .VAS-gljpq-amt,
+html[dir="rtl"] .VAS-gljpq-count,
+html[dir="rtl"] .VAS-gljtm-val,
+html[dir="rtl"] .VAS-glju-root .kpi-value,
+html[dir="rtl"] .VAS-gljp-root .kpi-value,
+html[dir="rtl"] .VAS-glje-root .kpi-value,
+html[dir="rtl"] .VAS-glju-page-text,
+html[dir="rtl"] .VAS-glju-page-count,
+html[dir="rtl"] .VAS-glje-page-text,
+html[dir="rtl"] .VAS-glje-page-count,
+html[dir="rtl"] .VAS-gljr-page-text,
+html[dir="rtl"] .VAS-gljr-page-count,
+html[dir="rtl"] .VAS-gljtm-page-text,
+html[dir="rtl"] .VAS-gljtm-page-count,
+html[dir="rtl"] .VAS-gljpq-page-text,
+html[dir="rtl"] .VAS-gljpq-page-count {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* --------------------------------------------------------------------------
+   2b. Free text — resolve direction per string (first strong character), so
+       untranslated English keeps its trailing punctuation in place while
+       Arabic reads right-to-left.
+   -------------------------------------------------------------------------- */
+html[dir="rtl"] .VAS-glju-root .w-title,
+html[dir="rtl"] .VAS-gljp-root .w-title,
+html[dir="rtl"] .VAS-glje-root .w-title,
+html[dir="rtl"] .VAS-gljv-root .w-title,
+html[dir="rtl"] .VAS-gljtm-root .w-title,
+html[dir="rtl"] .VAS-gljr-root .w-title,
+html[dir="rtl"] .VAS-gljpq-root .w-title,
+html[dir="rtl"] .VAS-glju-root .kpi-why-text,
+html[dir="rtl"] .VAS-gljp-root .kpi-why-text,
+html[dir="rtl"] .VAS-glje-root .kpi-why-text,
+html[dir="rtl"] .VAS-glju-desc,
+html[dir="rtl"] .VAS-glje-desc,
+html[dir="rtl"] .VAS-gljr-col-desc,
+html[dir="rtl"] .VAS-gljr-subtitle,
+html[dir="rtl"] .VAS-gljv-sub,
+html[dir="rtl"] .VAS-gljtm-acct,
+html[dir="rtl"] .VAS-gljtm-label,
+html[dir="rtl"] .VAS-gljpq-title,
+html[dir="rtl"] .VAS-gljpq-meta,
+html[dir="rtl"] .VAS-glju-dialog-title,
+html[dir="rtl"] .VAS-glju-dialog-sub,
+html[dir="rtl"] .VAS-glje-dialog-title,
+html[dir="rtl"] .VAS-glje-dialog-sub,
+html[dir="rtl"] .VAS-glje-dialog-desc,
+html[dir="rtl"] .VAS-glju-dialog-empty,
+html[dir="rtl"] .VAS-glje-dialog-empty {
+    unicode-bidi: plaintext;
+}
+
+/* --------------------------------------------------------------------------
+   3. Table alignment — text columns start (right), numeric columns end (left).
+      The numeric selectors mirror the LTR ones exactly, prefixed by the dir
+      attribute, so they out-rank the originals.
+   -------------------------------------------------------------------------- */
+
+/* VAS_036 — unposted journals dialog */
+html[dir="rtl"] .VAS-glju-dialog-table th,
+html[dir="rtl"] .VAS-glju-dialog-table td {
+    text-align: right;
+}
+
+html[dir="rtl"] .VAS-glju-dialog-table th:nth-child(6),
+html[dir="rtl"] .VAS-glju-dialog-table th:nth-child(7),
+html[dir="rtl"] .VAS-glju-dialog-table td:nth-child(6),
+html[dir="rtl"] .VAS-glju-dialog-table td:nth-child(7),
+html[dir="rtl"] .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(6),
+html[dir="rtl"] .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table th:nth-child(7),
+html[dir="rtl"] .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(6),
+html[dir="rtl"] .VAS-glju-dialog:not(.VAS-glju-detail-dialog) .VAS-glju-dialog-table td:nth-child(7),
+html[dir="rtl"] .VAS-glju-dialog-table .VAS-glju-amt {
+    text-align: left;
+}
+
+/* VAS_041 — entries dialog + shared detail dialog lines */
+html[dir="rtl"] .VAS-glje-dialog-table th,
+html[dir="rtl"] .VAS-glje-dialog-table td,
+html[dir="rtl"] .VAS-glje-detail-lines th,
+html[dir="rtl"] .VAS-glje-detail-lines td {
+    text-align: right;
+}
+
+html[dir="rtl"] .VAS-glje-dialog-table th:nth-child(6),
+html[dir="rtl"] .VAS-glje-dialog-table th:nth-child(7),
+html[dir="rtl"] .VAS-glje-dialog-table td:nth-child(6),
+html[dir="rtl"] .VAS-glje-dialog-table td:nth-child(7),
+html[dir="rtl"] .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(6),
+html[dir="rtl"] .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(7),
+html[dir="rtl"] .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6),
+html[dir="rtl"] .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(7),
+html[dir="rtl"] .VAS-glje-detail-lines th:nth-child(2),
+html[dir="rtl"] .VAS-glje-detail-lines th:nth-child(3),
+html[dir="rtl"] .VAS-glje-detail-lines td:nth-child(2),
+html[dir="rtl"] .VAS-glje-detail-lines td:nth-child(3),
+html[dir="rtl"] .VAS-glje-dialog-table .VAS-glje-amt,
+html[dir="rtl"] .VAS-glje-detail-lines .VAS-glje-amt {
+    text-align: left;
+}
+
+/* --------------------------------------------------------------------------
+   4. Cell tooltips — anchor to the row's start edge (right) in RTL.
+   -------------------------------------------------------------------------- */
+html[dir="rtl"] .VAS-glju-dialog-table td[title]:hover::after,
+html[dir="rtl"] .VAS-glje-dialog-table td[title]:hover::after,
+html[dir="rtl"] .VAS-glje-detail-lines td[title]:hover::after,
+html[dir="rtl"] .VAS-gljr-table td[title]:hover::after {
+    left: auto;
+    right: 0;
+}
+
+/* --------------------------------------------------------------------------
+   5. Pager — the flex row mirrors itself, so only the chevron glyphs and the
+      auto margin need flipping. `scaleX(-1)` turns ‹ into › (and back), which
+      keeps prev/next pointing the way the user reads.
+   -------------------------------------------------------------------------- */
+html[dir="rtl"] .VAS-glju-page-btn,
+html[dir="rtl"] .VAS-glje-page-btn,
+html[dir="rtl"] .VAS-gljr-page-btn,
+html[dir="rtl"] .VAS-gljtm-page-btn,
+html[dir="rtl"] .VAS-gljpq-page-btn {
+    transform: scaleX(-1);
+}
+
+html[dir="rtl"] .VAS-glju-page-text,
+html[dir="rtl"] .VAS-glje-page-text,
+html[dir="rtl"] .VAS-gljr-page-text,
+html[dir="rtl"] .VAS-gljtm-page-text,
+html[dir="rtl"] .VAS-gljpq-page-text {
+    margin-right: 0;
+    margin-left: auto;
+    text-align: right;
+}
+
+/* --------------------------------------------------------------------------
+   6. Remaining physical offsets inside mirrored rows.
+   -------------------------------------------------------------------------- */
+html[dir="rtl"] .VAS-glju-dialog-head a.VAS-glju-export,
+html[dir="rtl"] .VAS-glje-dialog-head a.VAS-glje-export {
+    margin-right: 0;
+    margin-left: 0.5em;
+}
+
+html[dir="rtl"] .VAS-gljtm-acct {
+    margin-right: 0;
+    margin-left: 0.4em;
+}
+
+/* --------------------------------------------------------------------------
+   7. Auto margins that park a control at the row's trailing edge.
+      `margin-left: auto` fills the free space on the element's LEFT, which
+      pins it to the physical right — correct in LTR, wrong once the row is
+      mirrored. In RTL the free space has to sit on the RIGHT instead, so the
+      control lands at the physical left (the end of an RTL row).
+   -------------------------------------------------------------------------- */
+
+/* VAS_043's Month / YTD toggle carries the auto margin itself.
+   VAS_042 is deliberately NOT listed: there the auto margin lives on
+   .VAS-gljv-sub (already flipped in that widget's own stylesheet) and the
+   period group merely trails it — a second auto margin would split the free
+   space between the two and strand the toggle mid-row. */
+html[dir="rtl"] .VAS-gljtm-period-group {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+/* Dialog footer button groups — the shared journal detail dialog keeps
+   Download PDF at the row start and Post / Close at the row end. */
+html[dir="rtl"] .VAS-glje-dialog-actions,
+html[dir="rtl"] .VAS-glje-detail-actions,
+html[dir="rtl"] .VAS-glju-dialog-actions {
+    margin-left: 0;
+    margin-right: auto;
+}
+
+/* KPI value carries a leading indent in LTR — mirror it. */
+html[dir="rtl"] .VAS-glju-root .kpi-value,
+html[dir="rtl"] .VAS-gljp-root .kpi-value,
+html[dir="rtl"] .VAS-glje-root .kpi-value {
+    padding-left: 0;
+    padding-right: 0.3125em;
+}
