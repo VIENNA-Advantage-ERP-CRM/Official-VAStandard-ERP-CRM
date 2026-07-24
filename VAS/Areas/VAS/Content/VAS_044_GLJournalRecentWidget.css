@@ -2,6 +2,16 @@
    VAS GL Journal Recent Entries Widget
    File  : VAS_044_GLJournalRecentWidget.css
    Scope : .VAS-gljr-root
+
+   Redesigned to the Onfinity design system (design.md):
+     - Glass widget surface, shared Widget Header (icon + title + subtitle).
+     - Row-based list follows the "List Widget" / "Grid Data Widget" pattern:
+       one internal em lever (widget-root clamp), row cells strictly SMALLER
+       than the widget title, xs meta line, load-bearing body dividers.
+     - No inner scrollbars: the body clips and the footer pager (24px buttons)
+       pages the rest; row count is fitted to the cell height at runtime.
+   The shared journal detail dialog is styled separately (VAS-glje-* in
+   VAS_041_GLJournalEntriesWidget.css); this file only owns the widget card.
    ========================================================================== */
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
@@ -9,32 +19,37 @@
     --on-text-muted: #748494;
     height: 100%;
     width: 100%;
+    container-type: inline-size;
 }
 
-/* ── Card container ──────────────────────────────────────────────────────── */
+/* ── Card container — canonical glass surface + widget-root em lever ──────── */
 .VAS-gljr-card {
     display: flex;
     flex-direction: column;
     height: 100%;
     padding: 0.85em;
+    box-sizing: border-box;
+    overflow: hidden;
     border-radius: 14px;
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
-    box-sizing: border-box;
-    overflow: hidden;
+    /* Widget-root anchor — design.md clamp(16px, 1.2cqi, 20px) expressed on the
+       dashboard-width variable (cqi is unusable: this root sets its own
+       container-type, so cqi would resolve against the narrow widget cell). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
 }
 
-/* ── Header row ──────────────────────────────────────────────────────────── */
+/* ── Header row (shared Widget Header) ───────────────────────────────────── */
 .VAS-gljr-root .w-head {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
     flex-shrink: 0;
-    margin-bottom: 0.625em;
+    margin-bottom: 0.5em;
 }
 
-/* Icon well */
+/* Icon well + glyph — scale off the same --dash-inline-size lever as the title */
 .VAS-gljr-icon {
     display: flex;
     align-items: center;
@@ -54,14 +69,6 @@
     stroke: currentColor;
 }
 
-/* Title */
-.VAS-gljr-root .w-title {
-    font-size: 0.8125em;
-    font-weight: 600;
-    color: #102C3F;
-    letter-spacing: 0.01em;
-}
-
 /* Title + subtitle stack */
 .VAS-gljr-title-wrap {
     display: flex;
@@ -69,165 +76,204 @@
     min-width: 0;
 }
 
-/* Widget subtitle — shared design.md Widget Header clamp (dashboard-widgets.md
-   §"Widget Header"): clamp(12px, …·0.009625, 13px), Roboto Regular, muted. */
+/* Title — Roboto Regular, clamp ceiling 17px (design.md Widget Header) */
+.VAS-gljr-root .w-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: 0;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Subtitle — Roboto Regular, clamp ceiling 13px, muted */
 .VAS-gljr-subtitle {
+    font-family: 'Roboto', sans-serif;
     font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     font-weight: 400;
-    color: #5F7283;
     line-height: 1.3;
     letter-spacing: 0;
+    color: #5F7283;
     margin-top: 0.125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.VAS-gljr-pager {
+/* ── Body — fills remaining space, clips (no inner scroll) ────────────────── */
+.VAS-gljr-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Adaptive paging fits the rows to this height, so the body never scrolls
+       (design.md "No Inner Scrollbars"); clip the in-progress measurement frame. */
+    overflow: hidden;
+}
+
+.VAS-gljr-body.is-empty {
     display: flex;
-    align-items: center;
-    gap: 0.625em;
-    flex-shrink: 0;
-    margin-left: auto;
-}
-
-.VAS-gljr-page-btn {
-    width: 2.25em;
-    height: 2.25em;
-    border: 1px solid #CFE9FF;
-    border-radius: 0.5em;
-    background: rgba(255, 255, 255, 0.86);
-    color: #0083DA;
-    font-size: 1em;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
-.VAS-gljr-page-btn:hover:not(:disabled) {
-    background: #EAF8FF;
-    border-color: #9ED1FF;
+/* ── Row list ────────────────────────────────────────────────────────────── */
+.VAS-gljr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
-.VAS-gljr-page-btn:disabled {
-    background: rgba(255, 255, 255, 0.64);
-    color: #C7D3DF;
-    cursor: default;
-}
-
-.VAS-gljr-page-text {
-    display: inline-block;
-    min-width: 4.25em;
-    text-align: center;
-    font-size: 1em;
-    font-weight: 700;
-    color: #141414;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-/* ── Alert strip ─────────────────────────────────────────────────────────── */
-/* ── Table wrapper — fills remaining space and scrolls ───────────────────── */
-.VAS-gljr-table-wrap {
-    flex: 1;
-    /* Adaptive paging fits the rows to this height, so the table never scrolls
-       (design.md "No Inner Scrollbars"); clip the in-progress measurement frame. */
-    overflow: hidden;
-    min-height: 0;
-}
-
-/* ── Table ───────────────────────────────────────────────────────────────── */
-.VAS-gljr-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8em;
-}
-
-/* Header */
-.VAS-gljr-table thead tr {
-    border-bottom: 1px solid #E2EAF0;
-}
-
-.VAS-gljr-table th {
-    font-size: 0.8125em;
-    font-weight: 600;
-    color: #748494;
-    text-align: left;
-    padding: 0.4em 0.5em;
-    white-space: nowrap;
-    letter-spacing: 0.02em;
-}
-
-.VAS-gljr-table th.VAS-gljr-num,
-.VAS-gljr-table td.VAS-gljr-col-num {
-    text-align: right;
-}
-
-/* Body rows */
-.VAS-gljr-table tbody tr {
-    border-bottom: 1px solid #F0F4F8;
+/* ── Single entry row ────────────────────────────────────────────────────── */
+.VAS-gljr-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.55em 0.1em;
+    cursor: pointer;
+    background: transparent;
+    /* Body row divider — load-bearing, #E2EAF1 (design.md Row And Header Separators) */
+    border-bottom: 1px solid #E2EAF1;
     transition: background 0.1s;
 }
 
-.VAS-gljr-table tbody tr:last-child {
-    border-bottom: none;
+.VAS-gljr-list .VAS-gljr-item:last-child {
+    border-bottom: 0;
 }
 
-.VAS-gljr-row {
+.VAS-gljr-item:hover {
+    background: #F8FBFE;
+}
+
+/* ── Left status stripe ──────────────────────────────────────────────────── */
+.VAS-gljr-mrk {
+    width: 0.22em;
+    align-self: stretch;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: #0083DA;
+}
+
+.VAS-gljr-mrk-danger { background: #ED1C24; }
+.VAS-gljr-mrk-warn   { background: #D78B10; }
+.VAS-gljr-mrk-ok     { background: #16A34A; }
+.VAS-gljr-mrk-info   { background: #0083DA; }
+
+/* ── Row body (title + meta) ─────────────────────────────────────────────── */
+.VAS-gljr-body-row {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+}
+
+/* Title line — document no. + description; sm (0.75em), smaller than the widget title */
+.VAS-gljr-title {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Document number acts as a zoom link to the GL Journal record */
+.VAS-gljr-doc-zoom {
+    color: #0069AE;
+    font-weight: 600;
     cursor: pointer;
 }
 
-.VAS-gljr-row:hover {
-    background: rgba(0, 131, 218, 0.04);
+.VAS-gljr-doc-zoom:hover,
+.VAS-gljr-doc-zoom:focus {
+    text-decoration: underline;
+    outline: none;
 }
 
-/* Unbalanced row — subtle amber tint */
-.VAS-gljr-row-unbal {
-    background: rgba(232, 160, 21, 0.06);
-}
-
-.VAS-gljr-row-unbal:hover {
-    background: rgba(232, 160, 21, 0.12);
-}
-
-/* Cells */
-.VAS-gljr-table td {
-    padding: 0.45em 0.5em;
-    color: #243545;
-    vertical-align: middle;
-}
-
-.VAS-gljr-col-id {
-    font-weight: 600;
-    color: #0083DA;
+/* Meta line — status pill + date; xs (0.6875em), muted */
+.VAS-gljr-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #5F7283;
     white-space: nowrap;
-}
-
-.VAS-gljr-col-date {
-    color: #748494;
-    white-space: nowrap;
-}
-
-.VAS-gljr-col-desc {
-    max-width: 18em;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    letter-spacing: 0;
 }
 
-.VAS-gljr-col-num {
-    font-weight: 500;
+.VAS-gljr-meta-date {
+    color: #5F7283;
+}
+
+/* Accounting schema name */
+.VAS-gljr-meta-schema {
+    color: #5F7283;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Unbalanced note — amber, calls out a debit≠credit journal */
+.VAS-gljr-meta-unbal {
+    color: #B5740C;
+    font-weight: 600;
+}
+
+/* ── Amounts — debit over credit, stacked right, tabular ─────────────────── */
+.VAS-gljr-amounts {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.1em;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.VAS-gljr-amt {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #102C3F;
     white-space: nowrap;
+    line-height: 1.25;
     font-variant-numeric: tabular-nums;
 }
 
-/* Empty / error row */
+/* Credit reads one tone lighter than debit so the pair is scannable */
+.VAS-gljr-amt-cr {
+    font-weight: 400;
+    color: #41576A;
+}
+
+/* Short Dr / Cr tag before each value */
+.VAS-gljr-amt-lbl {
+    font-size: 0.85em;
+    font-weight: 500;
+    color: #8A99A8;
+    margin-right: 0.15em;
+    letter-spacing: 0.02em;
+}
+
+/* ── Empty / error state ─────────────────────────────────────────────────── */
 .VAS-gljr-empty {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 6em;
+    font-size: 0.8em;
     color: #748494;
-    padding: 1.5em 0;
+    text-align: center;
 }
 
 /* ── Status pills ────────────────────────────────────────────────────────── */
+/* Nested inside .VAS-gljr-meta (0.6875em), so em compounds — 0.75em here mirrors
+   the proven VAS_045 pill size and reads as a compact chip beside the meta text. */
 .VAS-gljr-pill {
     display: inline-flex;
     align-items: center;
@@ -236,945 +282,20 @@
     padding: 0.2em 0.55em;
     border-radius: 999px;
     white-space: nowrap;
-    letter-spacing: 0.01em;
-}
-
-/* Draft */
-.VAS-gljr-pill-draft {
-    background: #EEF2FA;
-    color: #3B6ABD;
-}
-
-/* Posted / Completed / Approved */
-.VAS-gljr-pill-posted {
-    background: #E6F5ED;
-    color: #1A7A45;
-}
-
-/* In Progress / Submitted */
-.VAS-gljr-pill-submit {
-    background: #E8EFFF;
-    color: #3353C4;
-}
-
-/* Pending / Not Approved */
-.VAS-gljr-pill-pending {
-    background: #FFF3E0;
-    color: #C26A00;
-}
-
-/* Voided / Closed */
-.VAS-gljr-pill-voided,
-.VAS-gljr-pill-closed {
-    background: #F0F2F5;
-    color: #5F7283;
-}
-
-/* Reversed */
-.VAS-gljr-pill-reverse {
-    background: #F3EEFF;
-    color: #7B3FBE;
-}
-
-/* ── Scrollbar styling ───────────────────────────────────────────────────── */
-.VAS-gljr-table-wrap::-webkit-scrollbar {
-    width: 4px;
-}
-
-.VAS-gljr-table-wrap::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.VAS-gljr-table-wrap::-webkit-scrollbar-thumb {
-    background: #D0DCE8;
-    border-radius: 2px;
-}
-
-/* Per-viewport px font-size hacks removed per design.md (Widget Internal
-   Sizing) — the root em lever (clamp on --dash-inline-size) drives all
-   internal scaling; no max-width breakpoints. */
-
-/* RTL support */
-html[dir="rtl"] .VAS-gljr-root .w-head {
-    flex-direction: row-reverse;
-}
-
-html[dir="rtl"] .VAS-gljr-btn-new {
-    margin-left: unset;
-    margin-right: auto;
-}
-
-/* Typography alignment with VAS_003_OnAccountReceipts */
-.VAS-gljr-root {
-    container-type: inline-size;
-}
-
-.VAS-gljr-card {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
-}
-
-.VAS-gljr-root .w-title {
-    font-family: 'Roboto', sans-serif;
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: 0;
-    color: #102C3F;
-}
-
-.VAS-gljr-table,
-.VAS-gljr-empty {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    font-weight: 400;
-}
-
-.VAS-gljr-table th,
-.VAS-gljr-table td,
-.VAS-gljr-col-id,
-.VAS-gljr-col-num,
-.VAS-gljr-pill {
-    font-weight: 400;
+    line-height: 1.4;
     letter-spacing: 0;
 }
 
-.VAS-gljr-col-id {
-    font-weight: 700;
-}
-
-.VAS-gljr-col-num {
-    font-weight: 700;
-}
-
-/* Design-system color alignment */
-.VAS-gljr-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
-    border: 2px solid #FFFFFF;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-}
-
-.VAS-gljr-root .w-title,
-.VAS-gljr-col-desc,
-.VAS-gljr-col-num {
-    color: #102C3F;
-}
-
-.VAS-gljr-icon {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
-    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
-    color: #0083DA;
-}
-
-.VAS-gljr-table th,
-.VAS-gljr-col-date,
-.VAS-gljr-empty {
-    color: #748494;
-}
-
-.VAS-gljr-col-id {
-    color: #0083DA;
-}
-
-.VAS-gljr-table thead tr,
-.VAS-gljr-table tbody tr {
-    border-bottom-color: #EDF2F6;
-}
-
-.VAS-gljr-row:hover {
-    background: #EAF8FF;
-}
-
-.VAS-gljr-pill-draft {
-    background: #F1F5F9;
-    color: #64748B;
-}
-
-.VAS-gljr-pill-submit {
-    background: #DBEAFE;
-    color: #1D4ED8;
-}
-
-.VAS-gljr-pill-posted {
-    background: #DCFCE7;
-    color: #15803D;
-}
-
-.VAS-gljr-pill-closed {
-    background: #E0E7FF;
-    color: #3730A3;
-}
-
-.VAS-gljr-pill-pending {
-    background: #FEF3C7;
-    color: #92400E;
-}
-
-.VAS-gljr-pill-voided {
-    background: #FEE2E2;
-    color: #B91C1C;
-}
-
-.VAS-gljr-pill-reverse {
-    background: #F3E8FF;
-    color: #7E22CE;
-}
-
-html[dir="rtl"] .VAS-gljr-table th,
-html[dir="rtl"] .VAS-gljr-table td {
-    text-align: right;
-}
-
-html[dir="rtl"] .VAS-gljr-table th.VAS-gljr-num,
-html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
-    text-align: left;
-}
-
-.VAS-gljr-body-lock {
-    overflow: hidden;
-}
-
-.VAS-gljr-detail-dialog {
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
-    position: fixed;
-    inset: 0;
-    z-index: 10020;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.25em;
-}
-
-.VAS-gljr-detail-dialog,
-.VAS-gljr-detail-dialog * {
-    box-sizing: border-box;
-}
-
-.VAS-gljr-detail-scrim {
-    position: absolute;
-    inset: 0;
-    background: rgba(15, 27, 45, 0.42);
-    backdrop-filter: blur(0.125em);
-}
-
-.VAS-gljr-detail-card {
-    position: relative;
-    width: min(62em, 100%);
-    height: min(34em,100%);
-    background: #FFFFFF;
-    border-radius: 1em;
-    box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.VAS-gljr-detail-head {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75em;
-    padding: 1em 1em 1em 1.125em;
-    border-bottom: 0.0625em solid #EDF2F6;
-    flex-shrink: 0;
-}
-
-.VAS-gljr-detail-icon {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
-    background: linear-gradient(180deg, #FFFFFF, #EAF8FF);
-    border: 0.0625em solid #BFE4FF;
-    color: #0083DA;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.VAS-gljr-detail-icon svg {
-    width: 1.125em;
-    height: 1.125em;
-    stroke: currentColor;
-}
-
-.VAS-gljr-detail-title-wrap {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.VAS-gljr-detail-title {
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
-    font-weight: 600;
-    color: #102C3F;
-    line-height: 1.2;
-}
-
-.VAS-gljr-detail-sub {
-    margin-top: 0.125em;
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    color: #748494;
-    line-height: 1.3;
-}
-
-.VAS-gljr-detail-close-x {
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    width: 2em;
-    height: 2em;
-    border-radius: 0.5em;
-    color: #5F7283;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
-.VAS-gljr-detail-close-x svg {
-    width: 1em;
-    height: 1em;
-    stroke: currentColor;
-}
-
-.VAS-gljr-detail-close-x:hover {
-    background: #F3F7FB;
-    color: #102C3F;
-}
-
-.VAS-gljr-detail-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-    padding: 1.125em;
-    position: relative;
-}
-
-.VAS-gljr-detail-busy {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.62);
-    z-index: 5;
-}
-
-.VAS-gljr-detail-content {
-    display: flex;
-    flex-direction: column;
-    gap: 1.25em;
-    min-height: 100%;
-    padding-bottom: 0.25em;
-}
-
-.VAS-gljr-detail-summary {
-
-    background: #fff;
-    border: .0625em solid #e4edf4;
-    border-radius: .75em;
-    display: grid;
-    gap: 0.6em;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-    padding: 1.125em 1.25em;
-}
-
-.VAS-gljr-detail-summary div {
-    min-width: 0;
-}
-
-.VAS-gljr-detail-summary > div > span,
-.VAS-gljr-detail-section-title,
-.VAS-gljr-created-strip > div > span {
-    display: block;
-    color: #748494;
-    font-size: 0.75em;
-    font-weight: 400;
-    letter-spacing: 0.12em;
-    white-space: nowrap;
-}
-
-.VAS-gljr-detail-summary > div > strong {
-    display: block;
-    color: #000000;
-    font-size: 0.8em;
-    font-weight: 600;
-    line-height: 1.25;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.VAS-gljr-detail-summary .VAS-gljr-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35em;
-    width: auto;
-    max-width: max-content;
-    padding: 0.35em 0.7em;
-    border-radius: 999px;
-    font-size: 0.8125em;
-    font-weight: 600;
-    line-height: 1;
-    letter-spacing: 0;
-}
-
-.VAS-gljr-detail-summary .VAS-gljr-pill span {
-    display: inline-block;
-    width: 0.45em;
-    height: 0.45em;
-    min-width: 0.45em;
-    border-radius: 50%;
-    background: currentColor;
-}
-
-.VAS-gljr-detail-description {
-    grid-column: 1 / -1;
-}
-
-.VAS-gljr-detail-lines-wrap {
-    overflow: auto;
-    background: #FFFFFF;
-}
-
-.VAS-gljr-detail-lines {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-    font-size: 0.875em;
-    min-width: 58em;
-}
-
-.VAS-gljr-detail-lines th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: #FFFFFF;
-    color: #41576A;
-    font-size: 0.6875em;
-    font-weight: 500;
-    letter-spacing: 0;
-    text-align: left;
-    padding: 0.875em 0.75em;
-    border-bottom: 1px solid #C5D2DD;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: capitalize;
-}
-
-.VAS-gljr-detail-lines td {
-    padding: 0.875em 0.75em;
-    color: #001D32;
-    font-size: 0.75em;
-    border-bottom: 1px solid #E2EAF1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.VAS-gljr-detail-lines tbody tr:hover td {
-    background: #F8FBFE;
-}
-
-.VAS-gljr-detail-lines tfoot td {
-    background: #F5F8FB;
-    font-weight: 700;
-    border-bottom: 0;
-}
-
-.VAS-gljr-detail-lines th:nth-child(1),
-.VAS-gljr-detail-lines td:nth-child(1) {
-    width: 18em;
-}
-
-.VAS-gljr-detail-lines th:nth-child(2),
-.VAS-gljr-detail-lines th:nth-child(3),
-.VAS-gljr-detail-lines td:nth-child(2),
-.VAS-gljr-detail-lines td:nth-child(3) {
-    width: 7em;
-    text-align: right;
-}
-
-.VAS-gljr-detail-lines th:nth-child(4),
-.VAS-gljr-detail-lines td:nth-child(4),
-.VAS-gljr-detail-lines th:nth-child(5),
-.VAS-gljr-detail-lines td:nth-child(5) {
-    width: 12em;
-}
-
-.VAS-gljr-detail-lines th:nth-child(6),
-.VAS-gljr-detail-lines td:nth-child(6),
-.VAS-gljr-detail-lines th:nth-child(7),
-.VAS-gljr-detail-lines td:nth-child(7) {
-    width: 7em;
-}
-
-.VAS-gljr-detail-amt {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.VAS-gljr-created-strip {
-    display: flex;
-    align-items: center;
-    gap: 0.8em;
-    background: #EAF4FF;
-    border-radius: 0.75em;
-    padding: 0.9em 1.125em;
-    color: #001D32;
-}
-
-.VAS-gljr-created-strip strong {
-    color: #000000;
-    font-weight: 700;
-}
-
-.VAS-gljr-avatar {
-    width: 2.25em;
-    height: 2.25em;
-    border-radius: 50%;
-    background: #4268E8;
-    color: #FFFFFF !important;
-    display: inline-flex !important;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.875em !important;
-    font-weight: 700 !important;
-    letter-spacing: 0 !important;
-    flex-shrink: 0;
-}
-
-.VAS-gljr-detail-empty {
-    padding: 2.25em 1em;
-    text-align: center;
-    color: #748494;
-    font-size: 0.75em;
-    background: #FFFFFF;
-}
-
-.VAS-gljr-detail-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1em;
-    padding: 0.75em 1.125em;
-    border-top: 0.0625em solid #EDF2F6;
-    background: #FAFCFE;
-    flex-shrink: 0;
-}
-
-.VAS-gljr-detail-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    flex-shrink: 0;
-}
-
-.VAS-gljr-detail-secondary,
-.VAS-gljr-detail-primary {
-    height: 2.25em;
-    min-width: 5.75em;
-    border-radius: 0.5em;
-    padding: 0 1em;
-    font-size: 0.875em;
-    font-weight: 500;
-    cursor: pointer;
-}
-
-.VAS-gljr-detail-secondary {
-    background: #FBFDFF;
-    border: 0.0625em solid #E4EDF4;
-    color: #5F7283;
-}
-
-.VAS-gljr-detail-secondary:hover {
-    background: #F3F7FB;
-}
-
-.VAS-gljr-detail-primary {
-    background: #0083DA;
-    border: 0.0625em solid #0083DA;
-    color: #FFFFFF;
-}
-
-.VAS-gljr-detail-primary:hover {
-    background: #0075C3;
-}
-
-@media (max-width: 40em) {
-    .VAS-gljr-detail-dialog {
-        padding: 0;
-    }
-
-    .VAS-gljr-detail-card {
-        width: 100%;
-        height: 100%;
-        max-height: 100%;
-        border-radius: 0;
-    }
-
-    .VAS-gljr-detail-summary {
-        grid-template-columns: 1fr;
-    }
-
-    .VAS-gljr-detail-lines {
-        min-width: 56em;
-    }
-
-    .VAS-gljr-detail-footer {
-        flex-wrap: wrap;
-        gap: 0.625em;
-    }
-
-    .VAS-gljr-detail-actions {
-        width: 100%;
-    }
-
-    .VAS-gljr-detail-secondary,
-    .VAS-gljr-detail-primary {
-        flex: 1;
-    }
-}
-
-/* Compact bottom pager and centered empty state */
+.VAS-gljr-pill-draft   { background: #F1F5F9; color: #64748B; }
+.VAS-gljr-pill-submit  { background: #DBEAFE; color: #1D4ED8; }
+.VAS-gljr-pill-posted  { background: #DCFCE7; color: #15803D; }
+.VAS-gljr-pill-closed  { background: #E0E7FF; color: #3730A3; }
+.VAS-gljr-pill-pending { background: #FEF3C7; color: #92400E; }
+.VAS-gljr-pill-voided  { background: #FEE2E2; color: #B91C1C; }
+.VAS-gljr-pill-reverse { background: #F3E8FF; color: #7E22CE; }
+
+/* ── Footer pager (design.md Widget Footer Pager — 24px buttons) ─────────── */
 .VAS-gljr-pager {
-    justify-content: flex-end;
-    gap: 0.45em;
-    margin-top: auto;
-    margin-left: 0;
-    padding-top: 0.45em;
-    border-top: 1px solid #EDF2F6;
-}
-
-.VAS-gljr-page-btn {
-    width: 1.75em;
-    height: 1.75em;
-    font-size: 0.875em;
-}
-
-.VAS-gljr-page-text {
-    min-width: 3.5em;
-    font-size: 0.8125em;
-}
-
-.VAS-gljr-table-wrap.is-empty .VAS-gljr-table,
-.VAS-gljr-table-wrap.is-empty .VAS-gljr-table tbody,
-.VAS-gljr-table-wrap.is-empty .VAS-gljr-empty-row {
-    height: 100%;
-}
-
-.VAS-gljr-table-wrap.is-empty .VAS-gljr-empty {
-    padding: 0;
-    vertical-align: middle;
-}
-
-/* Dialog buttons: design-system primary / secondary pills */
-.VAS-gljr-detail-actions {
-    gap: 0.5rem;
-}
-
-.VAS-gljr-detail-secondary,
-.VAS-gljr-detail-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 6rem;
-    height: 2.25rem;
-    padding: 0 1rem;
-    border-radius: 999px;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.875rem;
-    font-weight: 700;
-    line-height: 1;
-    border-width: 1px;
-    border-style: solid;
-    cursor: pointer;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.VAS-gljr-detail-secondary {
-    background: #E5F3FB;
-    border-color: #BFE4FF;
-    color: #0083DA;
-}
-
-.VAS-gljr-detail-secondary:hover {
-    background: #CCE6F8;
-    border-color: #9ED1FF;
-    color: #0069AE;
-}
-
-.VAS-gljr-detail-primary {
-    background: #0083DA;
-    border-color: #0083DA;
-    color: #FFFFFF;
-}
-
-.VAS-gljr-detail-primary:hover {
-    background: #0069AE;
-    border-color: #0069AE;
-}
-
-.VAS-gljr-detail-secondary:focus-visible,
-.VAS-gljr-detail-primary:focus-visible {
-    outline: 2px solid #1F83FF;
-    outline-offset: 2px;
-}
-
-.VAS-gljr-detail-secondary:disabled,
-.VAS-gljr-detail-primary:disabled {
-    opacity: 0.55;
-    cursor: default;
-    box-shadow: none;
-}
-
-/* Dialog close alignment */
-.VAS-gljr-detail-close-x {
-    margin-left: auto;
-    color: #5F7283;
-    background: transparent;
-}
-
-.VAS-gljr-detail-close-x:hover {
-    color: #102C3F;
-    background: #F3F7FB;
-}
-
-.VAS-gljr-detail-actions {
-    margin-left: auto;
-}
-
-.VAS-gljr-detail-close {
-    background: #0083DA;
-    border-color: #0083DA;
-    color: #FFFFFF;
-}
-
-.VAS-gljr-detail-close:hover {
-    background: #0069AE;
-    border-color: #0069AE;
-}
-
-.VAS-gljr-line-pager {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    width: 100%;
-    margin: 0.75rem 0 1rem;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-btn {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 999px;
-    border: 1px solid #BFE4FF;
-    background: #E5F3FB;
-    color: #0083DA;
-    font-size: 1.25rem;
-    line-height: 1;
-    cursor: pointer;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-btn:hover {
-    background: #CCE6F8;
-    color: #0069AE;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-btn:disabled {
-    opacity: 0.45;
-    cursor: default;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-text {
-    min-width: 4rem;
-    text-align: center;
-    color: #5F7283;
-    font-size: 0.875rem;
-    font-weight: 700;
-}
-
-/* Popup pagination — compact */
-.VAS-gljr-line-pager {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.4em;
-    width: 100%;
-    flex-shrink: 0;
-    margin: 0.25em 0 0;
-    padding: 0.25em 0.5em;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-btn {
-    width: 1.5em;
-    height: 1.5em;
-    padding: 0;
-    border: 1px solid #CFE9FF;
-    border-radius: 0.5em;
-    background: rgba(255, 255, 255, 0.86);
-    color: #0083DA;
-    font-size: 0.8125em;
-    font-weight: 700;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-btn:hover:not(:disabled) {
-    background: #EAF8FF;
-    border-color: #9ED1FF;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-btn:disabled {
-    background: rgba(255, 255, 255, 0.64);
-    color: #C7D3DF;
-    cursor: default;
-    opacity: 1;
-}
-
-.VAS-gljr-line-pager .VAS-gljr-page-text {
-    display: inline-block;
-    min-width: 3em;
-    text-align: center;
-    font-size: 0.8125em;
-    font-weight: 700;
-    color: #141414;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
-/* Detail popup: pager compact, close to table */
-.VAS-gljr-detail-content .VAS-gljr-line-pager {
-    margin-top: calc(-1.25em);
-    position: relative;
-    z-index: 1;
-    padding: 0.3em 0.625em;
-    margin-bottom: 0;
-}
-
-/* Unified GL Journal list table design */
-.VAS-gljr-table-wrap {
-    flex: 1 1 auto;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    overflow: auto;
-}
-
-.VAS-gljr-table {
-    width: 100%;
-    border: 0;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-
-.VAS-gljr-table thead tr {
-    border-bottom: 0;
-}
-
-.VAS-gljr-table th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: transparent;
-    border-bottom: 1px solid #C5D2DD;
-    color: #41576A;
-    font-size: 0.6875em;
-    font-weight: 500;
-    letter-spacing: 0;
-    padding: 0.5em 0.75em;
-    text-align: left;
-    white-space: nowrap;
-    text-transform: capitalize;
-}
-
-.VAS-gljr-table tbody tr {
-    border-bottom: 0;
-}
-
-.VAS-gljr-table td {
-    border-bottom: 1px solid #E2EAF1;
-    color: #102C3F;
-    font-size: 0.75em;
-    padding: 0.85em 0.75em;
-}
-
-.VAS-gljr-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.VAS-gljr-table th.VAS-gljr-num,
-.VAS-gljr-table td.VAS-gljr-col-num {
-    text-align: right;
-}
-
-.VAS-gljr-table th {
-    font-size: 0.6875em;
-}
-
-.VAS-gljr-table td {
-    font-size: 0.95em;
-}
-
-.VAS-gljr-row:hover {
-    background: #F8FBFE;
-}
-
-.VAS-gljr-pager {
-    justify-content: flex-end;
-    margin-top: auto;
-    border-top: 1px solid #EDF2F6;
-}
-
-/* ── Cell hover tooltip ──────────────────────────────────────────────────── */
-.VAS-gljr-detail-lines td[title],
-.VAS-gljr-detail-table td[title] {
-    position: relative;
-    cursor: default;
-}
-
-.VAS-gljr-detail-lines td[title]:hover::after,
-.VAS-gljr-detail-table td[title]:hover::after {
-    content: attr(title);
-    position: absolute;
-    left: 0;
-    top: calc(100% + 0.25em);
-    z-index: 9999;
-    background: rgba(15, 44, 63, 0.96);
-    color: #FFFFFF;
-    font-size: 0.8125em;
-    font-weight: 400;
-    padding: 0.4em 0.65em;
-    border-radius: 0.4em;
-    white-space: normal;
-    word-break: break-word;
-    min-width: 8em;
-    max-width: 22em;
-    line-height: 1.5;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-    pointer-events: none;
-}
-
-/* Table amount columns only */
-.VAS-gljr-table .VAS-gljr-col-num,
-.VAS-gljr-detail-lines .VAS-gljr-num,
-.VAS-gljr-detail-lines .VAS-gljr-detail-amt,
-.VAS-gljr-table th.VAS-gljr-num,
-.VAS-gljr-detail-lines th:nth-child(2),
-.VAS-gljr-detail-lines th:nth-child(3),
-.VAS-gljr-detail-lines td:nth-child(2),
-.VAS-gljr-detail-lines td:nth-child(3) {
-    text-align: right;
-}
-
-/* MD widget pager pattern */
-.VAS-gljr-table-wrap {
-    overflow: hidden;
-}
-
-.VAS-gljr-pager,
-.VAS-gljr-line-pager {
     display: flex;
     align-items: center;
     justify-content: flex-end;
@@ -1182,14 +303,13 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     width: 100%;
     flex-shrink: 0;
     margin: 3px 0 0;
-    padding: 8px 10px 0;
-    border-top: 1px solid #EDF2F6;
+    padding: 8px 2px 0;
+    border-top: 1px solid #D9E2EB;
     background: transparent;
     box-sizing: border-box;
 }
 
-.VAS-gljr-page-btn,
-.VAS-gljr-line-pager .VAS-gljr-page-btn {
+.VAS-gljr-page-btn {
     width: 24px;
     min-width: 24px;
     height: 24px;
@@ -1207,22 +327,18 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     cursor: pointer;
 }
 
-.VAS-gljr-page-btn:hover:not(:disabled),
-.VAS-gljr-line-pager .VAS-gljr-page-btn:hover:not(:disabled) {
+.VAS-gljr-page-btn:hover:not(:disabled) {
     background: #EAF8FF;
     border-color: #BFE4FF;
 }
 
-.VAS-gljr-page-btn:disabled,
-.VAS-gljr-line-pager .VAS-gljr-page-btn:disabled {
+.VAS-gljr-page-btn:disabled {
     background: rgba(255, 255, 255, 0.72);
     color: #B8C6D2;
     cursor: default;
-    opacity: 1;
 }
 
-.VAS-gljr-page-text,
-.VAS-gljr-line-pager .VAS-gljr-page-text {
+.VAS-gljr-page-text {
     min-width: 116px;
     margin-right: auto;
     text-align: left;
@@ -1235,8 +351,7 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     white-space: nowrap;
 }
 
-.VAS-gljr-page-count,
-.VAS-gljr-line-pager .VAS-gljr-page-count {
+.VAS-gljr-page-count {
     min-width: 48px;
     text-align: center;
     font-size: 11.5px;
@@ -1248,30 +363,25 @@ html[dir="rtl"] .VAS-gljr-table td.VAS-gljr-col-num {
     white-space: nowrap;
 }
 
-/* ==========================================================================
-   Summary block above the table uses the same type as the table below:
-   label = table header cell, value = table body cell.
-   ========================================================================== */
-
-.VAS-gljr-detail-summary > div > span,
-.VAS-gljr-created-strip > div > span,
-.VAS-gljr-detail-section-title {
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 400;
-    color: #748494;
-    letter-spacing: 0;
-    line-height: 1.3;
-    text-transform: none;
+/* ── RTL support ─────────────────────────────────────────────────────────── */
+html[dir="rtl"] .VAS-gljr-root .w-head {
+    flex-direction: row-reverse;
 }
 
-.VAS-gljr-detail-summary > div > strong,
-.VAS-gljr-created-strip strong {
-    font-family: Roboto, Arial, sans-serif;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #102C3F;
-    letter-spacing: 0;
-    line-height: 1.3;
-    margin-top: 4px;
+html[dir="rtl"] .VAS-gljr-item {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .VAS-gljr-amt {
+    text-align: left;
+}
+
+html[dir="rtl"] .VAS-gljr-page-text {
+    margin-right: 0;
+    margin-left: auto;
+    text-align: right;
+}
+
+.VAS-gljr-body-lock {
+    overflow: hidden;
 }

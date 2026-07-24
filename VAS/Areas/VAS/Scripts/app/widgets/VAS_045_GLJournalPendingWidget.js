@@ -1157,7 +1157,10 @@
                     );
                 }
 
-                if (item.ActionLabel) {
+                /* Skip the action label for drafts — its value ("Draft") just
+                   repeats the "Drafted" status pill. Other statuses keep their
+                   action (Post / Approval / Resubmit), which is not redundant. */
+                if (item.ActionLabel && statusValue !== "DR") {
                     metaParts.push(
                         esc(
                             item.ActionLabel

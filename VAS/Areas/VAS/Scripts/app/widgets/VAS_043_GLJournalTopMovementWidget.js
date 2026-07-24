@@ -171,7 +171,10 @@
 
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljtm-icon">' + listIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_043_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
+                +   '<div class="VAS-gljtm-title-wrap">'
+                +     '<div class="w-title">' + lbl('VAS_043_TopLedgerMovement', 'Top Ledger Movement') + '</div>'
+                +     '<div class="VAS-gljtm-subtitle">' + lbl('VAS_043_PrimaryBookSubtitle', 'Showing data from Primary Accounting Book') + '</div>'
+                +   '</div>'
                 +   '<div class="VAS-gljtm-period-group" role="group" aria-label="Period">'
                 +     '<button type="button" class="VAS-gljtm-period-btn" data-period="ytd">'
                 +       lbl('VAS_043_YTD', 'YTD')

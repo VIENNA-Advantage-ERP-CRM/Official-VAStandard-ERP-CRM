@@ -250,7 +250,10 @@
                 // ── Header ────────────────────────────────────────────────────
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljv-icon">' + barIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_042_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
+                +   '<div class="VAS-gljv-title-wrap">'
+                +     '<div class="w-title">' + lbl('VAS_042_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
+                +     '<div class="VAS-gljv-subtitle">' + lbl('VAS_042_PrimaryBookSubtitle', 'Showing data from Primary Accounting Book') + '</div>'
+                +   '</div>'
                 +   '<span class="VAS-gljv-sub" id="VAS-gljv-sub-' + id + '">—</span>'
                 +   '<div class="VAS-gljv-period-group" role="group" aria-label="Period">'
                 +     '<button type="button" class="VAS-gljv-period-btn" data-period="week">'
