@@ -157,6 +157,7 @@
     <Content Include="Areas\VAS\Content\VAS_028_PaidThisMonthAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_032_RecentAPPaymentsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_033_PaymentMethodsWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_044_GLJournalRecentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_048_TodayCashOutCashJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_049_NetCashForCashJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_050_CurrentCashForCashJournalWidget.css" />

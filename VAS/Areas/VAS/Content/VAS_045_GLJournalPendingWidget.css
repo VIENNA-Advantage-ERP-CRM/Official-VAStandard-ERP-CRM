@@ -1034,7 +1034,7 @@ html[dir="rtl"] .VAS-gljpq-item {
     width: 100%;
     flex-shrink: 0;
     margin: 8px 0 0;
-    padding: 8px 10px 0;
+    /*padding: 8px 10px 0;*/
     border-top: 1px solid #EDF2F6;
     background: transparent;
     box-sizing: border-box;

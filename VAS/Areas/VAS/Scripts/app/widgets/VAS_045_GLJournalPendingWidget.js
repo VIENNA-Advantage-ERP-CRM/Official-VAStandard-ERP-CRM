@@ -1157,7 +1157,10 @@
                     );
                 }
 
-                if (item.ActionLabel) {
+                /* Skip the action label for drafts — its value ("Draft") just
+                   repeats the "Drafted" status pill. Other statuses keep their
+                   action (Post / Approval / Resubmit), which is not redundant. */
+                if (item.ActionLabel && statusValue !== "DR") {
                     metaParts.push(
                         esc(
                             item.ActionLabel
@@ -1179,11 +1182,41 @@
                     );
                 }
 
+                /*
+                 * Prefer the record's OWN currency (each row carries its journal's
+                 * schema currency); fall back to the response-level values.
+                 */
+                var itemSymbol =
+                    item.CurSymbol ||
+                    item.ISOCode ||
+                    symbol;
+
+                var itemPrecision =
+                    (item.StdPrecision === 0 ||
+                        Number(item.StdPrecision) > 0)
+                        ? Number(item.StdPrecision)
+                        : precision;
+
+                /*
+                 * Sign goes BEFORE the currency symbol, with no space between the
+                 * symbol and the digits (e.g. -$1,234.00, not $-1,234.00).
+                 */
+                var amountNumber =
+                    Number(item.TotalDebit || 0);
+
+                if (isNaN(amountNumber)) {
+                    amountNumber = 0;
+                }
+
+                var amountSign =
+                    amountNumber < 0 ? "-" : "";
+
                 var amountText =
-                    symbol +
+                    amountSign +
+                    itemSymbol +
                     fmtAmt(
-                        item.TotalDebit,
-                        precision
+                        Math.abs(amountNumber),
+                        itemPrecision
                     );
 
                 var markerType =
