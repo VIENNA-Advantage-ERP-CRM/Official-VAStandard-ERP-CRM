@@ -1137,6 +1137,17 @@
         function openMoreDialog(line) {
             closeDialogs();
             morePopoverFor = line.rowId;
+            // Snapshot the line's editable state BEFORE any field is touched. The dialog's
+            // dynamic fields commit live to line.values/display on change, so closing via the
+            // cross (Cancel) must restore this snapshot to leave the record unchanged. Done
+            // keeps the edits. Deep-copy so later in-dialog edits can't mutate the snapshot.
+            var moreSnapshot = {
+                values: $.extend(true, {}, line.values),
+                display: $.extend(true, {}, line.display),
+                dirty: line.dirty,
+                _priceOverride: line._priceOverride,
+                _error: line._error
+            };
             var primaryName = line.display.productName || line.display.chargeName ||
                 (lbl("VAS_074_Line", "Line") + " " + line.values.Line);
             var backdrop = $('<div class="vas-cil-dialog-backdrop" id="vasCilMore"></div>');
@@ -1144,7 +1155,7 @@
             dialog.html(
                 '<header class="vas-cil-dialog__header"><div class="vas-cil-dialog__header-row">' +
                 '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3>" +
-                '<button type="button" class="vas-cil-dialog__close" data-act="close-more" aria-label="' + esc(lbl("VAS_074_Close", "Close")) + '" title="' + esc(lbl("VAS_074_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
+                '<button type="button" class="vas-cil-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_074_Close", "Close")) + '" title="' + esc(lbl("VAS_074_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-cil-dialog__body vas-cil-more-body vas-cil-more-grid" id="vasCilMoreBody"></div>' +
                 '<footer class="vas-cil-dialog__footer vas-cil-dialog__footer--end">' +
@@ -1154,10 +1165,11 @@
 
             var $body = dialog.find("#vasCilMoreBody");
 
-            // Close ONLY via the Done button - not on backdrop click (so an outside
-            // click, e.g. on the framework lookup popup, doesn't dismiss the modal).
-            // Return focus to the row's "..." button so Tab continues the row's chain
-            // (Tab off "..." saves the row) without the user re-grabbing the mouse.
+            // Close only via the Done button (commit) or the cross (cancel/discard) -
+            // never on backdrop click (so an outside click, e.g. on the framework lookup
+            // popup, doesn't dismiss the modal). Both return focus to the row's "..."
+            // button so Tab continues the row's chain (Tab off "..." saves the row)
+            // without the user re-grabbing the mouse.
             function done() {
                 // Block close while a conditionally-mandatory curated field (e.g. Capital/Expense
                 // on an Asset-Related line) is still empty - show the message in the modal and
@@ -1166,7 +1178,22 @@
                 if (miss) { showMoreDialogError(miss); return; }
                 commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
             }
+            // Cross (X) = Cancel: discard everything changed in the modal and restore the
+            // line to its pre-open snapshot, so the record stays as it was. No mandatory
+            // validation here - we're throwing the edits away, not saving them.
+            function cancel() {
+                var l = lineById(line.rowId);
+                if (l) {
+                    l.values = moreSnapshot.values;
+                    l.display = moreSnapshot.display;
+                    l.dirty = moreSnapshot.dirty;
+                    l._priceOverride = moreSnapshot._priceOverride;
+                    l._error = moreSnapshot._error;
+                }
+                closeDialogs(); render(); focusMoreBtn(line);
+            }
             dialog.on("click", "[data-act=close-more]", done);
+            dialog.on("click", "[data-act=cancel-more]", cancel);
             // Enter / Space on the focused Done button must close the dialog. A native
             // <button> would do this itself, but the framework shell swallows Enter (its
             // global handler preventDefaults it), so wire it explicitly - same pattern as
@@ -1175,6 +1202,12 @@
             dialog.on("keydown", "[data-act=close-more]", function (e) {
                 if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
                     e.preventDefault(); e.stopPropagation(); done();
+                }
+            });
+            // Enter / Space on the focused cross (Cancel) discards and closes.
+            dialog.on("keydown", "[data-act=cancel-more]", function (e) {
+                if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault(); e.stopPropagation(); cancel();
                 }
             });
             // Field-group Show More/Less: collapse/expand the fields under a section header.
