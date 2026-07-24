@@ -34,7 +34,7 @@
  * 24  | Close                                            | VAS_118_Close
  * 25  | The journal could not be saved.                  | VAS_118_JournalNotSaved
  * 26  | Journal record saved as draft.                   | VAS_118_JournalSavedDraft
- * 27  | Journal record completed successfully.           | VAS_118_JournalComplete
+ * 27  | Journal record completed successfully.           | VAS_118_JournalCompleted
  * 28  | Search organization                              | VAS_118_SearchOrg
  * 29  | Search accounting schema                         | VAS_118_SearchSchema
  * 30  | Search document type                             | VAS_118_SearchDocType
