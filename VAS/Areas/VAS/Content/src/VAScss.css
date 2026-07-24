@@ -95,6 +95,9 @@
 @import "../VAS_042_GLJournalVolumeWidget.css";
 @import "../VAS_043_GLJournalTopMovementWidget.css";
 @import "../VAS_045_GLJournalPendingWidget.css";
+/* RTL (Arabic) overrides for the GL dashboard family — MUST stay after the
+   widget stylesheets above so its equal-specificity rules win. */
+@import "../VAS_GLDashboard_RTL.css";
 @import "../VAS_118_QuickJournalWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";

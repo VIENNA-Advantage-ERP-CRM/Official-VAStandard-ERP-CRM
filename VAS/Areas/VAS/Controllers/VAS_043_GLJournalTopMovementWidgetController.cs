@@ -94,21 +94,16 @@ namespace VAS.Controllers
 
                 int topLimit = 10;
 
-                string periodStartExpression = isYtd
-                    ? "CurrentPeriod.YearStart"
-                    : "CurrentPeriod.PeriodStart";
+                string periodStartExpression = isYtd                     ? "CurrentPeriod.YearStart"                     : "CurrentPeriod.PeriodStart";
 
                 string periodEndExclusiveExpression = DB.IsOracle()
-                    ? "CurrentPeriod.PeriodEnd + 1"
-                    : "CurrentPeriod.PeriodEnd + INTERVAL '1 day'";
+                    ? "CurrentPeriod.PeriodEnd + 1"                     : "CurrentPeriod.PeriodEnd + INTERVAL '1 day'";
 
                 string currentDateEndExpression = DB.IsOracle()
-                    ? "PeriodData.EndDate + 1"
-                    : "PeriodData.EndDate + INTERVAL '1 day'";
+                    ? "PeriodData.EndDate + 1"                     : "PeriodData.EndDate + INTERVAL '1 day'";
 
                 string clientParamSql = DB.IsOracle()
-                    ? "SELECT @ClientID AS AD_Client_ID FROM DUAL"
-                    : "SELECT @ClientID AS AD_Client_ID";
+                    ? "SELECT @ClientID AS AD_Client_ID FROM DUAL"                     : "SELECT @ClientID AS AD_Client_ID";
 
                 /*
                  * Oracle:
@@ -117,146 +112,62 @@ namespace VAS.Controllers
                  * PostgreSQL:
                  * ROUND(value, precision) requires NUMERIC.
                  */
-                string numericType = DB.IsOracle()
-                    ? "NUMBER"
-                    : "NUMERIC";
+                string numericType = DB.IsOracle()                     ? "NUMBER"                    : "NUMERIC";
 
-                string schemaCurrencySql = @"
-SELECT
-    ClientInfo.AD_Client_ID,
-    AcctSchema.C_AcctSchema_ID,
-    AcctSchema.C_Currency_ID,
-    Currency.StdPrecision,
-    Currency.ISO_Code,
+                string schemaCurrencySql = @"SELECT
+                                                ClientInfo.AD_Client_ID, AcctSchema.C_AcctSchema_ID,
+                                                AcctSchema.C_Currency_ID, Currency.StdPrecision, Currency.ISO_Code,
+                                                CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol
+                                                    ELSE Currency.ISO_Code END AS Cur_Symbol
+                                            FROM ClientParam ClientParam
+                                            INNER JOIN AD_ClientInfo ClientInfo ON (ClientInfo.AD_Client_ID = ClientParam.AD_Client_ID)
+                                            INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID = AcctSchema.C_AcctSchema_ID)
+                                            INNER JOIN C_Currency Currency ON (AcctSchema.C_Currency_ID = Currency.C_Currency_ID)
+                                            WHERE ClientInfo.IsActive = 'Y'
+                                            AND AcctSchema.IsActive = 'Y'";
 
-    CASE
-        WHEN Currency.CurSymbol IS NOT NULL
-        THEN Currency.CurSymbol
-        ELSE Currency.ISO_Code
-    END AS Cur_Symbol
+                string currentPeriodSql = @"SELECT
+                                                CurrentPeriodData.C_Year_ID,
+                                                CurrentPeriodData.PeriodName,
+                                                CurrentPeriodData.YearName,
+                                                CurrentPeriodData.PeriodStart,
+                                                CurrentPeriodData.PeriodEnd,
+                                                CurrentPeriodData.YearStart
+                                            FROM
+                                            (
+                                                SELECT
+                                                    PeriodData.C_Year_ID,
+                                                    PeriodData.Name AS PeriodName,
+                                                    YearData.FiscalYear AS YearName,
+                                                    PeriodData.StartDate AS PeriodStart,
+                                                    PeriodData.EndDate AS PeriodEnd,
+                                                    YearRange.YearStart,
+                                                    ROW_NUMBER() OVER (ORDER BY PeriodData.StartDate DESC, PeriodData.C_Period_ID DESC) AS RowNo
+                                                FROM ClientParam ClientParam
+                                                INNER JOIN AD_ClientInfo ClientInfo ON (ClientInfo.AD_Client_ID = ClientParam.AD_Client_ID)
+                                                INNER JOIN C_Year YearData ON (YearData.C_Calendar_ID = ClientInfo.C_Calendar_ID)
+                                                INNER JOIN C_Period PeriodData ON (PeriodData.C_Year_ID = YearData.C_Year_ID)
+                                                INNER JOIN
+                                                (
+                                                    SELECT C_Period.C_Year_ID,MIN(C_Period.StartDate) AS YearStart
+                                                    FROM C_Period C_Period
+                                                    WHERE C_Period.IsActive = 'Y'
+                                                    GROUP BY C_Period.C_Year_ID
+                                                ) YearRange ON (YearRange.C_Year_ID = PeriodData.C_Year_ID )
+                                                WHERE ClientInfo.IsActive = 'Y' AND YearData.IsActive = 'Y' AND PeriodData.IsActive = 'Y'
+                                                AND CURRENT_DATE >= PeriodData.StartDate AND CURRENT_DATE < " + currentDateEndExpression + @") CurrentPeriodData
+                                            WHERE CurrentPeriodData.RowNo = 1";
 
-FROM ClientParam ClientParam
-
-INNER JOIN AD_ClientInfo ClientInfo ON
-(
-    ClientInfo.AD_Client_ID =
-    ClientParam.AD_Client_ID
-)
-
-INNER JOIN C_AcctSchema AcctSchema ON
-(
-    ClientInfo.C_AcctSchema1_ID =
-    AcctSchema.C_AcctSchema_ID
-)
-
-INNER JOIN C_Currency Currency ON
-(
-    AcctSchema.C_Currency_ID =
-    Currency.C_Currency_ID
-)
-
-WHERE ClientInfo.IsActive = 'Y'
-
-AND AcctSchema.IsActive = 'Y'";
-
-                string currentPeriodSql = @"
-SELECT
-    CurrentPeriodData.C_Year_ID,
-    CurrentPeriodData.PeriodName,
-    CurrentPeriodData.YearName,
-    CurrentPeriodData.PeriodStart,
-    CurrentPeriodData.PeriodEnd,
-    CurrentPeriodData.YearStart
-
-FROM
-(
-    SELECT
-        PeriodData.C_Year_ID,
-        PeriodData.Name AS PeriodName,
-        YearData.FiscalYear AS YearName,
-        PeriodData.StartDate AS PeriodStart,
-        PeriodData.EndDate AS PeriodEnd,
-        YearRange.YearStart,
-
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                PeriodData.StartDate DESC,
-                PeriodData.C_Period_ID DESC
-        ) AS RowNo
-
-    FROM ClientParam ClientParam
-
-    INNER JOIN AD_ClientInfo ClientInfo ON
-    (
-        ClientInfo.AD_Client_ID =
-        ClientParam.AD_Client_ID
-    )
-
-    INNER JOIN C_Year YearData ON
-    (
-        YearData.C_Calendar_ID =
-        ClientInfo.C_Calendar_ID
-    )
-
-    INNER JOIN C_Period PeriodData ON
-    (
-        PeriodData.C_Year_ID =
-        YearData.C_Year_ID
-    )
-
-    INNER JOIN
-    (
-        SELECT
-            C_Period.C_Year_ID,
-
-            MIN
-            (
-                C_Period.StartDate
-            ) AS YearStart
-
-        FROM C_Period C_Period
-
-        WHERE C_Period.IsActive = 'Y'
-
-        GROUP BY
-            C_Period.C_Year_ID
-    ) YearRange ON
-    (
-        YearRange.C_Year_ID =
-        PeriodData.C_Year_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND YearData.IsActive = 'Y'
-
-    AND PeriodData.IsActive = 'Y'
-
-    AND CURRENT_DATE >=
-        PeriodData.StartDate
-
-    AND CURRENT_DATE <
-        " + currentDateEndExpression + @"
-) CurrentPeriodData
-
-WHERE CurrentPeriodData.RowNo = 1";
-
-                string secureJournalSql = @"
-SELECT
-    GL_Journal.GL_Journal_ID,
-    GL_Journal.AD_Client_ID,
-    GL_Journal.AD_Org_ID,
-    GL_Journal.C_AcctSchema_ID,
-    GL_Journal.DateAcct
-
-FROM GL_Journal GL_Journal
-
-WHERE GL_Journal.DocStatus = 'CO'
-
-AND GL_Journal.Posted = 'Y'
-
-AND GL_Journal.IsActive = 'Y'";
+                string secureJournalSql = @"SELECT
+                                                GL_Journal.GL_Journal_ID,
+                                                GL_Journal.AD_Client_ID,
+                                                GL_Journal.AD_Org_ID,
+                                                GL_Journal.C_AcctSchema_ID,
+                                                GL_Journal.DateAcct
+                                            FROM GL_Journal GL_Journal
+                                            WHERE GL_Journal.DocStatus IN ('CO', 'CL') 
+                                            AND GL_Journal.Posted = 'Y'
+                                            AND GL_Journal.IsActive = 'Y'";
 
                 secureJournalSql = MRole.GetDefault(ctx).AddAccessSQL(
                     secureJournalSql,
@@ -265,150 +176,16 @@ AND GL_Journal.IsActive = 'Y'";
                     MRole.SQL_RO
                 );
 
-                string ledgerMovementSql = @"
-SELECT
+                string ledgerMovementSql = @"SELECT
     C_ElementValue.Value AS AccountCode,
     C_ElementValue.Name AS AccountName,
-
-    ROUND
-    (
-        CAST
-        (
-            COALESCE
-            (
-                SUM
-                (
-                    COALESCE
-                    (
-                        GL_JournalLine.AmtAcctDr,
-                        0
-                    )
-                ),
-                0
-            )
-            AS " + numericType + @"
-        ),
-
-        CAST
-        (
-            COALESCE
-            (
-                SchemaCurrency.StdPrecision,
-                2
-            )
-            AS INTEGER
-        )
-    ) AS TotalDebit,
-
-    ROUND
-    (
-        CAST
-        (
-            COALESCE
-            (
-                SUM
-                (
-                    COALESCE
-                    (
-                        GL_JournalLine.AmtAcctCr,
-                        0
-                    )
-                ),
-                0
-            )
-            AS " + numericType + @"
-        ),
-
-        CAST
-        (
-            COALESCE
-            (
-                SchemaCurrency.StdPrecision,
-                2
-            )
-            AS INTEGER
-        )
-    ) AS TotalCredit,
-
-    ABS
-    (
-        ROUND
-        (
-            CAST
-            (
-                COALESCE
-                (
-                    SUM
-                    (
-                        COALESCE
-                        (
-                            GL_JournalLine.AmtAcctDr,
-                            0
-                        )
-                    ),
-                    0
-                )
-                -
-                COALESCE
-                (
-                    SUM
-                    (
-                        COALESCE
-                        (
-                            GL_JournalLine.AmtAcctCr,
-                            0
-                        )
-                    ),
-                    0
-                )
-                AS " + numericType + @"
-            ),
-
-            CAST
-            (
-                COALESCE
-                (
-                    SchemaCurrency.StdPrecision,
-                    2
-                )
-                AS INTEGER
-            )
-        )
-    ) AS NetMovement,
-
-    CASE
-        WHEN
-            COALESCE
-            (
-                SUM
-                (
-                    COALESCE
-                    (
-                        GL_JournalLine.AmtAcctDr,
-                        0
-                    )
-                ),
-                0
-            )
-            -
-            COALESCE
-            (
-                SUM
-                (
-                    COALESCE
-                    (
-                        GL_JournalLine.AmtAcctCr,
-                        0
-                    )
-                ),
-                0
-            ) < 0
-
-        THEN 'Y'
-
-        ELSE 'N'
-    END AS IsCredit,
-
+    ROUND(CAST(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr,0)),0) AS " + numericType + @"),
+        CAST(COALESCE(SchemaCurrency.StdPrecision,2) AS INTEGER)) AS TotalDebit,
+    ROUND(CAST(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr,0)),0) AS " + numericType + @"),
+        CAST(COALESCE(SchemaCurrency.StdPrecision,2) AS INTEGER)) AS TotalCredit,
+    ABS(ROUND(CAST(COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr,0)),0)-COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr,0)),0) AS " + numericType + @"),
+            CAST(COALESCE(SchemaCurrency.StdPrecision,2) AS INTEGER))) AS NetMovement,
+    CASE WHEN COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctDr,0)),0)-COALESCE(SUM(COALESCE(GL_JournalLine.AmtAcctCr,0)),0) < 0 THEN 'Y' ELSE 'N' END AS IsCredit,
     SchemaCurrency.Cur_Symbol,
     SchemaCurrency.ISO_Code,
     SchemaCurrency.StdPrecision,
@@ -417,47 +194,14 @@ SELECT
     CurrentPeriod.PeriodStart,
     CurrentPeriod.PeriodEnd,
     CurrentPeriod.YearStart
-
 FROM SecureJournal GL_Journal
-
-INNER JOIN GL_JournalLine GL_JournalLine ON
-(
-    GL_Journal.GL_Journal_ID =
-    GL_JournalLine.GL_Journal_ID
-
-    AND GL_JournalLine.IsActive = 'Y'
-)
-
-INNER JOIN C_ElementValue C_ElementValue ON
-(
-    GL_JournalLine.Account_ID =
-    C_ElementValue.C_ElementValue_ID
-
-    AND C_ElementValue.IsActive = 'Y'
-)
-
-INNER JOIN SchemaCurrency SchemaCurrency ON
-(
-    SchemaCurrency.C_AcctSchema_ID =
-    GL_Journal.C_AcctSchema_ID
-)
-
-INNER JOIN CurrentPeriod CurrentPeriod ON
-(
-    1 = 1
-)
-
-WHERE GL_Journal.C_AcctSchema_ID =
-    SchemaCurrency.C_AcctSchema_ID
-
-AND GL_Journal.DateAcct >=
-    " + periodStartExpression + @"
-
-AND GL_Journal.DateAcct <
-    " + periodEndExclusiveExpression + @"
-
-GROUP BY
-    C_ElementValue.Value,
+INNER JOIN GL_JournalLine GL_JournalLine ON (GL_Journal.GL_Journal_ID = GL_JournalLine.GL_Journal_ID AND GL_JournalLine.IsActive = 'Y')
+INNER JOIN C_ElementValue C_ElementValue ON (GL_JournalLine.Account_ID = C_ElementValue.C_ElementValue_ID AND C_ElementValue.IsActive = 'Y')
+INNER JOIN SchemaCurrency SchemaCurrency ON (SchemaCurrency.C_AcctSchema_ID = GL_Journal.C_AcctSchema_ID)
+INNER JOIN CurrentPeriod CurrentPeriod ON (1 = 1)
+WHERE GL_Journal.C_AcctSchema_ID = SchemaCurrency.C_AcctSchema_ID
+AND GL_Journal.DateAcct >= " + periodStartExpression + @" AND GL_Journal.DateAcct < " + periodEndExclusiveExpression + @"
+GROUP BY C_ElementValue.Value,
     C_ElementValue.Name,
     SchemaCurrency.Cur_Symbol,
     SchemaCurrency.ISO_Code,
@@ -469,46 +213,21 @@ GROUP BY
     CurrentPeriod.YearStart";
 
                 string sql = @"
-WITH ClientParam AS
-(
-" + clientParamSql + @"
-),
-SchemaCurrency AS
-(
-" + schemaCurrencySql + @"
-),
-CurrentPeriod AS
-(
-" + currentPeriodSql + @"
-),
-SecureJournal AS
-(
-" + secureJournalSql + @"
-),
-LedgerMovement AS
-(
-" + ledgerMovementSql + @"
-),
+WITH ClientParam AS (" + clientParamSql + @"),
+SchemaCurrency AS (" + schemaCurrencySql + @"),
+CurrentPeriod AS (" + currentPeriodSql + @"),
+SecureJournal AS (" + secureJournalSql + @"),
+LedgerMovement AS (" + ledgerMovementSql + @"),
 RankedMovement AS
 (
     SELECT
-        LedgerMovement.*,
-
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                LedgerMovement.NetMovement DESC
-        ) AS RowNo
-
+        LedgerMovement.*, ROW_NUMBER() OVER (ORDER BY LedgerMovement.NetMovement DESC) AS RowNo
     FROM LedgerMovement LedgerMovement
 ),
 TopMovement AS
 (
-    SELECT
-        RankedMovement.*
-
+    SELECT RankedMovement.*
     FROM RankedMovement RankedMovement
-
     WHERE RankedMovement.RowNo <= 10
 )
 SELECT
@@ -527,19 +246,10 @@ SELECT
     TopMovement.PeriodEnd,
     TopMovement.YearStart,
     TopMovement.RowNo,
-
-    COUNT(1) OVER
-    (
-    ) AS TotalCount,
-
-    10 AS TopLimit,
-
-    5 AS PageSize
-
+    COUNT(1) OVER() AS TotalCount,
+    10 AS TopLimit,5 AS PageSize
 FROM TopMovement TopMovement
-
-ORDER BY
-    TopMovement.RowNo";
+ORDER BY TopMovement.RowNo";
 
                 SqlParameter[] parameters =
                 {

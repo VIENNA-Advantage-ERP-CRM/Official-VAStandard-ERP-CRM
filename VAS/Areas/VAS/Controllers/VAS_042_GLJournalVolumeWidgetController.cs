@@ -79,12 +79,8 @@ namespace VAS.Controllers
 
             string dateFilter = isWeek
                 ? GetDateFilter("ProtectedJournal.DateAcct", weekStart, weekEndExclusive)
-                : @"
-AND ProtectedJournal.DateAcct >=
-    PeriodRange.MonthDateFrom
-
-AND ProtectedJournal.DateAcct <
-    " + GetDateToExclusiveExpression("PeriodRange.MonthDateTo");
+                : @" AND ProtectedJournal.DateAcct >= PeriodRange.MonthDateFrom
+                     AND ProtectedJournal.DateAcct < " + GetDateToExclusiveExpression("PeriodRange.MonthDateTo");
 
             string monthJoinType = isWeek ? "LEFT OUTER JOIN" : "INNER JOIN";
 
@@ -574,11 +570,10 @@ AND " + columnName + @" <
 
         private string BuildPeriodLabel(DateTime dateFrom, DateTime dateTo)
         {
-            bool sameMonth = dateFrom.Month == dateTo.Month && dateFrom.Year == dateTo.Year;
+            // Full month/day/year on both ends, e.g. "Dec 15, 2025 – Jan 14, 2026".
+            const string dateFormat = "MMM d, yyyy";
 
-            string endFormat = sameMonth ? "d" : "MMM d";
-
-            return dateFrom.ToString("MMM d") + " – " + dateTo.ToString(endFormat);
+            return dateFrom.ToString(dateFormat) + " – " + dateTo.ToString(dateFormat);
         }
 
         private string GetMsg(Ctx ctx, string key, string fallback)
