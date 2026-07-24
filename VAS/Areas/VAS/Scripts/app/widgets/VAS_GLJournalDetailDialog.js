@@ -339,13 +339,16 @@
                     ? (line.AccountCode + " · " + line.AccountName)
                     : (line.AccountCode || line.AccountName || "-");
 
+            /* Show the amount whenever the side is non-zero (negative OR positive);
+               only the empty side of a line renders as "-". A prior `> 0` guard hid
+               negative debits/credits entirely. */
             var ld =
-                Number(line.Debit || 0) > 0
+                Number(line.Debit || 0) !== 0
                     ? formatAmount(line.Debit, precision)
                     : "-";
 
             var lc =
-                Number(line.Credit || 0) > 0
+                Number(line.Credit || 0) !== 0
                     ? formatAmount(line.Credit, precision)
                     : "-";
 
