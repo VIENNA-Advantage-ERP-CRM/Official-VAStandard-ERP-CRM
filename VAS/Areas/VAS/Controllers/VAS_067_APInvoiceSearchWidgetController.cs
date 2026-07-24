@@ -30,6 +30,7 @@ using System.Data.SqlClient;
 using System.Web.Mvc;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VASLogic.Models;
 
 namespace VAS.Areas.VAS.Controllers
 {
@@ -228,17 +229,9 @@ namespace VAS.Areas.VAS.Controllers
         private int ResolveWindowId()
         {
             if (_windowId >= 0) { return _windowId; }
-            int id = GetWindowIdByName("VAS_APInvoice");
-            if (id == 0) { id = GetWindowIdByName("Invoice (Vendor)"); }
+            int id = new PoReceiptTabPanelModel().GetWindowId("VAS_APInvoice", "Invoice (Vendor)");
             _windowId = id;
             return _windowId;
-        }
-
-        private int GetWindowIdByName(string name)
-        {
-            string q = "SELECT MIN(AD_Window_ID) AS WID FROM AD_Window WHERE Name = @Name AND IsActive = 'Y'";
-            SqlParameter[] p = { new SqlParameter("@Name", name) };
-            return Util.GetValueOfInt(DB.ExecuteScalar(q, p, null));
         }
 
         public class DocSearchResult

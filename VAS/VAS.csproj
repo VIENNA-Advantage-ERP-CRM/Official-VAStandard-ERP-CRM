@@ -500,6 +500,7 @@
     <Content Include="Areas\VAS\Content\VAS_041_GLJournalEntriesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_118_QuickJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_045_GLJournalPendingWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_GLDashboard_RTL.css" />
     <Content Include="Areas\VAS\Content\VAS_043_GLJournalTopMovementWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_042_GLJournalVolumeWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_040_GLJournalNetDiffWidget.css" />

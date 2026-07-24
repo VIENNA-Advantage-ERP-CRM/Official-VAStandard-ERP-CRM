@@ -10,12 +10,15 @@
  * Created by     : Claude (VAS widget pattern)
  *
  * AD_Message keys used (add via System Messages):
- *   VAS_070_Placeholder       => "Search GL journals by no., description, GL reference..."
+ *   VAS_070_Placeholder       => "Search GL journals by Document No., Accounting Schema, Posting type, Ledger, Amount, Status"
  *   VAS_070_Kind              => "GL Journal"
- *   VAS_DocSearch_TypeToSearch=> "Type at least 2 characters to search"
- *   VAS_DocSearch_NoResults   => "No matching documents"
- *   VAS_DocSearch_Error       => "Search failed. Please try again."
- *   VAS_DocSearch_Results     => "results"
+ *   VAS_070_DocSearch_TypeToSearch=> "Type at least 2 characters to search"
+ *   VAS_070_DocSearch_NoResults   => "No matching documents"
+ *   VAS_070_DocSearch_Error       => "Search failed. Please try again."
+ *   VAS_070_DocSearch_Results     => "results"
+ *   VAS_070_Posted            => "Posted"
+ *   VAS_070_Unposted          => "Unposted"
+ *   VAS_070_Ledger            => "Ledger"
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -26,7 +29,7 @@
         var ZOOM_TABLE    = 'GL_Journal';
         var CHIP_CLASS    = 'gljournal';
         var PLACEHOLDER_K = 'VAS_070_Placeholder';
-        var PLACEHOLDER_D = 'Search GL journals by no., description, GL reference...';
+        var PLACEHOLDER_D = 'Search GL journals by Document No., Accounting Schema, Posting type, Ledger, Amount, Status';
         var KIND_K        = 'VAS_070_Kind';
         var KIND_D        = 'GL Journal';
 
@@ -39,8 +42,6 @@
         var widgetID = null;
 
         var windowId = 0;
-        var curSymbol = '';
-        var stdPrecision = 2;
         var debounceTimer = null;
         var requestSeq = 0;
         var MIN_LEN = 2;
@@ -152,13 +153,11 @@
                     var data = null;
                     try { data = (typeof res === 'string') ? JSON.parse(res) : res; } catch (e) { }
                     if (data) {
-                        curSymbol = data.CurSymbol || '';
-                        stdPrecision = (typeof data.StdPrecision === 'number') ? data.StdPrecision : 2;
                         windowId = VIS.Utility.Util.getValueOfInt(data.WindowId);
                     }
                     var items = data ? (data.Items || []) : [];
                     loadedCount = items.length;
-                    hasMore = items.length === PAGE_SIZE;
+                    hasMore = data ? !!data.HasMore : (items.length === PAGE_SIZE);
                     renderResults(items);
                 },
                 error: function () {
@@ -196,7 +195,7 @@
                     var items = data ? (data.Items || []) : [];
                     appendResults(items);
                     loadedCount += items.length;
-                    hasMore = items.length === PAGE_SIZE;
+                    hasMore = data ? !!data.HasMore : (items.length === PAGE_SIZE);
                     isLoadingMore = false;
                     showMoreSpinner(false);
                     updateCount();
@@ -211,18 +210,18 @@
 
         /* ---- Rendering ---- */
         function renderHint() {
-            $panel.html(stateHtml(searchSvg(), msg('VAS_DocSearch_TypeToSearch', 'Type at least 2 characters to search'), false));
+            $panel.html(stateHtml(searchSvg(), msg('VAS_070_DocSearch_TypeToSearch', 'Type at least 2 characters to search'), false));
             openPanel();
         }
 
         function renderError() {
-            $panel.html(stateHtml(alertSvg(), msg('VAS_DocSearch_Error', 'Search failed. Please try again.'), true));
+            $panel.html(stateHtml(alertSvg(), msg('VAS_070_DocSearch_Error', 'Search failed. Please try again'), true));
             openPanel();
         }
 
         function renderResults(items) {
             if (!items || items.length === 0) {
-                $panel.html(stateHtml(searchSvg(), msg('VAS_DocSearch_NoResults', 'No matching documents'), false));
+                $panel.html(stateHtml(searchSvg(), msg('VAS_070_DocSearch_NoResults', 'No matching documents'), false));
                 openPanel();
                 return;
             }
@@ -261,7 +260,7 @@
         }
 
         function updateCount() {
-            var text = loadedCount + (hasMore ? '+' : '') + ' ' + msg('VAS_DocSearch_Results', 'results');
+            var text = loadedCount + (hasMore ? '+' : '') + ' ' + msg('VAS_070_DocSearch_Results', 'results');
             $panel.find('.vas-dssrch-count').text(text);
         }
 
@@ -271,6 +270,7 @@
 
         function buildRow(item, label) {
             var hasZoom = item.RecordId > 0;
+            var sub = buildSubline(item);
             return (
                 '<div class="vas-dssrch-row' + (hasZoom ? '' : ' vas-dssrch-nozoom') + '" data-id="' + VIS.Utility.Util.getValueOfInt(item.RecordId) + '">' +
                     '<span class="vas-dssrch-chip vas-dssrch-chip-' + CHIP_CLASS + '">' + dsEsc(label) + '</span>' +
@@ -278,15 +278,33 @@
                         '<div class="vas-dssrch-docline">' +
                             '<span class="vas-dssrch-docno">' + dsEsc(item.DocumentNo || '') + '</span>' +
                             statusPill(item.DocStatus) +
+                            postedPill(item.Posted) +
                         '</div>' +
                         '<div class="vas-dssrch-title">' + dsEsc(item.Title || '') + '</div>' +
+                        (sub ? '<div class="vas-dssrch-subline">' + sub + '</div>' : '') +
                     '</div>' +
                     '<div class="vas-dssrch-meta">' +
-                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount) + '</div>' +
+                        '<div class="vas-dssrch-amount">' + formatAmount(item.Amount, item.CurSymbol, item.StdPrecision) + '</div>' +
                         '<div class="vas-dssrch-date">' + dsEsc(formatDate(item.DocDate)) + '</div>' +
                     '</div>' +
                 '</div>'
             );
+        }
+
+        /* Muted detail line: posting type · accounting schema · ledger account codes. */
+        function buildSubline(item) {
+            var parts = [];
+            if (item.PostingType) { parts.push(dsEsc(item.PostingType)); }
+            if (item.AcctSchema)  { parts.push(dsEsc(item.AcctSchema)); }
+            /*if (item.LedgerCode)  { parts.push(dsEsc(msg('VAS_070_Ledger', 'Ledger') + ': ' + item.LedgerCode)); }*/
+            return parts.join(' &middot; ');
+        }
+
+        /* Posted / Unposted pill (green when posted, muted otherwise). */
+        function postedPill(posted) {
+            var isPosted = (posted === true) || String(posted).toUpperCase() === 'Y' || String(posted) === 'true';
+            return '<span class="vas-dssrch-status vas-dssrch-status-' + (isPosted ? 'ok' : 'muted') + '">' +
+                dsEsc(isPosted ? msg('VAS_070_Posted', 'Posted') : msg('VAS_070_Unposted', 'Unposted')) + '</span>';
         }
 
         // The framework navigates IN-PLACE (no new window) only when the payload's
@@ -335,12 +353,16 @@
         function setBusy(on) { $bar.toggleClass('vas-dssrch-busy', !!on); }
 
         /* ---- Formatters / helpers ---- */
-        function formatAmount(number) {
+        // Amount is shown in the journal's OWN document currency (symbol + precision come
+        // per row from the server - no conversion). Sign goes BEFORE the currency symbol and
+        // there is NO space between symbol and amount (e.g. -$134.99, not $ -134.99).
+        function formatAmount(number, symbol, precision) {
             var n = (typeof number === 'number') ? number : parseFloat(number);
             if (isNaN(n)) { return ''; }
-            var prec = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var formatted = n.toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
-            return (curSymbol ? curSymbol + ' ' : '') + formatted;
+            var prec = (typeof precision === 'number' && precision >= 0) ? precision : 2;
+            var sign = n < 0 ? '-' : '';
+            var formatted = Math.abs(n).toLocaleString(window.navigator.language, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            return sign + (symbol || '') + formatted;
         }
         function formatDate(iso) {
             if (!iso) { return ''; }
