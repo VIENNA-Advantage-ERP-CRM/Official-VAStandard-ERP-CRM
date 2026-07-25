@@ -6,7 +6,8 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -136,7 +137,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
@@ -147,7 +149,7 @@
     color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     margin-left: auto;
     opacity: .55;
     text-decoration: none !important;
@@ -248,7 +250,8 @@
     border-radius: 14px;
     text-align: center;
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -285,9 +288,7 @@
         gap: 0.375em;
     }
 
-    .vas-scheduled-ap-payment-title {
-        font-size: 0.8125em;
-    }
+
 
     .vas-scheduled-ap-payment-value {
         font-size: 1.375em;
@@ -311,9 +312,7 @@
         height: 0.8125em;
     }
 
-    .vas-scheduled-ap-payment-title {
-        font-size: 0.75em;
-    }
+
 
     .vas-scheduled-ap-payment-value {
         font-size: 1em;
@@ -342,7 +341,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.25em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -543,10 +543,12 @@
     }
 
     .vas-scheduled-ap-payment-dialog-table tbody td {
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
         padding: 0.875em 0.75em;
         border-bottom: 1px solid #e2eaf1;
-        color: #102c3f;
-        font-size: 0.875em;
+        color: #5f7283;
+        font-family: var(--v-c-font-family);
+        font-size: 0.75em;
         line-height: 1.2;
         vertical-align: middle;
         white-space: nowrap;
@@ -586,7 +588,7 @@
 
 .vas-scheduled-ap-payment-th-amount,
 .vas-scheduled-ap-payment-td-amount {
-    width: 14em;
+    width: 16%;
     text-align: left;
 }
 
@@ -604,7 +606,8 @@
 }
 
 .vas-scheduled-ap-payment-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-weight: 400;
 }
 

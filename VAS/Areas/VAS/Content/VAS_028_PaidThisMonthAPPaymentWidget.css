@@ -6,7 +6,8 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -17,7 +18,8 @@
     border-radius: 14px;
     color: #41576a;
     display: none;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     inset: 0;
@@ -102,7 +104,8 @@
     border-radius: 14px;
     text-align: center;
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -189,7 +192,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
@@ -200,7 +204,7 @@
     color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     margin-left: auto;
     opacity: .55;
     text-decoration: none !important;
@@ -326,9 +330,7 @@
         gap: 0.375em;
     }
 
-    .vas-ptm-ap-root .vas-ptm-title {
-        font-size: 0.8125em;
-    }
+
 
     .vas-ptm-ap-root .vas-ptm-subtitle {
         font-size: 0.625em;
@@ -356,9 +358,7 @@
             height: 0.8125em;
         }
 
-    .vas-ptm-ap-root .vas-ptm-title {
-        font-size: 0.75em;
-    }
+
 
     .vas-ptm-ap-root .vas-ptm-subtitle {
         font-size: 0.5625em;
@@ -391,7 +391,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.25em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -549,7 +550,7 @@
     justify-content: center;
     background: rgba(255, 255, 255, 0.68);
     color: #60748a;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 600;
 }
 
@@ -581,10 +582,12 @@
 }
 
 .vas-ptm-dialog-table td {
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
     padding: 0.875em 0.75em;
     border-bottom: 1px solid #e2eaf1;
-    color: #102c3f;
-    font-size: 0.875em;
+    color: #5f7283;
+    font-family: var(--v-c-font-family);
+    font-size: 0.75em;
     line-height: 1.2;
     vertical-align: middle;
     overflow: hidden;
@@ -598,7 +601,8 @@
 
 .vas-ptm-td-doc {
     width: 10em;
-    font-family: "Roboto Mono", "Roboto", monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-weight: 400;
 }
 
@@ -624,7 +628,7 @@
 
 .vas-ptm-th-amount,
 .vas-ptm-td-amount {
-    width: 14em;
+    width: 16%;
     text-align: left;
 }
 

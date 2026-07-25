@@ -184,6 +184,42 @@
             ) + '%';
         }
 
+        /*
+         * Amounts shown in the dialog header are rounded to whole
+         * numbers and the currency symbol is printed without the
+         * trailing separator that comes from the currency setup,
+         * for example ID12,000. Table cells keep the exact amount.
+         */
+        function formatHeaderAmount(
+            value,
+            symbol
+        ) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign =
+                numericValue < 0 ? '-' : '';
+
+            var numberText = Math.abs(
+                numericValue
+            ).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }
+            );
+
+            var cleanSymbol = String(
+                symbol || ''
+            ).replace(/[\s-]+$/, '');
+
+            return sign + cleanSymbol + numberText;
+        }
+
         function formatExactAmount(
             value,
             precision,
@@ -753,20 +789,14 @@
         }
 
         function renderSummary(data) {
-            var stdPrecision =
-                normalizePrecision(
-                    data.stdPrecision
-                );
-
             var symbol =
                 data.curSymbol ||
                 data.currencyIso ||
                 '';
 
             var totalAmountText =
-                formatExactAmount(
+                formatHeaderAmount(
                     data.totalAmount,
-                    stdPrecision,
                     symbol
                 );
 

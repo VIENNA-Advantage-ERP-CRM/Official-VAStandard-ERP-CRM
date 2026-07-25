@@ -377,12 +377,11 @@
         function renderDialogSummary(data) {
             var totalAmount = Number((lastData && (lastData.value || lastData.scheduledAmountThisWeek)) || 0);
             var symbol = (lastData && (lastData.currencySymbol || lastData.symbol)) || '';
-            var precision = normalizePrecision(lastData && lastData.precision);
             var vendorCount = Number((data && data.vendorCount) || 0);
             var methodCount = Number((data && data.paymentMethodCount) || 0);
 
             if ($summaryTotal) {
-                $summaryTotal.text(formatCurrencyAmount(totalAmount, symbol, lastData && lastData.currencyISO, precision));
+                $summaryTotal.text(formatHeaderAmount(totalAmount, symbol, lastData && lastData.currencyISO));
             }
 
             if ($summaryInvoices) {
@@ -409,7 +408,7 @@
                     totalRecords.toLocaleString(window.navigator.language) + ' ' +
                     lbl('VAS_029_MessageInvoices', 'invoices') +
                     ' · ' +
-                    formatCurrencyAmount(totalAmount, symbol, lastData && lastData.currencyISO, precision)
+                    formatHeaderAmount(totalAmount, symbol, lastData && lastData.currencyISO)
                 );
             }
         }
@@ -617,6 +616,30 @@
                 month: 'short',
                 year: 'numeric'
             });
+        }
+
+        /*
+         * Amounts shown in the dialog header are rounded to whole
+         * numbers and the currency symbol is printed without the
+         * trailing separator that comes from the currency setup,
+         * for example ID12,000. Table cells keep the exact amount.
+         */
+        function formatHeaderAmount(value, currencySymbol, currencyISO) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0 ? '-' : '';
+            var amount = formatAmount(Math.abs(numericValue), 0);
+            var cleanSymbol = String(currencySymbol || '').replace(/[\s-]+$/, '');
+
+            if (cleanSymbol) {
+                return sign + cleanSymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {

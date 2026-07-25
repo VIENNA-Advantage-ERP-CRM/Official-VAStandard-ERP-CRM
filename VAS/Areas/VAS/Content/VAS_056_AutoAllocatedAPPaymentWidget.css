@@ -6,7 +6,8 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -18,7 +19,8 @@
     border-radius: 14px;
     color: #41576a;
     display: none;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     inset: 0;
@@ -168,7 +170,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
@@ -179,7 +182,7 @@
     color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     margin-left: auto;
     opacity: .55;
     text-decoration: none !important;
@@ -280,7 +283,8 @@
     border-radius: 14px;
     text-align: center;
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -317,9 +321,7 @@
         gap: 0.375em;
     }
 
-    .VAS-056-AutoAllocatedAPPayment-title {
-        font-size: 0.8125em;
-    }
+
 
     .VAS-056-AutoAllocatedAPPayment-value {
         font-size: 1.375em;
@@ -343,9 +345,7 @@
         height: 0.8125em;
     }
 
-    .VAS-056-AutoAllocatedAPPayment-title {
-        font-size: 0.75em;
-    }
+
 
     .VAS-056-AutoAllocatedAPPayment-value {
         font-size: 1em;
@@ -374,7 +374,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.25em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -564,10 +565,12 @@
     }
 
     .VAS-056-AutoAllocatedAPPayment-dialog-table tbody td {
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
         padding: 0.875em 0.75em;
         border-bottom: 1px solid #e2eaf1;
-        color: #102c3f;
-        font-size: 0.875em;
+        color: #5f7283;
+        font-family: var(--v-c-font-family);
+        font-size: 0.75em;
         line-height: 1.2;
         vertical-align: middle;
         white-space: nowrap;
@@ -607,7 +610,7 @@
 
 .VAS-056-AutoAllocatedAPPayment-th-amount,
 .VAS-056-AutoAllocatedAPPayment-td-amount {
-    width: 14em;
+    width: 16%;
     text-align: left;
 }
 
@@ -635,7 +638,8 @@
 }
 
 .VAS-056-AutoAllocatedAPPayment-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-weight: 400;
 }
 
@@ -756,7 +760,7 @@
     min-width: 3em;
     text-align: center;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: #102c3f;
@@ -864,7 +868,7 @@
     background: #edf2f6;
     color: #41576a;
     text-align: center;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 800;
     font-variant-numeric: tabular-nums;
 }

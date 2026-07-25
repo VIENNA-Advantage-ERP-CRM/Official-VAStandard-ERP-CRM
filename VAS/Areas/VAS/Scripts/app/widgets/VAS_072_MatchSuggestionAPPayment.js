@@ -2477,13 +2477,6 @@
                 'review-dialog-body">' +
                 '<div class="' +
                 classPrefix +
-                'review-busy">' +
-                '<div class="vis-busyindicatorinnerwrap">' +
-                '<i class="vis_widgetloader"></i>' +
-                "</div>" +
-                "</div>" +
-                '<div class="' +
-                classPrefix +
                 'review-banner"></div>' +
                 '<div class="' +
                 classPrefix +
@@ -2527,6 +2520,18 @@
                 ) +
                 "</span>" +
                 "</button>" +
+                "</div>" +
+                "</div>" +
+                /*
+                 * The busy overlay is a direct child of the card so it
+                 * covers the whole dialog (header, body and footer)
+                 * instead of only the scrollable body.
+                 */
+                '<div class="' +
+                classPrefix +
+                'review-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
                 "</div>" +
                 "</div>" +
                 "</div>" +

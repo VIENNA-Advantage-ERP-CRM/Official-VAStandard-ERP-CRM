@@ -6,7 +6,8 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -18,7 +19,8 @@
     border-radius: 14px;
     color: #41576a;
     display: none;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     inset: 0;
@@ -95,7 +97,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     letter-spacing: 0;
@@ -387,7 +390,8 @@
     border-radius: 14px;
     text-align: center;
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -434,9 +438,7 @@
         gap: 0.375em;
     }
 
-    .vas-payment-methods-title {
-        font-size: 0.8125em;
-    }
+
 
     .vas-payment-methods-pager {
         gap: 0.375em;
@@ -484,9 +486,7 @@
         height: 0.8125em;
     }
 
-    .vas-payment-methods-title {
-        font-size: 0.75em;
-    }
+
 
     .vas-payment-methods-pager {
         gap: 0.25em;

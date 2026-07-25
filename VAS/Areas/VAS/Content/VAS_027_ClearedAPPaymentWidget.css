@@ -10,7 +10,8 @@
     min-height: 0;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -84,7 +85,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
@@ -95,7 +97,7 @@
     color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: 0.875em;
+    font-size: 0.75em;
     margin-left: auto;
     opacity: 0.55;
     text-decoration: none !important;
@@ -193,12 +195,22 @@
     padding: 0.875em;
     border-radius: 14px;
     text-align: center;
-    background: rgba(255, 255, 255, 0.55);
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
+}
+
+/* only the loading overlay keeps a scrim; the "No Data" message sits
+   centered on the card with no background */
+.vas-finance-kpi-busy {
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.vas-finance-kpi-state-message {
+    background: transparent;
 }
 
 .vas-finance-kpi-busy.is-visible,
@@ -248,9 +260,7 @@
         height: 0.8125em;
     }
 
-    .vas-finance-kpi-title {
-        font-size: 0.8125em;
-    }
+
 
     .vas-finance-kpi-value {
         font-size: 1em;
@@ -283,7 +293,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.25em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
     color: #102c3f;
 }
@@ -445,7 +456,7 @@
     justify-content: center;
     background: rgba(255, 255, 255, 0.68);
     color: #60748a;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 600;
 }
 
@@ -478,10 +489,12 @@
 }
 
 .vas-cpa-dialog-table td {
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
     padding: 0.875em 0.75em;
     border-bottom: 1px solid #e2eaf1;
-    color: #102c3f;
-    font-size: 0.875em;
+    color: #5f7283;
+    font-family: var(--v-c-font-family);
+    font-size: 0.75em;
     font-weight: 400;
     line-height: 1.2;
     vertical-align: middle;
@@ -500,7 +513,8 @@
 }
 
 .vas-cpa-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-weight: 400 !important;
 }
 
@@ -533,7 +547,7 @@
 
 .vas-cpa-dialog-table th:nth-child(6),
 .vas-cpa-td-amount {
-    width: 14em;
+    width: 16%;
     text-align: left;
 }
 
@@ -566,6 +580,13 @@
     padding: 2.5em 1em !important;
     text-align: center;
     color: #5f7283 !important;
+    border-bottom: none !important;
+    background: transparent !important;
+    white-space: normal;
+}
+
+.vas-cpa-dialog-table tbody tr:hover td.vas-cpa-dialog-empty {
+    background: transparent;
 }
 
 .vas-cpa-dialog-footer {
@@ -661,7 +682,7 @@
     color: #0083da;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 700;
     line-height: 1.2;
 }

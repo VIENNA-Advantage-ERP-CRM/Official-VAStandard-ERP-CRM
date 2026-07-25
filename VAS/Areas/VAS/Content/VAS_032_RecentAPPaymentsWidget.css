@@ -6,7 +6,8 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -95,7 +96,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
@@ -140,7 +142,7 @@
 .vas-recent-ap-payments-page-text {
     min-width: 3.75em;
     text-align: center;
-    font-size: 0.875em;
+    font-size: 0.75em;
     color: #102c3f;
     font-weight: 500;
     line-height: 1.2;
@@ -249,7 +251,8 @@
     border-radius: 14px;
     color: #41576a;
     display: none;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     inset: 0;
@@ -329,7 +332,8 @@
 .vas-recent-ap-payments-value {
     width: 14%;
     color: #41576a;
-    font-family: "Roboto Mono", Consolas, monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.6875em;
 }
 
@@ -356,7 +360,7 @@ td.vas-recent-ap-payments-vendor {
 }
 
 .vas-recent-ap-payments-amount {
-    width: 24%;
+    width: 16%;
     text-align: right !important;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -490,7 +494,8 @@ td.vas-recent-ap-payments-amount {
     border-radius: 14px;
     text-align: center;
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -552,7 +557,8 @@ td.vas-recent-ap-payments-amount {
     align-items: center;
     justify-content: center;
     padding: 2em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -721,7 +727,8 @@ td.vas-recent-ap-payments-amount {
     }
 
 .vas-recent-ap-payments-dialog-mono {
-    font-family: "Roboto Mono", "Roboto", monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-weight: 400;
 }
 
@@ -775,9 +782,7 @@ td.vas-recent-ap-payments-amount {
         min-width: 40em;
     }
 
-    .vas-recent-ap-payments-title {
-        font-size: 0.8125em;
-    }
+
 }
 
 @container (max-width: 260px) {
@@ -798,9 +803,7 @@ td.vas-recent-ap-payments-amount {
         height: 0.8125em;
     }
 
-    .vas-recent-ap-payments-title {
-        font-size: 0.75em;
-    }
+
 
     .vas-recent-ap-payments-table {
         min-width: 38em;
@@ -892,10 +895,12 @@ td.vas-recent-ap-payments-amount {
     }
 
     .vas-recent-ap-payments-alloc-table tbody td {
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
         padding: 0.875em 0.75em;
         border-bottom: 1px solid #e2eaf1;
-        color: #102c3f;
-        font-size: 0.875em;
+        color: #5f7283;
+        font-family: var(--v-c-font-family);
+        font-size: 0.75em;
         line-height: 1.2;
         text-align: left;
         vertical-align: middle;
@@ -913,10 +918,12 @@ td.vas-recent-ap-payments-amount {
     }
 
     .vas-recent-ap-payments-alloc-table tfoot td {
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
         padding: 0.875em 0.75em;
         border-top: 2px solid #edf2f6;
         color: #102c3f;
-        font-size: 0.875em;
+        font-family: var(--v-c-font-family);
+        font-size: 0.75em;
         font-weight: 700;
         line-height: 1.2;
         text-align: left;
@@ -984,7 +991,8 @@ td.vas-recent-ap-payments-amount {
     border-radius: 14px;
     color: #41576a;
     display: none;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     inset: 0;
@@ -1002,7 +1010,8 @@ td.vas-recent-ap-payments-amount {
 
 .vas-allocation-popup {
     padding: 1.125em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
     color: #102c3f;
 }
@@ -1063,7 +1072,7 @@ td.vas-recent-ap-payments-amount {
 
 .vas-allocation-lines-title {
     margin: 0.75em 0 1em;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: #5f7283;
@@ -1098,10 +1107,12 @@ td.vas-recent-ap-payments-amount {
     }
 
     .vas-allocation-lines-table tbody td {
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
         padding: 0.875em 0.75em;
         border-bottom: 1px solid #e2eaf1;
-        font-size: 0.875em;
-        color: #102c3f;
+        font-family: var(--v-c-font-family);
+        font-size: 0.75em;
+        color: #5f7283;
         line-height: 1.2;
         text-align: left;
         vertical-align: middle;

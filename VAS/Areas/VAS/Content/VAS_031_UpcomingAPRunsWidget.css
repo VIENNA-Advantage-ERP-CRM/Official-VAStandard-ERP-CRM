@@ -18,7 +18,8 @@
     contain: layout style;
     container-type: inline-size;
     color: #102c3f;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
 }
 
@@ -97,7 +98,8 @@
     min-width: 0;
     overflow: hidden;
     color: #102c3f;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     text-overflow: ellipsis;
@@ -433,7 +435,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.5em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
     font-weight: 400;
     color: #102c3f;
@@ -520,7 +523,8 @@
     background: transparent;
     color: #41576a;
     cursor: pointer;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1.375em;
     font-weight: 400;
     line-height: 1;
@@ -830,7 +834,7 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
     border-radius: 999px;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 700;
     line-height: 1.2;
 }

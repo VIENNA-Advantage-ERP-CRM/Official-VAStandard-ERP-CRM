@@ -12,7 +12,8 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
@@ -102,7 +103,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     letter-spacing: 0;
@@ -279,7 +281,8 @@
 }
 
 .VAS-072-MatchSuggestionAPPayment-mono {
-    font-family: "Roboto Mono", Consolas, monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-variant-numeric: tabular-nums;
 }
 
@@ -293,7 +296,7 @@
     color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     margin-inline: 0.25em;
     opacity: .55;
     text-decoration: none !important;
@@ -352,7 +355,7 @@
     color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     opacity: .55;
     text-decoration: none !important;
     transition: opacity .15s, color .15s;
@@ -515,7 +518,8 @@
     border-radius: 14px;
     text-align: center;
     color: #41576a;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -532,7 +536,7 @@
 .VAS-072-MatchSuggestionAPPayment-review-skip,
 .VAS-072-MatchSuggestionAPPayment-review-apply {
     border-radius: 999px;
-    font-size: 0.875em;
+    font-size: 0.75em;
     min-height: 2.5em;
     min-width: 5.125em;
 }
@@ -614,7 +618,8 @@
     align-items: center;
     justify-content: center;
     padding: 2em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -749,13 +754,16 @@
     position: relative;
 }
 
+/* Covers the whole review card (header, body and footer), not just
+   the scrollable body. */
 .VAS-072-MatchSuggestionAPPayment-review-busy {
     position: absolute;
     inset: 0;
-    z-index: 5;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 1em;
     background: rgba(255, 255, 255, 0.62);
     opacity: 0;
     visibility: hidden;
@@ -911,9 +919,10 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         color: #102c3f;
-        font-size: 0.875em;
+        font-size: 0.75em;
         font-weight: 400;
-        font-family: "Roboto Mono", "Roboto", monospace;
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
+        font-family: var(--v-c-font-family);
     }
 
 .VAS-072-MatchSuggestionAPPayment-review-pane-row {
@@ -943,7 +952,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #102c3f;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 400;
     text-align: left;
     font-variant-numeric: tabular-nums;
@@ -989,7 +998,7 @@
     margin-top: 1em;
     padding: 0.875em 1.125em;
     border-radius: 0.625em;
-    font-size: 0.875em;
+    font-size: 0.75em;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-balance-exact {
@@ -1082,7 +1091,7 @@
     padding: 2.5em 1em;
     text-align: center;
     color: #5f7283;
-    font-size: 0.875em;
+    font-size: 0.75em;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-footer {
@@ -1122,7 +1131,7 @@
     padding: 0.625em 1.125em;
     border-radius: 999em;
     font-family: inherit;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 700;
     line-height: 1.2;
     cursor: pointer;
@@ -1182,9 +1191,7 @@
         gap: 0.375em;
     }
 
-    .VAS-072-MatchSuggestionAPPayment-title {
-        font-size: 0.8125em;
-    }
+
 
     .VAS-072-MatchSuggestionAPPayment-subtitle {
         display: none;
@@ -1247,9 +1254,7 @@
         height: 0.8125em;
     }
 
-    .VAS-072-MatchSuggestionAPPayment-title {
-        font-size: 0.75em;
-    }
+
 
     .VAS-072-MatchSuggestionAPPayment-pager {
         gap: 0.25em;
@@ -1316,6 +1321,10 @@
         max-width: none;
         height: 100%;
         max-height: 100%;
+        border-radius: 0;
+    }
+
+    .VAS-072-MatchSuggestionAPPayment-review-busy {
         border-radius: 0;
     }
 }
