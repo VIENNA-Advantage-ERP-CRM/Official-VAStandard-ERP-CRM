@@ -4,6 +4,19 @@
  * Screen : Cash Journal
  * Prefix : VAS_052_
  * Scope  : All selectors are scoped under the widget root.
+ *
+ * Sizing contract
+ * ───────────────
+ * The dashboard grid wrapper carries container-type: inline-size.
+ * The widget root sets font-size: clamp(16px, 1.2cqi, 20px) (the canonical
+ * Widget Root Anchor) so every internal em value scales with the container
+ * width. The title clamps around the global --dash-inline-size var (self-
+ * sufficient Widget Header). Borders, radii and shadows stay in px.
+ *
+ * The on-card grid never scrolls horizontally: the table is table-layout:
+ * fixed with proportional column widths and every cell truncates (a title
+ * attribute carries the raw value). Row overflow is handled by the footer
+ * pager, not a scrollbar.
  */
 
 .VAS_052_cashbook-root,
@@ -17,12 +30,13 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, 1.2cqi, 20px);
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
     color: #102C3F;
 }
 
+/* ── Card glass surface ───────────────────────────────────────────────── */
 .VAS_052_cashbook-card {
     width: 100%;
     height: 100%;
@@ -33,15 +47,15 @@
     display: flex;
     flex-direction: column;
     gap: 0.625em;
-    padding: 0.875em;
+    padding: 0.85em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102C3F;
 }
 
-/* Header */
+/* ── Header ───────────────────────────────────────────────────────────── */
 .VAS_052_cashbook-header {
     display: flex;
     align-items: center;
@@ -60,16 +74,14 @@
 }
 
 .VAS_052_cashbook-icon {
-    width: 1.75em !important;
-    height: 1.75em !important;
-    min-width: 1.75em !important;
-    max-width: 1.75em !important;
-    max-height: 1.75em !important;
-    flex: 0 0 1.75em !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    overflow: hidden !important;
+    flex: 0 0 1.75em;
+    width: 1.75em;
+    height: 1.75em;
+    min-width: 1.75em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
     border: 1px solid #E4EDF4;
     border-radius: 0.375em;
     background: rgba(0, 131, 218, 0.08);
@@ -77,83 +89,53 @@
 }
 
     .VAS_052_cashbook-icon svg {
-        width: 1em !important;
-        height: 1em !important;
-        min-width: 1em !important;
-        min-height: 1em !important;
-        max-width: 1em !important;
-        max-height: 1em !important;
-        display: block !important;
-        flex: 0 0 auto !important;
+        width: 1em;
+        height: 1em;
+        display: block;
         stroke: currentColor;
     }
 
+/* Widget title — shared Widget Header style (self-sufficient --dash-inline-size clamp) */
 .VAS_052_cashbook-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     line-height: 1.2;
     font-weight: 400;
     letter-spacing: 0;
     color: #102C3F;
 }
 
+/* Header meta ("N Entries") — neutral chip token */
 .VAS_052_cashbook-meta {
     flex: 0 0 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding: 0.25em 0.625em;
+    border-radius: 999px;
+    background: #F1F4F8;
+    color: #41576A;
     font-size: 0.6875em;
     line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: #748494;
-}
-
-.VAS_052_cashbook-action {
-    flex: 0 0 auto;
-    border: 0;
-    background: transparent;
-    color: #3B7DD8;
-    cursor: pointer;
-    font: inherit;
-    font-size: 0.75em;
-    line-height: 1.2;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 0;
-    padding: 0;
+    text-transform: none;
 }
 
-/* Body */
+/* ── Body — on-card grid (no horizontal scroll) ───────────────────────── */
 .VAS_052_cashbook-body {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
+    overflow: hidden;
 }
 
-.VAS_052_cashbook-body::-webkit-scrollbar {
-    height: 4px;
-}
-
-.VAS_052_cashbook-body::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.VAS_052_cashbook-body::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(16, 44, 63, 0.18);
-}
-
-/* Table */
+/* ── Table ────────────────────────────────────────────────────────────── */
 .VAS_052_cashbook-table {
     width: 100%;
-    min-width: 62em;
     border-collapse: collapse;
     table-layout: fixed;
     margin: 0;
@@ -164,73 +146,93 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        border-bottom: 1px solid rgba(228, 237, 244, 0.72);
-        text-align: left !important;
+        text-align: left;
         vertical-align: middle;
     }
 
+    /* Grid header rail: transparent, capitalized #41576A Medium */
     .VAS_052_cashbook-table th {
-        padding: 0 0.75em 0.6em;
-        color: #748494;
+        padding: 0.5em 0.75em;
+        background: transparent;
+        color: #41576A;
         font-family: Roboto, Arial, sans-serif;
-        font-size: 0.75em;
+        font-size: 0.6875em;
         line-height: 1.2;
-        font-weight: 400;
+        font-weight: 500;
+        letter-spacing: 0;
         text-transform: capitalize;
+        border-bottom: 1px solid #C5D2DD;
     }
 
+    /* Body rows: standard muted cells, thin divider, last row flush */
     .VAS_052_cashbook-table td {
         padding: 0.625em 0.75em;
-        color: #60748A;
+        color: #5F7283;
         font-size: 0.75em;
         line-height: 1.2;
         font-weight: 400;
+        border-bottom: 1px solid #E2EAF1;
     }
 
     .VAS_052_cashbook-table tbody tr:last-child td {
         border-bottom: 0;
     }
 
-.VAS_052_cashbook-col-time {
-    width: 6em;
-    color: #748494 !important;
-    font-family: Roboto, Arial, sans-serif;
-    font-weight: 500 !important;
-}
-
-.VAS_052_cashbook-desc {
-    color: #102C3F !important;
-    font-size: 0.75em !important;
-    font-weight: 700 !important;
+/* ── Proportional column widths (fit, then truncate) ──────────────────── */
+.VAS_052_cashbook-col-doc-no {
+    width: 16%;
 }
 
 .VAS_052_cashbook-col-category,
 .VAS_052_cashbook-col-cash-type {
-    width: 8.5em;
-}
-
-.VAS_052_cashbook-cash-type-cell {
-    color: #60748A !important;
-}
-
-.VAS_052_cashbook-posted {
-    color: #60748A !important;
+    width: 15%;
 }
 
 .VAS_052_cashbook-col-amount {
-    width: 16em;
-    overflow: visible !important;
-    text-overflow: clip !important;
-    white-space: nowrap !important;
-    text-align: left !important;
-    font-weight: 800 !important;
+    width: 15%;
+}
+
+/* Identity cell — document no, bold dark */
+.VAS_052_cashbook-col-doc-no {
+    color: #102C3F;
+    font-weight: 700;
+}
+
+.VAS_052_cashbook-cash-type-cell {
+    color: #5F7283;
+}
+
+/* Description — standard muted cell */
+.VAS_052_cashbook-desc {
+    color: #5F7283;
+    font-size: 0.75em;
+    font-weight: 400;
+}
+
+/* ── Amount cells (In / Out) — emphasized, right-aligned, truncating ──── */
+.VAS_052_cashbook-col-amount {
+    text-align: right;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 
+/* Right-align must out-specify the base `.cashbook-table th, td { text-align:left }`
+   rule (0,1,1) — qualify the class with the element to reach (0,2,1). Applies to
+   both the In/Out headers and their body cells. */
+.VAS_052_cashbook-table th.VAS_052_cashbook-col-amount,
+.VAS_052_cashbook-table td.VAS_052_cashbook-col-amount {
+    text-align: right;
+}
+
 .VAS_052_cashbook-col-amount .VAS-cash-amount-main {
-    display: inline-block;
-    overflow: visible;
-    text-overflow: clip;
+    vertical-align: baseline;
+    font-size: 1em;
+    line-height: 1;
+    color: currentColor;
+}
+
+.VAS_052_cashbook-col-amount .VAS-cash-amount-prefix,
+.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
     vertical-align: baseline;
     font-size: 1em;
     line-height: 1;
@@ -238,60 +240,27 @@
 }
 
 .VAS_052_cashbook-col-amount .VAS-cash-amount-prefix {
-    display: inline-block;
-    margin-right: 0.14em;
-    vertical-align: top;
-    font-size: 0.72em;
-    line-height: 1;
-    font-weight: 500;
-    color: currentColor;
-    opacity: 0.78;
+    font-weight: 700;
+}
+
+.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
+    font-weight: 400;
 }
 
 .VAS_052_cashbook-col-amount .VAS-cash-amount-prefix:empty,
 .VAS_052_cashbook-col-amount .VAS-cash-amount-decimal:empty {
     display: none;
-    margin: 0;
-}
-
-/*.VAS_052_cashbook-col-amount .VAS-cash-amount-main {
-    display: inline-block;
-    max-width: 4.5em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: baseline;
-    font-size: 1em;
-    line-height: 1;
-    color: currentColor;
-}*/
-
-.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
-    display: inline-block;
-    margin-left: 0.02em;
-    font-size: 0.72em;
-    font-weight: 500;
-    color: currentColor;
-    opacity: 0.66;
-}
-
-.VAS_052_cashbook-col-amount .VAS-cash-amount-prefix,
-.VAS_052_cashbook-col-amount .VAS-cash-amount-decimal {
-    margin: 0;
-    color: currentColor;
-    font-size: 1em;
-    font-weight: 800;
-    opacity: 1;
-    vertical-align: baseline;
 }
 
 .VAS_052_cashbook-in {
-    color: #356F4F !important;
+    color: #356F4F;
 }
 
 .VAS_052_cashbook-out {
-    color: #A94747 !important;
+    color: #A94747;
 }
 
+/* ── Category / cash-type chips ───────────────────────────────────────── */
 .VAS_052_cashbook-chip {
     display: inline-flex;
     align-items: center;
@@ -303,7 +272,7 @@
     border-radius: 999px;
     font-size: 0.6875em;
     line-height: 1.2;
-    font-weight: 800;
+    font-weight: 500;
     letter-spacing: 0;
 }
 
@@ -327,20 +296,30 @@
     color: #3B7DD8;
 }
 
-/* Pagination - same design as VAS_053 Approval Queue */
+/* ── Footer pager band ────────────────────────────────────────────────── */
 .VAS_052_cashbook-footer {
     flex-shrink: 0;
     display: none;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     gap: 0.625em;
     margin-top: 0.25em;
     padding-top: 0.5em;
-    border-top: 1px solid rgba(212, 225, 234, 0.66);
+    border-top: 1px solid #D9E2EB;
 }
 
 .VAS_052_cashbook-footer-info {
-    display: none;
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #748494;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
 }
 
 .VAS_052_cashbook-pager {
@@ -350,35 +329,10 @@
     gap: 0.625em;
 }
 
-.VAS_052_cashbook-pager {
-    gap: 0.625em;
-}
-
+/* Compact pager controls (mirror VAS_047 dialog pager): 24px square, 14px chevrons */
 .VAS_052_cashbook-page-btn {
-    width: 1.5em;
-    height: 1.5em;
-    border: 1px solid #cfe9ff;
-    border-radius: 0.5em;
-    background: rgba(255, 255, 255, 0.86);
-    color: #0083DA;
-}
-
-.VAS_052_cashbook-page-btn:disabled {
-    color: #c7d3df;
-    background: rgba(255, 255, 255, 0.64);
-}
-
-.VAS_052_cashbook-page-text {
-    display: inline-block;
-    min-width: 3em;
-    font-size: 1em;
-    font-weight: 700;
-    color: #141414;
-}
-
-.VAS_052_cashbook-page-btn {
-    width: 1.5em;
-    height: 1.5em;
+    width: 24px;
+    height: 24px;
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
@@ -389,15 +343,13 @@
     background: rgba(255, 255, 255, 0.86);
     color: #0083DA;
     font: inherit;
-    font-size: 0.875em;
     line-height: 1;
-    font-weight: 800;
     cursor: pointer;
 }
 
     .VAS_052_cashbook-page-btn svg {
-        width: 0.875em;
-        height: 0.875em;
+        width: 14px;
+        height: 14px;
         stroke: currentColor;
         stroke-width: 2.4;
     }
@@ -408,22 +360,23 @@
     }
 
     .VAS_052_cashbook-page-btn:disabled {
-        color: #c7d3df;
+        color: #B8C6D2;
         background: rgba(255, 255, 255, 0.64);
         cursor: default;
     }
 
 .VAS_052_cashbook-page-text {
+    display: inline-block;
     min-width: 3em;
     text-align: center;
-    font-size: 1em;
+    font-size: 0.8125em;
     line-height: 1.2;
-    font-weight: 700;
-    color: #141414;
+    font-weight: 500;
+    color: #102C3F;
     font-variant-numeric: tabular-nums;
 }
 
-/* Busy */
+/* ── Busy ─────────────────────────────────────────────────────────────── */
 .VAS_052_cashbook-busy {
     position: absolute;
     inset: 0;
@@ -433,7 +386,7 @@
     justify-content: center;
     padding: 0.875em;
     background: rgba(255, 255, 255, 0.74);
-    color: #60748A;
+    color: #5F7283;
     font-size: 0.8125em;
     line-height: 1.35;
     font-weight: 600;
@@ -445,7 +398,7 @@
         display: flex;
     }
 
-/* State / No data */
+/* ── State / No data ──────────────────────────────────────────────────── */
 .VAS_052_cashbook-state {
     position: absolute;
     inset: 0;
@@ -454,7 +407,7 @@
     align-items: center;
     justify-content: center;
     padding: 0.875em;
-    color: #60748A;
+    color: #5F7283;
     font-size: 0.8125em;
     line-height: 1.35;
     font-weight: 600;
@@ -467,7 +420,7 @@
         display: flex;
     }
 
-/* Responsive */
+/* ── Responsive ───────────────────────────────────────────────────────── */
 @container (max-width: 38em) {
     .VAS_052_cashbook-card {
         padding: 0.75em;
@@ -486,27 +439,7 @@
         gap: 0.375em;
     }
 
-    .VAS_052_cashbook-icon {
-        width: 1.75em !important;
-        height: 1.75em !important;
-        min-width: 1.75em !important;
-        max-width: 1.75em !important;
-        max-height: 1.75em !important;
-    }
-
-        .VAS_052_cashbook-icon svg {
-            width: 1em !important;
-            height: 1em !important;
-            max-width: 1em !important;
-            max-height: 1em !important;
-        }
-
-    .VAS_052_cashbook-action {
-        display: none;
-    }
-
     .VAS_052_cashbook-footer {
-        justify-content: flex-end;
         gap: 0.5em;
         margin-top: 0.25em;
         padding-top: 0.45em;
@@ -514,90 +447,27 @@
 
     .VAS_052_cashbook-page-text {
         min-width: 2em;
-        font-size: 0.7em;
     }
 }
 
-.VAS_052_cashbook-pager {
-    gap: 0.625em;
-}
-
-.VAS_052_cashbook-page-btn {
-    width: 1.5em;
-    height: 1.5em;
-    border: 1px solid #cfe9ff;
-    border-radius: 0.5em;
-    background: rgba(255, 255, 255, 0.86);
-    color: #0083DA;
-}
-
-.VAS_052_cashbook-page-btn:hover:not(:disabled) {
-    background: #eaf8ff;
-    border-color: #9ed1ff;
-}
-
-.VAS_052_cashbook-page-btn:disabled {
-    color: #c7d3df;
-    background: rgba(255, 255, 255, 0.64);
-}
-
-.VAS_052_cashbook-page-text {
-    display: inline-block;
-    min-width: 3em;
-    font-size: 1em;
-    font-weight: 700;
-    color: #141414;
-}
-
-/* ── Hover expand: show full cell text on pointer-over ─────────────────── */
+/* ── Hover expand: reveal full cell text on pointer-over ──────────────── */
 .VAS_052_cashbook-table td {
     cursor: default;
 }
 
-.VAS_052_cashbook-table td:hover {
-    overflow: visible;
-    white-space: normal;
-    word-break: break-word;
-    position: relative;
-    z-index: 30;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
-    border-radius: 6px;
+/* Row hover — highlight the WHOLE row uniformly with the design "selected list
+   row" surface (foundations.md). Applied to the <tr> so every cell (including
+   the one under the pointer) shows the same gradient — no cell stands out. */
+.VAS_052_cashbook-table tbody tr:hover {
+    background: linear-gradient(109deg, #EAF8FF 0%, #CAEDFF 100%);
 }
 
-/* Canonical dashboard widget footer pager. */
-.VAS_052_cashbook-footer {
-    justify-content: space-between;
+/* Responsive shrink — VAS_012 pattern: step the whole card font-size down on
+   narrow cells so all em-based content scales together. */
+@container (max-width: 18.75em) {
+    .VAS_052_cashbook-card { font-size: 0.8125em; }
 }
 
-.VAS_052_cashbook-footer-info {
-    display: block;
-    min-width: 0;
-    flex: 1 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #748494;
-    font-size: 0.8125rem;
-    font-weight: 400;
-}
-
-.VAS_052_cashbook-page-btn {
-    width: 24px;
-    height: 24px;
-}
-
-.VAS_052_cashbook-page-btn svg {
-    width: 14px;
-    height: 14px;
-}
-
-.VAS_052_cashbook-page-text {
-    font-size: 0.85rem;
-}
-
-.VAS_052_cashbook-table .VAS_052_cashbook-col-amount,
-.VAS_052_cashbook-table thead th:last-child,
-.VAS_052_cashbook-table tbody td:last-child {
-    text-align: right !important;
+@container (max-width: 13.75em) {
+    .VAS_052_cashbook-card { font-size: 0.6875em; }
 }
