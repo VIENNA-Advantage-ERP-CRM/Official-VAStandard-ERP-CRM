@@ -45,6 +45,21 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-27  Added the line-item Attribute Set Instance sub-line
+ *                        (.MPC-vaspo-itAttr).
+ *   VAI163   2026-07-27  Comment/chat notes now use the standard symmetric
+ *                        activity-row layout (tag | title | right-aligned
+ *                        timestamp · author); the earlier multi-line note block
+ *                        (.MPC-vaspo-actNote) was removed.
+ *   VAI163   2026-07-27  Added the line-items pager (.MPC-vaspo-pager /
+ *                        .MPC-vaspo-pgBtn), the Line History Show/Hide Details
+ *                        toggle (.MPC-vaspo-showDetails) and the Budget breach
+ *                        card + per-line table (.MPC-vaspo-budget /
+ *                        .MPC-vaspo-budgetTable).
+ *   VAI163   2026-07-27  Activity rows wrap (flex-wrap) with the timestamp/author
+ *                        right-aligned via margin-left:auto, so on a narrow panel
+ *                        it drops to its own line instead of being clipped off the
+ *                        right edge.
  ***********************************************************/
 
 .MPC-vaspo-root {
@@ -583,11 +598,14 @@
     overflow: hidden;
 }
 
-/* Row: tag chip | title | right-aligned timestamp. */
+/* Row: tag chip | title | right-aligned timestamp. The row wraps so on a
+   narrow panel the timestamp/author drops to its own line (right-aligned)
+   instead of being clipped off the right edge. */
 .MPC-vaspo-actRow {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.625em;
+    gap: 0.25em 0.625em;
     padding: 0.625em 0.75em;
     border-bottom: 1px solid var(--vaspo-row-div);
 }
@@ -628,6 +646,8 @@
 
 .MPC-vaspo-actWhen {
     flex: none;
+    margin-left: auto;      /* keep right-aligned, incl. when wrapped to its own line */
+    max-width: 100%;
     font-size: 0.6875em;
     color: var(--vaspo-muted);
     white-space: nowrap;
@@ -664,6 +684,9 @@
 }
 .MPC-vaspo-docTable .MPC-vaspo-tRow {
     grid-template-columns: 2.3fr 1.1fr 1.0fr 1.1fr;
+}
+.MPC-vaspo-budgetTable .MPC-vaspo-tRow {
+    grid-template-columns: 2.6fr 1.0fr;
 }
 
 /* Document identity cell: kind icon + doc no / caption + open affordance */
@@ -720,6 +743,16 @@
 .MPC-vaspo-itSku {
     font-size: 0.9231em; /* ~0.75em against the body anchor */
     color: var(--vaspo-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Attribute Set Instance sub-line (size / colour / lot / serial ...) */
+.MPC-vaspo-itAttr {
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    color: var(--vaspo-sub);
     margin-top: 0.125em;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -887,8 +920,78 @@
 .MPC-vaspo-toast.err  { background: #B23636; }
 
 /* ----------------------------------------------------------- */
+/*  Line-items pager (Showing a–b of N · prev / page / next)    */
+/* ----------------------------------------------------------- */
+.MPC-vaspo-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75em;
+    padding: 0.5em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--vaspo-card-bd);
+    font-size: 0.75em;
+    color: var(--vaspo-muted);
+}
+.MPC-vaspo-pagerNav { display: flex; align-items: center; gap: 0.5em; }
+.MPC-vaspo-pagerLabel { font-weight: 700; color: var(--vaspo-sub); min-width: 4em; text-align: center; }
+.MPC-vaspo-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9em;
+    height: 1.9em;
+    padding: 0;
+    border: 1px solid var(--vaspo-card-bd);
+    border-radius: 7px;
+    background: #fff;
+    color: var(--vaspo-sub);
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.MPC-vaspo-pgBtn:hover:not(:disabled) { background: var(--vaspo-info-bg); color: var(--vaspo-action); border-color: var(--vaspo-action); }
+.MPC-vaspo-pgBtn:disabled { opacity: .45; cursor: default; }
+.MPC-vaspo-pgBtn .MPC-vaspo-ic { display: inline-flex; }
+
+/* ----------------------------------------------------------- */
+/*  Show / Hide Details toggle (Line History)                  */
+/* ----------------------------------------------------------- */
+.MPC-vaspo-showDetails {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--vaspo-action);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.MPC-vaspo-showDetails:hover { color: var(--vaspo-action-dk); text-decoration: underline; }
+
+/* ----------------------------------------------------------- */
+/*  Budget breach                                              */
+/* ----------------------------------------------------------- */
+.MPC-vaspo-budget {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5em 1em;
+    padding: 0.75em 0.875em;
+    border: 1px solid var(--vaspo-risk-bg);
+    border-radius: var(--vaspo-card-radius);
+    background: var(--vaspo-risk-bg);
+    margin-bottom: 0.625em;
+}
+.MPC-vaspo-budgetHead { display: flex; align-items: center; gap: 0.5em; }
+.MPC-vaspo-budget .MPC-vaspo-ic { color: var(--vaspo-risk-tx); }
+.MPC-vaspo-budgetTitle { font-size: 0.875em; font-weight: 700; color: var(--vaspo-risk-tx); }
+.MPC-vaspo-budgetAmt { display: flex; align-items: baseline; gap: 0.375em; margin-left: auto; font-size: 0.8125em; color: var(--vaspo-sub); }
+.MPC-vaspo-budgetAmt b { font-size: 1.15em; font-weight: 700; color: var(--vaspo-risk-tx); }
+.MPC-vaspo-budgetOver { color: var(--vaspo-risk-tx); font-weight: 700; }
+
+/* ----------------------------------------------------------- */
 /*  RTL                                                         */
 /* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vaspo-budgetAmt { margin-left: 0; margin-right: auto; }
 [dir="rtl"] .MPC-vaspo-hdrColL { border-right: none; border-left: 1px solid var(--vaspo-row-div); padding-right: 0; padding-left: 1.25em; }
 [dir="rtl"] .MPC-vaspo-table .ta-r { text-align: left; justify-content: flex-start; }
 [dir="rtl"] .MPC-vaspo-recv { justify-content: flex-start; }
