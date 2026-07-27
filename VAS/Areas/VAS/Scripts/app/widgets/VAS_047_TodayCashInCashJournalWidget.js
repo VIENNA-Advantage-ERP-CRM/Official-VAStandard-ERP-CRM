@@ -590,7 +590,7 @@
             var uid = $self.AD_UserHomeWidgetID;
 
             var html = ''
-                + '<div class="VAS-047-today-cash-in-cash-journal-card">'
+                + '<div class="VAS-047-today-cash-in-cash-journal-card" role="button" tabindex="0" aria-label="' + escapeHtml(lbl('VAS_047_DialogTitle', "Today's Cash Receipts")) + '">'
 
                 + '  <div class="VAS-047-today-cash-in-cash-journal-header">'
                 + '    <span class="VAS-047-today-cash-in-cash-journal-icon" aria-hidden="true">'
@@ -627,8 +627,6 @@
                 + '  <div class="VAS-047-today-cash-in-cash-journal-state"'
                 + '       id="VAS-047-cj-state-' + uid + '"></div>'
 
-                + '  <button type="button" class="VAS-047-today-cash-in-cash-journal-action" aria-label="' + escapeHtml(lbl('VAS_047_DialogTitle', "Today's Cash Receipts")) + '"></button>'
-
                 + '</div>';
 
             $root.html(html);
@@ -642,11 +640,20 @@
         }
 
         function bindWidgetInteraction() {
-            var selector =
-                '.VAS-047-today-cash-in-cash-journal-action';
+            /* The whole card is the interactive element (like ExpectedThisWeek) —
+               no absolute button overlay. Click or Enter/Space opens the dialog. */
+            var cardSelector =
+                '.VAS-047-today-cash-in-cash-journal-card';
 
-            $root.on('click', selector, function () {
+            $root.on('click', cardSelector, function () {
                 openDialog();
+            });
+
+            $root.on('keydown', cardSelector, function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openDialog();
+                }
             });
         }
 

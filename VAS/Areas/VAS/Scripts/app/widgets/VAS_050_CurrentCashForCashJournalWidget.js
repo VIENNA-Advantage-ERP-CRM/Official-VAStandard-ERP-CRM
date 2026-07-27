@@ -481,12 +481,8 @@
 
             var $card = $('<section>', {
                 'class': 'VAS_current-cash-cash-journal-card',
-                'aria-label': lbl('VAS_050_CurrentCash', 'Current cash')
-            });
-
-            var $action = $('<button>', {
-                'type': 'button',
-                'class': 'VAS_current-cash-cash-journal-action',
+                'role': 'button',
+                'tabindex': '0',
                 'aria-label': lbl('VAS_050_DialogTitle', 'Cash Book Balance History')
             });
 
@@ -568,10 +564,24 @@
             $headerTools.append($filter);
             $titleCluster.append($iconWell).append($title);
             $header.append($titleCluster).append($headerTools);
-            $card.append($action).append($busy).append($header).append($value).append($footer).append($state);
+            $card.append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
 
-            $action.on('click', openDialog);
+            /* The whole card is the interactive element (ExpectedThisWeek pattern) —
+               no absolute button overlay. Click or Enter/Space opens the dialog. */
+            $card.on('click', openDialog);
+            $card.on('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openDialog();
+                }
+            });
+
+            /* The cashbook selector is interactive on its own — keep its clicks/keys
+               from bubbling to the card (which would open the drill-down dialog). */
+            $select.on('click mousedown keydown', function (event) {
+                event.stopPropagation();
+            });
 
             $select.on('change', function () {
                 selectedCashBookId = Number($(this).val() || 0);

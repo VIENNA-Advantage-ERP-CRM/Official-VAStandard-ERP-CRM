@@ -17,13 +17,17 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.2cqi, 20px);
+    /* Query container only — no font-size (see card). Keeps container-query em
+       breakpoints resolving against 16px like ExpectedThisWeek. */
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
     color: #102C3F;
 }
 
 .VAS_net-cash-cash-journal-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -53,12 +57,12 @@
 /* Header icon well — net-flow up/down arrows */
 .VAS_net-cash-cash-journal-icon {
     flex: 0 0 auto;
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
-    border-radius: 0.375em;
-    background: rgba(255, 255, 255, 0.62);
-    border: 1px solid #E4EDF4;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -66,8 +70,8 @@
 }
 
     .VAS_net-cash-cash-journal-icon svg {
-        width: 1em;
-        height: 1em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
         display: block;
     }
 
@@ -118,9 +122,11 @@
     gap: 0;
     font-size: 1.75em; /* KPI value token */
     line-height: 1.05;
-    letter-spacing: 0;
+    letter-spacing: -0.025em;
     font-weight: 600;
     color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    padding-left: 0.3125em;
 }
 
 .VAS_net-cash-cash-journal-value .VAS-cash-amount-prefix {

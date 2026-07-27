@@ -455,7 +455,9 @@
 
             var $card = $('<section>', {
                 'class': 'VAS_today-cash-out-cash-journal-card',
-                'aria-label': lbl('VAS_048_CashOut', 'Cash out')
+                'role': 'button',
+                'tabindex': '0',
+                'aria-label': lbl('VAS_048_DialogTitle', "Today's Cash Disbursements")
             });
 
             var $busy = $('<div>', {
@@ -522,14 +524,6 @@
                 'id': 'VAS_048_today-cash-out-state-' + widgetId
             });
 
-            var $action = $('<button>', {
-                'type': 'button',
-                'class': 'VAS_today-cash-out-cash-journal-action',
-                'aria-label': lbl('VAS_048_DialogTitle', "Today's Cash Disbursements")
-            });
-
-            $action.on('click', openDialog);
-
             $delta.append($icon).append($deltaText);
             $footer.append($delta).append($description);
 
@@ -541,8 +535,18 @@
 
             $titleWrap.append($title).append($date);
             $header.append($iconWell).append($titleWrap);
-            $card.append($busy).append($header).append($value).append($footer).append($state).append($action);
+            $card.append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
+
+            /* The whole card is the interactive element (ExpectedThisWeek pattern) —
+               no absolute button overlay. Click or Enter/Space opens the dialog. */
+            $card.on('click', openDialog);
+            $card.on('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openDialog();
+                }
+            });
         }
 
         function setState(message) {
