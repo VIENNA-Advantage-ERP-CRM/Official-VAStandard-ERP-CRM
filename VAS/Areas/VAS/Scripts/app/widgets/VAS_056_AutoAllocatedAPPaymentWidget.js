@@ -303,6 +303,10 @@
                 return;
             }
 
+            if (rowsLoading) {
+                return;
+            }
+
             adaptiveAdjustCount++;
 
             // Keep the record the user is looking at on screen.
@@ -448,6 +452,7 @@
 
                     showDialogBusy(false);
 
+                    updateAdaptivePageSize();
                     updatePagerControlsForCurrentState();
                 }
             });
@@ -1084,14 +1089,14 @@
             updateActiveTabStyles();
             updateTabCounts();
 
+            setupAdaptivePagination();
+
             if (!tabState[activeFilter].loaded) {
                 loadRows();
             }
             else {
                 updatePagerControlsForCurrentState();
             }
-
-            setupAdaptivePagination();
         }
 
         function closeDialog() {

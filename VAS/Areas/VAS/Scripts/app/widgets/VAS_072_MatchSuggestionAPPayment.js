@@ -131,6 +131,7 @@
         var resizeObserver = null;
         var widgetRowHeight = 54;
         var widgetMinimumRows = 2;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = null;

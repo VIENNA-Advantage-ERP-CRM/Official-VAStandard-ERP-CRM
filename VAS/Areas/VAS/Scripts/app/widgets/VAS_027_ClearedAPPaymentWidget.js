@@ -747,6 +747,10 @@
                 return;
             }
 
+            if (rowsLoading) {
+                return;
+            }
+
             adaptiveAdjustCount++;
 
             // Keep the record the user is looking at on screen.
@@ -883,6 +887,7 @@
                         rowsLoading = false;
 
                         showDialogBusy(false);
+                        updateAdaptivePageSize();
                         updatePagerButtons();
                     }
                 }
@@ -1215,12 +1220,12 @@
                 'vas-cpa-body-lock'
             );
 
+            setupAdaptivePagination();
+
             if (!rowsLoaded) {
                 pageNo = 1;
                 loadRows();
             }
-
-            setupAdaptivePagination();
         }
 
         function closeDialog() {

@@ -330,6 +330,10 @@
                 return;
             }
 
+            if (rowsLoading) {
+                return;
+            }
+
             adaptiveAdjustCount++;
 
             // Keep the record the user is looking at on screen.
@@ -426,6 +430,7 @@
                     if (!isDisposed) {
                         rowsLoading = false;
                         showDialogBusy(false);
+                        updateAdaptivePageSize();
                         updatePagerControls(
                             totalRecords === 0 ? 0 : (pageNo - 1) * pageSize,
                             Math.min((pageNo - 1) * pageSize + ($dialogTbody ? $dialogTbody.find('tr').not('.vas-scheduled-ap-payment-dialog-empty-row').length : 0), totalRecords)
@@ -592,12 +597,12 @@
             $dialog.show();
             $('body').addClass('vas-scheduled-ap-payment-body-lock');
 
+            setupAdaptivePagination();
+
             if (!rowsLoaded) {
                 pageNo = 1;
                 loadRows();
             }
-
-            setupAdaptivePagination();
         }
 
         function closeDialog() {

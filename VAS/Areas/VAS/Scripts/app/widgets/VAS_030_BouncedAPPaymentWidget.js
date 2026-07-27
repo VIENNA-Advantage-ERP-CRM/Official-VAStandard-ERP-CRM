@@ -638,8 +638,8 @@
             );
 
             updatePager();
-            loadRows();
             setupAdaptivePagination();
+            loadRows();
         }
 
         /**
@@ -757,6 +757,10 @@
              * layout that never settles from looping.
              */
             if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
                 return;
             }
 
@@ -1036,6 +1040,7 @@
                     rowsLoading = false;
 
                     showDialogBusy(false);
+                    updateAdaptivePageSize();
                     updatePager();
                 }
             });

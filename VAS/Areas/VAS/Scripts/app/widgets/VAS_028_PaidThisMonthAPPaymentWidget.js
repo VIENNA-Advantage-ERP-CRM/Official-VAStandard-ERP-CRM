@@ -566,12 +566,12 @@
                 'vas-ptm-body-lock'
             );
 
+            setupAdaptivePagination();
+
             if (!rowsLoaded) {
                 pageNo = 1;
                 loadRows();
             }
-
-            setupAdaptivePagination();
         }
 
         function closeDialog() {
@@ -666,6 +666,10 @@
              * layout that never settles from looping.
              */
             if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
                 return;
             }
 
@@ -791,6 +795,7 @@
                     if (!isDisposed) {
                         rowsLoading = false;
                         showDialogBusy(false);
+                        updateAdaptivePageSize();
                         updatePagerFromCurrent();
                     }
                 }
