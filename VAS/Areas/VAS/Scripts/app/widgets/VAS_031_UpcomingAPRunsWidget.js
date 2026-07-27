@@ -102,6 +102,8 @@
         var totalPages = 0;
 
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
 
         /*
          * Two-line widget row:
@@ -1195,6 +1197,7 @@
             var calculatedRows;
             var newPageSize;
             var newTotalPages;
+            var firstVisibleRecord;
 
             if (
                 !$body ||
@@ -1235,6 +1238,9 @@
 
             adaptiveAdjustCount++;
 
+            firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
             pageSize = newPageSize;
 
             newTotalPages =
@@ -1251,7 +1257,10 @@
             pageNo = Math.max(
                 1,
                 Math.min(
-                    pageNo,
+                    Math.ceil(
+                        firstVisibleRecord /
+                        pageSize
+                    ),
                     newTotalPages || 1
                 )
             );
@@ -1261,32 +1270,53 @@
 
         function startAdaptiveRowObserver() {
             if (
-                resizeObserver ||
                 !$body ||
                 !$body.length
             ) {
                 return;
             }
 
-            if (
-                typeof ResizeObserver ===
-                'undefined'
-            ) {
-                calculatePageSize();
-                return;
-            }
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
 
-            resizeObserver = new ResizeObserver(
-                function () {
-                    window.requestAnimationFrame(
-                        calculatePageSize
+                    adaptiveResizeFrame = window.requestAnimationFrame(
+                        function () {
+                            adaptiveResizeFrame = null;
+                            adaptiveAdjustCount = 0;
+                            calculatePageSize();
+                        }
+                    );
+                };
+
+                window.addEventListener(
+                    'resize',
+                    adaptiveResizeHandler
+                );
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener(
+                        'resize',
+                        adaptiveResizeHandler
                     );
                 }
-            );
+            }
 
-            resizeObserver.observe(
-                $body[0]
-            );
+            if (
+                typeof ResizeObserver !==
+                    'undefined' &&
+                !resizeObserver
+            ) {
+                resizeObserver = new ResizeObserver(
+                    adaptiveResizeHandler
+                );
+
+                resizeObserver.observe(
+                    $body[0]
+                );
+            }
 
             calculatePageSize();
         }
@@ -1295,6 +1325,29 @@
             if (resizeObserver) {
                 resizeObserver.disconnect();
                 resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener(
+                    'resize',
+                    adaptiveResizeHandler
+                );
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener(
+                        'resize',
+                        adaptiveResizeHandler
+                    );
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(
+                    adaptiveResizeFrame
+                );
+                adaptiveResizeFrame = null;
             }
         }
 

@@ -69,6 +69,8 @@
         var pageSize = 7;
         var totalPages = 0;
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
         var widgetRowHeight = 44;
         var widgetMinimumRows = 3;
         var adaptiveAdjustCount = 0;
@@ -362,6 +364,48 @@
                 });
 
                 resizeObserver.observe($tableWrap[0]);
+            }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
             }
         }
 
@@ -1415,10 +1459,7 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-                resizeObserver = null;
-            }
+            teardownAdaptivePagination();
 
             $root.remove();
             closeDialog();

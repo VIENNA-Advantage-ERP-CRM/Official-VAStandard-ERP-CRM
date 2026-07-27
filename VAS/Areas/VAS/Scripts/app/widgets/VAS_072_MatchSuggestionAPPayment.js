@@ -129,6 +129,8 @@
         var activeActionRequest = null;
         var activeDetailRequest = null;
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
         var widgetRowHeight = 54;
         var widgetMinimumRows = 2;
         var adaptiveAdjustCount = 0;
@@ -2991,14 +2993,32 @@
             return measured > 0 ? measured : widgetRowHeight;
         }
 
+        function measureWidgetRowGap() {
+            if (!$rows || !$rows[0] || !window.getComputedStyle) {
+                return 0;
+            }
+
+            var rowsStyle = window.getComputedStyle($rows[0]);
+            var measuredGap = parseFloat(
+                rowsStyle.rowGap || rowsStyle.gap
+            );
+
+            return isNaN(measuredGap) ? 0 : measuredGap;
+        }
+
         function updateAdaptivePageSize(shouldReload) {
             if (!$rows || !$rows[0]) {
                 return;
             }
 
+            var rowHeight = measureWidgetRowHeight();
+            var rowGap = measureWidgetRowGap();
             var nextPageSize = Math.max(
                 widgetMinimumRows,
-                Math.floor($rows[0].clientHeight / measureWidgetRowHeight())
+                Math.floor(
+                    ($rows[0].clientHeight + rowGap) /
+                    (rowHeight + rowGap)
+                )
             );
 
             if (nextPageSize === pageSize) {
@@ -3071,6 +3091,29 @@
 
                 resizeObserver.observe($rows[0]);
             }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize(true);
+                    });
+                };
+
+                window.addEventListener("resize", adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener(
+                        "resize",
+                        adaptiveResizeHandler
+                    );
+                }
+            }
         }
 
         function abortRequest(request) {
@@ -3140,6 +3183,29 @@
             if (resizeObserver) {
                 resizeObserver.disconnect();
                 resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener(
+                    "resize",
+                    adaptiveResizeHandler
+                );
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener(
+                        "resize",
+                        adaptiveResizeHandler
+                    );
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(
+                    adaptiveResizeFrame
+                );
+                adaptiveResizeFrame = null;
             }
 
             activeListRequest = null;

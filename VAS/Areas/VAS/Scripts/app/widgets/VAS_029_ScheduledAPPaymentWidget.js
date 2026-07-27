@@ -85,6 +85,8 @@
          * and falls back to this estimate while the table is still empty.
          */
         var dialogResizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
         var dialogRowHeightEstimate = 44;
         var dialogMinimumRows = 3;
         var adaptiveAdjustCount = 0;
@@ -379,12 +381,47 @@
                     dialogResizeObserver.observe($dialogTbody[0]);
                 }
             }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
         }
 
         function teardownAdaptivePagination() {
             if (dialogResizeObserver) {
                 dialogResizeObserver.disconnect();
                 dialogResizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
             }
         }
 

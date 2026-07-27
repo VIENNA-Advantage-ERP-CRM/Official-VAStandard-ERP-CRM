@@ -44,6 +44,8 @@
         var pageSize = 3;
         var totalPages = 0;
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
         var widgetRowHeight = 50;
         var widgetMinimumRows = 2;
         var adaptiveAdjustCount = 0;
@@ -306,6 +308,48 @@
 
                 resizeObserver.observe($body[0]);
             }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
+            }
         }
 
         function updatePager() {
@@ -529,10 +573,7 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-                resizeObserver = null;
-            }
+            teardownAdaptivePagination();
 
             $root.remove();
             $card = null;
