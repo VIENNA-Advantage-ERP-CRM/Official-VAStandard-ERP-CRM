@@ -69,7 +69,7 @@
         var pageSize = 7;
         var totalPages = 0;
         var resizeObserver = null;
-        var widgetRowHeight = 36;
+        var widgetRowHeight = 44;
         var widgetMinimumRows = 3;
         var adaptiveAdjustCount = 0;
 

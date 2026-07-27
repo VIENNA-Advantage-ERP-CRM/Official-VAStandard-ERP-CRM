@@ -240,9 +240,9 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
-    margin: 0 -0.25em;
-    padding: 0 0.25em;
+    overflow: auto;
+    margin: 0;
+    padding: 0;
 }
 
 .vas-recent-ap-payments-busy {
@@ -276,8 +276,9 @@
     align-items: center;
     justify-content: flex-end;
     gap: 0.5em;
-    padding-top: 0.625em;
+    padding: 0.75em 0 0;
     border-top: 1px solid #d9e2eb;
+    background: #fbfdff;
     overflow: hidden;
 }
 
@@ -285,42 +286,47 @@
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
+    --v-c-font-family: "NoirPro-Regular", sans-serif;
 }
 
     .vas-recent-ap-payments-table th {
         position: sticky;
         top: 0;
         z-index: 1;
-        padding: 0.625em 0.5em;
-        border-bottom: 1px solid #e2eaf1;
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(0.375em);
-        color: #5f7283;
-        font-size: 0.75em;
-        font-weight: 400;
+        padding: 0.5em 0.75em;
+        border-bottom: 1px solid #c5d2dd;
+        background: #ffffff;
+        color: #41576a;
+        font-size: 0.6875em;
+        font-weight: 500;
         line-height: 1.2;
         letter-spacing: 0;
         text-align: left;
         text-transform: capitalize;
+        white-space: nowrap;
     }
 
     .vas-recent-ap-payments-table td {
-        padding: 0.625em 0.5em;
+        --v-c-font-family: "NoirPro-Regular", sans-serif;
         border-bottom: 1px solid #e2eaf1;
-        color: #102c3f;
-        font-size: 0.75em;
-        line-height: 1.25;
-        text-align: left;
+        color: #5f7283;
+        font-family: var(--v-c-font-family);
+        font-size: .75em;
+        line-height: 1.2;
+        overflow: hidden;
+        padding: .875em .75em;
+        text-overflow: ellipsis;
         vertical-align: middle;
+        white-space: nowrap;
     }
 
     .vas-recent-ap-payments-table tr:last-child td {
-        border-bottom: none;
+        border-bottom: 1px solid #e2eaf1;
     }
 
     .vas-recent-ap-payments-table tr:hover td,
     .vas-recent-ap-payments-table tr.vas-recent-ap-payments-row:focus-visible td {
-        background: rgba(31, 131, 255, 0.04);
+        background: #f8fbfe;
     }
 
 .vas-recent-ap-payments-date {
@@ -331,7 +337,7 @@
 
 .vas-recent-ap-payments-value {
     width: 14%;
-    color: #41576a;
+    color: #60748a;
     --v-c-font-family: 'NoirPro-Regular', sans-serif;
     font-family: var(--v-c-font-family);
     font-size: 0.6875em;
@@ -352,7 +358,7 @@ td.vas-recent-ap-payments-vendor {
 
 .vas-recent-ap-payments-bank-account {
     width: 15%;
-    color: #41576a;
+    color: #60748a;
 }
 
 .vas-recent-ap-payments-status-col {
@@ -394,43 +400,32 @@ td.vas-recent-ap-payments-amount {
 .vas-recent-ap-payments-method {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     max-width: 100%;
-    padding: 0.1875em 0.4375em;
-    border-radius: 0.25em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    background: #edf2f6;
-    color: #41576a;
-    border: 1px solid transparent;
-    font-size: 0.6875em;
-    font-weight: 500;
+    color: #60748a;
+    font-size: 1em;
+    font-weight: 400;
     line-height: 1.2;
 }
 
 .vas-recent-ap-payments-status {
     display: inline-flex;
     align-items: center;
-    gap: 0.3125em;
     max-width: 100%;
-    padding: 0.1875em 0.4375em;
-    border-radius: 0.25em;
+    padding: 0.3125em 0.75em;
+    border-radius: 999px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.6875em;
+    font-size: 0.75em;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.1;
 }
 
     .vas-recent-ap-payments-status::before {
-        content: "";
-        flex: 0 0 auto;
-        width: 0.375em;
-        height: 0.375em;
-        border-radius: 50%;
-        background: currentColor;
+        content: none;
     }
 
 .vas-recent-ap-payments-status-cleared {
