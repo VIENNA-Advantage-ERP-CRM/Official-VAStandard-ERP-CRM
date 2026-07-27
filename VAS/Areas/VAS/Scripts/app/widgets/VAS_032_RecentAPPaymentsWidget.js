@@ -71,6 +71,7 @@
         var resizeObserver = null;
         var widgetRowHeight = 36;
         var widgetMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -289,6 +290,25 @@
 
             renderTable(pagePayments);
             updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize();
+        }
+
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $tableWrap
+                ? $tableWrap.find('tbody tr').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
         }
 
         function updateAdaptivePageSize() {
@@ -298,11 +318,22 @@
 
             var headerHeight = $tableWrap.find('thead').outerHeight() || 34;
             var availableHeight = Math.max(0, $tableWrap[0].clientHeight - headerHeight);
-            var nextPageSize = Math.max(widgetMinimumRows, Math.floor(availableHeight / widgetRowHeight));
+            var nextPageSize = Math.max(widgetMinimumRows, Math.floor(availableHeight / measureWidgetRowHeight()));
 
             if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
 

@@ -109,6 +109,7 @@
          */
         var widgetRowHeight = 65;
         var widgetMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -1173,6 +1174,22 @@
             return $row;
         }
 
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $body
+                ? $body.find('.vas-upcoming-ap-runs-row').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
+        }
+
         function calculatePageSize() {
             var availableHeight;
             var calculatedRows;
@@ -1195,7 +1212,7 @@
 
             calculatedRows = Math.floor(
                 availableHeight /
-                widgetRowHeight
+                measureWidgetRowHeight()
             );
 
             newPageSize = Math.max(
@@ -1204,8 +1221,19 @@
             );
 
             if (newPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             pageSize = newPageSize;
 
@@ -1426,6 +1454,9 @@
             }
 
             updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            calculatePageSize();
         }
 
         function renderData(data) {

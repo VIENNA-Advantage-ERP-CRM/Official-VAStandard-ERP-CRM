@@ -812,6 +812,9 @@
 
                 $rows.append($row);
             }
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize(true);
         }
 
         function renderResult(data) {
@@ -2971,6 +2974,22 @@
             );
         }
 
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $rows
+                ? $rows.find("." + classPrefix + "row").first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
+        }
+
         function updateAdaptivePageSize(shouldReload) {
             if (!$rows || !$rows[0]) {
                 return;
@@ -2978,12 +2997,23 @@
 
             var nextPageSize = Math.max(
                 widgetMinimumRows,
-                Math.floor($rows[0].clientHeight / widgetRowHeight)
+                Math.floor($rows[0].clientHeight / measureWidgetRowHeight())
             );
 
             if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             var firstVisibleRecord =
                 ((pageNo - 1) * pageSize) + 1;

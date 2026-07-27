@@ -53,6 +53,7 @@
         var $state = null;
 
         var $dialog = null;
+        var $dialogBody = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
 
@@ -65,6 +66,17 @@
         var pageSize = 8;
         var totalPages = 0;
         var totalRecords = 0;
+
+        /*
+         * The dialog body is a flex scroll area, so the number of rows that
+         * fit follows the popup's rendered height instead of a fixed page
+         * size. The row height is measured from a real row when one exists
+         * and falls back to this estimate while the table is still empty.
+         */
+        var dialogResizeObserver = null;
+        var dialogRowHeightEstimate = 44;
+        var dialogMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         var rowsLoading = false;
         var isDisposed = false;
@@ -627,6 +639,7 @@
 
             updatePager();
             loadRows();
+            setupAdaptivePagination();
         }
 
         /**
@@ -644,6 +657,8 @@
             ) {
                 return;
             }
+
+            teardownAdaptivePagination();
 
             $dialog
                 .hide()
@@ -667,6 +682,141 @@
         /**
          * Loads popup rows.
          */
+        function measureDialogRowHeight() {
+            var $row = $dialogTbody
+                ? $dialogTbody
+                    .find('tr')
+                    .not(':has(.vas-bounced-ap-payment-dialog-empty)')
+                    .first()
+                : null;
+
+            var measured =
+                $row && $row.length
+                    ? $row.outerHeight()
+                    : 0;
+
+            return measured > 0
+                ? measured
+                : dialogRowHeightEstimate;
+        }
+
+        function updateAdaptivePageSize() {
+            if (
+                isDisposed ||
+                !$dialogBody ||
+                !$dialogBody[0] ||
+                !$dialogTbody ||
+                !$dialogTbody[0] ||
+                !$dialog ||
+                !$dialog.is(':visible')
+            ) {
+                return;
+            }
+
+            var container = $dialogBody[0];
+
+            if (container.clientHeight <= 0) {
+                return;
+            }
+
+            /*
+             * Whatever sits above the first row inside the scroll area - the
+             * table header, padding, any summary strip - is measured from the
+             * tbody's own position rather than assumed, so the row space left
+             * over is exact.
+             */
+            var headerOffset =
+                (
+                    $dialogTbody[0].getBoundingClientRect().top -
+                    container.getBoundingClientRect().top
+                ) + container.scrollTop;
+
+            var availableHeight = Math.max(
+                0,
+                container.clientHeight - headerOffset
+            );
+
+            var rowHeight = measureDialogRowHeight();
+
+            if (rowHeight <= 0) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                dialogMinimumRows,
+                Math.floor(availableHeight / rowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            // Keep the record the user is looking at on screen.
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+
+            pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            loadRows();
+        }
+
+        function setupAdaptivePagination() {
+            if (!$dialogBody || !$dialogBody[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+            if (
+                window.ResizeObserver &&
+                !dialogResizeObserver
+            ) {
+                dialogResizeObserver = new ResizeObserver(
+                    function () {
+                        updateAdaptivePageSize();
+                    }
+                );
+
+                dialogResizeObserver.observe($dialogBody[0]);
+
+                /*
+                 * The scroll area keeps a fixed height, so only the row
+                 * container changes size when rows arrive. Watching it is
+                 * what corrects the estimate the first pass had to use.
+                 */
+                if ($dialogTbody && $dialogTbody[0]) {
+                    dialogResizeObserver.observe($dialogTbody[0]);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (dialogResizeObserver) {
+                dialogResizeObserver.disconnect();
+                dialogResizeObserver = null;
+            }
+        }
+
         function loadRows() {
             if (
                 isDisposed ||
@@ -1295,6 +1445,8 @@
                     '</tr>'
                 );
             }
+        
+            updateAdaptivePageSize();
         }
 
         /**
@@ -1644,6 +1796,11 @@
                 '</div>'
             );
 
+            $dialogBody =
+                $dialog.find(
+                    '.vas-bounced-ap-payment-dialog-body'
+                );
+
             $dialogTbody =
                 $dialog.find(
                     '.vas-bounced-ap-payment-dialog-tbody'
@@ -1915,6 +2072,8 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
+            teardownAdaptivePagination();
+
             $(document).off(
                 'keydown.vas-bounced-ap-payment-' +
                 this.AD_UserHomeWidgetID
@@ -1955,6 +2114,7 @@
             $state = null;
 
             $dialog = null;
+            $dialogBody = null;
             $dialogTbody = null;
             $dialogBusy = null;
 

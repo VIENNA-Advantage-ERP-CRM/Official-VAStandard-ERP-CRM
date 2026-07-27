@@ -46,6 +46,7 @@
         var resizeObserver = null;
         var widgetRowHeight = 50;
         var widgetMinimumRows = 2;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -218,6 +219,25 @@
             }
 
             updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize();
+        }
+
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $body
+                ? $body.find('.vas-payment-methods-row').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
         }
 
         function updateAdaptivePageSize() {
@@ -227,12 +247,23 @@
 
             var nextPageSize = Math.max(
                 widgetMinimumRows,
-                Math.floor($body[0].clientHeight / widgetRowHeight)
+                Math.floor($body[0].clientHeight / measureWidgetRowHeight())
             );
 
             if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
 
