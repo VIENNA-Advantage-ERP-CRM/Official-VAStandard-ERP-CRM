@@ -494,17 +494,6 @@ html[dir="rtl"] .vas-reconciliation-status-tooltip-row * {
     unicode-bidi: plaintext;
 }
 
-/* --- RTL: amounts ----------------------------------------------------------
-   Money is not prose. "-ID743,000.000" is one left-to-right token, and
-   leaving it to the bidi heuristics is what kept pushing the minus to the
-   far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
-   inherits into the ellipsis spans the cells wrap their text in, which a
-   rule on the cell alone never reached. The column then flips to the
-   inline-start edge the way the rest of the RTL layout does. */
-html[dir="rtl"] .vas-reconciliation-status-percent {
-    direction: ltr;
-    text-align: left !important;
-}
 
 /* The earlier `plaintext` rules cover prose, but on an amount they would win
    over the `direction` above -- plaintext derives direction from content and
@@ -514,4 +503,13 @@ html[dir="rtl"] .vas-reconciliation-status-percent,
 html[dir="rtl"] .vas-reconciliation-status-percent * {
     direction: ltr;
     unicode-bidi: isolate;
+}
+
+/* The card headline is not a table column: it keeps the side it always sat
+   on -- inline-end, so the right in Arabic and the left in English. It still
+   needs the LTR pin above so the minus stays in front of the figure, and
+   that pin is what would otherwise drag it to the left here, since these
+   elements never declared an alignment of their own. */
+html[dir="rtl"] .vas-reconciliation-status-percent {
+    text-align: right;
 }

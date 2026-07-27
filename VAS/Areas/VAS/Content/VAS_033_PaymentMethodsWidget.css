@@ -646,17 +646,6 @@ html[dir="rtl"] .vas-payment-methods-foot-text * {
     unicode-bidi: plaintext;
 }
 
-/* --- RTL: amounts ----------------------------------------------------------
-   Money is not prose. "-ID743,000.000" is one left-to-right token, and
-   leaving it to the bidi heuristics is what kept pushing the minus to the
-   far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
-   inherits into the ellipsis spans the cells wrap their text in, which a
-   rule on the cell alone never reached. The column then flips to the
-   inline-start edge the way the rest of the RTL layout does. */
-html[dir="rtl"] .vas-payment-methods-amount {
-    direction: ltr;
-    text-align: left !important;
-}
 
 /* The earlier `plaintext` rules cover prose, but on an amount they would win
    over the `direction` above -- plaintext derives direction from content and

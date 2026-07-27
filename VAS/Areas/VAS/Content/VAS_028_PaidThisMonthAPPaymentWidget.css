@@ -901,10 +901,7 @@ html[dir="rtl"] .vas-ptm-dialog-summary strong * {
    rule on the cell alone never reached. The column then flips to the
    inline-start edge the way the rest of the RTL layout does. */
 html[dir="rtl"] .vas-ptm-th-amount,
-html[dir="rtl"] .vas-ptm-td-amount,
-html[dir="rtl"] .vas-ptm-summary-total,
-html[dir="rtl"] .vas-ptm-dialog-summary strong,
-html[dir="rtl"] .vas-ptm-metric {
+html[dir="rtl"] .vas-ptm-td-amount {
     direction: ltr;
     text-align: left !important;
 }
@@ -925,4 +922,29 @@ html[dir="rtl"] .vas-ptm-metric,
 html[dir="rtl"] .vas-ptm-metric * {
     direction: ltr;
     unicode-bidi: isolate;
+}
+
+/* The card headline is not a table column: it keeps the side it always sat
+   on -- inline-end, so the right in Arabic and the left in English. It still
+   needs the LTR pin above so the minus stays in front of the figure, and
+   that pin is what would otherwise drag it to the left here, since these
+   elements never declared an alignment of their own. */
+html[dir="rtl"] .vas-ptm-metric {
+    text-align: right;
+}
+
+/* Summary tiles and popup read-outs are not table columns -- they sit under a
+   right-aligned label, so the figure belongs on the same side. Only the
+   direction stays pinned, to keep the sign in front of the number. */
+html[dir="rtl"] .vas-ptm-summary-total,
+html[dir="rtl"] .vas-ptm-dialog-summary strong {
+    text-align: right !important;
+}
+
+/* The figure sits in a `display: block` ellipsis span inside the cell, which
+   is its own alignment context -- name it too instead of trusting the cell to
+   carry the alignment down. */
+html[dir="rtl"] .vas-ptm-th-amount *,
+html[dir="rtl"] .vas-ptm-td-amount * {
+    text-align: left !important;
 }

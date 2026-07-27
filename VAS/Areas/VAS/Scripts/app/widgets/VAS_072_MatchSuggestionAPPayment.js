@@ -675,24 +675,40 @@
                         row.dueDate
                     );
 
-                var metaText =
+                /*
+                 * Built as markup rather than plain text so each
+                 * value can be isolated on its own: the separators
+                 * and labels then follow the reading direction while
+                 * the amount and the date keep their internal order.
+                 */
+                var metaHtml =
                     " · " +
-                    lbl(
-                        "VAS_072_Open",
-                        "Open"
+                    escapeHtml(
+                        lbl(
+                            "VAS_072_Open",
+                            "Open"
+                        )
                     ) +
-                    " " +
-                    invoiceOpenAmount;
+                    " <bdi>" +
+                    escapeHtml(
+                        invoiceOpenAmount
+                    ) +
+                    "</bdi>";
 
                 if (dueDate) {
-                    metaText +=
+                    metaHtml +=
                         " · " +
-                        lbl(
-                            "VAS_072_Due",
-                            "Due"
+                        escapeHtml(
+                            lbl(
+                                "VAS_072_Due",
+                                "Due"
+                            )
                         ) +
-                        " " +
-                        dueDate;
+                        " <bdi>" +
+                        escapeHtml(
+                            dueDate
+                        ) +
+                        "</bdi>";
                 }
 
                 var $row = $(
@@ -716,13 +732,22 @@
                         row.vendorName || ""
                     ) +
 
+                    /*
+                     * The separator belongs to the line, not to the
+                     * figure: keeping it outside the isolate lets it
+                     * sit between the vendor and the amount the way
+                     * the sentence reads, while the amount itself
+                     * stays a left-to-right token.
+                     */
                     '<span class="' +
                     classPrefix +
                     'amount"> · ' +
 
+                    "<bdi>" +
                     escapeHtml(
                         paymentAmount
                     ) +
+                    "</bdi>" +
 
                     "</span>" +
 
@@ -766,9 +791,7 @@
                     classPrefix +
                     'meta">' +
 
-                    escapeHtml(
-                        metaText
-                    ) +
+                    metaHtml +
 
                     "</span>" +
 

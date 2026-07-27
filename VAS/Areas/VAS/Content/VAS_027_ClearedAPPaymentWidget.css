@@ -847,9 +847,7 @@ html[dir="rtl"] .vas-cpa-summary strong * {
    rule on the cell alone never reached. The column then flips to the
    inline-start edge the way the rest of the RTL layout does. */
 html[dir="rtl"] .vas-cpa-td-amount,
-html[dir="rtl"] .vas-cpa-dialog-table th:last-child,
-html[dir="rtl"] .vas-cpa-summary-amount,
-html[dir="rtl"] .vas-finance-kpi-value {
+html[dir="rtl"] .vas-cpa-dialog-table th:last-child {
     direction: ltr;
     text-align: left !important;
 }
@@ -868,4 +866,28 @@ html[dir="rtl"] .vas-finance-kpi-value,
 html[dir="rtl"] .vas-finance-kpi-value * {
     direction: ltr;
     unicode-bidi: isolate;
+}
+
+/* The card headline is not a table column: it keeps the side it always sat
+   on -- inline-end, so the right in Arabic and the left in English. It still
+   needs the LTR pin above so the minus stays in front of the figure, and
+   that pin is what would otherwise drag it to the left here, since these
+   elements never declared an alignment of their own. */
+html[dir="rtl"] .vas-finance-kpi-value {
+    text-align: right;
+}
+
+/* Summary tiles and popup read-outs are not table columns -- they sit under a
+   right-aligned label, so the figure belongs on the same side. Only the
+   direction stays pinned, to keep the sign in front of the number. */
+html[dir="rtl"] .vas-cpa-summary-amount {
+    text-align: right !important;
+}
+
+/* The figure sits in a `display: block` ellipsis span inside the cell, which
+   is its own alignment context -- name it too instead of trusting the cell to
+   carry the alignment down. */
+html[dir="rtl"] .vas-cpa-td-amount *,
+html[dir="rtl"] .vas-cpa-dialog-table th:last-child * {
+    text-align: left !important;
 }

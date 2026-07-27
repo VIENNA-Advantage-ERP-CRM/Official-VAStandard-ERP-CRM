@@ -1076,17 +1076,6 @@ html[dir="rtl"] .vas-upcoming-ap-runs-pay-arrow {
     unicode-bidi: isolate;
 }
 
-/* --- RTL: amounts ----------------------------------------------------------
-   Money is not prose. "-ID743,000.000" is one left-to-right token, and
-   leaving it to the bidi heuristics is what kept pushing the minus to the
-   far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
-   inherits into the ellipsis spans the cells wrap their text in, which a
-   rule on the cell alone never reached. The column then flips to the
-   inline-start edge the way the rest of the RTL layout does. */
-html[dir="rtl"] .vas-upcoming-ap-runs-amount {
-    direction: ltr;
-    text-align: left !important;
-}
 
 /* The earlier `plaintext` rules cover prose, but on an amount they would win
    over the `direction` above -- plaintext derives direction from content and
@@ -1096,4 +1085,27 @@ html[dir="rtl"] .vas-upcoming-ap-runs-amount,
 html[dir="rtl"] .vas-upcoming-ap-runs-amount * {
     direction: ltr;
     unicode-bidi: isolate;
+}
+
+/* --- RTL: the amount inputs ------------------------------------------------
+   A field you type a figure into is not a read-out: it keeps the left, and it
+   has to be pinned LTR or the minus lands behind the digits ("100000-") as
+   soon as the form is opened in Arabic. */
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
+    direction: ltr;
+    text-align: left;
+}
+
+/* --- Form inputs, both directions ------------------------------------------
+   Every control you type into keeps the left, in Arabic and in English alike,
+   so the caret starts in the same place whichever language the session runs
+   in. This has to name the amount field explicitly as well, because the
+   attribute selector that right-aligns it outranks the class on its own. */
+.vas-upcoming-ap-runs-edit-control,
+.vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
+.vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
+.vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
+    text-align: left;
 }
