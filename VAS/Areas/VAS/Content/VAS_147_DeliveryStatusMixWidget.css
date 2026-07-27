@@ -1,0 +1,169 @@
+/* Delivery Orders Status Mix Widget (VAS_147) - 4x2 analytics widget: per-rep
+   stacked status-mix bars with Month/Year filters + DO drill-down modal.
+   Widget internals in em on the dashboard-width lever; borders/radii/shadows
+   in px. Modal internals in rem (app shell). Lists paged - no inner scrollbar
+   in the widget. The grid owns the widget's outer size. */
+
+.vas-dsm-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+.vas-dsm-root,
+.vas-dsm-root * {
+    box-sizing: border-box;
+}
+
+.vas-dsm-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
+       not a JS-measured container width - the old clamp's fixed 24px ceiling and
+       its dependency on --dash-inline-size froze all text from growing past a
+       point. max()+rem floor guards very narrow windows; no ceiling above it, so
+       text keeps scaling at any resolution. Everything below is em off this. */
+    font-size: max(0.9rem, 1.3vw);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    padding: .875em;
+}
+
+/* ---- header ---- */
+.vas-dsm-head { display: flex; align-items: center; justify-content: space-between; gap: .625em; flex-shrink: 0; }
+.vas-dsm-head-l { display: flex; align-items: center; gap: .625em; min-width: 0; }
+
+.vas-dsm-ico {
+    width: 2em; height: 2em; flex: 0 0 2em; border-radius: 10px;
+    background: #EEF6FF; border: 1px solid #E4EDF4;
+    display: flex; align-items: center; justify-content: center;
+}
+.vas-dsm-ico svg { width: 1em; height: 1em; }
+.vas-dsm-titles { min-width: 0; }
+.vas-dsm-title { font-weight: 500; color: #102C3F; line-height: 1.2; font-size: .8125em; }
+
+.vas-dsm-legend { display: flex; align-items: center; gap: .625em; margin-top: 2px; flex-wrap: wrap; }
+.vas-dsm-lg { display: flex; align-items: center; gap: .3125em; font-weight: 400; font-size: .6875em; color: #748494; white-space: nowrap; }
+.vas-dsm-sw { width: .625em; height: .625em; border-radius: 3px; flex-shrink: 0; }
+.vas-dsm-sw.inprogress { background: #0083DA; }
+.vas-dsm-sw.draft { background: #C9D4DD; }
+.vas-dsm-sw.completed { background: #20A464; }
+.vas-dsm-sw.voided { background: #D14545; }
+
+.vas-dsm-filters { display: flex; align-items: center; gap: .375em; flex-shrink: 0; }
+.vas-dsm-sel { position: relative; display: inline-flex; }
+.vas-dsm-sel select {
+    appearance: none; -webkit-appearance: none; font-family: inherit; font-weight: 500;
+    font-size: .75em; color: #102C3F; background: rgba(255, 255, 255, .9);
+    border: 1px solid #E4EDF4; border-radius: 8px; padding: .375em 1.625em .375em .625em;
+    cursor: pointer; line-height: 1.2;
+}
+.vas-dsm-sel select:hover { background: #EAF4FD; }
+.vas-dsm-sel select:focus { outline: 2px solid #9ED1FF; outline-offset: 1px; }
+.vas-dsm-chev { position: absolute; right: .4375em; top: 50%; transform: translateY(-50%); pointer-events: none; width: .875em; height: .875em; }
+
+/* ---- body: status-mix bars ---- */
+.vas-dsm-body { flex: 1; min-height: 0; overflow: hidden; margin-top: .25em; display: flex; flex-direction: column; justify-content: space-evenly; }
+.vas-dsm-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #748494; font-size: .8125em; }
+
+.vas-dsm-row {
+    display: grid; grid-template-columns: 6.25em 1fr 2.5em; column-gap: .75em; align-items: center;
+    width: 100%; background: transparent; border: none; border-radius: 8px; padding: .375em;
+    cursor: pointer; text-align: left; font-family: inherit; font-size: inherit;
+}
+.vas-dsm-row:hover { background: rgba(234, 244, 253, .7); }
+.vas-dsm-row:focus-visible { outline: 2px solid #9ED1FF; outline-offset: 1px; }
+
+.vas-dsm-rep { font-weight: 700; font-size: .75em; color: #102C3F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-dsm-track { display: flex; height: .75em; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, .85); border: 1px solid #E4EDF4; }
+.vas-dsm-seg { height: 100%; }
+.vas-dsm-seg.inprogress { background: #0083DA; }
+.vas-dsm-seg.draft { background: #C9D4DD; }
+.vas-dsm-seg.completed { background: #20A464; }
+.vas-dsm-seg.voided { background: #D14545; }
+.vas-dsm-total { font-weight: 700; font-size: .75em; color: #102C3F; text-align: right; white-space: nowrap; }
+
+/* ---- footer pager ---- */
+.vas-dsm-foot { display: flex; align-items: center; justify-content: space-between; padding-top: .5em; flex-shrink: 0; }
+.vas-dsm-help { font-weight: 400; font-size: .8125em; color: #748494; }
+.vas-dsm-pager { display: flex; align-items: center; gap: 8px; }
+.vas-dsm-pgbtn {
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; border: 1px solid #E4EDF4; background: rgba(255, 255, 255, .9); cursor: pointer; padding: 0; color: #0083DA;
+}
+.vas-dsm-pgbtn:hover:not(:disabled) { background: #EAF4FD; }
+.vas-dsm-pgbtn:disabled { background: rgba(255, 255, 255, .6); cursor: default; color: #B8C6D2; }
+.vas-dsm-pgbtn svg { width: 14px; height: 14px; }
+.vas-dsm-pgtext { font-weight: 500; font-size: .875em; color: #102C3F; }
+
+/* ===================== MODAL ===================== */
+.vas-dsm-overlay {
+    /* Viewport-anchored (the modal lives on <body>, outside the widget), same
+       basis as the widget card so it scales at any resolution; internals are em. */
+    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    position: fixed; inset: 0; background: rgba(16, 44, 63, .35);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 2em;
+    font-family: Roboto, Arial, sans-serif;
+}
+.vas-dsm-overlay.vas-dsm-hidden { display: none; }
+.vas-dsm-body-lock { overflow: hidden; }
+
+.vas-dsm-modal {
+    background: #fff; border-radius: 14px; box-shadow: 0 30px 70px rgba(2, 38, 64, .30);
+    width: min(51.25em, calc(100vw - 2em)); max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+}
+
+.vas-dsm-mhead { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; padding: 0.875em 1.125em; border-bottom: 1px solid #E4EDF4; flex-shrink: 0; }
+.vas-dsm-mhead-l { min-width: 0; }
+.vas-dsm-mtitle { font-weight: 700; font-size: 1em; color: #102C3F; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-dsm-msub { font-weight: 400; font-size: .8em; color: #748494; margin-top: 0.25em; }
+.vas-dsm-mclose { width: 2em; height: 2em; display: flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 8px; cursor: pointer; flex-shrink: 0; color: #141414; }
+.vas-dsm-mclose:hover { background: #EEF6FF; }
+.vas-dsm-mclose svg { width: 1.25em; height: 1.25em; }
+
+.vas-dsm-mbody { overflow: hidden; padding: 0.25em 1.125em 0.625em; }
+
+/* Fixed 5-row grid so the modal body is sized for 5 rows and never shrinks when
+   a page has fewer (the drill-down pages 5 orders at a time). Unused tracks stay
+   blank instead of collapsing the pop-up. */
+.vas-dsm-dolist { display: grid; grid-template-rows: repeat(5, 2.4em); }
+.vas-dsm-dolist .vas-dsm-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; }
+.vas-dsm-mloading { padding: 1.5em; text-align: center; color: #748494; }
+
+.vas-dsm-dohead, .vas-dsm-dorow {
+    display: grid; grid-template-columns: 1.4fr 2fr 1.1fr 1.1fr 1fr; column-gap: 0.625em; align-items: center; padding: 0.45em 0;
+}
+.vas-dsm-dohead { border-bottom: 1px solid #EDF2F6; position: sticky; top: 0; background: #fff; }
+.vas-dsm-dohead > div { font-weight: 400; font-size: .72em; color: #748494; text-transform: capitalize; }
+.vas-dsm-dohead > div.r { text-align: right; }
+.vas-dsm-dorow { border-bottom: 1px solid #EDF2F6; }
+.vas-dsm-dorow:last-child { border-bottom: none; }
+
+.vas-dsm-doid { font-weight: 700; font-size: .8em; color: #0083DA; white-space: nowrap; }
+.vas-dsm-docell { font-weight: 400; font-size: .8em; color: #5F7283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-dsm-doamount { font-weight: 700; font-size: .8em; color: #102C3F; text-align: right; white-space: nowrap; }
+
+.vas-dsm-dostatus { display: inline-flex; align-items: center; gap: 0.3em; font-weight: 500; font-size: .72em; line-height: 1; padding: 0.25em 0.5em; border-radius: 999px; white-space: nowrap; }
+.vas-dsm-dostatus .vas-dsm-dot { width: 0.4em; height: 0.4em; border-radius: 999px; }
+.vas-dsm-dostatus.inprogress { background: #DFF1FF; color: #106AB0; }
+.vas-dsm-dostatus.inprogress .vas-dsm-dot { background: #0083DA; }
+.vas-dsm-dostatus.draft { background: #F1F4F7; color: #5F7283; }
+.vas-dsm-dostatus.draft .vas-dsm-dot { background: #9AA9B6; }
+.vas-dsm-dostatus.completed { background: #E3F6ED; color: #0B6B45; }
+.vas-dsm-dostatus.completed .vas-dsm-dot { background: #20A464; }
+.vas-dsm-dostatus.voided { background: #FBEAEA; color: #A33F3F; }
+.vas-dsm-dostatus.voided .vas-dsm-dot { background: #D14545; }
+
+.vas-dsm-mfoot { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.625em 1.125em; border-top: 1px solid #E4EDF4; flex-shrink: 0; }
+.vas-dsm-mtotal { font-weight: 400; font-size: .8em; color: #748494; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-dsm-mfoot .vas-dsm-pager { flex: 0 0 auto; gap: 0.4em; }
+.vas-dsm-mfoot .vas-dsm-pgbtn { width: 1.1em; height: 1.1em; border-radius: 0.4em; }
+.vas-dsm-mfoot .vas-dsm-pgbtn svg { width: 0.65em; height: 0.65em; }
+.vas-dsm-mfoot .vas-dsm-pgtext { font-size: 0.75em; }
