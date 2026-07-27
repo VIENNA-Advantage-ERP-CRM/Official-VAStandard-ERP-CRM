@@ -20,7 +20,7 @@ namespace VAS.Controllers
     ///               are missing one or more master-data fields the CURRENT USER
     ///               chose to track. Each user's tracked-field set is stored as
     ///               one AD_Preference row per field (Attribute 'PM.IR.*', scoped
-    ///               by client+user, Org 0, Window 0); a missing row means the
+    ///               by client+user, Org 0, Window NULL); a missing row means the
     ///               field is tracked (selected = Y), so new fields are on by
     ///               default. The load endpoint returns the tracked set and the
     ///               incomplete products with their ordered missing-field keys;
@@ -180,13 +180,15 @@ namespace VAS.Controllers
                     : new MPreference(ctx, attribute, prefValue, null);
                 preference.SetValue(prefValue);
                 preference.SetAD_User_ID(ctx.GetAD_User_ID());
-                // Org 0 / Window 0: the user's tracked set follows them across
-                // organizations and windows (matches the load-query filter).
+                // Org 0: the user's tracked set follows them across organizations
+                // (matches the load-query filter). AD_Window_ID is deliberately
+                // LEFT NULL: forcing it to 0 violated the AD_Preference ->
+                // AD_Window foreign key (there is no AD_Window row with ID 0 -
+                // verified on both project Oracle DBs), so every save failed with
+                // ORA-02291 and the settings panel showed "Preference not saved."
+                // The column is nullable and both load queries filter with
+                // COALESCE(AD_Window_ID, 0) = 0, which a NULL row satisfies.
                 preference.SetAD_Org_ID(0);
-                if (preference.Get_ColumnIndex("AD_Window_ID") >= 0)
-                {
-                    preference.Set_Value("AD_Window_ID", 0);
-                }
 
                 if (!preference.Save())
                 {
@@ -359,9 +361,46 @@ namespace VAS.Controllers
                 MRole.SQL_RO
             );
 
-            // Track flags: 'Y' only for tracked+available fields. When a field is
-            // untracked its OR branch can never include a product for that field.
-            string T(string key) { return tracked.Contains(key) ? "@Track_Y" : "@Track_N"; }
+            // The tracked set is known server-side, so the OR filter is BUILT from
+            // it - only tracked fields' branches are emitted, as plain "flag = 1"
+            // conditions with no parameters. The original version instead bound a
+            // @Track_Y/@Track_N marker per branch (15 extra placeholder
+            // occurrences): the app's Oracle layer never sets BindByName, so
+            // ODP.NET binds BY POSITION, and any bind name that appears more
+            // often in the SQL than in the parameter list throws ORA-01008
+            // ("not all variables bound") before a single row is read - this is
+            // exactly why the widget said "Couldn't load" on every Oracle DB.
+            // With this rewrite @AD_Client_ID is the only placeholder and it
+            // occurs exactly once, so positional binding is safe.
+            Dictionary<string, string> flagByKey = new Dictionary<string, string>
+            {
+                { "hsn", "MissHsn" },
+                { "barcode", "MissBarcode" },
+                { "sku", "MissSku" },
+                { "image", "MissImage" },
+                { "description", "MissDescription" },
+                { "brand", "MissBrand" },
+                { "salesRep", "MissSalesRep" },
+                { "revenueRecognition", "MissRevenueRec" },
+                { "mailTemplate", "MissMailTemplate" },
+                { "qualityCriteria", "MissQualityCriteria" },
+                { "verified", "MissVerified" },
+                { "preferredVendor", "MissPreferredVendor" },
+                { "guaranteeDetails", "MissGuarantee" },
+                { "attributeGroup", "MissAttributeGroup" },
+                { "customTariff", "MissCustomTariff" }
+            };
+
+            // Nothing tracked -> nothing can be incomplete; never emit an empty
+            // WHERE (it would select every product).
+            List<string> orBranches = Catalog
+                .Where(c => tracked.Contains(c.Item1) && flagByKey.ContainsKey(c.Item1))
+                .Select(c => "s." + flagByKey[c.Item1] + " = 1")
+                .ToList();
+            if (orBranches.Count == 0)
+            {
+                return new List<object>();
+            }
 
             string sql = @"
                 WITH ProdStatus AS (
@@ -374,21 +413,8 @@ namespace VAS.Controllers
                        s.MissQualityCriteria, s.MissVerified, s.MissPreferredVendor,
                        s.MissGuarantee, s.MissAttributeGroup, s.MissCustomTariff
                 FROM ProdStatus s
-                WHERE (" + T("hsn") + @" = 'Y' AND s.MissHsn = 1)
-                   OR (" + T("barcode") + @" = 'Y' AND s.MissBarcode = 1)
-                   OR (" + T("sku") + @" = 'Y' AND s.MissSku = 1)
-                   OR (" + T("image") + @" = 'Y' AND s.MissImage = 1)
-                   OR (" + T("description") + @" = 'Y' AND s.MissDescription = 1)
-                   OR (" + T("brand") + @" = 'Y' AND s.MissBrand = 1)
-                   OR (" + T("salesRep") + @" = 'Y' AND s.MissSalesRep = 1)
-                   OR (" + T("revenueRecognition") + @" = 'Y' AND s.MissRevenueRec = 1)
-                   OR (" + T("mailTemplate") + @" = 'Y' AND s.MissMailTemplate = 1)
-                   OR (" + T("qualityCriteria") + @" = 'Y' AND s.MissQualityCriteria = 1)
-                   OR (" + T("verified") + @" = 'Y' AND s.MissVerified = 1)
-                   OR (" + T("preferredVendor") + @" = 'Y' AND s.MissPreferredVendor = 1)
-                   OR (" + T("guaranteeDetails") + @" = 'Y' AND s.MissGuarantee = 1)
-                   OR (" + T("attributeGroup") + @" = 'Y' AND s.MissAttributeGroup = 1)
-                   OR (" + T("customTariff") + @" = 'Y' AND s.MissCustomTariff = 1)
+                WHERE " + string.Join(@"
+                   OR ", orBranches) + @"
                 ORDER BY s.UpdatedAt DESC, s.ProductName, s.ProductCode";
 
             // Column-flag -> field key, in fixed catalog order (missingKeys order).
@@ -417,9 +443,7 @@ namespace VAS.Controllers
             {
                 dr = DB.ExecuteReader(sql, new SqlParameter[]
                 {
-                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
-                    new SqlParameter("@Track_Y", "Y"),
-                    new SqlParameter("@Track_N", "N")
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
                 });
 
                 while (dr != null && dr.Read())
