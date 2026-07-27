@@ -8,10 +8,12 @@
  * Sizing contract
  * ───────────────
  * The dashboard grid wrapper carries container-type: inline-size.
- * The widget root sets font-size: clamp(16px, 1.2cqi, 20px) (the canonical
- * Widget Root Anchor) so every internal em value scales with the container
- * width. The title clamps around the global --dash-inline-size var (self-
- * sufficient Widget Header). Borders, radii and shadows stay in px.
+ * The root is only the query container (no font-size). The card sets the
+ * anchor font-size: clamp(16px, calc(var(--dash-inline-size,100vw) * 0.012),
+ * 20px) (ExpectedThisWeek pattern) so container-query em breakpoints resolve
+ * against 16px and every internal em value scales on the dashboard-width lever
+ * — the SAME lever as the --dash-inline-size title clamp. Borders, radii and
+ * shadows stay in px.
  *
  * The on-card grid never scrolls horizontally: the table is table-layout:
  * fixed with proportional column widths and every cell truncates (a title
@@ -30,7 +32,8 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.2cqi, 20px);
+    /* Query container only — no font-size (see card), so container-query em
+       breakpoints resolve against 16px like ExpectedThisWeek. */
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
     color: #102C3F;
@@ -38,6 +41,9 @@
 
 /* ── Card glass surface ───────────────────────────────────────────────── */
 .VAS_052_cashbook-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -74,23 +80,23 @@
 }
 
 .VAS_052_cashbook-icon {
-    flex: 0 0 1.75em;
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
+    flex: 0 0 auto;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    border: 1px solid #E4EDF4;
-    border-radius: 0.375em;
-    background: rgba(0, 131, 218, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
     color: #4F83D8;
 }
 
     .VAS_052_cashbook-icon svg {
-        width: 1em;
-        height: 1em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
         display: block;
         stroke: currentColor;
     }
