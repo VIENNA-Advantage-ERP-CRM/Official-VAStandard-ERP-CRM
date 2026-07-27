@@ -26,7 +26,7 @@
         var data = null;
         var meta = null;
         var $scrim = null;
-        var LINES_PER_PAGE = 5;
+        var LINES_PER_PAGE = 20;
         var linePage = 0;
 
         /* ---------- short helpers ---------- */

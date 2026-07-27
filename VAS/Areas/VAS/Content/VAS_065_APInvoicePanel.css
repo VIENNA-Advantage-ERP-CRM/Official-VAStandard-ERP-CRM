@@ -174,14 +174,14 @@
 .vas-apinv-sub {
     font-size: 0.75em;
     font-weight: 400;
-    color: var(--apinv-muted);
+   /* color: var(--apinv-muted);*/
     margin-top: 0.25em;
 }
 
 .vas-apinv-ctx {
     font-size: 0.75em;
     font-weight: 400;
-    color: var(--apinv-muted);
+   /* color: var(--apinv-muted);*/
     text-align: right;
 }
 
@@ -406,14 +406,14 @@
 }
 
     .vas-apinv-mcell .k {
-        font-size: 0.6875em;
+        font-size: 0.77em;
         font-weight: 400;
-        color: var(--apinv-muted);
+        /*color: var(--apinv-muted);*/
     }
 
     .vas-apinv-mcell .v {
         font-size: 0.8125em;
-        font-weight: 400;
+        font-weight: 700;
         color: var(--apinv-text);
         margin-top: 0.125em;
         overflow: hidden;
@@ -439,7 +439,7 @@
         .vas-apinv-mcell .v .mi {
             font-size: calc(0.6875em / 0.8125);
             font-weight: 400;
-            color: var(--apinv-muted);
+            /*color: var(--apinv-muted);*/
             margin-left: 0.5em;
         }
 
@@ -451,7 +451,7 @@
 
     .vas-apinv-mcell .m {
         font-size: calc(0.6875em / 0.8125);
-        font-weight: 400;
+        font-weight: 700;
         color: var(--apinv-muted);
         margin-top: 0.125em;
         overflow: hidden;
@@ -531,7 +531,7 @@
     margin-top: 0.5em;
     width: 100%;
     text-align: center;
-    font-size: 0.8125em;
+    font-size: 0.8725em;
     font-weight: 400;
     color: var(--apinv-pending-dot);
     overflow: hidden;
@@ -554,7 +554,7 @@
 .vas-apinv-pipe-sub {
     width: 100%;
     text-align: center;
-    font-size: 0.6875em;
+    font-size: 0.7875em;
     font-weight: 400;
     line-height: 1.4;
     color: var(--apinv-muted);
@@ -589,7 +589,7 @@
     justify-content: space-between;
     gap: 0.8em;
     flex-wrap: wrap;
-    padding: 1em 1.1em;
+    padding: 0.8em 1.1em;
 }
 
 /* Section title token — 1em Bold. */
@@ -603,7 +603,7 @@
 .vas-apinv-block-r {
     font-size: 0.75em;
     font-weight: 400;
-    color: var(--apinv-muted);
+    /*color: var(--apinv-muted);*/
 }
 
 /* Footer band — caption tier at the 0.6875em floor. */
@@ -616,14 +616,15 @@
     padding: 0.8em 1.1em;
     background: var(--apinv-surface-2);
     border-top: var(--apinv-hair) solid var(--apinv-border);
-    font-size: 0.6875em;
+    font-size: 0.75em;
     font-weight: 400;
     color: var(--apinv-muted);
 }
 
     .vas-apinv-block-foot b {
-        color: var(--apinv-text);
+        color: var(--apinv-primary);
         font-weight: 700;
+        font-size: 1.2em;
     }
 
 /* Text pager inside a footer band. Buttons keep the pill radius but stay at
@@ -676,14 +677,14 @@
 }
 
 .vas-apinv-kv-k {
-    font-size: 0.75em;
+    font-size: 0.8em;
     font-weight: 400;
-    color: var(--apinv-text-2);
+    /*color: var(--apinv-text-2);*/
 }
 
 .vas-apinv-kv-v {
-    font-size: 0.8125em;
-    font-weight: 400;
+    font-size: 0.8725em;
+    font-weight: 700;
     color: var(--apinv-text);
     text-align: right;
     min-width: 0;
@@ -717,7 +718,7 @@
 
     /* Table header token — 0.6875em Medium, capitalize (no uppercase eyebrow). */
     .vas-apinv-li-head span {
-        font-size: 0.6875em;
+        font-size: 0.7875em;
         font-weight: 500;
         color: var(--apinv-text-2);
         text-transform: capitalize;
@@ -742,8 +743,8 @@
 
 /* Row title token — 0.875em; meta 0.75em Regular. */
 .vas-apinv-desc .vas-apinv-d {
-    font-size: 0.875em;
-    font-weight: 400;
+    font-size: 0.9375em;
+    font-weight: 700;
     color: var(--apinv-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -763,21 +764,21 @@
 .vas-apinv-qty,
 .vas-apinv-rate,
 .vas-apinv-tax {
-    font-size: 0.75em;
+    font-size: 0.8em;
     font-weight: 400;
     color: var(--apinv-text-2);
     text-align: right;
 }
 
 .vas-apinv-uom {
-    font-size: 0.75em;
+    font-size: 0.8em;
     font-weight: 400;
     color: var(--apinv-text-2);
 }
 
 /* Trailing amount token — 0.9375em. */
 .vas-apinv-amt {
-    font-size: 0.9375em;
+    font-size: 0.8em;
     font-weight: 400;
     color: var(--apinv-text);
     text-align: right;
@@ -809,13 +810,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 1em;
-    padding: 0.6em 0;
+    padding: 0.4em 0;
 }
 
 .vas-apinv-trow-k {
     font-size: 0.75em;
     font-weight: 400;
-    color: var(--apinv-text-2);
+    /*color: var(--apinv-text-2);*/
 }
 
 .vas-apinv-trow-v {
@@ -883,13 +884,13 @@
 }
 
     .vas-apinv-wh-grid .k {
-        font-size: 0.6875em;
+        font-size: 0.7875em;
         font-weight: 400;
-        color: var(--apinv-muted);
+        /*color: var(--apinv-muted);*/
     }
 
     .vas-apinv-wh-grid .v {
-        font-size: 0.8125em;
+        font-size: 0.8725em;
         font-weight: 700;
         color: var(--apinv-text);
         margin-top: 0.4em;
@@ -1030,9 +1031,9 @@
 }
 
     .vas-apinv-t4-head span {
-        font-size: 0.6875em;
+        font-size: 0.7875em;
         font-weight: 500;
-        color: var(--apinv-text-2);
+        /*color: var(--apinv-text-2);*/
         text-transform: capitalize;
     }
 
@@ -1067,11 +1068,11 @@
     .vas-apinv-t4-row .c {
         font-size: 1em;
         font-weight: 400;
-        color: var(--apinv-text-2);
+        /*color: var(--apinv-text-2);*/
     }
 
     .vas-apinv-t4-row .amt {
-        font-size: calc(0.9375em / 0.75);
+        font-size: calc(0.875em / 0.75);
         font-weight: 400;
         color: var(--apinv-text);
     }
@@ -1144,9 +1145,9 @@
         }
 
         .vas-apinv-vstep .c .mt {
-            font-size: 0.6875em;
+            font-size: 0.7875em;
             font-weight: 400;
-            color: var(--apinv-muted);
+            /*color: var(--apinv-muted);*/
             margin-top: 0.2em;
         }
 
@@ -1291,7 +1292,7 @@
 }
 
     .vas-apinv-je-head span {
-        font-size: 0.6875em;
+        font-size: 0.7875em;
         font-weight: 500;
         color: var(--apinv-text-2);
         text-transform: capitalize;
@@ -1362,7 +1363,7 @@
     .vas-apinv-je-total .num {
         font-size: 1em;
         font-weight: 700;
-        color: var(--apinv-text);
+        color: var(--apinv-primary);
         text-align: right;
     }
 
