@@ -240,14 +240,27 @@
             return measured > 0 ? measured : widgetRowHeight;
         }
 
+        function measureWidgetRowGap() {
+            if (!$body || !$body[0] || !window.getComputedStyle) {
+                return 0;
+            }
+
+            var bodyStyle = window.getComputedStyle($body[0]);
+            var measuredGap = parseFloat(bodyStyle.rowGap || bodyStyle.gap);
+
+            return isNaN(measuredGap) ? 0 : measuredGap;
+        }
+
         function updateAdaptivePageSize() {
             if (!$body || !$body[0]) {
                 return;
             }
 
+            var rowHeight = measureWidgetRowHeight();
+            var rowGap = measureWidgetRowGap();
             var nextPageSize = Math.max(
                 widgetMinimumRows,
-                Math.floor($body[0].clientHeight / measureWidgetRowHeight())
+                Math.floor(($body[0].clientHeight + rowGap) / (rowHeight + rowGap))
             );
 
             if (nextPageSize === pageSize) {
