@@ -847,7 +847,10 @@
         }
 
         function formatAllocAmount(value, currencySymbol, stdPrecision) {
-            var amount = Number(value || 0).toLocaleString(
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+
+            var amount = Math.abs(numericValue).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits: stdPrecision,
@@ -857,8 +860,8 @@
 
             return escapeHtml(
                 currencySymbol
-                    ? currencySymbol + amount
-                    : amount
+                    ? sign + currencySymbol + amount
+                    : sign + amount
             );
         }
 
@@ -957,16 +960,18 @@
                 precision = 2;
             }
 
-            var amount = numericValue.toLocaleString(window.navigator.language, {
+            var sign = numericValue < 0 ? '-' : '';
+
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
 
             if (currencySymbol) {
-                return currencySymbol + amount;
+                return sign + currencySymbol + amount;
             }
 
-            return currencyISO ? amount + ' ' + currencyISO : amount;
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
         }
 
         function formatWidgetCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {

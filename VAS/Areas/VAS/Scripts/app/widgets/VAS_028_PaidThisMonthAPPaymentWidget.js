@@ -347,7 +347,11 @@
                 amount = Number(data.value);
             }
 
-            if (isNaN(amount) || amount <= 0) {
+            /*
+             * AP amounts are outflows and arrive negative, so only a
+             * missing or zero total means there is nothing to show.
+             */
+            if (isNaN(amount) || amount === 0) {
                 setNoData();
                 return;
             }
@@ -1106,7 +1110,17 @@
         ) {
             var numericValue = Number(value || 0);
 
-            var amount = numericValue.toLocaleString(
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0
+                ? '-'
+                : '';
+
+            var amount = Math.abs(
+                numericValue
+            ).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits: precision,
@@ -1115,12 +1129,12 @@
             );
 
             if (symbol) {
-                return symbol + amount;
+                return sign + symbol + amount;
             }
 
             return iso
-                ? amount + ' ' + iso
-                : amount;
+                ? sign + amount + ' ' + iso
+                : sign + amount;
         }
 
         function formatDate(value) {

@@ -228,8 +228,17 @@
             var stdPrecision =
                 normalizePrecision(precision);
 
-            var numberText = Number(
-                value || 0
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign =
+                numericValue < 0 ? '-' : '';
+
+            var numberText = Math.abs(
+                numericValue
             ).toLocaleString(
                 window.navigator.language,
                 {
@@ -241,7 +250,7 @@
                 }
             );
 
-            return (
+            return sign + (
                 symbol ? symbol : ''
             ) + numberText;
         }

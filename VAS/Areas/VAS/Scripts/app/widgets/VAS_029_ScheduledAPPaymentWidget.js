@@ -211,7 +211,11 @@
                 totalAmount = Number(data.scheduledAmountThisWeek);
             }
 
-            if (isNaN(totalAmount) || totalAmount <= 0) {
+            /*
+             * AP amounts are outflows and arrive negative, so only a
+             * missing or zero total means there is nothing to show.
+             */
+            if (isNaN(totalAmount) || totalAmount === 0) {
                 setNoData();
                 return;
             }
@@ -368,7 +372,7 @@
                     '<td class="vas-scheduled-ap-payment-td-method" title="' + escapeHtml(paymentMethodName) + '">' +
                     '<span class="vas-scheduled-ap-payment-truncate">' + escapeHtml(paymentMethodName) + '</span>' +
                     '</td>' +
-                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml(sign + (sym ? sym : '') + amountText) + '">' + amountHtml + '</td>' +
                     '</tr>'
                 );
             }

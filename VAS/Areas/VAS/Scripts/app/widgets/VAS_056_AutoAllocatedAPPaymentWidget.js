@@ -445,9 +445,20 @@
                     currencyCode ||
                     "";
 
-                var amountText = formatAmount(row.amount);
+                var amountValue = Number(row.amount || 0);
 
-                var amountHtml = "";
+                if (isNaN(amountValue)) {
+                    amountValue = 0;
+                }
+
+                var amountSign =
+                    amountValue < 0 ? "-" : "";
+
+                var amountText = formatAmount(
+                    Math.abs(amountValue)
+                );
+
+                var amountHtml = amountSign;
 
                 if (currencySymbol) {
                     amountHtml +=
@@ -464,16 +475,30 @@
                 var partialTitle = "";
 
                 if (row.isPartiallyAllocated) {
+                    var unallocatedValue = Number(
+                        row.unallocatedAmt || 0
+                    );
+
+                    if (isNaN(unallocatedValue)) {
+                        unallocatedValue = 0;
+                    }
+
+                    var unallocatedSign =
+                        unallocatedValue < 0 ? "-" : "";
+
                     var unallocatedText = formatAmount(
-                        row.unallocatedAmt
+                        Math.abs(unallocatedValue)
                     );
 
                     partialTitle =
+                        unallocatedSign +
                         (
                             currencySymbol
-                                ? currencySymbol + " "
+                                ? currencySymbol
                                 : ""
                         ) + unallocatedText;
+
+                    partialHtml += unallocatedSign;
 
                     if (currencySymbol) {
                         partialHtml +=
@@ -554,9 +579,10 @@
                     classPrefix +
                     'td-amount" title="' +
                     escapeHtml(
+                        amountSign +
                         (
                             currencySymbol
-                                ? currencySymbol + " "
+                                ? currencySymbol
                                 : ""
                         ) + amountText
                     ) +

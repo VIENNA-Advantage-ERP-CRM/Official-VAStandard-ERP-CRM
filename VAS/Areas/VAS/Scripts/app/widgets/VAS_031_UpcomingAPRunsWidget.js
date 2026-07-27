@@ -426,7 +426,11 @@
                 precision = 2;
             }
 
-            amountText = numericValue.toLocaleString(
+            var sign = numericValue < 0 ? '-' : '';
+
+            amountText = Math.abs(
+                numericValue
+            ).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits: precision,
@@ -440,8 +444,8 @@
                 '';
 
             return currencyText
-                ? currencyText + ' ' + amountText
-                : amountText;
+                ? sign + currencyText + amountText
+                : sign + amountText;
         }
 
         function formatWidgetCurrencyAmount(

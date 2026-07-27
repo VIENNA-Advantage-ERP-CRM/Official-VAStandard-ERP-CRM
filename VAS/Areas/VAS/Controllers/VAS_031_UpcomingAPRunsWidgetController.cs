@@ -327,12 +327,13 @@ InvoiceOpenBalance AS
         CASE
             WHEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -355,12 +356,13 @@ UnpaidSchedule AS
         CASE
             WHEN
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(InvoicePaySchedule.DueAmt, 0)) *
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -375,7 +377,7 @@ UnpaidSchedule AS
     AND COALESCE(InvoicePaySchedule.VA009_IsPaid, 'N') = 'N'
     AND COALESCE(InvoicePaySchedule.C_Payment_ID, 0) = 0
     AND COALESCE(InvoicePaySchedule.C_CashLine_ID, 0) = 0
-    AND COALESCE(InvoicePaySchedule.DueAmt, 0) > 0
+    AND COALESCE(InvoicePaySchedule.DueAmt, 0) <> 0
     AND NOT EXISTS
     (
         SELECT 1
@@ -408,10 +410,10 @@ UpcomingInvoices AS
         UnpaidSchedule.ScheduleOpenAmount,
         InvoiceOpenBalance.InvoiceOpenAmount,
         CASE
-            WHEN UnpaidSchedule.ScheduleOpenAmount <
-                 InvoiceOpenBalance.InvoiceOpenAmount
-            THEN UnpaidSchedule.ScheduleOpenAmount
-            ELSE InvoiceOpenBalance.InvoiceOpenAmount
+            WHEN ABS(UnpaidSchedule.ScheduleOpenAmount) <
+             ABS(InvoiceOpenBalance.InvoiceOpenAmount)
+        THEN UnpaidSchedule.ScheduleOpenAmount
+        ELSE InvoiceOpenBalance.InvoiceOpenAmount
         END AS OpenAmount
     FROM SecuredInvoice Invoice
     INNER JOIN C_BPartner BusinessPartner ON
@@ -421,12 +423,12 @@ UpcomingInvoices AS
     INNER JOIN UnpaidSchedule UnpaidSchedule ON
     (
         UnpaidSchedule.C_Invoice_ID = Invoice.C_Invoice_ID
-        AND UnpaidSchedule.ScheduleOpenAmount > 0
+        AND UnpaidSchedule.ScheduleOpenAmount <> 0
     )
     INNER JOIN InvoiceOpenBalance InvoiceOpenBalance ON
     (
         InvoiceOpenBalance.C_Invoice_ID = Invoice.C_Invoice_ID
-        AND InvoiceOpenBalance.InvoiceOpenAmount > 0
+        AND InvoiceOpenBalance.InvoiceOpenAmount <> 0
     )
     LEFT OUTER JOIN C_Currency Currency ON
     (
@@ -456,7 +458,7 @@ SELECT
     COUNT(1) AS PaymentCount,
     SUM(OpenAmount) AS Amount
 FROM UpcomingInvoices
-WHERE OpenAmount > 0
+WHERE OpenAmount <> 0
 GROUP BY
     DueDate,
     C_BPartner_ID,
@@ -833,40 +835,15 @@ InvoiceOpenBalance AS
         CASE
             WHEN
             (
-                COALESCE
-                (
-                    Invoice.GrandTotal,
-                    0
-                )
-                -
-                ABS
-                (
-                    COALESCE
-                    (
-                        InvoiceAllocation.AllocatedAmt,
-                        0
-                    )
-                )
+                ABS(COALESCE(Invoice.GrandTotal, 0))
+                - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             ) > 0
-
             THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE
-                (
-                    Invoice.GrandTotal,
-                    0
-                )
-                -
-                ABS
-                (
-                    COALESCE
-                    (
-                        InvoiceAllocation.AllocatedAmt,
-                        0
-                    )
-                )
+                ABS(COALESCE(Invoice.GrandTotal, 0))
+                - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             )
-
             ELSE 0
         END AS InvoiceOpenAmount
 
@@ -919,40 +896,15 @@ UnpaidSchedule AS
         CASE
             WHEN
             (
-                COALESCE
-                (
-                    InvoicePaySchedule.DueAmt,
-                    0
-                )
-                -
-                ABS
-                (
-                    COALESCE
-                    (
-                        ScheduleAllocation.AllocatedAmt,
-                        0
-                    )
-                )
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
+                - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             ) > 0
-
             THEN
+            SIGN(COALESCE(InvoicePaySchedule.DueAmt, 0)) *
             (
-                COALESCE
-                (
-                    InvoicePaySchedule.DueAmt,
-                    0
-                )
-                -
-                ABS
-                (
-                    COALESCE
-                    (
-                        ScheduleAllocation.AllocatedAmt,
-                        0
-                    )
-                )
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
+                - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             )
-
             ELSE 0
         END AS ScheduleOpenAmount
 
@@ -976,7 +928,7 @@ UnpaidSchedule AS
     (
         InvoicePaySchedule.DueAmt,
         0
-    ) > 0
+    ) <> 0
 
     AND COALESCE
     (
@@ -1041,11 +993,9 @@ SELECT
     UnpaidSchedule.AllocatedAmt AS ScheduleAllocatedAmount,
 
     CASE
-        WHEN UnpaidSchedule.ScheduleOpenAmount <
-             InvoiceOpenBalance.InvoiceOpenAmount
-
+        WHEN ABS(UnpaidSchedule.ScheduleOpenAmount) <
+             ABS(InvoiceOpenBalance.InvoiceOpenAmount)
         THEN UnpaidSchedule.ScheduleOpenAmount
-
         ELSE InvoiceOpenBalance.InvoiceOpenAmount
     END AS ScheduleOpenAmount,
 
@@ -1103,11 +1053,9 @@ SELECT
     Invoice.GrandTotal,
 
     CASE
-        WHEN UnpaidSchedule.ScheduleOpenAmount <
-             InvoiceOpenBalance.InvoiceOpenAmount
-
+        WHEN ABS(UnpaidSchedule.ScheduleOpenAmount) <
+             ABS(InvoiceOpenBalance.InvoiceOpenAmount)
         THEN UnpaidSchedule.ScheduleOpenAmount
-
         ELSE InvoiceOpenBalance.InvoiceOpenAmount
     END AS OpenAmount,
 
@@ -1130,7 +1078,7 @@ INNER JOIN UnpaidSchedule UnpaidSchedule ON
     UnpaidSchedule.C_Invoice_ID =
         Invoice.C_Invoice_ID
 
-    AND UnpaidSchedule.ScheduleOpenAmount > 0
+    AND UnpaidSchedule.ScheduleOpenAmount <> 0
 )
 
 INNER JOIN InvoiceOpenBalance InvoiceOpenBalance ON
@@ -1138,7 +1086,7 @@ INNER JOIN InvoiceOpenBalance InvoiceOpenBalance ON
     InvoiceOpenBalance.C_Invoice_ID =
         Invoice.C_Invoice_ID
 
-    AND InvoiceOpenBalance.InvoiceOpenAmount > 0
+    AND InvoiceOpenBalance.InvoiceOpenAmount <> 0
 )
 
 INNER JOIN SelectedPeriod SelectedPeriod ON
@@ -3543,8 +3491,8 @@ LIMIT 1";
             string sql = @"
 SELECT
     CASE
-        WHEN ScheduleBalance.ScheduleOpenAmount <
-             InvoiceBalance.InvoiceOpenAmount
+        WHEN ABS(ScheduleBalance.ScheduleOpenAmount) <
+             ABS(InvoiceBalance.InvoiceOpenAmount)
         THEN ScheduleBalance.ScheduleOpenAmount
         ELSE InvoiceBalance.InvoiceOpenAmount
     END AS OpenAmount
@@ -3554,12 +3502,13 @@ FROM
         CASE
             WHEN
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(InvoicePaySchedule.DueAmt, 0)) *
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -3597,12 +3546,13 @@ CROSS JOIN
         CASE
             WHEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -3652,38 +3602,17 @@ CROSS JOIN
 SELECT
     CASE
         WHEN
-        (
-            COALESCE
             (
-                Invoice.GrandTotal,
-                0
-            ) -
-            ABS
+                ABS(COALESCE(Invoice.GrandTotal, 0))
+                - ABS(COALESCE(Allocation.AllocatedAmt, 0))
+            ) > 0
+            THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE
-                (
-                    Allocation.AllocatedAmt,
-                    0
-                )
+                ABS(COALESCE(Invoice.GrandTotal, 0))
+                - ABS(COALESCE(Allocation.AllocatedAmt, 0))
             )
-        ) > 0
-        THEN
-        (
-            COALESCE
-            (
-                Invoice.GrandTotal,
-                0
-            ) -
-            ABS
-            (
-                COALESCE
-                (
-                    Allocation.AllocatedAmt,
-                    0
-                )
-            )
-        )
-        ELSE 0
+            ELSE 0
     END AS OpenAmount
 
 FROM C_Invoice Invoice

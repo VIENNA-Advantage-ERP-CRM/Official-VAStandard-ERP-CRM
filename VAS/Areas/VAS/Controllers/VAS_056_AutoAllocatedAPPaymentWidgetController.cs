@@ -768,15 +768,26 @@ namespace VAS.Controllers
                         precision
                     );
 
-                    decimal allocatedAmount = Math.Max(
-                        payAmount - unallocatedAmount,
+                    /*
+                     * AP amounts are outflows and arrive negative, so the
+                     * allocated part is derived from the magnitudes and
+                     * then carries the payment's own sign.
+                     */
+                    decimal allocatedMagnitude = Math.Max(
+                        Math.Abs(payAmount) -
+                        Math.Abs(unallocatedAmount),
                         0
                     );
 
+                    decimal allocatedAmount =
+                        payAmount < 0
+                            ? -allocatedMagnitude
+                            : allocatedMagnitude;
+
                     bool isPartiallyAllocated =
                         isAllocated != "Y" &&
-                        allocatedAmount > 0 &&
-                        unallocatedAmount > 0;
+                        allocatedAmount != 0 &&
+                        unallocatedAmount != 0;
 
                     rows.Add(
                         new

@@ -782,7 +782,7 @@ ScheduledData AS
     (
         InvoicePaySchedule.DueAmt,
         0
-    ) > 0
+    ) <> 0
 )
 SELECT
     MAX
@@ -1131,7 +1131,7 @@ ScheduledRowsData AS
     (
         InvoicePaySchedule.DueAmt,
         0
-    ) > 0
+    ) <> 0
 ),
 SummaryData AS
 (

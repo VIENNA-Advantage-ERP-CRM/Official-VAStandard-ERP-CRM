@@ -592,7 +592,7 @@
 }
 
 .vas-bounced-ap-payment-currency-inline {
-    margin-inline-end: 0.2em;
+    margin-inline-end: 0;
 }
 
 .vas-bounced-ap-payment-status-chip {

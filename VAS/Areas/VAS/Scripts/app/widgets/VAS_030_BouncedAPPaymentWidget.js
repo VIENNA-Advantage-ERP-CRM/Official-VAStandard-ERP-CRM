@@ -1185,20 +1185,30 @@
                         accountNo: accountNo
                     });
 
+                var amountValue = Number(amount || 0);
+
+                if (isNaN(amountValue)) {
+                    amountValue = 0;
+                }
+
+                var amountSign =
+                    amountValue < 0 ? '-' : '';
+
                 var amountText =
                     formatAmountWithPrecision(
-                        amount,
+                        Math.abs(amountValue),
                         precision
                     );
 
                 var amountHtml =
                     currencySymbol
-                        ? '<span class="' +
+                        ? amountSign +
+                        '<span class="' +
                         'vas-bounced-ap-payment-currency-inline">' +
                         escapeHtml(currencySymbol) +
-                        '</span> ' +
+                        '</span>' +
                         escapeHtml(amountText)
-                        : escapeHtml(amountText);
+                        : escapeHtml(amountSign + amountText);
 
                 var statusHtml =
                     status
@@ -1270,9 +1280,10 @@
                     'class="vas-bounced-ap-payment-td-amount" ' +
                     'title="' +
                     escapeHtml(
+                        amountSign +
                         (
                             currencySymbol
-                                ? currencySymbol + ' '
+                                ? currencySymbol
                                 : ''
                         ) +
                         amountText

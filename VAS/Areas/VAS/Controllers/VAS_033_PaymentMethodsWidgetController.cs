@@ -220,11 +220,16 @@ namespace VAS.Controllers
 
                     decimal percentage = 0;
 
-                    if (totalAmount > 0)
+                    /*
+                     * AP amounts are outflows and arrive negative, so the
+                     * share is taken from the magnitudes and only a zero
+                     * total leaves the percentage at zero.
+                     */
+                    if (totalAmount != 0)
                     {
                         percentage = decimal.Round(
-                            row.PaymentAmount * 100M /
-                            totalAmount,
+                            Math.Abs(row.PaymentAmount) * 100M /
+                            Math.Abs(totalAmount),
                             2,
                             MidpointRounding.AwayFromZero
                         );
