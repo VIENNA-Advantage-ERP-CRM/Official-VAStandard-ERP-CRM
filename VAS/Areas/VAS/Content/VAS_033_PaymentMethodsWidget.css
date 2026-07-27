@@ -606,3 +606,64 @@ html[dir="rtl"] .vas-payment-methods-page-text {
 html[dir="rtl"] .vas-payment-methods-amount {
     unicode-bidi: plaintext;
 }
+
+/* --- RTL: the rest of the value surfaces -----------------------------------
+   The amount columns were only the visible half of this. Any string that
+   mixes digits with a neutral character -- the minus in "-ID1.104B", the
+   currency code, a trailing full stop, the en dash in "1-4 of 30" -- gets
+   that character dragged to the far end of an RTL paragraph. Rather than
+   chase one class at a time, hand every cell, summary tile and caption back
+   to its own script: `plaintext` reads the first strong character and lays
+   the string out accordingly, so Latin-and-digits stays LTR and translated
+   text stays RTL. */
+html[dir="rtl"] .vas-payment-methods-root td,
+html[dir="rtl"] .vas-payment-methods-root th,
+html[dir="rtl"] .vas-payment-methods-percent,
+html[dir="rtl"] .vas-payment-methods-showing {
+    unicode-bidi: plaintext;
+}
+
+/* Card rows are divs here rather than a table, so the same treatment has to
+   name them directly. */
+html[dir="rtl"] .vas-payment-methods-name,
+html[dir="rtl"] .vas-payment-methods-metrics,
+html[dir="rtl"] .vas-payment-methods-foot-text,
+html[dir="rtl"] .vas-payment-methods-tooltip {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: the truncation spans inside the cells ----------------------------
+   Cell text is wrapped in a `display: block` span so it can ellipsis, and a
+   block is its own bidi paragraph -- which means the rules above stopped at
+   the cell and never reached the string that actually renders. Repeat the
+   treatment for whatever sits inside. */
+html[dir="rtl"] .vas-payment-methods-root td *,
+html[dir="rtl"] .vas-payment-methods-root th *,
+html[dir="rtl"] .vas-payment-methods-name *,
+html[dir="rtl"] .vas-payment-methods-metrics *,
+html[dir="rtl"] .vas-payment-methods-amount *,
+html[dir="rtl"] .vas-payment-methods-foot-text * {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: amounts ----------------------------------------------------------
+   Money is not prose. "-ID743,000.000" is one left-to-right token, and
+   leaving it to the bidi heuristics is what kept pushing the minus to the
+   far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
+   inherits into the ellipsis spans the cells wrap their text in, which a
+   rule on the cell alone never reached. The column then flips to the
+   inline-start edge the way the rest of the RTL layout does. */
+html[dir="rtl"] .vas-payment-methods-amount {
+    direction: ltr;
+    text-align: left !important;
+}
+
+/* The earlier `plaintext` rules cover prose, but on an amount they would win
+   over the `direction` above -- plaintext derives direction from content and
+   ignores the declared one. Take the amounts back out of that scheme, cells
+   and ellipsis spans alike. */
+html[dir="rtl"] .vas-payment-methods-amount,
+html[dir="rtl"] .vas-payment-methods-amount * {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
