@@ -1,0 +1,76 @@
+/* Backorders Widget (VAS_142) - 2x1 Delivery Order KPI tile. Display-only
+   (no click, no modal). Widget size: 2 columns x 1 row (grid owns the outer
+   size). Internals in em on the dashboard-width lever; borders/radii/shadows
+   in px. Glass surface (not a tinted danger border) per the widget's own
+   doc spec; the value text itself carries the danger color. */
+
+.MPC-bko-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-bko-root,
+.MPC-bko-root * {
+    box-sizing: border-box;
+}
+
+.MPC-bko-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    text-align: left;
+    padding: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    backdrop-filter: blur(10px);
+    font-family: Roboto, sans-serif;
+    /* Fully dynamic root anchor: font-size scales with the dashboard width with
+       NO px ceiling, so the value/meta/title (all em) keep growing with the card
+       at any screen resolution instead of freezing at a fixed px cap. */
+    font-size: calc(var(--dash-inline-size, 100vw) * .014);
+}
+
+.MPC-bko-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.3;
+    font-size: calc(var(--dash-inline-size, 100vw) * .011375);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-bko-body {
+    margin-top: auto;
+}
+
+.MPC-bko-value {
+    font-size: 1.75em;
+    font-weight: 500;
+    line-height: 1.1;
+    margin-top: 0.25em;
+    color: #D14545;
+}
+
+/* Loading state: neutral color, no red flash before real data arrives. */
+.MPC-bko-value.MPC-bko-neutral {
+    color: #102C3F;
+}
+
+.MPC-bko-meta {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.3;
+    margin-top: 0.25em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

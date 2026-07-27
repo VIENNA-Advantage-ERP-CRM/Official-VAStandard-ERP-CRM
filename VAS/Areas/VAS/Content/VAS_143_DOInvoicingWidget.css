@@ -1,0 +1,565 @@
+/* DO Invoicing Status (VAS_143) - 3x2 period-scoped (Month/Quarter/FY)
+   invoicing summary for customer delivery orders: 3 stat blocks, a coverage
+   bar and a period switcher, with an adaptive-page-size drill-down modal.
+   Widget size: 3 columns x 2 rows (the dashboard grid owns the outer size).
+   Internals in em on the widget root anchor; modal is fixed rem/px chrome;
+   borders/radii/shadows px. Stat colors: Raised blue, Completed green,
+   Open amber. */
+
+.MPC-dis-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+.MPC-dis-root,
+.MPC-dis-root *,
+.MPC-dis-overlay,
+.MPC-dis-overlay * {
+    box-sizing: border-box;
+}
+
+/* ---- Widget root (glass surface) ---- */
+.MPC-dis-card {
+    position: relative;
+    font-family: Roboto, sans-serif;
+    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
+       not a JS-measured container width - the old clamp's fixed 24px ceiling and
+       its dependency on --dash-inline-size froze the header/footer text from
+       growing past a point. max()+rem floor guards very narrow windows; no
+       ceiling above it, so text keeps scaling at any resolution. This anchor only
+       affects the header/footer em sizes below - the 3 stat blocks have their
+       own independent per-box cqw scaling and are unaffected by this value. */
+    font-size: max(0.9rem, 1.3vw);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.875em;
+}
+
+/* ---- Header ---- */
+.MPC-dis-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex-shrink: 0;
+}
+
+.MPC-dis-ico {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
+    background: #EAF8FF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.MPC-dis-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-dis-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.MPC-dis-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    font-size: .8125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-subtitle {
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.3;
+    margin-top: .125em;
+    font-size: .6875em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---- Stat blocks ---- */
+.MPC-dis-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    /* Single row that FILLS the body height (not auto), so each box stretches to
+       the full available height and grows with the widget. */
+    grid-template-rows: 1fr;
+    gap: 0.75em;
+    margin-top: 0.75em;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.MPC-dis-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.15em;
+    text-align: left;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0.25em 0.5em;
+    cursor: pointer;
+    font-family: inherit;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    /* The box is its OWN query container. inline-size (width only) is used on
+       purpose: it never collapses (unlike container-type:size, which needs a
+       definite height and here resolved to ~0, pinning the text to its floor).
+       The label/value/meta below scale with THIS box's width via cqw, so they
+       grow as the widget/box grows - not tied to the shared --dash-inline-size. */
+    container-type: inline-size;
+}
+
+.MPC-dis-stat:hover,
+.MPC-dis-stat:focus-visible {
+    background: rgba(234, 248, 255, 0.7);
+}
+
+.MPC-dis-stat:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: -2px;
+}
+
+.MPC-dis-stat.MPC-dis-divider {
+    border-left: 1px solid #EDF2F6;
+    border-radius: 0 8px 8px 0;
+}
+
+.MPC-dis-stat-label {
+    /* cqw = 1% of THIS box's width; all three lines grow with the box. Bounds
+       are em (no px), so text never shrinks below the old size. */
+    font-size: clamp(0.75em, 11cqw, 1.15em);
+    font-weight: 400;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.MPC-dis-stat-value {
+    font-size: clamp(1.5em, 30cqw, 3.5em);
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.MPC-dis-v-raised { color: #106AB0; }
+.MPC-dis-v-completed { color: #0B6B45; }
+.MPC-dis-v-open { color: #9A6500; }
+
+.MPC-dis-stat-meta {
+    font-size: clamp(0.65em, 9cqw, 1em);
+    font-weight: 400;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+/* ---- Coverage ---- */
+.MPC-dis-coverage {
+    margin-top: 0.375em;
+    flex-shrink: 0;
+}
+
+.MPC-dis-cov-line1 {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5em;
+}
+
+.MPC-dis-cov-label {
+    font-size: 0.6875em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-cov-pct {
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+}
+
+.MPC-dis-cov-track {
+    margin-top: 0.25em;
+    width: 100%;
+    height: 0.4em;
+    border-radius: 999px;
+    background: #EDF2F6;
+    overflow: hidden;
+}
+
+.MPC-dis-cov-fill {
+    height: 100%;
+    background: #0083DA;
+    width: 0%;
+    transition: width 200ms ease;
+}
+
+/* ---- Footer / period switcher ---- */
+.MPC-dis-foot {
+    margin-top: 0.5em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+}
+
+.MPC-dis-foot-helper {
+    font-size: 0.8125em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.MPC-dis-switcher {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    flex-shrink: 0;
+}
+
+.MPC-dis-chev {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 6px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.MPC-dis-chev svg {
+    width: .875em;
+    height: .875em;
+}
+
+.MPC-dis-chev:hover:not(:disabled) {
+    background: #EAF4FD;
+}
+
+.MPC-dis-chev:disabled {
+    background: rgba(255, 255, 255, 0.6);
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.MPC-dis-period-labels {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.MPC-dis-period-btn {
+    font-family: inherit;
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #748494;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+}
+
+.MPC-dis-period-btn.MPC-dis-period-active {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* ---- Modal (Onfinity Panel Foundation) ---- */
+.MPC-dis-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    background: rgba(16, 44, 63, 0.40);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-dis-overlay.MPC-dis-open {
+    display: flex;
+}
+
+.MPC-dis-modal {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(15, 61, 97, 0.22);
+    /* Width is em-based so the box scales with the modal's own font-size anchor;
+       a fixed px width let the 5 nowrap columns overflow when the font scaled up. */
+    width: min(52em, calc(100vw - 2em));
+    max-width: calc(100vw - 2em);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0117), 30px);
+}
+
+@media (max-width: 640px) {
+    .MPC-dis-modal {
+        width: calc(100vw - 24px);
+        height: min(72vh, 560px);
+    }
+
+    .MPC-dis-col-customer {
+        display: none;
+    }
+
+    .MPC-dis-grid {
+        grid-template-columns: 1fr 1fr 5.5em 5.5em !important;
+    }
+}
+
+.MPC-dis-m-head {
+    height: 3em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1em;
+    border-bottom: 1px solid #1F83FF;
+}
+
+.MPC-dis-m-titlegroup {
+    min-width: 0;
+}
+
+.MPC-dis-m-title {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-m-subtitle {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #748494;
+    margin-top: 0.125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-m-close {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #141414;
+    transition: background 0.15s ease;
+}
+
+.MPC-dis-m-close:hover {
+    background: #EEF6FF;
+    color: #0083DA;
+}
+
+.MPC-dis-m-close svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.MPC-dis-m-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.5em 1em;
+}
+
+.MPC-dis-m-state {
+    padding: 2.5em 1em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: #748494;
+}
+
+/* Invoice | Against | Customer | Amount | Status */
+.MPC-dis-grid {
+    display: grid;
+    grid-template-columns: 1fr 0.9fr 1.1fr 0.9fr 5.5em;
+    /* One header track + 5 fixed data tracks, always reserved: the pop-up keeps
+       the size of a full 5-row page even when a page has fewer rows (empty
+       tracks stay blank instead of shrinking the modal). The 2.9em track height
+       fits the two-line Invoice/Against cells (number + date) without clipping. */
+    grid-template-rows: auto repeat(5, 2.9em);
+    gap: 0.625em;
+}
+
+.MPC-dis-gh {
+    font-size: 0.6875em;
+    font-weight: 400;
+    color: #748494;
+    text-transform: capitalize;
+    padding: 0.4375em 0.375em;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+.MPC-dis-align-right {
+    text-align: right;
+}
+
+.MPC-dis-gc {
+    font-size: 0.75em;
+    padding: 0.4375em 0.375em;
+    border-bottom: 1px solid #EDF2F6;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.MPC-dis-cell-primary {
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-cell-body {
+    font-weight: 400;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-cell-sub {
+    font-size: 0.9166em;
+    font-weight: 400;
+    color: #748494;
+    margin-top: 0.125em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-cell-amount {
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.MPC-dis-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.125em 0.5em;
+    font-size: 0.8333em;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.MPC-dis-pill-completed { background: #E4F6EC; color: #0B6B45; }
+.MPC-dis-pill-raised { background: #DFF1FF; color: #106AB0; }
+.MPC-dis-pill-partial { background: #FFF4DE; color: #9A6500; }
+
+.MPC-dis-m-foot {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    padding: 0.625em 1.125em;
+    border-top: 1px solid #E4EDF4;
+    background: #FFFFFF;
+}
+
+.MPC-dis-m-foot-helper {
+    font-weight: 400;
+    font-size: 0.8em;
+    color: #748494;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dis-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-shrink: 0;
+}
+
+.MPC-dis-pgtext {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.MPC-dis-pgbtn {
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 0.4em;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.MPC-dis-pgbtn svg {
+    width: 0.65em;
+    height: 0.65em;
+}
+
+.MPC-dis-pgbtn:hover:not(:disabled) {
+    background: #EAF4FD;
+}
+
+.MPC-dis-pgbtn:disabled {
+    background: rgba(255, 255, 255, 0.6);
+    color: #B8C6D2;
+    cursor: default;
+}
