@@ -124,6 +124,7 @@
         var dialogRowHeightEstimate = 44;
         var dialogMinimumRows = 3;
         var adaptiveAdjustCount = 0;
+        var adaptivePaginationReady = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -240,6 +241,28 @@
                     ? $row.outerHeight()
                     : 0;
 
+            if (
+                measured <= 0 &&
+                $dialogTbody &&
+                $dialogTbody.length
+            ) {
+                var $measureRow = $(
+                    '<tr aria-hidden="true" style="visibility:hidden;">' +
+                    '<td>00 Jan 0000</td>' +
+                    '<td>000000</td>' +
+                    '<td>Vendor</td>' +
+                    '<td>Bank account</td>' +
+                    '<td>USD</td>' +
+                    '<td>0.00</td>' +
+                    '<td>0.00</td>' +
+                    '</tr>'
+                );
+
+                $dialogTbody.append($measureRow);
+                measured = $measureRow.outerHeight();
+                $measureRow.remove();
+            }
+
             return measured > 0
                 ? measured
                 : dialogRowHeightEstimate;
@@ -332,7 +355,9 @@
                 }
             }
 
-            loadRows();
+            if (adaptivePaginationReady) {
+                loadRows();
+            }
         }
 
         function setupAdaptivePagination() {
@@ -340,10 +365,29 @@
                 return;
             }
 
+            adaptivePaginationReady = false;
+            adaptiveAdjustCount = 0;
             updateAdaptivePageSize();
 
             window.setTimeout(function () {
+                if (
+                    !$dialog ||
+                    !$dialog.is(':visible') ||
+                    isDisposed
+                ) {
+                    return;
+                }
+
                 updateAdaptivePageSize();
+
+                adaptivePaginationReady = true;
+
+                if (!tabState[activeFilter].loaded) {
+                    loadRows();
+                }
+                else {
+                    updatePagerControlsForCurrentState();
+                }
             }, 0);
 
               if (
@@ -390,6 +434,8 @@
           }
 
           function teardownAdaptivePagination() {
+            adaptivePaginationReady = false;
+
             if (dialogResizeObserver) {
                   dialogResizeObserver.disconnect();
                   dialogResizeObserver = null;
@@ -487,9 +533,12 @@
                         return;
                     }
 
-                    showDialogBusy(false);
-
                     updateAdaptivePageSize();
+
+                    if (!rowsLoading) {
+                        showDialogBusy(false);
+                    }
+
                     updatePagerControlsForCurrentState();
                 }
             });
@@ -1127,13 +1176,6 @@
             updateTabCounts();
 
             setupAdaptivePagination();
-
-            if (!tabState[activeFilter].loaded) {
-                loadRows();
-            }
-            else {
-                updatePagerControlsForCurrentState();
-            }
         }
 
         function closeDialog() {

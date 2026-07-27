@@ -945,3 +945,30 @@
     text-align: left;
 }
 
+
+/* --- RTL: pagination -------------------------------------------------------
+   Switching the UI to Arabic flips the footer, which swaps the prev/next
+   buttons while their chevrons keep pointing the same way -- so the arrows
+   end up contradicting what they do. Pin the pager itself to LTR: prev stays
+   on the left, next on the right, and the page indicator keeps "1 of 35" in
+   order instead of having its leading digit pushed to the far end by the
+   bidi algorithm. `plaintext` lets a translated indicator ("1 من 35") still
+   lay itself out by its own script. */
+html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-pager {
+    direction: ltr;
+}
+
+html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-pager-text {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: money -----------------------------------------------------------
+   A formatted amount is "-ID1,800.000": the minus is a neutral character, so
+   in an RTL paragraph the bidi algorithm parks it at the far (right) end and
+   the cell reads "ID1,800.000-". `plaintext` lets each amount pick its own
+   direction from its first strong character -- LTR for a Latin currency code,
+   RTL for a translated one -- so the sign stays glued to the number. */
+html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-td-amount,
+html[dir="rtl"] .VAS-056-AutoAllocatedAPPayment-value {
+    unicode-bidi: plaintext;
+}

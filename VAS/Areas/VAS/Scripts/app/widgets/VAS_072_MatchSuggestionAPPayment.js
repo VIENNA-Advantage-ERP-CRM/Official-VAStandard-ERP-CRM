@@ -408,6 +408,30 @@
             return getContextPrecision();
         }
 
+        /**
+         * True when the session runs a right-to-left culture
+         * (Arabic/Farsi); the login sets dir on <html>.
+         */
+        function isRtl() {
+            return (
+                document.documentElement &&
+                document.documentElement.dir ===
+                "rtl"
+            );
+        }
+
+        /**
+         * Arrow that points the way the eye travels, so
+         * "payment leads to invoice" keeps agreeing with the
+         * order the two documents are laid out in. A fixed
+         * "→" contradicts itself once the UI flips.
+         */
+        function flowArrow() {
+            return isRtl()
+                ? "←"
+                : "→";
+        }
+
         function formatAmount(
             value,
             precision
@@ -721,7 +745,9 @@
 
                     '<span class="' +
                     classPrefix +
-                    'arrow">→</span>' +
+                    'arrow">' +
+                    flowArrow() +
+                    "</span>" +
 
                     '<span class="' +
                     classPrefix +
@@ -1219,7 +1245,9 @@
                     ) +
                     (
                         row.invoiceDocumentNo
-                            ? " → " +
+                            ? " " +
+                              flowArrow() +
+                              " " +
                               row.invoiceDocumentNo
                             : ""
                     )
@@ -1929,7 +1957,9 @@
                     ) +
                     (
                         detail.dueDate
-                            ? " → " +
+                            ? " " +
+                              flowArrow() +
+                              " " +
                               formatDate(detail.dueDate)
                             : ""
                     )
@@ -2737,7 +2767,9 @@
                     )
                 ) +
 
-                " →</button>" +
+                " " +
+                flowArrow() +
+                "</button>" +
 
                 "</div>" +
 
