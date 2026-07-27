@@ -2067,7 +2067,11 @@
                 )
             );
 
-            return isNaN(amount) || amount < 0
+            /*
+             * Negative (outflow) amounts are kept as entered; only an
+             * unparsable value falls back to zero.
+             */
+            return isNaN(amount)
                 ? 0
                 : amount;
         }
@@ -2091,7 +2095,11 @@
                 )
             );
 
-            return isNaN(amount) || amount < 0
+            /*
+             * Negative (outflow) amounts are kept as entered; only an
+             * unparsable value falls back to zero.
+             */
+            return isNaN(amount)
                 ? 0
                 : amount;
         }
@@ -2114,7 +2122,11 @@
                 )
             );
 
-            return isNaN(amount) || amount < 0
+            /*
+             * Negative (outflow) amounts are kept as entered; only an
+             * unparsable value falls back to zero.
+             */
+            return isNaN(amount)
                 ? 0
                 : amount;
         }
@@ -2235,6 +2247,32 @@
             factor = Math.pow(10, precision);
 
             return Math.round(numericValue * factor) / factor;
+        }
+
+        /*
+         * AP amounts are outflows and may be typed negative, so the entered
+         * figure keeps its own sign and only its magnitude is capped by the
+         * open amount.
+         */
+        function clampPopupMagnitude(value, limit) {
+            var numericValue = Number(value);
+            var numericLimit = Number(limit);
+            var magnitude;
+
+            if (isNaN(numericValue)) {
+                return 0;
+            }
+
+            if (isNaN(numericLimit)) {
+                return numericValue;
+            }
+
+            magnitude = Math.min(
+                Math.abs(numericValue),
+                Math.abs(numericLimit)
+            );
+
+            return numericValue < 0 ? -magnitude : magnitude;
         }
 
         function getPopupConversionContext(
@@ -2478,38 +2516,30 @@
                 getPayField('discountAmt').val() || 0
             );
 
-            if (isNaN(discountAmt) || discountAmt < 0) {
-                discountAmt = 0;
-            }
-
-            if (discountAmt > openAmount) {
-                discountAmt = openAmount;
-            }
+            discountAmt = clampPopupMagnitude(
+                discountAmt,
+                openAmount
+            );
 
             writeOffAmt = Number(
                 getPayField('writeOffAmt').val() || 0
             );
 
-            if (isNaN(writeOffAmt) || writeOffAmt < 0) {
-                writeOffAmt = 0;
-            }
-
-            if (
-                writeOffAmt >
-                (openAmount - discountAmt)
-            ) {
-                writeOffAmt =
-                    Math.max(
-                        0,
-                        openAmount - discountAmt
-                    );
-            }
+            writeOffAmt = clampPopupMagnitude(
+                writeOffAmt,
+                Math.abs(openAmount) -
+                Math.abs(discountAmt)
+            );
 
             payAmt = roundPopupAmount(
-                openAmount -
-                discountAmt -
-                writeOffAmt
+                Math.abs(openAmount) -
+                Math.abs(discountAmt) -
+                Math.abs(writeOffAmt)
             );
+
+            if (openAmount < 0) {
+                payAmt = -payAmt;
+            }
 
             getPayField('discountAmt').val(
                 normalizeNumberOrEmpty(
@@ -2552,13 +2582,10 @@
                 getPayField('payAmt').val() || 0
             );
 
-            if (isNaN(payAmt) || payAmt < 0) {
-                payAmt = 0;
-            }
-
-            if (payAmt > openAmount) {
-                payAmt = openAmount;
-            }
+            payAmt = clampPopupMagnitude(
+                payAmt,
+                openAmount
+            );
 
             writeOffAmt = Number(
                 getPayField('writeOffAmt').val() || 0
@@ -2568,25 +2595,27 @@
                 getPayField('discountAmt').val() || 0
             );
 
-            if (isNaN(writeOffAmt) || writeOffAmt < 0) {
+            if (isNaN(writeOffAmt)) {
                 writeOffAmt = 0;
             }
 
-            if (isNaN(discountAmt) || discountAmt < 0) {
+            if (isNaN(discountAmt)) {
                 discountAmt = 0;
             }
 
             maximumPayAmt = roundPopupAmount(
-                openAmount - discountAmt - writeOffAmt
+                Math.max(
+                    Math.abs(openAmount) -
+                    Math.abs(discountAmt) -
+                    Math.abs(writeOffAmt),
+                    0
+                )
             );
 
-            if (maximumPayAmt < 0) {
-                maximumPayAmt = 0;
-            }
-
-            if (payAmt > maximumPayAmt) {
-                payAmt = maximumPayAmt;
-            }
+            payAmt = clampPopupMagnitude(
+                payAmt,
+                maximumPayAmt
+            );
 
             getPayField('payAmt').val(
                 normalizeNumber(
@@ -2628,34 +2657,29 @@
                 getPayField('writeOffAmt').val() || 0
             );
 
-            if (isNaN(discountAmt) || discountAmt < 0) {
-                discountAmt = 0;
-            }
-
-            if (isNaN(writeOffAmt) || writeOffAmt < 0) {
-                writeOffAmt = 0;
-            }
-
-            if (discountAmt > openAmount) {
-                discountAmt = openAmount;
-            }
-
-            if (
-                writeOffAmt >
-                (openAmount - discountAmt)
-            ) {
-                writeOffAmt =
-                    Math.max(
-                        0,
-                        openAmount - discountAmt
-                    );
-            }
-
-            payAmt = roundPopupAmount(
-                openAmount -
-                discountAmt -
-                writeOffAmt
+            discountAmt = clampPopupMagnitude(
+                discountAmt,
+                openAmount
             );
+
+            writeOffAmt = clampPopupMagnitude(
+                writeOffAmt,
+                Math.abs(openAmount) -
+                Math.abs(discountAmt)
+            );
+
+            payAmt = clampPopupMagnitude(
+                roundPopupAmount(
+                    Math.abs(openAmount) -
+                    Math.abs(discountAmt) -
+                    Math.abs(writeOffAmt)
+                ),
+                openAmount
+            );
+
+            if (openAmount < 0) {
+                payAmt = -Math.abs(payAmt);
+            }
 
             getPayField('writeOffAmt').val(
                 normalizeNumberOrEmpty(
@@ -3163,7 +3187,14 @@
                 .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
                 .on(
                     'input.vasRecalculate change.vasRecalculate',
-                    function () {
+                    function (event) {
+                        if (
+                            event.type === 'input' &&
+                            isPayFieldMidEntry('discountAmt')
+                        ) {
+                            return;
+                        }
+
                         recalculatePopupFromDiscount();
                     }
                 )
@@ -3178,7 +3209,14 @@
                 .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
                 .on(
                     'input.vasRecalculate change.vasRecalculate',
-                    function () {
+                    function (event) {
+                        if (
+                            event.type === 'input' &&
+                            isPayFieldMidEntry('payAmt')
+                        ) {
+                            return;
+                        }
+
                         recalculatePopupFromPayAmt();
                     }
                 )
@@ -3193,7 +3231,14 @@
                 .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
                 .on(
                     'input.vasRecalculate change.vasRecalculate',
-                    function () {
+                    function (event) {
+                        if (
+                            event.type === 'input' &&
+                            isPayFieldMidEntry('writeOffAmt')
+                        ) {
+                            return;
+                        }
+
                         recalculatePopupFromWriteOff();
                     }
                 )
@@ -3535,6 +3580,32 @@
             );
         }
 
+        /*
+         * A number input reports an empty value while the entry is still
+         * incomplete, and a lone minus sign is exactly that case. Rewriting
+         * the field on such a keystroke would erase the sign before the
+         * digits arrive, so those keystrokes are left alone; change and blur
+         * still normalize the value.
+         */
+        function isPayFieldMidEntry(name) {
+            var element = getPayField(name)[0];
+
+            if (!element) {
+                return false;
+            }
+
+            if (
+                element.validity &&
+                element.validity.badInput
+            ) {
+                return true;
+            }
+
+            return String(
+                element.value == null ? '' : element.value
+            ) === '';
+        }
+
         function bindDatePickers() {
             $payDialogGrid
                 .find('input[type="date"].vas-upcoming-ap-runs-edit-control')
@@ -3825,28 +3896,30 @@
                 return null;
             }
 
-            if (
-                isNaN(payload.discountAmt) ||
-                payload.discountAmt < 0
-            ) {
+            if (isNaN(payload.discountAmt)) {
                 showPayError(
                     lbl(
                         'VAS_031_MessageDiscountInvalid',
-                        'Discount amount must be zero or greater.'
+                        'Discount amount must be a number.'
                     )
                 );
 
                 return null;
             }
 
+            /*
+             * AP amounts are outflows and may be entered negative, so the
+             * pay amount only has to be a non-zero number and the totals
+             * are compared against the open amount by magnitude.
+             */
             if (
                 isNaN(payload.payAmt) ||
-                payload.payAmt <= 0
+                payload.payAmt === 0
             ) {
                 showPayError(
                     lbl(
                         'VAS_031_PaymentAmountRequired',
-                        'Payment amount must be greater than zero.'
+                        'Payment amount must not be zero.'
                     )
                 );
 
@@ -3858,15 +3931,15 @@
 
             if (
                 !isNaN(maximumAmount) &&
-                maximumAmount > 0 &&
+                maximumAmount !== 0 &&
                 (
-                    payload.payAmt >
-                    maximumAmount ||
+                    Math.abs(payload.payAmt) >
+                    Math.abs(maximumAmount) ||
                     (
-                        payload.payAmt +
-                        payload.discountAmt +
-                        payload.writeOffAmt
-                    ) > maximumAmount
+                        Math.abs(payload.payAmt) +
+                        Math.abs(payload.discountAmt) +
+                        Math.abs(payload.writeOffAmt)
+                    ) > Math.abs(maximumAmount)
                 )
             ) {
                 showPayError(

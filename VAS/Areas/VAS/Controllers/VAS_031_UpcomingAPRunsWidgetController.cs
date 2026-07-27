@@ -1313,38 +1313,41 @@ ORDER BY
                             "InitialDiscountAmount"
                         );
 
-                    if (initialOpenAmount <= 0)
+                    /*
+                     * AP amounts are outflows and may arrive negative, so
+                     * the checks below compare magnitudes and the open
+                     * amount's sign is carried through to the pay amount.
+                     */
+                    if (initialOpenAmount == 0)
                     {
                         initialOpenAmount =
                             scheduleOpenAmount;
                     }
 
-                    if (appliedDiscountAmt < 0)
-                    {
-                        appliedDiscountAmt = 0;
-                    }
-
                     if (
-                        appliedDiscountAmt >
-                        initialOpenAmount
+                        Math.Abs(appliedDiscountAmt) >
+                        Math.Abs(initialOpenAmount)
                     )
                     {
                         appliedDiscountAmt =
                             initialOpenAmount;
                     }
 
-                    decimal schedulePayAmt =
-                        initialOpenAmount -
-                        appliedDiscountAmt;
+                    decimal schedulePayMagnitude =
+                        Math.Max(
+                            Math.Abs(initialOpenAmount) -
+                            Math.Abs(appliedDiscountAmt),
+                            0
+                        );
 
-                    if (schedulePayAmt < 0)
-                    {
-                        schedulePayAmt = 0;
-                    }
+                    decimal schedulePayAmt =
+                        initialOpenAmount < 0
+                            ? -schedulePayMagnitude
+                            : schedulePayMagnitude;
 
                     if (
                         invoicePayScheduleId <= 0 ||
-                        initialOpenAmount <= 0
+                        initialOpenAmount == 0
                     )
                     {
                         continue;
@@ -2484,7 +2487,7 @@ ORDER BY
                         trx
                     );
 
-                if (openAmountBeforePayment <= 0)
+                if (openAmountBeforePayment == 0)
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -2495,33 +2498,17 @@ ORDER BY
                     );
                 }
 
-                if (discountAmt < 0)
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageDiscountInvalid",
-                            "Discount amount must be zero or greater."
-                        )
-                    );
-                }
-
-                if (writeOffAmt < 0)
-                {
-                    throw new InvalidOperationException(
-                        GetMsg(
-                            ctx,
-                            "VAS_031_MessageWriteOffInvalid",
-                            "Write off amount must be zero or greater."
-                        )
-                    );
-                }
-
+                /*
+                 * Negative (outflow) amounts are accepted, so the totals are
+                 * compared by magnitude against the open amount instead of
+                 * requiring every entered figure to be positive.
+                 */
                 if (
                     invoice.GetC_Currency_ID() == currencyId &&
                     (
-                        payAmt > openAmountBeforePayment ||
-                        (payAmt + discountAmt + writeOffAmt) > openAmountBeforePayment
+                        Math.Abs(payAmt) > Math.Abs(openAmountBeforePayment) ||
+                        Math.Abs(payAmt) + Math.Abs(discountAmt) + Math.Abs(writeOffAmt) >
+                        Math.Abs(openAmountBeforePayment)
                     )
                 )
                 {
@@ -2830,7 +2817,7 @@ AND PaymentMethod.AD_Client_ID IN
                             invoice.GetAD_Org_ID()
                         );
 
-                    if (scheduleOpenAmountInPaymentCurrency <= 0)
+                    if (scheduleOpenAmountInPaymentCurrency == 0)
                     {
                         throw new InvalidOperationException(
                             GetMsg(
@@ -2843,8 +2830,10 @@ AND PaymentMethod.AD_Client_ID IN
                 }
 
                 if (
-                    payAmt + discountAmt + writeOffAmt >
-                    scheduleOpenAmountInPaymentCurrency
+                    Math.Abs(payAmt) +
+                    Math.Abs(discountAmt) +
+                    Math.Abs(writeOffAmt) >
+                    Math.Abs(scheduleOpenAmountInPaymentCurrency)
                 )
                 {
                     throw new InvalidOperationException(
@@ -2945,13 +2934,13 @@ AND PaymentMethod.AD_Client_ID IN
 
                 payment.SetPayAmt(payAmt);
 
-                if (discountAmt > 0)
+                if (discountAmt != 0)
                 {
                     payment.SetDiscountAmt(discountAmt);
                 }
 
                 if (
-                    writeOffAmt > 0 &&
+                    writeOffAmt != 0 &&
                     payment.Get_ColumnIndex(
                         "WriteOffAmt"
                     ) >= 0
@@ -3096,7 +3085,7 @@ AND PaymentMethod.AD_Client_ID IN
                 );
 
                 bool invoiceFullyPaid =
-                    remainingOpenAmount <= 0;
+                    remainingOpenAmount == 0;
 
                 string createdPaymentDocumentNo =
                     payment.GetDocumentNo();
@@ -3774,12 +3763,16 @@ WHERE Invoice.C_Invoice_ID =
                 );
             }
 
-            if (payAmt <= 0)
+            /*
+             * AP amounts are outflows and may be sent negative, so only a
+             * zero payment amount is rejected here.
+             */
+            if (payAmt == 0)
             {
                 return GetValidationError(
                     ctx,
                     "VAS_031_PaymentAmountRequired",
-                    "Payment amount must be greater than zero."
+                    "Payment amount must not be zero."
                 );
             }
 
