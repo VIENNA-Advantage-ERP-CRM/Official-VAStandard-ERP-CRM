@@ -1468,3 +1468,19 @@ html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-value {
 html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-arrow svg {
     transform: scaleX(-1);
 }
+
+/* --- RTL: row disclosure chevron ------------------------------------------
+   The row caret points the way the row reads, so it has to turn around with
+   the UI. Mirroring the icon keeps the collapsed state pointing "onward"
+   rather than back into the row. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-chevron svg {
+    transform: scaleX(-1);
+}
+
+/* Stacked review panes turn the flow arrow downwards; there is no left or
+   right to mirror there, and combining the two transforms would aim it up. */
+@media (max-width: 40em) {
+    html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-arrow svg {
+        transform: none;
+    }
+}
