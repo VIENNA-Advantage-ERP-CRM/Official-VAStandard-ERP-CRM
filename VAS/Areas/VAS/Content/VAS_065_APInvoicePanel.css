@@ -1806,6 +1806,22 @@
     pointer-events: none;
 }
 
+/* A single field switched off — the Discount is disabled until the payment
+   line has an amount to settle. */
+.vas-apinv-field.is-disabled {
+    opacity: .55;
+}
+
+    .vas-apinv-field.is-disabled .control,
+    .vas-apinv-field.is-disabled input {
+        cursor: not-allowed;
+    }
+
+    .vas-apinv-field.is-disabled .control:hover,
+    .vas-apinv-field.is-disabled .control:focus-within {
+        border-bottom-color: var(--apinv-field-border);
+    }
+
     .vas-apinv-m-sec.is-readonly .vas-apinv-field .control:hover,
     .vas-apinv-m-sec.is-readonly .vas-apinv-field .control:focus-within {
         border-bottom-color: var(--apinv-field-border);

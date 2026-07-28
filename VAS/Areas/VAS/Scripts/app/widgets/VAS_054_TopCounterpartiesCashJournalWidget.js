@@ -6,7 +6,7 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Top Counterparties                   | VAS_054_TopCounterparties
- *  2  | Last 30 Days                         | VAS_054_Last30Days
+ *  2  | Records Created in Last 30 Days      | VAS_054_DialogSubtitle
  *  3  | All parties ->                       | VAS_054_AllParties
  *  4  | No counterparties found              | VAS_054_NoData
  *  5  | Unable to load top counterparties    | VAS_054_LoadError
@@ -226,17 +226,26 @@
                 '</span>'
             );
 
+            // Title + subtitle stack (shared Widget Header pattern) — replaces the
+            // former "Last 30 Days" meta chip.
+            var $titleWrap = $('<div>', {
+                'class': 'VAS_054_counterparties-title-wrap'
+            });
+
             var $title = $('<span>', {
                 'class': 'VAS_054_counterparties-title',
                 'id': 'VAS_054_counterparties-title-' + widgetId,
                 'text': lbl('VAS_054_TopCounterparties', 'Top Counterparties')
             });
 
-            var $meta = $('<span>', {
-                'class': 'VAS_054_counterparties-meta',
-                'id': 'VAS_054_counterparties-meta-' + widgetId,
-                'text': lbl('VAS_054_Last30Days', 'Last 30 Days')
+            var $subtitle = $('<span>', {
+                'class': 'VAS_054_counterparties-subtitle',
+                'id': 'VAS_054_counterparties-subtitle-' + widgetId,
+                'text': lbl('VAS_054_DialogSubtitle', 'Records Created in Last 30 Days'),
+                'title': lbl('VAS_054_DialogSubtitle', 'Records Created in Last 30 Days')
             });
+
+            $titleWrap.append($title).append($subtitle);
 
             $body = $('<div>', {
                 'class': 'VAS_054_counterparties-body'
@@ -320,7 +329,7 @@
             $pager.append($prevBtn).append($pageText).append($nextBtn);
             $footer.append($pageInfo).append($pager);
 
-            $titleRow.append($icon).append($title).append($meta);
+            $titleRow.append($icon).append($titleWrap);
             $header.append($titleRow);
 
             $card
@@ -487,14 +496,9 @@
             clearState();
 
             var title = data.title || lbl('VAS_054_TopCounterparties', 'Top Counterparties');
-            var metaText = data.metaText || lbl('VAS_054_Last30Days', 'Last 30 Days');
             $root.find('#VAS_054_counterparties-title-' + widgetId)
                 .text(title)
                 .attr('title', title);
-
-            $root.find('#VAS_054_counterparties-meta-' + widgetId)
-                .text(metaText)
-                .attr('title', metaText);
 
             $list.empty();
 
@@ -527,15 +531,13 @@
                     })
                 );
 
+                // Type reads as plain text (no chip / pill) — the cell truncates
+                // with an ellipsis and carries the full value as its tooltip.
                 var $typeCell = $('<td>', {
-                    'class': 'VAS_054_counterparties-cell-type'
-                }).append(
-                    $('<span>', {
-                        'class': 'VAS_054_counterparties-chip VAS_054_counterparties-chip-' + (item.typeClass || 'other'),
-                        'text': item.typeText || '',
-                        'title': item.typeText || ''
-                    })
-                );
+                    'class': 'VAS_054_counterparties-cell-type',
+                    'text': item.typeText || '-',
+                    'title': item.typeText || '-'
+                });
 
                 var $count = $('<td>', {
                     'class': 'VAS_054_counterparties-count',
@@ -574,6 +576,13 @@
 
             updatePager();
             resetHorizontalScroll();
+
+            /* Rows are on screen now, so the capacity can be measured for real
+               (the first pass only had the fallback height). No-ops when the size
+               is unchanged, so it settles after at most one extra fetch. */
+            if (items.length) {
+                updateAdaptivePageSize(true);
+            }
         }
 
         function loadData() {

@@ -78,6 +78,9 @@
 
         var pageNo = 1;
         var pageSize = 3;
+        /* Row-height guess used only before the first row is rendered; from then
+           on the real height is measured (see measureRowHeight). */
+        var ROW_HEIGHT_FALLBACK = 42;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -737,6 +740,26 @@
             }
         }
 
+        /* Height of one rendered body row. Measured from the DOM so the capacity
+           tracks the card's actual font scale (rows are ~34px at the default
+           clamp, not the 42px the fallback assumes) — a fixed guess left a row
+           or two of unused space on tall widgets. */
+        function measureRowHeight() {
+            var $sampleRow =
+                $body
+                    ? $body.find('tbody tr').first()
+                    : null;
+
+            var rowHeight =
+                ($sampleRow && $sampleRow.length)
+                    ? $sampleRow.outerHeight()
+                    : 0;
+
+            return rowHeight > 0
+                ? rowHeight
+                : ROW_HEIGHT_FALLBACK;
+        }
+
         function updateAdaptivePageSize(shouldReload) {
             if (!$body || !$body[0]) {
                 return;
@@ -747,7 +770,7 @@
             var availableHeight =
                 Math.max(0, $body[0].clientHeight - headerHeight);
             var nextPageSize =
-                Math.max(3, Math.floor(availableHeight / 42));
+                Math.max(3, Math.floor(availableHeight / measureRowHeight()));
 
             if (nextPageSize === pageSize) {
                 return;
@@ -787,10 +810,6 @@
             entry,
             data
         ) {
-            var categoryClass =
-                entry.categoryClass ||
-                'other';
-
             var cashTypeText =
                 entry.cashTypeName ||
                 entry.cashType ||
@@ -815,66 +834,41 @@
                     '-'
             }).appendTo($row);
 
-            var $categoryCell =
-                $('<td>', {
-                    'class':
-                        'VAS_052_cashbook-category-cell ' +
-                        'VAS_052_cashbook-col-category'
-                });
-
-            $categoryCell.append(
-                $('<span>', {
-                    'class':
-                        'VAS_052_cashbook-chip ' +
-                        'VAS_052_cashbook-chip-' +
-                        categoryClass,
-
-                    'text':
-                        entry.charge ||
-                        lbl(
-                            'VAS_052_Other',
-                            'Other'
-                        ),
-
-                    'title':
-                        entry.charge ||
-                        lbl(
-                            'VAS_052_Other',
-                            'Other'
-                        )
-                })
-            );
-
-            $categoryCell.appendTo($row);
-
-            var $cashTypeCell =
-                $('<td>', {
-                    'class':
-                        'VAS_052_cashbook-cash-type-cell ' +
-                        'VAS_052_cashbook-col-cash-type'
-                });
-
-            if (cashTypeText) {
-                $cashTypeCell.append(
-                    $('<span>', {
-                        'class':
-                            'VAS_052_cashbook-chip ' +
-                            'VAS_052_cashbook-chip-other ' +
-                            'VAS_052_cashbook-cash-type',
-
-                        'text':
-                            cashTypeText,
-
-                        'title':
-                            cashTypeText
-                    })
+            // Charge and Cash type read as plain text (no chip / pill). The cell
+            // itself truncates with an ellipsis, so the full value rides along as
+            // the native tooltip.
+            var chargeText =
+                entry.charge ||
+                lbl(
+                    'VAS_052_Other',
+                    'Other'
                 );
-            }
-            else {
-                $cashTypeCell.text('-');
-            }
 
-            $cashTypeCell.appendTo($row);
+            $('<td>', {
+                'class':
+                    'VAS_052_cashbook-category-cell ' +
+                    'VAS_052_cashbook-col-category',
+
+                'text':
+                    chargeText,
+
+                'title':
+                    chargeText
+            }).appendTo($row);
+
+            $('<td>', {
+                'class':
+                    'VAS_052_cashbook-cash-type-cell ' +
+                    'VAS_052_cashbook-col-cash-type',
+
+                'text':
+                    cashTypeText ||
+                    '-',
+
+                'title':
+                    cashTypeText ||
+                    '-'
+            }).appendTo($row);
 
             var $cashIn =
                 $('<td>', {
@@ -1039,6 +1033,11 @@
             }
 
             updatePager();
+
+            /* Rows are on screen now, so the capacity can be measured for real.
+               updateAdaptivePageSize() no-ops when the size is unchanged, so this
+               settles after at most one extra fetch. */
+            updateAdaptivePageSize(true);
         }
 
         function loadData() {
@@ -1188,6 +1187,17 @@
                 loadData();
             };
 
+        /* Re-measure the row capacity when the dashboard resizes the widget —
+           the framework's own size hook, in addition to the ResizeObserver. */
+        this.handleSizeChange =
+            function () {
+                if (isDisposed) {
+                    return;
+                }
+
+                updateAdaptivePageSize(true);
+            };
+
         this.disposeComponent =
             function () {
                 isDisposed = true;
@@ -1266,6 +1276,9 @@
             height,
             width
         ) {
+            if (this.handleSizeChange) {
+                this.handleSizeChange();
+            }
         };
 
     VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.dispose =

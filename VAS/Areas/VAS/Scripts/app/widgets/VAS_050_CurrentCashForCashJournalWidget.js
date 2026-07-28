@@ -9,7 +9,7 @@
  *  2  | Drawer                               | VAS_050_Drawer
  *  3  | Live                                 | VAS_050_Live
  *  4  | Loading                              | VAS_050_Loading
- *  5  | No data                              | VAS_050_NoData
+ *  5  | No Data Found                        | VAS_050_NoData
  *  6  | Unable to load current cash          | VAS_050_LoadError
  *  7  | short of float                       | VAS_050_ShortOfFloat
  *  8  | cash on hand                         | VAS_050_CashOnHand
@@ -17,6 +17,7 @@
  * 10  | Session Expired                      | VAS_050_SessionExpired
  * 11  | Cash Book Balance History            | VAS_050_DialogTitle
  * 12  | Journals for the selected cash book  | VAS_050_DialogSubtitle
+ *     | of last 15 days                      |
  * 13  | Document No.                         | VAS_050_DocumentNo
  * 14  | Beginning Balance                    | VAS_050_BeginningBalance
  * 15  | Ending Balance                       | VAS_050_EndingBalance
@@ -247,7 +248,7 @@
             $dialogTbody.empty();
 
             if (!rows || !rows.length) {
-                renderDialogMessage('No data');
+                renderDialogMessage(lbl('VAS_050_NoData', 'No Data Found'));
                 return;
             }
 
@@ -268,7 +269,7 @@
                     '<tr>' +
                     '<td class="VAS-050-current-cash-td-document" style="text-align:left" title="' + escapeHtml(documentNo) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(documentNo) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-date" style="text-align:left" title="' + escapeHtml(cashDate) + '">' + escapeHtml(cashDate) + '</td>' +
-                    '<td class="VAS-050-current-cash-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
+                    '<td class="VAS-050-current-cash-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashType) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-amount" style="text-align:right" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
                     '<td class="VAS-050-current-cash-td-status" style="text-align:left" title="' + escapeHtml(status) + '"><span class="VAS-050-current-cash-status' + getStatusTone(row.docStatusValue) + '">' + escapeHtml(status) + '</span></td>' +
@@ -297,7 +298,7 @@
 
         function loadDialogRows() {
             if (!$dialogTbody || rowsLoading || selectedCashBookId <= 0) {
-                if (selectedCashBookId <= 0) { renderDialogMessage('No data'); }
+                if (selectedCashBookId <= 0) { renderDialogMessage(lbl('VAS_050_NoData', 'No Data Found')); }
                 return;
             }
 
@@ -432,7 +433,7 @@
                 '<div class="VAS-047-cash-in-dialog-header"><div class="VAS-047-cash-in-dialog-icon" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M8 15h3"/></svg></div>' +
                 '<div class="VAS-047-cash-in-dialog-title-group"><div class="VAS-047-cash-in-dialog-title" id="' + titleId + '">' + escapeHtml(lbl('VAS_050_DialogTitle', 'Cash Book Balance History')) + '</div>' +
-                '<div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_050_DialogSubtitle', 'Journals for the selected cash book')) + '</div></div>' +
+                '<div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_050_DialogSubtitle', 'Journals for the selected cash book of last 15 days')) + '</div></div>' +
                 '<button type="button" class="VAS-047-cash-in-dialog-close" aria-label="' + escapeHtml(lbl('VAS_050_Close', 'Close')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
                 '<div class="VAS-047-cash-in-dialog-body"><div class="VAS-047-cash-in-dialog-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
                 '<table class="VAS-047-cash-in-dialog-table VAS-050-current-cash-table"><thead><tr>' +

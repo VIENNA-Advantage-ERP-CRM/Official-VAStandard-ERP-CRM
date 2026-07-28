@@ -1282,7 +1282,7 @@ namespace VASLogic.Models
             // restricted to the orgs the role can access.
             string sql = @"SELECT pm.VA009_PaymentMethod_ID, pm.VA009_Name, pm.VA009_PaymentBaseType
                              FROM VA009_PaymentMethod pm
-                            WHERE pm.IsActive = 'Y'
+                            WHERE pm.IsActive = 'Y' AND pm.VA009_PaymentBaseType NOT IN ('B' , 'C')
                               AND pm.AD_Org_ID IN (0, @AD_Org_ID)
                             ORDER BY pm.VA009_Name";
             try
@@ -2061,6 +2061,7 @@ namespace VASLogic.Models
                 }
                 if (!processed)
                 {
+                    result.Message = payment.GetProcessMsg();
                     if (string.IsNullOrEmpty(result.Message))
                     {
                         result.Message = RetrieveErr(ctx, "VAS_065_PaymentCompleteFailed");

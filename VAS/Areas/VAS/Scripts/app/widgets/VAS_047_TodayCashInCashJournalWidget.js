@@ -16,23 +16,23 @@
  *  6  | No data available                    | VAS_047_NoData
  *  7  | Could not load data                  | VAS_047_LoadError
  *  8  | Session Expired                      | VAS_047_SessionExpired
- *  9  | Today's Cash Receipts                 | VAS_047_DialogTitle
- * 10  | Receipts Completed Today       | VAS_047_DialogSubtitle
- * 11  | Document No.                          | VAS_047_DocumentNo
- * 12  | Date                                  | VAS_047_Date
- * 13  | Description                           | VAS_047_DialogDescription
- * 14  | Cash Type                             | VAS_047_CashType
- * 15  | Cash Book                             | VAS_047_CashBook
- * 16  | Amount                                | VAS_047_Amount
- * 17  | Close                                 | VAS_047_Close
- * 18  | No cash receipts found today          | VAS_047_NoReceipts
- * 19  | receipt                               | VAS_047_Receipt
- * 20  | Showing                               | VAS_047_Showing
- * 21  | of                                    | VAS_047_Of
- * 22  | total                                 | VAS_047_Total
- * 23  | Previous                              | VAS_047_Previous
- * 24  | Next                                  | VAS_047_Next
- * 25  | Charge                                | VAS_047_Charge
+ *  9  | Today's Cash Receipts                | VAS_047_DialogTitle
+ * 10  | Receipts Completed Today             | VAS_047_DialogSubtitle
+ * 11  | Document No.                         | VAS_047_DocumentNo
+ * 12  | Date                                 | VAS_047_Date
+ * 13  | Description                          | VAS_047_DialogDescription
+ * 14  | Cash Type                            | VAS_047_CashType
+ * 15  | Cash Book                            | VAS_047_CashBook
+ * 16  | Amount                               | VAS_047_Amount
+ * 17  | Close                                | VAS_047_Close
+ * 18  | No cash receipts found today         | VAS_047_NoReceipts
+ * 19  | receipt                              | VAS_047_Receipt
+ * 20  | Showing                              | VAS_047_Showing
+ * 21  | of                                   | VAS_047_Of
+ * 22  | total                                | VAS_047_Total
+ * 23  | Previous                             | VAS_047_Previous
+ * 24  | Next                                 | VAS_047_Next
+ * 25  | Charge                               | VAS_047_Charge
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -255,7 +255,7 @@
                     '<tr>' +
                     '<td class="VAS-047-cash-in-td-document" style="text-align:left" title="' + escapeHtml(documentNo) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(documentNo) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-date" style="text-align:left" title="' + escapeHtml(dateText) + '">' + escapeHtml(dateText) + '</td>' +
-                    '<td class="VAS-047-cash-in-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
+                    '<td class="VAS-047-cash-in-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashType) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-book" style="text-align:left" title="' + escapeHtml(cashBook) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashBook) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-amount" style="text-align:right" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
@@ -631,11 +631,18 @@
 
             $root.html(html);
 
+            // Title / subtitle truncate on narrow cards: the full text is exposed
+            // through the native tooltip (no hover overlay box).
+            var titleText = lbl('VAS_047_CashInTitle', 'Cash in');
+            var subtitleText = lbl('VAS_047_DialogSubtitle', 'Receipts Completed Today');
+
             $root.find('#VAS-047-cj-title-' + uid)
-                .text(lbl('VAS_047_CashInTitle', 'Cash in'));
+                .text(titleText)
+                .attr('title', titleText);
 
             $root.find('#VAS-047-cj-subtitle-' + uid)
-                .text(lbl('VAS_047_DialogSubtitle', 'Receipts Completed Today'));
+                .text(subtitleText)
+                .attr('title', subtitleText);
 
         }
 
