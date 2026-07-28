@@ -104,6 +104,8 @@
  *                          surfacing the GL budget check (IsBudgetViolated,
  *                          MaxBudgetViolationAmount, per-line BudgetViolationAmount).
  *                        - Received card quantity now item-only (server side).
+ *   VAI163   2026-07-27  - Line Attribute Set Instance sub-line is hidden when the
+ *                          line has no real instance (blank / "--" placeholder).
  ***********************************************************/
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
@@ -958,9 +960,12 @@
                 $item.append($('<div class="MPC-vaspo-itSku"></div>').text(ln.Description));
             }
             // Attribute Set Instance details (size / colour / lot / serial ...).
-            if (ln.AttributeSetInstance) {
+            // Only when the line carries a real instance — a blank or "--" / "-"
+            // placeholder (no M_AttributeSetInstance_ID) is not shown.
+            var asi = (ln.AttributeSetInstance || "").trim();
+            if (asi && asi !== "--" && asi !== "-") {
                 $item.append($('<div class="MPC-vaspo-itAttr"></div>')
-                    .text(ln.AttributeSetInstance).attr("title", ln.AttributeSetInstance));
+                    .text(asi).attr("title", asi));
             }
             $tr.append($item);
 
