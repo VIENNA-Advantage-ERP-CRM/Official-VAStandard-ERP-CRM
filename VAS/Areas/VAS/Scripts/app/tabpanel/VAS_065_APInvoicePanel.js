@@ -43,6 +43,18 @@
             return (fallback !== undefined) ? fallback : t;
         }
 
+        // A return transaction (IsReturnTrx = 'Y') is matched against a vendor return
+        // (material shipped back), not a goods receipt - every receipt-matching label
+        // is worded accordingly.
+        function isVendorReturn() {
+            return !!(data && data.IsReturnTrx);
+        }
+        // Picks the vendor-return wording over the goods-receipt one for a return trx.
+        // Both arguments are [key, fallback] pairs passed straight to lbl().
+        function retLbl(receiptKey, receiptText, returnKey, returnText) {
+            return isVendorReturn() ? lbl(returnKey, returnText) : lbl(receiptKey, receiptText);
+        }
+
         function fmtAmount(value, precision) {
             var v = +value || 0;
             var sign = v < 0 ? "-" : "";
@@ -723,7 +735,8 @@
                 ? lbl("VAS_065_ThreeWayMatchPassed", "3-way match passed - no price or quantity variance")
                 : lbl("VAS_065_VarianceFound", "Variance found"));
             $sec.find(".vas-apinv-insight-b").text(
-                lbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}")
+                retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
+                       "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                     .replace("{0}", gr.ReceiptDocumentNo || "")
                     .replace("{1}", gr.OrderDocumentNo || ""));
             $sec.append(chip(clean ? lbl("VAS_065_CleanMatch", "Clean match") : lbl("VAS_065_VarianceFound", "Variance found"),
@@ -817,7 +830,10 @@
                 '<div class="vas-apinv-kv js-kv"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching"));
+            // Return transaction -> the matched document is a vendor return, not a GRN.
+            $sec.find(".vas-apinv-block-h").text(retLbl(
+                "VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching",
+                "VAS_065_VendorReturnMatching", "Vendor Return & Matching"));
             $sec.find(".js-st").text(lbl("Matched"));
 
             var $kv = $sec.find(".js-kv");
@@ -827,10 +843,17 @@
             var receivedOn = (gr.ReceivedDates && gr.ReceivedDates.length)
                 ? gr.ReceivedDates.map(function (d) { return fmtDate(d); }).join(", ")
                 : fmtDate(gr.ReceivedDate);
-            kvRow($kv, lbl("VAS_065_ReceiptGRN", "Receipt (GRN)"), gr.ReceiptDocumentNo);
-            kvRow($kv, lbl("VAS_065_PurchaseOrder", "Purchase order"), gr.OrderDocumentNo);
-            kvRow($kv, lbl("VAS_065_ReceivedOn", "Received On"), receivedOn);
-            kvRow($kv, lbl("QtyReceived"), fmtNumber(gr.TotalReceived, 0) + " " +
+            kvRow($kv, retLbl("VAS_065_ReceiptGRN", "Receipt (GRN)",
+                              "VAS_065_VendorReturn", "Vendor Return"), gr.ReceiptDocumentNo);
+            kvRow($kv, retLbl("VAS_065_PurchaseOrder", "Purchase order",
+                              "VAS_065_VendorRMA", "Vendor RMA"), gr.OrderDocumentNo);
+            kvRow($kv, retLbl("VAS_065_ReceivedOn", "Received On",
+                              "VAS_065_ReturnedOn", "Returned On"), receivedOn);
+            // "QtyReceived" is an existing dictionary key, so it carries no inline
+            // fallback (undefined keeps lbl's raw-key behaviour unchanged).
+            kvRow($kv, retLbl("QtyReceived", undefined,
+                              "VAS_065_QtyReturned", "Quantity Returned"),
+                fmtNumber(gr.TotalReceived, 0) + " " +
                 lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim());
             kvRow($kv, lbl("VAS_065_Warehouse", "Warehouse"), gr.WarehouseName);
             kvRow($kv, lbl("VAS_065_PriceVariance", "Price Variance"), fmtAmount(gr.PriceVariance));
@@ -890,8 +913,11 @@
                     var paid = s.Status === "Paid";
                     var hold = s.Status === "OnHold";
                     var $r = $('<div class="vas-apinv-t4-row"></div>');
-                    $r.append($('<div class="col-a p"></div>').text(
-                        lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (absIdx + 1)).replace("{1}", pct)));
+                    // The first column truncates on narrow panels - carry the full text
+                    // as its tooltip.
+                    var schedLabel = lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%")
+                        .replace("{0}", (absIdx + 1)).replace("{1}", pct);
+                    $r.append($('<div class="col-a p"></div>').text(schedLabel).attr("title", schedLabel));
                     $r.append($('<div class="col-b c"></div>').text(fmtDate(s.DueDate)));
                     var statusKey = paid ? "VAS_065_Paid" : (hold ? "VAS_065_OnHold" : "Open");
                     $r.append($('<div class="col-c"></div>').append(
@@ -941,8 +967,12 @@
             steps.push({ st: lbl("VAS_065_Drafted", "Drafted"), mt: subLine(data.CreatedByName, data.Created), done: true });
             if (data.GoodsReceipt && data.GoodsReceipt.Rows && data.GoodsReceipt.Rows.length) {
                 steps.push({
-                    st: lbl("VAS_065_MatchedToReceipt", "Matched to receipt"), mt: fmtDate(data.GoodsReceipt.ReceivedDate),
-                    nt: lbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}")
+                    // Return transaction -> matched against a vendor return, not a receipt.
+                    st: retLbl("VAS_065_MatchedToReceipt", "Matched to receipt",
+                               "VAS_065_MatchedToVendorReturn", "Matched to vendor return"),
+                    mt: fmtDate(data.GoodsReceipt.ReceivedDate),
+                    nt: retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
+                               "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                         .replace("{0}", data.GoodsReceipt.ReceiptDocumentNo || "")
                         .replace("{1}", data.GoodsReceipt.OrderDocumentNo || ""), done: true
                 });
@@ -1304,7 +1334,9 @@
                         // Show the source document type + document no (no generic
                         // "On-account payment" literal).
                         var docLabel = (r.DocTypeName ? r.DocTypeName + " - " : "") + (r.DocumentNo || "");
-                        $row.append($('<div class="col-a p"></div>').text(docLabel || (r.DocumentNo || "")));
+                        docLabel = docLabel || (r.DocumentNo || "");
+                        // Full document label as tooltip - the column truncates.
+                        $row.append($('<div class="col-a p"></div>').text(docLabel).attr("title", docLabel));
                         $row.append($('<div class="col-b c"></div>').text(fmtDate(r.Date)));
 
                         // Status chip: Available -> Selected -> Allocated.
