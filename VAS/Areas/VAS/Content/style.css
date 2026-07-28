@@ -1886,10 +1886,11 @@ html[dir=rtl] .vas-dateBlock .vis-advancedSearchInput1 input[name="IsDynamic"] +
 /*CSS of VAS_TimeSheetInvoice.js Form Ends*/
 
 /* =====================================================================
-   Onfinity New Cash Journal quick-action widget (VAS_NewCashJournalWidget)
-   Spec: PROMPT.md (Cash Journal quick action) - 2x1 footprint.
-   All variables and classes are namespaced 'vas-cj-' so they cannot
-   collide with the app shell or with other widgets on the dashboard.
+   New Cash Journal quick-action widget (VAS_NewCashJournalWidget)
+   MOVED: the widget now follows the VAS_064_CreateARInvoice quick-action
+   pattern and is styled by Content/VAS_NewCashJournalWidget.css
+   (namespace vas-ncj-*). The legacy px-based vas-cj-qa-* block below is
+   no longer emitted by the widget and is kept only for reference.
    ===================================================================== */
 .vas-cj-qa-root {
     --vas-cj-primary: #0083DA;

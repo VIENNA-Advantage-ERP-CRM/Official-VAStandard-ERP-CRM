@@ -531,15 +531,13 @@
                     })
                 );
 
+                // Type reads as plain text (no chip / pill) — the cell truncates
+                // with an ellipsis and carries the full value as its tooltip.
                 var $typeCell = $('<td>', {
-                    'class': 'VAS_054_counterparties-cell-type'
-                }).append(
-                    $('<span>', {
-                        'class': 'VAS_054_counterparties-chip VAS_054_counterparties-chip-' + (item.typeClass || 'other'),
-                        'text': item.typeText || '',
-                        'title': item.typeText || ''
-                    })
-                );
+                    'class': 'VAS_054_counterparties-cell-type',
+                    'text': item.typeText || '-',
+                    'title': item.typeText || '-'
+                });
 
                 var $count = $('<td>', {
                     'class': 'VAS_054_counterparties-count',

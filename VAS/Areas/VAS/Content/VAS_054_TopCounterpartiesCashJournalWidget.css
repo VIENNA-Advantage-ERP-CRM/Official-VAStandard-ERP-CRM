@@ -203,7 +203,7 @@
 
 .VAS_054_counterparties-col-type,
 .VAS_054_counterparties-cell-type {
-    width: 13%;
+    width: 16%;
 }
 
 .VAS_054_counterparties-col-txns,
@@ -214,7 +214,7 @@
 
 .VAS_054_counterparties-col-trend,
 .VAS_054_counterparties-spark-wrap {
-    width: 20%;
+    width: 16%;
 }
 
 .VAS_054_counterparties-col-volume,
@@ -273,41 +273,10 @@
     color: #102C3F;
 }
 
-.VAS_054_counterparties-chip {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0.3em 0.75em;
-    border-radius: 7px;
-    border: 1px solid transparent;
-    /* Relative to the cell (0.75em), so it lands on the same chip token as the
-       other cash-journal widgets instead of compounding down to ~0.47em. */
-    font-size: 0.9166em;
-    line-height: 1.1;
-    font-weight: 800;
-    letter-spacing: 0;
+/* Type — plain text (no chip / pill), like the Cash Type column in the other
+   cash-journal widgets. Truncation comes from the shared cell rule. */
+.VAS_054_counterparties-cell-type {
     text-transform: capitalize;
-}
-
-.VAS_054_counterparties-chip-vendor {
-    background: rgba(164, 67, 67, 0.08);
-    border-color: rgba(164, 67, 67, 0.35);
-    color: #9F4545;
-}
-
-.VAS_054_counterparties-chip-customer {
-    background: rgba(12, 116, 87, 0.07);
-    border-color: rgba(12, 116, 87, 0.35);
-    color: #2D7555;
-}
-
-.VAS_054_counterparties-chip-bank,
-.VAS_054_counterparties-chip-cashbook,
-.VAS_054_counterparties-chip-other {
-    background: rgba(0, 120, 212, 0.07);
-    border-color: rgba(0, 120, 212, 0.30);
-    color: #2C6EAA;
 }
 
 .VAS_054_counterparties-count {

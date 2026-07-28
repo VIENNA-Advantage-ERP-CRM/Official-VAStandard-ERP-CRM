@@ -453,6 +453,7 @@
     <Content Include="Areas\VAS\Content\VAS_CreateNewReceipt.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateARInvoice.css" />
     <Content Include="Areas\VAS\Content\VAS_CreateGLJournal.css" />
+    <Content Include="Areas\VAS\Content\VAS_NewCashJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_ExpectedDeliveryWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_041_GLJournalEntriesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_118_QuickJournalWidget.css" />
