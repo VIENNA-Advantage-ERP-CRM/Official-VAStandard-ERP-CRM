@@ -17,13 +17,17 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    /* Query container only — no font-size (see card), so container-query em
+       breakpoints resolve against 16px like ExpectedThisWeek. */
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
     color: #102C3F;
 }
 
 .VAS_051_cash-flow-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -33,10 +37,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.875em;
-    padding: 0.875em;
+    padding: 0.85em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.52));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102C3F;
 }
@@ -58,45 +62,37 @@
 }
 
 .VAS_051_cash-flow-icon {
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #E4EDF4;
-    border-radius: 0.375em;
-    background: rgba(79, 131, 216, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
     color: #4F83D8;
 }
 
     .VAS_051_cash-flow-icon svg {
-        width: 1em;
-        height: 1em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     }
 
+/* Widget title — shared Widget Header style (self-sufficient --dash-inline-size clamp) */
 .VAS_051_cash-flow-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     line-height: 1.2;
     font-weight: 400;
     color: #102C3F;
 }
 
-.VAS_051_cash-flow-meta {
-    flex: 0 0 auto;
-    font-size: 0.6875em;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: #738090;
-    white-space: nowrap;
-}
-
+/* Header meta eyebrow ("IN VS OUT") — retokenized to the shared subtitle scale */
 .VAS_051_cash-flow-body,
 .VAS_051_cash-flow-seven-body {
     position: relative;
@@ -139,22 +135,24 @@
     transition: height 0.2s ease;
 }
 
+/* In / positive → foundations success-green tone */
 .VAS_051_cash-flow-day-in {
-    background: #5B9B66;
+    background: #20A464;
 }
 
+/* Out / negative → foundations risk-red tone */
 .VAS_051_cash-flow-day-out {
-    background: #B94E49;
+    background: #D14545;
 }
 
 .VAS_051_cash-flow-day-label {
     flex: 0 0 auto;
     margin-top: 0.5em;
-    font-size: 0.75em;
+    font-size: 0.75em; /* sm token */
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 500;
     letter-spacing: 0.12em;
-    color: #627181;
+    color: #5F7283;
     text-align: center;
 }
 
@@ -164,8 +162,8 @@
     justify-content: flex-end;
     gap: 0.75em;
     flex: 0 0 auto;
-    font-size: 0.75em;
-    color: #627181;
+    font-size: 0.75em; /* sm token */
+    color: #5F7283;
 }
 
 .VAS_051_cash-flow-legend-item {
@@ -186,11 +184,11 @@
     }
 
 .VAS_051_cash-flow-legend-in::before {
-    background: #5B9B66;
+    background: #20A464;
 }
 
 .VAS_051_cash-flow-legend-out::before {
-    background: #B94E49;
+    background: #D14545;
 }
 
 .VAS_051_cash-flow-busy {
@@ -265,10 +263,6 @@
         letter-spacing: 0.08em;
     }
 
-    .VAS_051_cash-flow-meta {
-        display: none;
-    }
-
     .VAS_051_cash-flow-legend {
         font-size: 0.75em;
         gap: 0.75em;
@@ -288,7 +282,7 @@
     }
 
     .VAS_051_cash-flow-title {
-        font-size: 0.875em;
+        font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     }
 
     .VAS_051_cash-flow-legend {
@@ -315,12 +309,14 @@
     }
 }
 
-/* ── Hover expand ─────────────────────────────────────────────────────── */
 .VAS_051_cash-flow-title { cursor: default; }
-.VAS_051_cash-flow-title:hover {
-    overflow: visible; white-space: normal; word-break: break-word;
-    position: relative; z-index: 30;
-    background: rgba(255,255,255,0.98);
-    box-shadow: 0 4px 16px rgba(15,61,97,0.14);
-    border-radius: 6px; padding: 0.25em 0.5em; margin: -0.25em -0.5em;
+
+/* Responsive shrink — VAS_012 pattern: step the whole card font-size down on
+   narrow cells so all em-based content scales together. */
+@container (max-width: 18.75em) {
+    .VAS_051_cash-flow-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {
+    .VAS_051_cash-flow-card { font-size: 0.6875em; }
 }

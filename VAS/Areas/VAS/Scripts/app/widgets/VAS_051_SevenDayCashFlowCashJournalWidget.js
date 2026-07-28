@@ -20,6 +20,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_051_SevenDayCashFlowCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -46,19 +71,32 @@
             return stdPrecision;
         }
 
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
-            var numericValue = safeNumber(value);
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getPrecision(precision),
-                maximumFractionDigits: getPrecision(precision)
-            });
-            var sign = numericValue < 0 ? '-' : '';
-
-            if (currencySymbol) {
-                return sign + currencySymbol + amount;
+        /* Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
             }
 
-            return currencyISO ? sign + currencyISO + amount : sign + amount;
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
+        }
+
+        /*
+         * Compact, locale-aware magnitude via VIS.Util.formatCompactAmount
+         * (K/L/Cr or M/B tiers by base currency). The formatter returns a
+         * non-negative magnitude, so we compose the final string ourselves:
+         * sign, then currency, then magnitude — a negative renders as e.g.
+         * -$200.56 (leading minus, before the symbol).
+         */
+        function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = safeNumber(value);
+            var sign = numericValue < 0 ? '-' : '';
+            var currency = getCurrencyLabel(currencySymbol, currencyISO);
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
+
+            return sign + currency + magnitude;
         }
 
         function showBusy(show) {
@@ -118,12 +156,6 @@
                 'text': lbl('VAS_051_SevenDayCashFlow', '7-Day Cash Flow')
             });
 
-            var $meta = $('<span>', {
-                'class': 'VAS_051_cash-flow-meta',
-                'id': 'VAS_051_cash-flow-meta-' + widgetId,
-                'text': lbl('VAS_051_InVsOut', 'IN VS OUT')
-            });
-
             var $legend = $('<div>', {
                 'class': 'VAS_051_cash-flow-legend',
                 'id': 'VAS_051_cash-flow-legend-' + widgetId
@@ -149,7 +181,7 @@
                 'id': 'VAS_051_cash-flow-state-' + widgetId
             });
 
-            $titleRow.append($icon).append($title).append($meta);
+            $titleRow.append($icon).append($title);
             $header.append($titleRow).append($legend);
             $card.append($busy).append($header).append($body).append($state);
             $root.append($card);
@@ -229,7 +261,6 @@
             $root.find('#VAS_051_cash-flow-state-' + widgetId).removeClass('is-visible').text('');
             var title = data.title || lbl('VAS_051_SevenDayCashFlow', '7-Day Cash Flow');
             $root.find('#VAS_051_cash-flow-title-' + widgetId).text(title).attr('title', title);
-            $root.find('#VAS_051_cash-flow-meta-' + widgetId).text(lbl('VAS_051_InVsOut', 'IN VS OUT'));
 
             $body.empty();
 
@@ -352,6 +383,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_051_SevenDayCashFlowCashJournalWidget.prototype.widgetSizeChange = function (height, width) {

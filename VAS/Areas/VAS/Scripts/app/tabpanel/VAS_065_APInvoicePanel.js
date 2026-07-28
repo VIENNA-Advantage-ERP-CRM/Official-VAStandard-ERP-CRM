@@ -26,7 +26,11 @@
         var data = null;
         var meta = null;
         var $scrim = null;
-        var LINES_PER_PAGE = 5;
+        // Set once an allocation / payment is created from the modal: the panel data
+        // (open amount, schedules, action buttons) is stale and must be re-fetched when
+        // the modal is closed, so "Record payment" turns read-only once nothing is open.
+        var panelDirty = false;
+        var LINES_PER_PAGE = 20;
         var linePage = 0;
 
         /* ---------- short helpers ---------- */
@@ -37,6 +41,18 @@
             var t = VIS.Msg.getMsg(key);
             if (t && t.charAt(0) !== '[') return t;
             return (fallback !== undefined) ? fallback : t;
+        }
+
+        // A return transaction (IsReturnTrx = 'Y') is matched against a vendor return
+        // (material shipped back), not a goods receipt - every receipt-matching label
+        // is worded accordingly.
+        function isVendorReturn() {
+            return !!(data && data.IsReturnTrx);
+        }
+        // Picks the vendor-return wording over the goods-receipt one for a return trx.
+        // Both arguments are [key, fallback] pairs passed straight to lbl().
+        function retLbl(receiptKey, receiptText, returnKey, returnText) {
+            return isVendorReturn() ? lbl(returnKey, returnText) : lbl(receiptKey, receiptText);
         }
 
         function fmtAmount(value, precision) {
@@ -323,17 +339,26 @@
             var isCN = data.IsAPCreditNote;
             var openAmt = +data.OpenAmount || 0;
             var isCompleted = (data.DocStatus === "CO" || data.DocStatus === "CL");
+            // Every pay schedule marked paid (VA009_IsPaid) leaves nothing to record, even
+            // if the invoice header has not been flagged paid yet.
+            var allSchedulesPaid = (+data.ScheduleTotal > 0) && ((+data.ScheduleOpenAmount || 0) <= 0);
+            var settled = !!data.IsPaid || allSchedulesPaid || openAmt <= 0;
             // Enabled whenever there is an open balance on a completed/closed document.
-            var canPay = openAmt > 0 && isCompleted;
+            var canPay = !settled && isCompleted;
 
             // Show exactly one primary action based on document type: credit notes get
             // "Allocate credit note", everything else gets "Record payment". The button
             // is read-only (disabled) unless there is an open balance and the doc is CO/CL.
-            $a.append($('<button type="button" class="vas-apinv-btn is-primary"><i class="fa fa-credit-card" aria-hidden="true"></i></button>')
+            var $payBtn = $('<button type="button" class="vas-apinv-btn is-primary"><i class="fa fa-credit-card" aria-hidden="true"></i></button>')
                 .append($('<span></span>').text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate credit note")
                     : lbl("VAS_065_RecordPayment", "Record payment")))
                 .prop("disabled", !canPay)
-                .on("click", function () { if (canPay) openPaymentModal(); }));
+                .on("click", function () { if (canPay) openPaymentModal(); });
+            if (settled && isCompleted) {
+                $payBtn.attr("title", lbl("VAS_065_AllSchedulesPaidMsg",
+                    "All payment schedules of this invoice are paid. No further payment can be recorded."));
+            }
+            $a.append($payBtn);
 
             // Download PDF runs the tab's print process; it is read-only (disabled)
             // when the current tab has no AD_Process_ID linked (nothing to print).
@@ -710,7 +735,8 @@
                 ? lbl("VAS_065_ThreeWayMatchPassed", "3-way match passed - no price or quantity variance")
                 : lbl("VAS_065_VarianceFound", "Variance found"));
             $sec.find(".vas-apinv-insight-b").text(
-                lbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}")
+                retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
+                       "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                     .replace("{0}", gr.ReceiptDocumentNo || "")
                     .replace("{1}", gr.OrderDocumentNo || ""));
             $sec.append(chip(clean ? lbl("VAS_065_CleanMatch", "Clean match") : lbl("VAS_065_VarianceFound", "Variance found"),
@@ -804,7 +830,10 @@
                 '<div class="vas-apinv-kv js-kv"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching"));
+            // Return transaction -> the matched document is a vendor return, not a GRN.
+            $sec.find(".vas-apinv-block-h").text(retLbl(
+                "VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching",
+                "VAS_065_VendorReturnMatching", "Vendor Return & Matching"));
             $sec.find(".js-st").text(lbl("Matched"));
 
             var $kv = $sec.find(".js-kv");
@@ -814,10 +843,17 @@
             var receivedOn = (gr.ReceivedDates && gr.ReceivedDates.length)
                 ? gr.ReceivedDates.map(function (d) { return fmtDate(d); }).join(", ")
                 : fmtDate(gr.ReceivedDate);
-            kvRow($kv, lbl("VAS_065_ReceiptGRN", "Receipt (GRN)"), gr.ReceiptDocumentNo);
-            kvRow($kv, lbl("VAS_065_PurchaseOrder", "Purchase order"), gr.OrderDocumentNo);
-            kvRow($kv, lbl("VAS_065_ReceivedOn", "Received On"), receivedOn);
-            kvRow($kv, lbl("QtyReceived"), fmtNumber(gr.TotalReceived, 0) + " " +
+            kvRow($kv, retLbl("VAS_065_ReceiptGRN", "Receipt (GRN)",
+                              "VAS_065_VendorReturn", "Vendor Return"), gr.ReceiptDocumentNo);
+            kvRow($kv, retLbl("VAS_065_PurchaseOrder", "Purchase order",
+                              "VAS_065_VendorRMA", "Vendor RMA"), gr.OrderDocumentNo);
+            kvRow($kv, retLbl("VAS_065_ReceivedOn", "Received On",
+                              "VAS_065_ReturnedOn", "Returned On"), receivedOn);
+            // "QtyReceived" is an existing dictionary key, so it carries no inline
+            // fallback (undefined keeps lbl's raw-key behaviour unchanged).
+            kvRow($kv, retLbl("QtyReceived", undefined,
+                              "VAS_065_QtyReturned", "Quantity Returned"),
+                fmtNumber(gr.TotalReceived, 0) + " " +
                 lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim());
             kvRow($kv, lbl("VAS_065_Warehouse", "Warehouse"), gr.WarehouseName);
             kvRow($kv, lbl("VAS_065_PriceVariance", "Price Variance"), fmtAmount(gr.PriceVariance));
@@ -877,8 +913,11 @@
                     var paid = s.Status === "Paid";
                     var hold = s.Status === "OnHold";
                     var $r = $('<div class="vas-apinv-t4-row"></div>');
-                    $r.append($('<div class="col-a p"></div>').text(
-                        lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (absIdx + 1)).replace("{1}", pct)));
+                    // The first column truncates on narrow panels - carry the full text
+                    // as its tooltip.
+                    var schedLabel = lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%")
+                        .replace("{0}", (absIdx + 1)).replace("{1}", pct);
+                    $r.append($('<div class="col-a p"></div>').text(schedLabel).attr("title", schedLabel));
                     $r.append($('<div class="col-b c"></div>').text(fmtDate(s.DueDate)));
                     var statusKey = paid ? "VAS_065_Paid" : (hold ? "VAS_065_OnHold" : "Open");
                     $r.append($('<div class="col-c"></div>').append(
@@ -928,8 +967,12 @@
             steps.push({ st: lbl("VAS_065_Drafted", "Drafted"), mt: subLine(data.CreatedByName, data.Created), done: true });
             if (data.GoodsReceipt && data.GoodsReceipt.Rows && data.GoodsReceipt.Rows.length) {
                 steps.push({
-                    st: lbl("VAS_065_MatchedToReceipt", "Matched to receipt"), mt: fmtDate(data.GoodsReceipt.ReceivedDate),
-                    nt: lbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}")
+                    // Return transaction -> matched against a vendor return, not a receipt.
+                    st: retLbl("VAS_065_MatchedToReceipt", "Matched to receipt",
+                               "VAS_065_MatchedToVendorReturn", "Matched to vendor return"),
+                    mt: fmtDate(data.GoodsReceipt.ReceivedDate),
+                    nt: retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
+                               "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                         .replace("{0}", data.GoodsReceipt.ReceiptDocumentNo || "")
                         .replace("{1}", data.GoodsReceipt.OrderDocumentNo || ""), done: true
                 });
@@ -1117,6 +1160,7 @@
 
         function openPaymentModal() {
             if (!data || !data.C_Invoice_ID) return;
+            panelDirty = false;   // fresh modal session
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetPaymentModalMeta",
@@ -1146,6 +1190,8 @@
         // document (record) number is shown once the refreshed modal is in place.
         function refreshPaymentModal(allocDocNo) {
             if (!data || !data.C_Invoice_ID) return;
+            // An allocation was just created -> the panel behind the modal is stale.
+            panelDirty = true;
             showModalBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetPaymentModalMeta",
@@ -1244,7 +1290,13 @@
             // currently in the DOM.
             var curCredits = meta.OnAccountPayments || [];
             var creditTotal = meta.OnAccountPaymentsTotal || curCredits.length;
-            var invOpen = +meta.NetOpenAmount || +meta.NetPayable || 0;
+            // Open amount still to settle. A ZERO open amount is a valid value (every pay
+            // schedule paid) - it must NOT fall back to the net payable, otherwise the
+            // fully-settled invoice would offer its whole total as a new payment.
+            var invOpen = (meta.NetOpenAmount === null || typeof meta.NetOpenAmount === "undefined")
+                ? (+meta.NetPayable || 0) : (+meta.NetOpenAmount || 0);
+            // Nothing left to settle -> the New Payment section is read-only.
+            var fullySettled = !!meta.IsFullySettled || invOpen <= 0;
 
             var state = { applied: 0, allocationCreated: false, selected: {} };
             var CREDITS_PER_PAGE = 5;
@@ -1275,13 +1327,16 @@
                         // the Payment schedule layout.
                         var $row = $('<div class="vas-apinv-t4-row vas-apinv-credit-t4row"></div>');
                         if (selected) $row.addClass("on");
-                        if (locked) $row.addClass("locked");
+                        // Nothing open to allocate against -> rows are shown but not selectable.
+                        if (locked || fullySettled) $row.addClass("locked");
                         else $row.addClass("selectable");
 
                         // Show the source document type + document no (no generic
                         // "On-account payment" literal).
                         var docLabel = (r.DocTypeName ? r.DocTypeName + " - " : "") + (r.DocumentNo || "");
-                        $row.append($('<div class="col-a p"></div>').text(docLabel || (r.DocumentNo || "")));
+                        docLabel = docLabel || (r.DocumentNo || "");
+                        // Full document label as tooltip - the column truncates.
+                        $row.append($('<div class="col-a p"></div>').text(docLabel).attr("title", docLabel));
                         $row.append($('<div class="col-b c"></div>').text(fmtDate(r.Date)));
 
                         // Status chip: Available -> Selected -> Allocated.
@@ -1302,7 +1357,7 @@
                         }
                         $row.append($amt);
                         $row.on("click", function () {
-                            if (state.allocationCreated) return;
+                            if (state.allocationCreated || fullySettled) return;
                             if (!isCreditSelected(r)) {
                                 // Single-currency rule: only sources sharing the currency of
                                 // the already-selected rows can be added at one time. When the
@@ -1407,11 +1462,20 @@
                 $bodyM.append($sec);
             }
 
-            // New payment form
+            // New payment form. When every pay schedule is already paid the whole section
+            // is rendered read-only - there is no balance left to record a payment for.
             var $pay = $('<div class="vas-apinv-m-sec js-newpay"></div>');
             $pay.append($('<div class="vas-apinv-m-sec-h"></div>')
                 .append($('<span class="t"></span>').text(lbl("VAS_065_NewPayment", "New Payment")))
-                .append($('<span class="hint"></span>').text(lbl("VAS_065_ForBalanceAfterCredits", "For the balance after credits"))));
+                .append($('<span class="hint"></span>').text(fullySettled
+                    ? lbl("VAS_065_NoBalanceToPay", "No balance left to pay")
+                    : lbl("VAS_065_ForBalanceAfterCredits", "For the balance after credits"))));
+            if (fullySettled) {
+                $pay.append($('<div class="vas-apinv-paid-note"></div>')
+                    .append('<i class="fa fa-check-circle"></i>')
+                    .append($('<span></span>').text(lbl("VAS_065_AllSchedulesPaidMsg",
+                        "All payment schedules of this invoice are paid. No further payment can be recorded."))));
+            }
 
             var $grid = $('<div class="vas-apinv-fgrid"></div>');
             var $amtField = field(lbl("VAS_065_PaymentAmount", "Payment Amount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
@@ -1673,6 +1737,12 @@
                     $sum.text(lbl("VAS_065_CreditsAppliedSummary", "{0} allocated. New payment amount has been recalculated.").replace("{0}", fmtAmountCur(state.applied, cur, p)));
                     return;
                 }
+                // Nothing open on the invoice: there is nothing left to allocate against.
+                if (fullySettled) {
+                    $btn.prop("disabled", true);
+                    $sum.text(lbl("VAS_065_NothingOpenToAllocate", "All payment schedules are paid - there is nothing left to allocate."));
+                    return;
+                }
                 $btn.prop("disabled", sel <= 0);
                 $sum.text(sel > 0
                     ? lbl("VAS_065_SelectedForAllocation", "{0} selected for allocation.").replace("{0}", fmtAmountCur(sel, cur, p))
@@ -1710,12 +1780,14 @@
                         : lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount"))
                     .toggleClass("err show", exceedsOpen || noRate);
 
+                // Nothing open -> no payment can be recorded (section is read-only).
                 var $submit = $scrim.find(".js-submit");
-                $submit.prop("disabled", exceedsOpen || noRate)
+                $submit.prop("disabled", exceedsOpen || noRate || fullySettled)
                     .text(pay <= 0 && creditPay > 0 ? lbl("VAS_065_CompleteSettlement", "Complete settlement") : lbl("VAS_065_RecordPayment", "Record payment"));
 
                 var $foot = $scrim.find(".js-foot-msg");
-                if (noRate) { $foot.text(lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency.")); }
+                if (fullySettled) { $foot.text(lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")); }
+                else if (noRate) { $foot.text(lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency.")); }
                 else if (exceedsOpen) { $foot.text(lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount")); }
                 else if (remain <= 1e-6) { $foot.text(lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")); }
                 else { $foot.text(lbl("VAS_065_WillRemainOpen", "{0} will remain open").replace("{0}", fmtAmountCur(remain, sym, prec))); }
@@ -1762,7 +1834,7 @@
             $bodyM.data("updateCreditSummary", updateCreditSummary);
             $bodyM.data("recompute", recompute);
             $bodyM.data("applySelectedCredits", applySelectedCredits);
-            $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum, payCtx: payCtx }; });
+            $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum, payCtx: payCtx, fullySettled: fullySettled }; });
 
             // Payment amount and discount are numeric/amount fields: restrict input to a
             // non-negative decimal before the live recompute runs.
@@ -1794,6 +1866,17 @@
             // Both amount fields are shown in the user's locale number format.
             $payAmt.val(fmtAmtInput(invOpen, p));
             $payDisc.val(fmtAmtInput(parseNum($payDisc.val()), p));
+
+            // Every schedule paid: freeze the New Payment section - amount / discount are
+            // zero and every field (bank, currency, date, method, amount, discount,
+            // reference, check date) is disabled so nothing can be entered.
+            if (fullySettled) {
+                $payAmt.val(fmtAmtInput(0, p));
+                $payDisc.val(fmtAmtInput(0, p));
+                $pay.addClass("is-readonly")
+                    .find("input, select").prop("disabled", true).attr("tabindex", "-1");
+            }
+
             updateCreditSummary();
             recompute();
 
@@ -1952,6 +2035,12 @@
             var pay = st.parseNum(st.payAmt.val());
             var disc = st.parseNum(st.payDisc.val());
 
+            // Fully settled invoice: the New Payment section is read-only, nothing to record.
+            if (st.fullySettled) {
+                info(lbl("VAS_065_AllSchedulesPaidMsg", "All payment schedules of this invoice are paid. No further payment can be recorded."));
+                return;
+            }
+
             if (pay <= 0 && st.state.applied > 0) {
                 // Settlement is fully covered by the already-created allocation (shown in
                 // the invoice currency - the allocation is in invoice currency).
@@ -2063,6 +2152,9 @@
 
         function showSuccess(title, message, recapRows) {
             if (!$scrim) return;
+            // The document changed -> refresh the panel when the modal is closed
+            // (Done button, X, Esc or scrim click all funnel through closeModal).
+            panelDirty = true;
             $scrim.find(".js-form").hide();
             // Use flex (not .show()'s display:block) so the success body can scroll.
             var $s = $scrim.find(".js-success").css("display", "flex");
@@ -2075,8 +2167,7 @@
                     .append($('<span class="v"></span>').text(r.v)));
             });
             $s.find(".js-done").text(lbl("VAS_065_Done", "Done")).off("click").on("click", function () {
-                closeModal();
-                $self.fetchData($self.record_ID);
+                closeModal();   // closeModal re-fetches the panel data (panelDirty)
             });
         }
 
@@ -2106,6 +2197,13 @@
             $scrim.removeClass("open");
             $(document).off("keydown.vasApinvModal");
             setTimeout(removeModal, 220);
+            // An allocation / payment was created while the modal was open: reload the
+            // panel so the hero, the schedule table and the action buttons (Record
+            // payment turns read-only once every schedule is paid) show the new state.
+            if (panelDirty) {
+                panelDirty = false;
+                $self.fetchData($self.record_ID);
+            }
         }
         function removeModal() {
             if ($scrim) { $scrim.remove(); $scrim = null; }
