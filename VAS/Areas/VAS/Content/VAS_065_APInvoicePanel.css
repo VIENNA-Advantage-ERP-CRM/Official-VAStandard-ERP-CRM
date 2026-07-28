@@ -1780,6 +1780,43 @@
     padding: 0.6em 0;
 }
 
+/* Every pay schedule paid: the New Payment section is frozen (read-only) and
+   carries a success note instead of an editable balance. */
+.vas-apinv-paid-note {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.8em;
+    padding: 0.7em 0.8em;
+    border: var(--apinv-hair) solid var(--apinv-success-border);
+    background: var(--apinv-success-bg);
+    border-radius: var(--apinv-r-md);
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--apinv-success-text);
+    line-height: 1.5;
+}
+
+    .vas-apinv-paid-note .fa {
+        font-size: 1.05em;
+    }
+
+.vas-apinv-m-sec.is-readonly .vas-apinv-fgrid {
+    opacity: .6;
+    pointer-events: none;
+}
+
+    .vas-apinv-m-sec.is-readonly .vas-apinv-field .control:hover,
+    .vas-apinv-m-sec.is-readonly .vas-apinv-field .control:focus-within {
+        border-bottom-color: var(--apinv-field-border);
+    }
+
+    .vas-apinv-m-sec.is-readonly .vas-apinv-field input,
+    .vas-apinv-m-sec.is-readonly .vas-apinv-field select {
+        color: var(--apinv-muted);
+        cursor: default;
+    }
+
 /* Modal-scoped busy overlay. */
 .vas-apinv-m-busy {
     position: absolute;

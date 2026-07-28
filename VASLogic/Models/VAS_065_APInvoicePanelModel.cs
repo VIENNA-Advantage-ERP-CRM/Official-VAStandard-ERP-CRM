@@ -861,6 +861,11 @@ namespace VASLogic.Models
                 meta.NetOpenAmount = head.OpenAmount;
             }
 
+            // Nothing left to settle: the invoice is flagged paid or every pay schedule
+            // is marked paid (open amount consumed by payments / allocations). The modal
+            // uses this to render the New Payment section read-only.
+            meta.IsFullySettled = meta.NetOpenAmount <= 0m || (!head.IsAPCreditNote && head.IsPaid);
+
             // First page of on-account payments (server-side paged). The page rows are
             // converted for display; total count + "Available to apply" come from a
             // full aggregate pass so they are not limited to the page.
@@ -2529,6 +2534,9 @@ namespace VASLogic.Models
             public decimal Withholding { get; set; }
             public decimal NetPayable { get; set; }
             public decimal NetOpenAmount { get; set; }
+            // True when nothing is left to settle (invoice flagged paid or every pay
+            // schedule paid). The modal then shows the New Payment section read-only.
+            public bool IsFullySettled { get; set; }
             public decimal AvailableToApply { get; set; }
             public decimal CreditNoteAmount { get; set; }
             public decimal OpenInvoicesAvailable { get; set; }
