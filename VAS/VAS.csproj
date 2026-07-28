@@ -157,7 +157,6 @@
     <Content Include="Areas\VAS\Content\VAS_028_PaidThisMonthAPPaymentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_032_RecentAPPaymentsWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_033_PaymentMethodsWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_044_GLJournalRecentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_048_TodayCashOutCashJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_049_NetCashForCashJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_050_CurrentCashForCashJournalWidget.css" />
@@ -177,19 +176,6 @@
     <Compile Include="Areas\VAS\Controllers\VAS_074_CreateInvoiceLinePanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_105_AccountRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_120_CustomerSearchWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_122_TotalCustomersWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_124_DelayedPaymentsWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_125_OpenPipelineWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_126_OpenTicketsWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_127_OpenTicketsListWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_135_ActiveProjectsWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_136_OnboardingStatusWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_137_NeedsAttentionWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_138_DelayedPaymentsListWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_139_HighValuePipelineWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_140_ContractsExpiringWidgetController.cs" />
-    <Compile Include="Areas\VAS\Controllers\VAS_141_CustomersBySegmentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_AttributeControlController.cs" />
     <Compile Include="Areas\VAS\Controllers\BouncedChequesController.cs" />
     <Compile Include="Areas\VAS\Controllers\AvgDaysToPayController.cs" />
@@ -239,6 +225,27 @@
     <Compile Include="Areas\VAS\Controllers\CallOut\MUOMConversionController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MVASContractController.cs" />
     <Compile Include="Areas\VAS\Controllers\CallOut\MWarehouseController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_156_CountedMTDWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_166_NewCycleCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_157_VarianceLinesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_159_PositiveVarianceQtyWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_160_NegativeVarianceQtyWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_158_OpenCountSheetsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_162_AdjustmentWiseCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_161_WHWiseCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_163_InventoryAgingReportWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_164_StockSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_165_LocationWiseInventoryCountWidgetController.cs" />
+
+
+
+
+
+
+
+
+
+
     <Compile Include="Areas\VAS\Controllers\VAS_027_ClearedAPPaymentWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\CollectionEfficiencyController.cs" />
     <Compile Include="Areas\VAS\Controllers\CommonController.cs" />
@@ -401,21 +408,6 @@
     <Content Include="Areas\VAS\Content\VAS_104_OverviewShipGRNConfirmation.css" />
     <Content Include="Areas\VAS\Content\VAS_105_AccountRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_106_OverviewSalesOrder.css" />
-    <Content Include="Areas\VAS\Content\VAS_120_CustomerSearchWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_121_NewCustomerWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_KpiDrillThrough.css" />
-    <Content Include="Areas\VAS\Content\VAS_122_TotalCustomersWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_124_DelayedPaymentsWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_125_OpenPipelineWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_126_OpenTicketsWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_127_OpenTicketsListWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_135_ActiveProjectsWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_136_OnboardingStatusWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_137_NeedsAttentionWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_138_DelayedPaymentsListWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_139_HighValuePipelineWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_140_ContractsExpiringWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_141_CustomersBySegmentWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_DocumentSearchWidgets.css" />
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
     <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
@@ -507,7 +499,6 @@
     <Content Include="Areas\VAS\Content\VAS_041_GLJournalEntriesWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_118_QuickJournalWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_045_GLJournalPendingWidget.css" />
-    <Content Include="Areas\VAS\Content\VAS_GLDashboard_RTL.css" />
     <Content Include="Areas\VAS\Content\VAS_043_GLJournalTopMovementWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_042_GLJournalVolumeWidget.css" />
     <Content Include="Areas\VAS\Content\VAS_040_GLJournalNetDiffWidget.css" />
@@ -654,21 +645,6 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\OutstandingSalesOrderWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\OverdueWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\PaidthismonthWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_KpiDrillThrough.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_120_CustomerSearchWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_121_NewCustomerWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_122_TotalCustomersWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_124_DelayedPaymentsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_125_OpenPipelineWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_126_OpenTicketsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_127_OpenTicketsListWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_135_ActiveProjectsWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_136_OnboardingStatusWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_137_NeedsAttentionWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_138_DelayedPaymentsListWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_139_HighValuePipelineWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_140_ContractsExpiringWidget.js" />
-    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_141_CustomersBySegmentWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_GLJournalDetailDialog.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_041_GLJournalEntriesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\VAS_118_QuickJournalWidget.js" />
