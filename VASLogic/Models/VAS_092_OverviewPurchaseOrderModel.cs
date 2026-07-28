@@ -116,6 +116,10 @@
 ///                          VAS_ContractMaster_ID from C_Order first (so the
 ///                          Generated From chip always shows when the order has
 ///                          one), then the DocumentNo enriched separately.
+///   VAI163   2026-07-27  - Attribute Set Instance join now matches only a real
+///                          instance (M_AttributeSetInstance_ID > 0) so a line
+///                          with no ASI no longer picks up the zero-record's "--"
+///                          description.
 /// </summary>
 
 using System;
@@ -564,7 +568,8 @@ namespace VASLogic.Models
                            LEFT OUTER JOIN M_Product   p   ON (ol.M_Product_ID = p.M_Product_ID)
                            LEFT OUTER JOIN C_Charge    ch  ON (ol.C_Charge_ID  = ch.C_Charge_ID)
                            LEFT OUTER JOIN C_UOM       uom ON (ol.C_UOM_ID     = uom.C_UOM_ID)
-                           LEFT OUTER JOIN M_AttributeSetInstance asi ON (ol.M_AttributeSetInstance_ID = asi.M_AttributeSetInstance_ID)
+                           LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID = ol.M_AttributeSetInstance_ID
+                                                                          AND ol.M_AttributeSetInstance_ID > 0)
                            LEFT OUTER JOIN C_Order     o   ON (ol.C_Order_ID   = o.C_Order_ID)
                            LEFT OUTER JOIN M_PriceList pl  ON (o.M_PriceList_ID = pl.M_PriceList_ID)
                            WHERE ol.C_Order_ID = @C_Order_ID
