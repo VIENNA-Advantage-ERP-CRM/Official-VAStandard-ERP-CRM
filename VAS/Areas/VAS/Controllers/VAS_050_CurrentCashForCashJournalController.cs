@@ -21,6 +21,14 @@ namespace VAS.Controllers
     public class VAS_050_CurrentCashForCashJournalController : Controller
     {
         /// <summary>
+        /// Look-back window (in days) applied to C_Cash.DateAcct when listing the
+        /// cash journal lines: only journals accounted for within the last
+        /// 15 days are shown in the detail dialog.
+        /// </summary>
+        private const int RECENT_DAYS = 15;
+
+
+        /// <summary>
         /// Returns the ending balance of the latest accessible cash journal.
         ///
         /// Latest means:
@@ -300,8 +308,9 @@ namespace VAS.Controllers
         }
 
         /// <summary>
-        /// Returns one page of C_CashLine records belonging to the same
-        /// latest C_Cash record displayed by GetCurrentCash.
+        /// Returns one page of C_CashLine records of the cash journals whose
+        /// C_Cash.DateAcct falls within the last <see cref="RECENT_DAYS"/> days
+        /// (optionally restricted to one Cash Book).
         /// </summary>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
@@ -316,87 +325,38 @@ namespace VAS.Controllers
 
             if (ctx == null)
             {
-                return Json(
-                    new
-                    {
-                        success = false,
-                        error = GetMsg(
-                            Env.GetCtx(),
-                            "VAS_050_SessionExpired",
-                            "Session Expired"
-                        ),
-                        hasData = false
-                    },
-                    JsonRequestBehavior.AllowGet
-                );
+                return Json(new
+                {
+                    success = false,
+                    error = GetMsg(Env.GetCtx(), "VAS_050_SessionExpired", "Session Expired"),
+                    hasData = false
+                }, JsonRequestBehavior.AllowGet);
             }
 
-            pageNo =
-                Math.Max(
-                    pageNo,
-                    1
-                );
-
-            pageSize =
-                Math.Max(
-                    1,
-                    Math.Min(
-                        pageSize,
-                        50
-                    )
-                );
+            pageNo = Math.Max(pageNo, 1);
+            pageSize = Math.Max(1, Math.Min(pageSize, 50));
 
             IDataReader reader = null;
-
             try
             {
-                SqlQueryData queryData =
-                    BuildCurrentCashRowsSql(
-                        ctx,
-                        cashBookId,
-                        pageNo,
-                        pageSize
-                    );
-
-                reader =
-                    DB.ExecuteReader(
-                        queryData.Sql,
-                        queryData.Parameters,
-                        null
-                    );
-
-                List<object> rows =
-                    new List<object>();
-
+                SqlQueryData queryData = BuildCurrentCashRowsSql(ctx, cashBookId, pageNo, pageSize);
+                reader = DB.ExecuteReader(queryData.Sql, queryData.Parameters, null);
+                List<object> rows = new List<object>();
                 int totalRecords = 0;
                 int stdPrecision = 2;
                 decimal totalAmount = 0;
-
                 int selectedCashId = 0;
                 int selectedCashBookId = 0;
+                string cashBookName = string.Empty;
+                string documentNo = string.Empty;
 
-                string cashBookName =
-                    string.Empty;
+                string selectedStatementDate = string.Empty;
 
-                string documentNo =
-                    string.Empty;
+                string selectedDateAcct = string.Empty;
 
-                string selectedStatementDate =
-                    string.Empty;
-
-                string selectedDateAcct =
-                    string.Empty;
-
-                while (
-                    reader != null &&
-                    reader.Read()
-                )
+                while (reader != null && reader.Read())
                 {
-                    totalRecords =
-                        GetInt(
-                            reader,
-                            "TotalRecords"
-                        );
+                    totalRecords = GetInt(reader, "TotalRecords");
 
                     stdPrecision =
                         NormalizePrecision(
@@ -702,32 +662,13 @@ namespace VAS.Controllers
             List<object> result =
                 new List<object>();
 
-            string sql = @"
-SELECT
-    CashBook.C_CashBook_ID,
-    CashBook.Name
+            string sql = @"SELECT
+                            CashBook.C_CashBook_ID, CashBook.Name
+                        FROM C_CashBook CashBook
+                        WHERE CashBook.IsActive = 'Y' AND CashBook.AD_Client_ID = @AD_Client_ID";
 
-FROM C_CashBook CashBook
-
-WHERE CashBook.IsActive = 'Y'
-
-AND CashBook.AD_Client_ID =
-    @AD_Client_ID";
-
-            sql =
-                MRole.GetDefault(ctx)
-                    .AddAccessSQL(
-                        sql,
-                        "CashBook",
-                        MRole.SQL_FULLYQUALIFIED,
-                        MRole.SQL_RO
-                    );
-
-            sql += @"
-
-ORDER BY
-    CashBook.Name,
-    CashBook.C_CashBook_ID";
+            sql = MRole.GetDefault(ctx).AddAccessSQL(sql, "CashBook", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+            sql += @" ORDER BY CashBook.Name, CashBook.C_CashBook_ID";
 
             SqlParameter[] parameters =
                 new SqlParameter[]
@@ -782,101 +723,33 @@ ORDER BY
             int cashBookId
         )
         {
-            string queryParametersFrom =
-                DB.IsOracle()
-                    ? " FROM DUAL"
-                    : string.Empty;
+            string queryParametersFrom = DB.IsOracle() ? " FROM DUAL" : string.Empty;
 
-            string numericType =
-                DB.IsOracle()
-                    ? "NUMBER"
-                    : "NUMERIC";
+            string numericType = DB.IsOracle() ? "NUMBER" : "NUMERIC";
 
-            string queryParametersSql = @"
-QueryParameters AS
-(
-    SELECT
-        @AD_Client_ID AS AD_Client_ID,
-        @C_CashBook_ID AS C_CashBook_ID"
-        + queryParametersFrom + @"
-)";
+            string queryParametersSql = @" QueryParameters AS
+                                            (SELECT
+                                            @AD_Client_ID AS AD_Client_ID,
+                                            @C_CashBook_ID AS C_CashBook_ID"
+                                            + queryParametersFrom + @")";
 
-            string schemaCurrencySql = @"
-SchemaCurrency AS
-(
-    SELECT
-        ClientInfo.AD_Client_ID,
-        AcctSchema.C_Currency_ID,
-        Currency.StdPrecision,
-        Currency.ISO_Code,
-        CASE
-            WHEN Currency.CurSymbol IS NOT NULL
-            THEN Currency.CurSymbol
-            ELSE Currency.ISO_Code
-        END AS CurSymbol
-    FROM AD_ClientInfo ClientInfo
-    INNER JOIN C_AcctSchema AcctSchema ON
-    (
-        AcctSchema.C_AcctSchema_ID =
-        ClientInfo.C_AcctSchema1_ID
-    )
-    INNER JOIN C_Currency Currency ON
-    (
-        Currency.C_Currency_ID =
-        AcctSchema.C_Currency_ID
-    )
-    WHERE ClientInfo.IsActive = 'Y'
-    AND AcctSchema.IsActive = 'Y'
-    AND Currency.IsActive = 'Y'
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
-)";
-
-            string protectedCashSql = @"
-SELECT
-    CashHeader.C_Cash_ID,
-    CashHeader.AD_Client_ID,
-    CashHeader.AD_Org_ID,
-    CashHeader.C_CashBook_ID,
-    CashHeader.DocumentNo,
-    CashHeader.StatementDate,
-    CashHeader.DateAcct,
-    CashHeader.EndingBalance,
-    CashHeader.DocStatus
-FROM C_Cash CashHeader
-WHERE CashHeader.IsActive = 'Y'
-AND CashHeader.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)
-AND CashHeader.DocStatus IN
-(
-    'DR',
-    'CO',
-    'CL'
-)
-AND
-(
-    (
-        SELECT
-            QueryParameters.C_CashBook_ID
-        FROM QueryParameters QueryParameters
-    ) <= 0
-    OR CashHeader.C_CashBook_ID =
-    (
-        SELECT
-            QueryParameters.C_CashBook_ID
-        FROM QueryParameters QueryParameters
-    )
-)";
+            string protectedCashSql = @"SELECT
+                                        CashHeader.C_Cash_ID,
+                                        CashHeader.AD_Client_ID,
+                                        CashHeader.AD_Org_ID,
+                                        CashHeader.C_CashBook_ID,
+                                        CashHeader.DocumentNo,
+                                        CashHeader.StatementDate,
+                                        CashHeader.DateAcct,
+                                        CashHeader.EndingBalance,
+                                        CashHeader.DocStatus
+                                    FROM C_Cash CashHeader
+                                    WHERE CashHeader.IsActive = 'Y'
+                                    AND CashHeader.AD_Client_ID = (SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)
+                                    AND CashHeader.DocStatus IN ('DR','CO','CL')
+                                    AND
+                                    ((SELECT QueryParameters.C_CashBook_ID FROM QueryParameters QueryParameters) <= 0
+                                        OR CashHeader.C_CashBook_ID = (SELECT QueryParameters.C_CashBook_ID FROM QueryParameters QueryParameters))";
 
             protectedCashSql =
                 MRole.GetDefault(ctx)
@@ -887,112 +760,58 @@ AND
                         MRole.SQL_RO
                     );
 
-            string convertedBalanceSql = @"
-CASE
-    WHEN CashBook.C_Currency_ID =
-        SchemaCurrency.C_Currency_ID
-    THEN COALESCE
-    (
-        ProtectedCash.EndingBalance,
-        0
-    )
-    ELSE CurrencyConvert
-    (
-        COALESCE
-        (
-            ProtectedCash.EndingBalance,
-            0
-        ),
-        CashBook.C_Currency_ID,
-        SchemaCurrency.C_Currency_ID,
-        ProtectedCash.DateAcct,
-        0,
-        ProtectedCash.AD_Client_ID,
-        ProtectedCash.AD_Org_ID
-    )
-END";
-
-            string sql = @"
-WITH
-" + queryParametersSql + @",
-" + schemaCurrencySql + @",
-ProtectedCash AS
-(
-" + protectedCashSql + @"
-),
-RankedCash AS
-(
-    SELECT
-        ProtectedCash.C_Cash_ID,
-        ProtectedCash.AD_Client_ID,
-        ProtectedCash.AD_Org_ID,
-        ProtectedCash.C_CashBook_ID,
-        ProtectedCash.DocumentNo,
-        ProtectedCash.StatementDate,
-        ProtectedCash.DateAcct,
-        CashBook.Name AS CashBookName,
-        ROUND
-        (
-            CAST
-            (
-                " + convertedBalanceSql + @"
-                AS " + numericType + @"
-            ),
-            CAST
-            (
-                COALESCE
-                (
-                    SchemaCurrency.StdPrecision,
-                    2
-                )
-                AS INTEGER
-            )
-        ) AS CurrentBalance,
-        COALESCE
-        (
-            SchemaCurrency.StdPrecision,
-            2
-        ) AS StdPrecision,
-        SchemaCurrency.C_Currency_ID,
-        SchemaCurrency.ISO_Code
-            AS CurrencyISO,
-        SchemaCurrency.CurSymbol
-            AS CurrencySymbol,
-        ROW_NUMBER() OVER
-        (
-            ORDER BY
-                ProtectedCash.StatementDate DESC,
-                ProtectedCash.C_Cash_ID DESC
-        ) AS RowNumber
-    FROM ProtectedCash ProtectedCash
-    INNER JOIN C_CashBook CashBook ON
-    (
-        CashBook.C_CashBook_ID =
-        ProtectedCash.C_CashBook_ID
-    )
-    INNER JOIN SchemaCurrency SchemaCurrency ON
-    (
-        SchemaCurrency.AD_Client_ID =
-        ProtectedCash.AD_Client_ID
-    )
-    WHERE CashBook.IsActive = 'Y'
-    AND CashBook.AD_Client_ID =
-        ProtectedCash.AD_Client_ID
-)
-SELECT
-    RankedCash.C_Cash_ID,
-    RankedCash.C_CashBook_ID,
-    RankedCash.CashBookName,
-    RankedCash.DocumentNo,
-    RankedCash.StatementDate,
-    RankedCash.DateAcct,
-    RankedCash.CurrentBalance,
-    RankedCash.StdPrecision,
-    RankedCash.C_Currency_ID,
-    RankedCash.CurrencyISO,
-    RankedCash.CurrencySymbol
-FROM RankedCash RankedCash
-WHERE RankedCash.RowNumber = 1";
+            // The balance is reported in the CASH BOOK's own currency (no conversion to
+            // the accounting-schema currency), so the amount, its precision and the
+            // symbol all come from C_CashBook.C_Currency_ID.
+            string sql = @" WITH
+                            " + queryParametersSql + @",
+                            ProtectedCash AS
+                            (
+                            " + protectedCashSql + @"
+                            ),
+                            RankedCash AS
+                            (
+                                SELECT
+                                    ProtectedCash.C_Cash_ID,
+                                    ProtectedCash.AD_Client_ID,
+                                    ProtectedCash.AD_Org_ID,
+                                    ProtectedCash.C_CashBook_ID,
+                                    ProtectedCash.DocumentNo,
+                                    ProtectedCash.StatementDate,
+                                    ProtectedCash.DateAcct,
+                                    CashBook.Name AS CashBookName,
+                                    ROUND(CAST(COALESCE(ProtectedCash.EndingBalance,0) AS " + numericType + @"),
+                                        CAST(COALESCE(BookCurrency.StdPrecision,2) AS INTEGER)) AS CurrentBalance,
+                                    COALESCE(BookCurrency.StdPrecision,2) AS StdPrecision,
+                                    BookCurrency.C_Currency_ID,
+                                    BookCurrency.ISO_Code
+                                        AS CurrencyISO,
+                                    CASE
+                                        WHEN BookCurrency.CurSymbol IS NOT NULL
+                                        THEN BookCurrency.CurSymbol
+                                        ELSE BookCurrency.ISO_Code
+                                    END AS CurrencySymbol,
+                                    ROW_NUMBER() OVER (ORDER BY ProtectedCash.StatementDate DESC, ProtectedCash.C_Cash_ID DESC) AS RowNumber
+                                FROM ProtectedCash ProtectedCash
+                                INNER JOIN C_CashBook CashBook ON (CashBook.C_CashBook_ID = ProtectedCash.C_CashBook_ID)
+                                INNER JOIN C_Currency BookCurrency ON (BookCurrency.C_Currency_ID = CashBook.C_Currency_ID AND BookCurrency.IsActive = 'Y')
+                                WHERE CashBook.IsActive = 'Y'
+                                AND CashBook.AD_Client_ID = ProtectedCash.AD_Client_ID
+                            )
+                            SELECT
+                                RankedCash.C_Cash_ID,
+                                RankedCash.C_CashBook_ID,
+                                RankedCash.CashBookName,
+                                RankedCash.DocumentNo,
+                                RankedCash.StatementDate,
+                                RankedCash.DateAcct,
+                                RankedCash.CurrentBalance,
+                                RankedCash.StdPrecision,
+                                RankedCash.C_Currency_ID,
+                                RankedCash.CurrencyISO,
+                                RankedCash.CurrencySymbol
+                            FROM RankedCash RankedCash
+                            WHERE RankedCash.RowNumber = 1";
 
             SqlParameter[] parameters =
                 new SqlParameter[]
@@ -1062,12 +881,8 @@ AND CashHeader.AD_Client_ID =
         QueryParameters.AD_Client_ID
     FROM QueryParameters QueryParameters
 )
-AND CashHeader.DocStatus IN
-(
-    'DR',
-    'CO',
-    'CL'
-)
+AND CashHeader.DocStatus IN ('DR', 'CO','CL')
+AND CashHeader.StatementDate >= @FromDateAcct
 AND
 (
     (
@@ -1107,7 +922,7 @@ ProtectedCash AS
 (
 " + protectedCashSql + @"
 ),
-RankedCash AS
+LatestCash AS
 (
     SELECT
         ProtectedCash.C_Cash_ID,
@@ -1125,20 +940,6 @@ RankedCash AS
                 ProtectedCash.C_Cash_ID DESC
         ) AS RowNumber
     FROM ProtectedCash ProtectedCash
-),
-LatestCash AS
-(
-    SELECT
-        RankedCash.C_Cash_ID,
-        RankedCash.AD_Client_ID,
-        RankedCash.AD_Org_ID,
-        RankedCash.C_CashBook_ID,
-        RankedCash.DocumentNo,
-        RankedCash.StatementDate,
-        RankedCash.DateAcct,
-        RankedCash.DocStatus
-    FROM RankedCash RankedCash
-    WHERE RankedCash.RowNumber = 1
 ),
 StatusReference AS
 (
@@ -1470,6 +1271,16 @@ ORDER BY
                     new SqlParameter(
                         "@AD_Language",
                         ctx.GetAD_Language()
+                    ),
+
+                    // Look-back cut-off for C_Cash.DateAcct. Computed here rather
+                    // than in SQL so the statement stays neutral between
+                    // PostgreSQL (INTERVAL) and Oracle (SYSDATE - n).
+                    new SqlParameter(
+                        "@FromDateAcct",
+                        DateTime.Today.AddDays(
+                            -RECENT_DAYS
+                        )
                     ),
 
                     new SqlParameter(

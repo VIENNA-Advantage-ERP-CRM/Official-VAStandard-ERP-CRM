@@ -743,22 +743,11 @@
     }
 }
 
-/* ── Hover expand: show full title on pointer-over ─────────────────────── */
+/* ── Header title ──────────────────────────────────────────────────────
+   No hover treatment: the title keeps its truncation and exposes the full
+   text through its native `title` tooltip (no white overlay box). */
 .VAS-047-today-cash-in-cash-journal-title {
     cursor: default;
-}
-
-.VAS-047-today-cash-in-cash-journal-title:hover {
-    overflow: visible;
-    white-space: normal;
-    word-break: break-word;
-    position: relative;
-    z-index: 30;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
-    border-radius: 6px;
-    padding: 0.25em 0.5em;
-    margin: -0.25em -0.5em;
 }
 
 @container (max-width: 16em) {

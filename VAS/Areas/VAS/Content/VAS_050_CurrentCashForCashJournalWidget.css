@@ -536,6 +536,13 @@
     text-align: right !important;
 }
 
+/* Empty / error message row — a single colspan cell, so the ":last-child"
+   right-alignment above would otherwise push it to the far right. Centre it
+   across the whole table instead. */
+.VAS-050-current-cash-dialog .VAS-050-current-cash-table tbody td.VAS-047-cash-in-dialog-empty {
+    text-align: center !important;
+}
+
 /* ── Modal table dividers — 3-tone (mirrors the VAS_047 dialog skin) ──── */
 .VAS-050-current-cash-dialog .VAS-050-current-cash-table thead th {
     border-bottom: 1px solid #C5D2DD;

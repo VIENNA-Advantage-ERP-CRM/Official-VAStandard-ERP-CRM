@@ -6,7 +6,7 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Net cash                             | VAS_049_NetCash
- *  2  | Today                                | VAS_049_Today
+ *  2  | Today’s Net Cash Movement            | VAS_049_Subtitle
  *  3  | Loading                              | VAS_049_Loading
  *  4  | No data                              | VAS_049_NoData
  *  5  | Unable to load net cash              | VAS_049_LoadError
@@ -171,10 +171,15 @@
                 'text': lbl('VAS_049_NetCash', 'Net cash')
             });
 
+            // Static widget subtitle (not the server's badge text, which only
+            // carries the period name).
+            var subtitleText = lbl('VAS_049_Subtitle', 'Today’s Net Cash Movement');
+
             var $date = $('<span>', {
                 'class': 'VAS_net-cash-cash-journal-subtitle',
                 'id': 'VAS_049_net-cash-date-' + widgetId,
-                'text': lbl('VAS_049_Today', 'Today')
+                'text': subtitleText,
+                'title': subtitleText
             });
 
             var $value = $('<div>', {
@@ -267,15 +272,14 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
             var title = data.title || lbl('VAS_049_NetCash', 'Net cash');
-            var dateText = data.badgeText || lbl('VAS_049_Today', 'Today');
             var netAmount = safeNumber(data.mainMetric);
             var deltaAmount = safeNumber(data.deltaAmount);
             var valueClass = getStateClass(netAmount, 'VAS_net-cash-cash-journal-value');
             var deltaClass = getStateClass(deltaAmount, 'VAS_net-cash-cash-journal-delta');
 
             $root.find('#VAS_049_net-cash-state-' + widgetId).removeClass('is-visible').text('');
+            // The subtitle is static (set in buildLayout) — nothing to refresh here.
             $root.find('#VAS_049_net-cash-title-' + widgetId).text(title).attr('title', title);
-            $root.find('#VAS_049_net-cash-date-' + widgetId).text(dateText).attr('title', dateText);
 
             $root.find('#VAS_049_net-cash-value-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-value-positive VAS_net-cash-cash-journal-value-negative VAS_net-cash-cash-journal-value-neutral')
