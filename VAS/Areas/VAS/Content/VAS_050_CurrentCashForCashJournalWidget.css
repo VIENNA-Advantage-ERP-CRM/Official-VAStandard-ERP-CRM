@@ -17,13 +17,17 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    /* Query container only — no font-size (see card). Keeps container-query em
+       breakpoints resolving against 16px like ExpectedThisWeek. */
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
-    color: rgba(255, 255, 255, 0.92);
+    color: #102C3F;
 }
 
 .VAS_current-cash-cash-journal-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -34,34 +38,24 @@
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5em;
-    padding: 0.875em;
-    border: 2px solid rgba(255, 255, 255, 0.16);
+    padding: 0.85em;
+    border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, #11263A 0%, #092037 100%);
-    box-shadow: 0 10px 24px rgba(8, 24, 42, 0.18);
-    color: rgba(255, 255, 255, 0.92);
-}
-
-.VAS_current-cash-cash-journal-action {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    border: 0 !important;
-    border-radius: inherit;
-    background: transparent;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    color: #60748A;
     cursor: pointer;
+    transition: box-shadow 180ms ease;
 }
 
-.VAS_current-cash-cash-journal-action:active,
-.VAS_current-cash-cash-journal-action:focus,
-.VAS_current-cash-cash-journal-action:focus-visible {
-    border: 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
-}
+    .VAS_current-cash-cash-journal-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+    }
+
+    .VAS_current-cash-cash-journal-card:focus-visible {
+        outline: 2px solid #0083DA;
+        outline-offset: 2px;
+    }
 
 .VAS_current-cash-cash-journal-row {
     display: flex;
@@ -72,61 +66,92 @@
     flex-shrink: 0;
 }
 
+/* Left cluster — icon well + title/subtitle stack */
+.VAS_current-cash-cash-journal-title-cluster {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    flex: 1 1 auto;
+}
+
+/* Header icon well — carries the same glyph as the drill-down modal */
+.VAS_current-cash-cash-journal-icon {
+    flex: 0 0 auto;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+}
+
+    .VAS_current-cash-cash-journal-icon svg {
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        display: block;
+    }
+
 .VAS_current-cash-cash-journal-label {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     line-height: 1.2;
     font-weight: 400;
     letter-spacing: 0;
     color: #102C3F;
 }
 
+/* Cashbook selector — clean bordered dropdown control (image_1 style).
+   Raised above the full-card action button so it stays clickable. */
 .VAS_current-cash-cash-journal-filter {
     position: relative;
-    z-index: 3;
+    z-index: 5;
     flex-shrink: 0;
-    max-width: 45%;
+    max-width: 100%;
     min-width: 0;
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
-    padding: 0.25em 0.625em;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.78);
+    padding: 0.375em 0.625em;
+    /*border-radius: 8px;*/
+    border-bottom: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    color: #41576A;
 }
 
 .VAS_current-cash-cash-journal-select {
-
     appearance: none;
-    background: transparent;
+    -webkit-appearance: none;
     border: 0;
-    color: inherit;
+    color: #102C3F;
     cursor: pointer;
     font: inherit;
-    font-size: 0.6875em;
-    padding-left: 4px !important;
+    font-size: 0.75em;
     width: 100%;
     min-width: 0;
     outline: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 1.1em 0 0; /* room for the caret */
+    background-color: transparent;
+    background-repeat: no-repeat;
+    background-position: right 0 center;
+    background-size: 0.9em 0.9em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235F7283' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
 }
 
     .VAS_current-cash-cash-journal-select option {
         color: #102C3F;
         background: #FFFFFF;
     }
-
-.VAS_current-cash-cash-journal-filter-separator,
-.VAS_current-cash-cash-journal-live {
-    flex-shrink: 0;
-    font-size: 0.6875em;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-}
 
 .VAS_current-cash-cash-journal-value {
     min-width: 0;
@@ -138,18 +163,20 @@
     align-items: center;
     justify-content: flex-start;
     gap: 0;
-    font-size: 1.375em;
-    line-height: 1;
-    letter-spacing: 0;
-    font-weight: 700;
-    color: #FFFFFF;
+    font-size: 1.75em;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    padding-left: 0.3125em;
 }
 
 .VAS_current-cash-cash-journal-value,
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix,
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-main,
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-decimal {
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix {
@@ -253,9 +280,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: rgba(255, 255, 255, 0.56);
-    font-size: 0.75em;
-    line-height: 1.25;
+    color: #5F7283;
+    font-size: 0.6875em;
+    line-height: 1.3;
     font-weight: 400;
 }
 
@@ -302,38 +329,7 @@
     gap: 0.5em;
     flex-shrink: 0;
     min-width: 0;
-    max-width: 65%;
-}
-
-.VAS_current-cash-cash-journal-header-tools .VAS_current-cash-cash-journal-filter {
-    max-width: calc(100% - 1.5em);
-}
-
-.VAS_current-cash-cash-journal-row .VAS-glje-zoom {
-    position: relative;
-    z-index: 4;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 1.125em;
-    width: 1.125em;
-    height: 1.125em;
-    color: #748494 !important;
-    font-size: 0.875em;
-    opacity: 0.75 !important;
-    text-decoration: none !important;
-    transition: opacity 0.15s, color 0.15s;
-    pointer-events: none;
-}
-
-.VAS_current-cash-cash-journal-row .VAS-glje-zoom svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-[dir="rtl"] .VAS_current-cash-cash-journal-row .VAS-glje-zoom svg {
-    transform: rotate(180deg);
+    max-width: 40%;
 }
 
 /* Drill-down uses the canonical cash-journal popup skin from VAS_047. */
@@ -416,7 +412,10 @@
 }
 
 @container (max-width: 18.75em) {
+    /* VAS_012 pattern: step the whole card font-size down on narrow cells so
+       every em-based value scales together. */
     .VAS_current-cash-cash-journal-card {
+        font-size: 0.8125em;
         padding: 0.75em;
         gap: 0.375em;
         border-radius: 12px;
@@ -433,6 +432,7 @@
 
 @container (max-width: 13.75em) {
     .VAS_current-cash-cash-journal-card {
+        font-size: 0.6875em;
         padding: 0.625em;
         gap: 0.25em;
     }
@@ -456,35 +456,36 @@
 }
 
 .VAS_current-cash-cash-journal-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
 }
 
 .VAS_current-cash-cash-journal-label {
     color: #102C3F;
 }
 
-.VAS_current-cash-cash-journal-filter {
-    background: rgba(255, 255, 255, 0.86);
-    border: 1px solid #E4EDF4;
-    color: #7C8795;
-}
-
-.VAS_current-cash-cash-journal-value,
-.VAS_current-cash-cash-journal-value-positive {
+.VAS_current-cash-cash-journal-value {
     color: #102C3F;
 }
 
-.VAS_current-cash-cash-journal-value-negative {
-    color: #A94747;
+.VAS_current-cash-cash-journal-value-positive {
+    color: #0B6B45;
 }
 
-.VAS_current-cash-cash-journal-value-neutral,
+.VAS_current-cash-cash-journal-value-negative {
+    color: #A33F3F;
+}
+
+.VAS_current-cash-cash-journal-value-neutral {
+    color: #102C3F;
+}
+
 .VAS_current-cash-cash-journal-footer,
 .VAS_current-cash-cash-journal-delta-neutral,
 .VAS_current-cash-cash-journal-description {
-    color: #60748A;
+    color: #5F7283;
 }
 
 .VAS_current-cash-cash-journal-delta-positive {
@@ -496,13 +497,13 @@
 }
 
 .VAS_current-cash-cash-journal-value {
-    font-size: 1.375em;
-    font-weight: 700;
+    font-size: 1.75em;
+    font-weight: 600;
 }
 
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-main {
     font-size: 1em;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 .VAS_current-cash-cash-journal-value .VAS-cash-amount-prefix,
@@ -520,19 +521,11 @@
     color: #60748A;
 }
 
-/* ── Hover expand ─────────────────────────────────────────────────────── */
 .VAS_current-cash-cash-journal-label { cursor: default; }
-.VAS_current-cash-cash-journal-label:hover {
-    overflow: visible; white-space: normal; word-break: break-word;
-    position: relative; z-index: 30;
-    background: rgba(255,255,255,0.98);
-    box-shadow: 0 4px 16px rgba(15,61,97,0.14);
-    border-radius: 6px; padding: 0.25em 0.5em; margin: -0.25em -0.5em;
-}
 
 @container (max-width: 16em) {
     .VAS_current-cash-cash-journal-value {
-        font-size: 1.375em;
+        font-size: 1.75em;
     }
 }
 
@@ -541,4 +534,20 @@
 .VAS-050-current-cash-table thead th:last-child,
 .VAS-050-current-cash-table tbody td:last-child {
     text-align: right !important;
+}
+
+/* ── Modal table dividers — 3-tone (mirrors the VAS_047 dialog skin) ──── */
+.VAS-050-current-cash-dialog .VAS-050-current-cash-table thead th {
+    border-bottom: 1px solid #C5D2DD;
+    color: #41576A;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.VAS-050-current-cash-dialog .VAS-050-current-cash-table tbody td {
+    border-bottom: 1px solid #E2EAF1;
+}
+
+.VAS-050-current-cash-dialog .VAS-047-cash-in-dialog-footer {
+    border-top: 1px solid #D9E2EB;
 }

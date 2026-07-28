@@ -13,9 +13,8 @@
  *  6  | vs 7-day avg                         | VAS_048_VsSevenDayAvg
  *  7  | disbursements                        | VAS_048_Disbursements
  *  8  | Session Expired                      | VAS_048_SessionExpired
- *  9  | Today's Cash Disbursements            | VAS_048_DialogTitle
- * 10  | Completed cash journal disbursements  | VAS_048_DialogSubtitle
- *     | recorded today                        |
+ *  9  | Today's Cash Disbursements           | VAS_048_DialogTitle
+ * 10  | Disbursements completed today        | VAS_048_DialogSubtitle
  * 11  | Document No.                          | VAS_048_DocumentNo
  * 12  | Date                                  | VAS_048_Date
  * 13  | Cash Type                             | VAS_048_CashType
@@ -37,6 +36,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_048_TodayCashOutCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -51,7 +75,7 @@
         var $pagerNext = null;
         var $pagerText = null;
         var pageNo = 1;
-        var pageSize = 6;
+        var pageSize = 6; /* fallback until the body is measured (see computePageSize) */
         var totalPages = 0;
         var totalRecords = 0;
         var totalAmount = 0;
@@ -59,6 +83,13 @@
         var dialogCurrencyLabel = '';
         var rowsLoading = false;
         var eventNamespace = '';
+
+        /* Adaptive paging: page size is derived from the visible dialog body
+           height, clamped to a floor, and recomputed on resize. */
+        var MIN_ROWS = 3;
+        var ROW_HEIGHT = 44; /* px fallback: tbody row ≈ 13px*2 padding + ~17px line + 1px border */
+        var dialogResizeObserver = null;
+        var resizeDebounce = null;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -71,31 +102,32 @@
             return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
+        /* Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            var label = String(currencyISO || currencySymbol || '').trim();
-            return label.toUpperCase() === 'IQD' ? 'ID' : label;
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
+            }
+
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
         }
 
-        function getAmountParts(value, currencySymbol, currencyISO, precision) {
-            var numericValue = Number(value || 0);
-            var stdPrecision = getPrecision(precision);
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-            var decimalMatch = amount.match(/([.,]\d+)$/);
-
-            return {
-                prefix: (numericValue < 0 ? '-' : '') + getCurrencyLabel(currencySymbol, currencyISO),
-                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
-                decimal: decimalMatch ? decimalMatch[1] : ''
-            };
-        }
-
+        /*
+         * KPI hero value — compact, locale-aware magnitude via
+         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
+         * The formatter returns a non-negative magnitude, so we compose the
+         * final string ourselves: sign, then currency, then magnitude — a
+         * negative renders as e.g. -$200.56 (leading minus, before the symbol).
+         */
         function renderCurrencyAmount($target, value, currencySymbol, currencyISO, precision) {
-            var parts = getAmountParts(value, currencySymbol, currencyISO, precision);
+            var numericValue = Number(value) || 0;
+            var sign = numericValue < 0 ? '-' : '';
+            var currency = getCurrencyLabel(currencySymbol, currencyISO);
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
-            $target.text(parts.prefix + parts.main + parts.decimal);
+            $target.text(sign + currency + magnitude);
         }
 
         function showBusy(show) {
@@ -209,9 +241,7 @@
                 $pagerHelper.text(totalRecords > 0
                     ? lbl('VAS_048_Showing', 'Showing') + ' ' + from + '\u2013' + to + ' ' +
                         lbl('VAS_048_Of', 'of') + ' ' + totalRecords + ' ' +
-                        lbl(totalRecords === 1 ? 'VAS_048_Disbursement' : 'VAS_048_Disbursements', totalRecords === 1 ? 'disbursement' : 'disbursements') +
-                        ' \u00B7 ' + lbl('VAS_048_Total', 'total') + ' ' +
-                        formatDialogAmountWithCurrency(totalAmount, dialogPrecision, dialogCurrencyLabel)
+                        lbl(totalRecords === 1 ? 'VAS_048_Disbursement' : 'VAS_048_Disbursements', totalRecords === 1 ? 'disbursement' : 'disbursements')
                     : '');
             }
 
@@ -223,6 +253,69 @@
 
             $pagerPrev.prop('disabled', rowsLoading || pageNo <= 1);
             $pagerNext.prop('disabled', rowsLoading || totalPages <= 1 || pageNo >= totalPages);
+        }
+
+        /* Rows that fit the visible dialog body: (body content height − thead)
+           / row height, floored, clamped to MIN_ROWS. Uses an actual rendered
+           row's height once data exists; otherwise the ROW_HEIGHT fallback. */
+        function computePageSize() {
+            var bodyEl = $dialog && $dialog.find('.VAS-047-cash-in-dialog-body')[0];
+
+            if (!bodyEl) {
+                return pageSize;
+            }
+
+            var theadEl = $dialog.find('.VAS-047-cash-in-dialog-table thead')[0];
+            var styles = window.getComputedStyle(bodyEl);
+            var padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+            var theadH = theadEl ? theadEl.offsetHeight : 40;
+            var firstRow = totalRecords > 0
+                ? $dialog.find('.VAS-047-cash-in-dialog-tbody tr')[0]
+                : null;
+            var rowH = (firstRow && firstRow.offsetHeight) ? firstRow.offsetHeight : ROW_HEIGHT;
+            var avail = bodyEl.clientHeight - padY - theadH;
+
+            if (!(avail > 0) || !(rowH > 0)) {
+                return pageSize;
+            }
+
+            return Math.max(MIN_ROWS, Math.floor(avail / rowH));
+        }
+
+        /* Re-derive the page size when the dialog is resized; only re-fetch when
+           the fit actually changes, and keep the current page in range. */
+        function recomputeDialogPageSize() {
+            if (!$dialog || !$dialog.is(':visible')) {
+                return;
+            }
+
+            var next = computePageSize();
+
+            if (next === pageSize) {
+                return;
+            }
+
+            pageSize = next;
+
+            var pages = totalRecords > 0 ? Math.ceil(totalRecords / pageSize) : 1;
+
+            if (pageNo > pages) {
+                pageNo = pages;
+            }
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            loadDialogRows();
+        }
+
+        function onDialogResize() {
+            if (resizeDebounce) {
+                clearTimeout(resizeDebounce);
+            }
+
+            resizeDebounce = setTimeout(recomputeDialogPageSize, 120);
         }
 
         function loadDialogRows() {
@@ -283,6 +376,7 @@
             $dialog.css('display', 'flex');
             $('body').addClass('VAS-047-cash-in-body-lock');
             $dialog.find('.VAS-047-cash-in-dialog-close').trigger('focus');
+            pageSize = computePageSize();
             loadDialogRows();
         }
 
@@ -305,7 +399,7 @@
                 '<div class="VAS-047-cash-in-dialog-card">' +
                 '<div class="VAS-047-cash-in-dialog-header">' +
                 '<div class="VAS-047-cash-in-dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2l-2 2-2-2-2 2-2-2-2 2-2-2-2 2-2-2Z"/><path d="M8 9h8"/><path d="M8 13h6"/></svg></div>' +
-                '<div class="VAS-047-cash-in-dialog-title-group"><div class="VAS-047-cash-in-dialog-title" id="' + titleId + '">' + escapeHtml(lbl('VAS_048_DialogTitle', "Today's Cash Disbursements")) + '</div><div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_048_DialogSubtitle', 'Completed cash journal disbursements recorded today')) + '</div></div>' +
+                '<div class="VAS-047-cash-in-dialog-title-group"><div class="VAS-047-cash-in-dialog-title" id="' + titleId + '">' + escapeHtml(lbl('VAS_048_DialogTitle', "Today's Cash Disbursements")) + '</div><div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_048_DialogSubtitle', 'Disbursements completed today')) + '</div></div>' +
                 '<button type="button" class="VAS-047-cash-in-dialog-close" aria-label="' + escapeHtml(lbl('VAS_048_Close', 'Close')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
                 '</div>' +
                 '<div class="VAS-047-cash-in-dialog-body"><div class="VAS-047-cash-in-dialog-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
@@ -334,6 +428,11 @@
             $pagerText = $dialog.find('.VAS-047-cash-in-pager-text');
             showDialogBusy(false);
 
+            if (typeof ResizeObserver !== 'undefined') {
+                dialogResizeObserver = new ResizeObserver(onDialogResize);
+                dialogResizeObserver.observe($dialog.find('.VAS-047-cash-in-dialog-body')[0]);
+            }
+
             $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
             $pagerPrev.on('click', function () { if (!rowsLoading && pageNo > 1) { pageNo--; loadDialogRows(); } });
             $pagerNext.on('click', function () { if (!rowsLoading && pageNo < totalPages) { pageNo++; loadDialogRows(); } });
@@ -356,7 +455,9 @@
 
             var $card = $('<section>', {
                 'class': 'VAS_today-cash-out-cash-journal-card',
-                'aria-label': lbl('VAS_048_CashOut', 'Cash out')
+                'role': 'button',
+                'tabindex': '0',
+                'aria-label': lbl('VAS_048_DialogTitle', "Today's Cash Disbursements")
             });
 
             var $busy = $('<div>', {
@@ -369,6 +470,10 @@
                 'class': 'VAS_today-cash-out-cash-journal-row'
             });
 
+            var $titleWrap = $('<div>', {
+                'class': 'VAS_today-cash-out-cash-journal-title-wrap'
+            });
+
             var $title = $('<span>', {
                 'class': 'VAS_today-cash-out-cash-journal-label',
                 'id': 'VAS_048_today-cash-out-title-' + widgetId,
@@ -378,17 +483,7 @@
             var $date = $('<span>', {
                 'class': 'VAS_today-cash-out-cash-journal-date',
                 'id': 'VAS_048_today-cash-out-date-' + widgetId,
-                'text': lbl('VAS_048_Today', 'Today')
-            });
-
-            var $zoom = $('<span>', {
-                'class': 'VAS-glje-zoom',
-                'aria-hidden': 'true',
-                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>'
-            });
-
-            var $headerTools = $('<div>', {
-                'class': 'VAS_today-cash-out-cash-journal-header-tools'
+                'text': lbl('VAS_048_DialogSubtitle', 'Disbursements completed today')
             });
 
             var $value = $('<div>', {
@@ -429,20 +524,29 @@
                 'id': 'VAS_048_today-cash-out-state-' + widgetId
             });
 
-            var $action = $('<button>', {
-                'type': 'button',
-                'class': 'VAS_today-cash-out-cash-journal-action',
-                'aria-label': lbl('VAS_048_DialogTitle', "Today's Cash Disbursements")
-            });
-
-            $action.on('click', openDialog);
-
             $delta.append($icon).append($deltaText);
             $footer.append($delta).append($description);
-            $headerTools.append($date).append($zoom);
-            $header.append($title).append($headerTools);
-            $card.append($busy).append($header).append($value).append($footer).append($state).append($action);
+
+            var $iconWell = $('<span>', {
+                'class': 'VAS_today-cash-out-cash-journal-icon',
+                'aria-hidden': 'true',
+                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-2 2 2 2-2 2 2 2-2 2 2 2-2 2 2V2l-2 2-2-2-2 2-2-2-2 2-2-2-2 2-2-2Z"/><path d="M8 9h8"/><path d="M8 13h6"/></svg>'
+            });
+
+            $titleWrap.append($title).append($date);
+            $header.append($iconWell).append($titleWrap);
+            $card.append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
+
+            /* The whole card is the interactive element (ExpectedThisWeek pattern) —
+               no absolute button overlay. Click or Enter/Space opens the dialog. */
+            $card.on('click', openDialog);
+            $card.on('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openDialog();
+                }
+            });
         }
 
         function setState(message) {
@@ -475,7 +579,6 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
             var title = data.title || lbl('VAS_048_CashOut', 'Cash out');
-            var dateText = data.badgeText || lbl('VAS_048_Today', 'Today');
             var amount = safeNumber(data.mainMetric);
             var deltaPercent = safeNumber(data.deltaPercent);
             var disbursementCount = safeNumber(data.disbursementCount);
@@ -484,7 +587,6 @@
 
             $root.find('#VAS_048_today-cash-out-state-' + widgetId).removeClass('is-visible').text('');
             $root.find('#VAS_048_today-cash-out-title-' + widgetId).text(title).attr('title', title);
-            $root.find('#VAS_048_today-cash-out-date-' + widgetId).text(dateText).attr('title', dateText);
             renderCurrencyAmount($root.find('#VAS_048_today-cash-out-value-' + widgetId), amount, data.currencySymbol, data.currencyISO, data.stdPrecision);
             $root.find('#VAS_048_today-cash-out-value-' + widgetId).show();
             $root.find('.VAS_today-cash-out-cash-journal-footer').show();
@@ -582,6 +684,16 @@
                 $(document).off(eventNamespace);
             }
 
+            if (resizeDebounce) {
+                clearTimeout(resizeDebounce);
+                resizeDebounce = null;
+            }
+
+            if (dialogResizeObserver) {
+                dialogResizeObserver.disconnect();
+                dialogResizeObserver = null;
+            }
+
             $('body').removeClass('VAS-047-cash-in-body-lock');
 
             if ($dialog) {
@@ -622,6 +734,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_048_TodayCashOutCashJournalWidget.prototype.widgetSizeChange = function (height, width) {
