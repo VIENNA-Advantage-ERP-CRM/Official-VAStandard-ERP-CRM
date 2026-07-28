@@ -578,6 +578,13 @@
 
             updatePager();
             resetHorizontalScroll();
+
+            /* Rows are on screen now, so the capacity can be measured for real
+               (the first pass only had the fallback height). No-ops when the size
+               is unchanged, so it settles after at most one extra fetch. */
+            if (items.length) {
+                updateAdaptivePageSize(true);
+            }
         }
 
         function loadData() {
