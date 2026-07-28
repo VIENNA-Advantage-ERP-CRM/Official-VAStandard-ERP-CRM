@@ -12,8 +12,9 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
+    font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
     color: #102c3f;
@@ -36,7 +37,7 @@
     gap: 0.5em;
     border-radius: 14px;
     border: 2px solid #ffffff;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
@@ -102,7 +103,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     letter-spacing: 0;
@@ -119,7 +121,7 @@
     font-weight: 400;
     line-height: 1.3;
     letter-spacing: 0.02em;
-    color: #748494;
+    color: #5f7283;
 }
 
 .VAS-072-MatchSuggestionAPPayment-apply-high {
@@ -220,6 +222,28 @@
     background: linear-gradient(180deg, #d78b10, #9a6500);
 }
 
+.VAS-072-MatchSuggestionAPPayment-row-return
+.VAS-072-MatchSuggestionAPPayment-rail {
+    background: linear-gradient(180deg, #8b7cff, #5f4aa6);
+}
+
+.VAS-072-MatchSuggestionAPPayment-return-tag {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.3125em 0.625em;
+    border-radius: 999px;
+    background: #efeeff;
+    color: #5f4aa6;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
 .VAS-072-MatchSuggestionAPPayment-info {
     flex: 1 1 auto;
     min-width: 0;
@@ -240,7 +264,7 @@
 .VAS-072-MatchSuggestionAPPayment-amount {
     font-size: 1em;
     font-weight: 500;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .VAS-072-MatchSuggestionAPPayment-link {
@@ -253,25 +277,26 @@
     font-weight: 500;
     line-height: 1.2;
     display: flex;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .VAS-072-MatchSuggestionAPPayment-mono {
-    font-family: "Roboto Mono", Consolas, monospace;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-variant-numeric: tabular-nums;
 }
 
 .VAS-072-MatchSuggestionAPPayment-invoice {
     color: #0083da;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .VAS-072-MatchSuggestionAPPayment-arrow {
     align-items: center;
-    color: #748494;
+    color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     margin-inline: 0.25em;
     opacity: .55;
     text-decoration: none !important;
@@ -284,7 +309,7 @@
 }
 
 .VAS-072-MatchSuggestionAPPayment-meta {
-    color: #5f7283;
+    color: #41576a;
 }
 
 .VAS-072-MatchSuggestionAPPayment-actions {
@@ -310,7 +335,7 @@
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: 0.075em;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .VAS-072-MatchSuggestionAPPayment-confidence-high {
@@ -327,10 +352,10 @@
 
 .VAS-072-MatchSuggestionAPPayment-chevron {
     align-items: center;
-    color: #748494;
+    color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     opacity: .55;
     text-decoration: none !important;
     transition: opacity .15s, color .15s;
@@ -369,7 +394,7 @@
 
     .VAS-072-MatchSuggestionAPPayment-footer-summary strong {
         color: #102c3f;
-        font-weight: 700;
+        font-weight: 400;
     }
 
 .VAS-072-MatchSuggestionAPPayment-footer-right {
@@ -478,7 +503,7 @@
     font-size: 0.75em;
     font-weight: 500;
     line-height: 1.3;
-    color: #748494;
+    color: #5f7283;
 }
 
 .VAS-072-MatchSuggestionAPPayment-busy,
@@ -492,8 +517,9 @@
     padding: 0.875em;
     border-radius: 14px;
     text-align: center;
-    color: #5f7283;
-    font-family: Roboto, Arial, sans-serif;
+    color: #41576a;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
@@ -510,7 +536,7 @@
 .VAS-072-MatchSuggestionAPPayment-review-skip,
 .VAS-072-MatchSuggestionAPPayment-review-apply {
     border-radius: 999px;
-    font-size: 0.875em;
+    font-size: 0.75em;
     min-height: 2.5em;
     min-width: 5.125em;
 }
@@ -551,7 +577,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .VAS-072-MatchSuggestionAPPayment-root.VAS-072-MatchSuggestionAPPayment-compact .VAS-072-MatchSuggestionAPPayment-card {
@@ -592,7 +618,8 @@
     align-items: center;
     justify-content: center;
     padding: 2em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -727,13 +754,16 @@
     position: relative;
 }
 
+/* Covers the whole review card (header, body and footer), not just
+   the scrollable body. */
 .VAS-072-MatchSuggestionAPPayment-review-busy {
     position: absolute;
     inset: 0;
-    z-index: 5;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 1em;
     background: rgba(255, 255, 255, 0.62);
     opacity: 0;
     visibility: hidden;
@@ -815,7 +845,7 @@
     }
 
     .VAS-072-MatchSuggestionAPPayment-review-banner-copy span {
-        color: #5f7283;
+        color: #41576a;
         font-size: 0.8125em;
         line-height: 1.3;
     }
@@ -842,11 +872,11 @@
 
     .VAS-072-MatchSuggestionAPPayment-review-score span {
         margin-top: 0.25em;
-        color: #5f7283;
-        font-size: 0.625em;
-        font-weight: 700;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
+        color: #41576a;
+        font-size: 0.5625em;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: capitalize;
     }
 
 .VAS-072-MatchSuggestionAPPayment-review-compare {
@@ -876,11 +906,11 @@
 }
 
     .VAS-072-MatchSuggestionAPPayment-review-pane-head span {
-        color: #748494;
-        font-size: 0.6875em;
-        font-weight: 700;
-        letter-spacing: 0.075em;
-        text-transform: uppercase;
+        color: #5f7283;
+        font-size: 0.625em;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: capitalize;
     }
 
     .VAS-072-MatchSuggestionAPPayment-review-pane-head strong {
@@ -889,9 +919,10 @@
         text-overflow: ellipsis;
         white-space: nowrap;
         color: #102c3f;
-        font-size: 0.875em;
-        font-weight: 700;
-        font-family: "Roboto Mono", "Roboto", monospace;
+        font-size: 0.75em;
+        font-weight: 400;
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
+        font-family: var(--v-c-font-family);
     }
 
 .VAS-072-MatchSuggestionAPPayment-review-pane-row {
@@ -911,7 +942,7 @@
 
 .VAS-072-MatchSuggestionAPPayment-review-pane-label {
     flex: 0 0 auto;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.8125em;
 }
 
@@ -921,8 +952,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #102c3f;
-    font-size: 0.875em;
-    font-weight: 700;
+    font-size: 0.75em;
+    font-weight: 400;
     text-align: left;
     font-variant-numeric: tabular-nums;
 }
@@ -967,7 +998,7 @@
     margin-top: 1em;
     padding: 0.875em 1.125em;
     border-radius: 0.625em;
-    font-size: 0.875em;
+    font-size: 0.75em;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-balance-exact {
@@ -984,7 +1015,7 @@
 
     .VAS-072-MatchSuggestionAPPayment-review-balance strong {
         flex: 0 0 auto;
-        font-weight: 800;
+        font-weight: 400;
         font-variant-numeric: tabular-nums;
     }
 
@@ -993,12 +1024,12 @@
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-why-title {
-    margin-bottom: 0.625em;
-    color: #5f7283;
-    font-size: 0.6875em;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    margin-bottom: 0.5em;
+    color: #41576a;
+    font-size: 0.625em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: capitalize;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-check {
@@ -1046,7 +1077,7 @@
     display: flex;
     align-items: baseline;
     gap: 0.375em;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.8125em;
     line-height: 1.35;
 }
@@ -1059,8 +1090,8 @@
 .VAS-072-MatchSuggestionAPPayment-review-empty {
     padding: 2.5em 1em;
     text-align: center;
-    color: #748494;
-    font-size: 0.875em;
+    color: #5f7283;
+    font-size: 0.75em;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-footer {
@@ -1079,7 +1110,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.8125em;
 }
 
@@ -1100,7 +1131,7 @@
     padding: 0.625em 1.125em;
     border-radius: 999em;
     font-family: inherit;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 700;
     line-height: 1.2;
     cursor: pointer;
@@ -1160,9 +1191,7 @@
         gap: 0.375em;
     }
 
-    .VAS-072-MatchSuggestionAPPayment-title {
-        font-size: 0.8125em;
-    }
+
 
     .VAS-072-MatchSuggestionAPPayment-subtitle {
         display: none;
@@ -1225,9 +1254,7 @@
         height: 0.8125em;
     }
 
-    .VAS-072-MatchSuggestionAPPayment-title {
-        font-size: 0.75em;
-    }
+
 
     .VAS-072-MatchSuggestionAPPayment-pager {
         gap: 0.25em;
@@ -1296,6 +1323,10 @@
         max-height: 100%;
         border-radius: 0;
     }
+
+    .VAS-072-MatchSuggestionAPPayment-review-busy {
+        border-radius: 0;
+    }
 }
 
 @media (max-width: 40em) {
@@ -1356,8 +1387,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #748494;
-    font-size: 0.8125rem;
+    color: #5f7283;
+    font-size: 0.75rem;
     font-weight: 400;
 }
 
@@ -1373,7 +1404,7 @@
 
 .VAS-072-MatchSuggestionAPPayment-pager-text {
     min-width: 3.5rem;
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
 }
 
 .VAS-072-MatchSuggestionAPPayment-review-pane-value,
@@ -1384,4 +1415,165 @@
 
 .VAS-072-MatchSuggestionAPPayment-review-pane-head strong {
     text-align: right;
+}
+
+/* Footer result-range helper text (matches VAS_031 pager pattern) */
+.VAS-072-MatchSuggestionAPPayment-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.VAS-072-MatchSuggestionAPPayment-showing {
+    flex: 0 0 auto;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+
+/* --- RTL: pagination -------------------------------------------------------
+   Switching the UI to Arabic flips the footer, which swaps the prev/next
+   buttons while their chevrons keep pointing the same way -- so the arrows
+   end up contradicting what they do. Pin the pager itself to LTR: prev stays
+   on the left, next on the right, and the page indicator keeps "1 of 35" in
+   order instead of having its leading digit pushed to the far end by the
+   bidi algorithm. `plaintext` lets a translated indicator ("1 من 35") still
+   lay itself out by its own script. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-pager {
+    direction: ltr;
+}
+
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-pager-text {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: money -----------------------------------------------------------
+   A formatted amount is "-ID1,800.000": the minus is a neutral character, so
+   in an RTL paragraph the bidi algorithm parks it at the far (right) end and
+   the cell reads "ID1,800.000-". `plaintext` lets each amount pick its own
+   direction from its first strong character -- LTR for a Latin currency code,
+   RTL for a translated one -- so the sign stays glued to the number. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-value {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: flow arrow ------------------------------------------------------
+   The payment -> invoice arrow in the review pane is an SVG, so it cannot
+   swap glyphs the way the inline text arrows do. RTL already puts the
+   payment pane on the right, so mirror the icon to keep it pointing at the
+   invoice instead of back at the payment. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-arrow svg {
+    transform: scaleX(-1);
+}
+
+/* --- RTL: row disclosure chevron ------------------------------------------
+   The row caret points the way the row reads, so it has to turn around with
+   the UI. Mirroring the icon keeps the collapsed state pointing "onward"
+   rather than back into the row. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-chevron svg {
+    transform: scaleX(-1);
+}
+
+/* Stacked review panes turn the flow arrow downwards; there is no left or
+   right to mirror there, and combining the two transforms would aim it up. */
+@media (max-width: 40em) {
+    html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-arrow svg {
+        transform: none;
+    }
+}
+
+/* --- RTL: the rest of the value surfaces -----------------------------------
+   The amount columns were only the visible half of this. Any string that
+   mixes digits with a neutral character -- the minus in "-ID1.104B", the
+   currency code, a trailing full stop, the en dash in "1-4 of 30" -- gets
+   that character dragged to the far end of an RTL paragraph. Rather than
+   chase one class at a time, hand every cell, summary tile and caption back
+   to its own script: `plaintext` reads the first strong character and lays
+   the string out accordingly, so Latin-and-digits stays LTR and translated
+   text stays RTL. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-dialog td,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-dialog th,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-row-title,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-meta,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-showing,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-footer-summary,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-subtitle,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-sub {
+    unicode-bidi: plaintext;
+}
+
+/* Card rows are divs here rather than a table, so the same treatment has to
+   name them directly. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-info,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-invoice,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-mono,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-label,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-state-text {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: the truncation spans inside the cells ----------------------------
+   Cell text is wrapped in a `display: block` span so it can ellipsis, and a
+   block is its own bidi paragraph -- which means the rules above stopped at
+   the cell and never reached the string that actually renders. Repeat the
+   treatment for whatever sits inside. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-dialog td *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-dialog th *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-row-title *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-meta *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-info *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-amount *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-value * {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: amounts ----------------------------------------------------------
+   Money is not prose. "-ID743,000.000" is one left-to-right token, and
+   leaving it to the bidi heuristics is what kept pushing the minus to the
+   far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
+   inherits into the ellipsis spans the cells wrap their text in, which a
+   rule on the cell alone never reached. The column then flips to the
+   inline-start edge the way the rest of the RTL layout does. */
+
+
+/* The earlier `plaintext` rules cover prose, but on an amount they would win
+   over the `direction` above -- plaintext derives direction from content and
+   ignores the declared one. Take the amounts back out of that scheme, cells
+   and ellipsis spans alike. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-amount *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-value,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-value *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-balance strong,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-balance strong *,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-head strong,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-head strong * {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Summary tiles and popup read-outs are not table columns -- they sit under a
+   right-aligned label, so the figure belongs on the same side. Only the
+   direction stays pinned, to keep the sign in front of the number. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-value,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-balance strong,
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-review-pane-head strong {
+    text-align: right !important;
+}
+
+/* The row's amount span opens with the " . " that separates it from the vendor
+   name, so the span as a whole has to stay in the line's direction -- isolating
+   it would carry the separator off to the far end along with the figure, which
+   is what puts the dot after the number instead of between the two. It has to
+   out-rank the blanket `.row-title *` rule further up, hence the weight; only
+   the <bdi> around the number itself stays pinned to LTR. */
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-amount {
+    direction: inherit !important;
+    unicode-bidi: normal !important;
+}
+
+html[dir="rtl"] .VAS-072-MatchSuggestionAPPayment-amount bdi {
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
 }

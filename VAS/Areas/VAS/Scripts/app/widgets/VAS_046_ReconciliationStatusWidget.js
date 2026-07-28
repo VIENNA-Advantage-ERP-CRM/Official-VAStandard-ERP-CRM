@@ -69,12 +69,14 @@
                 '</svg>'
             );
 
+            var $headText = $('<div class="vas-reconciliation-status-head-text">');
             var $title = $('<div class="vas-reconciliation-status-title">').text(lbl('VAS_046_ReconciliationStatus', 'Reconciliation status'));
             var $sub = $('<div class="vas-reconciliation-status-sub">').text(lbl('VAS_046_MatchedToBillsBank', 'Matched to bills + bank'));
 
             $iconBox.append($icon);
-            $titleRow.append($iconBox).append($title);
-            $headLeft.append($titleRow).append($sub);
+            $headText.append($title).append($sub);
+            $titleRow.append($iconBox).append($headText);
+            $headLeft.append($titleRow);
             $head.append($headLeft);
 
             $body = $('<div class="vas-reconciliation-status-body">');
@@ -299,11 +301,10 @@
 
         function formatPercentage(value) {
             var numericValue = Number(value || 0);
-            var stdPrecision = getStdPrecision();
 
             return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             }) + '%';
         }
 

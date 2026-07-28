@@ -470,7 +470,8 @@ namespace VAS.Controllers
                            Payment.C_BankAccount_ID,
                            Payment.C_Currency_ID,
                            Payment.PayAmt,
-                           Payment.IsAllocated
+                           Payment.IsAllocated,
+                           Payment.VAS_UnAllocatedAmount
                     FROM C_Payment Payment
                     WHERE Payment.IsReceipt = 'N'
                     AND Payment.IsActive = 'Y'
@@ -575,7 +576,13 @@ namespace VAS.Controllers
                                Currency.ISO_Code AS Payment_Currency,
                                Currency.CurSymbol AS Payment_Currency_Symbol,
                                SecuredPayments.IsAllocated AS Is_Allocated,
-                               SecuredPayments.PayAmt AS Pay_Amount
+                               SecuredPayments.PayAmt AS Pay_Amount,
+                               ABS(
+                                   COALESCE(
+                                       SecuredPayments.VAS_UnAllocatedAmount,
+                                       0
+                                   )
+                               ) AS Unallocated_Amount
                         FROM SecuredPayments
                         INNER JOIN CurrentPeriod ON
                         (
@@ -619,6 +626,7 @@ namespace VAS.Controllers
                                PaymentsData.Payment_Currency_Symbol,
                                PaymentsData.Is_Allocated,
                                PaymentsData.Pay_Amount,
+                               PaymentsData.Unallocated_Amount,
                                ROW_NUMBER() OVER
                                (
                                    ORDER BY PaymentsData.Date_Acct DESC,
@@ -639,6 +647,7 @@ namespace VAS.Controllers
                                NumberedPayments.Payment_Currency_Symbol,
                                NumberedPayments.Is_Allocated,
                                NumberedPayments.Pay_Amount,
+                               NumberedPayments.Unallocated_Amount,
                                NumberedPayments.TotalRecords,
                                NumberedPayments.RowNumber
                         FROM NumberedPayments
@@ -665,6 +674,7 @@ namespace VAS.Controllers
                            PagedPayments.Payment_Currency_Symbol,
                            PagedPayments.Is_Allocated,
                            PagedPayments.Pay_Amount,
+                           PagedPayments.Unallocated_Amount,
                            PagedPayments.TotalRecords,
                            PagedPayments.RowNumber,
                            PeriodStatus.PeriodCount,
@@ -746,6 +756,39 @@ namespace VAS.Controllers
                                 "Unallocated"
                             );
 
+                    int precision = GetStandardPrecision(ctx);
+
+                    decimal payAmount = GetSafeDecimal(
+                        dr["Pay_Amount"],
+                        precision
+                    );
+
+                    decimal unallocatedAmount = GetSafeDecimal(
+                        dr["Unallocated_Amount"],
+                        precision
+                    );
+
+                    /*
+                     * AP amounts are outflows and arrive negative, so the
+                     * allocated part is derived from the magnitudes and
+                     * then carries the payment's own sign.
+                     */
+                    decimal allocatedMagnitude = Math.Max(
+                        Math.Abs(payAmount) -
+                        Math.Abs(unallocatedAmount),
+                        0
+                    );
+
+                    decimal allocatedAmount =
+                        payAmount < 0
+                            ? -allocatedMagnitude
+                            : allocatedMagnitude;
+
+                    bool isPartiallyAllocated =
+                        isAllocated != "Y" &&
+                        allocatedAmount != 0 &&
+                        unallocatedAmount != 0;
+
                     rows.Add(
                         new
                         {
@@ -785,10 +828,11 @@ namespace VAS.Controllers
                                 isAllocated,
                             statusName =
                                 statusName,
-                            amount = GetSafeDecimal(
-                                dr["Pay_Amount"],
-                                GetStandardPrecision(ctx)
-                            )
+                            amount = payAmount,
+                            allocatedAmt = allocatedAmount,
+                            unallocatedAmt = unallocatedAmount,
+                            isPartiallyAllocated =
+                                isPartiallyAllocated
                         }
                     );
                 }

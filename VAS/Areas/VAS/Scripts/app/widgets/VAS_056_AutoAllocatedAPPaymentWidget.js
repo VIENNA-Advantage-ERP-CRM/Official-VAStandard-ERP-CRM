@@ -24,6 +24,7 @@
  * 18  | Next                                              | VAS_Next
  * 19  | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20  | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
+ * 21  | Un Allocated                               | VAS_UnAllocatedAmount
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -52,6 +53,7 @@
  * 19 | Auto-allocated AP                                 | VAS_056_AutoAllocatedAPPayments
  * 20 | Payment Match to Invoice                          | VAS_056_PaymentMatchToInvoice
  * 21 | Last 30 days                                      | VAS_Last30Days
+ * 22 | Partially allocated                               | VAS_UnAllocatedAmount
  */
 
 ; VAS = window.VAS || {};
@@ -76,6 +78,7 @@
         var $state = null;
 
         var $dialog = null;
+        var $dialogBody = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
 
@@ -90,7 +93,7 @@
         var $tabUnallocatedCount = null;
 
         var rowsLoading = false;
-        var pageSize = 10;
+        var pageSize = 8;
         var activeFilter = "allocated";
         var isDisposed = false;
 
@@ -108,6 +111,20 @@
                 loaded: false
             }
         };
+
+        /*
+         * The dialog body is a flex scroll area, so the number of rows that
+         * fit follows the popup's rendered height instead of a fixed page
+         * size. The row height is measured from a real row when one exists
+         * and falls back to this estimate while the table is still empty.
+         */
+        var dialogResizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var dialogRowHeightEstimate = 44;
+        var dialogMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
+        var adaptivePaginationReady = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -211,6 +228,235 @@
             });
         }
 
+        function measureDialogRowHeight() {
+            var $row = $dialogTbody
+                ? $dialogTbody
+                    .find("tr")
+                    .not(":has(." + classPrefix + "dialog-empty)")
+                    .first()
+                : null;
+
+            var measured =
+                $row && $row.length
+                    ? $row.outerHeight()
+                    : 0;
+
+            if (
+                measured <= 0 &&
+                $dialogTbody &&
+                $dialogTbody.length
+            ) {
+                var $measureRow = $(
+                    '<tr aria-hidden="true" style="visibility:hidden;">' +
+                    '<td>00 Jan 0000</td>' +
+                    '<td>000000</td>' +
+                    '<td>Vendor</td>' +
+                    '<td>Bank account</td>' +
+                    '<td>USD</td>' +
+                    '<td>0.00</td>' +
+                    '<td>0.00</td>' +
+                    '</tr>'
+                );
+
+                $dialogTbody.append($measureRow);
+                measured = $measureRow.outerHeight();
+                $measureRow.remove();
+            }
+
+            return measured > 0
+                ? measured
+                : dialogRowHeightEstimate;
+        }
+
+        function updateAdaptivePageSize() {
+            if (
+                isDisposed ||
+                !$dialogBody ||
+                !$dialogBody[0] ||
+                !$dialogTbody ||
+                !$dialogTbody[0] ||
+                !$dialog ||
+                !$dialog.is(':visible')
+            ) {
+                return;
+            }
+
+            var container = $dialogBody[0];
+
+            if (container.clientHeight <= 0) {
+                return;
+            }
+
+            /*
+             * Whatever sits above the first row inside the scroll area - the
+             * table header, padding, any summary strip - is measured from the
+             * tbody's own position rather than assumed, so the row space left
+             * over is exact.
+             */
+            var headerOffset =
+                (
+                    $dialogTbody[0].getBoundingClientRect().top -
+                    container.getBoundingClientRect().top
+                ) + container.scrollTop;
+
+            var availableHeight = Math.max(
+                0,
+                container.clientHeight - headerOffset
+            );
+
+            var rowHeight = measureDialogRowHeight();
+
+            if (rowHeight <= 0) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                dialogMinimumRows,
+                Math.floor(availableHeight / rowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            // Keep the record the user is looking at on screen.
+            var firstVisibleRecord =
+                ((tabState[activeFilter].pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+
+            tabState[activeFilter].pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            for (var key in tabState) {
+                if (
+                    tabState.hasOwnProperty(key) &&
+                    key !== activeFilter
+                ) {
+                    tabState[key].loaded = false;
+                    tabState[key].pageNo = 1;
+                }
+            }
+
+            if (adaptivePaginationReady) {
+                loadRows();
+            }
+        }
+
+        function setupAdaptivePagination() {
+            if (!$dialogBody || !$dialogBody[0]) {
+                return;
+            }
+
+            adaptivePaginationReady = false;
+            adaptiveAdjustCount = 0;
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                if (
+                    !$dialog ||
+                    !$dialog.is(':visible') ||
+                    isDisposed
+                ) {
+                    return;
+                }
+
+                updateAdaptivePageSize();
+
+                adaptivePaginationReady = true;
+
+                if (!tabState[activeFilter].loaded) {
+                    loadRows();
+                }
+                else {
+                    updatePagerControlsForCurrentState();
+                }
+            }, 0);
+
+              if (
+                  window.ResizeObserver &&
+                  !dialogResizeObserver
+              ) {
+                dialogResizeObserver = new ResizeObserver(
+                    function () {
+                        updateAdaptivePageSize();
+                    }
+                );
+
+                dialogResizeObserver.observe($dialogBody[0]);
+
+                /*
+                 * The scroll area keeps a fixed height, so only the row
+                 * container changes size when rows arrive. Watching it is
+                 * what corrects the estimate the first pass had to use.
+                 */
+                if ($dialogTbody && $dialogTbody[0]) {
+                      dialogResizeObserver.observe($dialogTbody[0]);
+                  }
+              }
+
+              if (!adaptiveResizeHandler) {
+                  adaptiveResizeHandler = function () {
+                      if (adaptiveResizeFrame !== null) {
+                          return;
+                      }
+
+                      adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                          adaptiveResizeFrame = null;
+                          adaptiveAdjustCount = 0;
+                          updateAdaptivePageSize();
+                      });
+                  };
+
+                  window.addEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                  }
+              }
+          }
+
+          function teardownAdaptivePagination() {
+            adaptivePaginationReady = false;
+
+            if (dialogResizeObserver) {
+                  dialogResizeObserver.disconnect();
+                  dialogResizeObserver = null;
+              }
+
+              if (adaptiveResizeHandler) {
+                  window.removeEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                  }
+
+                  adaptiveResizeHandler = null;
+              }
+
+              if (adaptiveResizeFrame !== null) {
+                  window.cancelAnimationFrame(adaptiveResizeFrame);
+                  adaptiveResizeFrame = null;
+              }
+          }
+
         function loadRows() {
             if (!$dialogTbody || rowsLoading) {
                 return;
@@ -287,7 +533,11 @@
                         return;
                     }
 
-                    showDialogBusy(false);
+                    updateAdaptivePageSize();
+
+                    if (!rowsLoading) {
+                        showDialogBusy(false);
+                    }
 
                     updatePagerControlsForCurrentState();
                 }
@@ -415,7 +665,7 @@
                     "<tr>" +
                     '<td class="' +
                     classPrefix +
-                    'dialog-empty" colspan="6">' +
+                    'dialog-empty" colspan="7">' +
                     escapeHtml(
                         lbl(
                             "VAS_056_NoPaymentsThisPeriod",
@@ -443,9 +693,20 @@
                     currencyCode ||
                     "";
 
-                var amountText = formatAmount(row.amount);
+                var amountValue = Number(row.amount || 0);
 
-                var amountHtml = "";
+                if (isNaN(amountValue)) {
+                    amountValue = 0;
+                }
+
+                var amountSign =
+                    amountValue < 0 ? "-" : "";
+
+                var amountText = formatAmount(
+                    Math.abs(amountValue)
+                );
+
+                var amountHtml = amountSign;
 
                 if (currencySymbol) {
                     amountHtml +=
@@ -457,6 +718,47 @@
                 }
 
                 amountHtml += escapeHtml(amountText);
+
+                var partialHtml = "";
+                var partialTitle = "";
+
+                if (row.isPartiallyAllocated) {
+                    var unallocatedValue = Number(
+                        row.unallocatedAmt || 0
+                    );
+
+                    if (isNaN(unallocatedValue)) {
+                        unallocatedValue = 0;
+                    }
+
+                    var unallocatedSign =
+                        unallocatedValue < 0 ? "-" : "";
+
+                    var unallocatedText = formatAmount(
+                        Math.abs(unallocatedValue)
+                    );
+
+                    partialTitle =
+                        unallocatedSign +
+                        (
+                            currencySymbol
+                                ? currencySymbol
+                                : ""
+                        ) + unallocatedText;
+
+                    partialHtml += unallocatedSign;
+
+                    if (currencySymbol) {
+                        partialHtml +=
+                            '<span class="' +
+                            classPrefix +
+                            'cur-inline">' +
+                            escapeHtml(currencySymbol) +
+                            "</span>";
+                    }
+
+                    partialHtml += escapeHtml(unallocatedText);
+                }
 
                 var rowHtml =
                     "<tr>" +
@@ -515,11 +817,20 @@
 
                     '<td class="' +
                     classPrefix +
+                    'td-partial" title="' +
+                    escapeHtml(partialTitle) +
+                    '">' +
+                    partialHtml +
+                    "</td>" +
+
+                    '<td class="' +
+                    classPrefix +
                     'td-amount" title="' +
                     escapeHtml(
+                        amountSign +
                         (
                             currencySymbol
-                                ? currencySymbol + " "
+                                ? currencySymbol
                                 : ""
                         ) + amountText
                     ) +
@@ -531,6 +842,8 @@
 
                 $dialogTbody.append(rowHtml);
             }
+        
+            updateAdaptivePageSize();
         }
 
         function updatePagerControlsForCurrentState() {
@@ -688,6 +1001,13 @@
                     ? "true"
                     : "false"
             );
+
+            if ($dialog) {
+                $dialog.toggleClass(
+                    classPrefix + "filter-unallocated",
+                    activeFilter === "unallocated"
+                );
+            }
         }
 
         function showState(show, message) {
@@ -737,8 +1057,8 @@
             ).toLocaleString(
                 window.navigator.language,
                 {
-                    minimumFractionDigits: getStdPrecision(),
-                    maximumFractionDigits: getStdPrecision()
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                 }
             ) + "%";
         }
@@ -827,7 +1147,7 @@
             }
 
             if (bankName && last4) {
-                return bankName + " - ****" + last4;
+                return bankName + " ****" + last4;
             }
 
             if (bankName) {
@@ -855,18 +1175,15 @@
             updateActiveTabStyles();
             updateTabCounts();
 
-            if (!tabState[activeFilter].loaded) {
-                loadRows();
-            }
-            else {
-                updatePagerControlsForCurrentState();
-            }
+            setupAdaptivePagination();
         }
 
         function closeDialog() {
             if (!$dialog) {
                 return;
             }
+
+            teardownAdaptivePagination();
 
             $dialog.hide();
 
@@ -1098,6 +1415,17 @@
 
                 '<th class="' +
                 classPrefix +
+                'th-partial">' +
+                escapeHtml(
+                    lbl(
+                        "VAS_UnAllocatedAmount",
+                        "Un Allocated"
+                    )
+                ) +
+                "</th>" +
+
+                '<th class="' +
+                classPrefix +
                 'th-amount">' +
                 escapeHtml(
                     lbl(
@@ -1178,6 +1506,10 @@
 
                 "</div>" +
                 "</div>"
+            );
+
+            $dialogBody = $dialog.find(
+                "." + classPrefix + "dialog-body"
             );
 
             $dialogTbody = $dialog.find(
@@ -1336,14 +1668,6 @@
                 ) +
                 "</span>" +
 
-                '<span class="' +
-                classPrefix +
-                'arrow" aria-hidden="true">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M9 18l6-6-6-6"></path>' +
-                '</svg>' +
-                '</span>' +
-
                 "</div>" +
 
                 '<div class="' +
@@ -1452,6 +1776,8 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
+            teardownAdaptivePagination();
+
             $(document).off(
                 "keydown.VAS-056-AutoAllocatedAPPayment-" +
                 this.AD_UserHomeWidgetID
@@ -1475,6 +1801,7 @@
             $footer = null;
             $busy = null;
             $state = null;
+            $dialogBody = null;
             $dialogTbody = null;
             $dialogBusy = null;
             $pagerHelper = null;

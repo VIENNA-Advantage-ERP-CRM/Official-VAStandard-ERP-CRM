@@ -7,6 +7,7 @@ using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
+using VAdvantage.Process;
 using VAdvantage.Utility;
 using VIS.Filters;
 
@@ -20,7 +21,7 @@ namespace VAS.Controllers
     ///
     /// Details popup:
     ///     Reads individual invoices for the selected:
-    ///     Due Date + Payment Method + Currency.
+    ///     Due Date + Payment Method + Currency + Business Partner.
     ///
     /// Create:
     ///     Creates and completes C_Payment linked to C_Invoice.
@@ -28,6 +29,8 @@ namespace VAS.Controllers
     public class VAS_031_UpcomingAPRunsWidgetController : Controller
     {
         private const int MaximumRows = 30;
+        private const int PaymentTableId = 335;
+        private const int PaymentProcessId = 149;
 
         #region Upcoming AP Runs
 
@@ -157,6 +160,16 @@ namespace VAS.Controllers
                             )
                         ),
 
+                        cBPartnerId = GetInt(
+                            reader,
+                            "C_BPartner_ID"
+                        ),
+
+                        vendorId = GetInt(
+                            reader,
+                            "C_BPartner_ID"
+                        ),
+
                         vendorName = GetString(
                             reader,
                             "VendorName"
@@ -226,7 +239,7 @@ namespace VAS.Controllers
 
             string dateToSql = DB.IsOracle()
                 ? "TRUNC(CURRENT_DATE) + 7"
-                : "CURRENT_DATE + 7";
+                : "CURRENT_DATE + INTERVAL '7 DAY'";
 
             string invoiceAccessSql = @"
 SELECT
@@ -240,6 +253,7 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.C_ConversionType_ID,
     Invoice.DocumentNo,
+    Invoice.Description,
     Invoice.DateInvoiced,
     Invoice.DateAcct,
     Invoice.GrandTotal,
@@ -313,12 +327,13 @@ InvoiceOpenBalance AS
         CASE
             WHEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -341,12 +356,13 @@ UnpaidSchedule AS
         CASE
             WHEN
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(InvoicePaySchedule.DueAmt, 0)) *
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -361,7 +377,7 @@ UnpaidSchedule AS
     AND COALESCE(InvoicePaySchedule.VA009_IsPaid, 'N') = 'N'
     AND COALESCE(InvoicePaySchedule.C_Payment_ID, 0) = 0
     AND COALESCE(InvoicePaySchedule.C_CashLine_ID, 0) = 0
-    AND COALESCE(InvoicePaySchedule.DueAmt, 0) > 0
+    AND COALESCE(InvoicePaySchedule.DueAmt, 0) <> 0
     AND NOT EXISTS
     (
         SELECT 1
@@ -394,10 +410,10 @@ UpcomingInvoices AS
         UnpaidSchedule.ScheduleOpenAmount,
         InvoiceOpenBalance.InvoiceOpenAmount,
         CASE
-            WHEN UnpaidSchedule.ScheduleOpenAmount <
-                 InvoiceOpenBalance.InvoiceOpenAmount
-            THEN UnpaidSchedule.ScheduleOpenAmount
-            ELSE InvoiceOpenBalance.InvoiceOpenAmount
+            WHEN ABS(UnpaidSchedule.ScheduleOpenAmount) <
+             ABS(InvoiceOpenBalance.InvoiceOpenAmount)
+        THEN UnpaidSchedule.ScheduleOpenAmount
+        ELSE InvoiceOpenBalance.InvoiceOpenAmount
         END AS OpenAmount
     FROM SecuredInvoice Invoice
     INNER JOIN C_BPartner BusinessPartner ON
@@ -407,12 +423,12 @@ UpcomingInvoices AS
     INNER JOIN UnpaidSchedule UnpaidSchedule ON
     (
         UnpaidSchedule.C_Invoice_ID = Invoice.C_Invoice_ID
-        AND UnpaidSchedule.ScheduleOpenAmount > 0
+        AND UnpaidSchedule.ScheduleOpenAmount <> 0
     )
     INNER JOIN InvoiceOpenBalance InvoiceOpenBalance ON
     (
         InvoiceOpenBalance.C_Invoice_ID = Invoice.C_Invoice_ID
-        AND InvoiceOpenBalance.InvoiceOpenAmount > 0
+        AND InvoiceOpenBalance.InvoiceOpenAmount <> 0
     )
     LEFT OUTER JOIN C_Currency Currency ON
     (
@@ -431,6 +447,8 @@ UpcomingInvoices AS
 
 SELECT
     DueDate AS RunDate,
+    C_BPartner_ID,
+    VendorName,
     COALESCE(VA009_PaymentMethod_ID, 0) AS VA009_PaymentMethod_ID,
     PaymentMethodName,
     C_Currency_ID,
@@ -438,12 +456,13 @@ SELECT
     CurrencySymbol,
     MAX(COALESCE(StdPrecision, 2)) AS StdPrecision,
     COUNT(1) AS PaymentCount,
-    MIN(VendorName) AS VendorName,
     SUM(OpenAmount) AS Amount
 FROM UpcomingInvoices
-WHERE OpenAmount > 0
+WHERE OpenAmount <> 0
 GROUP BY
     DueDate,
+    C_BPartner_ID,
+    VendorName,
     COALESCE(VA009_PaymentMethod_ID, 0),
     PaymentMethodName,
     C_Currency_ID,
@@ -451,21 +470,25 @@ GROUP BY
     CurrencySymbol
 ORDER BY
     RunDate,
-    Amount DESC";
+    Amount DESC,
+    VendorName";
 
             return sql;
         }
         #endregion
 
 
+
         #region Upcoming Invoice Details
+
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetUpcomingAPRunDetails(
             string runDate,
             int paymentMethodId = 0,
-            int currencyId = 0)
+            int currencyId = 0,
+            int cBPartnerId = 0)
         {
             Ctx ctx = GetContext();
 
@@ -485,7 +508,7 @@ ORDER BY
             {
                 string invalidDateMessage = GetMsg(
                     ctx,
-                    "VAS_031_MessageTransactionDateInvalid",
+                    "VAS_031_TransactionDateInvalid",
                     "Invalid due date."
                 );
 
@@ -493,7 +516,9 @@ ORDER BY
                 {
                     success = false,
                     error = invalidDateMessage,
-                    errorText = invalidDateMessage
+                    errorText = invalidDateMessage,
+                    hasData = false,
+                    rows = new List<object>()
                 }, JsonRequestBehavior.AllowGet);
             }
 
@@ -509,7 +534,27 @@ ORDER BY
                 {
                     success = false,
                     error = currencyMessage,
-                    errorText = currencyMessage
+                    errorText = currencyMessage,
+                    hasData = false,
+                    rows = new List<object>()
+                }, JsonRequestBehavior.AllowGet);
+            }
+
+            if (cBPartnerId <= 0)
+            {
+                string businessPartnerMessage = GetMsg(
+                    ctx,
+                    "VAS_031_BusinessPartnerRequired",
+                    "Business partner is required."
+                );
+
+                return Json(new
+                {
+                    success = false,
+                    error = businessPartnerMessage,
+                    errorText = businessPartnerMessage,
+                    hasData = false,
+                    rows = new List<object>()
                 }, JsonRequestBehavior.AllowGet);
             }
 
@@ -517,9 +562,6 @@ ORDER BY
 
             try
             {
-                DateTime dateFrom = parsedRunDate.Date;
-                DateTime dateTo = dateFrom.AddDays(1);
-
                 string clientIdSql =
                     ctx.GetAD_Client_ID().ToString(
                         CultureInfo.InvariantCulture
@@ -538,6 +580,49 @@ ORDER BY
                         CultureInfo.InvariantCulture
                     );
 
+                string cBPartnerIdSql =
+                    cBPartnerId.ToString(
+                        CultureInfo.InvariantCulture
+                    );
+
+                string runDateText =
+                    parsedRunDate.ToString(
+                        "yyyy-MM-dd",
+                        CultureInfo.InvariantCulture
+                    );
+
+                string runDateSql =
+                    DB.IsOracle()
+                        ? "TO_DATE('" +
+                          runDateText +
+                          "', 'YYYY-MM-DD')"
+                        : "DATE '" +
+                          runDateText +
+                          "'";
+
+                /*
+                 * Exclusive end date for the selected widget group.
+                 *
+                 * Oracle:
+                 *     selected date + 1 day
+                 *
+                 * PostgreSQL:
+                 *     selected date + INTERVAL '1 DAY'
+                 */
+                string runDateEndSql =
+                    DB.IsOracle()
+                        ? runDateSql + " + 1"
+                        : runDateSql + " + INTERVAL '1 DAY'";
+
+                string periodEndExclusiveSql =
+                    DB.IsOracle()
+                        ? "Period.EndDate + 1"
+                        : "Period.EndDate + INTERVAL '1 DAY'";
+
+                /*
+                 * Apply MRole only to the main physical table query
+                 * before placing it inside the SecuredInvoice CTE.
+                 */
                 string invoiceAccessSql = @"
 SELECT
     Invoice.C_Invoice_ID,
@@ -550,6 +635,7 @@ SELECT
     Invoice.C_Currency_ID,
     Invoice.C_ConversionType_ID,
     Invoice.DocumentNo,
+    Invoice.Description,
     Invoice.DateInvoiced,
     Invoice.DateAcct,
     Invoice.GrandTotal,
@@ -559,7 +645,8 @@ FROM C_Invoice Invoice
 
 WHERE Invoice.IsActive = 'Y'
 
-AND Invoice.AD_Client_ID = " + clientIdSql + @"
+AND Invoice.AD_Client_ID =
+    " + clientIdSql + @"
 
 AND Invoice.IsSOTrx = 'N'
 
@@ -571,12 +658,13 @@ AND Invoice.DocStatus IN
 
 AND EXISTS
 (
-    SELECT 1
+    SELECT
+        1
 
     FROM C_DocType InvoiceDocumentType
 
     WHERE InvoiceDocumentType.C_DocType_ID =
-          Invoice.C_DocType_ID
+        Invoice.C_DocType_ID
 
     AND InvoiceDocumentType.IsActive = 'Y'
 
@@ -585,7 +673,11 @@ AND EXISTS
     AND InvoiceDocumentType.IsSOTrx = 'N'
 )
 
-AND Invoice.C_Currency_ID = " + currencyIdSql + @"
+AND Invoice.C_Currency_ID =
+    " + currencyIdSql + @"
+
+AND Invoice.C_BPartner_ID =
+    " + cBPartnerIdSql + @"
 
 AND COALESCE
 (
@@ -593,15 +685,72 @@ AND COALESCE
     0
 ) = " + paymentMethodIdSql;
 
-                invoiceAccessSql = MRole.GetDefault(ctx).AddAccessSQL(
-                    invoiceAccessSql,
-                    "Invoice",
-                    MRole.SQL_FULLYQUALIFIED,
-                    MRole.SQL_RO
-                );
+                invoiceAccessSql =
+                    MRole.GetDefault(ctx).AddAccessSQL(
+                        invoiceAccessSql,
+                        "Invoice",
+                        MRole.SQL_FULLYQUALIFIED,
+                        MRole.SQL_RO
+                    );
 
                 string sql = @"
-WITH SecuredInvoice AS
+WITH SelectedPeriodSource AS
+(
+    SELECT
+        Period.C_Period_ID,
+        Period.StartDate AS DateFrom,
+        Period.EndDate AS DateTo,
+
+        ROW_NUMBER() OVER
+        (
+            ORDER BY
+                Period.StartDate DESC,
+                Period.C_Period_ID DESC
+        ) AS PeriodRowNumber
+
+    FROM AD_ClientInfo ClientInfo
+
+    INNER JOIN C_Year YearData ON
+    (
+        YearData.C_Calendar_ID =
+            ClientInfo.C_Calendar_ID
+    )
+
+    INNER JOIN C_Period Period ON
+    (
+        Period.C_Year_ID =
+            YearData.C_Year_ID
+    )
+
+    WHERE ClientInfo.IsActive = 'Y'
+
+    AND YearData.IsActive = 'Y'
+
+    AND Period.IsActive = 'Y'
+
+    AND ClientInfo.AD_Client_ID =
+        " + clientIdSql + @"
+
+    AND " + runDateSql + @" >=
+        Period.StartDate
+
+    AND " + runDateSql + @" <
+        " + periodEndExclusiveSql + @"
+),
+
+SelectedPeriod AS
+(
+    SELECT
+        SelectedPeriodSource.C_Period_ID,
+        SelectedPeriodSource.DateFrom,
+        SelectedPeriodSource.DateTo
+
+    FROM SelectedPeriodSource SelectedPeriodSource
+
+    WHERE SelectedPeriodSource.PeriodRowNumber = 1
+),
+
+SecuredInvoice AS
 (
 " + invoiceAccessSql + @"
 ),
@@ -636,8 +785,7 @@ ScheduleAllocation AS
 
     WHERE AllocationLine.IsActive = 'Y'
 
-    AND AllocationLine.C_InvoicePaySchedule_ID
-        IS NOT NULL
+    AND AllocationLine.C_InvoicePaySchedule_ID IS NOT NULL
 
     GROUP BY
         AllocationLine.C_InvoicePaySchedule_ID
@@ -650,17 +798,33 @@ InvoiceAllocation AS
 
         SUM
         (
-            COALESCE(AllocationLine.Amount, 0)
-            + COALESCE(AllocationLine.DiscountAmt, 0)
-            + COALESCE(AllocationLine.WriteOffAmt, 0)
+            COALESCE
+            (
+                AllocationLine.Amount,
+                0
+            )
+            +
+            COALESCE
+            (
+                AllocationLine.DiscountAmt,
+                0
+            )
+            +
+            COALESCE
+            (
+                AllocationLine.WriteOffAmt,
+                0
+            )
         ) AS AllocatedAmt
 
     FROM C_AllocationLine AllocationLine
 
     WHERE AllocationLine.IsActive = 'Y'
+
     AND AllocationLine.C_Invoice_ID IS NOT NULL
 
-    GROUP BY AllocationLine.C_Invoice_ID
+    GROUP BY
+        AllocationLine.C_Invoice_ID
 ),
 
 InvoiceOpenBalance AS
@@ -671,12 +835,13 @@ InvoiceOpenBalance AS
         CASE
             WHEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -686,7 +851,8 @@ InvoiceOpenBalance AS
 
     LEFT OUTER JOIN InvoiceAllocation InvoiceAllocation ON
     (
-        InvoiceAllocation.C_Invoice_ID = Invoice.C_Invoice_ID
+        InvoiceAllocation.C_Invoice_ID =
+            Invoice.C_Invoice_ID
     )
 ),
 
@@ -694,9 +860,7 @@ UnpaidSchedule AS
 (
     SELECT
         InvoicePaySchedule.C_InvoicePaySchedule_ID,
-
         InvoicePaySchedule.C_Invoice_ID,
-
         InvoicePaySchedule.DueDate,
 
         COALESCE
@@ -707,6 +871,24 @@ UnpaidSchedule AS
 
         COALESCE
         (
+            InvoicePaySchedule.DiscountAmt,
+            0
+        ) AS DiscountAmt,
+
+        InvoicePaySchedule.DiscountDate,
+
+        InvoicePaySchedule.DiscountDays2,
+
+        COALESCE
+        (
+            InvoicePaySchedule.Discount2,
+            0
+        ) AS Discount2,
+
+        0 AS WriteOffAmt,
+
+        COALESCE
+        (
             ScheduleAllocation.AllocatedAmt,
             0
         ) AS AllocatedAmt,
@@ -714,39 +896,15 @@ UnpaidSchedule AS
         CASE
             WHEN
             (
-                COALESCE
-                (
-                    InvoicePaySchedule.DueAmt,
-                    0
-                )
-                -
-                ABS
-                (
-                    COALESCE
-                    (
-                        ScheduleAllocation.AllocatedAmt,
-                        0
-                    )
-                )
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
+                - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(InvoicePaySchedule.DueAmt, 0)) *
             (
-                COALESCE
-                (
-                    InvoicePaySchedule.DueAmt,
-                    0
-                )
-                -
-                ABS
-                (
-                    COALESCE
-                    (
-                        ScheduleAllocation.AllocatedAmt,
-                        0
-                    )
-                )
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
+                - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             )
-
             ELSE 0
         END AS ScheduleOpenAmount
 
@@ -770,12 +928,8 @@ UnpaidSchedule AS
     (
         InvoicePaySchedule.DueAmt,
         0
-    ) > 0
+    ) <> 0
 
-    /*
-     * Hide schedule when the payment engine would reject it as already
-     * assigned/paid.
-     */
     AND COALESCE
     (
         InvoicePaySchedule.C_Payment_ID,
@@ -790,7 +944,8 @@ UnpaidSchedule AS
 
     AND NOT EXISTS
     (
-        SELECT 1
+        SELECT
+            1
 
         FROM C_Payment ExistingPayment
 
@@ -812,29 +967,58 @@ UnpaidSchedule AS
 
 SELECT
     Invoice.C_Invoice_ID,
-
     Invoice.DocumentNo,
-
+    Invoice.Description,
     Invoice.AD_Org_ID,
 
     Organization.Name AS OrganizationName,
 
     Invoice.C_BPartner_ID,
-
     Invoice.C_BPartner_Location_ID,
 
     UnpaidSchedule.C_InvoicePaySchedule_ID,
 
     UnpaidSchedule.DueAmt AS ScheduleDueAmount,
 
+    UnpaidSchedule.DiscountAmt AS DiscountAmt,
+
+    UnpaidSchedule.DiscountDate,
+
+    UnpaidSchedule.DiscountDays2,
+
+    UnpaidSchedule.Discount2,
+
+    UnpaidSchedule.WriteOffAmt AS WriteOffAmt,
+
     UnpaidSchedule.AllocatedAmt AS ScheduleAllocatedAmount,
 
     CASE
-        WHEN UnpaidSchedule.ScheduleOpenAmount <
-             InvoiceOpenBalance.InvoiceOpenAmount
+        WHEN ABS(UnpaidSchedule.ScheduleOpenAmount) <
+             ABS(InvoiceOpenBalance.InvoiceOpenAmount)
         THEN UnpaidSchedule.ScheduleOpenAmount
         ELSE InvoiceOpenBalance.InvoiceOpenAmount
     END AS ScheduleOpenAmount,
+
+    COALESCE
+    (
+        invoiceOpen
+        (
+            Invoice.C_Invoice_ID,
+            UnpaidSchedule.C_InvoicePaySchedule_ID
+        ),
+        0
+    ) AS InitialOpenAmount,
+
+    COALESCE
+    (
+        invoiceDiscount
+        (
+            Invoice.C_Invoice_ID,
+            " + runDateSql + @",
+            UnpaidSchedule.C_InvoicePaySchedule_ID
+        ),
+        0
+    ) AS InitialDiscountAmount,
 
     BusinessPartner.Name AS VendorName,
 
@@ -869,11 +1053,17 @@ SELECT
     Invoice.GrandTotal,
 
     CASE
-        WHEN UnpaidSchedule.ScheduleOpenAmount <
-             InvoiceOpenBalance.InvoiceOpenAmount
+        WHEN ABS(UnpaidSchedule.ScheduleOpenAmount) <
+             ABS(InvoiceOpenBalance.InvoiceOpenAmount)
         THEN UnpaidSchedule.ScheduleOpenAmount
         ELSE InvoiceOpenBalance.InvoiceOpenAmount
-    END AS OpenAmount
+    END AS OpenAmount,
+
+    SelectedPeriod.C_Period_ID,
+
+    SelectedPeriod.DateFrom AS PeriodDateFrom,
+
+    SelectedPeriod.DateTo AS PeriodDateTo
 
 FROM SecuredInvoice Invoice
 
@@ -888,16 +1078,36 @@ INNER JOIN UnpaidSchedule UnpaidSchedule ON
     UnpaidSchedule.C_Invoice_ID =
         Invoice.C_Invoice_ID
 
-    /*
-     * Only unpaid schedules appear in popup.
-     */
-    AND UnpaidSchedule.ScheduleOpenAmount > 0
+    AND UnpaidSchedule.ScheduleOpenAmount <> 0
 )
 
 INNER JOIN InvoiceOpenBalance InvoiceOpenBalance ON
 (
-    InvoiceOpenBalance.C_Invoice_ID = Invoice.C_Invoice_ID
-    AND InvoiceOpenBalance.InvoiceOpenAmount > 0
+    InvoiceOpenBalance.C_Invoice_ID =
+        Invoice.C_Invoice_ID
+
+    AND InvoiceOpenBalance.InvoiceOpenAmount <> 0
+)
+
+INNER JOIN SelectedPeriod SelectedPeriod ON
+(
+    COALESCE
+    (
+        UnpaidSchedule.DueDate,
+        Invoice.DateAcct
+    ) >= SelectedPeriod.DateFrom
+
+    AND COALESCE
+    (
+        UnpaidSchedule.DueDate,
+        Invoice.DateAcct
+    ) <
+        " +
+                (
+                    DB.IsOracle()
+                        ? "SelectedPeriod.DateTo + 1"
+                        : "SelectedPeriod.DateTo + INTERVAL '1 DAY'"
+                ) + @"
 )
 
 LEFT OUTER JOIN AD_Org Organization ON
@@ -927,16 +1137,32 @@ LEFT OUTER JOIN VA009_PaymentMethod PaymentMethod ON
 WHERE BusinessPartner.IsActive = 'Y'
 
 AND BusinessPartner.IsVendor = 'Y'
-"
-        + GetDateFilter(
-                    @"COALESCE
+
+/*
+ * The main widget groups records by:
+ *
+ * 1. Due Date
+ * 2. Payment Method
+ * 3. Currency
+ * 4. Business Partner
+ *
+ * Payment Method, Currency, and Business Partner are already filtered
+ * inside SecuredInvoice.
+ *
+ * This date filter ensures that the popup returns only
+ * invoices belonging to the selected widget group.
+ */
+AND COALESCE
 (
     UnpaidSchedule.DueDate,
     Invoice.DateAcct
-)",
-                    dateFrom,
-                    dateTo
-                ) + @"
+) >= " + runDateSql + @"
+
+AND COALESCE
+(
+    UnpaidSchedule.DueDate,
+    Invoice.DateAcct
+) < " + runDateEndSql + @"
 
 ORDER BY
     DueDate,
@@ -950,76 +1176,179 @@ ORDER BY
                     null
                 );
 
-                List<object> rows = new List<object>();
+                List<object> rows =
+                    new List<object>();
+
+                DateTime? periodDateFrom = null;
+                DateTime? periodDateTo = null;
+
+                int periodId = 0;
 
                 while (
                     reader != null &&
                     reader.Read()
                 )
                 {
-                    DateTime? dueDate = GetNullableDateTime(
-                        reader,
-                        "DueDate"
-                    );
+                    DateTime? dueDate =
+                        GetNullableDateTime(
+                            reader,
+                            "DueDate"
+                        );
 
-                    DateTime? dateInvoiced = GetNullableDateTime(
-                        reader,
-                        "DateInvoiced"
-                    );
+                    DateTime? dateInvoiced =
+                        GetNullableDateTime(
+                            reader,
+                            "DateInvoiced"
+                        );
 
-                    string currencyISO = GetString(
-                        reader,
-                        "CurrencyISO"
-                    );
+                    if (!periodDateFrom.HasValue)
+                    {
+                        periodDateFrom =
+                            GetNullableDateTime(
+                                reader,
+                                "PeriodDateFrom"
+                            );
+                    }
 
-                    string currencySymbol = GetString(
-                        reader,
-                        "CurrencySymbol"
-                    );
+                    if (!periodDateTo.HasValue)
+                    {
+                        periodDateTo =
+                            GetNullableDateTime(
+                                reader,
+                                "PeriodDateTo"
+                            );
+                    }
+
+                    if (periodId <= 0)
+                    {
+                        periodId = GetInt(
+                            reader,
+                            "C_Period_ID"
+                        );
+                    }
+
+                    string currencyISO =
+                        GetString(
+                            reader,
+                            "CurrencyISO"
+                        );
+
+                    string currencySymbol =
+                        GetString(
+                            reader,
+                            "CurrencySymbol"
+                        );
 
                     if (string.IsNullOrWhiteSpace(
                         currencySymbol
                     ))
                     {
-                        currencySymbol = currencyISO;
+                        currencySymbol =
+                            currencyISO;
                     }
 
-                    int invoiceId = GetInt(
-                        reader,
-                        "C_Invoice_ID"
-                    );
+                    int invoiceId =
+                        GetInt(
+                            reader,
+                            "C_Invoice_ID"
+                        );
 
-                    int vendorId = GetInt(
-                        reader,
-                        "C_BPartner_ID"
-                    );
+                    int vendorId =
+                        GetInt(
+                            reader,
+                            "C_BPartner_ID"
+                        );
 
-                    int invoicePayScheduleId = GetInt(
-                        reader,
-                        "C_InvoicePaySchedule_ID"
-                    );
+                    int invoicePayScheduleId =
+                        GetInt(
+                            reader,
+                            "C_InvoicePaySchedule_ID"
+                        );
 
-                    decimal scheduleDueAmount = GetDecimal(
-                        reader,
-                        "ScheduleDueAmount"
-                    );
+                    decimal scheduleDueAmount =
+                        GetDecimal(
+                            reader,
+                            "ScheduleDueAmount"
+                        );
 
-                    decimal scheduleAllocatedAmount = GetDecimal(
-                        reader,
-                        "ScheduleAllocatedAmount"
-                    );
+                    decimal scheduleAllocatedAmount =
+                        GetDecimal(
+                            reader,
+                            "ScheduleAllocatedAmount"
+                        );
 
-                    decimal scheduleOpenAmount = GetDecimal(
-                        reader,
-                        "ScheduleOpenAmount"
-                    );
+                    decimal scheduleDiscountAmt =
+                        GetDecimal(
+                            reader,
+                            "DiscountAmt"
+                        );
+
+                    decimal scheduleDiscountAmt2 =
+                        GetDecimal(
+                            reader,
+                            "Discount2"
+                        );
+
+                    decimal writeOffAmt =
+                        GetDecimal(
+                            reader,
+                            "WriteOffAmt"
+                        );
+
+                    decimal scheduleOpenAmount =
+                        GetDecimal(
+                            reader,
+                            "ScheduleOpenAmount"
+                        );
+
+                    decimal initialOpenAmount =
+                        GetDecimal(
+                            reader,
+                            "InitialOpenAmount"
+                        );
+
+                    decimal appliedDiscountAmt =
+                        GetDecimal(
+                            reader,
+                            "InitialDiscountAmount"
+                        );
 
                     /*
-                     * Final C# protection:
-                     * never add a paid schedule to popup rows.
+                     * AP amounts are outflows and may arrive negative, so
+                     * the checks below compare magnitudes and the open
+                     * amount's sign is carried through to the pay amount.
                      */
-                    if (invoicePayScheduleId <= 0 ||
-                        scheduleOpenAmount <= 0)
+                    if (initialOpenAmount == 0)
+                    {
+                        initialOpenAmount =
+                            scheduleOpenAmount;
+                    }
+
+                    if (
+                        Math.Abs(appliedDiscountAmt) >
+                        Math.Abs(initialOpenAmount)
+                    )
+                    {
+                        appliedDiscountAmt =
+                            initialOpenAmount;
+                    }
+
+                    decimal schedulePayMagnitude =
+                        Math.Max(
+                            Math.Abs(initialOpenAmount) -
+                            Math.Abs(appliedDiscountAmt),
+                            0
+                        );
+
+                    decimal schedulePayAmt =
+                        initialOpenAmount < 0
+                            ? -schedulePayMagnitude
+                            : schedulePayMagnitude;
+
+                    if (
+                        invoicePayScheduleId <= 0 ||
+                        initialOpenAmount == 0
+                    )
                     {
                         continue;
                     }
@@ -1027,9 +1356,7 @@ ORDER BY
                     rows.Add(new
                     {
                         invoiceId = invoiceId,
-
                         sourceInvoiceId = invoiceId,
-
                         cInvoiceId = invoiceId,
 
                         invoicePayScheduleId =
@@ -1038,116 +1365,149 @@ ORDER BY
                         cInvoicePayScheduleId =
                             invoicePayScheduleId,
 
-                        invoiceDocumentNo = GetString(
-                            reader,
-                            "DocumentNo"
-                        ),
-
-                        documentNo = GetString(
-                            reader,
-                            "DocumentNo"
-                        ),
-
-                        organizationId = GetInt(
-                            reader,
-                            "AD_Org_ID"
-                        ),
-
-                        adOrgId = GetInt(
-                            reader,
-                            "AD_Org_ID"
-                        ),
-
-                        organizationName = GetString(
-                            reader,
-                            "OrganizationName"
-                        ),
-
-                        vendorId = vendorId,
-
-                        cBPartnerId = vendorId,
-
-                        bPartnerLocationId = GetInt(
-                            reader,
-                            "C_BPartner_Location_ID"
-                        ),
-
-                        cBPartnerLocationId = GetInt(
-                            reader,
-                            "C_BPartner_Location_ID"
-                        ),
-
-                        vendorName = GetString(
-                            reader,
-                            "VendorName"
-                        ),
-
-                        isVendor = string.Equals(
+                        invoiceDocumentNo =
                             GetString(
                                 reader,
-                                "IsVendor"
+                                "DocumentNo"
                             ),
-                            "Y",
-                            StringComparison.OrdinalIgnoreCase
-                        ),
 
-                        cCurrencyId = GetInt(
-                            reader,
-                            "C_Currency_ID"
-                        ),
+                        documentNo =
+                            GetString(
+                                reader,
+                                "DocumentNo"
+                            ),
 
-                        currencyId = GetInt(
-                            reader,
-                            "C_Currency_ID"
-                        ),
+                        description =
+                            GetString(
+                                reader,
+                                "Description"
+                            ),
 
-                        currencyISO = currencyISO,
+                        invoiceDescription =
+                            GetString(
+                                reader,
+                                "Description"
+                            ),
 
-                        currencySymbol = currencySymbol,
-
-                        stdPrecision = NormalizePrecision(
+                        organizationId =
                             GetInt(
                                 reader,
-                                "StdPrecision",
-                                2
-                            )
-                        ),
+                                "AD_Org_ID"
+                            ),
 
-                        conversionTypeId = GetInt(
-                            reader,
-                            "C_ConversionType_ID"
-                        ),
+                        adOrgId =
+                            GetInt(
+                                reader,
+                                "AD_Org_ID"
+                            ),
 
-                        cConversionTypeId = GetInt(
-                            reader,
-                            "C_ConversionType_ID"
-                        ),
+                        organizationName =
+                            GetString(
+                                reader,
+                                "OrganizationName"
+                            ),
 
-                        currencyTypeName = GetString(
-                            reader,
-                            "CurrencyTypeName"
-                        ),
+                        vendorId = vendorId,
+                        cBPartnerId = vendorId,
 
-                        dateInvoiced = FormatDate(
-                            dateInvoiced
-                        ),
+                        bPartnerLocationId =
+                            GetInt(
+                                reader,
+                                "C_BPartner_Location_ID"
+                            ),
 
-                        dueDate = FormatDate(
-                            dueDate
-                        ),
+                        cBPartnerLocationId =
+                            GetInt(
+                                reader,
+                                "C_BPartner_Location_ID"
+                            ),
 
-                        transactionDate = FormatDate(
-                            dueDate
-                        ),
+                        vendorName =
+                            GetString(
+                                reader,
+                                "VendorName"
+                            ),
 
-                        dateTrx = FormatDate(
-                            dueDate
-                        ),
+                        isVendor =
+                            string.Equals(
+                                GetString(
+                                    reader,
+                                    "IsVendor"
+                                ),
+                                "Y",
+                                StringComparison.OrdinalIgnoreCase
+                            ),
 
-                        grandTotal = GetDecimal(
-                            reader,
-                            "GrandTotal"
-                        ),
+                        cCurrencyId =
+                            GetInt(
+                                reader,
+                                "C_Currency_ID"
+                            ),
+
+                        currencyId =
+                            GetInt(
+                                reader,
+                                "C_Currency_ID"
+                            ),
+
+                        currencyISO =
+                            currencyISO,
+
+                        currencySymbol =
+                            currencySymbol,
+
+                        stdPrecision =
+                            NormalizePrecision(
+                                GetInt(
+                                    reader,
+                                    "StdPrecision",
+                                    2
+                                )
+                            ),
+
+                        conversionTypeId =
+                            GetInt(
+                                reader,
+                                "C_ConversionType_ID"
+                            ),
+
+                        cConversionTypeId =
+                            GetInt(
+                                reader,
+                                "C_ConversionType_ID"
+                            ),
+
+                        currencyTypeName =
+                            GetString(
+                                reader,
+                                "CurrencyTypeName"
+                            ),
+
+                        dateInvoiced =
+                            FormatDate(
+                                dateInvoiced
+                            ),
+
+                        dueDate =
+                            FormatDate(
+                                dueDate
+                            ),
+
+                        transactionDate =
+                            FormatDate(
+                                parsedRunDate
+                            ),
+
+                        dateTrx =
+                            FormatDate(
+                                parsedRunDate
+                            ),
+
+                        grandTotal =
+                            GetDecimal(
+                                reader,
+                                "GrandTotal"
+                            ),
 
                         scheduleDueAmount =
                             scheduleDueAmount,
@@ -1155,39 +1515,49 @@ ORDER BY
                         scheduleAllocatedAmount =
                             scheduleAllocatedAmount,
 
+                        discountAmt =
+                            appliedDiscountAmt,
+
+                        discountAmount =
+                            appliedDiscountAmt,
+
+                        writeOffAmt =
+                            writeOffAmt,
+
+                        writeOffAmount =
+                            writeOffAmt,
+
                         scheduleOpenAmount =
                             scheduleOpenAmount,
 
                         openAmount =
-                            scheduleOpenAmount,
+                            initialOpenAmount,
 
                         amount =
-                            scheduleOpenAmount,
+                            schedulePayAmt,
 
                         payAmt =
-                            scheduleOpenAmount,
+                            schedulePayAmt,
 
-                        paymentMethodId = GetInt(
-                            reader,
-                            "VA009_PaymentMethod_ID"
-                        ),
-
-                        paymentMethodName = GetPaymentMethodName(
-                            ctx,
-                            GetString(
+                        paymentMethodId =
+                            GetInt(
                                 reader,
-                                "PaymentMethodName"
-                            )
-                        ),
+                                "VA009_PaymentMethod_ID"
+                            ),
+
+                        paymentMethodName =
+                            GetPaymentMethodName(
+                                ctx,
+                                GetString(
+                                    reader,
+                                    "PaymentMethodName"
+                                )
+                            ),
 
                         bankAccountId = 0,
-
                         docTypeId = 0,
-
                         cDocTypeId = 0,
-
                         tenderType = string.Empty,
-
                         paymentDocumentNo = string.Empty
                     });
                 }
@@ -1196,8 +1566,25 @@ ORDER BY
                 {
                     success = true,
                     error = string.Empty,
-                    hasData = rows.Count > 0,
-                    rows = rows
+
+                    hasData =
+                        rows.Count > 0,
+
+                    periodId =
+                        periodId,
+
+                    dateFrom =
+                        FormatDate(
+                            periodDateFrom
+                        ),
+
+                    dateTo =
+                        FormatDate(
+                            periodDateTo
+                        ),
+
+                    rows =
+                        rows
                 }, JsonRequestBehavior.AllowGet);
             }
             catch (Exception ex)
@@ -1228,13 +1615,15 @@ ORDER BY
             }
         }
 
+
         #endregion
 
         #region Popup Lookups
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPaymentPopupLookups()
+        public JsonResult GetPaymentPopupLookups(
+            int currencyId = 0)
         {
             Ctx ctx = GetContext();
 
@@ -1275,7 +1664,8 @@ ORDER BY
 
                 List<object> bankAccounts =
                     ReadBankAccountLookupRows(
-                        clientId
+                        clientId,
+                        currencyId
                     );
 
                 currentLookup = "vendors";
@@ -1307,7 +1697,7 @@ SELECT
 
 FROM C_Currency Currency
 
-WHERE Currency.IsActive = 'Y'
+WHERE Currency.IsActive = 'Y' and Currency.IsMyCurrency = 'Y'
 
 ORDER BY
     Currency.ISO_Code");
@@ -1442,7 +1832,8 @@ ORDER BY
         }
 
         private List<object> ReadBankAccountLookupRows(
-            int clientId)
+            int clientId,
+            int currencyId = 0)
         {
             List<object> rows = new List<object>();
 
@@ -1456,7 +1847,9 @@ SELECT
 
     BankAccount.Name AS BankAccountName,
 
-    BankAccount.AccountNo
+    BankAccount.AccountNo,
+
+    Currency.ISO_Code AS CurrencyISO
 
 FROM C_BankAccount BankAccount
 
@@ -1466,11 +1859,27 @@ LEFT OUTER JOIN C_Bank Bank ON
     BankAccount.C_Bank_ID
 )
 
+LEFT OUTER JOIN C_Currency Currency ON
+(
+    Currency.C_Currency_ID =
+    BankAccount.C_Currency_ID
+)
+
 WHERE BankAccount.IsActive = 'Y'
 
 AND BankAccount.AD_Client_ID = " +
                 clientId.ToString(
                     CultureInfo.InvariantCulture
+                ) + @"
+" +
+                (
+                    currencyId > 0
+                        ? @"
+AND BankAccount.C_Currency_ID = " +
+                          currencyId.ToString(
+                              CultureInfo.InvariantCulture
+                          )
+                        : string.Empty
                 ) + @"
 
 ORDER BY
@@ -1509,21 +1918,47 @@ ORDER BY
                         "AccountNo"
                     );
 
-                    string displayName = FirstNotEmpty(
-                        bankName,
-                        accountName,
-                        accountNo
+                    string currencyISO = GetString(
+                        reader,
+                        "CurrencyISO"
                     );
 
-                    if (
-                        !string.IsNullOrWhiteSpace(accountNo) &&
-                        displayName != accountNo
-                    )
+                    /*
+                     * Display format: "BankName - AccountNo - Currency"
+                     * e.g. "Iraqi National Bank - 123456789 - IQD".
+                     * The bank name is shown first, followed by the
+                     * account number, falling back to the account name when
+                     * the bank has no name.
+                     */
+                    List<string> displayNameParts =
+                        new List<string>();
+
+                    string primaryName = FirstNotEmpty(
+                        bankName,
+                        accountName
+                    );
+
+                    if (!string.IsNullOrWhiteSpace(primaryName))
+                    {
+                        displayNameParts.Add(primaryName);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(accountNo))
+                    {
+                        displayNameParts.Add(accountNo);
+                    }
+
+                    string displayName = string.Join(
+                        " - ",
+                        displayNameParts
+                    );
+
+                    if (!string.IsNullOrWhiteSpace(currencyISO))
                     {
                         displayName =
                             displayName +
-                            " · " +
-                            accountNo;
+                            " - " +
+                            currencyISO;
                     }
 
                     rows.Add(new
@@ -1731,7 +2166,7 @@ AND PaymentMethod.AD_Client_ID IN
 (
     0,
     " + clientIdSql + @"
-)
+) AND  PaymentMethod.VA009_PAYMENTBASETYPE NOT IN ('B','C','P') 
 ORDER BY
     PaymentMethod.VA009_Name";
 
@@ -1806,25 +2241,23 @@ ORDER BY
             string checkDate,
             string transactionDate,
             string documentNo,
+            string paymentDescription,
+            decimal discountAmt,
+            decimal writeOffAmt,
             decimal payAmt)
         {
             Ctx ctx = GetContext();
 
             if (ctx == null)
             {
-                return Json(new
-                {
-                    success = false,
-                    error = "Session Expired",
-                    errorText = "Session Expired"
-                });
+                return GetSessionExpiredResult();
             }
 
             if (invoiceId <= 0)
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageSourceInvoiceRequired",
+                    "VAS_031_SourceInvoiceRequired",
                     "Source invoice is required."
                 );
             }
@@ -1833,7 +2266,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageInvoicePayScheduleRequired",
+                    "VAS_031_InvoicePayScheduleRequired",
                     "Invoice payment schedule is required."
                 );
             }
@@ -1842,7 +2275,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessagePaymentMethodRequired",
+                    "VAS_031_PaymentMethodRequired",
                     "Payment method is required."
                 );
             }
@@ -1876,7 +2309,7 @@ ORDER BY
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageTransactionDateInvalid",
+                    "VAS_031_TransactionDateInvalid",
                     "Transaction date must be in yyyy-MM-dd format."
                 );
             }
@@ -1905,7 +2338,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageSourceInvoiceNotFound",
+                            "VAS_031_SourceInvoiceNotFound",
                             "The source invoice was not found."
                         )
                     );
@@ -1916,7 +2349,7 @@ ORDER BY
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidSourceInvoice",
+                            "VAS_031_InvalidSourceInvoice",
                             "The invoice does not belong to the current client."
                         )
                     );
@@ -1974,9 +2407,14 @@ ORDER BY
                 ))
                 {
                     throw new InvalidOperationException(
-                        "The selected document is not a normal AP Invoice. " +
-                        "Invoice DocBaseType must be API, but it is " +
-                        invoiceDocBaseType + "."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_InvalidAPInvoiceDocBaseType",
+                            "The selected document is not a normal AP Invoice. Invoice DocBaseType must be API, but it is {0}."
+                        ).Replace(
+                            "{0}",
+                            invoiceDocBaseType
+                        )
                     );
                 }
 
@@ -1987,21 +2425,22 @@ ORDER BY
                 if (invoice.GetAD_Org_ID() != adOrgId)
                 {
                     throw new InvalidOperationException(
-                        "Selected organization does not match the invoice."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_OrganizationInvoiceMismatch",
+                            "Selected organization does not match the invoice."
+                        )
                     );
                 }
 
                 if (invoice.GetC_BPartner_ID() != vendorId)
                 {
                     throw new InvalidOperationException(
-                        "Selected vendor does not match the invoice."
-                    );
-                }
-
-                if (invoice.GetC_Currency_ID() != currencyId)
-                {
-                    throw new InvalidOperationException(
-                        "Selected currency does not match the invoice."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_VendorInvoiceMismatch",
+                            "Selected vendor does not match the invoice."
+                        )
                     );
                 }
 
@@ -2015,8 +2454,11 @@ ORDER BY
                 if (validatedInvoicePayScheduleId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "The selected invoice payment schedule is invalid, inactive, paid, " +
-                        "or does not belong to the selected invoice."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_InvalidInvoicePaySchedule",
+                            "The selected invoice payment schedule is invalid, inactive, paid, or does not belong to the selected invoice."
+                        )
                     );
                 }
 
@@ -2027,7 +2469,11 @@ ORDER BY
                 ))
                 {
                     throw new InvalidOperationException(
-                        "Invoice schedule already has an active payment."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_ScheduleAlreadyHasPayment",
+                            "Invoice schedule already has an active payment."
+                        )
                     );
                 }
 
@@ -2041,7 +2487,7 @@ ORDER BY
                         trx
                     );
 
-                if (openAmountBeforePayment <= 0)
+                if (openAmountBeforePayment == 0)
                 {
                     throw new InvalidOperationException(
                         GetMsg(
@@ -2052,13 +2498,25 @@ ORDER BY
                     );
                 }
 
-                if (payAmt > openAmountBeforePayment)
+                /*
+                 * Negative (outflow) amounts are accepted, so the totals are
+                 * compared by magnitude against the open amount instead of
+                 * requiring every entered figure to be positive.
+                 */
+                if (
+                    invoice.GetC_Currency_ID() == currencyId &&
+                    (
+                        Math.Abs(payAmt) > Math.Abs(openAmountBeforePayment) ||
+                        Math.Abs(payAmt) + Math.Abs(discountAmt) + Math.Abs(writeOffAmt) >
+                        Math.Abs(openAmountBeforePayment)
+                    )
+                )
                 {
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessagePaymentExceedsOpenAmount",
-                            "Payment amount exceeds the invoice open amount."
+                            "VAS_031_PaymentExceedsOpenAmount",
+                            "Payment amount and discount exceed the invoice open amount."
                         )
                     );
                 }
@@ -2076,7 +2534,11 @@ ORDER BY
                     !organization.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Organization was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_OrganizationInactive",
+                            "Organization was not found or is inactive."
+                        )
                     );
                 }
 
@@ -2093,14 +2555,22 @@ ORDER BY
                     !bankAccount.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Bank account was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageBankAccountInactive",
+                            "Bank account was not found or is inactive."
+                        )
                     );
                 }
 
                 if (bankAccount.GetAD_Client_ID() != ctx.GetAD_Client_ID())
                 {
                     throw new InvalidOperationException(
-                        "Bank account does not belong to the current client."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_BankAccountInvalidClient",
+                            "Bank account does not belong to the current client."
+                        )
                     );
                 }
 
@@ -2118,7 +2588,11 @@ ORDER BY
                     !vendor.IsVendor())
                 {
                     throw new InvalidOperationException(
-                        "Selected business partner is not an active vendor."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInactiveVendor",
+                            "Selected business partner is not an active vendor."
+                        )
                     );
                 }
 
@@ -2131,7 +2605,11 @@ ORDER BY
                 if (bPartnerLocationId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "No active business partner location was found for the selected vendor."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_VendorLocationNotFound",
+                            "No active business partner location was found for the selected vendor."
+                        )
                     );
                 }
 
@@ -2148,7 +2626,11 @@ ORDER BY
                     !currency.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Currency was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageCurrencyInactive",
+                            "Currency was not found or is inactive."
+                        )
                     );
                 }
 
@@ -2165,7 +2647,11 @@ ORDER BY
                     !conversionType.IsActive())
                 {
                     throw new InvalidOperationException(
-                        "Conversion type was not found or is inactive."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_ConversionTypeInactive",
+                            "Conversion type was not found or is inactive."
+                        )
                     );
                 }
 
@@ -2182,7 +2668,11 @@ ORDER BY
                 if (resolvedDocTypeId <= 0)
                 {
                     throw new InvalidOperationException(
-                        "AP Payment document type was not found."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_APPaymentDocTypeNotFound",
+                            "AP Payment document type was not found."
+                        )
                     );
                 }
 
@@ -2201,7 +2691,11 @@ ORDER BY
                     ))
                 {
                     throw new InvalidOperationException(
-                        "The selected document type is not an AP Payment document type."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_InvalidAPPaymentDocType",
+                            "The selected document type is not an AP Payment document type."
+                        )
                     );
                 }
 
@@ -2217,7 +2711,11 @@ ORDER BY
                 ))
                 {
                     throw new InvalidOperationException(
-                        "The selected tender type is not valid."
+                        GetMsg(
+                            ctx,
+                            "VAS_031_MessageInvalidTenderType",
+                            "The selected tender type is not valid."
+                        )
                     );
                 }
 
@@ -2258,7 +2756,7 @@ AND PaymentMethod.AD_Client_ID IN
                     throw new InvalidOperationException(
                         GetMsg(
                             ctx,
-                            "VAS_031_MessageInvalidPaymentMethod",
+                            "VAS_031_InvalidPaymentMethod",
                             "The selected payment method is invalid or inactive."
                         )
                     );
@@ -2302,6 +2800,51 @@ AND PaymentMethod.AD_Client_ID IN
                     }
                 }
 
+                decimal scheduleOpenAmountInPaymentCurrency =
+                    openAmountBeforePayment;
+
+                if (invoice.GetC_Currency_ID() != currencyId)
+                {
+                    scheduleOpenAmountInPaymentCurrency =
+                        MConversionRate.Convert(
+                            ctx,
+                            openAmountBeforePayment,
+                            invoice.GetC_Currency_ID(),
+                            currencyId,
+                            dateTrx,
+                            conversionTypeId,
+                            invoice.GetAD_Client_ID(),
+                            invoice.GetAD_Org_ID()
+                        );
+
+                    if (scheduleOpenAmountInPaymentCurrency == 0)
+                    {
+                        throw new InvalidOperationException(
+                            GetMsg(
+                                ctx,
+                                "VAS_031_NoCurrencyConversion",
+                                "No currency conversion found for the selected currency."
+                            )
+                        );
+                    }
+                }
+
+                if (
+                    Math.Abs(payAmt) +
+                    Math.Abs(discountAmt) +
+                    Math.Abs(writeOffAmt) >
+                    Math.Abs(scheduleOpenAmountInPaymentCurrency)
+                )
+                {
+                    throw new InvalidOperationException(
+                        GetMsg(
+                            ctx,
+                            "VAS_031_PaymentExceedsOpenAmount",
+                            "Payment amount and discount exceed the invoice open amount."
+                        )
+                    );
+                }
+
                 /*
                  * Create AP payment.
                  */
@@ -2334,7 +2877,7 @@ AND PaymentMethod.AD_Client_ID IN
                 );
 
                 payment.SetC_Currency_ID(
-                    invoice.GetC_Currency_ID()
+                    currencyId
                 );
 
                 payment.SetC_ConversionType_ID(
@@ -2354,8 +2897,8 @@ AND PaymentMethod.AD_Client_ID IN
                     validatedInvoicePayScheduleId
                 );
 
-                payment.SetDateTrx(dateTrx);
-                payment.SetDateAcct(dateTrx);
+                payment.SetDateTrx(DateTime.Now);
+                payment.SetDateAcct(DateTime.Now);
 
                 payment.SetTenderType(
                     normalizedTenderType
@@ -2379,13 +2922,54 @@ AND PaymentMethod.AD_Client_ID IN
                     );
                 }
 
+                if (!string.IsNullOrWhiteSpace(
+                    paymentDescription
+                ))
+                {
+                    payment.Set_Value(
+                        "Description",
+                        paymentDescription.Trim()
+                    );
+                }
+
                 payment.SetPayAmt(payAmt);
 
+                if (discountAmt != 0)
+                {
+                    payment.SetDiscountAmt(discountAmt);
+                }
+
+                if (
+                    writeOffAmt != 0 &&
+                    payment.Get_ColumnIndex(
+                        "WriteOffAmt"
+                    ) >= 0
+                )
+                {
+                    payment.SetWriteOffAmt(writeOffAmt);
+                }
+
+                decimal overUnderAmt =
+                    scheduleOpenAmountInPaymentCurrency -
+                    payAmt -
+                    discountAmt -
+                    writeOffAmt;
+
+                payment.SetOverUnderAmt(overUnderAmt);
+                payment.SetIsOverUnderPayment(
+                    overUnderAmt != 0
+                );
+
                 /*
-                 * Initially save as Draft.
+                 * Save the payment in progress first, then complete
+                 * it through the standard workflow process below.
                  */
-                payment.SetDocStatus("DR");
-                payment.SetDocAction("CO");
+                payment.SetDocStatus(
+                    MPayment.DOCSTATUS_InProgress
+                );
+                payment.SetDocAction(
+                    MPayment.DOCACTION_Complete
+                );
                 payment.SetProcessed(false);
 
                 if (!string.IsNullOrWhiteSpace(documentNo))
@@ -2395,55 +2979,55 @@ AND PaymentMethod.AD_Client_ID IN
                     );
                 }
 
-                if (!payment.Save())
+                if (!payment.Save(trx))
                 {
                     throw new InvalidOperationException(
                         GetLastModelError(
                             ctx,
-                            "VAS_031_MessageCouldNotSaveAPPayment",
+                            "VAS_031_CouldNotSaveAPPayment",
                             "Could not save AP payment."
                         )
                     );
                 }
 
+                int createdPaymentId =
+                    payment.GetC_Payment_ID();
+
                 /*
-                 * Important:
-                 * Complete the payment so Vienna Advantage creates
-                 * the accounting/allocation records.
+                 * Complete through the standard workflow process.
+                 * CompleteOrReverse runs outside this transaction,
+                 * so commit the saved payment first just like the
+                 * existing shipment/payment workflow callers do.
                  */
-                bool completed = payment.ProcessIt("CO");
+                trx.Commit();
+                trx.Close();
+                trx = null;
 
-                if (!completed)
+                string completionMessage =
+                    DocumentEngine.CompleteOrReverse(
+                        ctx,
+                        "C_Payment",
+                        PaymentTableId,
+                        createdPaymentId,
+                        PaymentProcessId,
+                        MPayment.DOCACTION_Complete
+                    );
+
+                if (!string.IsNullOrWhiteSpace(completionMessage))
                 {
-                    string processMessage = payment.GetProcessMsg();
-
-                    if (string.IsNullOrWhiteSpace(processMessage))
-                    {
-                        processMessage = GetMsg(
-                            ctx,
-                            "VAS_031_MessageCouldNotCompleteAPPayment",
-                            "Could not complete AP payment."
-                        );
-                    }
-
                     throw new InvalidOperationException(
-                        processMessage
+                        completionMessage
                     );
                 }
 
                 /*
-                 * Save changes made by ProcessIt.
+                 * Reload changes made by the workflow completion.
                  */
-                if (!payment.Save())
-                {
-                    throw new InvalidOperationException(
-                        GetLastModelError(
-                            ctx,
-                            "VAS_031_MessageCouldNotCompleteAPPayment",
-                            "Could not save the completed AP payment."
-                        )
-                    );
-                }
+                payment = new MPayment(
+                    ctx,
+                    createdPaymentId,
+                    null
+                );
 
                 /*
                  * Confirm that payment is really completed.
@@ -2469,9 +3053,14 @@ AND PaymentMethod.AD_Client_ID IN
                     if (string.IsNullOrWhiteSpace(processMessage))
                     {
                         processMessage =
-                            "Payment was saved but was not completed. " +
-                            "Current status: " +
-                            completedDocStatus;
+                            GetMsg(
+                                ctx,
+                                "VAS_031_PaymentSavedNotCompleted",
+                                "Payment was saved but was not completed. Current status: {0}"
+                            ).Replace(
+                                "{0}",
+                                completedDocStatus
+                            );
                     }
 
                     throw new InvalidOperationException(
@@ -2492,25 +3081,25 @@ AND PaymentMethod.AD_Client_ID IN
                  */
                 decimal remainingOpenAmount = GetInvoiceOpenAmount(
                     invoiceId,
-                    trx
+                    null
                 );
 
                 bool invoiceFullyPaid =
-                    remainingOpenAmount <= 0;
-
-                /*
-                 * Commit payment and allocation together.
-                 */
-                trx.Commit();
+                    remainingOpenAmount == 0;
 
                 string createdPaymentDocumentNo =
                     payment.GetDocumentNo();
 
-                string msg = GetMsg(
-                    ctx,
-                    "VAS_031_MessagePaymentCreatedSuccessfully",
-                    "AP payment created and completed successfully:"
-                ) + " " + createdPaymentDocumentNo;
+                string msg = (
+                    GetMsg(
+                        ctx,
+                        "VAS_031_PaymentCreatedSuccessfully",
+                        "AP payment created and completed successfully:"
+                    ) + " " + createdPaymentDocumentNo
+                )
+                    .Replace("[", string.Empty)
+                    .Replace("]", string.Empty)
+                    .Trim();
 
 
                 return Json(new
@@ -2599,7 +3188,7 @@ AND PaymentMethod.AD_Client_ID IN
 
                 string message = GetMsg(
                     ctx,
-                    "VAS_031_MessageCouldNotSaveAPPayment",
+                    "VAS_031_CouldNotSaveAPPayment",
                     "Could not save or complete AP payment."
                 );
 
@@ -2891,8 +3480,8 @@ LIMIT 1";
             string sql = @"
 SELECT
     CASE
-        WHEN ScheduleBalance.ScheduleOpenAmount <
-             InvoiceBalance.InvoiceOpenAmount
+        WHEN ABS(ScheduleBalance.ScheduleOpenAmount) <
+             ABS(InvoiceBalance.InvoiceOpenAmount)
         THEN ScheduleBalance.ScheduleOpenAmount
         ELSE InvoiceBalance.InvoiceOpenAmount
     END AS OpenAmount
@@ -2902,12 +3491,13 @@ FROM
         CASE
             WHEN
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(InvoicePaySchedule.DueAmt, 0)) *
             (
-                COALESCE(InvoicePaySchedule.DueAmt, 0)
+                ABS(COALESCE(InvoicePaySchedule.DueAmt, 0))
                 - ABS(COALESCE(ScheduleAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -2945,12 +3535,13 @@ CROSS JOIN
         CASE
             WHEN
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             ) > 0
             THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                COALESCE(Invoice.GrandTotal, 0)
+                ABS(COALESCE(Invoice.GrandTotal, 0))
                 - ABS(COALESCE(InvoiceAllocation.AllocatedAmt, 0))
             )
             ELSE 0
@@ -3000,24 +3591,17 @@ CROSS JOIN
 SELECT
     CASE
         WHEN
-        (
-            Invoice.GrandTotal -
-            COALESCE
             (
-                Allocation.AllocatedAmt,
-                0
-            )
-        ) > 0
-        THEN
-        (
-            Invoice.GrandTotal -
-            COALESCE
+                ABS(COALESCE(Invoice.GrandTotal, 0))
+                - ABS(COALESCE(Allocation.AllocatedAmt, 0))
+            ) > 0
+            THEN
+            SIGN(COALESCE(Invoice.GrandTotal, 0)) *
             (
-                Allocation.AllocatedAmt,
-                0
+                ABS(COALESCE(Invoice.GrandTotal, 0))
+                - ABS(COALESCE(Allocation.AllocatedAmt, 0))
             )
-        )
-        ELSE 0
+            ELSE 0
     END AS OpenAmount
 
 FROM C_Invoice Invoice
@@ -3111,7 +3695,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageOrganizationRequired",
+                    "VAS_031_OrganizationRequired",
                     "Organization is required."
                 );
             }
@@ -3147,7 +3731,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageConversionTypeRequired",
+                    "VAS_031_ConversionTypeRequired",
                     "Currency type is required."
                 );
             }
@@ -3156,7 +3740,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageDocumentTypeRequired",
+                    "VAS_031_DocumentTypeRequired",
                     "Document type is required."
                 );
             }
@@ -3174,17 +3758,21 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageTransactionDateRequired",
+                    "VAS_031_TransactionDateRequired",
                     "Transaction date is required."
                 );
             }
 
-            if (payAmt <= 0)
+            /*
+             * AP amounts are outflows and may be sent negative, so only a
+             * zero payment amount is rejected here.
+             */
+            if (payAmt == 0)
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessagePaymentAmountRequired",
-                    "Payment amount must be greater than zero."
+                    "VAS_031_PaymentAmountRequired",
+                    "Payment amount must not be zero."
                 );
             }
 
@@ -3199,7 +3787,7 @@ WHERE Invoice.C_Invoice_ID =
             {
                 return GetValidationError(
                     ctx,
-                    "VAS_031_MessageTransactionDateInvalid",
+                    "VAS_031_TransactionDateInvalid",
                     "Transaction date must be in yyyy-MM-dd format."
                 );
             }
@@ -3221,6 +3809,8 @@ WHERE Invoice.C_Invoice_ID =
             return Json(new
             {
                 success = false,
+                errorKey = messageKey,
+                messageKey = messageKey,
                 error = message,
                 errorText = message
             });
@@ -3418,11 +4008,16 @@ AND " + columnName + @" < DATE '" +
 
         private JsonResult GetSessionExpiredResult()
         {
+            const string messageKey = "SessionExpired";
+            const string message = "Session Expired";
+
             return Json(new
             {
                 success = false,
-                error = "Session Expired",
-                errorText = "Session Expired",
+                errorKey = messageKey,
+                messageKey = messageKey,
+                error = message,
+                errorText = message,
                 hasData = false
             }, JsonRequestBehavior.AllowGet);
         }

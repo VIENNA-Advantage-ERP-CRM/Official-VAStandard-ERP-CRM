@@ -197,13 +197,21 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
-                        error = ex.Message,
-                        errorText = ex.Message
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -228,13 +236,10 @@ namespace VAS.Controllers
                     ? "TRUNC(CURRENT_DATE)"
                     : "CURRENT_DATE";
 
-            /*
-             * CAST(... AS DATE) + 1 works on both:
-             * Oracle     : DATE + integer
-             * PostgreSQL : DATE + integer
-             */
             string periodEndExclusiveSql =
-                "CAST(Period.EndDate AS DATE) + 1";
+                DB.IsOracle()
+                    ? "CAST(Period.EndDate AS DATE) + 1"
+                    : "CAST(Period.EndDate AS DATE) + INTERVAL '1 DAY'";
 
             string paymentFilteredSql = @"
 SELECT
@@ -292,7 +297,7 @@ PeriodRange AS
             CAST
             (
                 Period.EndDate AS DATE
-            ) + 1
+            ) " + (DB.IsOracle() ? "+ 1" : "+ INTERVAL '1 DAY'") + @"
         ) AS DateToExclusive
 
     FROM AD_ClientInfo ClientInfo
