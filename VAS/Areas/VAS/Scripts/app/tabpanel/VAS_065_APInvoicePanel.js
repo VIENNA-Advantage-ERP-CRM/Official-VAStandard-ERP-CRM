@@ -26,7 +26,11 @@
         var data = null;
         var meta = null;
         var $scrim = null;
-        var LINES_PER_PAGE = 5;
+        // Set once an allocation / payment is created from the modal: the panel data
+        // (open amount, schedules, action buttons) is stale and must be re-fetched when
+        // the modal is closed, so "Record payment" turns read-only once nothing is open.
+        var panelDirty = false;
+        var LINES_PER_PAGE = 20;
         var linePage = 0;
 
         /* ---------- short helpers ---------- */
@@ -37,6 +41,18 @@
             var t = VIS.Msg.getMsg(key);
             if (t && t.charAt(0) !== '[') return t;
             return (fallback !== undefined) ? fallback : t;
+        }
+
+        // A return transaction (IsReturnTrx = 'Y') is matched against a vendor return
+        // (material shipped back), not a goods receipt - every receipt-matching label
+        // is worded accordingly.
+        function isVendorReturn() {
+            return !!(data && data.IsReturnTrx);
+        }
+        // Picks the vendor-return wording over the goods-receipt one for a return trx.
+        // Both arguments are [key, fallback] pairs passed straight to lbl().
+        function retLbl(receiptKey, receiptText, returnKey, returnText) {
+            return isVendorReturn() ? lbl(returnKey, returnText) : lbl(receiptKey, receiptText);
         }
 
         function fmtAmount(value, precision) {
@@ -173,7 +189,7 @@
             var $panel = $('<div class="vas-apinv-panel"></div>');
             $panel.append(buildHeader());
             $panel.append(buildActions());
-            $panel.append(buildKpis());
+            $panel.append(buildHero());
 
             var $life = buildLifecycle();
             if ($life) $panel.append($life);
@@ -208,6 +224,76 @@
             if ($journal) $panel.append($journal);
 
             $body.append($panel);
+        }
+
+        /* ---------- shared primitives ----------
+         * Used by the header / hero / lifecycle blocks and by every section that
+         * needs a spec-conformant chip. The per-section table markup below keeps
+         * its original structure. */
+
+        /* Section Header: title (1em/700) + optional summary (0.75em/400) and chip. */
+        function section(title, summary, chipText, chipTone) {
+            var $sec = $('<section class="vas-apinv-sec"></section>');
+            var $head = $('<div class="vas-apinv-sec-head"></div>');
+            $head.append($('<span class="vas-apinv-sec-h"></span>').text(title));
+            if (summary || chipText) {
+                var $r = $('<span class="vas-apinv-sec-r"></span>');
+                if (summary) $r.append($('<span></span>').text(summary));
+                if (chipText) $r.append(chip(chipText, chipTone));
+                $head.append($r);
+            }
+            $sec.append($head);
+            return $sec;
+        }
+
+        /* Chip tier: 0.6875em, weight 700 (semantic) / 500 (neutral), pill radius. */
+        function chip(text, tone) {
+            return $('<span class="vas-apinv-chip ' + (tone || "neutral") + '"></span>').text(text);
+        }
+
+        /* One Metric Grid cell — label 0.6875em/400, value 0.8125em, optional meta.
+           `value` may be a string or a node (e.g. a status chip). */
+        function metric($grid, label, value, meta, tone) {
+            var isNode = !!(value && (value.jquery || value.nodeType));
+            if (!isNode && (value == null || String(value).length === 0)) return;
+            var $c = $('<div class="vas-apinv-mcell"></div>');
+            $c.append($('<div class="k"></div>').text(label));
+            var $v = $('<div class="v ' + (tone || "") + '"></div>');
+            if (isNode) { $v.append(value); } else { $v.text(value).attr("title", String(value)); }
+            $c.append($v);
+            if (meta) $c.append($('<div class="m"></div>').text(meta).attr("title", String(meta)));
+            $grid.append($c);
+        }
+
+        /* Metric cell whose qualifier sits INLINE after the value — "value (note)" —
+           instead of wrapping onto its own meta line. */
+        function metricNote($grid, label, value, note, tone) {
+            var full = value + (note ? " (" + note + ")" : "");
+            var $c = $('<div class="vas-apinv-mcell"></div>');
+            $c.append($('<div class="k"></div>').text(label));
+            var $v = $('<div class="v ' + (tone || "") + '"></div>').text(value).attr("title", full);
+            if (note) $v.append($('<span class="mi"></span>').text("(" + note + ")"));
+            $c.append($v);
+            $grid.append($c);
+        }
+
+        /* Footer pager: "Showing x-y of N" on the left, Previous / Next on the right
+           (the panel's original pager). `go(page)` takes the zero-based target page. */
+        function footPager($foot, total, page, perPage, shown, go) {
+            $foot.empty().show();
+            var pageCount = Math.max(1, Math.ceil(total / perPage));
+            var start = page * perPage;
+            $foot.append($('<span></span>').text(
+                lbl("VAS_065_Showing", "Showing {0} of {1}")
+                    .replace("{0}", (start + 1) + "–" + (start + shown))
+                    .replace("{1}", total)));
+            var $nav = $('<span class="vas-apinv-pager"></span>');
+            var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
+            var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
+            $prev.prop("disabled", page <= 0).on("click", function () { if (page > 0) go(page - 1); });
+            $next.prop("disabled", page >= pageCount - 1).on("click", function () { if (page < pageCount - 1) go(page + 1); });
+            $nav.append($prev).append($next);
+            $foot.append($nav);
         }
 
         /* Header (vendor name + context line) */
@@ -253,103 +339,99 @@
             var isCN = data.IsAPCreditNote;
             var openAmt = +data.OpenAmount || 0;
             var isCompleted = (data.DocStatus === "CO" || data.DocStatus === "CL");
+            // Every pay schedule marked paid (VA009_IsPaid) leaves nothing to record, even
+            // if the invoice header has not been flagged paid yet.
+            var allSchedulesPaid = (+data.ScheduleTotal > 0) && ((+data.ScheduleOpenAmount || 0) <= 0);
+            var settled = !!data.IsPaid || allSchedulesPaid || openAmt <= 0;
             // Enabled whenever there is an open balance on a completed/closed document.
-            var canPay = openAmt > 0 && isCompleted;
+            var canPay = !settled && isCompleted;
 
             // Show exactly one primary action based on document type: credit notes get
             // "Allocate credit note", everything else gets "Record payment". The button
             // is read-only (disabled) unless there is an open balance and the doc is CO/CL.
-            $a.append($('<button type="button" class="vas-apinv-btn is-primary"></button>')
-                .text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate credit note")
-                    : lbl("VAS_065_RecordPayment", "Record payment"))
+            var $payBtn = $('<button type="button" class="vas-apinv-btn is-primary"><i class="fa fa-credit-card" aria-hidden="true"></i></button>')
+                .append($('<span></span>').text(isCN ? lbl("VAS_065_AllocateCreditNote", "Allocate credit note")
+                    : lbl("VAS_065_RecordPayment", "Record payment")))
                 .prop("disabled", !canPay)
-                .on("click", function () { if (canPay) openPaymentModal(); }));
+                .on("click", function () { if (canPay) openPaymentModal(); });
+            if (settled && isCompleted) {
+                $payBtn.attr("title", lbl("VAS_065_AllSchedulesPaidMsg",
+                    "All payment schedules of this invoice are paid. No further payment can be recorded."));
+            }
+            $a.append($payBtn);
 
             // Download PDF runs the tab's print process; it is read-only (disabled)
             // when the current tab has no AD_Process_ID linked (nothing to print).
             var hasPrintProcess = $self.curTab
                 && typeof $self.curTab.getAD_Process_ID === "function"
                 && +$self.curTab.getAD_Process_ID() > 0;
-            $a.append($('<button type="button" class="vas-apinv-btn is-ghost"></button>')
-                .text(lbl("VAS_065_DownloadPDF", "Download PDF"))
+            $a.append($('<button type="button" class="vas-apinv-btn"><i class="fa fa-download" aria-hidden="true"></i></button>')
+                .append($('<span></span>').text(lbl("VAS_065_DownloadPDF", "Download PDF")))
                 .prop("disabled", !hasPrintProcess)
                 .on("click", function () { if (hasPrintProcess) downloadInvoicePDF(); }));
 
             // View ledger entry only when posted facts exist.
             if (data.PostedJournal && data.PostedJournal.Rows && data.PostedJournal.Rows.length) {
-                $a.append($('<button type="button" class="vas-apinv-btn is-text"></button>')
-                    .text(lbl("VAS_065_ViewLedgerEntry", "View ledger entry"))
+                $a.append($('<button type="button" class="vas-apinv-btn"><i class="fa fa-book" aria-hidden="true"></i></button>')
+                    .append($('<span></span>').text(lbl("VAS_065_ViewLedgerEntry", "View ledger entry")))
                     .on("click", function () { scrollToSection("vas-apinv-journal"); }));
             }
             return $a;
         }
 
-        /* KPI cards: Vendor, Due date, Net payable / Paid */
-        function buildKpis() {
-            var $info = $('<section class="vas-apinv-info"></section>');
-
-            // Vendor card (always).
-            var $vendor = $(
-                '<div class="vas-apinv-icard">' +
-                '<div class="vas-apinv-eyebrow"></div>' +
-                '<div class="vas-apinv-big link js-v"></div>' +
-                '<div class="vas-apinv-meta js-m"></div>' +
-                '</div>'
-            );
-            $vendor.find(".vas-apinv-eyebrow").text(lbl("Vendor"));
-            $vendor.find(".js-v").text(data.BPName || "");
-            $vendor.find(".js-m").text(data.BPTaxID || "");
-            $info.append($vendor);
-
-            // Due date card (only if due date exists).
-            if (data.DueDate) {
-                var $due = $(
-                    '<div class="vas-apinv-icard">' +
-                    '<div class="vas-apinv-eyebrow"></div>' +
-                    '<div class="vas-apinv-big js-v"></div>' +
-                    '<div class="vas-apinv-meta warn js-m"></div>' +
-                    '</div>'
-                );
-                $due.find(".vas-apinv-eyebrow").text(lbl("DueDate"));
-                $due.find(".js-v").text(fmtDate(data.DueDate));
-                // Day delta = Due Date - Current Date (computed client-side).
-                var dayDiff = dayDelta(data.DueDate);
-                var overdue = dayDiff < 0;
-                $due.find(".js-m").toggleClass("warn", overdue).text(overdue
-                    ? lbl("VAS_065_DaysOverdue", "{0} days overdue").replace("{0}", Math.abs(dayDiff))
-                    : lbl("VAS_065_DaysRemaining", "{0} days remaining").replace("{0}", Math.abs(dayDiff)));
-                $info.append($due);
-            }
-
-            // Net payable / Paid card.
+        /* Hero Status Card — the panel's single headline fact (what is still owed,
+           or that the invoice is settled). One per panel; the vendor / due-date /
+           gross figures ride along in its embedded 2-col Metric Grid. */
+        function buildHero() {
             var openAmt = +data.OpenAmount || 0;
-            if (data.IsPaid || openAmt <= 0) {
-                var $paid = $(
-                    '<div class="vas-apinv-icard">' +
-                    '<div class="vas-apinv-eyebrow"></div>' +
-                    '<div class="vas-apinv-big js-v"></div>' +
-                    '<div class="vas-apinv-meta js-m"></div>' +
-                    '</div>'
-                );
-                $paid.find(".vas-apinv-eyebrow").text(lbl("VAS_065_Status", "Status"));
-                $paid.find(".js-v").text(lbl("VAS_065_Paid", "Paid"));
-                $paid.find(".js-m").text(fmtAmount(data.NetPayable));
-                $info.append($paid);
-            } else {
-                var $np = $(
-                    '<div class="vas-apinv-icard amber">' +
-                    '<div class="vas-apinv-eyebrow"></div>' +
-                    '<div class="vas-apinv-big js-v"></div>' +
-                    '<div class="vas-apinv-meta js-m"></div>' +
-                    '</div>'
-                );
-                $np.find(".vas-apinv-eyebrow").text(lbl("VAS_065_NetPayable", "Net payable"));
-                $np.find(".js-v").text(fmtAmount(openAmt));
-                if (+data.WithholdingAmount > 0) $np.find(".js-m").text(lbl("VAS_065_AfterWithholding", "After withholding"));
-                else $np.find(".js-m").hide();
-                $info.append($np);
+            var settled = data.IsPaid || openAmt <= 0;
+            var dayDiff = data.DueDate ? dayDelta(data.DueDate) : 0;
+            var overdue = !settled && data.DueDate && dayDiff < 0;
+
+            // Semantic tone: settled -> success, overdue -> risk, open -> warning,
+            // nothing due yet (draft / not completed) -> info.
+            var tone = settled ? "ok" : (overdue ? "risk" : (openAmt > 0 ? "warn" : "info"));
+            var $hero = $('<div class="vas-apinv-hero ' + tone + '"></div>');
+
+            // Fixed 3x2 reading order — left column identifies the document, right
+            // column carries the money:
+            //   Vendor            | Gross invoice total
+            //   Invoice No        | Net payable (+ after-withholding note)
+            //   Due Date (+ days) | Less withholding
+            // Cells always render (em-dash when a value is missing) so the pairing
+            // never shifts on a record that lacks one of them.
+            var $grid = $('<div class="vas-apinv-mgrid"></div>');
+            var hasWh = +data.WithholdingAmount > 0;
+
+            metric($grid, lbl("Vendor"), dash(data.BPName), data.BPTaxID || "");
+            metric($grid, lbl("VAS_065_GrossInvoiceTotal", "Gross invoice total"), fmtAmount(data.GrandTotal));
+
+            metric($grid, lbl("InvoiceNo"), dash(data.DocumentNo));
+            metricNote($grid,
+                settled ? lbl("VAS_065_Paid", "Paid") : lbl("VAS_065_NetPayable", "Net payable"),
+                fmtAmount(settled ? data.NetPayable : openAmt),
+                hasWh ? lbl("VAS_065_AfterWithholding", "After withholding") : "",
+                tone === "info" ? "" : tone);
+
+            // Due date carries its own day delta (overdue / remaining) as the meta line.
+            var dueMeta = "";
+            if (data.DueDate && !settled) {
+                dueMeta = overdue
+                    ? lbl("VAS_065_DaysOverdue", "{0} days overdue").replace("{0}", Math.abs(dayDiff))
+                    : lbl("VAS_065_DaysRemaining", "{0} days remaining").replace("{0}", Math.abs(dayDiff));
             }
-            return $info;
+            metricNote($grid, lbl("DueDate"), dash(data.DueDate ? fmtDate(data.DueDate) : ""), dueMeta);
+            metric($grid, lbl("VAS_065_LessWithholding", "Less withholding"),
+                hasWh ? fmtAmount(data.WithholdingAmount) : "—", "", hasWh ? "warn" : "");
+
+            $hero.append($grid);
+            return $hero;
+        }
+
+        /* Keeps a Metric Grid cell occupied when the record has no value for it,
+           so the fixed left/right pairing of the hero card never shifts. */
+        function dash(v) {
+            return (v == null || String(v).length === 0) ? "—" : v;
         }
 
         /* Lifecycle stepper — at least two states required */
@@ -377,21 +459,50 @@
 
             if (steps.length < 2) return null;
 
-            var $s = $('<section class="vas-apinv-stepper"></section>');
-            var lastDone = -1;
-            for (var k = 0; k < steps.length; k++) if (steps[k].done) lastDone = k;
+            // Stage Pipeline: horizontal milestone circles joined by a progress-tinted
+            // rail. The panel is a wide surface, so the pipeline (not the vertical Step
+            // Flow) is the right primitive for the document lifecycle.
+            var activeIdx = -1;
+            for (var k = 0; k < steps.length; k++) {
+                if (steps[k].active) activeIdx = k;
+            }
+            var summary = (activeIdx >= 0)
+                ? lbl("VAS_065_StageOf", "Stage {0} of {1}").replace("{0}", activeIdx + 1).replace("{1}", steps.length)
+                : lbl("VAS_065_Complete", "Complete");
+
+            var $sec = section(lbl("VAS_065_Lifecycle", "Lifecycle"), summary);
+            var $pipe = $('<div class="vas-apinv-pipe"></div>');
+            var $grid = $('<div class="vas-apinv-pipe-grid"></div>')
+                .css("grid-template-columns", "repeat(" + steps.length + ", minmax(0, 1fr))");
+
             for (var i = 0; i < steps.length; i++) {
                 var st = steps[i];
-                var cls = st.done ? (i === lastDone && !hasActiveAfter(steps, i) ? "step done" : "step done") : "step future";
-                if (st.active) cls = "step active";
-                var $step = $('<div class="vas-apinv-step ' + (st.active ? "active" : (st.done ? "done" : "future")) + '"></div>');
-                $step.append($('<div class="vas-apinv-step-t"></div>').text(st.t));
-                $step.append($('<div class="vas-apinv-step-s"></div>').text(st.sub || " "));
-                $s.append($step);
+                var state = st.active ? "active" : (st.done ? "done" : "pending");
+                var $col = $('<div class="vas-apinv-pipe-col"></div>');
+                // Trailing rail segment: blue once the circle on its left is done.
+                if (i < steps.length - 1) {
+                    $col.append($('<span class="vas-apinv-pipe-seg ' + (st.done ? "done" : "") + '"></span>'));
+                }
+                var $dot = $('<span class="vas-apinv-pipe-dot ' + state + '"></span>');
+                if (state === "done") $dot.append('<i class="fa fa-check" aria-hidden="true"></i>');
+                else if (state === "active") $dot.append('<i></i>');
+                $col.append($dot);
+                $col.append($('<div class="vas-apinv-pipe-lbl ' + state + '"></div>').text(st.t).attr("title", st.t));
+                // Sub-line facts are joined with " · " (e.g. "user · date", "GRN nos · date").
+                // Each fact gets its own line so a stage never truncates the parts that
+                // follow the separator — the full string stays available as the tooltip.
+                if (st.sub) {
+                    st.sub.split("·").forEach(function (part) {
+                        var t = part.trim();
+                        if (t) $col.append($('<div class="vas-apinv-pipe-sub"></div>').text(t).attr("title", st.sub));
+                    });
+                }
+                $grid.append($col);
             }
-            return $s;
+            $pipe.append($grid);
+            $sec.append($pipe);
+            return $sec;
         }
-        function hasActiveAfter(steps, idx) { for (var i = idx + 1; i < steps.length; i++) if (steps[i].active) return true; return false; }
         function subLine(name, date) {
             var bits = [];
             if (name) bits.push(name);
@@ -430,7 +541,7 @@
             visible.forEach(function (r) {
                 $kv.append($('<div class="vas-apinv-kv-r"></div>')
                     .append($('<span class="vas-apinv-kv-k"></span>').text(r.k))
-                    .append($('<span class="vas-apinv-kv-v"></span>').text(r.v)));
+                    .append($('<span class="vas-apinv-kv-v"></span>').text(r.v).attr("title", String(r.v))));
             });
             return $sec;
         }
@@ -517,15 +628,15 @@
                 var name = ln.ProductName || ln.ChargeName || ln.Description || "";
                 var $r = $('<div class="vas-apinv-lirow"></div>');
                 var $desc = $('<div class="vas-apinv-desc"></div>');
-                $desc.append($('<div class="vas-apinv-d"></div>').text(name));
+                $desc.append($('<div class="vas-apinv-d"></div>').text(name).attr("title", name));
                 // Attribute-set-instance detail (e.g. lot/serial/attributes) below the item name.
                 // Skip when absent or only a placeholder ("--", separators, whitespace).
                 var asiText = (ln.ASIDescription || "").trim();
                 if (asiText && asiText.replace(/[-\s—–_]/g, "") !== "") {
-                    $desc.append($('<div class="vas-apinv-ds asi"></div>').text(asiText));
+                    $desc.append($('<div class="vas-apinv-ds asi"></div>').text(asiText).attr("title", asiText));
                 }
                 if (ln.Description && (ln.ProductName || ln.ChargeName)) {
-                    $desc.append($('<div class="vas-apinv-ds"></div>').text(ln.Description));
+                    $desc.append($('<div class="vas-apinv-ds"></div>').text(ln.Description).attr("title", ln.Description));
                 }
                 $r.append($desc);
                 $r.append($('<div class="vas-apinv-qty"></div>').text(fmtNumber(ln.QtyEntered, 0)));
@@ -538,19 +649,10 @@
 
             var $foot = $sec.find(".js-foot");
             if (paged) {
-                $foot.empty().show();
-                var pageCount = Math.ceil(total / LINES_PER_PAGE);
-                $foot.append($('<span></span>').text(
-                    lbl("VAS_065_Showing", "Showing {0} of {1}")
-                        .replace("{0}", (start + 1) + "–" + end)
-                        .replace("{1}", total)));
-                var $nav = $('<span class="vas-apinv-pager"></span>');
-                var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
-                var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                $prev.prop("disabled", linePage <= 0).on("click", function () { linePage--; renderLineRows($sec, lines); });
-                $next.prop("disabled", linePage >= pageCount - 1).on("click", function () { linePage++; renderLineRows($sec, lines); });
-                $nav.append($prev).append($next);
-                $foot.append($nav);
+                footPager($foot, total, linePage, LINES_PER_PAGE, end - start, function (p) {
+                    linePage = p;
+                    renderLineRows($sec, lines);
+                });
             } else {
                 $foot.hide();
             }
@@ -611,7 +713,8 @@
             return $sec;
         }
 
-        /* Three-way match insight — only for product invoices with receipt linkage */
+        /* Three-way match insight — only for product invoices with receipt linkage.
+           The verdict pill uses the spec chip tier (0.6875em Bold). */
         function buildMatchInsight() {
             var gr = data.GoodsReceipt;
             if (!gr || !gr.Rows || !gr.Rows.length) return null;
@@ -626,17 +729,18 @@
                 '<div class="vas-apinv-insight-b"></div>' +
                 '</div>' +
                 '</div>' +
-                '<span class="vas-apinv-risk js-risk"></span>' +
                 '</section>'
             );
             $sec.find(".vas-apinv-insight-a").text(clean
                 ? lbl("VAS_065_ThreeWayMatchPassed", "3-way match passed - no price or quantity variance")
                 : lbl("VAS_065_VarianceFound", "Variance found"));
             $sec.find(".vas-apinv-insight-b").text(
-                lbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}")
+                retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
+                       "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                     .replace("{0}", gr.ReceiptDocumentNo || "")
                     .replace("{1}", gr.OrderDocumentNo || ""));
-            $sec.find(".js-risk").text(clean ? lbl("VAS_065_CleanMatch", "Clean match") : lbl("VAS_065_VarianceFound", "Variance found"));
+            $sec.append(chip(clean ? lbl("VAS_065_CleanMatch", "Clean match") : lbl("VAS_065_VarianceFound", "Variance found"),
+                clean ? "ok" : "warn"));
             return $sec;
         }
 
@@ -676,10 +780,10 @@
             lc.Rows.forEach(function (row) {
                 var $r = $('<div class="vas-apinv-lc-row"></div>');
                 var $it = $('<div class="it"></div>');
-                $it.append($('<div class="nm"></div>').text(row.ItemName || ""));
+                $it.append($('<div class="nm"></div>').text(row.ItemName || "").attr("title", row.ItemName || ""));
                 $it.append($('<div class="su"></div>').text(fmtNumber(row.QtyEntered, 0) + (row.UOMSymbol ? " " + row.UOMSymbol : "")));
                 $r.append($it);
-                $r.append($('<div class="ref"></div>').text(row.SourceDocumentNo || ""));
+                $r.append($('<div class="ref"></div>').text(row.SourceDocumentNo || "").attr("title", row.SourceDocumentNo || ""));
                 $r.append($('<div class="num pv"></div>').text(fmtAmount(row.PurchaseValue)));
                 $r.append($('<div class="num lc"></div>').text("+ " + fmtAmount(row.AllocatedLandedCost)));
                 var $iv = $('<div class="num iv"></div>').text(fmtAmount(row.InventoryCost));
@@ -726,7 +830,10 @@
                 '<div class="vas-apinv-kv js-kv"></div>' +
                 '</section>'
             );
-            $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching"));
+            // Return transaction -> the matched document is a vendor return, not a GRN.
+            $sec.find(".vas-apinv-block-h").text(retLbl(
+                "VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching",
+                "VAS_065_VendorReturnMatching", "Vendor Return & Matching"));
             $sec.find(".js-st").text(lbl("Matched"));
 
             var $kv = $sec.find(".js-kv");
@@ -736,10 +843,17 @@
             var receivedOn = (gr.ReceivedDates && gr.ReceivedDates.length)
                 ? gr.ReceivedDates.map(function (d) { return fmtDate(d); }).join(", ")
                 : fmtDate(gr.ReceivedDate);
-            kvRow($kv, lbl("VAS_065_ReceiptGRN", "Receipt (GRN)"), gr.ReceiptDocumentNo);
-            kvRow($kv, lbl("VAS_065_PurchaseOrder", "Purchase order"), gr.OrderDocumentNo);
-            kvRow($kv, lbl("VAS_065_ReceivedOn", "Received On"), receivedOn);
-            kvRow($kv, lbl("QtyReceived"), fmtNumber(gr.TotalReceived, 0) + " " +
+            kvRow($kv, retLbl("VAS_065_ReceiptGRN", "Receipt (GRN)",
+                              "VAS_065_VendorReturn", "Vendor Return"), gr.ReceiptDocumentNo);
+            kvRow($kv, retLbl("VAS_065_PurchaseOrder", "Purchase order",
+                              "VAS_065_VendorRMA", "Vendor RMA"), gr.OrderDocumentNo);
+            kvRow($kv, retLbl("VAS_065_ReceivedOn", "Received On",
+                              "VAS_065_ReturnedOn", "Returned On"), receivedOn);
+            // "QtyReceived" is an existing dictionary key, so it carries no inline
+            // fallback (undefined keeps lbl's raw-key behaviour unchanged).
+            kvRow($kv, retLbl("QtyReceived", undefined,
+                              "VAS_065_QtyReturned", "Quantity Returned"),
+                fmtNumber(gr.TotalReceived, 0) + " " +
                 lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim());
             kvRow($kv, lbl("VAS_065_Warehouse", "Warehouse"), gr.WarehouseName);
             kvRow($kv, lbl("VAS_065_PriceVariance", "Price Variance"), fmtAmount(gr.PriceVariance));
@@ -785,6 +899,7 @@
 
             var $rows = $sec.find(".js-rows");
             var $pager = $sec.find(".js-sched-pager");
+            var $foot = $sec.find(".js-foot");
             var SCHED_PER_PAGE = 5;
             var schedPage = 0;
             var curRows = firstPage;
@@ -795,32 +910,24 @@
                 var start = schedPage * SCHED_PER_PAGE;
                 curRows.forEach(function (s, idx) {
                     var absIdx = start + idx;
+                    var paid = s.Status === "Paid";
+                    var hold = s.Status === "OnHold";
                     var $r = $('<div class="vas-apinv-t4-row"></div>');
-                    $r.append($('<div class="col-a p"></div>').text(
-                        lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%").replace("{0}", (absIdx + 1)).replace("{1}", pct)));
+                    // The first column truncates on narrow panels - carry the full text
+                    // as its tooltip.
+                    var schedLabel = lbl("VAS_065_ScheduleLine", "Schedule {0} - {1}%")
+                        .replace("{0}", (absIdx + 1)).replace("{1}", pct);
+                    $r.append($('<div class="col-a p"></div>').text(schedLabel).attr("title", schedLabel));
                     $r.append($('<div class="col-b c"></div>').text(fmtDate(s.DueDate)));
-                    var statusKey = s.Status === "Paid" ? "VAS_065_Paid" : (s.Status === "OnHold" ? "VAS_065_OnHold" : "Open");
-                    var statusCls = s.Status === "Paid" ? "ok" : "warn";
+                    var statusKey = paid ? "VAS_065_Paid" : (hold ? "VAS_065_OnHold" : "Open");
                     $r.append($('<div class="col-c"></div>').append(
-                        $('<span class="vas-apinv-spill ' + statusCls + '"></span>').text(lbl(statusKey))));
+                        chip(lbl(statusKey), paid ? "ok" : "warn")));
                     $r.append($('<div class="col-d amt"></div>').text(fmtAmount(s.DueAmt)));
                     $rows.append($r);
                 });
 
                 if (total > SCHED_PER_PAGE) {
-                    $pager.empty().show();
-                    var pageCount = Math.ceil(total / SCHED_PER_PAGE);
-                    var end = start + curRows.length;
-                    $pager.append($('<span></span>').text(
-                        lbl("VAS_065_Showing", "Showing {0} of {1}")
-                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
-                    var $nav = $('<span class="vas-apinv-pager"></span>');
-                    var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
-                    var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                    $prev.prop("disabled", schedPage <= 0).on("click", function () { if (schedPage > 0) gotoSchedPage(schedPage - 1); });
-                    $next.prop("disabled", schedPage >= pageCount - 1).on("click", function () { if (schedPage < pageCount - 1) gotoSchedPage(schedPage + 1); });
-                    $nav.append($prev).append($next);
-                    $pager.append($nav);
+                    footPager($pager, total, schedPage, SCHED_PER_PAGE, curRows.length, gotoSchedPage);
                 } else {
                     $pager.hide();
                 }
@@ -845,7 +952,6 @@
             }
             renderSchedRows();
 
-            var $foot = $sec.find(".js-foot");
             $foot.append($('<span></span>').text(
                 lbl("VAS_065_PaymentHold", "Payment hold: {0}").replace("{0}", data.ScheduleAnyHold ? lbl("Y") : lbl("N")) +
                 " · " + lbl("VAS_065_AwaitingPayment", "awaiting payment")));
@@ -861,8 +967,12 @@
             steps.push({ st: lbl("VAS_065_Drafted", "Drafted"), mt: subLine(data.CreatedByName, data.Created), done: true });
             if (data.GoodsReceipt && data.GoodsReceipt.Rows && data.GoodsReceipt.Rows.length) {
                 steps.push({
-                    st: lbl("VAS_065_MatchedToReceipt", "Matched to receipt"), mt: fmtDate(data.GoodsReceipt.ReceivedDate),
-                    nt: lbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}")
+                    // Return transaction -> matched against a vendor return, not a receipt.
+                    st: retLbl("VAS_065_MatchedToReceipt", "Matched to receipt",
+                               "VAS_065_MatchedToVendorReturn", "Matched to vendor return"),
+                    mt: fmtDate(data.GoodsReceipt.ReceivedDate),
+                    nt: retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
+                               "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                         .replace("{0}", data.GoodsReceipt.ReceiptDocumentNo || "")
                         .replace("{1}", data.GoodsReceipt.OrderDocumentNo || ""), done: true
                 });
@@ -966,11 +1076,12 @@
 
             var $head = $sec.find(".vas-apinv-je-head").css("grid-template-columns", tmpl);
             cols.forEach(function (c) {
-                $head.append($('<span></span>').addClass(c.num ? "right" : "").text(c.label));
+                $head.append($('<span></span>').addClass(c.num ? "right" : "").text(c.label).attr("title", c.label));
             });
 
             var $rows = $sec.find(".js-rows");
             var $jePager = $sec.find(".js-je-pager");
+            var $foot = $sec.find(".js-foot");
             var JE_PER_PAGE = 10;
             var jePage = 0;
             // Server-side paged: pj.Rows is the FIRST page; pj.Total is the row count and
@@ -981,35 +1092,23 @@
 
             function renderJeRows() {
                 $rows.empty();
-                var start = jePage * JE_PER_PAGE;
                 curRows.forEach(function (jr) {
                     var $r = $('<div class="vas-apinv-je-row"></div>').css("grid-template-columns", tmpl);
                     cols.forEach(function (c) {
                         if (c.num) {
                             $r.append(jeAmt(c.get(jr), c.key === "Dr" ? "dr" : "cr", acctCur, acctPrec));
                         } else if (c.key === "Account") {
-                            $r.append($('<div class="acct"></div>').append($('<div class="code"></div>').text(c.get(jr))));
+                            var v = c.get(jr);
+                            $r.append($('<div class="acct"></div>').append($('<div class="code"></div>').text(v).attr("title", v)));
                         } else {
-                            $r.append($('<div class="dimc"></div>').text(c.get(jr)));
+                            $r.append($('<div class="dimc"></div>').text(c.get(jr)).attr("title", c.get(jr)));
                         }
                     });
                     $rows.append($r);
                 });
 
                 if (jeTotal > JE_PER_PAGE) {
-                    $jePager.empty().show();
-                    var pageCount = Math.ceil(jeTotal / JE_PER_PAGE);
-                    var end = start + curRows.length;
-                    $jePager.append($('<span></span>').text(
-                        lbl("VAS_065_Showing", "Showing {0} of {1}")
-                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", jeTotal)));
-                    var $nav = $('<span class="vas-apinv-pager"></span>');
-                    var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
-                    var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                    $prev.prop("disabled", jePage <= 0).on("click", function () { if (jePage > 0) gotoJePage(jePage - 1); });
-                    $next.prop("disabled", jePage >= pageCount - 1).on("click", function () { if (jePage < pageCount - 1) gotoJePage(jePage + 1); });
-                    $nav.append($prev).append($next);
-                    $jePager.append($nav);
+                    footPager($jePager, jeTotal, jePage, JE_PER_PAGE, curRows.length, gotoJePage);
                 } else {
                     $jePager.hide();
                 }
@@ -1033,20 +1132,19 @@
             }
             renderJeRows();
 
-            var $tot = $sec.find(".vas-apinv-je-total").css("grid-template-columns", tmpl);
+            var $jeTot = $sec.find(".vas-apinv-je-total").css("grid-template-columns", tmpl);
             cols.forEach(function (c, idx) {
-                if (c.key === "Dr") $tot.append($('<div class="num dr"></div>').text(fmtAmountCur(pj.TotalDr, acctCur, acctPrec)));
-                else if (c.key === "Cr") $tot.append($('<div class="num cr"></div>').text(fmtAmountCur(pj.TotalCr, acctCur, acctPrec)));
-                else if (idx === 0) $tot.append($('<div class="tlab"></div>').text(lbl("VAS_065_Total", "Total")));
-                else $tot.append($('<div></div>'));
+                if (c.key === "Dr") $jeTot.append($('<div class="num dr"></div>').text(fmtAmountCur(pj.TotalDr, acctCur, acctPrec)));
+                else if (c.key === "Cr") $jeTot.append($('<div class="num cr"></div>').text(fmtAmountCur(pj.TotalCr, acctCur, acctPrec)));
+                else if (idx === 0) $jeTot.append($('<div class="tlab"></div>').text(lbl("VAS_065_Total", "Total")));
+                else $jeTot.append($('<div></div>'));
             });
 
             var footBits = [];
             if (pj.PeriodName) footBits.push(lbl("VAS_065_Period", "Period {0}").replace("{0}", pj.PeriodName));
             if (pj.PostingDate) footBits.push(lbl("VAS_065_PostingDate", "Posting date {0}").replace("{0}", fmtDate(pj.PostingDate)));
             var balanced = Math.abs((+pj.TotalDr || 0) - (+pj.TotalCr || 0)) < 0.005;
-            $sec.find(".js-foot")
-                .append($('<span></span>').text(footBits.join(" · ")))
+            $foot.append($('<span></span>').text(footBits.join(" · ")))
                 .append($('<span></span>').text(balanced ? lbl("VAS_065_Balanced", "Balanced - Dr = Cr") : ""));
             return $sec;
         }
@@ -1055,13 +1153,14 @@
             var $d = $('<div class="num ' + cls + '"></div>');
             if (v === 0) { $d.addClass("zero").text("—"); }
             else { $d.text((v < 0 ? "-" : "") + fmtAmountCur(v, cur, prec)); }
-            return $d;
+            return $d.attr("title", $d.text());
         }
 
         /* ===================== Payment / allocation modal ===================== */
 
         function openPaymentModal() {
             if (!data || !data.C_Invoice_ID) return;
+            panelDirty = false;   // fresh modal session
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetPaymentModalMeta",
@@ -1091,6 +1190,8 @@
         // document (record) number is shown once the refreshed modal is in place.
         function refreshPaymentModal(allocDocNo) {
             if (!data || !data.C_Invoice_ID) return;
+            // An allocation was just created -> the panel behind the modal is stale.
+            panelDirty = true;
             showModalBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_065_APInvoicePanel/GetPaymentModalMeta",
@@ -1189,7 +1290,13 @@
             // currently in the DOM.
             var curCredits = meta.OnAccountPayments || [];
             var creditTotal = meta.OnAccountPaymentsTotal || curCredits.length;
-            var invOpen = +meta.NetOpenAmount || +meta.NetPayable || 0;
+            // Open amount still to settle. A ZERO open amount is a valid value (every pay
+            // schedule paid) - it must NOT fall back to the net payable, otherwise the
+            // fully-settled invoice would offer its whole total as a new payment.
+            var invOpen = (meta.NetOpenAmount === null || typeof meta.NetOpenAmount === "undefined")
+                ? (+meta.NetPayable || 0) : (+meta.NetOpenAmount || 0);
+            // Nothing left to settle -> the New Payment section is read-only.
+            var fullySettled = !!meta.IsFullySettled || invOpen <= 0;
 
             var state = { applied: 0, allocationCreated: false, selected: {} };
             var CREDITS_PER_PAGE = 5;
@@ -1210,33 +1317,34 @@
                 $creditRows.empty();
                 var total = creditTotal;
                 var paged = total > CREDITS_PER_PAGE;
-                var start = creditPage * CREDITS_PER_PAGE;
-                var end = start + curCredits.length;
 
                 for (var i = 0; i < curCredits.length; i++) {
                     (function (r) {
                         var selected = isCreditSelected(r);
                         var locked = selected && state.allocationCreated;
+
                         // 4-column table row (document / date / status / amount) matching
                         // the Payment schedule layout.
                         var $row = $('<div class="vas-apinv-t4-row vas-apinv-credit-t4row"></div>');
                         if (selected) $row.addClass("on");
-                        if (locked) $row.addClass("locked");
+                        // Nothing open to allocate against -> rows are shown but not selectable.
+                        if (locked || fullySettled) $row.addClass("locked");
                         else $row.addClass("selectable");
 
                         // Show the source document type + document no (no generic
                         // "On-account payment" literal).
                         var docLabel = (r.DocTypeName ? r.DocTypeName + " - " : "") + (r.DocumentNo || "");
-                        $row.append($('<div class="col-a p"></div>').text(docLabel || (r.DocumentNo || "")));
+                        docLabel = docLabel || (r.DocumentNo || "");
+                        // Full document label as tooltip - the column truncates.
+                        $row.append($('<div class="col-a p"></div>').text(docLabel).attr("title", docLabel));
                         $row.append($('<div class="col-b c"></div>').text(fmtDate(r.Date)));
 
-                        // Status pill: Available -> Selected -> Allocated.
-                        var stText, stCls;
-                        if (locked) { stText = lbl("VAS_065_Allocated", "Allocated"); stCls = "ok"; }
-                        else if (selected) { stText = lbl("Selected"); stCls = "info"; }
-                        else { stText = lbl("VAS_065_Available", "Available"); stCls = "warn"; }
-                        $row.append($('<div class="col-c"></div>').append(
-                            $('<span class="vas-apinv-spill ' + stCls + '"></span>').text(stText)));
+                        // Status chip: Available -> Selected -> Allocated.
+                        var stText, stTone;
+                        if (locked) { stText = lbl("VAS_065_Allocated", "Allocated"); stTone = "ok"; }
+                        else if (selected) { stText = lbl("Selected"); stTone = "info"; }
+                        else { stText = lbl("VAS_065_Available", "Available"); stTone = "warn"; }
+                        $row.append($('<div class="col-c"></div>').append(chip(stText, stTone)));
 
                         // Amount in the source's own (payment) currency; when that differs
                         // from the invoice currency also show the invoice-currency equivalent
@@ -1245,11 +1353,11 @@
                         var rPrec = (r.StdPrecision >= 0) ? r.StdPrecision : p;
                         var $amt = $('<div class="col-d amt"></div>').text(fmtAmountCur(r.AvailableAmount, rSym, rPrec));
                         if (r.C_Currency_ID && r.C_Currency_ID !== meta.C_Currency_ID) {
-                            $amt.append($('<div class="conv"></div>').text(fmtAmountCur(r.AvailableAmountInv, cur, p)));
+                            $amt.append($('<span class="conv"></span>').text(fmtAmountCur(r.AvailableAmountInv, cur, p)));
                         }
                         $row.append($amt);
                         $row.on("click", function () {
-                            if (state.allocationCreated) return;
+                            if (state.allocationCreated || fullySettled) return;
                             if (!isCreditSelected(r)) {
                                 // Single-currency rule: only sources sharing the currency of
                                 // the already-selected rows can be added at one time. When the
@@ -1288,18 +1396,7 @@
                 }
 
                 if (paged) {
-                    $creditFoot.empty().show();
-                    var pageCount = Math.ceil(total / CREDITS_PER_PAGE);
-                    $creditFoot.append($('<span></span>').text(
-                        lbl("VAS_065_Showing", "Showing {0} of {1}")
-                            .replace("{0}", (start + 1) + "–" + end).replace("{1}", total)));
-                    var $nav = $('<span class="vas-apinv-pager"></span>');
-                    var $prev = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Previous", "Previous"));
-                    var $next = $('<button type="button" class="vas-apinv-pagebtn"></button>').text(lbl("VAS_065_Next", "Next"));
-                    $prev.prop("disabled", creditPage <= 0).on("click", function () { if (creditPage > 0) gotoCreditPage(creditPage - 1); });
-                    $next.prop("disabled", creditPage >= pageCount - 1).on("click", function () { if (creditPage < pageCount - 1) gotoCreditPage(creditPage + 1); });
-                    $nav.append($prev).append($next);
-                    $creditFoot.append($nav);
+                    footPager($creditFoot, total, creditPage, CREDITS_PER_PAGE, curCredits.length, gotoCreditPage);
                 } else {
                     $creditFoot.hide();
                 }
@@ -1365,11 +1462,20 @@
                 $bodyM.append($sec);
             }
 
-            // New payment form
+            // New payment form. When every pay schedule is already paid the whole section
+            // is rendered read-only - there is no balance left to record a payment for.
             var $pay = $('<div class="vas-apinv-m-sec js-newpay"></div>');
             $pay.append($('<div class="vas-apinv-m-sec-h"></div>')
                 .append($('<span class="t"></span>').text(lbl("VAS_065_NewPayment", "New Payment")))
-                .append($('<span class="hint"></span>').text(lbl("VAS_065_ForBalanceAfterCredits", "For the balance after credits"))));
+                .append($('<span class="hint"></span>').text(fullySettled
+                    ? lbl("VAS_065_NoBalanceToPay", "No balance left to pay")
+                    : lbl("VAS_065_ForBalanceAfterCredits", "For the balance after credits"))));
+            if (fullySettled) {
+                $pay.append($('<div class="vas-apinv-paid-note"></div>')
+                    .append('<i class="fa fa-check-circle"></i>')
+                    .append($('<span></span>').text(lbl("VAS_065_AllSchedulesPaidMsg",
+                        "All payment schedules of this invoice are paid. No further payment can be recorded."))));
+            }
 
             var $grid = $('<div class="vas-apinv-fgrid"></div>');
             var $amtField = field(lbl("VAS_065_PaymentAmount", "Payment Amount"), '<div class="control"><span class="pfx">' + escapeHtml(cur) +
@@ -1631,6 +1737,12 @@
                     $sum.text(lbl("VAS_065_CreditsAppliedSummary", "{0} allocated. New payment amount has been recalculated.").replace("{0}", fmtAmountCur(state.applied, cur, p)));
                     return;
                 }
+                // Nothing open on the invoice: there is nothing left to allocate against.
+                if (fullySettled) {
+                    $btn.prop("disabled", true);
+                    $sum.text(lbl("VAS_065_NothingOpenToAllocate", "All payment schedules are paid - there is nothing left to allocate."));
+                    return;
+                }
                 $btn.prop("disabled", sel <= 0);
                 $sum.text(sel > 0
                     ? lbl("VAS_065_SelectedForAllocation", "{0} selected for allocation.").replace("{0}", fmtAmountCur(sel, cur, p))
@@ -1668,12 +1780,14 @@
                         : lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount"))
                     .toggleClass("err show", exceedsOpen || noRate);
 
+                // Nothing open -> no payment can be recorded (section is read-only).
                 var $submit = $scrim.find(".js-submit");
-                $submit.prop("disabled", exceedsOpen || noRate)
+                $submit.prop("disabled", exceedsOpen || noRate || fullySettled)
                     .text(pay <= 0 && creditPay > 0 ? lbl("VAS_065_CompleteSettlement", "Complete settlement") : lbl("VAS_065_RecordPayment", "Record payment"));
 
                 var $foot = $scrim.find(".js-foot-msg");
-                if (noRate) { $foot.text(lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency.")); }
+                if (fullySettled) { $foot.text(lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")); }
+                else if (noRate) { $foot.text(lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency.")); }
                 else if (exceedsOpen) { $foot.text(lbl("VAS_065_AmountExceedsOpen", "Amount cannot exceed the open invoice due amount")); }
                 else if (remain <= 1e-6) { $foot.text(lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")); }
                 else { $foot.text(lbl("VAS_065_WillRemainOpen", "{0} will remain open").replace("{0}", fmtAmountCur(remain, sym, prec))); }
@@ -1720,7 +1834,7 @@
             $bodyM.data("updateCreditSummary", updateCreditSummary);
             $bodyM.data("recompute", recompute);
             $bodyM.data("applySelectedCredits", applySelectedCredits);
-            $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum, payCtx: payCtx }; });
+            $bodyM.data("getPayState", function () { return { state: state, payAmt: $payAmt, payDisc: $payDisc, invOpen: invOpen, parseNum: parseNum, payCtx: payCtx, fullySettled: fullySettled }; });
 
             // Payment amount and discount are numeric/amount fields: restrict input to a
             // non-negative decimal before the live recompute runs.
@@ -1752,6 +1866,17 @@
             // Both amount fields are shown in the user's locale number format.
             $payAmt.val(fmtAmtInput(invOpen, p));
             $payDisc.val(fmtAmtInput(parseNum($payDisc.val()), p));
+
+            // Every schedule paid: freeze the New Payment section - amount / discount are
+            // zero and every field (bank, currency, date, method, amount, discount,
+            // reference, check date) is disabled so nothing can be entered.
+            if (fullySettled) {
+                $payAmt.val(fmtAmtInput(0, p));
+                $payDisc.val(fmtAmtInput(0, p));
+                $pay.addClass("is-readonly")
+                    .find("input, select").prop("disabled", true).attr("tabindex", "-1");
+            }
+
             updateCreditSummary();
             recompute();
 
@@ -1779,6 +1904,7 @@
                 $sec.append($('<div class="vas-apinv-alloc-empty"></div>').text(lbl("VAS_065_NoOpenInvoices", "No open invoices found for this vendor.")));
             }
 
+            var $oiGrid = $('<div class="js-open-invoices"></div>');
             openInvoices.forEach(function (oi) {
                 var $row = $('<div class="vas-apinv-open-invoice-row"></div>');
                 $row.append('<span class="chk"><i class="fa fa-check"></i></span>');
@@ -1797,12 +1923,13 @@
                     $row.toggleClass("on");
                     recomputeCN();
                 });
-                $sec.append($row);
+                $oiGrid.append($row);
             });
+            $sec.append($oiGrid);
 
             var $actions = $('<div class="vas-apinv-allocation-actions"></div>');
             var $summary = $('<span class="summary js-cn-summary"></span>').text(lbl("VAS_065_SelectInvoicesHint", "Select open invoices to allocate this credit note."));
-            var $allocBtn = $('<button type="button" class="vas-apinv-btn is-outline js-alloc-cn"></button>')
+            var $allocBtn = $('<button type="button" class="vas-apinv-btn js-alloc-cn"></button>')
                 .text(lbl("VAS_065_AllocateSelectedInvoices", "Allocate selected invoices")).prop("disabled", true);
             $actions.append($summary).append($allocBtn);
             $sec.append($actions);
@@ -1826,7 +1953,7 @@
 
             function selectedAmount() {
                 var remaining = cnTotal, total = 0;
-                $bodyM.find(".vas-apinv-open-invoice-row.on").each(function () {
+                $oiGrid.find(".vas-apinv-open-invoice-row.on").each(function () {
                     var oi = $(this).data("inv");
                     var use = Math.min(+oi.OpenAmount, remaining);
                     if (use > 0) { total += use; remaining -= use; }
@@ -1848,7 +1975,7 @@
 
             $allocBtn.on("click", function () {
                 var ids = [];
-                $bodyM.find(".vas-apinv-open-invoice-row.on").each(function () {
+                $oiGrid.find(".vas-apinv-open-invoice-row.on").each(function () {
                     ids.push($(this).data("inv").C_Invoice_ID);
                 });
                 if (!ids.length) return;
@@ -1863,7 +1990,8 @@
                         showModalBusy(false);
                         var resp = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                         if (resp && resp.Success) {
-                            $bodyM.find(".vas-apinv-open-invoice-row.on").addClass("locked").find(".ap").text(lbl("VAS_065_Allocated", "Allocated"));
+                            $oiGrid.find(".vas-apinv-open-invoice-row.on").addClass("locked")
+                                .find(".ap").text(lbl("VAS_065_Allocated", "Allocated"));
                             $bodyM.find(".js-alloc-status").addClass("show");
                             recomputeCN();
                             showSuccess(lbl("VAS_065_CreditNoteAllocated", "Credit note allocated"), lbl("VAS_065_CreditNoteAllocatedMsg", "The selected invoices have been allocated against the AP credit note."), [
@@ -1886,7 +2014,7 @@
         function buildModalFooter(isCN) {
             var $foot = $('<div class="vas-apinv-m-foot"></div>');
             $foot.append($('<span class="spacer js-foot-msg"></span>').text(isCN ? "" : lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")));
-            $foot.append($('<button type="button" class="vas-apinv-btn is-ghost js-cancel"></button>')
+            $foot.append($('<button type="button" class="vas-apinv-btn js-cancel"></button>')
                 .text(lbl("VAS_065_Cancel", "Cancel")).on("click", closeModal));
             if (isCN) {
                 $foot.append($('<button type="button" class="vas-apinv-btn is-primary js-submit-cn"></button>')
@@ -1906,6 +2034,12 @@
             var payCtx = st.payCtx || { curId: meta.C_Currency_ID, sym: (meta.CurSymbol || meta.ISO_Code || ""), prec: (meta.StdPrecision >= 0 ? meta.StdPrecision : 2), rate: 1 };
             var pay = st.parseNum(st.payAmt.val());
             var disc = st.parseNum(st.payDisc.val());
+
+            // Fully settled invoice: the New Payment section is read-only, nothing to record.
+            if (st.fullySettled) {
+                info(lbl("VAS_065_AllSchedulesPaidMsg", "All payment schedules of this invoice are paid. No further payment can be recorded."));
+                return;
+            }
 
             if (pay <= 0 && st.state.applied > 0) {
                 // Settlement is fully covered by the already-created allocation (shown in
@@ -2018,6 +2152,9 @@
 
         function showSuccess(title, message, recapRows) {
             if (!$scrim) return;
+            // The document changed -> refresh the panel when the modal is closed
+            // (Done button, X, Esc or scrim click all funnel through closeModal).
+            panelDirty = true;
             $scrim.find(".js-form").hide();
             // Use flex (not .show()'s display:block) so the success body can scroll.
             var $s = $scrim.find(".js-success").css("display", "flex");
@@ -2030,8 +2167,7 @@
                     .append($('<span class="v"></span>').text(r.v)));
             });
             $s.find(".js-done").text(lbl("VAS_065_Done", "Done")).off("click").on("click", function () {
-                closeModal();
-                $self.fetchData($self.record_ID);
+                closeModal();   // closeModal re-fetches the panel data (panelDirty)
             });
         }
 
@@ -2061,6 +2197,13 @@
             $scrim.removeClass("open");
             $(document).off("keydown.vasApinvModal");
             setTimeout(removeModal, 220);
+            // An allocation / payment was created while the modal was open: reload the
+            // panel so the hero, the schedule table and the action buttons (Record
+            // payment turns read-only once every schedule is paid) show the new state.
+            if (panelDirty) {
+                panelDirty = false;
+                $self.fetchData($self.record_ID);
+            }
         }
         function removeModal() {
             if ($scrim) { $scrim.remove(); $scrim = null; }
@@ -2080,10 +2223,10 @@
                 .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
         function info(msg) {
-            if (VIS && VIS.ADialog && VIS.ADialog.info) VIS.ADialog.info(msg); else console.log(msg);
+            if (VIS && VIS.ADialog && VIS.ADialog.info) VIS.ADialog.info("", "" , msg); else console.log(msg);
         }
         function error(msg) {
-            if (VIS && VIS.ADialog && VIS.ADialog.error) VIS.ADialog.error(msg); else console.log(msg);
+            if (VIS && VIS.ADialog && VIS.ADialog.error) VIS.ADialog.error("", "" , msg); else console.log(msg);
         }
 
         // Generate the invoice PDF via the framework print process and download it.

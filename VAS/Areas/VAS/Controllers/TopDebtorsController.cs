@@ -159,6 +159,7 @@ namespace VIS.Controllers
                        p.Prec AS Std_Precision
                 FROM customer_outstanding co
                 CROSS JOIN precision_data p
+                WHERE ROUND(co.Total_Outstanding_Amount, p.Prec) <> 0
                 ORDER BY Total_Outstanding_Amount DESC
                 FETCH FIRST 5 ROWS ONLY";
 

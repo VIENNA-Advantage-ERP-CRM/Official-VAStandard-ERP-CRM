@@ -198,13 +198,12 @@
         }
 
         function syncPageSize() {
-            var nextPageSize = measurePageSize();
-            if (nextPageSize === pageSize) { return; }
-
-            var firstRecord = ((pageNo - 1) * pageSize) + 1;
-            pageSize = nextPageSize;
-            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
-            if (!loading) { loadReceiptQueue(pageNo); }
+            /* The Receipt Queue is FIXED at 5 rows per page (fewer only when the
+               data has fewer records). The font and row height already scale with
+               the screen together with the widget tile, so 5 rows always fit
+               proportionally - no dynamic row-count measuring, which mis-measured
+               a transient font/layout state and dropped the page to the 3-row
+               floor (Math.max(3, ...)). */
         }
 
         this.Initalize = function () {
@@ -290,12 +289,8 @@
                 if (!loading && pageNo < totalPages) { loadReceiptQueue(pageNo + 1); }
             });
 
-            if (window.ResizeObserver) {
-                rowResizeObserver = new ResizeObserver(function () {
-                    window.setTimeout(syncPageSize, 0);
-                });
-                rowResizeObserver.observe($body.find('.vas-rq-rows')[0]);
-            }
+            /* No row-count ResizeObserver: the page is fixed at 5 rows (see
+               syncPageSize), so there is nothing to re-measure on resize. */
         }
 
         function loadReceiptQueue(page) {

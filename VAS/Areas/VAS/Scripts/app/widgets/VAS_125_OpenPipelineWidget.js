@@ -1,0 +1,328 @@
+/**
+ * VAS_125 Open Pipeline KPI Widget (Customers module dashboard)
+ * Purpose - Static 2x1 glass KPI tile. Main value is the total UNWEIGHTED value of
+ *           active, open opportunities (C_Project) converted to the tenant base
+ *           currency; the sub-line is the count of distinct customers with at least
+ *           one qualifying opportunity. Read-only headline - the drill-down is the
+ *           separate High-Value Pipeline widget. No click / hover-lift / navigation.
+ * Design  - kpi-open-pipeline.html (attached) + Design Specs/dashboard-widgets.md
+ *           "KPI And Summary Widget". Reference kpiWidget tile: muted label on top,
+ *           big bold value, muted sub-line at the bottom (space-between), default
+ *           glass surface. Internal sizing in em against the widget-root clamp;
+ *           borders/radii in px. CSS namespaced vas125-* (MPC prefix rule).
+ *
+ * Backend - VAS_125_OpenPipelineWidget/GetOpenPipeline
+ *
+ * ── Labels / Message Keys ─────────────────────────────────────────────────
+ *  # | Current Text                | Message Key
+ * ---+-----------------------------+--------------------------------
+ *  1 | Open pipeline               | VAS_125_OpenPipeline
+ *  2 | clients with opps           | VAS_125_ClientsWithOpps
+ *  3 | client with opps            | VAS_125_ClientWithOpps
+ *  4 | No open opportunities       | VAS_125_NoOpenOpportunities
+ *  5 | Pipeline unavailable        | VAS_125_PipelineUnavailable
+ *  6 | Currency rate unavailable   | VAS_125_RateUnavailable
+ * ──────────────────────────────────────────────────────────────────────────
+ */
+; VAS = window.VAS || {};
+
+; (function (VAS, $) {
+
+    /* Keep --dash-inline-size on :root equal to the dashboard container width so
+       the widget clamp resolves against the dashboard's visible width. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
+    // Currencies of Indian-numbering countries get Indian digit grouping and
+    // Lakh/Crore compact notation; all others get international grouping and K/M/B/T.
+    var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+    var CUSTOMER_WINDOW_NAME = 'Business Partner';
+
+    VAS.VAS_125_OpenPipelineWidget = function () {
+
+        this.frame;
+        this.windowNo;
+
+        var $self = this;
+        var $root = $('<div class="vas125-root">');
+        var $card;
+        var $value;
+        var $meta;
+        var drill;
+
+        function label(key, fallback) {
+            var translated = VIS.Msg.getMsg(key);
+            return translated && translated.charAt(0) !== '[' ? translated : fallback;
+        }
+
+        function usesIndianNumbering(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0;
+        }
+
+        function currencyLocale(isoCode) {
+            return usesIndianNumbering(isoCode) ? 'en-IN' : window.navigator.language;
+        }
+
+        function getPrecision(value) {
+            var precision = Number(value);
+            if (!isNaN(precision) && precision >= 0) { return precision; }
+            if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
+                precision = Number(VIS.Env.getCtx().getStdPrecision());
+            }
+            return !isNaN(precision) && precision >= 0 ? precision : 0;
+        }
+
+        function trimTrailingZeros(text) {
+            return text.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+        }
+
+        // Compact currency amount (e.g. ₹3.42 Cr / €1.25M). Sign before the symbol,
+        // compaction on the absolute value.
+        function formatCompactAmount(value, symbol, isoCode) {
+            var number = Number(value || 0);
+            if (!isFinite(number)) { number = 0; }
+            var sign = number < 0 ? '-' : '';
+            var abs = Math.abs(number);
+            var currency = symbol || isoCode || '';
+            var compact;
+            if (usesIndianNumbering(isoCode)) {
+                if (abs >= 10000000) { compact = trimTrailingZeros((abs / 10000000).toFixed(2)) + ' Cr'; }
+                else if (abs >= 100000) { compact = trimTrailingZeros((abs / 100000).toFixed(2)) + ' Lakh'; }
+                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
+                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
+            } else {
+                if (abs >= 1000000000000) { compact = trimTrailingZeros((abs / 1000000000000).toFixed(1)) + 'T'; }
+                else if (abs >= 1000000000) { compact = trimTrailingZeros((abs / 1000000000).toFixed(1)) + 'B'; }
+                else if (abs >= 1000000) { compact = trimTrailingZeros((abs / 1000000).toFixed(1)) + 'M'; }
+                else if (abs >= 1000) { compact = trimTrailingZeros((abs / 1000).toFixed(1)) + 'K'; }
+                else { compact = abs.toLocaleString(currencyLocale(isoCode), { maximumFractionDigits: 2 }); }
+            }
+            return sign + currency + compact;
+        }
+
+        // Full, precise currency amount for the value tooltip.
+        function formatFullAmount(value, symbol, isoCode, precision) {
+            var number = Number(value || 0);
+            if (!isFinite(number)) { number = 0; }
+            var sign = number < 0 ? '-' : '';
+            var abs = Math.abs(number);
+            var currency = symbol || isoCode || '';
+            var stdPrecision = getPrecision(precision);
+            var formatted = abs.toLocaleString(currencyLocale(isoCode), {
+                minimumFractionDigits: stdPrecision,
+                maximumFractionDigits: stdPrecision
+            });
+            return sign + (currency ? currency + ' ' + formatted : formatted);
+        }
+
+        function parseResponse(response) {
+            var parsed = response;
+            if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
+            if (typeof parsed === 'string' && parsed.length) { parsed = JSON.parse(parsed); }
+            return parsed || {};
+        }
+
+        // "N clients with opps" / "1 client with opps".
+        function clientsWithOppsText(count) {
+            var n = Number(count || 0);
+            if (n === 1) { return '1 ' + label('VAS_125_ClientWithOpps', 'client with opps'); }
+            return n.toLocaleString(window.navigator.language) + ' ' + label('VAS_125_ClientsWithOpps', 'clients with opps');
+        }
+
+        function loadKpi() {
+            // Layout-stable skeleton; never flash a zero (spec §States Loading).
+            $value.text('—').removeAttr('title');
+            $meta.text('…');
+            $card.attr('aria-busy', 'true');
+            $card.attr('aria-label', label('VAS_125_OpenPipeline', 'Open pipeline'));
+
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_125_OpenPipelineWidget/GetOpenPipeline',
+                type: 'GET',
+                cache: false,
+                success: function (response) {
+                    var data = parseResponse(response);
+                    if (data && data.error) { showError(); return; }
+                    renderMetric(data || {});
+                },
+                error: showError,
+                complete: function () { $card.attr('aria-busy', 'false'); }
+            });
+        }
+
+        function renderMetric(data) {
+            var customerCount = Number(data.customer_count || 0);
+            var pipelineValue = Number(data.pipeline_value || 0);
+
+            // Missing exchange rate -> neutral unavailable state ONLY when nothing
+            // could be converted at all. A partial miss (some opportunities in a
+            // currency without a rate, but a real base-currency total exists) still
+            // shows that total so the headline KPI stays useful.
+            if (data.data_complete === false && pipelineValue === 0 && customerCount > 0) {
+                $value.text('—').removeAttr('title');
+                $meta.text(label('VAS_125_RateUnavailable', 'Currency rate unavailable')).removeAttr('title');
+                $card.attr('aria-label', label('VAS_125_OpenPipeline', 'Open pipeline') + ': ' + label('VAS_125_RateUnavailable', 'Currency rate unavailable'));
+                return;
+            }
+
+            // Empty: formatted zero + "No open opportunities" (spec §States Empty).
+            if (customerCount <= 0) {
+                var zero = formatCompactAmount(0, data.currency_symbol, data.currency_iso);
+                $value.text(zero).attr('title', formatFullAmount(0, data.currency_symbol, data.currency_iso, data.std_precision));
+                $meta.text(label('VAS_125_NoOpenOpportunities', 'No open opportunities')).removeAttr('title');
+                $card.attr('aria-label', label('VAS_125_OpenPipeline', 'Open pipeline') + ': ' + zero + '; ' + label('VAS_125_NoOpenOpportunities', 'No open opportunities'));
+                return;
+            }
+
+            var compact = formatCompactAmount(data.pipeline_value, data.currency_symbol, data.currency_iso);
+            var full = formatFullAmount(data.pipeline_value, data.currency_symbol, data.currency_iso, data.std_precision);
+            var countText = clientsWithOppsText(customerCount);
+
+            $value.text(compact).attr('title', full);
+            $meta.text(countText).removeAttr('title');
+            $card.attr('aria-label', label('VAS_125_OpenPipeline', 'Open pipeline') + ': ' + full + '; ' + countText);
+        }
+
+        // Error state - keep the tile + label, show a dash, never substitute demo
+        // values (spec §States Error).
+        function showError() {
+            $value.text('—').removeAttr('title');
+            $meta.text(label('VAS_125_PipelineUnavailable', 'Pipeline unavailable')).removeAttr('title');
+            $card.attr('aria-label', label('VAS_125_PipelineUnavailable', 'Pipeline unavailable'));
+        }
+
+        // Resolve the window hosting this widget so the framework navigates the
+        // current grid in place; falls back to the Business Partner window name.
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var i = 0; i < 6 && listener; i++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) {
+                        return listener.apanel.gridWindow.getName();
+                    }
+                    if (listener.gridWindow && listener.gridWindow.getName) {
+                        return listener.gridWindow.getName();
+                    }
+                    listener = listener.listener;
+                }
+            } catch (e) { /* best-effort */ }
+            return '';
+        }
+
+        // Drill-through: the customers whose open opportunities make up the pipeline
+        // total (reuses the VAS_139 High-Value Pipeline endpoint); a row opens the
+        // customer record.
+        function zoomToCustomer(bpId) {
+            if (!bpId) { return; }
+            if (drill) { drill.close(); }
+            try {
+                $self.widgetFirevalueChanged({ "TabWhereClause": "C_BPartner.C_BPartner_ID=" + Number(bpId), "TabLayout": "Y", "TabIndex": "0", "ActionName": hostWindowName() || CUSTOMER_WINDOW_NAME, "ActionType": "W" });
+            } catch (e) { /* best-effort */ }
+        }
+
+        function createDrill() {
+            drill = VAS.KpiDrill({
+                title: label('VAS_125_DrillTitle', 'Open pipeline'),
+                endpoint: 'VAS_139_HighValuePipelineWidget/GetRows',
+                pageSize: 7,
+                mapData: function (data) {
+                    return {
+                        items: data.items || [],
+                        total: Number(data.total || 0),
+                        currency: { symbol: data.currency_symbol || '', iso: data.currency_iso || '', precision: data.std_precision }
+                    };
+                },
+                mapRow: function (item, cur, h) {
+                    var opps = Number(item.openOpps || 0);
+                    var oppWord = opps === 1 ? label('VAS_125_Opp', 'opp') : label('VAS_125_Opps', 'opps');
+                    return { bpId: item.customerId, title: item.customerName, meta: h.formatCount(opps) + ' ' + oppWord, valueText: h.formatMoney(item.pipeline, cur) };
+                },
+                navigate: zoomToCustomer
+            });
+        }
+
+        this.Initalize = function () {
+            $card = $(
+                '<div class="vas125-card MPC-kpi-clickable" aria-live="polite" role="button" tabindex="0">' +
+                    '<div class="vas125-label"></div>' +
+                    '<div class="vas125-group">' +
+                        '<div class="vas125-value">—</div>' +
+                        '<div class="vas125-meta"></div>' +
+                    '</div>' +
+                '</div>'
+            );
+
+            $card.find('.vas125-label').text(label('VAS_125_OpenPipeline', 'Open pipeline'));
+            $value = $card.find('.vas125-value');
+            $meta = $card.find('.vas125-meta');
+            $root.append($card);
+
+            createDrill();
+            $card.on('click', function () { drill.open(); });
+            $card.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); drill.open(); }
+            });
+            $(document).on('keydown.MPCvas125drill', function (e) {
+                if (e.key === 'Escape' && drill && drill.isOpen()) { drill.close(); }
+            });
+
+            loadKpi();
+        };
+
+        this.refreshWidget = function () {
+            loadKpi();
+        };
+
+        this.getRoot = function () { return $root; };
+
+        this.disposeComponent = function () {
+            $(document).off('keydown.MPCvas125drill');
+            if (drill) { drill.dispose(); drill = null; }
+            $root.remove();
+        };
+    };
+
+    VAS.VAS_125_OpenPipelineWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) { this.listener.widgetFirevalueChanged(value); }
+    };
+
+    VAS.VAS_125_OpenPipelineWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
+
+    VAS.VAS_125_OpenPipelineWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        this.windowNo = windowNo;
+        this.Initalize();
+        this.frame.getContentGrid().append(this.getRoot());
+        ensureDashInlineSizeVar(this.getRoot());
+    };
+
+    VAS.VAS_125_OpenPipelineWidget.prototype.widgetSizeChange = function (height, width) { };
+
+    VAS.VAS_125_OpenPipelineWidget.prototype.refreshWidget = function () {
+        this.refreshWidget();
+    };
+
+    VAS.VAS_125_OpenPipelineWidget.prototype.dispose = function () {
+        this.disposeComponent();
+        if (this.frame) { this.frame.dispose(); }
+        this.frame = null;
+    };
+
+})(VAS, jQuery);

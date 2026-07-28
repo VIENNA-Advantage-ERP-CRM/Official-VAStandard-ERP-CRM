@@ -17,9 +17,9 @@
  *                  price / tax / amounts resolve through the server callout and
  *                  every line is persisted through MInvoiceLine.
  * chronological  : Development
- *   VAI_XXX        Created  25 June 2026
+ *   VAI_145       Created  25 June 2026
  ************************************************************/
-// NOTE: Replace VAI_XXX with your own Employee Code before committing.
+// NOTE: Replace VAI_145 with your own Employee Code before committing.
 ; VAS = window.VAS || {};
 ; (function (VAS, $) {
 
@@ -34,10 +34,17 @@
 
         var $self = this;
         var $root, $busy, $body, $emptyState, $linesBody, $totalsRow, $pager;
-        var $addBtn, $saveBtn, $deleteBtn, $selectAll;
+        var $addBtn, $saveBtn, $deleteBtn, $refreshBtn, $selectAll;
 
         /* parent invoice context returned by GetPanelData */
         var parent = null;
+        /* Monotonic token for GetPanelData (fetchData) requests. Bumped on every fetchData AND
+           on clear(), and each fetch captures its value; a fetch's async success is IGNORED when
+           the token has moved on. Guards the record-switch race: opening the AR Invoice window
+           in NEW mode (e.g. from the VAS_064 widget) first positions the grid on an existing
+           invoice (fetchData(existingId) in flight) then clears for the new record - without the
+           token the stale response would repaint the previous invoice's lines on the new record. */
+        var fetchSeq = 0;
         /* server-side line paging (20/page): current 0-based page, total saved lines, size */
         var linePage = 0, linesTotal = 0, linePageSize = 20;
         /* saved totals of every line NOT on the current page (invoice grand total minus this
@@ -59,10 +66,26 @@
         var rowCounter = 0;
         var editing = null;            // { rowId, field }
         var morePopoverFor = null;     // rowId
+        // True only WHILE render() detaches/re-attaches the row whose catalog dropdown is
+        // open (see the preserve block in render). Detaching a focused input fires a native
+        // blur, whose handler (commitPrimary) would otherwise clear `editing` + rebuild the
+        // row - discarding the in-progress product/charge search and tearing down the open
+        // dropdown. This flag makes the primary blur handler ignore that transient blur so a
+        // background save completing mid-search never wipes the loaded dropdown results.
+        var suppressPrimaryBlur = false;
         /* catalog popover working state (for the row currently editing a primary) */
         var catalog = { results: [], highlight: 0, seq: 0, offset: 0, hasMore: true, loading: false, term: "", debounce: null };
         /* attribute picker + scan working state */
         var attrState = null, scanState = null;
+        // Save serialization: only ONE SaveLines POST may be in flight for this invoice at a
+        // time. Two concurrent saves would share a single server-side named DB transaction (and
+        // race on the invoice's shared tax/total rows), so the second one failed. `saveInFlight`
+        // guards the request; a Save issued while one is running SNAPSHOTS exactly the rows the
+        // user asked to save into `pendingSaveIds` (a rowId set) and the in-flight save's
+        // completion flushes THOSE rows - NOT any line the user added afterwards but never
+        // Save-clicked. So the user can keep adding / editing / saving and each Save-clicked
+        // batch persists back-to-back, while an in-progress unsaved line is left untouched.
+        var saveInFlight = false, pendingSaveIds = {};
 
         var CATALOG_PAGE_SIZE = 50;
         var SEARCH_DEBOUNCE = 260;
@@ -87,25 +110,55 @@
             return (decSep !== ".") ? s.replace(".", decSep) : s;
         }
 
-        function sanitizeAmount(s) {
-            s = String(s);
+        /* Upper bound for an amount MAGNITUDE - Int32.MaxValue (2,147,483,647), matching
+           VAS_118 QuickJournal. Capped inclusive of its precision digits so a value can
+           never overflow a 32-bit signed integer downstream. Negative amounts ARE allowed
+           (credit memos / treat-as-discount), so only the magnitude is clamped - the sign
+           is preserved. */
+        var AMOUNT_MAX_VALUE = 2147483647;
+
+        /* Clean an amount input's raw text: an optional leading '-' (only when allowNeg),
+           digits and one decimal separator, the fraction capped to `prec` digits and the
+           magnitude clamped to AMOUNT_MAX_VALUE. A lone '-' / '' is preserved so the user
+           can keep typing. */
+        function sanitizeAmount(raw, prec, allowNeg) {
+            raw = String(raw == null ? "" : raw);
+            var neg = !!allowNeg && raw.charAt(0) === "-";
             var out = "", seenDec = false;
-            for (var i = 0; i < s.length; i++) {
-                var c = s.charAt(i);
+            for (var i = 0; i < raw.length; i++) {
+                var c = raw.charAt(i);
                 if (c >= "0" && c <= "9") out += c;
                 else if (c === decSep && !seenDec) { out += decSep; seenDec = true; }
             }
-            return out;
+            var p = prec >= 0 ? prec : precision();
+            var sepIdx = out.indexOf(decSep);
+            if (sepIdx >= 0) out = (p > 0) ? out.slice(0, sepIdx + 1 + p) : out.slice(0, sepIdx);
+            // Clamp the magnitude to Int32.MaxValue (parseNum ignores the sign for this test).
+            if (out !== "" && out !== decSep && Math.abs(parseNum(out)) > AMOUNT_MAX_VALUE) out = fmtAmtInput(AMOUNT_MAX_VALUE, p);
+            return (neg ? "-" : "") + out;
         }
 
-        function bindAmountInput($inp) {
+        function bindAmountInput($inp, prec, allowNeg) {
             $inp.attr({ inputmode: "decimal", autocomplete: "off" });
             $inp.on("keypress", function (e) {
                 if (e.ctrlKey || e.metaKey || e.which === 0 || e.which === 8) return;
                 var ch = String.fromCharCode(e.which);
+                // Leading minus only, and only when negatives are allowed (e.g. price).
+                if (ch === "-") { if (!allowNeg || this.selectionStart !== 0 || this.value.indexOf("-") !== -1) e.preventDefault(); return; }
                 if (ch === decSep) { if (this.value.indexOf(decSep) !== -1) e.preventDefault(); return; }
                 if (ch === grpSep) return;
-                if (!/[0-9.]/.test(ch)) e.preventDefault();
+                if (!/[0-9]/.test(ch)) e.preventDefault();
+            });
+            // Enforce precision + Int32 magnitude cap on every input event (typing, paste,
+            // autofill) so an out-of-range value can never survive a keystroke.
+            $inp.on("input", function () {
+                var before = this.value, caret = this.selectionStart;
+                var after = sanitizeAmount(before, prec, allowNeg);
+                if (after !== before) {
+                    $inp.val(after);
+                    var np = Math.max(0, (caret == null ? after.length : caret) - (before.length - after.length));
+                    try { this.setSelectionRange(np, np); } catch (e2) { }
+                }
             });
         }
 
@@ -235,6 +288,15 @@
             // Framework calls fetchData(recordID) on record load -> reset to page 0; the
             // pager calls it with an explicit page. Server returns LinePageSize (20) rows.
             var reqPage = (typeof page === "number" && page >= 0) ? page : 0;
+            // Claim the latest request token so a stale/out-of-order response (e.g. a prior
+            // invoice's load that lands AFTER a clear() for a new record) is discarded below.
+            var mySeq = ++fetchSeq;
+            // A pager page change (explicit page arg) is OUR own AJAX, NOT a framework record
+            // load - the framework paints no spinner for it, so show the per-panel busy overlay
+            // ourselves. A framework record load (no page arg) already gets the framework's own
+            // vis-apanel-busy, so we skip ours there to avoid a stacked double spinner.
+            var isPageChange = (typeof page === "number");
+            if (isPageChange) showBusy(true);
             // Tear down any open dialog FIRST. The framework calls fetchData to (re)load the
             // record - including after a save - and a still-open dialog's position:fixed
             // backdrop would otherwise be left orphaned over the page (morePopoverFor is
@@ -252,6 +314,9 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetPanelData",
                 type: "GET", dataType: "json", data: { C_Invoice_ID: recordID, AD_Window_ID: $self.AD_Window_ID || 0, page: reqPage },
                 success: function (raw) {
+                    // Superseded by a newer fetchData / clear() (record switched, or new-record
+                    // mode) - drop this stale response so it can't repaint the previous invoice.
+                    if (mySeq !== fetchSeq) { if (isPageChange) showBusy(false); return; }
                     var data = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     parent = data || null;
                     linesTotal = (parent && parent.LinesTotal) || 0;
@@ -283,12 +348,16 @@
                     render();
                     if ($root && $root[0]) $root.scrollTop(0);
                     refreshSummary();    // then load this invoice's server tax breakdown
+                    if (isPageChange) showBusy(false);
                 },
-                error: function (err) { console.log(err); }
+                error: function (err) { console.log(err); if (isPageChange && mySeq === fetchSeq) showBusy(false); }
             });
         };
 
         this.clear = function () {
+            // Invalidate any in-flight fetchData so its response can't repaint stale data over
+            // the cleared (new-record) panel - the record-switch race described on fetchSeq.
+            fetchSeq++;
             // Also tear down any open dialog so a fixed backdrop isn't orphaned over the page.
             closeDialogs();
             try { if (window.VIS && VIS.AttributeControl && VIS.AttributeControl.close) VIS.AttributeControl.close(); } catch (e) { }
@@ -324,9 +393,12 @@
                 _productType: r.ProductType || "",
                 values: vals,
                 display: {
-                    productName: r.ProductName || "", chargeName: r.ChargeName || "",
-                    uomName: r.UOMName || "", taxName: r.TaxName || "",
-                    attrName: r.AttrName || "", hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName || !!r.HasAttributeSet)
+                    productName: r.ProductName || "",
+                    chargeName: r.ChargeName || "",
+                    uomName: r.UOMName || "",
+                    taxName: r.TaxName || "",
+                    attrName: r.AttrName || "",
+                    hasAttributeSet: r.M_Product_ID > 0 && (!!r.AttrName && !!r.HasAttributeSet)
                 }
             };
             // Pristine snapshot of the just-loaded/just-saved state, so the row Undo can
@@ -421,7 +493,12 @@
             $saveBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--primary vas-cil-is-disabled" data-action="save-rows" title="' + esc(lbl("VAS_074_SaveRow", "Save row")) + ' (Ctrl+Alt+S)">' + icon("hard-drive", "💾") + '<span class="vas-cil-save-lbl"></span></button>');
             $deleteBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--danger vas-cil-is-disabled" data-action="delete-selected" title="' + esc(lbl("Delete", "Delete")) + ' (Ctrl+Alt+D)" disabled>' +
                 icon("trash", "🗑") + "<span>" + esc(lbl("Delete", "Delete")) + ' <span class="vas-cil-sel-count"></span></span></button>');
-            $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn);
+            // Refresh re-loads the current invoice's panel data (current page) from the server.
+            // A read action - stays enabled even on a completed/void/read-only invoice, so it is
+            // NOT touched by renderHeaderButtons' lock logic.
+            $refreshBtn = $('<button type="button" class="vas-cil-btn vas-cil-btn--outline" data-action="refresh-panel" title="' + esc(lbl("VAS_074_Refresh", "Refresh")) + ' (Ctrl+Alt+Q)">' + icon("refresh-cw", "⟳") +
+                "<span>" + esc(lbl("VAS_074_Refresh", "Refresh")) + "</span></button>");
+            $actions.append($scanBtn, $addBtn, $saveBtn, $deleteBtn, $refreshBtn);
             $header.append($actions);
             $panel.append($header);
 
@@ -441,6 +518,7 @@
 
             $header.on("click", "[data-action=open-scan]", openScanDialog);
             $header.on("click", "[data-action=add-line]", function () { addLine(); });
+            $header.on("click", "[data-action=refresh-panel]", function () { refreshPanel(); });
             // Save on mousedown (not click): mousedown fires BEFORE the focused cell
             // editor blurs, so we can flush that pending edit ourselves and the action
             // never gets lost to a blur/commit re-render happening between mousedown and
@@ -465,11 +543,26 @@
             $row.append('<div class="vas-cil-cell" role="columnheader">' + esc(lbl("VAS_074_ProductCharge", "Product / Charge")) + "</div>");
             $row.append('<div class="vas-cil-cell" role="columnheader">' + esc(lbl("Description", "Description")) + "</div>");
             $row.append('<div class="vas-cil-cell vas-cil-cell--right" role="columnheader">' + esc(lbl("VAS_074_QtyUom", "Quantity / UOM")) + "</div>");
-            $row.append('<div class="vas-cil-cell vas-cil-cell--right" role="columnheader">' + esc(lbl("Price", "Price")) + "</div>");
+            $row.append('<div class="vas-cil-cell vas-cil-cell--right vas-cil-hdr-price" role="columnheader">' + priceHeaderHtml() + "</div>");
             $row.append('<div class="vas-cil-cell" role="columnheader">' + esc(lbl("Tax", "Tax")) + "</div>");
             $row.append('<div class="vas-cil-cell vas-cil-cell--right" role="columnheader">' + esc(lbl("VAS_074_LineAmount", "Line Amount")) + "</div>");
             $row.append('<div class="vas-cil-cell vas-cil-cell--more" role="columnheader" aria-label="' + esc(lbl("VAS_074_More", "More")) + '"></div>');
             return $row;
+        }
+
+        /* Price header markup: "Price", with a smaller second line "Incl. Tax" beneath it when the
+           price list is tax-inclusive. Returns already-escaped (safe) HTML. */
+        function priceHeaderHtml() {
+            var main = esc(lbl("Price", "Price"));
+            if (parent && parent.IsTaxIncluded)
+                main += '<span class="vas-cil-hdr-price-sub">' + esc(lbl("VAS_074_InclTax", "(Incl. Tax)")) + "</span>";
+            return main;
+        }
+
+        /* Re-render the (once-built) Price header cell for the current parent tax mode. Called from
+           render() so the header tracks the invoice/price-list data that loads AFTER buildHeadRow ran. */
+        function updatePriceHeader() {
+            if ($body) $body.find(".vas-cil-hdr-price").html(priceHeaderHtml());
         }
 
         /* ---------- render ---------- */
@@ -483,20 +576,63 @@
             }
             applyTabVisibility(true);
             $emptyState.hide(); $body.show();
+            // The head row was built before the invoice data arrived, so refresh the Price header
+            // now that parent.IsTaxIncluded (price-list tax mode) is known.
+            updatePriceHeader();
             // Read-only invoice: mark the panel so disabled controls (checkbox, "...")
             // show a not-allowed cursor via their (enabled) parent cell - a disabled
             // control ignores its own `cursor` in Chromium, so the cell shows it instead.
             $body.toggleClass("vas-cil-locked", !panelEditable());
 
+            // Preserve the LIVE DOM of the row whose product/charge catalog is OPEN (the user is
+            // mid-search). An EXTERNAL render - a background save completing, a callout, the
+            // summary refresh - would otherwise rebuild that row -> resetCatalog -> tear down and
+            // RELOAD the dropdown (flicker; a render/keystroke seq race sometimes left it empty).
+            // detach() keeps the node's handlers, input value and open popover; we re-insert it
+            // in place and restore focus + caret (detach blurs the input).
+            var keepId = null, $keep = null, refocusEl = null, caretPos = null;
+            if (editing && catalog.$pop && catalog.$pop.closest("body").length && lineById(editing.rowId)) {
+                var $existing = $linesBody.find('[data-rowid="' + editing.rowId + '"]').first();
+                if ($existing.length) {
+                    var ae = document.activeElement;
+                    if (ae && $.contains($existing[0], ae)) {
+                        refocusEl = ae;
+                        try { caretPos = ae.selectionStart; } catch (e) { }
+                    }
+                    keepId = editing.rowId;
+                    // Detaching a focused input fires blur; suppress the primary blur handler
+                    // so it doesn't commitPrimary() -> clear editing -> destroy the search. The
+                    // flag is cleared after focus is restored below (async, to also cover
+                    // browsers that dispatch the detach blur on a later tick).
+                    suppressPrimaryBlur = true;
+                    $keep = $existing.detach();
+                }
+            }
+
             $linesBody.empty();
             if (!lines.length) {
                 $linesBody.append('<div class="vas-cil-emptyrow">' + esc(lbl("VAS_074_NoLines", "No lines yet - use Add line or Scan")) + "</div>");
             } else {
-                for (var i = 0; i < lines.length; i++) $linesBody.append(renderRow(lines[i]));
+                for (var i = 0; i < lines.length; i++) {
+                    if ($keep && lines[i].rowId === keepId) $linesBody.append($keep);
+                    else $linesBody.append(renderRow(lines[i]));
+                }
             }
             renderTotals();
             renderHeaderButtons();
             renderPager();
+
+            // Restore focus + caret to the preserved input (detach blurred it).
+            if (refocusEl) {
+                try {
+                    refocusEl.focus();
+                    if (caretPos != null && refocusEl.setSelectionRange) refocusEl.setSelectionRange(caretPos, caretPos);
+                } catch (e) { }
+            }
+            // Clear the blur-suppression after the current tick so any detach blur dispatched
+            // synchronously (during detach) OR asynchronously (queued to a later tick) is
+            // ignored; a genuine later user blur still commits normally.
+            if (suppressPrimaryBlur) setTimeout(function () { suppressPrimaryBlur = false; }, 0);
         }
 
         /* Server-side line pager: "Showing X-Y of N" on the left, "‹ P of Q ›" on the
@@ -544,6 +680,19 @@
             $self.fetchData(parent.C_Invoice_ID, p);
         }
 
+        /* Reload the CURRENT invoice's panel data from the server, RESETTING to the first page -
+           the Refresh button / Ctrl+Alt+Q. Flushes any pending cell edit first so it counts
+           toward the unsaved-work guard, then blocks (like a page change) when unsaved lines
+           exist so a reload never silently discards a new/edited row. Passing page 0 (an explicit
+           number) both jumps to page 1 AND makes fetchData show the per-panel busy overlay
+           (explicit page = our own AJAX, not a framework load). */
+        function refreshPanel() {
+            if (!parent || !parent.C_Invoice_ID) return;
+            flushActiveEdit();
+            if (unsavedLines().length) { showToast(lbl("VAS_074_SaveBeforeRefresh", "Save or discard your changes before refreshing")); return; }
+            $self.fetchData(parent.C_Invoice_ID, 0);   // 0 = first page + triggers the busy overlay
+        }
+
         // Cached server tax breakdown for the CURRENT invoice (from VAS/PoReceipt/GetTaxData,
         // the same contract VAS_InvoiceSummary uses). null until loaded / on a fresh record;
         // renderTotals() then falls back to a client-computed subtotal+tax so an unsaved
@@ -554,7 +703,16 @@
            the VAS_InvoiceSummary design, right-aligned in the totals row. */
         function renderTotals() {
             $totalsRow.empty();
-            var html = '<div class="vas-cil-summary">';
+            // On a treat-as-discount invoice, the product/qty/uom are driven by the referenced
+            // original line (picked in the "..." Additional Info modal), so show a left-side
+            // hint telling the user where to select it.
+            var html = "";
+            if (isTreatAsDiscount()) {
+                html += '<div class="vas-cil-totals-note">' +
+                    esc(lbl("VAS_074_TreatAsDiscountHint", "Please select the Original Invoice details in the Additional Info section to select the product")) +
+                    '</div>';
+            }
+            html += '<div class="vas-cil-summary">';
             if (taxSummary && taxSummary.length) {
                 var h = taxSummary[0];
                 var sym = h.CurSymbol || "";
@@ -666,8 +824,10 @@
             $row.append(renderTaxCell(line));
 
             var amt = lineAmount(line);
+            // Show any NON-ZERO amount (negative amounts are valid on credit / treat-as-
+            // discount lines); only a genuine 0 stays blank. `amt` is truthy for negatives.
             $row.append($('<div class="vas-cil-cell vas-cil-cell--right" role="cell"></div>')
-                .append('<span class="vas-cil-amt">' + (amt > 0 ? esc(fmtMoney(amt)) : "") + "</span>"));
+                .append('<span class="vas-cil-amt">' + (amt ? esc(fmtMoney(amt)) : "") + "</span>"));
 
             $row.append(renderMoreCell(line));
             // Per-row inline validation error (set by validateUnsaved on Save) - shown as a
@@ -728,10 +888,22 @@
                 var inner = $('<div style="position:relative"></div>');
                 wrap.append(inner);
                 var $inp = $('<input type="text" class="vas-cil-cell-edit__input" />');
-                $inp.val(editing.field === "product" ? line.display.productName : line.display.chargeName);
+                // Seed from the committed display name; but if nothing is committed yet (a new /
+                // cleared line) keep any IN-PROGRESS typed keyword. The keyword lives in
+                // catalog.term (set on every keystroke), NOT in line.display, so a render()
+                // triggered mid-typing - e.g. a background save completing while the user types a
+                // product keyword on a new line - would otherwise blank the input and drop the
+                // search (the "entered keyword gets rolled back" bug).
+                var primaryInit = editing.field === "product" ? line.display.productName : line.display.chargeName;
+                if (!primaryInit && catalog.term) primaryInit = catalog.term;
+                $inp.val(primaryInit);
                 $inp.attr("placeholder", editing.field === "product" ? lbl("VAS_074_SearchProduct", "Search product…") : lbl("VAS_074_SearchCharge", "Search charge…"));
                 $inp.on("input", function () { scheduleCatalog($(this).val(), inner, line, $inp); });
                 $inp.on("blur", function (e) {
+                    // Ignore the transient blur fired when render() detaches this row to
+                    // preserve its open dropdown (e.g. a background save completing mid-search)
+                    // - committing here would clear `editing` and destroy the loaded results.
+                    if (suppressPrimaryBlur) return;
                     if (e.relatedTarget && $(e.relatedTarget).attr("data-catalog-item") === "true") return;
                     commitPrimary(line, editing && editing.field, $inp.val());
                 });
@@ -751,7 +923,7 @@
                 setTimeout(function () { $inp.focus(); }, 0);
             } else {
                 var pv = primaryValue(line);
-                wrap.append(dispInput(line, pField, pv, { placeholder: lbl("VAS_074_AddProductCharge", "Add product / charge…") }));
+                wrap.append(dispInput(line, pField, pv, { placeholder: lbl("VAS_074_AddProductCharge", "Add product / charge…"), readOnly: isTreatAsDiscount() }));
                 // For a product carrying (or able to carry) an attribute set, show the
                 // attribute-set-instance description as a clickable sub-line under the
                 // product. Clicking it opens the attribute control instead of editing
@@ -767,7 +939,7 @@
                     // set was removed after the line was created but the old ASI description
                     // still shows), the attribute is informational only - not a link (no click,
                     // no pointer cursor / hover underline).
-                    if (editable && productHasAttributeSet(line)) {
+                    if (editable && productHasAttributeSet(line) && !isTreatAsDiscount()) {
                         // Open on mousedown + preventDefault (like Undo/Save): a plain click
                         // while a cell editor is focused blurs -> commits -> re-renders the row,
                         // destroying this element before mouseup so the FIRST click is eaten
@@ -799,7 +971,9 @@
                 $inp.attr("placeholder", placeholder || "");
                 if (opts.maxLength > 0) $inp.attr("maxlength", opts.maxLength);   // AD_Column.FieldLength cap
                 if (opts.align === "right") $inp.css("text-align", "right");
-                if (opts.amount) bindAmountInput($inp);
+                // Amount inputs: cap magnitude to Int32.MaxValue; allow a negative value for
+                // everything except quantity (qty is coerced non-negative in commitField).
+                if (opts.amount) bindAmountInput($inp, field === "quantity" ? 2 : precision(), field !== "quantity");
                 $inp.on("blur", function () { commitField(line, field, opts.amount ? parseNum($inp.val()) : $inp.val()); editing = null; render(); });
                 $inp.on("keydown", function (e) {
                     e.stopPropagation();
@@ -831,7 +1005,7 @@
             if (editQty) {
                 var $q = $('<input type="text" class="vas-cil-cell-edit__input" inputmode="decimal" />').val(fmtAmtInput(v.QtyEntered, 2)).css("text-align", "right");
                 var qLen = colFieldLength("QtyEntered"); if (qLen > 0) $q.attr("maxlength", qLen);   // AD_Column.FieldLength cap
-                bindAmountInput($q);
+                bindAmountInput($q, 2, false);   // quantity: precision 2, non-negative, Int32 cap
                 $q.on("blur", function () { commitField(line, "quantity", parseNum($q.val())); editing = null; render(); });
                 $q.on("keydown", function (e) {
                     e.stopPropagation();
@@ -844,7 +1018,7 @@
             } else {
                 var hasQ = v.QtyEntered !== undefined && v.QtyEntered !== "" && +v.QtyEntered !== 0;
                 wrap.append(dispInput(line, "quantity", hasQ ? fmtAmtInput(v.QtyEntered, 2) : "",
-                    { align: "right", placeholder: lbl("VAS_074_Qty", "Qty"), cls: "vas-cil-qtyval" }));
+                    { align: "right", placeholder: lbl("VAS_074_Qty", "Qty"), cls: "vas-cil-qtyval", readOnly: isColumnReadOnly(line, "QtyEntered") }));
             }
 
             // UOM (bottom) — real editable C_UOM dropdown, options filtered to this
@@ -963,6 +1137,17 @@
         function openMoreDialog(line) {
             closeDialogs();
             morePopoverFor = line.rowId;
+            // Snapshot the line's editable state BEFORE any field is touched. The dialog's
+            // dynamic fields commit live to line.values/display on change, so closing via the
+            // cross (Cancel) must restore this snapshot to leave the record unchanged. Done
+            // keeps the edits. Deep-copy so later in-dialog edits can't mutate the snapshot.
+            var moreSnapshot = {
+                values: $.extend(true, {}, line.values),
+                display: $.extend(true, {}, line.display),
+                dirty: line.dirty,
+                _priceOverride: line._priceOverride,
+                _error: line._error
+            };
             var primaryName = line.display.productName || line.display.chargeName ||
                 (lbl("VAS_074_Line", "Line") + " " + line.values.Line);
             var backdrop = $('<div class="vas-cil-dialog-backdrop" id="vasCilMore"></div>');
@@ -970,7 +1155,7 @@
             dialog.html(
                 '<header class="vas-cil-dialog__header"><div class="vas-cil-dialog__header-row">' +
                 '<h3 class="vas-cil-dialog__title">' + esc(primaryName) + " - " + esc(lbl("VAS_074_AdditionalInfo", "Additional Info")) + "</h3>" +
-                '<button type="button" class="vas-cil-dialog__close" data-act="close-more" aria-label="' + esc(lbl("VAS_074_Close", "Close")) + '" title="' + esc(lbl("VAS_074_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
+                '<button type="button" class="vas-cil-dialog__close" data-act="cancel-more" aria-label="' + esc(lbl("VAS_074_Close", "Close")) + '" title="' + esc(lbl("VAS_074_Close", "Close")) + '">' + icon("x", "✕") + "</button>" +
                 "</div></header>" +
                 '<div class="vas-cil-dialog__body vas-cil-more-body vas-cil-more-grid" id="vasCilMoreBody"></div>' +
                 '<footer class="vas-cil-dialog__footer vas-cil-dialog__footer--end">' +
@@ -980,12 +1165,35 @@
 
             var $body = dialog.find("#vasCilMoreBody");
 
-            // Close ONLY via the Done button - not on backdrop click (so an outside
-            // click, e.g. on the framework lookup popup, doesn't dismiss the modal).
-            // Return focus to the row's "..." button so Tab continues the row's chain
-            // (Tab off "..." saves the row) without the user re-grabbing the mouse.
-            function done() { commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line); }
+            // Close only via the Done button (commit) or the cross (cancel/discard) -
+            // never on backdrop click (so an outside click, e.g. on the framework lookup
+            // popup, doesn't dismiss the modal). Both return focus to the row's "..."
+            // button so Tab continues the row's chain (Tab off "..." saves the row)
+            // without the user re-grabbing the mouse.
+            function done() {
+                // Block close while a conditionally-mandatory curated field (e.g. Capital/Expense
+                // on an Asset-Related line) is still empty - show the message in the modal and
+                // keep it open until the required value is set.
+                var miss = firstMissingDynMandatory(line);
+                if (miss) { showMoreDialogError(miss); return; }
+                commitMorePopover(); closeDialogs(); render(); focusMoreBtn(line);
+            }
+            // Cross (X) = Cancel: discard everything changed in the modal and restore the
+            // line to its pre-open snapshot, so the record stays as it was. No mandatory
+            // validation here - we're throwing the edits away, not saving them.
+            function cancel() {
+                var l = lineById(line.rowId);
+                if (l) {
+                    l.values = moreSnapshot.values;
+                    l.display = moreSnapshot.display;
+                    l.dirty = moreSnapshot.dirty;
+                    l._priceOverride = moreSnapshot._priceOverride;
+                    l._error = moreSnapshot._error;
+                }
+                closeDialogs(); render(); focusMoreBtn(line);
+            }
             dialog.on("click", "[data-act=close-more]", done);
+            dialog.on("click", "[data-act=cancel-more]", cancel);
             // Enter / Space on the focused Done button must close the dialog. A native
             // <button> would do this itself, but the framework shell swallows Enter (its
             // global handler preventDefaults it), so wire it explicitly - same pattern as
@@ -994,6 +1202,12 @@
             dialog.on("keydown", "[data-act=close-more]", function (e) {
                 if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
                     e.preventDefault(); e.stopPropagation(); done();
+                }
+            });
+            // Enter / Space on the focused cross (Cancel) discards and closes.
+            dialog.on("keydown", "[data-act=cancel-more]", function (e) {
+                if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault(); e.stopPropagation(); cancel();
                 }
             });
             // Field-group Show More/Less: collapse/expand the fields under a section header.
@@ -1025,10 +1239,35 @@
             }, 0);
         }
 
+        /* Show a blocking validation message in the open "..." modal (above the footer) and
+           focus the offending field, so the modal refuses to close until it's set. */
+        function showMoreDialogError(miss) {
+            var $dialog = $("#vasCilMore .vas-cil-dialog");
+            if (!$dialog.length) return;
+            var $err = $dialog.find(".vas-cil-more-error");
+            if (!$err.length) {
+                $err = $('<div class="vas-cil-more-error" role="alert"></div>');
+                $dialog.find(".vas-cil-dialog__footer").before($err);
+            }
+            $err.text(miss.msg);
+            var $fld = $("#vasCilMoreBody").children('[data-col="' + miss.col + '"]');
+            if ($fld.length && $fld[0].scrollIntoView) $fld[0].scrollIntoView({ block: "nearest" });
+            setTimeout(function () { $fld.find("input,select,textarea").first().focus(); }, 0);
+        }
+
+        /* Dismiss the "..." modal's blocking validation message (on any value change - it
+           re-validates on the next close attempt). */
+        function clearMoreDialogError() {
+            $("#vasCilMore .vas-cil-dialog").find(".vas-cil-more-error").remove();
+        }
+
         /* ---------- edit / commit ---------- */
         function startEdit(line, field) {
             if (!panelEditable()) return;             // completed/void/reversed/closed -> read-only
             if (line._saving) return;                 // row is being saved - locked until it returns
+            // Product / Charge cell has no FIELD_COL mapping, so gate the treat-as-discount
+            // lock here (Qty / UOM go through fieldReadOnly below via isColumnReadOnly).
+            if ((field === "product" || field === "charge") && isTreatAsDiscount()) return;
             if (fieldReadOnly(line, field)) return;   // AD_Column.ReadOnlyLogic / IsReadOnly
             commitMorePopover(); morePopoverFor = null;
             editing = { rowId: line.rowId, field: field };
@@ -1227,12 +1466,27 @@
             for (var i = 0; i < lines.length; i++) maxLine = Math.max(maxLine, lines[i].values.Line || 0);
             var line = {
                 rowId: "r" + (++rowCounter), status: "new", dirty: true, _priceOverride: false,
-                values: { C_InvoiceLine_ID: 0, Line: maxLine + 10, M_Product_ID: 0, C_Charge_ID: 0, M_AttributeSetInstance_ID: 0,
-                    QtyEntered: 0, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
+                values: {
+                    C_InvoiceLine_ID: 0, Line: maxLine + 10, M_Product_ID: 0, C_Charge_ID: 0, M_AttributeSetInstance_ID: 0,
+                    QtyEntered: 0, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: ""
+                },
                 display: { productName: "", chargeName: "", uomName: "", taxName: "", attrName: "", hasAttributeSet: false }
             };
             seedAllColumns(line.values);
             lines.unshift(line);
+            // On a treat-as-discount invoice the product / qty / uom are locked and populated
+            // from the referenced line (picked via the "..." modal), so do NOT auto-open the
+            // product search editor - just render the new (locked) row and focus its "..."
+            // button so the reference modal is one keystroke away.
+            if (isTreatAsDiscount()) {
+                editing = null;
+                render();
+                setTimeout(function () {
+                    var $b = $linesBody.find('[data-rowid="' + line.rowId + '"] .vas-cil-more-btn');
+                    if ($b.length) $b.focus();
+                }, 0);
+                return;
+            }
             editing = { rowId: line.rowId, field: "product" };
             catalog.term = ""; catalog.highlight = 0;
             render();
@@ -1419,7 +1673,7 @@
             // Blur: only act while still editing THIS row's primary. If a catalog pick has
             // already advanced focus (e.g. to Description), leave that state untouched.
             if (!(editing && editing.rowId === line.rowId &&
-                  (editing.field === "product" || editing.field === "charge"))) return;
+                (editing.field === "product" || editing.field === "charge"))) return;
             editing = null;
             render();   // repaint the cell from the committed value (revert the typed text)
         }
@@ -1618,9 +1872,9 @@
                 getAD_Reference_ID: function () { return (m && m.AD_Reference_ID) || 0; },
                 isMandatory: function () { return !!(m && m.IsMandatory); },
                 isReadOnly: function () { return m ? !m.IsUpdateable : false; },
-                setError: function () {}, setMandatory: function () {}, setReadOnly: function () {},
-                setDisplayed: function () {}, setDisplayLength: function () {},
-                setBackgroundColor: function () {}, setInputMandatory: function () {}
+                setError: function () { }, setMandatory: function () { }, setReadOnly: function () { },
+                setDisplayed: function () { }, setDisplayLength: function () { },
+                setBackgroundColor: function () { }, setInputMandatory: function () { }
             };
         }
 
@@ -1769,7 +2023,20 @@
          * mirrors the framework Evaluator: comparison tuples "@token@<op>value"
          * (op = =, !, ^, <, >) joined by & (AND) / | (OR); @tokens@ resolve from the
          * line values first, then the invoice header / document context. */
+        /* On a "treat as discount" invoice (header C_Invoice.TreatAsDiscount) EVERY line's
+           product / attribute set / UOM / quantity are driven by the referenced original
+           line (picked via Ref_InvoiceLineOrg_ID in the "..." modal) and must NOT be
+           selected / changed directly on the grid - they are copied and locked. */
+        var REF_DISCOUNT_LOCKED_COLS = { M_Product_ID: 1, QtyEntered: 1, C_UOM_ID: 1, M_AttributeSetInstance_ID: 1 };
+        function isTreatAsDiscount() {
+            return !!(parent && parent.TreatAsDiscount);
+        }
+
         function isColumnReadOnly(line, col) {
+            // Treat-as-discount invoice: product / ASI / UOM / qty come from the referenced
+            // line and are read-only on the grid (checked first so it holds even without
+            // column meta).
+            if (REF_DISCOUNT_LOCKED_COLS[col] && isTreatAsDiscount()) return true;
             // C_UOM_ID is locked once the line is saved (C_InvoiceLine_ID > 0): the unit of
             // measure must not change on an existing invoice line. Checked before the meta
             // lookup so it holds even when column meta is absent.
@@ -1832,6 +2099,10 @@
                 case "AD_Client_ID": return String((parent && parent.AD_Client_ID) || 0);
                 case "IsSOTrx": return (parent && parent.IsSOTrx) ? "Y" : "N";
                 case "IsTaxIncluded": return (parent && parent.IsTaxIncluded) ? "Y" : "N";
+                // Header flag kept in context so a line field's DisplayLogic / ReadOnlyLogic
+                // (e.g. @TreatAsDiscount@='Y' on the reference group) resolves correctly - it
+                // is NOT a C_InvoiceLine column, so it never comes from line.values.
+                case "TreatAsDiscount": return (parent && parent.TreatAsDiscount) ? "Y" : "N";
                 case "Processed": return (parent && parent.Processed) ? "Y" : "N";
                 case "DocStatus": return (parent && parent.DocStatus) || "";
                 default: return "";
@@ -1891,6 +2162,107 @@
          * when one is configured, enforces AD_Val_Rule (FK lookups, server-side) and is
          * covered by the mandatory check in validateLine. Values live in line.values and
          * persist through the existing generic column save. */
+        /* ---------- VAFAM asset-related business rule (VAFAM module) ----------
+         * When a line is flagged Asset Related (VAFAM_IsAssetRelated = Y):
+         *   - Capital Expense (VAFAM_CapitalExpense) becomes MANDATORY (red asterisk +
+         *     enforced in validateLine).
+         * When the flag is cleared back to N:
+         *   - Capital Expense AND Asset (A_Asset_ID) are cleared (and marked touched so the
+         *     nulls persist on save), and their controls are rebuilt to show the cleared state.
+         */
+        var VAFAM_ASSET_RELATED_COL = "VAFAM_IsAssetRelated";
+        var VAFAM_CAPITAL_EXPENSE_COL = "VAFAM_CapitalExpense";
+        var VAFAM_ASSET_ID_COL = "A_Asset_ID";
+        /* Revenue recognition start date: mandatory whenever it is on-screen (service / expense /
+           charge line + its AD_Field DisplayLogic passes), mirroring the Capital-Expense rule. */
+        var REVENUE_START_DATE_COL = "RevenueStartDate";
+        /* Treat-as-discount reference fields: mandatory whenever shown (only surfaced while the
+           invoice header's TreatAsDiscount is set), mirroring the Capital-Expense rule. */
+        var REF_INVOICE_ORG_COL = "Ref_InvoiceOrg_ID";
+        var REF_INVOICE_LINE_ORG_COL = "Ref_InvoiceLineOrg_ID";
+
+        /* Is this line currently flagged Asset Related? (YesNo, read case-insensitively.) */
+        function isAssetRelated(line) {
+            var v = lineVal(line, VAFAM_ASSET_RELATED_COL);
+            return (v === true || v === "Y" || v === "true" || v === 1 || v === "1");
+        }
+
+        /* Effective mandatory flag for a curated modal field: the dictionary IsMandatory,
+           OR the conditional rule that Capital Expense is mandatory while the line is Asset
+           Related. Used both for the control's asterisk and for validateLine. */
+        function dynMandatory(line, m) {
+            if (m.IsMandatory) return true;
+            if (m.ColumnName === VAFAM_CAPITAL_EXPENSE_COL) return isAssetRelated(line);
+            // RevenueStartDate is required whenever it is shown. Its visibility (svcExpenseOrCharge
+            // candidacy + AD_Field DisplayLogic) is enforced by the callers - firstMissingDynMandatory
+            // skips non-visible fields and applyDynDisplay hides the control - so returning true here
+            // makes it mandatory exactly when on-screen, like Capital Expense on an Asset-Related line.
+            if (m.ColumnName === REVENUE_START_DATE_COL) return true;
+            // Treat-as-discount reference fields are required whenever shown - they are only candidates
+            // while the header's TreatAsDiscount is set, and the callers enforce actual visibility.
+            if (m.ColumnName === REF_INVOICE_ORG_COL || m.ColumnName === REF_INVOICE_LINE_ORG_COL) return true;
+            return false;
+        }
+
+        /* Clear a curated modal field's value (to null), drop its cached FK label, and mark
+           it dirty + touched so the intentional null persists on save (ApplyExtraColumns). */
+        function clearDynValue(line, col) {
+            if (!columnMeta[col]) return;
+            var prev = lineVal(line, col);
+            setLineVal(line, col, null);
+            if (line._dynDisp) delete line._dynDisp[col];
+            if (!sameVal(prev, null)) {
+                markDirty(line);
+                if (!line._dynTouched) line._dynTouched = {};
+                line._dynTouched[col] = true;
+            }
+        }
+
+        /* Rebuild one curated field's control in the open modal (preserving field order) so a
+           value clear / mandatory-asterisk toggle shows immediately. No-op when the field's
+           modal isn't open or the column isn't present. */
+        function rebuildDynField(line, col) {
+            var $b = $("#vasCilMoreBody");
+            if (!$b.length || morePopoverFor !== line.rowId) return;
+            var m = columnMeta[col];
+            if (!m) return;
+            var $old = $b.children('[data-col="' + col + '"]');
+            if (!$old.length) return;
+            $old.replaceWith(buildDynField(line, m));
+            applyDynDisplay(line, $b);
+        }
+
+        /* Apply the asset-related rule after VAFAM_IsAssetRelated changes: clear the dependent
+           fields when no longer related, then rebuild both dependent controls (Capital Expense's
+           asterisk toggles with the flag; Asset may have just been cleared). */
+        function applyAssetRelatedRule(line) {
+            if (!isAssetRelated(line)) {
+                clearDynValue(line, VAFAM_CAPITAL_EXPENSE_COL);
+                clearDynValue(line, VAFAM_ASSET_ID_COL);
+            }
+            rebuildDynField(line, VAFAM_CAPITAL_EXPENSE_COL);
+            rebuildDynField(line, VAFAM_ASSET_ID_COL);
+        }
+
+        /* First visible, editable, (conditionally-)mandatory curated field that is still empty -
+           {col, name, msg} or null. Covers dictionary-mandatory fields AND the conditional rule
+           (Capital/Expense on an Asset-Related line). Shared by validateLine (Save) and the
+           "..." modal's close guard so both enforce the same requirement. */
+        function firstMissingDynMandatory(line) {
+            var dyn = additionalInfoColumns(line);
+            for (var d = 0; d < dyn.length; d++) {
+                var dm = dyn[d];
+                // A field hidden by DisplayLogic can't be set by the user - don't require it.
+                if (!dynFieldVisible(line, dm)) continue;
+                if (!dynMandatory(line, dm) || isColumnReadOnly(line, dm.ColumnName)) continue;
+                var dv = lineVal(line, dm.ColumnName);
+                var isFk = (dm.AD_Reference_ID === 18 || dm.AD_Reference_ID === 19 || dm.AD_Reference_ID === 30 || dm.AD_Reference_ID === 13);
+                var empty = isFk ? !(+dv > 0) : (dv == null || String(dv).trim() === "");
+                if (empty) return { col: dm.ColumnName, name: dm.Name || dm.ColumnName, msg: lbl("VAS_074_FieldRequired", "Required") + ": " + (dm.Name || dm.ColumnName) };
+            }
+            return null;
+        }
+
         /* Curated "Additional Info" columns shown in the "..." modal, in this order.
            To add a field, append its column name here (with an optional `when`
            condition). A column missing from the dictionary (e.g. a module's columns
@@ -1908,7 +2280,14 @@
             { col: "VAFAM_CapitalExpense", when: "vafam" },
             { col: "A_Asset_ID", when: "vafam" },
             { col: "VA106_TaxCollectedAtSource_ID", when: "va106_" },
-            { col: "VA106_TCSAmount", when: "va106_" }
+            { col: "VA106_TCSAmount", when: "va106_" },
+            // "Treat as Discount Reference" group - only when the invoice header's
+            // TreatAsDiscount flag is set (AP credit-memo treated as a discount). Picking
+            // Ref_InvoiceLineOrg_ID copies the referenced line's product / ASI / UOM / qty
+            // onto this line (see setDyn -> applyRefLineDetail).
+            { col: "Ref_InvoiceOrg_ID", when: "treatasdiscount" },
+            { col: "Ref_InvoiceLineOrg_ID", when: "treatasdiscount" },
+            { col: "M_Warehouse_ID", when: "treatasdiscount" }
         ];
 
         /* Whether a conditional group applies to this line. */
@@ -1920,6 +2299,10 @@
                 return pt === "S" || pt === "E";                        // Service / Expense product
             }
             if (when === "vafam") return !!columnMeta["VAFAM_IsAssetRelated"];   // module installed
+            // Treat-as-discount reference group: gated by the invoice header flag (kept in
+            // parent context on load). The columns must also exist in the dictionary
+            // (additionalInfoColumns already drops any missing column meta).
+            if (when === "treatasdiscount") return !!(parent && parent.TreatAsDiscount);
             // VA106 (Tax Collected at Source) - shown only when the module is installed
             // (the TCS column is present in the dictionary). The field's own
             // AD_Field.DisplayLogic (e.g. sales-only) is still applied separately.
@@ -1957,9 +2340,9 @@
                 if (!s) continue;
                 switch (dynFieldKind(m)) {
                     case "fk": case "int": if (parseInt(s, 10) > 0) return true; break;
-                    case "number":         if (parseFloat(s) !== 0) return true; break;
-                    case "yesno":          if (s === "Y" || s === "true" || s === "1") return true; break;
-                    default:               return true;   // string / memo / date / list with any text
+                    case "number": if (parseFloat(s) !== 0) return true; break;
+                    case "yesno": if (s === "Y" || s === "true" || s === "1") return true; break;
+                    default: return true;   // string / memo / date / list with any text
                 }
             }
             return false;
@@ -2018,8 +2401,9 @@
            (the header is inserted before its [data-col] wrapper), `key`/`def` = the group
            title (AD_Message key + English fallback), `collapsed` = initial state. */
         var MORE_FIELD_GROUPS = [
-            { anchor: "AD_OrgTrx_ID",     key: "VAS_074_GrpDimension",  def: "Dimension",  collapsed: false },
-            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false }
+            { anchor: "AD_OrgTrx_ID", key: "VAS_074_GrpDimension", def: "Dimension", collapsed: false },
+            { anchor: "C_Withholding_ID", key: "VAS_074_GrpReferences", def: "References", collapsed: false },
+            { anchor: "Ref_InvoiceOrg_ID", key: "VAS_074_GrpTreatAsDiscount", def: "Treat as Discount Reference", collapsed: false }
         ];
         // Per-anchor collapsed state; persists across refreshMoreDialog and re-opens so a
         // user's expand/collapse choice survives value-change reconciles within the session.
@@ -2106,6 +2490,11 @@
                 }
                 $field.prepend($prep);
             }
+            // Mandatory field (dictionary IsMandatory OR the conditional Capital/Expense-on-
+            // Asset-Related rule): colour its label with the framework mandatory colour so the
+            // requirement reads at a glance. Recomputed on every (re)build, so it toggles with
+            // the Asset-Related flag.
+            $field.toggleClass("vas-cil-dyn-mandatory", dynMandatory(line, m));
             return $field.attr("data-col", m.ColumnName);
         }
 
@@ -2204,12 +2593,19 @@
                 stage("DateInvoiced", parent.DateInvoiced);
                 stage("IsSOTrx", !!parent.IsSOTrx);
                 stage("IsTaxIncluded", !!parent.IsTaxIncluded);
+                stage("TreatAsDiscount", !!parent.TreatAsDiscount);   // treat-as-discount ref pickers' val rules
                 stage("Processed", !!parent.Processed);
                 stage("DocStatus", parent.DocStatus || "");
             }
             // Current line's own C_InvoiceLine columns (current-row context) - staged last.
             var v = line.values || {};
             for (var k in v) { if (v.hasOwnProperty(k)) stage(k, v[k]); }
+            // Organization for a line's lookups / AD_Val_Rule must be the INVOICE's org, not
+            // the login org. A new/unsaved line carries AD_Org_ID = null (seedAllColumns),
+            // which the loop above would stage as "" - clobbering the header org and making a
+            // validated framework lookup fall back to the login organization. Re-assert the
+            // invoice org last so @AD_Org_ID@ resolves to the invoice's org.
+            if (parent && (parent.AD_Org_ID || 0) > 0) stage("AD_Org_ID", parent.AD_Org_ID);
             // Write each column once.
             for (var key in bag) {
                 if (!bag.hasOwnProperty(key)) continue;
@@ -2274,7 +2670,7 @@
             if (!viennaAvailable() || kind === "ro") return null;
             var col = m.ColumnName, dt = m.AD_Reference_ID, ctrl;
             try {
-                ctrl = makeViennaCtrl(dt, col, m.Name || col, m.AD_Reference_Value_ID, !!m.IsMandatory, ro, m.AD_Column_ID);
+                ctrl = makeViennaCtrl(dt, col, m.Name || col, m.AD_Reference_Value_ID, dynMandatory(line, m), ro, m.AD_Column_ID);
                 ctrl.getControl().css("width", "100%");
             }
             catch (e) { if (window.console) console.log("VAS_074 vienna ctrl error " + col, e); return null; }
@@ -2439,6 +2835,17 @@
                 if (!line._dynTouched) line._dynTouched = {};
                 line._dynTouched[col] = true;
             }
+            // VAFAM asset-related rule: toggling Asset Related makes Capital Expense mandatory
+            // (asterisk) or clears Capital Expense + Asset. Runs regardless of any column callout.
+            if (String(col).toLowerCase() === VAFAM_ASSET_RELATED_COL.toLowerCase()) applyAssetRelatedRule(line);
+            // Treat-as-discount: picking the referenced original invoice line copies its
+            // product / ASI / UOM / qty onto this line (then locks them). Fires on a genuine
+            // change to a real line id, independent of any AD_Column.Callout on the column.
+            if (!sameVal(prev, value) && String(col).toLowerCase() === "ref_invoicelineorg_id") {
+                var refLineId = parseInt(value, 10) || 0;
+                if (refLineId > 0) fetchRefLineDetail(line, refLineId);
+            }
+            clearMoreDialogError();   // any field change dismisses the blocking close-error banner
             var m = columnMeta[col];
             if (m && m.Callout) {
                 // Snapshot the other modal fields so we can refresh just the ones the
@@ -2452,6 +2859,53 @@
                 return;
             }
             if (refresh) refreshIfAffectsLogic(line, col);
+        }
+
+        /* ---------- treat-as-discount reference sync ----------
+           When the user picks Ref_InvoiceLineOrg_ID, fetch the referenced original invoice
+           line and copy its product / attribute-set / UOM / entered quantity onto this line
+           so the discount line stays consistent with the line it references. On a treat-as-
+           discount invoice these fields are read-only anyway (isTreatAsDiscount -> isColumnReadOnly). */
+        function fetchRefLineDetail(line, refLineId) {
+            showBusy(true);
+            $.ajax({
+                url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/GetRefInvoiceLineDetail",
+                type: "GET", dataType: "json", data: { C_InvoiceLine_ID: refLineId },
+                success: function (raw) {
+                    showBusy(false);
+                    // still on the same reference the user just picked?
+                    if ((parseInt(lineVal(line, "Ref_InvoiceLineOrg_ID"), 10) || 0) !== refLineId) return;
+                    var d = (typeof raw === "string") ? (raw ? jQuery.parseJSON(raw) : null) : raw;
+                    if (!d) { showToast(lbl("VAS_074_RefLineNotFound", "Referenced invoice line not found")); return; }
+                    applyRefLineDetail(line, d);
+                },
+                error: function (e) { console.log(e); showBusy(false); }
+            });
+        }
+
+        /* Copy the referenced line's product / ASI / UOM / qty onto this line (values +
+           display), mark dirty, and repaint the grid row + open modal. Pricing is NOT
+           recomputed - the user enters the discount amount manually. The core columns
+           (M_Product_ID / M_AttributeSetInstance_ID / C_UOM_ID / QtyEntered) persist via
+           buildRowPayload's top-level fields, so no _dynTouched flag is needed for them. */
+        function applyRefLineDetail(line, d) {
+            var v = line.values, disp = line.display || (line.display = {});
+            var asi = parseInt(d.M_AttributeSetInstance_ID, 10) || 0;
+            v.M_Product_ID = parseInt(d.M_Product_ID, 10) || 0;
+            v.C_Charge_ID = 0;
+            v.M_AttributeSetInstance_ID = asi;
+            var uom = parseInt(d.C_UOM_ID, 10) || 0;
+            if (uom > 0) v.C_UOM_ID = uom;
+            v.QtyEntered = parseNum(d.QtyEntered);
+            disp.productName = d.ProductName || "";
+            disp.chargeName = "";
+            disp.attrName = d.AttrName || "";
+            disp.hasAttributeSet = asi > 0;
+            if (d.UomName) disp.uomName = d.UomName;
+            line._productType = d.ProductType || "";
+            markDirty(line);
+            render();   // product / qty / uom now shown locked
+            if (morePopoverFor === line.rowId) refreshMoreDialog(line);
         }
 
         /* Snapshot the current value of every curated modal field (case-insensitive). */
@@ -2542,7 +2996,7 @@
                     var rows = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw; rows = rows || [];
                     if (rows.length) { setDynDisplay(line, col, rows[0].Name); if ($input && $input.closest("body").length) $input.val(rows[0].Name); }
                 },
-                error: function () {}
+                error: function () { }
             });
         }
 
@@ -2623,19 +3077,10 @@
             // Qty must be positive whenever a line carries a product/charge.
             if (!(v.QtyEntered > 0))
                 return { col: "QtyEntered", msg: lbl("VAS_074_QtyRequired", "Quantity must be greater than zero") };
-            // Mandatory dynamic ("...") fields (skip read-only - the user can't set them).
-            var dyn = additionalInfoColumns(line);
-            for (var d = 0; d < dyn.length; d++) {
-                var dm = dyn[d];
-                // A field hidden by DisplayLogic can't be set by the user - don't require it.
-                if (!dynFieldVisible(line, dm)) continue;
-                if (!dm.IsMandatory || isColumnReadOnly(line, dm.ColumnName)) continue;
-                var dv = lineVal(line, dm.ColumnName);
-                var isFk = (dm.AD_Reference_ID === 18 || dm.AD_Reference_ID === 19 || dm.AD_Reference_ID === 30 || dm.AD_Reference_ID === 13);
-                var empty = isFk ? !(+dv > 0) : (dv == null || String(dv).trim() === "");
-                if (empty)
-                    return { col: dm.ColumnName, msg: lbl("VAS_074_FieldRequired", "Required") + ": " + (dm.Name || dm.ColumnName) };
-            }
+            // Mandatory dynamic ("...") fields (skip read-only / hidden - the user can't set
+            // them). Includes the conditional Capital/Expense-on-Asset-Related rule.
+            var miss = firstMissingDynMandatory(line);
+            if (miss) return { col: miss.col, msg: miss.msg };
             return null;
         }
 
@@ -2643,8 +3088,10 @@
            row renders its own red message - instead of a single toast that only named the
            first failure. Repaints so every offending record in a multi-row save is flagged
            in place; returns false when any line is invalid. */
-        function validateUnsaved() {
-            var dirty = unsavedLines();
+        function validateUnsaved(batch) {
+            // Validate only the rows about to be saved (batch) - a deferred flush must not be
+            // blocked by an unrelated, still-being-entered line that wasn't Save-clicked.
+            var dirty = batch || unsavedLines();
             var anyBad = false;
             for (var i = 0; i < dirty.length; i++) {
                 var err = validateLine(dirty[i]);
@@ -2679,6 +3126,9 @@
                 M_Product_ID: line.values.M_Product_ID,
                 M_AttributeSetInstance_ID: line.values.M_AttributeSetInstance_ID,
                 productName: line.display.productName,
+                // Purchase invoice (IsSOTrx = false) -> the control shows a "Select Lot" dropdown of
+                // the product's existing M_Lots; picking one fills the Lot field.
+                IsSOTrx: !!(parent && parent.IsSOTrx),
                 // true -> open straight on the New-attribute form; false -> instance list.
                 // Set this per your own requirement.
                 newAttribute: true,
@@ -2714,8 +3164,10 @@
                     var attr = info.Attributes[a];
                     if (attr.Values) for (var i = 0; i < attr.Values.length; i++) {
                         var val = attr.Values[i];
-                        out.push({ code: val.Code || val.Name, label: val.Name, spec: attr.Name, priceDelta: "—", availability: "—",
-                            M_Attribute_ID: attr.M_Attribute_ID, M_AttributeValue_ID: val.M_AttributeValue_ID });
+                        out.push({
+                            code: val.Code || val.Name, label: val.Name, spec: attr.Name, priceDelta: "—", availability: "—",
+                            M_Attribute_ID: attr.M_Attribute_ID, M_AttributeValue_ID: val.M_AttributeValue_ID
+                        });
                     }
                 }
             }
@@ -3092,8 +3544,12 @@
             $.ajax({
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveAttribute",
                 type: "POST", dataType: "json",
-                data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
-                    Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }] }) },
+                data: {
+                    payload: JSON.stringify({
+                        M_Product_ID: line.values.M_Product_ID, Lot: "", SerNo: "", GuaranteeDate: "",
+                        Values: [{ M_Attribute_ID: sel.M_Attribute_ID, ValueType: "L", M_AttributeValue_ID: sel.M_AttributeValue_ID, DisplayValue: sel.label }]
+                    })
+                },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -3153,9 +3609,13 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveAttribute",
                 type: "POST", dataType: "json",
                 // editAsi set -> UPDATE that instance in place; else create a new one.
-                data: { payload: JSON.stringify({ M_Product_ID: line.values.M_Product_ID,
-                    M_AttributeSetInstance_ID: (attrState.editAsi && attrState.editAsi.M_AttributeSetInstance_ID) || 0,
-                    Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values }) },
+                data: {
+                    payload: JSON.stringify({
+                        M_Product_ID: line.values.M_Product_ID,
+                        M_AttributeSetInstance_ID: (attrState.editAsi && attrState.editAsi.M_AttributeSetInstance_ID) || 0,
+                        Lot: lot, SerNo: serno, GuaranteeDate: guarantee, Values: values
+                    })
+                },
                 success: function (raw) {
                     showBusy(false);
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
@@ -3268,8 +3728,10 @@
                 var line = {
                     rowId: "r" + (++rowCounter), status: "new", dirty: true, _priceOverride: false,
                     _productType: r.item.Kind === "C" ? "" : (r.item.ProductType || ""),
-                    values: { C_InvoiceLine_ID: 0, Line: maxLine, M_Product_ID: r.item.Kind === "C" ? 0 : r.item.RecordId, C_Charge_ID: r.item.Kind === "C" ? r.item.RecordId : 0,
-                        M_AttributeSetInstance_ID: 0, QtyEntered: parseInt(r.qty || "1", 10) || 1, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: "" },
+                    values: {
+                        C_InvoiceLine_ID: 0, Line: maxLine, M_Product_ID: r.item.Kind === "C" ? 0 : r.item.RecordId, C_Charge_ID: r.item.Kind === "C" ? r.item.RecordId : 0,
+                        M_AttributeSetInstance_ID: 0, QtyEntered: parseInt(r.qty || "1", 10) || 1, C_UOM_ID: 0, PriceEntered: 0, C_Tax_ID: 0, Discount: 0, Notes: "", Description: ""
+                    },
                     display: { productName: r.item.Kind === "C" ? "" : r.item.DisplayName, chargeName: r.item.Kind === "C" ? r.item.DisplayName : "", uomName: "", taxName: "", attrName: "", hasAttributeSet: !!r.item.HasAttributeSet }
                 };
                 seedAllColumns(line.values);
@@ -3303,22 +3765,33 @@
             var v = l.values;
             // Core fields drive the business setters; Values carries the full column
             // bag so every callout-set column is persisted server-side.
-            return { C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
+            return {
+                C_InvoiceLine_ID: v.C_InvoiceLine_ID || 0, RowKey: l.rowId, Line: v.Line || 0, M_Product_ID: v.M_Product_ID || 0, C_Charge_ID: v.C_Charge_ID || 0,
                 M_AttributeSetInstance_ID: v.M_AttributeSetInstance_ID || 0, QtyEntered: v.QtyEntered || 0, C_UOM_ID: v.C_UOM_ID || 0,
                 PriceEntered: v.PriceEntered || 0, C_Tax_ID: v.C_Tax_ID || 0, Discount: v.Discount || 0, Description: v.Description || "",
-                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : [] };
+                Values: v, TouchedCols: l._dynTouched ? Object.keys(l._dynTouched) : []
+            };
         }
 
         /* Save the currently-unsaved lines as a non-blocking batch. Each saved row shows
            its OWN per-row spinner (like a callout) instead of a panel-wide overlay, and
            is locked from editing until the save returns - so the user can keep working
            (Add line, edit other rows) while the save is in flight. */
-        function saveRows(done) {
+        function saveRows(done, restrictIds) {
             commitMorePopover();
             if (!panelEditable()) { if (done) done(false); return; }   // read-only when doc completed/void/reversed/closed
             var batch = unsavedLines();
+            // A DEFERRED flush saves ONLY the rows the user had actually Save-clicked (snapshotted
+            // in restrictIds), never a line added afterwards while the prior save was running.
+            if (restrictIds) batch = batch.filter(function (l) { return restrictIds[l.rowId]; });
             if (!batch.length || !parent) { if (done) done(false); return; }
-            if (!validateUnsaved()) { if (done) done(false); return; }   // AD_Column mandatory validation
+            if (!validateUnsaved(batch)) { if (done) done(false); return; }   // AD_Column mandatory validation (only the rows being saved)
+            // Serialize: never run a second SaveLines while one is in flight (they'd share a
+            // server transaction and race on the invoice tax/totals). Defer instead - snapshot
+            // exactly THESE rows so the in-flight save's completion flushes them; a line the user
+            // adds later but never Save-clicks is not swept in. Rows stay editable until flushed.
+            if (saveInFlight) { batch.forEach(function (l) { pendingSaveIds[l.rowId] = true; }); if (done) done(false); return; }
+            saveInFlight = true;
             var rows = batch.map(buildRowPayload);
             // Lock + show a per-row spinner on each saving row.
             batch.forEach(function (l) { l._saving = true; setRowBusy(l, true, lbl("VAS_074_Saving", "Saving…")); });
@@ -3327,13 +3800,25 @@
                 url: VIS.Application.contextUrl + "VAS_074_CreateInvoiceLinePanel/SaveLines",
                 type: "POST", dataType: "json", data: { payload: JSON.stringify({ C_Invoice_ID: parent.C_Invoice_ID, AD_Window_ID: $self.AD_Window_ID || 0, Page: linePage, Lines: rows }) },
                 success: function (raw) {
+                    saveInFlight = false;
                     batch.forEach(function (l) { l._saving = false; });
                     var res = (typeof raw === "string") ? jQuery.parseJSON(raw) : raw;
                     if (res && res.Success) { applyLinePaging(res); mergeSavedLines(batch, res.Lines); showToast(lbl("VAS_074_LinesSaved", "Lines saved")); refreshSummary(); if (done) done(true); }
                     else { batch.forEach(function (l) { setRowBusy(l, false); }); showServerSaveErrors(batch, res); if (done) done(false); }
+                    flushPendingSave();   // save any line(s) queued while this was in flight
                 },
-                error: function (err) { console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); }
+                error: function (err) { saveInFlight = false; console.log(err); batch.forEach(function (l) { l._saving = false; setRowBusy(l, false); }); showServerSaveErrors(batch, null); if (done) done(false); flushPendingSave(); }
             });
+        }
+
+        /* Flush the rows the user Save-clicked while a prior save was in flight (snapshotted in
+           pendingSaveIds). Called from the in-flight save's success AND error handlers, so those
+           rows persist after the current save settles - restricted to the snapshotted rowIds so a
+           line added afterwards but never Save-clicked is NOT saved. */
+        function flushPendingSave() {
+            var ids = pendingSaveIds;
+            pendingSaveIds = {};
+            for (var k in ids) { if (ids.hasOwnProperty(k)) { saveRows(null, ids); return; } }
         }
 
         /* Paint server-side save failures on their record rows (line._error) instead of a
@@ -3468,7 +3953,8 @@
             // The Additional-Info modal closes ONLY via its Done button (Escape ignored).
         });
 
-        // Ctrl+Alt+ N/S/D/Z action shortcuts. Bound in the CAPTURE phase (3rd arg true) so they
+        // Ctrl+Alt+ N/S/D/Z/Q action shortcuts (N=add, S=save, D=delete, Z=undo, Q=refresh).
+        // Bound in the CAPTURE phase (3rd arg true) so they
         // fire BEFORE the grid cell editors' own keydown handlers, which stopPropagation() to
         // keep keys from the framework - otherwise the shortcut is swallowed while a product /
         // qty / price / UOM / tax control has focus (e.g. right after Add line focuses the
@@ -3490,6 +3976,7 @@
                 deleteSelected();
             };
             else if (k === "z" || code === "KeyZ") act = function () { undoActive(); };
+            else if (k === "q" || code === "KeyQ") act = function () { refreshPanel(); };
             else return;   // not one of ours - let it through
             e.preventDefault();
             e.stopPropagation();

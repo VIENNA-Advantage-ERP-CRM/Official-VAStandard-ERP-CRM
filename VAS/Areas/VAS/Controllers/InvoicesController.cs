@@ -78,6 +78,7 @@ namespace VIS.Controllers
                 INNER JOIN C_Invoice b ON (a.C_BPartner_ID=b.C_BPartner_ID
                 AND a.GrandTotal=b.GrandTotal
                 AND a.C_Currency_ID=b.C_Currency_ID
+                AND a.C_DocTypeTarget_ID=b.C_DocTypeTarget_ID
                 AND a.C_Invoice_ID < b.C_Invoice_ID
                 AND " + dayGap + @" <= 7)
                 INNER JOIN C_BPartner bp ON (a.C_BPartner_ID=bp.C_BPartner_ID)
@@ -286,11 +287,14 @@ namespace VIS.Controllers
                        cur.ISO_Code AS Currency_ISO,
                        CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Currency_Symbol,
                        cur.StdPrecision AS Currency_Precision,
+                       dt.Name AS Document_Type_Name,
+                       dt.DocBaseType AS Doc_Base_Type,
                        ROW_NUMBER() OVER (ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC) AS Newest_Rank,
                        ROW_NUMBER() OVER (ORDER BY i.DateInvoiced ASC, i.C_Invoice_ID ASC) AS Oldest_Rank
                 FROM C_Invoice i
                 INNER JOIN C_BPartner bp ON (i.C_BPartner_ID=bp.C_BPartner_ID)
                 INNER JOIN C_Currency cur ON (i.C_Currency_ID=cur.C_Currency_ID)
+                INNER JOIN C_DocType dt ON (dt.C_DocType_ID=i.C_DocTypeTarget_ID)
                 WHERE i.C_Invoice_ID IN (" + inList + @")
                   AND i.IsActive='Y'
                   AND i.AD_Client_ID=" + clientId;
@@ -330,6 +334,8 @@ namespace VIS.Controllers
                            si.DocStatus AS DocStatus,
                            si.Invoice_Date AS Invoice_Date,
                            org.Name AS Organization_Name,
+                           si.Document_Type_Name AS Document_Type_Name,
+                           si.Doc_Base_Type AS Doc_Base_Type,
                            si.Customer_Name AS Customer_Name,
                            so.DocumentNo AS Sales_Order_No,
                            dio.DocumentNo AS Delivery_Order_No,
@@ -380,6 +386,8 @@ namespace VIS.Controllers
                        ld.DocStatus,
                        ld.Invoice_Date,
                        ld.Organization_Name,
+                       ld.Document_Type_Name,
+                       ld.Doc_Base_Type,
                        ld.Customer_Name,
                        ld.Sales_Order_No,
                        ld.Delivery_Order_No,
@@ -441,6 +449,8 @@ namespace VIS.Controllers
                         docStatus = Util.GetValueOfString(dr["DocStatus"]),
                         invoiceDate = dr["Invoice_Date"] != DBNull.Value ? Convert.ToDateTime(dr["Invoice_Date"]).ToString("MMM dd, yyyy") : "",
                         organizationName = Util.GetValueOfString(dr["Organization_Name"]),
+                        documentTypeName = Util.GetValueOfString(dr["Document_Type_Name"]),
+                        docBaseType = Util.GetValueOfString(dr["Doc_Base_Type"]),
                         customerName = Util.GetValueOfString(dr["Customer_Name"]),
                         salesOrderNo = Util.GetValueOfString(dr["Sales_Order_No"]),
                         deliveryOrderNo = Util.GetValueOfString(dr["Delivery_Order_No"]),
@@ -580,6 +590,7 @@ namespace VIS.Controllers
                            WHEN " + dayDiff + @" BETWEEN 1 AND 3 THEN 2
                        END AS Sort_Priority,
                        " + dayDiff + @" AS Days_Delta,
+                       (CASE WHEN dt.DocBaseType='ARC' THEN -1 ELSE 1 END) *
                        CASE
                            WHEN i.C_Currency_ID=sc.Base_Currency_ID THEN ips.DueAmt
                            ELSE CurrencyConvert(ips.DueAmt, i.C_Currency_ID, sc.Base_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
@@ -589,6 +600,7 @@ namespace VIS.Controllers
                 INNER JOIN C_Invoice i ON (ips.C_Invoice_ID=i.C_Invoice_ID)
                 INNER JOIN C_BPartner bp ON (i.C_BPartner_ID=bp.C_BPartner_ID)
                 INNER JOIN Schema_Currency sc ON (sc.AD_Client_ID=i.AD_Client_ID)
+                INNER JOIN C_DocType dt ON (dt.C_DocType_ID=i.C_DocTypeTarget_ID)
                 WHERE i.IsSOTrx='Y'
                   AND i.IsActive='Y'
                   AND i.IsPaid='N'
@@ -624,6 +636,7 @@ namespace VIS.Controllers
                        'Sent' AS Attention_Status,
                        3 AS Sort_Priority,
                        " + nullDelta + @" AS Days_Delta,
+                       (CASE WHEN dt.DocBaseType='ARC' THEN -1 ELSE 1 END) *
                        CASE
                            WHEN i.C_Currency_ID=sc.Base_Currency_ID THEN i.GrandTotal
                            ELSE CurrencyConvert(i.GrandTotal, i.C_Currency_ID, sc.Base_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
@@ -632,6 +645,7 @@ namespace VIS.Controllers
                 FROM C_Invoice i
                 INNER JOIN C_BPartner bp ON (i.C_BPartner_ID=bp.C_BPartner_ID)
                 INNER JOIN Schema_Currency sc ON (sc.AD_Client_ID=i.AD_Client_ID)
+                INNER JOIN C_DocType dt ON (dt.C_DocType_ID=i.C_DocTypeTarget_ID)
                 WHERE i.IsSOTrx='Y'
                   AND i.IsActive='Y'
                   AND i.DocStatus IN ('CO', 'CL')
@@ -792,7 +806,7 @@ namespace VIS.Controllers
         /// docStatus, isPaid, dateInvoiced, curSymbol, currencyIso.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult SearchInvoices(string q, int max = 10)
+        public JsonResult SearchInvoices(string q, int max = 10, int page = 1)
         {
             if (Session["ctx"] == null)
             {
@@ -810,6 +824,11 @@ namespace VIS.Controllers
             if (max <= 0 || max > 25)
             {
                 max = 25;
+            }
+            /* 1-based page for scroll paging (25 rows per page). */
+            if (page < 1)
+            {
+                page = 1;
             }
 
             /* All user input is bound; only fixed, code-controlled literals (status codes) are inlined.
@@ -838,6 +857,7 @@ namespace VIS.Controllers
             if (ql.Contains("close")) { codes.Add("'CL'"); }
             if (ql.Contains("approv")) { codes.Add("'AP'"); }
             if (ql.Contains("complete")) { codes.Add("'CO'"); }
+            if (ql.Contains("reverse")) { codes.Add("'RE'"); codes.Add("'VO'"); }
             if (ql.Contains("invalid")) { codes.Add("'IN'"); }
             if (ql.Contains("waiting")) { codes.Add("'WP'"); codes.Add("'WC'"); }
             if (codes.Count > 0)
@@ -858,8 +878,8 @@ namespace VIS.Controllers
             decimal amt;
             if (decimal.TryParse(q.Replace(",", "").Replace("$", "").Trim(), out amt))
             {
-                parameters.Add(new SqlParameter("@Amt", amt));
-                ors.Add("i.GrandTotal = @Amt");
+                parameters.Add(new SqlParameter("@Amt", Math.Abs(amt)));
+                ors.Add("ABS(i.GrandTotal) = @Amt");
             }
 
             string selectSql = @"
@@ -877,7 +897,6 @@ namespace VIS.Controllers
                 INNER JOIN C_Currency cur ON (i.C_Currency_ID=cur.C_Currency_ID)
                 WHERE i.IsSOTrx='Y'
                   AND i.IsActive='Y'
-                  AND i.DocStatus NOT IN ('RE', 'VO')
                   AND i.AD_Client_ID=" + clientId + @"
                   AND (" + string.Join(" OR ", ors) + @")";
 
@@ -891,11 +910,15 @@ namespace VIS.Controllers
 
             string sql = selectSql + @"
                 ORDER BY i.DateInvoiced DESC, i.C_Invoice_ID DESC
-                OFFSET 0 ROWS FETCH NEXT @Max ROWS ONLY";
+                OFFSET @Offset ROWS FETCH NEXT @Max ROWS ONLY";
 
-            /* @Max is the FETCH bind — it appears last in the SQL, so for Oracle's positional binding
-               it must be the last parameter added (after @Like1, @Like2 and the optional @Amt). */
-            parameters.Add(new SqlParameter("@Max", max));
+            /* Scroll paging: skip the pages already loaded, then fetch ONE row more than the page
+               size so we can tell the client whether another page exists (hasMore) without a
+               separate COUNT query. @Offset then @Max appear last in the SQL — for Oracle's
+               positional binding they must be added last, in that order (after @Like1, @Like2 and
+               the optional @Amt). */
+            parameters.Add(new SqlParameter("@Offset", (page - 1) * max));
+            parameters.Add(new SqlParameter("@Max", max + 1));
 
             List<object> rows = new List<object>();
             IDataReader dr = null;
@@ -927,7 +950,15 @@ namespace VIS.Controllers
                 }
             }
 
-            return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            /* The extra (max+1)th row only signals another page exists; trim it so the client
+               always receives at most a full page of `max` rows. */
+            bool hasMore = rows.Count > max;
+            if (hasMore)
+            {
+                rows.RemoveAt(rows.Count - 1);
+            }
+
+            return Json(JsonConvert.SerializeObject(new { rows = rows, page = page, pageSize = max, hasMore = hasMore }), JsonRequestBehavior.AllowGet);
         }
 
         /// <summary>

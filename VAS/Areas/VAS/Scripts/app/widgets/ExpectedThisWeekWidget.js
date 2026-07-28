@@ -1,9 +1,11 @@
 /**
  * Expected This Week Widget
- * Purpose - KPI card showing AR invoice amount due in the next 7 days in
- *           base (accounting schema) currency. Clicking the card opens a
- *           modal dialog listing the invoices with Date, Invoice No., Customer,
- *           Invoice Currency, Amount (in invoice currency — no conversion).
+ * Purpose - KPI card showing the AR amount due in the next 7 days in base
+ *           (accounting schema) currency — from BOTH AR invoice pay schedules
+ *           and sales-order (VA009) pay schedules. Clicking the card opens a
+ *           modal listing each document with Document No., Document Type,
+ *           Document Date, Customer, Due Date, Currency, Due Amount, Due In
+ *           (amount in document currency — no conversion in the list).
  * Design   - Per design.md / dashboard-widgets.md: Onfinity Glass Widget with
  *            `tint-success` KPI shell — icon well, muted label, ↗ View hint,
  *            big bold success-green metric prefixed with the base currency
@@ -16,8 +18,9 @@
  *  2  | View                                  | VIS_View
  *  3  | Invoice due in 7 days                 | VIS_InvoiceDueIn7Days
  *  4  | Invoices due within the next 7 days   | VIS_InvoicesDueWithinNext7Days
- *  5  | Invoice No.                           | VIS_InvoiceNo
- *  6  | Invoice date                          | VIS_InvoiceDate
+ *  5  | Document No                           | VIS_DocumentNo
+ *  5a | Document Type                         | VIS_DocumentType
+ *  6  | Document Date                         | VIS_DocumentDate
  *  7  | Customer                              | VIS_Customer
  *  8  | Due date                              | VIS_DueDate
  *  9  | Invoice Currency                      | VIS_InvoiceCurrency
@@ -82,6 +85,8 @@
         /* Latest KPI snapshot (kept so the dialog header can re-use the base
            currency symbol and the period string without a refetch). */
         var lastSymbol = "";
+        var lastIso = "";
+        var lastPrecision;              /* undefined until the KPI response supplies stdPrecision */
         var lastTotal = 0;
         var rowsLoaded = false;
         var rowsLoading = false;
@@ -219,67 +224,35 @@
             lastTotal = 0;
 
             if ($metricEl) {
-                $metricEl.html(formatMetric(0, lastSymbol));
+                $metricEl.html(formatMetric(0, lastSymbol, lastIso, lastPrecision));
             }
         }
 
-        function formatCompactAmount(value) {
-            value = Number(value || 0);
-
-            if (value >= 10000000) {
-                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
-            }
-
-            if (value >= 100000) {
-                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
-
-            if (value >= 1000) {
-                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
-
-            var stdPrecision = 2;
-
+        /* Safe accounting-schema precision fallback used when the response does
+           not carry an explicit precision (e.g. the per-row invoice amounts). */
+        function safeStdPrecision() {
             try {
                 if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                    return VIS.Env.getCtx().getStdPrecision();
                 }
             }
-            catch (e) {
-                stdPrecision = 2;
-            }
+            catch (e) { /* fall through */ }
 
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-        }
-
-        function formatExactAmount(value) {
-            var num = Number(value || 0);
-            var stdPrecision = 2;
-
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                }
-            }
-            catch (e) {
-                stdPrecision = 2;
-            }
-
-            return num.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
+            return 2;
         }
 
         /* Currency symbol leads the amount (sign before symbol; nothing for zero
-           and positive, - for negative). */
-        function formatMetric(value, symbol) {
+           and positive, - for negative). Compact magnitude comes from the shared
+           VIS.Util.formatCompactAmount (Indian vs international numbering by
+           isoCode, kept to the base-currency precision). */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var compact = formatCompactAmount(Math.abs(value));
+            var compact = VIS.Util.formatCompactAmount(
+                value,
+                isoCode,
+                (precision == null ? safeStdPrecision() : precision)
+            );
             var sym = symbol ? '<span class="vas-etw-cur">' + escapeHtml(symbol) + '</span>' : '';
             return sign + sym + compact;
         }
@@ -290,9 +263,13 @@
 
             lastTotal = Number(total);
             lastSymbol = sym;
+            lastIso = (data && data.isoCode) || "";
+            lastPrecision = (data && data.stdPrecision != null)
+                ? Number(data.stdPrecision)
+                : undefined;
 
             if ($metricEl) {
-                $metricEl.html(formatMetric(lastTotal, lastSymbol));
+                $metricEl.html(formatMetric(lastTotal, lastSymbol, lastIso, lastPrecision));
             }
 
             if ($dialog && $dialog.is(':visible')) {
@@ -351,7 +328,7 @@
 
             if (!rows || rows.length === 0) {
                 $dialogTbody.html(
-                    '<tr><td class="vas-etw-dialog-empty" colspan="7">' +
+                    '<tr><td class="vas-etw-dialog-empty" colspan="8">' +
                     lbl("VIS_NoInvoicesDuePeriod", "No invoices due in this period") +
                     '</td></tr>'
                 );
@@ -361,14 +338,17 @@
             for (var i = 0; i < rows.length; i++) {
                 var row = rows[i];
                 var docNo = row.documentNo || "";
-                var invoiceDateText = formatDate(row.invoiceDate);
+                var docType = row.documentType || "";
+                var documentDateText = formatDate(row.documentDate);
                 var customer = row.customer || "";
                 var dueDateText = formatDate(row.dueDate);
                 var invoiceCurrency = row.invoiceCurrency || "";
                 var sym = row.invoiceCurrencySymbol || invoiceCurrency || "";
                 var rawAmount = Number(row.amount || 0);
                 var amountSign = rawAmount < 0 ? '-' : '';
-                var amountText = formatExactAmount(Math.abs(rawAmount));
+                /* Modal shows the full, exact per-row amount (no compact
+                   magnitude): locale-formatted number at the row's precision. */
+                var amountText = Math.abs(rawAmount).toLocaleString(window.navigator.language, { minimumFractionDigits: safeStdPrecision(), maximumFractionDigits: safeStdPrecision() });
                 /* Amount keeps its invoice-currency symbol inline — no
                    conversion to base currency, per spec.  Sign leads the
                    symbol: e.g. "$1,000.00" (positive) or "-$1,000.00" (negative). */
@@ -392,7 +372,10 @@
                     '<td class="vas-etw-td-doc" title="' + escapeHtml(docNo) + '">' +
                     '<span class="vas-etw-truncate">' + escapeHtml(docNo) + '</span>' +
                     '</td>' +
-                    '<td class="vas-etw-td-invdate" title="' + escapeHtml(invoiceDateText) + '">' + escapeHtml(invoiceDateText) + '</td>' +
+                    '<td class="vas-etw-td-doctype" title="' + escapeHtml(docType) + '">' +
+                    '<span class="vas-etw-truncate">' + escapeHtml(docType) + '</span>' +
+                    '</td>' +
+                    '<td class="vas-etw-td-invdate" title="' + escapeHtml(documentDateText) + '">' + escapeHtml(documentDateText) + '</td>' +
                     '<td class="vas-etw-td-customer" title="' + escapeHtml(customer) + '">' +
                     '<span class="vas-etw-truncate">' + escapeHtml(customer) + '</span>' +
                     '</td>' +
@@ -490,8 +473,9 @@
                 '<table class="vas-etw-dialog-table">' +
                 '<thead>' +
                 '<tr>' +
-                '<th class="vas-etw-th-doc" title="' + escapeHtml(lbl("VIS_InvoiceNo", "Invoice No.")) + '">' + lbl("VIS_InvoiceNo", "Invoice No.") + '</th>' +
-                '<th class="vas-etw-th-invdate" title="' + escapeHtml(lbl("VIS_InvoiceDate", "Invoice date")) + '">' + lbl("VIS_InvoiceDate", "Invoice date") + '</th>' +
+                '<th class="vas-etw-th-doc" title="' + escapeHtml(lbl("VIS_DocumentNo", "Document No")) + '">' + lbl("VIS_DocumentNo", "Document No") + '</th>' +
+                '<th class="vas-etw-th-doctype" title="' + escapeHtml(lbl("VIS_DocumentType", "Document Type")) + '">' + lbl("VIS_DocumentType", "Document Type") + '</th>' +
+                '<th class="vas-etw-th-invdate" title="' + escapeHtml(lbl("VIS_DocumentDate", "Document Date")) + '">' + lbl("VIS_DocumentDate", "Document Date") + '</th>' +
                 '<th class="vas-etw-th-customer" title="' + escapeHtml(lbl("VIS_Customer", "Customer")) + '">' + lbl("VIS_Customer", "Customer") + '</th>' +
                 '<th class="vas-etw-th-duedate" title="' + escapeHtml(lbl("VIS_DueDate", "Due date")) + '">' + lbl("VIS_DueDate", "Due date") + '</th>' +
                 '<th class="vas-etw-th-currency" title="' + escapeHtml(lbl("VIS_InvoiceCurrency", "Invoice Currency")) + '">' + lbl("VIS_InvoiceCurrency", "Invoice Currency") + '</th>' +
@@ -573,7 +557,10 @@
                 '<line x1="3" y1="10" x2="21" y2="10"/>' +
                 '</svg>' +
                 '</div>' +
+                '<div class="vas-etw-label-group">' +
                 '<span class="vas-etw-label">' + lbl("VIS_ExpectedThisWeek", "Expected this week") + '</span>' +
+                '<span class="vas-etw-subtitle">' + lbl("VAS_006_ReceivablesDueThisWeek", "Receivables due this week") + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

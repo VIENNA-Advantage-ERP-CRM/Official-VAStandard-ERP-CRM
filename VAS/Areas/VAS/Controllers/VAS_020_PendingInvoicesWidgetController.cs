@@ -428,7 +428,7 @@ namespace VAS.Areas.VAS.Controllers
             SqlParameter[] dataParams = { new SqlParameter("@ClientID", clientId) };
 
             string baseSql = @"SELECT i.C_Invoice_ID, i.DocumentNo, i.DateInvoiced, i.DocStatus,
-                       i.GrandTotal, i.C_BPartner_ID, i.C_Currency_ID
+                       i.GrandTotal, i.C_BPartner_ID, i.C_Currency_ID, i.IsReturnTrx, i.IsSOTrx
                   FROM C_Invoice i
                  WHERE i.IsSOTrx = 'N'
                    AND i.IsExpenseInvoice = 'N'
@@ -436,8 +436,12 @@ namespace VAS.Areas.VAS.Controllers
                    AND i.AD_Client_ID = @ClientID" + baseWhere;
             baseSql = MRole.GetDefault(ctx).AddAccessSQL(baseSql, "i", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
+            // A credit note (return transaction) shows its amount as NEGATIVE - same sign
+            // convention the KPI queries above use (IsReturnTrx = 'Y' -> negate GrandTotal).
             string core = @"SELECT b.C_Invoice_ID AS InvID, b.DocumentNo AS DocumentNo, b.DateInvoiced AS DocDate,
-                       bp.Name AS VendorName, b.DocStatus AS DocStatus, b.GrandTotal AS Amount,
+                       bp.Name AS VendorName, b.DocStatus AS DocStatus,
+                       CASE WHEN b.IsReturnTrx = 'N' THEN b.GrandTotal ELSE -b.GrandTotal END AS Amount,
+                       b.IsSOTrx AS IsSOTrx,
                        cur.ISO_Code AS CurCode, cur.CurSymbol AS CurSym
                   FROM (" + baseSql + @") b
                  INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID = b.C_BPartner_ID)
@@ -474,11 +478,13 @@ namespace VAS.Areas.VAS.Controllers
                     string curSymbol = Util.GetValueOfString(row["CurSym"]);
                     result.Items.Add(new CategoryInvoiceRow
                     {
+                        C_Invoice_ID = Util.GetValueOfInt(row["InvID"]),
                         DocumentNo = Util.GetValueOfString(row["DocumentNo"]),
                         DocDate    = docDate.HasValue ? docDate.Value.ToString("yyyy-MM-dd") : "",
                         VendorName = Util.GetValueOfString(row["VendorName"]),
                         DocStatus  = Util.GetValueOfString(row["DocStatus"]),
                         Amount     = Util.GetValueOfDecimal(row["Amount"]),
+                        IsSOTrx    = Util.GetValueOfString(row["IsSOTrx"]) == "Y",
                         CurCode    = !string.IsNullOrEmpty(curCode) ? curCode : curSymbol
                     });
                 }
@@ -537,11 +543,13 @@ namespace VAS.Areas.VAS.Controllers
 
         public class CategoryInvoiceRow
         {
+            public int     C_Invoice_ID { get; set; }   // for the DocumentNo zoom link
             public string  DocumentNo { get; set; }
             public string  DocDate    { get; set; }
             public string  VendorName { get; set; }
             public string  DocStatus  { get; set; }
-            public decimal Amount     { get; set; }
+            public decimal Amount     { get; set; }     // signed: negative for a credit note
+            public bool    IsSOTrx    { get; set; }      // AP vs AR window resolution on zoom
             public string  CurCode    { get; set; }
         }
     }

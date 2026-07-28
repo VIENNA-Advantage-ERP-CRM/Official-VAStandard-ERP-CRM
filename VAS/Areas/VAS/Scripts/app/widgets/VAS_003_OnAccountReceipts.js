@@ -81,8 +81,10 @@
         var $pagerNext;
         var $pagerText;
 
-        /* Latest KPI snapshot (base-currency symbol re-used by the metric). */
+        /* Latest KPI snapshot (base-currency symbol/iso/precision re-used by the metric). */
         var lastSymbol = "";
+        var lastIso = "";
+        var lastPrecision;               /* undefined → formatCompactAmount falls back to std precision */
         var lastTotal = 0;
         var lastCount = 0;
         var rowsLoaded = false;
@@ -199,21 +201,8 @@
         function setNoData() {
             lastTotal = 0;
             lastCount = 0;
-            if ($metricEl) { $metricEl.html(formatMetric(0, lastSymbol)); }
+            if ($metricEl) { $metricEl.html(formatMetric(0, lastSymbol, lastIso, lastPrecision)); }
             if ($detailEl) { $detailEl.text(detailText(0)); }
-        }
-
-        /* Compact INR-style formatter: 10M→Cr, 100K→L, 1K→K; locale full
-           number under 1000. */
-        function formatCompactAmount(value) {
-            value = Number(value || 0);
-            if (value >= 10000000) { return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr"; }
-            if (value >= 100000) { return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L"; }
-            if (value >= 1000) { return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K"; }
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: getStdPrecision(),
-                maximumFractionDigits: getStdPrecision()
-            });
         }
 
         function getStdPrecision() {
@@ -225,20 +214,15 @@
             return 2;
         }
 
-        function formatExactAmount(value, stdPrecision) {
-            var num = Number(value || 0);
-            var prec = (typeof stdPrecision === "number") ? stdPrecision : getStdPrecision();
-            return num.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: prec,
-                maximumFractionDigits: prec
-            });
-        }
-
-        /* Symbol before the amount; '-' for negative, no sign for positive/zero. */
-        function formatMetric(value, symbol) {
+        /* Compose the metric exactly like OverdueWidget: sign FIRST, then the
+           base-currency symbol, then the compact magnitude from the shared
+           VIS.Util.formatCompactAmount (Indian vs international numbering by iso,
+           kept to the currency precision). The symbol renders whenever it is
+           present — never gated behind a non-zero value, so 0 still shows it. */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var compact = formatCompactAmount(Math.abs(value));
+            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
             var sym = symbol ? '<span class="vas-oar-cur">' + escapeHtml(symbol) + '</span>' : '';
             return sign + sym + compact;
         }
@@ -255,8 +239,13 @@
             lastTotal = Number(data.onAccountAmount || 0);
             lastSymbol = data.symbol || "";
             lastCount = Number(data.advanceCount || 0);
+            /* Use iso + precision from the backend when present; otherwise fall
+               back to the client's standard precision (iso stays "" → intl scale). */
+            lastIso = data.isoCode || "";
+            lastPrecision = (data.stdPrecision === undefined || data.stdPrecision === null)
+                ? getStdPrecision() : Number(data.stdPrecision);
 
-            if ($metricEl) { $metricEl.html(formatMetric(lastTotal, lastSymbol)); }
+            if ($metricEl) { $metricEl.html(formatMetric(lastTotal, lastSymbol, lastIso, lastPrecision)); }
             if ($detailEl) { $detailEl.text(detailText(lastCount)); }
 
             if ($dialog && $dialog.is(':visible')) { loadRows(); }
@@ -303,12 +292,15 @@
                 var docNo = row.documentNo || "";
                 var customer = row.customer || "";
                 var bankText = formatBankAccount(row);
-                var stdPrecision = Number(row.stdPrecision || getStdPrecision());
-                var rawAmt = Number(row.amount || 0);
-                var amtSign = rawAmt < 0 ? '-' : '';
-                var amtText = formatExactAmount(Math.abs(rawAmt), stdPrecision);
                 var iso = row.currencyIso || "";
                 var sym = row.curSymbol || iso || "";
+                var stdPrecision = (row.stdPrecision === undefined || row.stdPrecision === null)
+                    ? getStdPrecision() : Number(row.stdPrecision);
+                var rawAmt = Number(row.amount || 0);
+                var amtSign = rawAmt < 0 ? '-' : '';
+                /* Modal shows the full, exact per-row amount (no compact magnitude):
+                   sign + symbol + locale-formatted number at the row's precision. */
+                var amtText = Math.abs(rawAmt).toLocaleString(window.navigator.language, { minimumFractionDigits: stdPrecision, maximumFractionDigits: stdPrecision });
                 var amtHtml = escapeHtml(amtSign) + (sym ? '<span class="vas-oar-cur-inline">' + escapeHtml(sym) + '</span>' : '') + escapeHtml(amtText);
 
                 var $tr = $(
@@ -467,7 +459,10 @@
                 '<div class="vas-oar-head">' +
                 '<div class="vas-oar-head-left">' +
                 '<div class="vas-oar-icon">' + cardIconSvg() + '</div>' +
+                '<div class="vas-oar-label-group">' +
                 '<span class="vas-oar-label">' + escapeHtml(lbl("VAS_003_OnAccount", "On-account")) + '</span>' +
+                '<span class="vas-oar-subtitle">' + escapeHtml(lbl("VAS_003_TotalUnallocatedReceipts", "Total Unallocated Receipts")) + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

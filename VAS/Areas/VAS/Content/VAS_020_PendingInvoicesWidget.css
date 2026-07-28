@@ -6,6 +6,11 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Named query container so the card can step its base font down on narrow / zoomed
+       cells (see the @container rules at the bottom). Without this the card only had the
+       --dash-inline-size clamp, which floors at 16px and overflows a narrow cell —
+       mirrors VIS.OutstandingSalesOrderWidget. */
+    container: vas-piawdg / inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
@@ -111,7 +116,7 @@
     /* Multi-stat tile grid (2x2), not a single hero KPI: use the xl token so
        four values fit the stat-card budget (cap ~24px) instead of 1.75em/35px. */
     font-size: 1.375em;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.05;
 }
 
@@ -223,6 +228,10 @@
 }
 
 .vas-piawdg-due-empty {
+    /* Centered in the middle of the due-list body (flex column) per the no-data
+       reference; margin:auto absorbs the free space on both axes. */
+    margin: auto;
+    text-align: center;
     font-size: 0.75em;
     color: #5F7283;
     padding: 0.5em 0;
@@ -410,11 +419,17 @@
     }
 
 .vas-piawdg-pop-state {
-    padding: 28px 8px;
+    /* No-data / error message centered in the middle of the modal body (fills the
+       fixed-height dialog body like the .vas-piawdg-pop data state does). */
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
+    padding: 1.75em 0.5em;
     color: #41576A;
     font-family: Roboto, sans-serif;
-    font-size: 14px;
+    font-size: 0.75em;
 }
 
 .vas-piawdg-pop-error {
@@ -506,6 +521,18 @@
     line-height: 1.25;
 }
 
+/* DocumentNo rendered as a zoom hyperlink (opens the invoice record). */
+a.vas-piawdg-pop-docno-link {
+    color: #2563EB;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+a.vas-piawdg-pop-docno-link:hover,
+a.vas-piawdg-pop-docno-link:focus {
+    text-decoration: underline;
+}
+
 .vas-piawdg-pop-status {
     font-size: 0.62rem;
     font-weight: 700;
@@ -559,7 +586,7 @@
 
 .vas-piawdg-pop-amount {
     font-size: 0.82rem;
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.25;
     font-variant-numeric: tabular-nums;
@@ -575,6 +602,19 @@
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-piawdg-container, so no
-   per-breakpoint font-size stepping is needed. The drill-down dialog is a
-   document-baseline (px) surface and needs no reflow rules here. */
+   The card base size follows the --dash-inline-size clamp, but that clamp floors at
+   16px; on a narrow / zoomed-in cell the content overflows at 16px. Step the base font
+   down on narrow cells (query the .vas-piawdg-root container), mirroring
+   VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. The drill-down dialog is a
+   document-baseline (px) surface appended to <body>, so this containment never clips it. */
+@container vas-piawdg (max-width: 300px) {
+    .vas-piawdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-piawdg (max-width: 220px) {
+    .vas-piawdg-container {
+        font-size: 11px;
+    }
+}

@@ -19,17 +19,24 @@ namespace VASLogic.Models
     /// <summary>
     /// Module Name : VAS_014_DailyCollectionTrend
     /// Purpose     : Backs the VAS_014_DailyCollectionTrend dashboard widget.
-    ///               Returns daily AR receipt cash-inflow (C_Payment.PaymentAmount)
-    ///               for the last N days (default 14), converted to the
-    ///               accounting-schema (base) currency, plus the N-day average and
-    ///               the peak day. The base-currency lookup is scoped to the
-    ///               session client; MRole row-level security is applied only on
-    ///               the main physical table (C_Payment, alias Payment). The
-    ///               calendar fill, average and peak are computed in C# so the SQL
-    ///               stays a simple portable GROUP BY (no UNION calendar / window
-    ///               functions). Compatible with PostgreSQL and Oracle.
+    ///               Returns the daily collection cash-inflow for the last N days
+    ///               (default 14) from BOTH sources — AR receipts
+    ///               (C_Payment.PaymentAmount) and cash-journal collections
+    ///               (positive C_CashLine.Amount on completed C_Cash journals) —
+    ///               converted to the accounting-schema (base) currency and summed
+    ///               per day, plus the N-day average and the peak day. The
+    ///               base-currency lookup is scoped to the session client; MRole
+    ///               row-level security is applied to each main physical table
+    ///               independently (C_Payment alias Payment; C_Cash alias Cash).
+    ///               The two sources are read as two simple portable GROUP BY
+    ///               queries and merged into one per-day map in C#, where the
+    ///               calendar fill, average and peak are also computed (no UNION
+    ///               calendar / window functions). Compatible with PostgreSQL and
+    ///               Oracle.
     /// Chronological development:
     ///   VAI154      2026-06-02 Created
+    ///   VAI154      2026-07-14 Include cash-journal collections (C_Cash /
+    ///                          C_CashLine) alongside AR receipts in the daily total.
     /// </summary>
     public class VAS_014_DailyCollectionTrendModel
     {
@@ -99,13 +106,13 @@ namespace VASLogic.Models
             string dateCondition;
             if (DB.IsPostgreSQL())
             {
-                dayExpr = "CAST(Payment.DateTrx AS DATE)";
-                dateCondition = "Payment.DateTrx >= CURRENT_DATE - " + (days - 1) + " AND Payment.DateTrx < CURRENT_DATE + 1";
+                dayExpr = "CAST(Payment.DateAcct AS DATE)";
+                dateCondition = "Payment.DateAcct >= CURRENT_DATE - " + (days - 1) + " AND Payment.DateAcct < CURRENT_DATE + 1";
             }
             else
             {
-                dayExpr = "TRUNC(Payment.DateTrx)";
-                dateCondition = "TRUNC(Payment.DateTrx) >= TRUNC(SYSDATE) - " + (days - 1) + " AND TRUNC(Payment.DateTrx) <= TRUNC(SYSDATE)";
+                dayExpr = "TRUNC(Payment.DateAcct)";
+                dateCondition = "TRUNC(Payment.DateAcct) >= TRUNC(SYSDATE) - " + (days - 1) + " AND TRUNC(Payment.DateAcct) <= TRUNC(SYSDATE)";
             }
 
             /* acctCurrencyId is a trusted int from the schema lookup above, so it
@@ -164,7 +171,7 @@ namespace VASLogic.Models
                         MidpointRounding.AwayFromZero
                     );
 
-                    dailyByDate[day.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)] = amount;
+                    AddDaily(dailyByDate, day.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), amount);
                 }
             }
             finally
@@ -172,8 +179,106 @@ namespace VASLogic.Models
                 if (dr != null) { dr.Close(); dr.Dispose(); }
             }
 
+            /* 3) Daily cash-journal collections (C_Cash header + C_CashLine
+               lines), converted to the base currency and ADDED into the same
+               per-day map so the trend reflects both AR receipts and cash-book
+               collections. A cash line is a collection when its Amount is
+               positive on a completed/closed journal (same rule as the Cash-in
+               widget, VAS_047). The cash-book currency lives on the C_Cash
+               header and the conversion uses the default conversion type (0) at
+               the statement date. Day grouping + window are dialect-aware and
+               mirror the receipt query (StatementDate is the cash journal date). */
+            string cashDayExpr;
+            string cashDateCondition;
+            if (DB.IsPostgreSQL())
+            {
+                cashDayExpr = "CAST(Cash.StatementDate AS DATE)";
+                cashDateCondition = "Cash.StatementDate >= CURRENT_DATE - " + (days - 1) + " AND Cash.StatementDate < CURRENT_DATE + 1";
+            }
+            else
+            {
+                cashDayExpr = "TRUNC(Cash.StatementDate)";
+                cashDateCondition = "TRUNC(Cash.StatementDate) >= TRUNC(SYSDATE) - " + (days - 1) + " AND TRUNC(Cash.StatementDate) <= TRUNC(SYSDATE)";
+            }
+
+            string cashSql = @"
+                SELECT " + cashDayExpr + @" AS Collection_Date,
+                       SUM(
+                           CASE
+                               WHEN Cash.C_Currency_ID = " + acctCurrencyId + @"
+                               THEN COALESCE(CashLine.Amount, 0)
+                               ELSE CurrencyConvert(
+                                   COALESCE(CashLine.Amount, 0),
+                                   CashLine.C_Currency_ID,
+                                   " + acctCurrencyId + $@",
+                                   COALESCE(Cash.DateAcct, Cash.StatementDate),
+                                   COALESCE(CashLine.C_ConversionType_ID, 0),
+                                   CashLine.AD_Client_ID,
+                                   CashLine.AD_Org_ID
+                               )
+                           END
+                       ) AS Daily_Amount
+                FROM C_Cash Cash
+                INNER JOIN C_CashLine CashLine ON (CashLine.C_Cash_ID = Cash.C_Cash_ID)
+                WHERE Cash.IsActive = 'Y'
+                  AND CashLine.IsActive = 'Y'
+                  AND CashLine.VSS_PAYMENTTYPE IN ({GlobalVariable.TO_STRING(MCashLine.VSS_PAYMENTTYPE_Receipt)} , {GlobalVariable.TO_STRING(MCashLine.VSS_PAYMENTTYPE_ReceiptReturn)})
+                  AND Cash.DocStatus IN ('CO', 'CL')
+                  /*AND CashLine.Amount > 0*/
+                  AND Cash.AD_Client_ID = " + clientId + @"
+                  AND " + cashDateCondition;
+
+            /* MRole only on the main physical table (C_Cash / alias Cash); the
+               C_CashLine join is a child of the access-controlled header. GROUP
+               BY / ORDER BY are appended AFTER MRole so the FROM-clause parser is
+               not confused by a trailing clause. */
+            cashSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashSql,
+                "Cash",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+
+            cashSql += @"
+                GROUP BY " + cashDayExpr + @"
+                ORDER BY " + cashDayExpr;
+
+            IDataReader cashDr = null;
+            try
+            {
+                cashDr = DB.ExecuteReader(cashSql);
+                while (cashDr != null && cashDr.Read())
+                {
+                    DateTime? day = Util.GetValueOfDateTime(cashDr["Collection_Date"]);
+                    if (!day.HasValue) { continue; }
+
+                    decimal amount = Math.Round(
+                        Util.GetValueOfDecimal(cashDr["Daily_Amount"]),
+                        result.StdPrecision,
+                        MidpointRounding.AwayFromZero
+                    );
+
+                    AddDaily(dailyByDate, day.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), amount);
+                }
+            }
+            finally
+            {
+                if (cashDr != null) { cashDr.Close(); cashDr.Dispose(); }
+            }
+
             BuildCalendar(result, days, dailyByDate);
             return result;
+        }
+
+        /// <summary>
+        /// Adds <paramref name="amount"/> to the running per-day total for
+        /// <paramref name="key"/> (yyyy-MM-dd), so multiple sources (AR receipts
+        /// and cash-journal collections) accumulate on the same calendar day.
+        /// </summary>
+        private static void AddDaily(Dictionary<string, decimal> map, string key, decimal amount)
+        {
+            if (map.ContainsKey(key)) { map[key] = map[key] + amount; }
+            else { map[key] = amount; }
         }
 
         /// <summary>

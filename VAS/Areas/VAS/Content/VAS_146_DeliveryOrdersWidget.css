@@ -1,0 +1,568 @@
+/* Delivery Orders Widget (VAS_118) - 6x3 glass list of customer delivery
+   orders with Month/Year filters, 6-row paging and a line-item modal.
+   Hybrid units per the design: widget internals in em anchored to the
+   dashboard-width lever, modal chrome in em anchored to its own font-size
+   clamp (like the Pending/Expected GRN modal), borders/radii/shadows px. */
+
+.MPC-dow-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+.MPC-dow-root,
+.MPC-dow-root * {
+    box-sizing: border-box;
+}
+
+/* ---- Widget surface (glass) ---- */
+.MPC-dow-card {
+    position: relative;
+    font-family: Roboto, sans-serif;
+    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
+       not a JS-measured container width. The dashboard host here does not update
+       --dash-inline-size in a way that tracks the screen, and its old clamp had a
+       fixed 24px ceiling - together that froze all text (title/sub/rows) from
+       ever growing past a point. max()+rem floor guards very narrow windows;
+       there is no ceiling, so text keeps scaling at any resolution. Every size
+       below is em, derived from this one anchor. */
+    font-size: max(0.9rem, 1.3vw);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.875em;
+}
+
+/* ---- Header ---- */
+.MPC-dow-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    flex-shrink: 0;
+}
+
+.MPC-dow-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.MPC-dow-ico {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
+    background: #EAF8FF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.MPC-dow-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-dow-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.MPC-dow-title {
+    font-size: .8125em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dow-sub {
+    margin-top: .125em;
+    font-size: .6875em;
+    font-weight: 400;
+    color: #717182;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* ---- Month / Year filters ---- */
+.MPC-dow-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.MPC-dow-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    font-family: inherit;
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    background: #FFFFFF url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230083DA' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.6em center;
+    background-size: 1em 1em;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.45em 2em 0.45em 0.75em;
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+}
+
+.MPC-dow-select:hover {
+    border-color: #BFE4FF;
+    background-color: #FBFDFF;
+}
+
+.MPC-dow-select:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: 1px;
+}
+
+.MPC-dow-select:disabled {
+    color: #B8C6D2;
+    cursor: default;
+}
+
+/* ---- Table: shared column template for header + body rows ---- */
+.MPC-dow-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1.3fr 0.7fr 0.9fr 0.9fr 0.85fr;
+    column-gap: 0.75em;
+    align-items: center;
+}
+
+.MPC-dow-thead {
+    padding: 0.5em 0.5em 0.4em;
+    margin-top: 0.5em;
+    border-bottom: 1px solid #EDF2F6;
+    flex-shrink: 0;
+}
+
+.MPC-dow-thead span {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Body is a grid of equal dynamic tracks (like Due Fulfilments): the page of
+   rows splits the body evenly, so every row height = body / page-size and scales
+   with the widget's own size. Content is centred in each track and the compact
+   2-line DO cell (.8em + .68em ~= 1.6em) fits comfortably. */
+.MPC-dow-tbody {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: repeat(5, minmax(0, 1fr));
+    overflow: hidden;
+}
+
+.MPC-dow-tbody .MPC-dow-state,
+.MPC-dow-tbody .MPC-dow-empty { grid-row: 1 / -1; }
+
+.MPC-dow-trow {
+    /* Uniform, natural-height rows. `flex:0 0 auto` means a row is never
+       compressed below its content (the old `flex:1` squeezed every row to an
+       equal slice of the body, so the 2-line DO cell overflowed and overlapped
+       its neighbours). `min-height` guarantees a comfortable, uniform row and a
+       full-height hover/click target that always covers the status pill. All
+       sizing in em, so the whole row scales with the widget. */
+    text-align: left;
+    padding: 0.15em 0.5em;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #EDF2F6;
+    cursor: pointer;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    transition: background 0.12s ease;
+}
+
+.MPC-dow-trow:last-child {
+    border-bottom: none;
+}
+
+.MPC-dow-trow:hover {
+    background: rgba(234, 248, 255, 0.55);
+}
+
+.MPC-dow-trow:focus-visible {
+    outline: 2px solid #0083DA;
+    outline-offset: -2px;
+    border-radius: 8px;
+}
+
+.MPC-dow-do-cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.MPC-dow-do-no {
+    font-size: 0.8em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dow-do-date {
+    font-size: 0.68em;
+    font-weight: 400;
+    color: #748494;
+    line-height: 1.05;
+    white-space: nowrap;
+}
+
+.MPC-dow-cust {
+    font-size: 0.72em;
+    font-weight: 400;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dow-num {
+    font-size: 0.72em;
+    color: #5F7283;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ---- Status chip ---- */
+.MPC-dow-chip {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+    font-size: 0.68em;
+    font-weight: 500;
+    padding: 0.3em 0.6em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.MPC-dow-chip-drafted {
+    background: #F0F1F3;
+    color: #748494;
+}
+
+.MPC-dow-chip-completed {
+    background: #E5F6F0;
+    color: #0B6B45;
+}
+
+.MPC-dow-chip-invoiced {
+    background: #DFF1FF;
+    color: #106AB0;
+}
+
+.MPC-dow-chip-cell {
+    display: flex;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+/* ---- Loading / empty / error state inside the body ---- */
+.MPC-dow-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #748494;
+    text-align: center;
+}
+
+.MPC-dow-retry {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.35em 0.9em;
+    cursor: pointer;
+}
+
+.MPC-dow-retry:hover {
+    background: #EAF8FF;
+    border-color: #BFE4FF;
+}
+
+/* ---- Footer pager ---- */
+.MPC-dow-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.5em;
+    margin-top: 0.25em;
+    flex-shrink: 0;
+}
+
+.MPC-dow-helper {
+    font-size: 0.8125em;
+    color: #748494;
+    font-weight: 400;
+}
+
+.MPC-dow-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.MPC-dow-pgbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.MPC-dow-pgbtn:hover:not(:disabled) {
+    background: #EAF4FD;
+}
+
+.MPC-dow-pgbtn:disabled {
+    background: rgba(255, 255, 255, 0.6);
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.MPC-dow-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.MPC-dow-pgtext {
+    font-size: 0.875em;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+/* ---- Busy overlay ---- */
+.MPC-dow-busy {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.55);
+    z-index: 5;
+}
+
+.MPC-dow-busy-hidden {
+    display: none;
+}
+
+/* ---- Modal (chrome -> em, anchored like the Pending/Expected GRN modal) ---- */
+.MPC-dow-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-dow-overlay {
+    /* Viewport-anchored (the overlay lives on <body>, outside the widget), same
+       basis as the widget card so it scales at any resolution; every size below
+       is in em off this anchor. */
+    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.32);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+    z-index: 10050;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-dow-overlay.MPC-dow-open {
+    display: flex;
+}
+
+.MPC-dow-modal {
+    width: min(51.25em, calc(100vw - 2em));
+    max-height: 88vh;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-dow-m-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 1.125em 1.25em;
+    border-bottom: 1px solid #E4EDF4;
+}
+
+.MPC-dow-m-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+}
+
+.MPC-dow-m-no {
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+/* The modal's status chip re-uses the row chip classes at modal (em) scale. */
+.MPC-dow-m-chip {
+    font-size: 0.72em;
+}
+
+.MPC-dow-m-sub {
+    font-size: 0.8em;
+    color: #5F7283;
+    margin-top: 0.25em;
+}
+
+.MPC-dow-m-close {
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #141414;
+    cursor: pointer;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.MPC-dow-m-close:hover {
+    background: #EEF6FF;
+    color: #0083DA;
+}
+
+.MPC-dow-m-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.MPC-dow-m-summary {
+    display: flex;
+    gap: 1.75em;
+    padding: 0.875em 1.25em;
+    background: #FBFDFF;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-dow-m-k {
+    font-size: 0.72em;
+    color: #748494;
+    display: block;
+}
+
+.MPC-dow-m-v {
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+    display: block;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-dow-m-lines {
+    padding: 0.5em 1.25em 1em;
+    overflow-y: auto;
+}
+
+.MPC-dow-lrow {
+    display: grid;
+    grid-template-columns: 1fr 0.45fr 0.6fr;
+    column-gap: 1em;
+    align-items: center;
+}
+
+.MPC-dow-lhead {
+    padding: 0.625em 0.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-dow-lhead span {
+    font-size: 0.72em;
+    color: #748494;
+}
+
+.MPC-dow-lbody {
+    padding: 0.7em 0.25em;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-dow-lbody:last-child {
+    border-bottom: none;
+}
+
+.MPC-dow-l-item {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dow-l-qty {
+    font-size: 0.9em;
+    color: #102C3F;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-dow-l-loc {
+    font-size: 0.8em;
+    color: #106AB0;
+    background: #EEF6FF;
+    padding: 0.2em 0.5em;
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-dow-m-state {
+    padding: 1.25em 0.25em;
+    font-size: 0.85em;
+    color: #748494;
+    text-align: center;
+}
+
+.MPC-dow-ta-r {
+    text-align: right;
+}

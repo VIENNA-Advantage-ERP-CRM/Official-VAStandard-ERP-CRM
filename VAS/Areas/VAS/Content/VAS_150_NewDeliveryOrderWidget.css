@@ -1,0 +1,85 @@
+/* New Delivery Order Widget (VAS_150) - 1x1 quick-action launcher tile.
+   Glass tile (uses the shared .vas-widget-bg glass surface). Flex column,
+   space-between: blue action icon well pinned top-right, title + subtitle at
+   the bottom. Internals in em on the dashboard-width lever; borders/radii/
+   shadows in px. Hover = subtle shadow lift only. The grid owns the outer
+   1x1 size - no fixed height here. */
+
+.vas-ndo-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+.vas-ndo-root,
+.vas-ndo-root * {
+    box-sizing: border-box;
+}
+
+.vas-ndo-card {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: left;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    padding: .875em;
+    cursor: pointer;
+    transition: box-shadow 180ms ease;
+}
+
+.vas-ndo-card:hover {
+    box-shadow: 0 14px 30px rgba(15, 61, 97, .13);
+}
+
+.vas-ndo-card:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.vas-ndo-iconrow {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.vas-ndo-ico {
+    width: 1.75em;
+    height: 1.75em;
+    border-radius: 10px;
+    background: #1F83FF;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-ndo-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.vas-ndo-title {
+    font-size: .75em;
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.vas-ndo-sub {
+    font-size: .625em;
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.25;
+    margin-top: .25em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

@@ -1,0 +1,42 @@
+/* Pending GRN (VAS_093) - review #25: the widget reuses the Expected GRN
+   (vas-egrn-*) design for both the card and the drill-down modal; this file
+   only adds the Pending-GRN-specific line variant, where lines are selected
+   with a checkbox instead of a received-quantity entry.
+   Correction 2026-07-18: the attribute column is flexible so it sits right
+   next to the item name (reference design), matching the tightened flat rows
+   in the shared modal styles. */
+
+/* Item | Attribute | Remaining Qty | UOM */
+.vas-egrn-rcv-line.vas-pgrn-line {
+    grid-template-columns: minmax(0, 1.1fr) minmax(7.5em, 1.3fr) 5.5em 3.25em;
+}
+
+.vas-pgrn-name {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin: 0;
+    cursor: pointer;
+}
+
+    .vas-pgrn-name span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+.vas-pgrn-check {
+    width: 1em;
+    height: 1em;
+    flex: 0 0 auto;
+    margin: 0;
+    accent-color: #1F83FF;
+    cursor: pointer;
+}
+
+@media (max-width: 720px) {
+    .vas-egrn-rcv-line.vas-pgrn-line {
+        grid-template-columns: minmax(0, 1.1fr) minmax(5.5em, 1.2fr) 4.5em 2.75em;
+    }
+}

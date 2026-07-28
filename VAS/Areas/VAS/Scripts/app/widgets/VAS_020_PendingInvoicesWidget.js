@@ -402,7 +402,7 @@
             _catTotalPgs = data.TotalPages || (_catPageSize > 0 ? Math.ceil(_catTotal / _catPageSize) : 0);
 
             if (_catTotal === 0) {
-                $catDialog.html('<div class="vas-piawdg-pop-state">' + piEsc(msg('VAS_020_NoInvoices', 'No invoices found.')) + '</div>');
+                $catDialog.html('<div class="vas-piawdg-pop-state">' + piEsc(msg('VAS_020_NoInvoices', 'No data found.')) + '</div>');
                 return;
             }
 
@@ -425,6 +425,12 @@
             });
             $catDialog.find('.vas-piawdg-pop-pager .vas-piawdg-pg-next').on('click', function () {
                 if (!_catLoading && _catPage < _catTotalPgs) { loadCatPage(_catPage + 1); }
+            });
+
+            // DocumentNo hyperlink -> zoom to the invoice record in its window.
+            $catDialog.find('.vas-piawdg-pop-docno-link').on('click', function (e) {
+                e.preventDefault();
+                piZoomInvoice(parseInt($(this).attr('data-invid'), 10) || 0, $(this).attr('data-sotrx') === '1');
             });
 
             // Adapt the page size to the popup list height on first render (and on resize) —
@@ -484,7 +490,9 @@
                 '<span class="vas-piawdg-pop-chip">' + piEsc(msg('VAS_020_Kind', 'Invoice')) + '</span>' +
                 '<div class="vas-piawdg-pop-main">' +
                     '<div class="vas-piawdg-pop-docline">' +
-                        '<span class="vas-piawdg-pop-docno">' + piEsc(it.DocumentNo || '') + '</span>' +
+                        '<a href="#" class="vas-piawdg-pop-docno vas-piawdg-pop-docno-link" role="link"' +
+                            ' data-invid="' + (Number(it.C_Invoice_ID) || 0) + '" data-sotrx="' + (it.IsSOTrx ? '1' : '0') + '"' +
+                            ' title="' + piEsc(msg('VAS_020_OpenRecord', 'Open record')) + '">' + piEsc(it.DocumentNo || '') + '</a>' +
                         '<span class="vas-piawdg-pop-status vas-piawdg-pop-status-' + st.tone + '">' + piEsc(st.label) + '</span>' +
                     '</div>' +
                     '<div class="vas-piawdg-pop-title">' + piEsc(it.VendorName || '') + '</div>' +
@@ -494,6 +502,21 @@
                     '<div class="vas-piawdg-pop-date">' + piEsc(piDate(it.DocDate)) + '</div>' +
                 '</div>' +
             '</div>';
+        }
+
+        /* Zoom to the invoice record in its window (AP / AR resolved from IsSOTrx),
+           mirroring the framework zoom used elsewhere (VIS.ZoomTarget.getZoomAD_Window_ID
+           + VIS.viewManager.startWindow). The drill-down dialog is closed first so the
+           opened window is not left behind the modal. */
+        function piZoomInvoice(invoiceId, isSOTrx) {
+            if (!invoiceId) { return; }
+            // Close the drill-down dialog first so it isn't left over the opened window.
+            if ($catDialog) { try { $catDialog.dialog('close'); } catch (e) { } }
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "C_Invoice.C_Invoice_ID=" + invoiceId,
+                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                "TabIndex": "0"
+            });
         }
 
         /* ---- Canonical Widget Footer Pager (design.md): "Showing a–b of N" left,
@@ -598,6 +621,17 @@
         };
 
         this.getRoot = function () { return $root; };
+    };
+
+    /* Relay a fired value (e.g. open-in-new-mode params) to the registered widget host. */
+    VAS.VAS_020_PendingInvoicesWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener)
+            this.listener.widgetFirevalueChanged(value);
+    };
+
+    /* The widget host registers itself here so the widget can drive the host (Scenario 1). */
+    VAS.VAS_020_PendingInvoicesWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
     };
 
     /* ---- Prototype ---- */

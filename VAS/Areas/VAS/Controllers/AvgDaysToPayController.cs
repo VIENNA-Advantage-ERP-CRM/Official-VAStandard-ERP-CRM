@@ -31,6 +31,26 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            /* Base (accounting-schema) currency for this client — the allocation amount is
+               amount-weighted in this currency. Fetched as a scalar and inlined as an integer
+               literal so it is never referenced as a CTE alias inside the MRole-wrapped body
+               (the access parser cannot resolve CTE aliases as physical tables). */
+            string baseCurrencySql = @"SELECT acc.C_Currency_ID
+                FROM AD_ClientInfo ci
+                INNER JOIN C_AcctSchema acc ON (ci.C_AcctSchema1_ID=acc.C_AcctSchema_ID)
+                WHERE ci.AD_Client_ID=" + ctx.GetAD_Client_ID();
+            int baseCurrencyId = DB.GetSQLValue(null, baseCurrencySql);
+
+            /* Allocation amount converted from the ALLOCATION's own currency to the base currency,
+               using the allocation header's DateAcct as the conversion date and its
+               C_ConversionType_ID, with the client/org taken from the allocation line. When the
+               allocation is already in base currency — or the base currency cannot be resolved — the
+               raw line amount is used as-is. */
+            string allocAmountExpr = baseCurrencyId > 0
+                ? @"(CASE WHEN ah.C_Currency_ID=" + baseCurrencyId + @" THEN COALESCE(al.Amount, 0)
+                        ELSE CurrencyConvert(COALESCE(al.Amount, 0), ah.C_Currency_ID, " + baseCurrencyId + @", ah.DateAcct, ah.C_ConversionType_ID, al.AD_Client_ID, al.AD_Org_ID) END)"
+                : "COALESCE(al.Amount, 0)";
+
             string currentPeriodDateCondition = "";
             string daysToPayCondition = "";
             
@@ -81,10 +101,11 @@ namespace VIS.Controllers
             string paymentsSql = @"SELECT CAST(TO_CHAR(COALESCE(pay.DateAcct, csh.DateAcct), 'Q') AS NUMERIC) AS PayQuarter,
                        CAST(TO_CHAR(COALESCE(pay.DateAcct, csh.DateAcct), 'YYYY') AS NUMERIC) AS PayYear,
                        " + daysToPayCondition + @" AS Days_To_Pay,
-                       COALESCE(al.Amount, 0) AS Amount
+                       " + allocAmountExpr + @" AS Amount
                 FROM C_Invoice i
                 INNER JOIN C_InvoicePaySchedule ips ON (ips.C_Invoice_ID=i.C_Invoice_ID)
                 INNER JOIN C_AllocationLine al ON (al.C_InvoicePaySchedule_ID=ips.C_InvoicePaySchedule_ID)
+                INNER JOIN C_AllocationHdr ah ON (ah.C_AllocationHdr_ID=al.C_AllocationHdr_ID)
                 LEFT JOIN C_Payment pay ON (pay.C_Payment_ID=al.C_Payment_ID AND pay.IsActive='Y')
                 LEFT JOIN C_CashLine cl ON (cl.C_CashLine_ID=al.C_CashLine_ID AND cl.IsActive='Y')
                 LEFT JOIN C_Cash csh ON (csh.C_Cash_ID=cl.C_Cash_ID AND csh.IsActive='Y' AND csh.DocStatus NOT IN ('VO'))

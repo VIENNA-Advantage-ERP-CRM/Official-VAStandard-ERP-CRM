@@ -56,7 +56,10 @@ namespace VAS.Controllers
         public JsonResult GetProductPerformance(int productId)
         {
             Ctx ctx = Session["ctx"] as Ctx;
-            if (ctx == null) { return Json("", JsonRequestBehavior.AllowGet); }
+            if (ctx == null)
+            {
+                return Json(JsonConvert.SerializeObject(new { error = "Session Expired" }), JsonRequestBehavior.AllowGet);
+            }
 
             try
             {
@@ -321,25 +324,24 @@ namespace VAS.Controllers
         /// <returns>Modal payload, or null when the product is not accessible.</returns>
         private ProductPerformanceResult GetProductPerformanceData(Ctx ctx, int productId)
         {
+            // Review #35 (follow-up): no COALESCE/CASE mixing a column with an
+            // N'' literal - CHAR columns (ProductType, IsStocked, ...) raise
+            // ORA-12704 against an NVARCHAR2 literal and NVARCHAR2 columns
+            // (C_UOM.Name) raise it against a plain literal. Columns are read
+            // raw and the defaults applied in C# instead (same fix as #43).
+            // The BOM-existence check runs as its own query below: a subquery
+            // table inside an MRole-secured statement gets its access predicate
+            // appended to the OUTER where-clause, where the subquery alias is
+            // out of scope (ORA-00904 "ProductBOM"."...": invalid identifier).
             string productSql = @"
                 SELECT Product.M_Product_ID,
                        Product.Value AS Product_Code,
                        Product.Name AS Product_Name,
-                       COALESCE(Product.ProductType,N'I') AS Product_Type,
-                       COALESCE(Product.IsStocked,N'N') AS Is_Stocked,
-                       COALESCE(Product.IsPurchased,N'N') AS Is_Purchased,
-                       COALESCE(Product.IsBOM,N'N') AS Is_BOM,
-                       CASE
-                           WHEN COALESCE(Product.IsBOM,N'N')=N'Y'
-                             OR EXISTS (
-                                   SELECT 1
-                                   FROM M_Product_BOM ProductBOM
-                                   WHERE ProductBOM.M_Product_ID=Product.M_Product_ID
-                                     AND ProductBOM.IsActive=N'Y'
-                               )
-                           THEN N'Y' ELSE N'N'
-                       END AS Has_BOM,
-                       COALESCE(UnitOfMeasure.Name,N'Unit') AS UOM_Name
+                       Product.ProductType AS Product_Type,
+                       Product.IsStocked AS Is_Stocked,
+                       Product.IsPurchased AS Is_Purchased,
+                       Product.IsBOM AS Is_BOM,
+                       UnitOfMeasure.Name AS UOM_Name
                 FROM M_Product Product
                 LEFT OUTER JOIN C_UOM UnitOfMeasure ON (UnitOfMeasure.C_UOM_ID=Product.C_UOM_ID AND UnitOfMeasure.IsActive=N'Y')
                 WHERE Product.IsActive=N'Y'
@@ -367,12 +369,11 @@ namespace VAS.Controllers
                         product_id = Util.GetValueOfInt(reader["M_Product_ID"]),
                         product_code = Util.GetValueOfString(reader["Product_Code"]),
                         product_name = Util.GetValueOfString(reader["Product_Name"]),
-                        product_type = Util.GetValueOfString(reader["Product_Type"]),
-                        is_stocked = Util.GetValueOfString(reader["Is_Stocked"]),
-                        is_purchased = Util.GetValueOfString(reader["Is_Purchased"]),
-                        is_bom = Util.GetValueOfString(reader["Is_BOM"]),
-                        has_bom = Util.GetValueOfString(reader["Has_BOM"]),
-                        uom_name = Util.GetValueOfString(reader["UOM_Name"]),
+                        product_type = DefaultIfEmpty(Util.GetValueOfString(reader["Product_Type"]), "I"),
+                        is_stocked = DefaultIfEmpty(Util.GetValueOfString(reader["Is_Stocked"]), "N"),
+                        is_purchased = DefaultIfEmpty(Util.GetValueOfString(reader["Is_Purchased"]), "N"),
+                        is_bom = DefaultIfEmpty(Util.GetValueOfString(reader["Is_BOM"]), "N"),
+                        uom_name = DefaultIfEmpty(Util.GetValueOfString(reader["UOM_Name"]), "Unit"),
                         attributes = new List<ProductPerformanceAttribute>(),
                         stock = new List<ProductPerformanceStock>()
                     };
@@ -384,6 +385,10 @@ namespace VAS.Controllers
             }
 
             if (result == null) { return null; }
+
+            // Sourcing chip rule: manufactured when the product is flagged BOM or
+            // an active BOM structure exists for it (client-scoped lookup).
+            result.has_bom = result.is_bom == "Y" || HasActiveBom(ctx, productId) ? "Y" : "N";
 
             SchemaCurrency currency = GetSchemaCurrency(ctx);
             result.currency_symbol = currency.Symbol;
@@ -1021,6 +1026,41 @@ namespace VAS.Controllers
         }
 
         /// <summary>
+        /// True when the product has an active BOM structure. Kept as its own
+        /// simple statement (review #35 follow-up): inside a larger MRole-secured
+        /// query the subquery alias broke the appended access predicate.
+        /// </summary>
+        private bool HasActiveBom(Ctx ctx, int productId)
+        {
+            string sql = @"
+                SELECT COUNT(1)
+                FROM M_Product_BOM ProductBOM
+                WHERE ProductBOM.M_Product_ID=@BOM_Product_ID
+                  AND ProductBOM.IsActive='Y'
+                  AND ProductBOM.AD_Client_ID=@BOM_Client_ID";
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(
+                sql,
+                new SqlParameter[]
+                {
+                    new SqlParameter("@BOM_Product_ID", productId),
+                    new SqlParameter("@BOM_Client_ID", ctx.GetAD_Client_ID())
+                },
+                null
+            )) > 0;
+        }
+
+        /// <summary>
+        /// Applies the SQL-side default that was removed from the query
+        /// (review #35 follow-up: COALESCE with a literal raises ORA-12704
+        /// when the column and literal character sets differ).
+        /// </summary>
+        private static string DefaultIfEmpty(string value, string fallback)
+        {
+            return string.IsNullOrEmpty(value) ? fallback : value;
+        }
+
+        /// <summary>
         /// File name of the uploaded image: the name stored on AD_Image.ImageURL when set
         /// (stripped of any folders, so the value can never escape the Images directory),
         /// otherwise the upload convention &lt;AD_Image_ID&gt;&lt;extension&gt;.
@@ -1074,7 +1114,10 @@ namespace VAS.Controllers
         private JsonResult ErrorResult(Ctx ctx, Exception ex)
         {
             Log.Log(Level.SEVERE, "VAS_094_HighestSellingProductsWidget.GetHighestSellingProducts", ex);
-            string json = JsonConvert.SerializeObject(new { error = Msg.GetMsg(ctx, "Error") ?? "Error" });
+            // The concrete reason (e.g. an ORA-/PG error) is shown in the widget so
+            // a data-side fault is diagnosable without reading the server log.
+            string message = (Msg.GetMsg(ctx, "Error") ?? "Error") + ": " + ex.Message;
+            string json = JsonConvert.SerializeObject(new { error = message });
             return Json(json, JsonRequestBehavior.AllowGet);
         }
 

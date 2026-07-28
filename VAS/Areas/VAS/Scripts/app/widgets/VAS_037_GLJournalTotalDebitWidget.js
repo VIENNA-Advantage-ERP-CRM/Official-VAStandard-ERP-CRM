@@ -19,6 +19,25 @@
 
 ; (function (VAS, $) {
 
+    /* Creates a single document-level ResizeObserver on the dashboard container
+       and mirrors its width into the global CSS var --dash-inline-size (px), so
+       the widget's clamp() sizing tracks the dashboard width, not the viewport. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_037_GLJournalTotalDebitWidget = function () {
 
         this.frame = null;
@@ -29,7 +48,6 @@
         var $root = $('<div class="VAS-gljtd-root">');
         var $kpiValue = null;
         var $whyText = null;
-        var refreshTimer = null;
         var activePeriod = 'month';
         var baseUrl = VIS.Application.contextUrl;
 
@@ -37,10 +55,6 @@
             createWidget();
             createBusyIndicator();
             loadData();
-
-            refreshTimer = setInterval(function () {
-                $self.refreshWidget();
-            }, 1000 * 60 * 5);
         };
 
         function lbl(key, fallback) {
@@ -55,6 +69,16 @@
                 .replace(/>/g, "&gt;")
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
+        }
+
+        function getResponseMessage(data, fallback) {
+            var key = data && (data.errorKey || data.messageKey);
+
+            if (key) {
+                return lbl(key, data.error || data.errorText || data.message || fallback);
+            }
+
+            return data && (data.error || data.errorText || data.message) || fallback;
         }
 
         function formatCurrencyAmount(value, currencySymbol, currencyISO) {
@@ -227,12 +251,7 @@
                     }
 
                     if (data.success === false || data.error) {
-                        renderEmpty(data.error || lbl('VIS_Error', 'Error loading data.'));
-                        return;
-                    }
-
-                    if (data.hasData === false) {
-                        renderEmpty(lbl('VIS_NoData', 'No data available.'));
+                        renderEmpty(getResponseMessage(data, lbl('VIS_Error', 'Error loading data.')));
                         return;
                     }
 
@@ -260,11 +279,6 @@
         };
 
         this.disposeComponent = function () {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
-            }
-
             if ($root) {
                 $root.off();
                 $root.remove();
@@ -283,6 +297,8 @@
         this.windowNo = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_037_GLJournalTotalDebitWidget.prototype.widgetSizeChange = function (height, width) {

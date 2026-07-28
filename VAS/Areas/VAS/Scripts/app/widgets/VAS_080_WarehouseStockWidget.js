@@ -379,9 +379,14 @@
             $('body').removeClass('MPC-ws-body-lock');
         }
 
-        function showError() {
+        /* Review #36 (follow-up): show the database's own message (e.g. a
+           missing-column error naming the field) instead of a bare generic
+           text, so a data-side fault is diagnosable from the widget itself. */
+        function showError(detail) {
             $summary.empty();
-            $list.html('<div class="MPC-ws-empty">' + escapeHtml(label('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+            var text = label('VAS_CouldntLoad', "Couldn't load");
+            if (detail) { text += ' - ' + String(detail); }
+            $list.html('<div class="MPC-ws-empty">' + escapeHtml(text) + '</div>');
             $footer.empty();
         }
 
@@ -398,7 +403,7 @@
                     var result = parseResponse(response);
                     if (hasErrorProp(result)) {
                         console.error('[VAS_080] GetWarehouses error:', result.error, '|', result.detail || '');
-                        showError(); return;
+                        showError(result.detail || result.error); return;
                     }
 
                     // Review #15: the endpoint returns { warehouses, default_warehouse_id };
@@ -425,7 +430,7 @@
                             var stockResult = parseResponse(stockResponse);
                             if (hasErrorProp(stockResult)) {
                                 console.error('[VAS_080] GetStockRows error:', stockResult.error, '|', stockResult.detail || '');
-                                showError(); return;
+                                showError(stockResult.detail || stockResult.error); return;
                             }
                             warehouseStockState.rows = stockResult.rows || [];
                             warehouseStockState.currencySymbol = stockResult.currency_symbol || '';
@@ -435,13 +440,13 @@
                         },
                         error: function (xhr) {
                             console.error('[VAS_080] GetStockRows HTTP error:', xhr.status, xhr.responseText);
-                            showError();
+                            showError('HTTP ' + (xhr && xhr.status ? xhr.status : 0));
                         }
                     });
                 },
                 error: function (xhr) {
                     console.error('[VAS_080] GetWarehouses HTTP error:', xhr.status, xhr.responseText);
-                    showError();
+                    showError('HTTP ' + (xhr && xhr.status ? xhr.status : 0));
                 }
             });
         }

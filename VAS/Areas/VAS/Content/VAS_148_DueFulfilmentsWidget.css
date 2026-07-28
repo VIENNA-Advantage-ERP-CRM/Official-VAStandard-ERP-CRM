@@ -1,0 +1,267 @@
+/* Due Fulfilments Widget (VAS_148) - 3x2 document-list widget + Generate
+   Delivery Order modal. Widget internals in em on the dashboard-width lever;
+   borders/radii/shadows in px. Modal internals in rem (app shell). Lists are
+   paged - never an inner scrollbar. The grid owns the widget's outer size. */
+
+/* ===================== WIDGET (3x2 list) ===================== */
+.vas-duf-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+.vas-duf-root,
+.vas-duf-root * {
+    box-sizing: border-box;
+}
+
+.vas-duf-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
+       not a JS-measured container width - the old clamp's fixed 24px ceiling and
+       its dependency on --dash-inline-size froze all text from growing past a
+       point. max()+rem floor guards very narrow windows; no ceiling above it, so
+       text keeps scaling at any resolution. Everything below is em off this. */
+    font-size: max(0.9rem, 1.3vw);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, .06);
+    backdrop-filter: blur(10px);
+    padding: .875em;
+}
+
+.vas-duf-head {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    flex: 0 0 auto;
+    margin-bottom: .625em;
+}
+
+.vas-duf-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 131, 218, .10);
+    color: #0083DA;
+}
+
+.vas-duf-ico svg { width: 1em; height: 1em; }
+.vas-duf-title { font-size: .8125em; font-weight: 500; color: #102C3F; line-height: 1.3; }
+.vas-duf-spacer { flex: 1; }
+
+.vas-duf-pill {
+    font-size: .6875em;
+    font-weight: 700;
+    color: #fff;
+    background: #5F4AA6;
+    border-radius: 999px;
+    padding: .15em .6em;
+    white-space: nowrap;
+}
+
+/* The body is a grid of equal dynamic tracks: one page of rows splits the body
+   evenly, so every row is the same height (body / page-size) whether the page
+   is full or has a single row - no row ever balloons to fill the whole body. */
+.vas-duf-body { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); overflow: hidden; }
+.vas-duf-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; color: #748494; font-size: .8125em; }
+
+/* Compact 2-line row so all pageSize rows fit the 3x2 body without overflow.
+   Line 1: number . customer (ellipsis) . value    Line 2: warehouse . address
+   (ellipsis) . line count. Rows sit at natural height and pack from the top. */
+.vas-duf-row {
+    /* Fills its own grid track (equal body/page-size height); content is
+       vertically centred. A single row is one track tall, never the whole body. */
+    display: flex;
+    align-items: center;
+    gap: .6em;
+    width: 100%;
+    text-align: left;
+    padding: .1em .3em;
+    border-bottom: 1px solid #EDF2F6;
+    cursor: pointer;
+    border-radius: 8px;
+    background: none;
+    border-left: none; border-right: none; border-top: none;
+}
+
+.vas-duf-row:last-child { border-bottom: none; }
+.vas-duf-row:hover { background: rgba(31, 131, 255, .05); }
+
+.vas-duf-fi {
+    width: 1.5em; height: 1.5em; flex: 0 0 auto; border-radius: 7px;
+    background: rgba(0, 131, 218, .10); color: #0083DA;
+    display: flex; align-items: center; justify-content: center;
+}
+.vas-duf-fi svg { width: .85em; height: .85em; }
+
+.vas-duf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .05em; }
+
+.vas-duf-r1 { display: flex; align-items: baseline; gap: .5em; line-height: 1.08; }
+.vas-duf-no { font-size: .8em; font-weight: 700; color: #102C3F; white-space: nowrap; flex: 0 0 auto; }
+.vas-duf-cust { flex: 1; min-width: 0; font-size: .72em; color: #5F7283; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-duf-val { font-size: .8em; font-weight: 700; color: #0083DA; white-space: nowrap; flex: 0 0 auto; }
+
+.vas-duf-r2 { display: flex; align-items: baseline; gap: .5em; line-height: 1.02; }
+.vas-duf-wh { font-size: .68em; color: #748494; white-space: nowrap; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+.vas-duf-addr { flex: 1; min-width: 0; font-size: .68em; color: #748494; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-duf-lc { font-size: .68em; color: #748494; white-space: nowrap; flex: 0 0 auto; }
+
+.vas-duf-foot {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    gap: .5em; padding-top: .6em; margin-top: .4em; border-top: 1px solid #EDF2F6;
+}
+.vas-duf-help { font-size: .8125em; color: #748494; }
+.vas-duf-pager { display: flex; align-items: center; gap: 8px; }
+.vas-duf-pgbtn {
+    width: 24px; height: 24px; border-radius: 6px; border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, .9); display: flex; align-items: center; justify-content: center; color: #0083DA; cursor: pointer; padding: 0;
+}
+.vas-duf-pgbtn:hover:not(:disabled) { background: #EAF4FD; }
+.vas-duf-pgbtn:disabled { background: rgba(255, 255, 255, .6); color: #B8C6D2; cursor: default; }
+.vas-duf-pgbtn svg { width: 14px; height: 14px; }
+.vas-duf-pgtext { font-size: .875em; font-weight: 500; color: #102C3F; }
+
+/* ===================== MODAL ===================== */
+.vas-duf-dialog {
+    /* Viewport-anchored (the dialog lives on <body>, outside the widget), same
+       basis as the widget card so it scales at any resolution; internals are em. */
+    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 2em; font-family: Roboto, Arial, sans-serif;
+}
+.vas-duf-dialog.vas-duf-hidden { display: none; }
+.vas-duf-scrim { position: absolute; inset: 0; background: rgba(2, 38, 64, .28); backdrop-filter: blur(2px); }
+.vas-duf-body-lock { overflow: hidden; }
+
+.vas-duf-modal {
+    position: relative; width: min(55em, calc(100vw - 4em)); max-height: 90vh;
+    display: flex; flex-direction: column;
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, .30);
+}
+
+.vas-duf-mtitle {
+    flex: 0 0 auto; height: 3.5em; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 1.25em; background: rgba(255, 255, 255, .9); border-bottom: 1px solid #1F83FF;
+}
+.vas-duf-mtitle-l { display: flex; align-items: center; gap: 0.75em; min-width: 0; }
+.vas-duf-mt-text { margin: 0; font-size: 1em; font-weight: 400; color: #141414; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-duf-mt-pill { font-size: .72em; flex: 0 0 auto; background: #EEF2F6; color: #5F7283; border-radius: 999px; padding: .18em .7em; font-weight: 500; white-space: nowrap; }
+.vas-duf-mclose { width: 2em; height: 2em; display: flex; align-items: center; justify-content: center; color: #141414; border-radius: 0.5em; flex: 0 0 auto; background: none; border: none; cursor: pointer; }
+.vas-duf-mclose:hover { background: #EEF6FF; color: #0083DA; }
+.vas-duf-mclose svg { width: 1.25em; height: 1.25em; }
+
+.vas-duf-mcontent { position: relative; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.vas-duf-mbody { padding: 0.875em 1.25em; overflow: hidden; }
+
+.vas-duf-mbusy { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, .6); z-index: 5; }
+.vas-duf-mbusy.vas-duf-hidden { display: none; }
+
+.vas-duf-optrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 1.25em; }
+.vas-duf-shiprow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 1em; }
+.vas-duf-field { display: flex; flex-direction: column; padding: 0.5em 0.125em 0.375em; }
+.vas-duf-flabel { font-size: .75em; color: #5F7283; margin-bottom: 0.25em; }
+.vas-duf-f {
+    font-family: inherit; font-size: .9em; color: #102C3F; border: none;
+    border-bottom: 1px solid #D7D7D7; background: transparent; padding: 0.3em 0.125em; outline: none;
+}
+select.vas-duf-f {
+    appearance: none; -webkit-appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231F83FF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 0.125em center; padding-right: 1.125em;
+}
+.vas-duf-f:hover, .vas-duf-f:focus { border-bottom-color: #0083DA; }
+
+.vas-duf-note { display: flex; align-items: center; gap: 0.375em; font-size: .78em; color: #748494; margin: 0.625em 0; }
+.vas-duf-note svg { width: 0.875em; height: 0.875em; color: #0083DA; flex: 0 0 auto; }
+
+/* Sized for a full page of 5 lines so the modal keeps a stable height and does
+   not shrink when a page has fewer (lines page 5 at a time). */
+.vas-duf-lines { display: flex; flex-direction: column; gap: 0.5em; min-height: 14.5em; }
+.vas-duf-line {
+    display: flex; align-items: center; gap: 0.625em;
+    border: 1px solid #E4EDF4; border-radius: 0.625em; padding: 0.5em 0.75em; background: #fff;
+}
+.vas-duf-line.avail { border-color: #BFE6D5; background: #F3FBF7; }
+.vas-duf-line.short { border-color: #F2C4C6; background: #FDF3F3; }
+.vas-duf-line.off { opacity: .55; }
+
+.vas-duf-chk {
+    width: 1.125em; height: 1.125em; flex: 0 0 auto; border-radius: 0.3em; border: 0.125em solid #C3D0DA;
+    background: #fff; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; padding: 0;
+}
+.vas-duf-chk.on { background: #0083DA; border-color: #0083DA; }
+.vas-duf-chk svg { width: 0.75em; height: 0.75em; }
+.vas-duf-lfi { width: 1.375em; height: 1.375em; flex: 0 0 auto; border-radius: 0.375em; background: rgba(0, 131, 218, .10); color: #0083DA; display: flex; align-items: center; justify-content: center; }
+.vas-duf-lfi svg { width: 0.8em; height: 0.8em; }
+.vas-duf-lname { flex: 1; min-width: 0; font-size: .92em; font-weight: 700; color: #102C3F; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.vas-duf-badge { font-size: .72em; font-weight: 500; padding: .18em .6em; border-radius: 999px; white-space: nowrap; flex: 0 0 auto; }
+.vas-duf-badge.ok { background: #E2F6EF; color: #0B6B45; }
+.vas-duf-badge.bad { background: #FBE3E4; color: #A33F3F; }
+
+.vas-duf-loc {
+    font-family: inherit; font-size: .78em; color: #102C3F; border: 1px solid #E4EDF4; border-radius: 0.5em;
+    background: #fff; padding: 0.3em 1.375em 0.3em 0.5em; outline: none; max-width: 11em; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%231F83FF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 0.375em center;
+}
+.vas-duf-loc:hover, .vas-duf-loc:focus { border-color: #0083DA; }
+.vas-duf-loc:disabled { opacity: .5; cursor: default; }
+
+.vas-duf-qtywrap { display: flex; align-items: center; gap: 0.3em; flex: 0 0 auto; }
+.vas-duf-qty { width: 4.375em; font-family: inherit; font-size: .9em; font-weight: 700; text-align: right; color: #102C3F; border: 1px solid #E4EDF4; border-radius: 0.5em; padding: 0.3em 0.5em; outline: none; }
+.vas-duf-qty:hover, .vas-duf-qty:focus { border-color: #0083DA; }
+.vas-duf-qty:disabled { opacity: .5; }
+.vas-duf-uom { font-size: .72em; color: #748494; }
+
+.vas-duf-linepager { display: flex; align-items: center; justify-content: space-between; gap: .5em; margin: 0.625em 0 0.375em; min-height: 1.5em; }
+/* The line pager reuses the card's .vas-duf-pgbtn; scale it in em inside the modal. */
+.vas-duf-linepager .vas-duf-pager { gap: 0.4em; }
+.vas-duf-linepager .vas-duf-pgbtn { width: 1.1em; height: 1.1em; border-radius: 0.4em; }
+.vas-duf-linepager .vas-duf-pgbtn svg { width: 0.65em; height: 0.65em; }
+.vas-duf-linepager .vas-duf-pgtext { font-size: 0.75em; }
+.vas-duf-linepager:empty { display: none; }
+
+.vas-duf-shhead { font-size: .95em; font-weight: 700; color: #000; padding: 0.75em 0 0.25em; }
+
+.vas-duf-mfoot {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 0.75em;
+    padding: 0.75em 1.25em; border-top: 1px solid #EDF2F6; background: #fff;
+}
+.vas-duf-mfoot-end { justify-content: flex-end; }
+.vas-duf-sum { font-size: .82em; color: #5F7283; }
+.vas-duf-sum b { color: #102C3F; }
+
+.vas-duf-gen {
+    background: #1F83FF; color: #fff; border: none; border-radius: 0.625em; padding: 0.625em 1.125em;
+    font-family: inherit; font-weight: 600; font-size: .9em; display: inline-flex; gap: 0.5em; align-items: center; cursor: pointer;
+}
+.vas-duf-gen:hover { background: #0E6FE0; }
+.vas-duf-gen:disabled { background: #B8C6D2; cursor: default; }
+.vas-duf-gen svg { width: 1em; height: 1em; }
+
+/* Confirmation view */
+.vas-duf-cgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 1.5em; }
+.vas-duf-cf { padding: 0.5em 0.25em; border-bottom: 1px solid #D7D7D7; }
+.vas-duf-cl { font-size: .72em; color: #5F7283; }
+.vas-duf-cv { font-size: .95em; color: #102C3F; margin-top: 0.25em; }
+.vas-duf-cv.s { font-weight: 700; }
+.vas-duf-chead { font-size: 1em; font-weight: 700; color: #000; padding: 1em 0 0.5em; }
+.vas-duf-ctable { width: 100%; border-collapse: collapse; }
+.vas-duf-ctable th { text-align: left; font-size: .72em; color: #748494; padding: 0.375em 0.5em; border-bottom: 1px solid #EDF2F6; }
+.vas-duf-ctable td { font-size: .85em; padding: 0.5em; border-bottom: 1px solid #EDF2F6; color: #5F7283; }
+.vas-duf-ctable td.s { font-weight: 700; color: #102C3F; }
+.vas-duf-ctable td.r, .vas-duf-ctable th.r { text-align: right; }
+.vas-duf-ctable tr:last-child td { border-bottom: none; }

@@ -1,0 +1,96 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_121 New Customer — 1x1 dashed quick-action tile (Customers dashboard).
+ * Design: new-customer.html (attached) + Design Specs/dashboard-widgets.md
+ * "Quick Action Widget". Pale-blue glass surface, 2px dashed #9ED1FF border,
+ * centred blue "+" well above a bold title + muted subtitle. Internal type /
+ * spacing in em against the widget-root font-size; borders / radii / shadows in
+ * px (physical edges). All classes carry the module MPC prefix (vas121-*).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas121-root {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    position: relative;
+}
+
+    .vas121-root,
+    .vas121-root * {
+        box-sizing: border-box;
+    }
+
+/* Dashed quick-action surface — the dashed blue border + blue "+" well mark it
+   as an "add" tile (matches the attached design). */
+.vas121-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* Widget root anchor — one lever; internal em values scale from this. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    text-align: center;
+    padding: 0.875em;
+    border: 2px dashed #9ED1FF;                 /* px — physical edge */
+    border-radius: 14px;                        /* px */
+    background: linear-gradient(180deg, #EAF6FF 0%, rgba(255, 255, 255, 0.6) 100%);
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    cursor: pointer;
+    transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+    .vas121-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.13);
+    }
+
+    .vas121-card:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+/* Centred blue "+" well. */
+.vas121-well {
+    width: 2.25em;
+    height: 2.25em;
+    flex: 0 0 auto;
+    border-radius: 11px;                        /* px */
+    background: #1F83FF;
+    color: #FFFFFF;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 10px 24px rgba(31, 131, 255, 0.22);
+}
+
+    .vas121-well svg {
+        display: block;
+        width: 1.1em;
+        height: 1.1em;
+    }
+
+.vas121-text {
+    display: block;
+    min-width: 0;
+}
+
+.vas121-title {
+    display: block;
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #102C3F;
+    line-height: 1.1;
+}
+
+.vas121-sub {
+    display: -webkit-box;
+    font-size: 0.66em;
+    color: #748494;
+    line-height: 1.25;
+    margin-top: 0.125em;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

@@ -3,13 +3,18 @@
    ========================================================== */
 
 .vas-towdg-root {
-    /* Positioning context only (mirrors VIS.OutstandingSalesOrderWidget's root);
-       the glass surface lives on the card (.vas-towdg-container) below. No
+    /* Positioning context + query container (mirrors VIS.OutstandingSalesOrderWidget's
+       root); the glass surface lives on the card (.vas-towdg-container) below. No
        overflow:hidden here so the card's drop-shadow is not clipped. */
     width: 100%;
     height: 100%;
     box-sizing: border-box;
     position: relative;
+    /* Named query container so the card can step its base font down on narrow /
+       zoomed cells (see the @container rules at the bottom). Without this the card
+       only had the --dash-inline-size clamp, which floors at 16px and overflows a
+       narrow cell — the reason zoom-in/out misbehaved vs. OutstandingSalesOrderWidget. */
+    container: vas-towdg / inline-size;
     font-family: Roboto, sans-serif;
 }
 
@@ -54,7 +59,7 @@
 
 .vas-towdg-value {
     font-size: 1.75em;
-    font-weight: 600; /* Roboto SemiBold */
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
     color: #D14545;
     line-height: 1.05;
     letter-spacing: -0.01em;
@@ -84,18 +89,18 @@
     min-width: 2em;
     flex-shrink: 0;
     border-radius: 0.5625em;
-    /* Red tint to match this widget's semantic (outstanding AP exposure = danger);
-       the SVG stroke inherits this color via currentColor. */
-    background: linear-gradient(180deg, #FFFFFF, #FDECEC);
-    color: #D14545;
+    /* Self-contained SVG tile (its own red-tinted well + bars, ported from
+       VIS.OutstandingSalesOrderWidget) fills the well; overflow clips the tile's
+       corners to the family radius. No competing gradient/currentColor here. */
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .vas-towdg-icon svg {
-    width: 1.125em;
-    height: 1.125em;
+    width: 100%;
+    height: 100%;
 }
 
 .vas-towdg-head-text {
@@ -428,9 +433,23 @@
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-towdg-container, so no
-   per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
-   document-baseline surface) reflows at narrow widths. */
+   The card base size follows the --dash-inline-size clamp, but that clamp floors
+   at 16px; on a narrow / zoomed-in cell the KPI value + icon overflow at 16px.
+   Step the base font down on narrow cells (query the .vas-towdg-root container),
+   mirroring VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-towdg (max-width: 300px) {
+    .vas-towdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-towdg (max-width: 220px) {
+    .vas-towdg-container {
+        font-size: 11px;
+    }
+}
+
+/* Only the drill-down dialog (a document-baseline surface) reflows at narrow widths. */
 @media (max-width: 680px) {
     .vas-towdg-dialog-shell .ui-dialog-content {
         padding: 0.875em;
@@ -444,4 +463,36 @@
     .vas-towdg-drill-copy {
         width: 100%;
     }
+}
+
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-towdg-dialog-shell .vas-towdg-dialog-close {
+    right: auto;
+    left: 0.875em;
+}
+
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-towdg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-towdg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-towdg-drill-pager-btn svg {
+    transform: scaleX(-1);
 }

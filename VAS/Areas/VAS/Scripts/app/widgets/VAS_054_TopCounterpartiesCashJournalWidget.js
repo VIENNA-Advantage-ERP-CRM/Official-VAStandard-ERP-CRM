@@ -27,6 +27,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_054_TopCounterpartiesCashJournalWidget = function () {
         var $self = this;
 
@@ -95,60 +120,43 @@
             return data;
         }
 
-        function formatAmount(item) {
-            var precision = Number(item && item.stdPrecision);
-            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
-            var iso = item && item.currencyISO ? item.currencyISO : '';
-
-            if (isNaN(precision) || precision < 0) {
-                precision = 2;
-            }
-
-            var numericValue = safeNumber(item && item.displayAmount);
-
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: precision,
-                maximumFractionDigits: precision
-            });
-
-            var sign = numericValue < 0 ? '-' : '';
-
-            if (symbol) {
-                return sign + symbol + amount;
-            }
-
-            return iso ? sign + iso + amount : sign + amount;
+        function getPrecision(precision) {
+            var stdPrecision = Number(precision);
+            return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
-        function renderAmount($target, item) {
-            var precision = Number(item && item.stdPrecision);
-            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
-            var iso = item && item.currencyISO ? item.currencyISO : '';
-
-            if (isNaN(precision) || precision < 0) {
-                precision = 2;
+        /* ── Currency label ─────────────────────────────────────────────
+           Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
             }
 
-            var numericValue = safeNumber(item && item.displayAmount);
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: precision,
-                maximumFractionDigits: precision
-            });
-            var decimalMatch = amount.match(/([.,]\d+)$/);
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
+        }
 
-            $target.empty()
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-prefix',
-                    'text': (numericValue < 0 ? '-' : '') + (symbol || iso)
-                }))
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-main',
-                    'text': decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount
-                }))
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-decimal',
-                    'text': decimalMatch ? decimalMatch[1] : ''
-                }));
+        /*
+         * Per-row Volume — aggregate cash volume, so a compact, locale-aware
+         * magnitude via VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by
+         * base currency) is appropriate. The formatter returns a non-negative
+         * magnitude, so we compose the final string ourselves: sign, then
+         * currency, then magnitude — a negative renders as e.g. -$200.56
+         * (leading minus, before the symbol).
+         */
+        function formatVolume(item) {
+            var numericValue = safeNumber(item && item.displayAmount);
+            var sign = numericValue < 0 ? '-' : '';
+            var currency = getCurrencyLabel(item && item.currencySymbol, item && item.currencyISO);
+            var magnitude = VIS.Util.formatCompactAmount(
+                numericValue,
+                item && item.currencyISO,
+                getPrecision(item && item.stdPrecision)
+            );
+
+            return sign + currency + magnitude;
         }
 
         function showBusy(show) {
@@ -403,7 +411,12 @@
 
             var headerHeight = $body.find('thead').outerHeight() || 0;
             var availableHeight = Math.max(0, $body[0].clientHeight - headerHeight);
-            var nextPageSize = Math.max(3, Math.floor(availableHeight / 48));
+
+            /* Measure an actual rendered row so the page fits exactly (rows are
+               clipped rather than scrolled now); fall back to a scaled default. */
+            var firstRow = $body.find('tbody tr')[0];
+            var rowHeight = firstRow && firstRow.offsetHeight ? firstRow.offsetHeight : 48;
+            var nextPageSize = Math.max(3, Math.floor(availableHeight / rowHeight));
 
             if (nextPageSize === pageSize) {
                 return;
@@ -538,12 +551,14 @@
                     'class': 'VAS_054_counterparties-cell-volume'
                 });
 
+                var volumeText = formatVolume(item);
+
                 var $amount = $('<span>', {
                     'class': 'VAS_054_counterparties-amount',
-                    'title': formatAmount(item)
+                    'text': volumeText,
+                    'title': volumeText
                 });
 
-                renderAmount($amount, item);
                 $amountCell.append($amount);
 
                 $row
@@ -687,6 +702,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_054_TopCounterpartiesCashJournalWidget.prototype.widgetSizeChange = function (height, width) {

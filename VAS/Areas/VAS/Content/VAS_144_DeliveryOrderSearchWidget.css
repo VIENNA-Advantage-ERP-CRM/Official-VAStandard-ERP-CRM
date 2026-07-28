@@ -1,0 +1,733 @@
+/* Delivery Order Search Widget (VAS_120) - 9x1 transparent cell with a
+   centered 80% glass search pill, a fixed-position suggestion dropdown and a
+   two-tab detail modal. Widget size: 9 columns x 1 row. Pill internals in em
+   on the dashboard lever; dropdown and modal are fixed rem/px chrome;
+   borders/radii/shadows px. */
+
+.MPC-dos-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.125em 0;
+    overflow: visible;
+    font-family: Roboto, sans-serif;
+    /* Single dynamic font anchor, viewport-based (vw) so it tracks the SCREEN,
+       not a JS-measured container width - the old clamp's fixed 24px ceiling and
+       its dependency on --dash-inline-size froze the search pill from growing
+       past a point. max()+rem floor guards very narrow windows; no ceiling
+       above it, so text keeps scaling at any resolution. */
+    font-size: max(0.9rem, 1.3vw);
+}
+
+.MPC-dos-root,
+.MPC-dos-root *,
+.MPC-dos-dd,
+.MPC-dos-dd *,
+.MPC-dos-overlay,
+.MPC-dos-overlay * {
+    box-sizing: border-box;
+}
+
+/* ---- Search pill ---- */
+.MPC-dos-pill {
+    width: 80%;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    padding: 1em 1.125em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    backdrop-filter: blur(10px);
+}
+
+.MPC-dos-ico {
+    width: 1.125em;
+    height: 1.125em;
+    color: #0083DA;
+    flex: 0 0 auto;
+    display: inline-flex;
+}
+
+.MPC-dos-ico svg {
+    width: 100%;
+    height: 100%;
+}
+
+.MPC-dos-pill .MPC-dos-input,
+.MPC-dos-pill .MPC-dos-input:focus {
+    flex: 1 1 0%;
+    min-width: 0;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 none !important;
+    border-radius: 0 !important;
+    outline: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    font-family: inherit;
+    font-size: 0.875em;
+    color: #102C3F;
+}
+
+.MPC-dos-pill .MPC-dos-input::placeholder {
+    color: #9F9F9F;
+}
+
+.MPC-dos-hint {
+    flex: 0 0 auto;
+    font-size: 0.6875em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .MPC-dos-hint {
+        display: none;
+    }
+}
+
+/* ---- Suggestion dropdown (the search-result pop-up) ----
+   Appended directly to <body> by the widget JS, so it sits OUTSIDE the
+   .MPC-dos-root DOM tree and never inherited the pill's font-size - it was
+   rendering at a fixed rem/px size regardless of screen size. It gets its own
+   viewport-based anchor (same basis as every other pop-up/modal fixed on this
+   dashboard) and every internal size below is em off that anchor. */
+.MPC-dos-dd {
+    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    position: fixed;
+    z-index: 10050;
+    display: none;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 18px 40px rgba(15, 61, 97, 0.18);
+    max-height: 340px;
+    overflow-y: auto;
+    font-family: Roboto, sans-serif;
+    padding: .25em;
+}
+
+.MPC-dos-dd.MPC-dos-open {
+    display: block;
+}
+
+.MPC-dos-dd-row {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    width: 100%;
+    text-align: left;
+    padding: .5em .625em;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.MPC-dos-dd-row:hover,
+.MPC-dos-dd-row:focus-visible {
+    background: #EEF6FF;
+    outline: none;
+}
+
+.MPC-dos-dd-ico {
+    width: 1.875em;
+    height: 1.875em;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    background: rgba(0, 131, 218, 0.10);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.MPC-dos-dd-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-dos-dd-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-dos-dd-top {
+    display: flex;
+    align-items: center;
+    gap: .5em;
+    min-width: 0;
+}
+
+.MPC-dos-dd-no {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.MPC-dos-dd-cust {
+    font-size: 0.8125em;
+    color: #5F7283;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dos-dd-sub {
+    margin-top: .125em;
+    font-size: 0.6875em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dos-dd-facet {
+    flex: 0 0 auto;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #106AB0;
+    background: #DFF1FF;
+    border-radius: 999px;
+    padding: .1875em .5625em;
+    white-space: nowrap;
+}
+
+.MPC-dos-dd-state {
+    padding: .875em;
+    font-size: 0.8125em;
+    color: #748494;
+    text-align: center;
+}
+
+/* ---- Status pills (the ONE status palette) ----
+   Shared by the dropdown row AND the detail modal - em (not rem) so it scales
+   with whichever ambient anchor it's rendered under. */
+.MPC-dos-status {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.4;
+    font-size: 0.6875em;
+    font-weight: 500;
+    padding: .125em .5625em;
+    border-radius: 999px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-st-dr { background: #EEF2F6; color: #5F7283; }
+.MPC-dos-st-ip { background: #DFF1FF; color: #106AB0; }
+.MPC-dos-st-wc { background: #FCF1DD; color: #9A6500; }
+.MPC-dos-st-co { background: #E2F6EF; color: #0B6B45; }
+
+/* ---- Detail modal ---- */
+.MPC-dos-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-dos-overlay {
+    /* Viewport-anchored (the modal lives on <body>, outside the widget), same
+       basis as every other pop-up on this dashboard, so it scales at any
+       resolution instead of freezing at a fixed px ceiling. Internals below
+       are all em off this anchor. */
+    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 38, 64, 0.28);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 2em;
+    z-index: 10050;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-dos-overlay.MPC-dos-open {
+    display: flex;
+}
+
+.MPC-dos-modal {
+    width: min(51.25em, calc(100vw - 2em));
+    max-height: 88vh;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-dos-m-head {
+    height: 3.25em;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.125em;
+    border-bottom: 1px solid #1F83FF;
+}
+
+.MPC-dos-m-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+}
+
+.MPC-dos-m-title {
+    font-size: 1em;
+    font-weight: 400;
+    color: #141414;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dos-m-close {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #141414;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.MPC-dos-m-close:hover {
+    background: #EEF6FF;
+    color: #0083DA;
+}
+
+.MPC-dos-m-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+/* ---- Tabs ---- */
+.MPC-dos-tabs {
+    display: inline-flex;
+    gap: 0.25em;
+    margin: 0.75em 1.125em 0;
+    padding: 0.25em;
+    background: #EEF6FF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    align-self: flex-start;
+}
+
+.MPC-dos-tab {
+    padding: 0.4375em 0.875em;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 0.82em;
+    font-weight: 500;
+    color: #5F7283;
+    cursor: pointer;
+}
+
+.MPC-dos-tab:hover {
+    color: #0083DA;
+}
+
+.MPC-dos-tab-active {
+    background: #FFFFFF;
+    color: #0083DA;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(15, 61, 97, 0.10);
+}
+
+/* Fixed-height panel: switching tabs or line pages never resizes the modal
+   and nothing inside it scrolls (stable-size rule + spec). */
+.MPC-dos-panel {
+    height: 23.5em;
+    overflow: hidden;
+    padding: 0.75em 1.125em 1em;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ---- Overview tab ---- */
+.MPC-dos-hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .875em;
+    padding: .75em .875em;
+    background: linear-gradient(135deg, #EAF8FF, #F4FBFF);
+    border: 1px solid #BFE4FF;
+    border-radius: 12px;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-hero-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.MPC-dos-hero-name {
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dos-hero-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.MPC-dos-chip {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #5F7283;
+    background: rgba(16, 44, 63, 0.05);
+    border-radius: 999px;
+    padding: .1875em .5625em;
+    white-space: nowrap;
+}
+
+.MPC-dos-stats {
+    display: flex;
+    gap: .625em;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-stat {
+    /* No max-width cap: the old 130px ceiling is why "Total Value" overflowed
+       once the value didn't fit (a fixed px box that never grew with the
+       widget). The box now sizes to its own content (min-width keeps short
+       values like the Lines count from looking cramped), and the compact
+       K/M/Cr/L amount format (below) keeps large currency values short enough
+       to fit comfortably instead of relying on the box to stretch forever. */
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 10px;
+    padding: .4375em .6875em;
+    min-width: 4.75em;
+}
+
+.MPC-dos-stat-k {
+    font-size: 0.6875em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.MPC-dos-stat-v {
+    margin-top: .125em;
+    font-size: 0.875em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+    .MPC-dos-stats {
+        display: none;
+    }
+}
+
+.MPC-dos-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.5em;
+    margin-top: .375em;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 560px) {
+    .MPC-dos-fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .MPC-dos-field-span2 {
+        grid-column: auto;
+    }
+}
+
+.MPC-dos-field {
+    min-width: 0;
+    padding: .5em 0 .5625em;
+    border-bottom: 1px solid #D7D7D7;
+}
+
+.MPC-dos-field-span2 {
+    grid-column: span 2;
+}
+
+.MPC-dos-field-lbl {
+    font-size: 0.75em;
+    color: #748494;
+}
+
+.MPC-dos-field-val {
+    margin-top: .3125em;
+    font-size: 0.875em;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dos-notes {
+    margin-top: .625em;
+    display: flex;
+    flex-direction: column;
+    gap: .25em;
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.MPC-dos-notes-text {
+    font-size: 0.8125em;
+    color: #5F7283;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ---- Line Items tab ----
+   Qty/Price/Total were fixed px column widths (52/100/104px) that never grew
+   as the modal's font-size scaled up - the name column (1fr) absorbed ALL the
+   extra width while the numeric columns stayed pinned at their original tiny
+   size, so the row read as "mostly empty" (dead space in the name column)
+   with the numbers "squashed" into columns too narrow for their now-larger
+   text. Converting the numeric columns to em (scaling with the same font-size
+   as the text inside them) fixes both symptoms at once. */
+.MPC-dos-lhead,
+.MPC-dos-lrow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3.25em 6.25em 6.5em;
+    column-gap: .75em;
+    align-items: center;
+}
+
+@media (max-width: 560px) {
+    .MPC-dos-lhead,
+    .MPC-dos-lrow {
+        grid-template-columns: minmax(0, 1fr) 3.25em 6.5em;
+    }
+
+    .MPC-dos-l-price {
+        display: none;
+    }
+}
+
+.MPC-dos-lhead {
+    padding: .375em 0;
+    border-bottom: 1px solid #EDF2F6;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-lhead span {
+    font-size: 0.75em;
+    color: #748494;
+}
+
+/* The lines block reserves a full 4-row page, so shorter pages keep the
+   same modal size. */
+.MPC-dos-lines {
+    display: flex;
+    flex-direction: column;
+    min-height: 13em;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-lrow {
+    padding: .5em 0;
+    border-bottom: 1px solid #EDF2F6;
+    height: 3.25em;
+}
+
+.MPC-dos-lrow:last-child {
+    border-bottom: none;
+}
+
+.MPC-dos-li {
+    display: flex;
+    align-items: center;
+    gap: .625em;
+    min-width: 0;
+}
+
+/* Package fallback tile - always rendered; a loaded image covers it. */
+.MPC-dos-li-thumb {
+    position: relative;
+    width: 2.25em;
+    height: 2.25em;
+    flex: 0 0 auto;
+    border-radius: 9px;
+    border: 1px solid #E4EDF4;
+    background: linear-gradient(180deg, #EEF6FF, #E3F1FD);
+    color: #7FB4DC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.MPC-dos-li-thumb svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-dos-li-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.MPC-dos-li-main {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-dos-li-name {
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dos-li-sku {
+    font-size: 0.6875em;
+    color: #748494;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dos-l-qty,
+.MPC-dos-l-price,
+.MPC-dos-l-total {
+    font-size: 0.8125em;
+    color: #102C3F;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-dos-l-total {
+    font-weight: 700;
+}
+
+.MPC-dos-ta-r {
+    text-align: right;
+}
+
+/* ---- Line pager ---- */
+.MPC-dos-lp {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: .5em;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-lp-helper {
+    font-size: 0.75em;
+    color: #748494;
+}
+
+.MPC-dos-lp-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.MPC-dos-lp-btn {
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 0.4em;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+}
+
+.MPC-dos-lp-btn:hover:not(:disabled) {
+    background: #EAF4FD;
+}
+
+.MPC-dos-lp-btn:disabled {
+    background: rgba(255, 255, 255, 0.6);
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.MPC-dos-lp-btn svg {
+    width: 0.65em;
+    height: 0.65em;
+}
+
+.MPC-dos-lp-text {
+    font-size: 0.75em;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+/* ---- Totals ---- */
+.MPC-dos-totals {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-top: 1px solid #EDF2F6;
+    padding-top: 8px;
+    flex: 0 0 auto;
+}
+
+.MPC-dos-total-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8125em;
+    color: #5F7283;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-dos-total-grand {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: #102C3F;
+}

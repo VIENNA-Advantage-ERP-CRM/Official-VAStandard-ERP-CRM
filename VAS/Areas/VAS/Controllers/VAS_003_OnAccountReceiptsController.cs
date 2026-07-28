@@ -35,7 +35,7 @@ namespace VIS.Controllers
         /// C_Payment table inside the OnAccountAgg CTE — never on the CTE alias
         /// or the outer combined query, per the project CTE rule.
         /// </summary>
-        /// <returns>JSON { cCurrencyId, symbol, onAccountAmount, advanceCount }.</returns>
+        /// <returns>JSON { cCurrencyId, symbol, isoCode, stdPrecision, onAccountAmount, advanceCount }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
         public JsonResult GetOnAccountReceipts()
@@ -57,6 +57,7 @@ namespace VIS.Controllers
                 SELECT ClientInfo.AD_Client_ID AS AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision AS StdPrecision,
+                       Currency.ISO_Code AS ISO_Code,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (AcctSchema.C_AcctSchema_ID=ClientInfo.C_AcctSchema1_ID)
@@ -96,6 +97,8 @@ namespace VIS.Controllers
                 )
                 SELECT SchemaCurrency.C_Currency_ID,
                        SchemaCurrency.Cur_Symbol,
+                       SchemaCurrency.ISO_Code,
+                       SchemaCurrency.StdPrecision AS Std_Precision,
                        COALESCE(OnAccountAgg.Advance_Count, 0) AS Advance_Count,
                        ROUND(COALESCE(OnAccountAgg.OnAccountAmount, 0), SchemaCurrency.StdPrecision) AS OnAccountAmount
                 FROM SchemaCurrency
@@ -103,6 +106,8 @@ namespace VIS.Controllers
 
             int currencyId = 0;
             string currencySymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
             decimal onAccountAmount = 0;
             int advanceCount = 0;
 
@@ -116,6 +121,11 @@ namespace VIS.Controllers
                 {
                     currencyId = Util.GetValueOfInt(dr["C_Currency_ID"]);
                     currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    isoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                    if (dr["Std_Precision"] != null && dr["Std_Precision"] != DBNull.Value)
+                    {
+                        stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]);
+                    }
                     advanceCount = Util.GetValueOfInt(dr["Advance_Count"]);
                     onAccountAmount = Util.GetValueOfDecimal(dr["OnAccountAmount"]);
                 }
@@ -124,6 +134,8 @@ namespace VIS.Controllers
                 {
                     cCurrencyId = currencyId,
                     symbol = currencySymbol,
+                    isoCode = isoCode,
+                    stdPrecision = stdPrecision,
                     onAccountAmount = onAccountAmount,
                     advanceCount = advanceCount
                 };

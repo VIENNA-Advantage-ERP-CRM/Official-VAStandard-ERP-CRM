@@ -264,8 +264,7 @@
             updateDonut(percent, status);
 
             if ($percentText) {
-                var prec = getStdPrecision();
-                $percentText.text(formatExactAmount(percent, prec) + "%");
+                $percentText.text(formatExactAmount(percent, 2) + "%");
                 $percentText.css("color", donutValueColor(status));
             }
 
@@ -273,9 +272,9 @@
 
             if ($dsoText) {
                 $dsoText.html(
-                    '<strong>' + escapeHtml(lbl("VAS_001_DSO", "DSO")) + '</strong> ' +
+                    escapeHtml(lbl("VAS_001_DSO", "DSO")) +
                     escapeHtml(String(dsoDays)) + ' ' +
-                    escapeHtml(lbl("VAS_001_DaysTarget", "days · target")) + ' ' +
+                    escapeHtml(lbl("VAS_001_DaysTarget", " Target Days")) + ' ' +
                     escapeHtml(String(targetDays))
                 );
             }
@@ -513,7 +512,7 @@
                 '<thead><tr>' +
                 '<th class="vas-ce-d-th-doc">' + escapeHtml(lbl("VAS_InvoiceNo", "Invoice No.")) + '</th>' +
                 '<th class="vas-ce-d-th-cust">' + escapeHtml(lbl("VAS_Customer", "Customer")) + '</th>' +
-                '<th class="vas-ce-d-th-date">' + escapeHtml(lbl("VAS_DueDate", "Due date")) + '</th>' +
+                '<th class="vas-ce-d-th-date">' + escapeHtml(lbl("VAS_DueDate", "Due Date")) + '</th>' +
                 '<th class="vas-ce-d-th-age">' + escapeHtml(lbl("VAS_001_Age", "Age")) + '</th>' +
                 '<th class="vas-ce-d-th-cur">' + escapeHtml(lbl("VAS_Currency", "Currency")) + '</th>' +
                 '<th class="vas-ce-d-th-amount">' + escapeHtml(lbl("VAS_001_OverdueAmount", "Overdue amount")) + '</th>' +
@@ -594,7 +593,7 @@
                 '<div class="vas-ce-body">' +
                 '<div class="vas-ce-donut">' +
                 '<svg viewBox="0 0 140 140" aria-hidden="true">' +
-                '<circle cx="70" cy="70" r="56" fill="none" stroke="#EDF2F6" stroke-width="14"/>' +
+                '<circle cx="70" cy="70" r="56" fill="none" stroke="#E2EAF1" stroke-width="14"/>' +
                 '<circle class="vas-ce-ring-fg" cx="70" cy="70" r="56" fill="none" stroke="#019D89" stroke-width="14" pathLength="100" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 70 70)"/>' +
                 '</svg>' +
                 '<div class="vas-ce-donut-center">' +
@@ -603,7 +602,7 @@
                 '</div>' +
                 '</div>' +
                 '<div class="vas-ce-meta">' +
-                '<div class="vas-ce-dso"><strong>' + escapeHtml(lbl("VAS_001_DSO", "DSO")) + '</strong> 0 ' + escapeHtml(lbl("VAS_001_DaysTarget", "days · target")) + ' 22</div>' +
+                '<div class="vas-ce-dso">' + escapeHtml(lbl("VAS_001_DSO", "DSO")) + ' 0 ' + escapeHtml(lbl("VAS_001_DaysTarget", "days · target days")) + ' 0</div>' +
                 '<div class="vas-ce-overdue">0 ' + escapeHtml(lbl("VAS_001_OverdueDot", "overdue ·")) + ' 0 ' + escapeHtml(lbl("VAS_001_Invoices", "invoices")) + '</div>' +
                 '</div>' +
                 '</div>' +

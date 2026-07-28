@@ -156,6 +156,7 @@
     <Compile Include="Models\VAS_103_MaterialTransferModel.cs" />
     <Compile Include="Models\VAS_104_OverviewShipGRNConfirmationModel.cs" />
     <Compile Include="Models\VAS_105_AccountRightPanelModel.cs" />
+    <Compile Include="Models\VAS_106_OverviewSalesOrderModel.cs" />
     <Compile Include="Models\VAS_InvoiceOverviewModel.cs" />
     <Compile Include="Models\VAS_PaymentVoucherPanelModel.cs" />
     <Compile Include="Models\VAS_RecentReceiptsModel.cs" />
@@ -163,6 +164,7 @@
     <Compile Include="Models\VAS_014_DailyCollectionTrendModel.cs" />
     <Compile Include="Models\VAS_015_OutstandingVsReceivedModel.cs" />
     <Compile Include="Models\VAS_035_MatchSuggestionsModel.cs" />
+    <Compile Include="Models\VAS_118_QuickJournalModel.cs" />
     <Compile Include="Models\VAS_SentEmailDocModel.cs" />
     <Compile Include="Models\VAS_LeadModel.cs" />
     <Compile Include="Models\VAS_PaymentWidgetModel.cs" />

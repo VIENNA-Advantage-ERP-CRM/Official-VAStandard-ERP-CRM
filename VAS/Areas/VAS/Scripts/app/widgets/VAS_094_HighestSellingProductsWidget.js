@@ -352,14 +352,20 @@
                     if (typeof result === 'string' && result) { result = JSON.parse(result); }
 
                     if (!result || result.error) {
-                        $modalBody.html('<div class="MPC-hsp-modal-state">' + escapeHtml(label('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+                        /* Surface the server-provided reason when there is one so a
+                           data/session problem is distinguishable from a load failure. */
+                        var reason = (result && result.error) ? result.error : label('VAS_CouldntLoad', "Couldn't load");
+                        $modalBody.html('<div class="MPC-hsp-modal-state">' + escapeHtml(reason) + '</div>');
                         return;
                     }
                     renderPerformanceModal(result, rank);
                 },
                 error: function (xhr, status) {
                     if (status !== 'abort') {
-                        $modalBody.html('<div class="MPC-hsp-modal-state">' + escapeHtml(label('VAS_CouldntLoad', "Couldn't load")) + '</div>');
+                        /* Include the HTTP status: 404 means the endpoint is missing
+                           on the running server (stale VAS.dll), 500 a server fault. */
+                        var detail = label('VAS_CouldntLoad', "Couldn't load") + ' (HTTP ' + (xhr && xhr.status ? xhr.status : 0) + ')';
+                        $modalBody.html('<div class="MPC-hsp-modal-state">' + escapeHtml(detail) + '</div>');
                     }
                 },
                 complete: function () {

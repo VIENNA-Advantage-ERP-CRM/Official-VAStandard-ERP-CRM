@@ -809,33 +809,25 @@ SchemaCurrency AS
         AcctSchema.C_Currency_ID,
         Currency.StdPrecision,
         Currency.ISO_Code,
-
         CASE
             WHEN Currency.CurSymbol IS NOT NULL
             THEN Currency.CurSymbol
             ELSE Currency.ISO_Code
         END AS CurSymbol
-
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_AcctSchema AcctSchema ON
     (
         AcctSchema.C_AcctSchema_ID =
         ClientInfo.C_AcctSchema1_ID
     )
-
     INNER JOIN C_Currency Currency ON
     (
         Currency.C_Currency_ID =
         AcctSchema.C_Currency_ID
     )
-
     WHERE ClientInfo.IsActive = 'Y'
-
     AND AcctSchema.IsActive = 'Y'
-
     AND Currency.IsActive = 'Y'
-
     AND ClientInfo.AD_Client_ID =
     (
         SELECT
@@ -856,11 +848,8 @@ SELECT
     CashHeader.DateAcct,
     CashHeader.EndingBalance,
     CashHeader.DocStatus
-
 FROM C_Cash CashHeader
-
 WHERE CashHeader.IsActive = 'Y'
-
 AND CashHeader.AD_Client_ID =
 (
     SELECT
@@ -868,28 +857,23 @@ AND CashHeader.AD_Client_ID =
 
     FROM QueryParameters QueryParameters
 )
-
 AND CashHeader.DocStatus IN
 (
     'DR',
     'CO',
     'CL'
 )
-
 AND
 (
     (
         SELECT
             QueryParameters.C_CashBook_ID
-
         FROM QueryParameters QueryParameters
     ) <= 0
-
     OR CashHeader.C_CashBook_ID =
     (
         SELECT
             QueryParameters.C_CashBook_ID
-
         FROM QueryParameters QueryParameters
     )
 )";
@@ -907,13 +891,11 @@ AND
 CASE
     WHEN CashBook.C_Currency_ID =
         SchemaCurrency.C_Currency_ID
-
     THEN COALESCE
     (
         ProtectedCash.EndingBalance,
         0
     )
-
     ELSE CurrencyConvert
     (
         COALESCE
@@ -948,9 +930,7 @@ RankedCash AS
         ProtectedCash.DocumentNo,
         ProtectedCash.StatementDate,
         ProtectedCash.DateAcct,
-
         CashBook.Name AS CashBookName,
-
         ROUND
         (
             CAST
@@ -958,7 +938,6 @@ RankedCash AS
                 " + convertedBalanceSql + @"
                 AS " + numericType + @"
             ),
-
             CAST
             (
                 COALESCE
@@ -969,44 +948,34 @@ RankedCash AS
                 AS INTEGER
             )
         ) AS CurrentBalance,
-
         COALESCE
         (
             SchemaCurrency.StdPrecision,
             2
         ) AS StdPrecision,
-
         SchemaCurrency.C_Currency_ID,
-
         SchemaCurrency.ISO_Code
             AS CurrencyISO,
-
         SchemaCurrency.CurSymbol
             AS CurrencySymbol,
-
         ROW_NUMBER() OVER
         (
             ORDER BY
                 ProtectedCash.StatementDate DESC,
                 ProtectedCash.C_Cash_ID DESC
         ) AS RowNumber
-
     FROM ProtectedCash ProtectedCash
-
     INNER JOIN C_CashBook CashBook ON
     (
         CashBook.C_CashBook_ID =
         ProtectedCash.C_CashBook_ID
     )
-
     INNER JOIN SchemaCurrency SchemaCurrency ON
     (
         SchemaCurrency.AD_Client_ID =
         ProtectedCash.AD_Client_ID
     )
-
     WHERE CashBook.IsActive = 'Y'
-
     AND CashBook.AD_Client_ID =
         ProtectedCash.AD_Client_ID
 )
@@ -1022,9 +991,7 @@ SELECT
     RankedCash.C_Currency_ID,
     RankedCash.CurrencyISO,
     RankedCash.CurrencySymbol
-
 FROM RankedCash RankedCash
-
 WHERE RankedCash.RowNumber = 1";
 
             SqlParameter[] parameters =
@@ -1087,40 +1054,31 @@ SELECT
     CashHeader.DateAcct,
     CashHeader.EndingBalance,
     CashHeader.DocStatus
-
 FROM C_Cash CashHeader
-
 WHERE CashHeader.IsActive = 'Y'
-
 AND CashHeader.AD_Client_ID =
 (
     SELECT
         QueryParameters.AD_Client_ID
-
     FROM QueryParameters QueryParameters
 )
-
 AND CashHeader.DocStatus IN
 (
     'DR',
     'CO',
     'CL'
 )
-
 AND
 (
     (
         SELECT
             QueryParameters.C_CashBook_ID
-
         FROM QueryParameters QueryParameters
     ) <= 0
-
     OR CashHeader.C_CashBook_ID =
     (
         SELECT
             QueryParameters.C_CashBook_ID
-
         FROM QueryParameters QueryParameters
     )
 )";
@@ -1160,14 +1118,12 @@ RankedCash AS
         ProtectedCash.StatementDate,
         ProtectedCash.DateAcct,
         ProtectedCash.DocStatus,
-
         ROW_NUMBER() OVER
         (
             ORDER BY
                 ProtectedCash.StatementDate DESC,
                 ProtectedCash.C_Cash_ID DESC
         ) AS RowNumber
-
     FROM ProtectedCash ProtectedCash
 ),
 LatestCash AS
@@ -1181,9 +1137,7 @@ LatestCash AS
         RankedCash.StatementDate,
         RankedCash.DateAcct,
         RankedCash.DocStatus
-
     FROM RankedCash RankedCash
-
     WHERE RankedCash.RowNumber = 1
 ),
 StatusReference AS
@@ -1197,7 +1151,6 @@ StatusReference AS
                 AS " + textType + @"
             )
         ) AS StatusValue,
-
         TRIM
         (
             CAST
@@ -1206,7 +1159,6 @@ StatusReference AS
                 AS " + textType + @"
             )
         ) AS BaseName,
-
         TRIM
         (
             CAST
@@ -1215,53 +1167,39 @@ StatusReference AS
                 AS " + textType + @"
             )
         ) AS TranslatedName
-
     FROM AD_Table TableInfo
-
     INNER JOIN AD_Column ColumnInfo ON
     (
         ColumnInfo.AD_Table_ID =
         TableInfo.AD_Table_ID
     )
-
     INNER JOIN AD_Reference ReferenceInfo ON
     (
         ReferenceInfo.AD_Reference_ID =
         ColumnInfo.AD_Reference_Value_ID
     )
-
     INNER JOIN AD_Ref_List RefList ON
     (
         RefList.AD_Reference_ID =
         ReferenceInfo.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
         RefListTrl.AD_Ref_List_ID =
         RefList.AD_Ref_List_ID
-
         AND RefListTrl.AD_Language =
         (
             SELECT
                 QueryParameters.AD_Language
-
             FROM QueryParameters QueryParameters
         )
-
         AND RefListTrl.IsActive = 'Y'
     )
-
     WHERE TableInfo.TableName = 'C_Cash'
-
     AND ColumnInfo.ColumnName = 'DocStatus'
-
     AND TableInfo.IsActive = 'Y'
-
     AND ColumnInfo.IsActive = 'Y'
-
     AND ReferenceInfo.IsActive = 'Y'
-
     AND RefList.IsActive = 'Y'
 ),
 CashTypeReference AS
@@ -1293,53 +1231,39 @@ CashTypeReference AS
                 AS " + textType + @"
             )
         ) AS TranslatedName
-
     FROM AD_Table TableInfo
-
     INNER JOIN AD_Column ColumnInfo ON
     (
         ColumnInfo.AD_Table_ID =
         TableInfo.AD_Table_ID
     )
-
     INNER JOIN AD_Reference ReferenceInfo ON
     (
         ReferenceInfo.AD_Reference_ID =
         ColumnInfo.AD_Reference_Value_ID
     )
-
     INNER JOIN AD_Ref_List RefList ON
     (
         RefList.AD_Reference_ID =
         ReferenceInfo.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
         RefListTrl.AD_Ref_List_ID =
         RefList.AD_Ref_List_ID
-
         AND RefListTrl.AD_Language =
         (
             SELECT
                 QueryParameters.AD_Language
-
             FROM QueryParameters QueryParameters
         )
-
         AND RefListTrl.IsActive = 'Y'
     )
-
     WHERE TableInfo.TableName = 'C_CashLine'
-
     AND ColumnInfo.ColumnName = 'CashType'
-
     AND TableInfo.IsActive = 'Y'
-
     AND ColumnInfo.IsActive = 'Y'
-
     AND ReferenceInfo.IsActive = 'Y'
-
     AND RefList.IsActive = 'Y'
 ),
 CashLineRows AS
@@ -1351,18 +1275,14 @@ CashLineRows AS
         LatestCash.StatementDate,
         LatestCash.DateAcct,
         LatestCash.DocStatus,
-
         StatusReference.BaseName
             AS StatusBaseName,
-
         StatusReference.TranslatedName
             AS StatusTranslatedName,
-
         CashLine.C_CashLine_ID,
         CashLine.Description,
         CashLine.Amount,
         CashLine.C_Charge_ID,
-
         TRIM
         (
             CAST
@@ -1371,39 +1291,29 @@ CashLineRows AS
                 AS " + textType + @"
             )
         ) AS CashTypeValue,
-
         CashTypeReference.BaseName
             AS CashTypeBaseName,
-
         CashTypeReference.TranslatedName
             AS CashTypeTranslatedName,
-
         Charge.Name
             AS ChargeName,
-
         CashBook.Name
             AS CashBookName,
-
         Currency.ISO_Code
             AS CurrencyISO,
-
         Currency.CurSymbol
             AS CurrencySymbol,
-
         COALESCE
         (
             Currency.StdPrecision,
             2
         ) AS StdPrecision
-
     FROM LatestCash LatestCash
-
     INNER JOIN C_CashLine CashLine ON
     (
         CashLine.C_Cash_ID =
         LatestCash.C_Cash_ID
     )
-
     INNER JOIN C_CashBook CashBook ON
     (
         CashBook.C_CashBook_ID =
@@ -1411,7 +1321,6 @@ CashLineRows AS
 
         AND CashBook.IsActive = 'Y'
     )
-
     INNER JOIN C_Currency Currency ON
     (
         Currency.C_Currency_ID =
@@ -1419,13 +1328,11 @@ CashLineRows AS
 
         AND Currency.IsActive = 'Y'
     )
-
     LEFT OUTER JOIN C_Charge Charge ON
     (
         Charge.C_Charge_ID =
         CashLine.C_Charge_ID
     )
-
     LEFT OUTER JOIN StatusReference StatusReference ON
     (
         StatusReference.StatusValue =
@@ -1438,7 +1345,6 @@ CashLineRows AS
             )
         )
     )
-
     LEFT OUTER JOIN CashTypeReference CashTypeReference ON
     (
         CashTypeReference.CashTypeValue =
@@ -1451,7 +1357,6 @@ CashLineRows AS
             )
         )
     )
-
     WHERE CashLine.IsActive = 'Y'
 ),
 NumberedRows AS
@@ -1477,12 +1382,10 @@ NumberedRows AS
         CashLineRows.CurrencyISO,
         CashLineRows.CurrencySymbol,
         CashLineRows.StdPrecision,
-
         COUNT
         (
             1
         ) OVER () AS TotalRecords,
-
         ROUND
         (
             CAST
@@ -1497,20 +1400,17 @@ NumberedRows AS
                 ) OVER ()
                 AS " + numericType + @"
             ),
-
             CAST
             (
                 CashLineRows.StdPrecision
                 AS INTEGER
             )
         ) AS TotalAmount,
-
         ROW_NUMBER() OVER
         (
             ORDER BY
                 CashLineRows.C_CashLine_ID
         ) AS RowNo
-
     FROM CashLineRows CashLineRows
 )
 SELECT
@@ -1536,9 +1436,7 @@ SELECT
     NumberedRows.StdPrecision,
     NumberedRows.TotalRecords,
     NumberedRows.TotalAmount
-
 FROM NumberedRows NumberedRows
-
 WHERE NumberedRows.RowNo >=
 (
     SELECT
@@ -1546,7 +1444,6 @@ WHERE NumberedRows.RowNo >=
 
     FROM QueryParameters QueryParameters
 )
-
 AND NumberedRows.RowNo <=
 (
     SELECT
@@ -1554,7 +1451,6 @@ AND NumberedRows.RowNo <=
 
     FROM QueryParameters QueryParameters
 )
-
 ORDER BY
     NumberedRows.RowNo";
 

@@ -21,12 +21,12 @@
  *  3  | items                                 | VAS_081_Items
  *  4  | Today                                 | VAS_081_Today
  *  5  | Yesterday                             | VAS_081_Yesterday
- *  6  | Receipt                               | VAS_081_Receipt
+ *  6  | (removed - review #23)                | VAS_081_Receipt
  *  7  | Linked PO                             | VAS_081_LinkedPO
- *  8  | Supplier                              | VAS_081_Supplier
- *  9  | Customer / Project                    | VAS_081_CustomerProject
+ *  8  | (removed - review #23)                | VAS_081_Supplier
+ *  9  | (removed - review #23)                | VAS_081_CustomerProject
  * 10  | Received on                           | VAS_081_ReceivedOn
- * 11  | Put-away on                           | VAS_081_PutAwayOn
+ * 11  | (removed - review #23)                | VAS_081_PutAwayOn
  * 12  | Receipt Lines                         | VAS_081_ReceiptLines
  * 13  | Item                                  | VAS_081_Product
  * 14  | PO Qty                                | VAS_081_POQty
@@ -230,7 +230,9 @@
             var rowHeight = $listBody.find('.vas-mrr-row').first().outerHeight(true) || 44;
             if (!listHeight || !rowHeight) { return pageSize; }
 
-            return Math.max(3, Math.floor(listHeight / rowHeight));
+            /* Review #45: the register fits 4 records on the standard 2x3 card
+               (compact rows); the count still grows with taller screens/zoom. */
+            return Math.max(4, Math.floor(listHeight / rowHeight));
         }
 
         function syncPageSize() {
@@ -405,17 +407,16 @@
 
             $dialogTitle.text((r.receiptNo || '') + ' - ' + (r.supplier || ''));
 
+            // Review #23 (follow-up): Receipt, Supplier, Customer/Project and
+            // Put-away on removed from the modal - the title bar already
+            // carries "Receipt No - Supplier".
             var header =
                 '<div class="vas-mrr-form">' +
-                field("VAS_081_Receipt", "Receipt", r.receiptNo, true) +
                 field("VAS_081_LinkedPO", "Linked PO", r.linkedPoNo || "—") +
-                field("VAS_081_Supplier", "Supplier", r.supplier) +
-                field("VAS_081_CustomerProject", "Customer / Project", r.customerProject || "—") +
                 // Review #24: Warehouse and Representative shown on the modal.
                 field("VAS_081_Warehouse", "Warehouse", r.warehouseName || "—") +
                 field("VAS_081_Representative", "Representative", r.salesRepName || "—") +
                 field("VAS_081_ReceivedOn", "Received on", formatFullDate(r.receivedOn)) +
-                field("VAS_081_PutAwayOn", "Put-away on", formatFullDate(r.putAwayOn)) +
                 '</div>' +
                 '<div class="vas-mrr-lines-title">' + escapeHtml(lbl("VAS_081_ReceiptLines", "Receipt Lines")) + '</div>' +
                 '<div class="vas-mrr-lines-wrap"></div>';
@@ -592,5 +593,12 @@
         if (this.frame) { this.frame.dispose(); }
         this.frame = null;
     };
+
+    /* Review #46: dashboard records reference this widget by class-name string
+       (AD_Widget.Name), and the home and window-specific (GRN screen) catalogs
+       hold separate records whose names can differ - one uses the un-numbered
+       form. Registering the constructor under both names makes the widget load
+       regardless of which record a screen resolves it through. */
+    VAS.VAS_MaterialReceiptRegisterWidget = VAS.VAS_081_MaterialReceiptRegisterWidget;
 
 })(VAS, jQuery);

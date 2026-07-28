@@ -31,6 +31,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_053_ApprovalQueueCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -52,10 +77,22 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
+        /* ── Currency label helper ──────────────────────────────────────
+           Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
+            }
+
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
+        }
+
         function formatAmount(item) {
             var precision = Number(item && item.stdPrecision);
-            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
-            var iso = item && item.currencyISO ? item.currencyISO : '';
+            var currency = getCurrencyLabel(item && item.currencySymbol, item && item.currencyISO);
 
             if (isNaN(precision) || precision < 0) {
                 precision = 2;
@@ -68,17 +105,12 @@
             });
             var sign = numericValue < 0 ? '-' : '';
 
-            if (symbol) {
-                return sign + symbol + amount;
-            }
-
-            return iso ? sign + iso + amount : sign + amount;
+            return sign + currency + amount;
         }
 
         function renderAmount($target, item) {
             var precision = Number(item && item.stdPrecision);
-            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
-            var iso = item && item.currencyISO ? item.currencyISO : '';
+            var currency = getCurrencyLabel(item && item.currencySymbol, item && item.currencyISO);
 
             if (isNaN(precision) || precision < 0) {
                 precision = 2;
@@ -94,7 +126,7 @@
             $target.empty()
                 .append($('<span>', {
                     'class': 'VAS-cash-amount-prefix',
-                    'text': (numericValue < 0 ? '-' : '') + (symbol || iso)
+                    'text': (numericValue < 0 ? '-' : '') + currency
                 }))
                 .append($('<span>', {
                     'class': 'VAS-cash-amount-main',
@@ -559,6 +591,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_053_ApprovalQueueCashJournalWidget.prototype.widgetSizeChange = function (height, width) {

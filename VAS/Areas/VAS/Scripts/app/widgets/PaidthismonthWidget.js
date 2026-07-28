@@ -141,8 +141,8 @@
                 '</div>' +
 
                 '<div>' +
-                '<div class="vas-ptm-title">' + lbl("VAS_058_PaidThisMonth", 'Paid this month') + '</div>' +
-                '<div class="vas-ptm-subtitle">' + lbl("VAS_058_CashReceived", 'Cash received') + '</div>' +
+                '<div class="vas-ptm-title">' + lbl("VAS_058_PaidThisMonth", 'Paid This Month') + '</div>' +
+                '<div class="vas-ptm-subtitle">' + lbl("VAS_058_CashReceived", 'Amount Received') + '</div>' +
                 '</div>' +
                 '</div>'
             );

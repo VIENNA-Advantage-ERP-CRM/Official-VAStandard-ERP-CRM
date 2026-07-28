@@ -22,6 +22,7 @@ namespace VAS.Models
     /// Purpose       : Account Right Detail Panel — data model
     /// Chronological development:
     ///   VAI154  09-Jun-2026
+    ///   VAI154  10-Jul-2026  Added product details to Contracts section
     /// </summary>
     public class VAS_105_AccountRightPanelModel
     {
@@ -335,12 +336,14 @@ namespace VAS.Models
             {
                 var sb = new StringBuilder();
                 sb.Append("SELECT u.AD_User_ID AS id,");
-                sb.Append("       u.Name || ' ' || u.LastName AS name,");
-                sb.Append("       j.Name AS title,");
+                // COALESCE guards against NULL LastName so the concatenated name is never NULL
+                sb.Append("       TRIM(COALESCE(u.Name,N'') || ' ' || COALESCE(u.LastName,N'')) AS name,");
+                // LEFT OUTER JOIN so contacts without a job entry are still included
+                sb.Append("       COALESCE(j.Name, u.Title, N'') AS title,");
                 sb.Append("       u.EMail AS email,");
                 sb.Append("       u.Phone AS phone");
                 sb.Append("  FROM AD_User u");
-                sb.Append("  INNER JOIN C_Job j ON (j.C_Job_ID = u.C_Job_ID AND j.IsActive = 'Y')");
+                sb.Append("  LEFT OUTER JOIN C_Job j ON (j.C_Job_ID = u.C_Job_ID AND j.IsActive = 'Y')");
                 sb.Append(" WHERE u.IsActive = 'Y' AND u.C_BPartner_ID = @bPartnerId");
 
                 string baseSql = sb.ToString();
@@ -414,9 +417,11 @@ namespace VAS.Models
                 sb.Append("       co.Name AS country,");
                 sb.Append("       CASE WHEN bpl.IsShipTo = 'Y' THEN 'VAS_105_ShipTo'");
                 sb.Append("            WHEN bpl.IsBillTo = 'Y' THEN 'VAS_105_BillTo'");
-                sb.Append("            ELSE 'VAS_105_Site' END AS loc_type");
-                // sb.Append("       (SELECT MIN(uu.Name) FROM AD_User uu WHERE uu.C_BPartner_Location_ID = bpl.C_BPartner_Location_ID AND uu.IsActive = 'Y') AS primary_contact");
-                sb.Append("  FROM AD_USER usr INNER JOIN C_BPartner_Location bpl ON (bpl.C_BPartner_Location_ID = usr.C_BPartner_Location_ID)");
+                sb.Append("            ELSE 'VAS_105_Site' END AS loc_type,");
+                // Scalar subquery for primary contact — avoids duplicate rows from a JOIN
+                sb.Append("       (SELECT MIN(uu.Name) FROM AD_User uu WHERE uu.C_BPartner_Location_ID = bpl.C_BPartner_Location_ID AND uu.IsActive = 'Y') AS primary_contact");
+                // Drive FROM C_BPartner_Location directly; the old AD_USER INNER JOIN excluded locations without linked users
+                sb.Append("  FROM C_BPartner_Location bpl");
                 sb.Append("  LEFT OUTER JOIN C_Location l ON (l.C_Location_ID = bpl.C_Location_ID)");
                 sb.Append("  LEFT OUTER JOIN C_Country co ON (co.C_Country_ID = l.C_Country_ID)");
                 sb.Append(" WHERE bpl.IsActive = 'Y' AND bpl.C_BPartner_ID = @bPartnerId");
@@ -426,7 +431,7 @@ namespace VAS.Models
                     baseSql, "bpl", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
 
                 // ORDER BY appended after AddAccessSQL (RULE 5)
-                accessSql += " ORDER BY usr.Name";
+                accessSql += " ORDER BY bpl.Name";
 
                 var sqlParams = new SqlParameter[]
                 {
@@ -448,7 +453,7 @@ namespace VAS.Models
                         item.regionName = Util.GetValueOfString(row["region_name"]);
                         item.country = Util.GetValueOfString(row["country"]);
                         item.locType = Msg.GetMsg(ctx, Util.GetValueOfString(row["loc_type"]));
-                        item.primaryContact = string.Empty;
+                        item.primaryContact = Util.GetValueOfString(row["primary_contact"]);
                         items.Add(item);
                     }
                     response.total = items.Count;
@@ -592,7 +597,8 @@ namespace VAS.Models
         /// Dynamic object with <c>items</c> and base-currency metadata.
         /// Each item exposes: <c>id</c>, <c>contractNo</c>, <c>name</c>,
         /// <c>typeCode</c>, <c>startDate</c>, <c>endDate</c>, <c>statusCode</c>,
-        /// <c>renewalCode</c>, <c>value</c>, <c>source</c> ("CC" = C_Contract, "VM" = VAS_ContractMaster).
+        /// <c>renewalCode</c>, <c>value</c>, <c>productName</c>,
+        /// <c>source</c> ("CC" = C_Contract, "VM" = VAS_ContractMaster).
         /// </returns>
         public dynamic GetContracts(Ctx ctx, int bPartnerId)
         {
@@ -626,14 +632,17 @@ namespace VAS.Models
                     sbCC.Append("       ct.ContractType AS type_code,");
                     sbCC.Append("       TO_CHAR(ct.StartDate,'YYYY-MM-DD') AS start_date,");
                     sbCC.Append("       TO_CHAR(ct.EndDate,'YYYY-MM-DD') AS end_date,");
-                    sbCC.Append("       ct.DocStatus AS status_code,");
+                    sbCC.Append("       ct.Processed AS status_code,");
                     sbCC.Append("       ct.RenewalType AS renewal_code,");
-                    sbCC.Append("       CURRENCYCONVERT(ct.GrandTotal, ct.C_Currency_ID, cs.C_Currency_ID,");
+                    // COALESCE ensures the raw amount is shown when no conversion rate exists
+                    sbCC.Append("       COALESCE(CURRENCYCONVERT(ct.GrandTotal, ct.C_Currency_ID, cs.C_Currency_ID,");
                     sbCC.Append("           COALESCE(ct.StartDate, CURRENT_DATE), NULL,");
-                    sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID) AS value");
+                    sbCC.Append("           ct.AD_Client_ID, ct.AD_Org_ID), ct.GrandTotal) AS value,");
+                    sbCC.Append("       p.Name AS product_name");
                     sbCC.Append("  FROM C_Contract ct");
                     sbCC.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = ct.AD_Client_ID)");
                     sbCC.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
+                    sbCC.Append("  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = ct.M_Product_ID)");
                     sbCC.Append(" WHERE ct.IsActive = 'Y' AND ct.C_BPartner_ID = @bPartnerIdCC");
 
                     string accessCC = MRole.GetDefault(ctx).AddAccessSQL(
@@ -655,8 +664,9 @@ namespace VAS.Models
                             item.endDate    = Util.GetValueOfString(row["end_date"]);
                             item.statusCode = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
-                            item.value      = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
-                            item.source     = "CC";
+                            item.value       = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.productName = Util.GetValueOfString(row["product_name"]);
+                            item.source      = "CC";
                             items.Add(item);
                         }
                     }
@@ -678,9 +688,10 @@ namespace VAS.Models
                     sbVM.Append("       TO_CHAR(vm.EndDate,'YYYY-MM-DD') AS end_date,");
                     sbVM.Append("       vm.VAS_Status AS status_code,");
                     sbVM.Append("       vm.RenewalType AS renewal_code,");
-                    sbVM.Append("       CURRENCYCONVERT(vm.VAS_ContractAmount, vm.C_Currency_ID, cs.C_Currency_ID,");
+                    // COALESCE ensures the raw amount is shown when no conversion rate exists
+                    sbVM.Append("       COALESCE(CURRENCYCONVERT(vm.VAS_ContractAmount, vm.C_Currency_ID, cs.C_Currency_ID,");
                     sbVM.Append("           COALESCE(vm.StartDate, CURRENT_DATE), NULL,");
-                    sbVM.Append("           vm.AD_Client_ID, vm.AD_Org_ID) AS value");
+                    sbVM.Append("           vm.AD_Client_ID, vm.AD_Org_ID), vm.VAS_ContractAmount) AS value");
                     sbVM.Append("  FROM VAS_ContractMaster vm");
                     sbVM.Append("  INNER JOIN AD_ClientInfo ci ON (ci.AD_Client_ID = vm.AD_Client_ID)");
                     sbVM.Append("  INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID = ci.C_AcctSchema1_ID)");
@@ -705,8 +716,9 @@ namespace VAS.Models
                             item.endDate    = Util.GetValueOfString(row["end_date"]);
                             item.statusCode = Util.GetValueOfString(row["status_code"]);
                             item.renewalCode = Util.GetValueOfString(row["renewal_code"]);
-                            item.value      = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
-                            item.source     = "VM";
+                            item.value       = row["value"] != DBNull.Value ? Convert.ToDecimal(row["value"]) : 0m;
+                            item.productName = "";
+                            item.source      = "VM";
                             items.Add(item);
                         }
                     }
@@ -714,6 +726,73 @@ namespace VAS.Models
                 catch (Exception exVM)
                 {
                     _log.SaveError("VAS_105_AccountRightPanelModel.GetContracts.VAS_ContractMaster", exVM.Message);
+                }
+
+                // ── Part 2b: Enrich VAS_ContractMaster items with product names from VAS_ContractLine ──
+                try
+                {
+                    // Collect VAS_ContractMaster IDs from the items already fetched
+                    var vmIds = new List<int>();
+                    foreach (dynamic it in items)
+                    {
+                        var dict = (IDictionary<string, object>)it;
+                        if ((string)dict["source"] == "VM")
+                            vmIds.Add((int)dict["id"]);
+                    }
+
+                    if (vmIds.Count > 0)
+                    {
+                        // Build a comma-separated integer IN list — these are internal DB IDs, not user input
+                        var sbIds = new StringBuilder();
+                        for (int k = 0; k < vmIds.Count; k++)
+                        {
+                            if (k > 0) sbIds.Append(", ");
+                            sbIds.Append(vmIds[k]);
+                        }
+
+                        var sbProd = new StringBuilder();
+                        sbProd.Append("SELECT vl.VAS_ContractMaster_ID AS master_id,");
+                        sbProd.Append("       p.Name AS product_name");
+                        sbProd.Append("  FROM VAS_ContractLine vl");
+                        sbProd.Append("  INNER JOIN M_Product p ON (p.M_Product_ID = vl.M_Product_ID)");
+                        sbProd.Append(" WHERE vl.IsActive = 'Y' AND vl.M_Product_ID > 0");
+                        sbProd.Append("   AND vl.VAS_ContractMaster_ID IN (");
+                        sbProd.Append(sbIds);
+                        sbProd.Append(") ORDER BY vl.VAS_ContractMaster_ID, p.Name");
+
+                        DataSet dsProd = DB.ExecuteDataset(sbProd.ToString(), null, null);
+
+                        // Aggregate product names per contract master
+                        var productMap = new Dictionary<int, List<string>>();
+                        if (dsProd != null && dsProd.Tables.Count > 0)
+                        {
+                            foreach (DataRow row in dsProd.Tables[0].Rows)
+                            {
+                                int masterId  = Util.GetValueOfInt(row["master_id"]);
+                                string pName  = Util.GetValueOfString(row["product_name"]);
+                                if (!productMap.ContainsKey(masterId))
+                                    productMap[masterId] = new List<string>();
+                                if (!string.IsNullOrEmpty(pName) && !productMap[masterId].Contains(pName))
+                                    productMap[masterId].Add(pName);
+                            }
+                        }
+
+                        // Apply aggregated product names back to the VM items
+                        foreach (dynamic it in items)
+                        {
+                            var dict = (IDictionary<string, object>)it;
+                            if ((string)dict["source"] == "VM")
+                            {
+                                int masterId = (int)dict["id"];
+                                if (productMap.ContainsKey(masterId))
+                                    it.productName = string.Join(", ", productMap[masterId]);
+                            }
+                        }
+                    }
+                }
+                catch (Exception exProd)
+                {
+                    _log.SaveError("VAS_105_AccountRightPanelModel.GetContracts.ProductNames", exProd.Message);
                 }
 
                 // Sort merged list by StartDate descending (YYYY-MM-DD string order == date order)

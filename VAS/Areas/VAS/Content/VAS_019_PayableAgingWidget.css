@@ -6,6 +6,8 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Establishes the query container for the widget root anchor (matches peer widgets). */
+    container-type: inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
@@ -135,7 +137,8 @@
 }
 
 .vas-pawdg-ag-cnt {
-    font-size: 0.75em;
+    /* Secondary metadata (invoice count) — one step below the row label/value (xs token). */
+    font-size: 0.6875em;
     font-weight: 400;
     color: #5F7283;
     text-align: right;
@@ -236,5 +239,14 @@
 .vas-pawdg-lv-err  { color: #D14545; }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-pawdg-container, so no
-   per-breakpoint font-size stepping is needed. */
+   The em anchor clamp on .vas-pawdg-container FLOORS at 16px, so on a narrow /
+   zoomed-in cell content overflows. Step the card base font below that floor. The
+   root already establishes an (unnamed) inline-size container, so these unnamed
+   @container rules query it (matches .vas-oso-* reference). */
+@container (max-width: 300px) {
+    .vas-pawdg-container { font-size: 13px; }
+}
+
+@container (max-width: 220px) {
+    .vas-pawdg-container { font-size: 11px; }
+}

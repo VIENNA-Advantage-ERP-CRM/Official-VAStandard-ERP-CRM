@@ -6,6 +6,11 @@
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
+    /* Named query container so the card can step its base font down on narrow / zoomed
+       cells (see the @container rules at the bottom). Without this the card only had the
+       --dash-inline-size clamp, which floors at 16px and overflows a narrow cell —
+       mirrors VIS.OutstandingSalesOrderWidget. */
+    container: vas-t5vwdg / inline-size;
     /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
        widget root so it never depends on the shared .vas-widget-bg being loaded. */
     background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
@@ -65,6 +70,18 @@
     color: #41576A;
 }
 
+/* No-data message centered in the card body below the header (the container is a
+   flex column filling the card height), at the canonical sm no-data token. */
+.vas-t5vwdg-nodata {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.75em;
+}
+
 /* ---- Vendor list ---- */
 .vas-t5vwdg-list {
     flex-shrink: 0;
@@ -94,7 +111,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.68em;
+    font-size: 0.6875em;
     font-weight: 700;
     letter-spacing: 0.03em;
 }
@@ -111,7 +128,7 @@
 }
 
 .vas-t5vwdg-name {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px); /*0.75em;*/
+    font-size: 0.75em;
     font-weight: 400;
     color: #102C3F;
     white-space: nowrap;
@@ -120,7 +137,7 @@
 }
 
 .vas-t5vwdg-cat {
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 22px);
+    font-size: 0.6875em;
     color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
@@ -133,7 +150,7 @@
 }
 
 .vas-t5vwdg-amt {
-    font-size: clamp(12px,calc(var(--dash-inline-size, 100vw)*.0088),24px);
+    font-size: 0.75em;
     font-weight: 700;
     color: #102C3F;
     white-space: nowrap;
@@ -152,8 +169,8 @@
     display: flex;
     align-items: center;
     gap: 0.35em;
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
-    font-weight: 600;
+    font-size: 0.6875em;
+    font-weight: 500;
     color: #41576A;
     flex-shrink: 0;
     margin-bottom: 0.25em;
@@ -226,7 +243,7 @@
 .vas-t5vwdg-lg-name {
     flex: 1 1 auto;
     min-width: 0;
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 22px);
+    font-size: 0.6875em;
     font-weight: 400;
     color: #41576A;
     white-space: nowrap;
@@ -236,12 +253,25 @@
 
 .vas-t5vwdg-lg-val {
     flex-shrink: 0;
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * .008), 22px);
-    font-weight: 600;
+    font-size: 0.6875em;
+    font-weight: 500;
     color: #102C3F;
     white-space: nowrap;
 }
 
 /* ---- Responsive ----
-   Widget interior scales via the em anchor clamp on .vas-t5vwdg-container, so no
-   per-breakpoint font-size stepping is needed. */
+   The card base size follows the --dash-inline-size clamp, but that clamp floors at
+   16px; on a narrow / zoomed-in cell the content overflows at 16px. Step the base font
+   down on narrow cells (query the .vas-t5vwdg-root container), mirroring
+   VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-t5vwdg (max-width: 300px) {
+    .vas-t5vwdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-t5vwdg (max-width: 220px) {
+    .vas-t5vwdg-container {
+        font-size: 11px;
+    }
+}

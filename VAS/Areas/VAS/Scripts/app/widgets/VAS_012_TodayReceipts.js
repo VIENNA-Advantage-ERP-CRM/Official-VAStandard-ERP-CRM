@@ -82,6 +82,8 @@
 
         /* Latest KPI snapshot. */
         var lastSymbol = "";
+        var lastIso = "";
+        var lastPrecision;               /* undefined → VIS.Util falls back to std precision */
         var lastAmount = 0;
         var lastReceiptCount = 0;
         var lastCustomerCount = 0;
@@ -201,7 +203,7 @@
             lastAmount = 0;
             lastReceiptCount = 0;
             lastCustomerCount = 0;
-            if ($metricEl) { $metricEl.html(formatMetric(0, lastSymbol)); }
+            if ($metricEl) { $metricEl.html(formatMetric(0, lastSymbol, lastIso, lastPrecision)); }
             renderDetail();
         }
 
@@ -214,28 +216,6 @@
             return 2;
         }
 
-        /* Compact-amount formatter: 10M→Cr (Indian crore), 100K→L (lakh),
-           1K→K; below 1000 falls back to locale formatting at std precision. */
-        function formatCompactAmount(value) {
-            value = Number(value || 0);
-
-            if (value >= 10000000) {
-                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
-            }
-            if (value >= 100000) {
-                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
-            if (value >= 1000) {
-                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
-
-            var prec = getStdPrecision();
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: prec,
-                maximumFractionDigits: prec
-            });
-        }
-
         function formatExactAmount(value, stdPrecision) {
             var num = Number(value || 0);
             var prec = (typeof stdPrecision === "number") ? stdPrecision : getStdPrecision();
@@ -246,11 +226,15 @@
         }
 
         /* Currency symbol *before* the amount, sign before symbol only for
-           negatives ('-' for value < 0; no sign for value >= 0; e.g. ₹1.2M, -₹0.5K). */
-        function formatMetric(value, symbol) {
+           negatives ('-' for value < 0; no sign for value >= 0; e.g. ₹1.2M, -₹0.5K).
+           The compact magnitude (Indian vs international numbering by base currency,
+           kept to precision) comes from the shared VIS.Util.formatCompactAmount, which
+           always returns a non-negative string. The symbol is shown whenever present
+           — including at zero (e.g. ₹0.00) — never gated behind a non-zero amount. */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var compact = formatCompactAmount(Math.abs(value));
+            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
             var sym = symbol ? '<span class="vas-tdr-cur">' + escapeHtml(symbol) + '</span>' : '';
             return sign + sym + compact;
         }
@@ -276,15 +260,19 @@
         function renderMetric(data) {
             lastAmount = Number(data.amount || 0);
             lastSymbol = (data && data.symbol) || lastSymbol || "";
+            lastIso = (data && data.isoCode) || lastIso || "";
+            if (data && data.stdPrecision !== undefined && data.stdPrecision !== null) {
+                lastPrecision = Number(data.stdPrecision);
+            }
             lastReceiptCount = Number(data.receiptCount || 0);
             lastCustomerCount = Number(data.customerCount || 0);
 
             if ($metricEl) {
-                $metricEl.html(formatMetric(lastAmount, lastSymbol));
+                $metricEl.html(formatMetric(lastAmount, lastSymbol, lastIso, lastPrecision));
                 /* Full (non-compact) value on hover so the abbreviation never
                    hides the exact figure. */
                 var _metricSign = lastAmount < 0 ? '-' : '';
-                $metricEl.attr('title', _metricSign + (lastSymbol ? lastSymbol + ' ' : '') + formatExactAmount(Math.abs(lastAmount)));
+                $metricEl.attr('title', _metricSign + (lastSymbol ? lastSymbol + ' ' : '') + formatExactAmount(Math.abs(lastAmount), lastPrecision));
             }
 
             renderDetail();
@@ -498,7 +486,10 @@
                 '<div class="vas-tdr-head">' +
                 '<div class="vas-tdr-head-left">' +
                 '<div class="vas-tdr-icon">' + clockIconSvg() + '</div>' +
+                '<div class="vas-tdr-label-group">' +
                 '<span class="vas-tdr-label">' + escapeHtml(lbl("VAS_012_TodayReceipts", "Today's receipts")) + '</span>' +
+                '<span class="vas-tdr-subtitle">' + escapeHtml(lbl("VAS_012_ReceiptsRecordedToday", "Receipts Recorded Today")) + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

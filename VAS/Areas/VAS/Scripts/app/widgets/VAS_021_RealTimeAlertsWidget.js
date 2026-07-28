@@ -288,8 +288,8 @@
                 '<div class="vas-rtawdg-alert ' + typeClass + '" data-idx="' + idx + '">' +
                     '<div class="vas-rtawdg-al-icon">' + (alert.Icon || '!') + '</div>' +
                     '<div class="vas-rtawdg-al-body">' +
-                        '<div class="vas-rtawdg-al-title">' + rtaEsc(alert.Title || '') + '</div>' +
-                        '<div class="vas-rtawdg-al-sub">' + rtaEsc(sub) + '</div>' +
+                        '<div class="vas-rtawdg-al-title" title="' + rtaEsc(alert.Title || '') + '">' + rtaEsc(alert.Title || '') + '</div>' +
+                        '<div class="vas-rtawdg-al-sub" title="' + rtaEsc(sub) + '">' + rtaEsc(sub) + '</div>' +
                     '</div>' +
                 '</div>'
             );

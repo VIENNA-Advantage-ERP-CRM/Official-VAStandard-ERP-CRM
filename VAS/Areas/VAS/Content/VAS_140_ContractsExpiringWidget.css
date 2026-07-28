@@ -1,0 +1,452 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS_140 Contracts Expiring — 3x1 glass widget (Customers dashboard) + modal.
+ * Design: contracts-expiring.html (attached) + Design Specs/dashboard-widgets.md.
+ * Glass surface, icon-well header, three tinted urgency columns (<=30 red, 31-60
+ * amber, 61-90 blue) each showing count + value + high-value; drill-down contract
+ * list modal with the shared circular pager. Widget scales in em against the widget
+ * root; modal is a px overlay. Borders/radii/strokes in px. All selectors MPC-prefixed.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.vas140-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 20px);
+}
+
+    .vas140-root,
+    .vas140-root * {
+        box-sizing: border-box;
+    }
+
+.vas140-card {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0.875em 1em 1.125em;
+    border: 2px solid #FFFFFF;                  /* px */
+    border-radius: 14px;                        /* px */
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header. */
+.vas140-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    margin-bottom: 0.625em;
+    flex-shrink: 0;
+}
+
+.vas140-head-l {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.vas140-iconwell {
+    width: 2em;
+    height: 2em;
+    flex-shrink: 0;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    background: linear-gradient(180deg, #FFFFFF, #F1F8FF);
+    border: 1px solid #E8F2FB;                  /* px */
+    color: #0083DA;
+}
+
+    .vas140-iconwell svg {
+        width: 1.05em;
+        height: 1.05em;
+    }
+
+.vas140-head-txt {
+    min-width: 0;
+}
+
+.vas140-title {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 500;
+    color: #000000;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas140-sub {
+    font-size: 0.7em;
+    color: #717182;
+    margin-top: 1px;                            /* px */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas140-hvlink {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;                                   /* px */
+    background: transparent;
+    border: none;
+    color: #0083DA;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.78em;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas140-hvlink svg {
+        width: 0.8em;
+        height: 0.8em;
+    }
+
+/* Body + urgency columns. */
+.vas140-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vas140-band {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 0.5em;
+}
+
+.vas140-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.4em;
+    border: 1px solid #E4EDF4;                  /* px — overridden inline per urgency */
+    border-radius: 11px;                        /* px */
+    padding: 0.7em 0.75em;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+    .vas140-col:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px rgba(15, 61, 97, 0.10);
+    }
+
+    .vas140-col:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 1px;
+    }
+
+.vas140-col-win {
+    font-size: 0.72em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas140-col-n {
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1;
+    margin-top: 0.25em;
+    font-variant-numeric: tabular-nums;
+}
+
+.vas140-col-val {
+    font-size: 0.72em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas140-state {
+    padding: 0.9em 0.25em;
+    font-size: 0.82em;
+    color: #748494;
+    text-align: center;
+    width: 100%;
+    align-self: center;
+}
+
+.vas140-retry {
+    margin-left: 6px;                           /* px */
+    border: 1px solid #BFE4FF;                  /* px */
+    background: #FFFFFF;
+    color: #0083DA;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 2px 10px;                          /* px */
+    cursor: pointer;
+}
+
+/* Temporary diagnostic: raw server error under the error state. */
+.vas140-errdetail {
+    margin-top: 0.5em;
+    font-size: 0.72em;
+    color: #8F2D2D;
+    word-break: break-word;
+    white-space: normal;
+}
+
+/* ── Drill-down contract list modal ───────────────────────────────────────── */
+
+.vas140-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .vas140-dialog.is-open {
+        display: flex;
+    }
+
+    .vas140-dialog *,
+    .vas140-dialog {
+        box-sizing: border-box;
+    }
+
+.vas140-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas140-panel {
+    position: relative;
+    width: 100%;
+    max-width: 620px;                           /* px */
+    max-height: 84vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.vas140-phead {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.vas140-ptitle {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas140-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+    .vas140-close:hover {
+        background: #F2F6FA;
+    }
+
+    .vas140-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.vas140-pbody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 14px 8px;                      /* px */
+}
+
+.vas140-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas140-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    width: 100%;
+    padding: 11px 8px;                          /* px */
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+
+    .vas140-row:last-child {
+        border-bottom: none;
+    }
+
+    .vas140-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.vas140-row-ic {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;                         /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+
+    .vas140-row-ic svg {
+        width: 15px;
+        height: 15px;
+    }
+
+.vas140-row-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas140-row-title {
+    display: flex;
+    align-items: center;
+    gap: 5px;                                   /* px */
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas140-hv {
+    display: inline-grid;
+    place-items: center;
+    color: #D78B10;
+    flex-shrink: 0;
+}
+
+    .vas140-hv svg {
+        width: 13px;
+        height: 13px;
+    }
+
+.vas140-row-meta {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vas140-row-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;                                  /* px */
+}
+
+.vas140-row-val {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+}
+
+.vas140-row-days {
+    font-size: 12px;                            /* px */
+    font-weight: 600;
+    padding: 2px 8px;                           /* px */
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.vas140-pfoot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.vas140-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;                                  /* px */
+}
+
+.vas140-pglabel {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+}
+
+.vas140-pgbtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: none;
+    background: #1F83FF;
+    color: #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
+}
+
+    .vas140-pgbtn:disabled {
+        background: #C7D6E2;
+        box-shadow: none;
+        cursor: default;
+    }
+
+    .vas140-pgbtn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+body.vas140-modal-open {
+    overflow: hidden;
+}

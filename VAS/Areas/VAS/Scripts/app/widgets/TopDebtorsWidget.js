@@ -9,6 +9,7 @@
  *  2  | LARGEST UNPAID BALANCES                                   | VAS_061_LargestUnpaidBalances  | LARGEST UNPAID BALANCES
  *  3  | Chase all                                                 | VAS_061_ChaseAll               | Chase all
  *  4  | days overdue                                              | VAS_061_DaysOverdue            | days overdue
+ *  4a | Oldest Overdue Days                                       | VAS_061_OldestOverdueDays      | Oldest Overdue Days
  *  5  | Not yet overdue                                           | VAS_061_NotYetOverdue          | Not yet overdue
  *  6  | HIGH RISK                                                 | VAS_061_HighRisk               | HIGH RISK
  *  7  | ON TRACK                                                  | VAS_061_OnTrack                | ON TRACK
@@ -132,9 +133,14 @@
             return '<span class="vas-td-chip ' + cls + '">' + label + '</span>';
         }
 
-        /* ── Overdue label ── */
-        function overdueLabel(statusText) {
-            return '<span class="vas-td-overdue-label">' + escapeHtml(statusText || '') + '</span>';
+        /* ── Overdue label ──
+           Overdue rows show "Oldest Overdue Days: N"; non-overdue rows keep the
+           backend status text (e.g. "Not yet overdue"). */
+        function overdueLabel(daysOverdue, statusText) {
+            var text = Number(daysOverdue) > 0
+                ? lbl("VAS_061_OldestOverdueDays", 'Oldest Overdue Days') + daysOverdue
+                : (statusText || lbl("VAS_061_NotYetOverdue", 'Not yet overdue'));
+            return '<span class="vas-td-overdue-label">' + escapeHtml(text) + '</span>';
         }
 
         /* ── Render rows ── */
@@ -163,7 +169,7 @@
                         /* Name + overdue */
                         '<div class="vas-td-name-wrap">' +
                             '<div class="vas-td-name">' + escapeHtml(r.customerName || '—') + '</div>' +
-                            '<div class="vas-td-overdue-wrap">' + overdueLabel(r.statusText) + '</div>' +
+                            '<div class="vas-td-overdue-wrap">' + overdueLabel(r.daysOverdue, r.statusText) + '</div>' +
                         '</div>' +
                         /* Amount + risk chip (base-currency symbol before the amount) */
                         '<div class="vas-td-amount-wrap">' +

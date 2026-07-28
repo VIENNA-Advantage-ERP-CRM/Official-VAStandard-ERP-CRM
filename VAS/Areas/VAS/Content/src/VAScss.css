@@ -59,6 +59,7 @@
 
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_CreateARInvoice.css";
+@import "../VAS_CreateGLJournal.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
@@ -94,8 +95,27 @@
 @import "../VAS_042_GLJournalVolumeWidget.css";
 @import "../VAS_043_GLJournalTopMovementWidget.css";
 @import "../VAS_045_GLJournalPendingWidget.css";
+/* RTL (Arabic) overrides for the GL dashboard family — MUST stay after the
+   widget stylesheets above so its equal-specificity rules win. */
+@import "../VAS_GLDashboard_RTL.css";
+@import "../VAS_118_QuickJournalWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
+@import "../VAS_KpiDrillThrough.css";
+@import "../VAS_120_CustomerSearchWidget.css";
+@import "../VAS_121_NewCustomerWidget.css";
+@import "../VAS_122_TotalCustomersWidget.css";
+@import "../VAS_124_DelayedPaymentsWidget.css";
+@import "../VAS_125_OpenPipelineWidget.css";
+@import "../VAS_126_OpenTicketsWidget.css";
+@import "../VAS_127_OpenTicketsListWidget.css";
+@import "../VAS_135_ActiveProjectsWidget.css";
+@import "../VAS_136_OnboardingStatusWidget.css";
+@import "../VAS_137_NeedsAttentionWidget.css";
+@import "../VAS_138_DelayedPaymentsListWidget.css";
+@import "../VAS_139_HighValuePipelineWidget.css";
+@import "../VAS_140_ContractsExpiringWidget.css";
+@import "../VAS_141_CustomersBySegmentWidget.css";
 
 @import "../VAS_073_LowStockCountWidget.css";
 @import "../VAS_074_PendingGRNsWidget.css";
@@ -108,6 +128,37 @@
 @import "../VAS_094_HighestSellingProductsWidget.css";
 @import "../VAS_095_QuickOperationsWidget.css";
 @import "../VAS_096_StockMovementTodayWidget.css";
+@import "../VAS_117_MovingAnalysisWidget.css";
+@import "../VAS_128_IncompleteRecordsWidget.css";
+@import "../VAS_129_ProductsByTypeWidget.css";
+@import "../VAS_130_TopVendorsWidget.css";
+@import "../VAS_131_TopCustomersWidget.css";
+@import "../VAS_132_OutOfStockWidget.css";
+@import "../VAS_133_UpdatedThisMonthWidget.css";
+@import "../VAS_134_BillOfMaterialsWidget.css";
+@import "../VAS_146_DeliveryOrdersWidget.css";
+@import "../VAS_145_DeliveryOrdersByRepWidget.css";
+@import "../VAS_144_DeliveryOrderSearchWidget.css";
+@import "../VAS_155_WaitingConfirmationWidget.css";
+@import "../VAS_143_DOInvoicingWidget.css";
+@import "../VAS_142_BackordersWidget.css";
+@import "../VAS_152_OpenDOsWidget.css";
+@import "../VAS_153_ShippedTodayWidget.css";
+@import "../VAS_151_OnTimeRateWidget.css";
+@import "../VAS_150_NewDeliveryOrderWidget.css";
+@import "../VAS_148_DueFulfilmentsWidget.css";
+@import "../VAS_149_ExpectedFulfilmentsWidget.css";
+@import "../VAS_147_DeliveryStatusMixWidget.css";
+@import "../VAS_154_ShippingMethodWidget.css";
+@import "../VAS_108_NewItemWidget.css";
+@import "../VAS_109_ActiveItemsWidget.css";
+@import "../VAS_110_CategoriesWidget.css";
+@import "../VAS_111_BelowMinWidget.css";
+@import "../VAS_112_SlowMoversWidget.css";
+@import "../VAS_113_CategoryMixWidget.css";
+@import "../VAS_114_TopSellersWidget.css";
+@import "../VAS_115_ABCAnalysisWidget.css";
+@import "../VAS_116_Top10SellingWidget.css";
 @import "../VAS_DocumentSearchWidgets.css";
 
 @import "../VAS_081_MaterialReceiptRegisterWidget.css"; 
@@ -123,6 +174,8 @@
 
 @import "../VAS_097_ExpectedGRNWidget.css";
 
+@import "../VAS_093_PendingGRNWidget.css";
+
 
 @import "../VAS_048_TodayCashOutCashJournalWidget.css";
 @import "../VAS_049_NetCashForCashJournalWidget.css";
@@ -136,3 +189,4 @@
 @import "../VAS_065_APInvoicePanel.css";
 @import "../VAS_074_CreateInvoiceLinePanel.css";
 @import "../VAS_105_AccountRightPanel.css";
+@import "../VAS_106_OverviewSalesOrder.css";

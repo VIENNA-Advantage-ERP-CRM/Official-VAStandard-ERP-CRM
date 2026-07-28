@@ -122,9 +122,9 @@
         var currentPaymentId = 0;
         var printBusy = false;
 
-        /* Server-paged list state. pageSize is 7 rows per page; pageNo /
+        /* Server-paged list state. pageSize is 9 rows per page; pageNo /
            totalPages / totalRecords come from the server response. */
-        var pageSize = 7;
+        var pageSize = 9;
         var pageNo = 1;
         var totalPages = 0;
         var totalRecords = 0;
@@ -307,6 +307,9 @@
             $tbody.empty();
 
             if (!rows || rows.length === 0) {
+                /* Stretch the table to fill the flex-1 wrap so the empty cell's
+                   vertical-align:middle centres the message in the body area. */
+                $tbody.closest('.vas-rr-table').addClass('vas-rr-table--empty');
                 $tbody.html(
                     '<tr><td class="vas-rr-empty" colspan="6">' +
                     escapeHtml(lbl("VAS_NoReceiptsThisPeriod", "No receipts in this period")) +
@@ -314,6 +317,9 @@
                 );
                 return;
             }
+
+            /* Populated: table sizes to its rows (top-anchored), not the wrap. */
+            $tbody.closest('.vas-rr-table').removeClass('vas-rr-table--empty');
 
             for (var i = 0; i < rows.length; i++) {
                 var row = rows[i];
@@ -644,10 +650,13 @@
                 var refDateText = formatDate(refDate);
                 var refAmtNumVal = Number(refAmtNum || 0);
                 var refAmtSign = refAmtNumVal < 0 ? '-' : '';
-                var refAmount = refAmtSign + formatExactAmount(Math.abs(refAmtNumVal), stdPrecision);
+                /* Magnitude only — the sign is emitted BEFORE the currency symbol
+                   at render time (e.g. "-$58,643.20", not "$-58,643.20"), matching
+                   the summary Amount / Receipt Total. */
+                var refAmount = formatExactAmount(Math.abs(refAmtNumVal), stdPrecision);
                 var appliedNum = Number(pick(line, "AppliedAmount", "appliedAmount") || 0);
                 var appliedSign = appliedNum < 0 ? '-' : '';
-                var applied = appliedSign + formatExactAmount(Math.abs(appliedNum), stdPrecision);
+                var applied = formatExactAmount(Math.abs(appliedNum), stdPrecision);
 
                 /* Type chip — INV (blue) / PMT (success-deep) / GL (warning). */
                 var chipText = type === "Payment" ? "PMT"
@@ -666,8 +675,8 @@
                     '<span class="vas-rr-d-inv-no">' + escapeHtml(refDocText) + '</span>' +
                     '</td>' +
                     '<td class="vas-rr-d-inv-date">' + escapeHtml(refDateText) + '</td>' +
-                    '<td class="vas-rr-d-num">' + symHtml + escapeHtml(refAmount) + '</td>' +
-                    '<td class="vas-rr-d-num vas-rr-d-alloc-amt">' + symHtml + escapeHtml(applied) + '</td>' +
+                    '<td class="vas-rr-d-num">' + refAmtSign + symHtml + escapeHtml(refAmount) + '</td>' +
+                    '<td class="vas-rr-d-num vas-rr-d-alloc-amt">' + appliedSign + symHtml + escapeHtml(applied) + '</td>' +
                     '</tr>';
             }
 
@@ -802,7 +811,10 @@
                 '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' +
                 '</svg>' +
                 '</span>' +
+                '<div class="vas-rr-title-group">' +
                 '<span class="vas-rr-title">' + escapeHtml(lbl("VAS_RecentReceipts", "Recent receipts")) + '</span>' +
+                '<span class="vas-rr-subtitle">' + escapeHtml(lbl("VAS_008_RecentReceiptsSubtitle", "Receipts in last 30 days")) + '</span>' +
+                '</div>' +
                 '</div>' +
                 '<span class="vas-rr-head-hint">' + escapeHtml(lbl("VAS_ClickRowForDetail", "Click a row for full detail")) + '</span>' +
                 '</div>' +

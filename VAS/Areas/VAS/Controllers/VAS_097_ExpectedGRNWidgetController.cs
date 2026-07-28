@@ -10,6 +10,7 @@ using VAdvantage.Classes;
 using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
+using VAdvantage.Process;
 using VAdvantage.Utility;
 using VIS.Filters;
 
@@ -35,19 +36,28 @@ namespace VIS.Controllers
     ///   VAI147   2026-06-29 Rebuilt on the Onfinity GRN-dashboard pattern with a
     ///                       dedicated controller, MRole, parameterized SQL and the
     ///                       shared GRN line-entry create flow.
+    ///   VAI147   2026-07-18 Correction round: added the 'PG' (Pending GRN) list
+    ///                       mode serving the VAS_093 widget (promised before
+    ///                       today), and open quantity is now purely
+    ///                       QtyOrdered - QtyDelivered so a purchase order stays
+    ///                       listed until every line is fully received or the PO
+    ///                       is closed (draft GRN quantities no longer hide it).
     /// </summary>
     public class VAS_097_ExpectedGRNWidgetController : Controller
     {
         /// <summary>
-        /// One page of completed vendor purchase orders whose expected (promised)
-        /// date is today or later and that still have open quantity, soonest first.
+        /// One page of completed vendor purchase orders that still have open
+        /// (un-received) quantity, newest promise date first (review #26).
+        /// type 'EG' (default) lists POs promised today or later (Expected GRN);
+        /// type 'PG' lists overdue POs promised before today (Pending GRN).
         /// </summary>
         /// <param name="pageNo">1-based page number.</param>
         /// <param name="pageSize">Rows per page (default 5, max 50).</param>
+        /// <param name="type">'EG' promised today/later, 'PG' promised before today.</param>
         /// <returns>JSON { rows[], pageNo, pageSize, totalRecords, totalPages }.</returns>
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetExpectedPurchaseOrders(int pageNo = 1, int pageSize = 5)
+        public JsonResult GetExpectedPurchaseOrders(int pageNo = 1, int pageSize = 5, string type = "EG")
         {
             if (Session["ctx"] == null)
             {
@@ -62,31 +72,45 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
 
+            // Review #26 (follow-up): same SQL semantics as the existing
+            // VAS.VAS_ExpectedGRNWidget (Product/GetExpectedDelivery): completed
+            // vendor POs, no returns / quotations / blanket orders, item
+            // products only unless the tenant allows non-item lines, newest
+            // promise date first. 'PG' flips the promise-date filter to overdue
+            // POs for the Pending GRN widget.
+            // Correction 2026-07-18: open quantity is QtyOrdered - QtyDelivered
+            // only. Quantities sitting on draft / in-progress GRNs are NOT
+            // netted off any more - a GRN saved with less quantity than the PO
+            // used to hide the PO from this list even though nothing had been
+            // received. The PO must stay until every line is fully delivered or
+            // the PO itself is closed (DocStatus filter keeps only 'CO').
+            bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
+            bool pendingMode = "PG".Equals(type, StringComparison.OrdinalIgnoreCase);
+
             string rawSql = @"
                 SELECT o.C_Order_ID AS PO_ID,
                        o.DocumentNo AS PO_NO,
-                       bp.Name AS Supplier,
-                       TRIM(COALESCE(loc.Address1, '') || ' ' || COALESCE(loc.City, '')) AS Address_Line,
-                       wh.Name AS Warehouse_Name,
-                       cur.CurSymbol AS Cur_Symbol,
-                       cur.ISO_Code AS Currency_ISO,
-                       cur.StdPrecision AS Std_Precision,
-                       COALESCE(ol.DatePromised, o.DatePromised) AS Line_Promise_Date,
-                       ol.C_OrderLine_ID AS PO_Line_ID,
-                       COALESCE(ol.LineNetAmt, 0) AS Line_Net_Amt
+                       cb.Name AS Supplier,
+                       l.Name AS Address_Line,
+                       w.Name AS Warehouse_Name,
+                       o.DatePromised AS Promise_Date,
+                       COALESCE(CURRENCYCONVERT(o.GrandTotal, o.C_Currency_ID, @Base_Currency_ID, o.DateAcct, o.C_ConversionType_ID, o.AD_Client_ID, o.AD_Org_ID), 0) AS PO_Value,
+                       ol.C_OrderLine_ID AS PO_Line_ID
                 FROM C_Order o
-                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID AND ol.IsActive='Y')
-                INNER JOIN C_BPartner bp ON (bp.C_BPartner_ID=o.C_BPartner_ID AND bp.IsActive='Y')
-                LEFT OUTER JOIN C_BPartner_Location bpl ON (bpl.C_BPartner_Location_ID=o.C_BPartner_Location_ID AND bpl.IsActive='Y')
-                LEFT OUTER JOIN C_Location loc ON (loc.C_Location_ID=bpl.C_Location_ID)
-                LEFT OUTER JOIN M_Warehouse wh ON (wh.M_Warehouse_ID=COALESCE(ol.M_Warehouse_ID, o.M_Warehouse_ID) AND wh.IsActive='Y')
-                LEFT OUTER JOIN C_Currency cur ON (cur.C_Currency_ID=o.C_Currency_ID AND cur.IsActive='Y')
-                WHERE o.IsActive='Y'
-                  AND ol.IsActive='Y'
-                  AND o.IsSOTrx='N'
+                INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)"
+                + (!allowNonItem ? @"
+                INNER JOIN M_Product ItemProduct ON (ItemProduct.M_Product_ID=ol.M_Product_ID AND ItemProduct.ProductType='I')" : "") + @"
+                INNER JOIN M_Warehouse w ON (w.M_Warehouse_ID=o.M_Warehouse_ID)
+                INNER JOIN C_BPartner cb ON (cb.C_BPartner_ID=o.C_BPartner_ID)
+                INNER JOIN C_BPartner_Location l ON (l.C_BPartner_Location_ID=o.C_BPartner_Location_ID)
+                WHERE o.AD_Client_ID=@AD_Client_ID
                   AND o.DocStatus='CO'
-                  AND o.AD_Client_ID=@AD_Client_ID
-                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)";
+                  AND o.DatePromised" + (pendingMode ? "<" : ">=") + @"@Promised_From
+                  AND o.IsSOTrx='N'
+                  AND o.IsReturnTrx='N'
+                  AND o.IsSalesQuotation='N'
+                  AND o.IsBlanketTrx='N'
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) > 0";
 
             rawSql = MRole.GetDefault(ctx).AddAccessSQL(
                 rawSql,
@@ -101,9 +125,6 @@ namespace VIS.Controllers
                        ExpectedPO.Supplier,
                        ExpectedPO.Address_Line,
                        ExpectedPO.Warehouse_Name,
-                       ExpectedPO.Cur_Symbol,
-                       ExpectedPO.Currency_ISO,
-                       ExpectedPO.Std_Precision,
                        ExpectedPO.Promise_Date,
                        ExpectedPO.Line_Count,
                        ExpectedPO.PO_Value,
@@ -114,12 +135,9 @@ namespace VIS.Controllers
                            RawData.Supplier,
                            RawData.Address_Line,
                            RawData.Warehouse_Name,
-                           RawData.Cur_Symbol,
-                           RawData.Currency_ISO,
-                           RawData.Std_Precision,
-                           MIN(RawData.Line_Promise_Date) AS Promise_Date,
-                           COUNT(RawData.PO_Line_ID) AS Line_Count,
-                           SUM(RawData.Line_Net_Amt) AS PO_Value
+                           RawData.Promise_Date,
+                           RawData.PO_Value,
+                           COUNT(RawData.PO_Line_ID) AS Line_Count
                     FROM (
                         " + rawSql + @"
                     ) RawData
@@ -128,22 +146,45 @@ namespace VIS.Controllers
                              RawData.Supplier,
                              RawData.Address_Line,
                              RawData.Warehouse_Name,
-                             RawData.Cur_Symbol,
-                             RawData.Currency_ISO,
-                             RawData.Std_Precision
+                             RawData.Promise_Date,
+                             RawData.PO_Value
                 ) ExpectedPO
-                ORDER BY ExpectedPO.Promise_Date, ExpectedPO.PO_NO
+                ORDER BY ExpectedPO.Promise_Date DESC, ExpectedPO.PO_NO
                 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY";
 
-            // Review #26: data was not showing because every completed PO's promised
-            // date is in the past in this data set, and the old "promised >= today"
-            // filter hid them all. Aligned with the existing VAS.VAS_ExpectedGRNWidget
-            // behaviour - list all completed vendor POs that still have open (un-received)
-            // quantity, soonest promised first - so the widget shows real data.
+            // Parameters in order of appearance (the DB layer binds positionally).
             List<SqlParameter> parameters = new List<SqlParameter>();
+            parameters.Add(new SqlParameter("@Base_Currency_ID", ctx.GetContextAsInt("$C_Currency_ID")));
             parameters.Add(new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()));
+            parameters.Add(new SqlParameter("@Promised_From", SqlDbType.DateTime) { Value = DateTime.Today });
             parameters.Add(new SqlParameter("@Offset", offset));
             parameters.Add(new SqlParameter("@PageSize", pageSize));
+
+            // Legacy behaviour: the value is shown in the session/base currency,
+            // so every row carries that one currency's symbol and precision.
+            string baseCurSymbol = "";
+            string baseCurIso = "";
+            int baseStdPrecision = 2;
+            IDataReader curReader = null;
+            try
+            {
+                curReader = DB.ExecuteReader(
+                    @"SELECT CurSymbol, ISO_Code, StdPrecision
+                      FROM C_Currency
+                      WHERE C_Currency_ID=@Cur_ID",
+                    new SqlParameter[] { new SqlParameter("@Cur_ID", ctx.GetContextAsInt("$C_Currency_ID")) });
+                if (curReader != null && curReader.Read())
+                {
+                    baseCurSymbol = Util.GetValueOfString(curReader["CurSymbol"]);
+                    baseCurIso = Util.GetValueOfString(curReader["ISO_Code"]);
+                    baseStdPrecision = Util.GetValueOfInt(curReader["StdPrecision"]);
+                    if (String.IsNullOrEmpty(baseCurSymbol)) { baseCurSymbol = baseCurIso; }
+                }
+            }
+            finally
+            {
+                if (curReader != null) { curReader.Close(); curReader.Dispose(); }
+            }
 
             List<object> rows = new List<object>();
             int totalRecords = 0;
@@ -165,9 +206,9 @@ namespace VIS.Controllers
                         supplier = Util.GetValueOfString(dr["Supplier"]),
                         addressLine = Util.GetValueOfString(dr["Address_Line"]),
                         warehouseName = Util.GetValueOfString(dr["Warehouse_Name"]),
-                        curSymbol = Util.GetValueOfString(dr["Cur_Symbol"]),
-                        currencyIso = Util.GetValueOfString(dr["Currency_ISO"]),
-                        stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]),
+                        curSymbol = baseCurSymbol,
+                        currencyIso = baseCurIso,
+                        stdPrecision = baseStdPrecision,
                         promiseDate = promiseDate.HasValue ? promiseDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         lineCount = Util.GetValueOfInt(dr["Line_Count"]),
                         poValue = Util.GetValueOfDecimal(dr["PO_Value"])
@@ -214,24 +255,30 @@ namespace VIS.Controllers
 
             Ctx ctx = Session["ctx"] as Ctx;
 
+            // Correction 2026-07-18: the line's open quantity is
+            // QtyOrdered - QtyDelivered, matching the list and the create-time
+            // validation (GetOpenLineInfo). Draft GRN quantities are not
+            // netted off - the line stays receivable until actually delivered.
+            bool allowNonItem = Util.GetValueOfString(ctx.GetContext("$AllowNonItem")).Equals("Y");
+
             string lineSql = @"
                 SELECT ol.C_OrderLine_ID AS PO_Line_ID,
                        p.Name AS Item_Name,
+                       asi.Description AS Attribute_Name,
                        COALESCE(ol.QtyOrdered, 0) AS PO_Qty,
                        COALESCE(ol.QtyDelivered, 0) AS Already_Received_Qty,
                        COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0) AS Default_Received_Qty,
-                       COALESCE(u.UOMSymbol, u.Name) AS UOM
+                       u.Name AS UOM
                 FROM C_Order o
                 INNER JOIN C_OrderLine ol ON (ol.C_Order_ID=o.C_Order_ID)
-                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID AND p.IsActive='Y')
-                LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID=ol.C_UOM_ID AND u.IsActive='Y')
-                WHERE o.IsActive='Y'
-                  AND ol.IsActive='Y'
-                  AND o.IsSOTrx='N'
+                INNER JOIN M_Product p ON (p.M_Product_ID=ol.M_Product_ID" + (!allowNonItem ? " AND p.ProductType='I'" : "") + @")
+                LEFT OUTER JOIN M_AttributeSetInstance asi ON (asi.M_AttributeSetInstance_ID=ol.M_AttributeSetInstance_ID)
+                LEFT OUTER JOIN C_UOM u ON (u.C_UOM_ID=ol.C_UOM_ID)
+                WHERE o.IsSOTrx='N'
                   AND o.DocStatus='CO'
                   AND o.AD_Client_ID=@AD_Client_ID
                   AND ol.C_Order_ID=@PO_ID
-                  AND COALESCE(ol.QtyOrdered, 0) > COALESCE(ol.QtyDelivered, 0)";
+                  AND (COALESCE(ol.QtyOrdered, 0) - COALESCE(ol.QtyDelivered, 0)) > 0";
 
             lineSql = MRole.GetDefault(ctx).AddAccessSQL(
                 lineSql,
@@ -264,6 +311,7 @@ namespace VIS.Controllers
                     {
                         poLineId = Util.GetValueOfInt(dr["PO_Line_ID"]),
                         itemName = Util.GetValueOfString(dr["Item_Name"]),
+                        attributeName = Util.GetValueOfString(dr["Attribute_Name"]),
                         poQty = poQty,
                         alreadyReceivedQty = alreadyReceivedQty,
                         defaultReceivedQty = defaultReceivedQty,
@@ -443,28 +491,38 @@ namespace VIS.Controllers
                     }
                 }
 
-                receipt.SetDocAction(MInOut.DOCACTION_Complete);
-                if (!receipt.ProcessIt(MInOut.DOCACTION_Complete))
-                {
-                    string processMessage = receipt.GetProcessMsg();
-                    trx.Rollback();
-                    return Fail(!string.IsNullOrEmpty(processMessage) ? processMessage : "GRN could not be completed.");
-                }
-
-                if (!receipt.Save(trx))
-                {
-                    trx.Rollback();
-                    return Fail(GetSaveError(ctx, "VAS_GRNNotSaved", "GRN could not be completed."));
-                }
-
+                // The receipt + lines are saved in this transaction as a DRAFT;
+                // commit them, then run the standard document completion through
+                // the document process (DocumentEngine.CompleteOrReverse - the same
+                // path the core runs on Complete). That process executes outside
+                // this transaction, so the record is committed first. The
+                // AD_Table_ID and AD_Process_ID are resolved from the dictionary at
+                // runtime by name/Value - never hardcoded.
                 trx.Commit();
+                trx.Close();
+                trx = null;
 
+                int receiptId = receipt.GetM_InOut_ID();
+                string completeError = DocumentEngine.CompleteOrReverse(
+                    ctx,
+                    "M_InOut",
+                    GetTableId("M_InOut"),
+                    receiptId,
+                    GetProcessIdByValue(ctx, "M_InOut Process"),
+                    MInOut.DOCACTION_Complete);
+
+                if (!string.IsNullOrEmpty(completeError))
+                {
+                    return Fail(completeError);
+                }
+
+                MInOut completedReceipt = new MInOut(ctx, receiptId, null);
                 return Ok(new
                 {
                     success = true,
-                    shipmentId = receipt.GetM_InOut_ID(),
-                    grnId = receipt.GetM_InOut_ID(),
-                    grnNo = receipt.GetDocumentNo(),
+                    shipmentId = receiptId,
+                    grnId = receiptId,
+                    grnNo = completedReceipt.GetDocumentNo(),
                     message = Msg.GetMsg(ctx, "VAS_GRNSaved") ?? "GRN created."
                 });
             }
@@ -577,6 +635,11 @@ namespace VIS.Controllers
         /// <returns>C_DocType_ID, or 0 when none is configured.</returns>
         private int GetDocTypeId(int orgId, int clientId)
         {
+            // Prefer an org-specific receipt type; C_DocType_ID is the deterministic
+            // tiebreak so the plain "MM Receipt" (lower id) is chosen over the
+            // "MM Receipt with Confirmation" one - the latter completes to In
+            // Progress (awaiting confirmation) instead of Completed. Without the
+            // tiebreak the pick was arbitrary and GRNs could land un-completed.
             string sql = @"
                 SELECT DocType.C_DocType_ID
                 FROM C_DocType DocType
@@ -586,7 +649,7 @@ namespace VIS.Controllers
                   AND DocType.AD_Org_ID IN (0, @AD_Org_ID)
                   AND DocType.IsSOTrx='N'
                   AND DocType.IsReturnTrx='N'
-                ORDER BY DocType.AD_Org_ID DESC";
+                ORDER BY DocType.AD_Org_ID DESC, DocType.C_DocType_ID";
 
             List<SqlParameter> parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@AD_Client_ID", clientId));
@@ -641,6 +704,51 @@ namespace VIS.Controllers
             }
 
             return string.IsNullOrEmpty(error) ? fallback : error;
+        }
+
+        /// <summary>Resolves the AD_Table_ID for a physical table name (0 when missing).</summary>
+        private int GetTableId(string tableName)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Table_ID FROM AD_Table WHERE TableName=@TableName AND IsActive='Y'",
+                    new SqlParameter[] { new SqlParameter("@TableName", tableName) }, null));
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Resolves the AD_Process_ID of a document process by its (stable) Value -
+        /// e.g. "M_InOut Process" - preferring a client-specific record, then the
+        /// system one. Resolving by Value keeps the completion dynamic (the numeric
+        /// id can differ per database).
+        /// </summary>
+        private int GetProcessIdByValue(Ctx ctx, string processValue)
+        {
+            try
+            {
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    @"SELECT AD_Process_ID
+                      FROM AD_Process
+                      WHERE Value=@Value
+                        AND IsActive='Y'
+                        AND AD_Client_ID IN (0, @AD_Client_ID)
+                      ORDER BY AD_Client_ID DESC
+                      FETCH FIRST 1 ROW ONLY",
+                    new SqlParameter[]
+                    {
+                        new SqlParameter("@Value", processValue),
+                        new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID())
+                    }, null));
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>

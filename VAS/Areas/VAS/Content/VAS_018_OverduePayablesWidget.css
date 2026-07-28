@@ -11,6 +11,9 @@
     box-sizing: border-box;
     position: relative;
     font-family: Roboto, sans-serif;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-opwdg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -53,7 +56,7 @@
 
 .vas-opwdg-value {
     font-size: 1.75em;
-    font-weight: 600; /* Roboto SemiBold */
+    font-weight: 700; /* Roboto Bold — 600/SemiBold is not in the spec weight palette */
     color: #D78B10;
     line-height: 1.05;
     letter-spacing: -0.01em;
@@ -434,6 +437,16 @@
    Widget interior scales via the em anchor clamp on .vas-opwdg-container, so no
    per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
    document-baseline surface) reflows at narrow widths. */
+/* Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-opwdg (max-width: 300px) {
+    .vas-opwdg-container { font-size: 13px; }
+}
+
+@container vas-opwdg (max-width: 220px) {
+    .vas-opwdg-container { font-size: 11px; }
+}
+
 @media (max-width: 768px) {
     .vas-opwdg-pills-row { gap: 0.35em; }
 }
@@ -451,4 +464,36 @@
     .vas-opwdg-drill-copy {
         width: 100%;
     }
+}
+
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-opwdg-dialog-shell .vas-opwdg-dialog-close {
+    right: auto;
+    left: 0.875em;
+}
+
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-opwdg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-opwdg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-opwdg-drill-pager-btn svg {
+    transform: scaleX(-1);
 }

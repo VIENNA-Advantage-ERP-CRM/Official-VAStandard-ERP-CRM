@@ -271,7 +271,7 @@
             var html = '<div class="vas-opwdg-drill">'
                 + '<div class="vas-opwdg-drill-card">'
                 +   '<span class="vas-opwdg-drill-card-label">' + opEsc(msg('VAS_018_OverdueAmount', 'Overdue Amount')) + '</span>'
-                +   '<strong class="vas-opwdg-drill-card-value" title="' + opEsc(totalTip) + '">' + opEsc(sym + VIS.Util.formatCompactAmount(total, data.CurIso, precision)) + '</strong>'
+                +   '<strong class="vas-opwdg-drill-card-value" title="' + opEsc(totalTip) + '">' + opEsc((total < 0 ? '-' : '') + sym + VIS.Util.formatCompactAmount(total, data.CurIso, precision)) + '</strong>'
                 + '</div>'
                 + '<div class="vas-opwdg-drill-copy">'
                 +   '<p class="vas-opwdg-drill-desc">' + opEsc(summaryText) + '</p>'
@@ -284,12 +284,12 @@
                 var width = maxAmount > 0 ? (amount / maxAmount) * 100 : 0;
                 width = Math.max(0, Math.min(100, width));
                 var barWidth = width > 0 ? Math.max(2, width) : 0;
-                var rowValue = sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
+                var rowValue = (amount < 0 ? '-' : '') + sym + VIS.Util.formatCompactAmount(amount, data.CurIso, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
                 var rowTip = sym + ' ' + formatFull(amount, precision) + ' — ' + formatQty(dpd) + msg('VAS_018_DaySuffix', 'd');
 
                 html += '<div class="vas-opwdg-drill-row">'
                     + '<div class="vas-opwdg-drill-row-head">'
-                    +   '<span class="vas-opwdg-drill-row-name">' + opEsc(vendor.VendorName || '-') + '</span>'
+                    +   '<span class="vas-opwdg-drill-row-name" title="' + opEsc(vendor.VendorName || '-') + '">' + opEsc(vendor.VendorName || '-') + '</span>'
                     +   '<span class="vas-opwdg-drill-row-val" title="' + opEsc(rowTip) + '">' + opEsc(rowValue) + '</span>'
                     + '</div>'
                     + '<div class="vas-opwdg-drill-track">'

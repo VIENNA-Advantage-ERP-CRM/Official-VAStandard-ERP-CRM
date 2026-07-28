@@ -15,7 +15,7 @@
  *  4 | No products match                             | VAS_ProductNoMatches
  *  5 | Product Detail                                | VAS_ProductDetail
  *  6 | Unable to load product detail.                | VAS_ProductDetailLoadError
- *  7 | Showing latest 5 records.                     | VAS_ShowingLatest5Records
+ *  7 | latest records                                | VAS_LatestRecords
  *  8 | No records found for this product.            | VAS_NoProductRecords
  *  9 | On Hand Qty                                   | VAS_OnHandQty
  * 10 | Stock Value                                   | VAS_StockValue
@@ -76,7 +76,15 @@
         var activeTab = 'overview';
         var searchCurrency = { symbol: '', iso: '', precision: 0 };
         var tabPages = {};
-        var tablePageSize = 5;
+        /* Correction 2026-07-18 (round 2): every data tab pages its records 5
+           rows at a time with the pager. The lists fetch the latest
+           TABLE_FETCH_SIZE records in one call (50 = the controller's cap)
+           and page them client-side. The row count per page is FIXED: the
+           table area always reserves a full 5-row block (CSS min-height), so
+           the dialog keeps one standard size whether a page shows 5 lines,
+           1 line or none. */
+        var TABLE_FETCH_SIZE = 50;
+        var TABLE_PAGE_ROWS = 5;
         var openProductDetail;
 
         function label(key, fallback) {
@@ -381,7 +389,6 @@
             $(window).on('scroll' + eventNamespace, closeSuggestions);
             $(window).on('resize' + eventNamespace, function () {
                 if ($suggest && $suggest.hasClass('is-open')) { positionSuggest(); }
-                syncTablePageSize();
             });
 
             $dashboardScroll = $root.closest('.vis-widget-container, [data-dashboard-container]');
@@ -522,13 +529,12 @@
             loadProductDetail(product.ProductId, product.ProductName, product.ProductCode);
         }
 
-        function loadProductDetail(productId, productName, productCode, keepDialog) {
+        function loadProductDetail(productId, productName, productCode) {
             currentProductId = productId;
             currentProductName = productName || '';
             currentProductCode = productCode || '';
-            var nextActiveTab = keepDialog ? activeTab : 'overview';
 
-            if (!keepDialog) { openLoadingDialog(productName, productCode); }
+            openLoadingDialog(productName, productCode);
 
             detailLoading = true;
             $.ajax({
@@ -537,7 +543,7 @@
                 dataType: 'json',
                 data: {
                     M_Product_ID: productId,
-                    pageSize: tablePageSize
+                    pageSize: TABLE_FETCH_SIZE
                 },
                 success: function (response) {
                     var parsed = parseResponse(response);
@@ -548,8 +554,8 @@
                     }
 
                     productDetail = parsed;
-                    activeTab = nextActiveTab;
-                    if (!keepDialog) { tabPages = {}; }
+                    activeTab = 'overview';
+                    tabPages = {};
                     renderProductDialog();
                 },
                 error: function () {
@@ -671,8 +677,6 @@
             else if (activeTab === 'requisitions') {
                 $tabBody.html(renderRequisitions());
             }
-
-            window.setTimeout(syncTablePageSize, 0);
         }
 
         function renderOverview() {
@@ -745,7 +749,7 @@
                 ];
             });
 
-            return latestRecordsNote() + renderTable(headers, rows, [4, 5, 6], isSales ? 'salesOrders' : 'purchaseOrders');
+            return latestRecordsNote(orders.length) + renderTable(headers, rows, [4, 5, 6], isSales ? 'salesOrders' : 'purchaseOrders');
         }
 
         function renderMovements() {
@@ -760,7 +764,7 @@
                 ];
             });
 
-            return latestRecordsNote() + renderTable(
+            return latestRecordsNote(rows.length) + renderTable(
                 [label('MovementDate', 'Date'), label('MovementType', 'Type'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('Warehouse', 'Warehouse'), label('Locator', 'Locator')],
                 rows,
                 [3],
@@ -781,7 +785,7 @@
                 ];
             });
 
-            return latestRecordsNote() + renderTable(
+            return latestRecordsNote(rows.length) + renderTable(
                 [label('Requisition', 'Requisition #'), label('VAS_DocumentDate', 'Document Date'), label('VAS_RequiredDate', 'Required Date'), label('VAS_Attribute', 'Attribute'), label('Qty', 'Qty'), label('VAS_OrderedQty', 'Ordered Qty'), label('Status', 'Status')],
                 rows,
                 [4, 5],
@@ -789,42 +793,12 @@
             );
         }
 
-        function latestRecordsNote() {
-            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + tablePageSize + ' ' + label('VAS_LatestRecords', 'latest records')) + '</span></div>';
-        }
-
-        function measureTablePageSize() {
-            if (!$dialog || !$dialog.hasClass('is-open')) { return tablePageSize; }
-
-            var $tbody = $dialogBody.find('.MPC-product-search-table tbody');
-            if (!$tbody.length) { return tablePageSize; }
-
-            var bodyHeight = Math.floor($tbody.innerHeight());
-            if (bodyHeight <= 0) { return tablePageSize; }
-
-            var $row = $tbody.find('tr:first');
-            var rowHeight = $row.length ? Math.ceil($row.outerHeight(true)) : 34;
-            if (rowHeight <= 0) { rowHeight = 34; }
-
-            return Math.max(3, Math.floor(bodyHeight / rowHeight));
-        }
-
-        function syncTablePageSize() {
-            if (detailLoading || !productDetail) { return; }
-
-            var nextPageSize = measureTablePageSize();
-            if (nextPageSize === tablePageSize) { return; }
-
-            var currentPage = tabPages[activeTab] || 1;
-            var firstRecord = ((currentPage - 1) * tablePageSize) + 1;
-            tablePageSize = nextPageSize;
-            tabPages[activeTab] = Math.max(1, Math.ceil(firstRecord / tablePageSize));
-
-            if (currentProductId > 0) {
-                loadProductDetail(currentProductId, currentProductName, currentProductCode, true);
-            } else {
-                renderTab();
-            }
+        /* The note only appears when the fetched list actually hit the
+           TABLE_FETCH_SIZE cap (older records exist beyond it); otherwise the
+           pager's "Showing x-y of N" already tells the whole story. */
+        function latestRecordsNote(rowCount) {
+            if (rowCount < TABLE_FETCH_SIZE) { return ''; }
+            return '<div class="MPC-product-search-note">' + icon('clock') + '<span>' + escapeHtml(label('VAS_Showing', 'Showing') + ' ' + TABLE_FETCH_SIZE + ' ' + label('VAS_LatestRecords', 'latest records')) + '</span></div>';
         }
 
         function renderTable(headers, rows, rightAlignedColumns, pageKey) {
@@ -832,11 +806,11 @@
                 return '<div class="MPC-product-search-empty">' + escapeHtml(label('VAS_NoProductRecords', 'No records found for this product.')) + '</div>';
             }
 
-            var totalPages = Math.max(1, Math.ceil(rows.length / tablePageSize));
+            var totalPages = Math.max(1, Math.ceil(rows.length / TABLE_PAGE_ROWS));
             var page = Math.min(Math.max(tabPages[pageKey] || 1, 1), totalPages);
             tabPages[pageKey] = page;
-            var start = (page - 1) * tablePageSize;
-            var pageRows = rows.slice(start, start + tablePageSize);
+            var start = (page - 1) * TABLE_PAGE_ROWS;
+            var pageRows = rows.slice(start, start + TABLE_PAGE_ROWS);
 
             var head = headers.map(function (header, index) {
                 return '<th class="' + (rightAlignedColumns.indexOf(index) >= 0 ? 'is-right' : '') + '" title="' + escapeHtml(header) + '">' + escapeHtml(header) + '</th>';
@@ -849,17 +823,18 @@
                 }).join('') + '</tr>';
             }).join('');
 
-            var pager = '';
-            if (totalPages > 1) {
-                pager = '<div class="MPC-product-search-table-footer">' +
-                    '<span>' + escapeHtml(label('VAS_Showing', 'Showing')) + ' ' + (start + 1) + '\u2013' + (start + pageRows.length) + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + rows.length + '</span>' +
-                    '<span class="MPC-product-search-table-pager">' +
-                        '<button type="button" class="MPC-product-search-table-page" data-direction="previous" aria-label="' + escapeHtml(label('VAS_PreviousPage', 'Previous page')) + '"' + (page === 1 ? ' disabled' : '') + '>&lsaquo;</button>' +
-                        '<span>' + page + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + totalPages + '</span>' +
-                        '<button type="button" class="MPC-product-search-table-page" data-direction="next" aria-label="' + escapeHtml(label('VAS_NextPage', 'Next page')) + '"' + (page === totalPages ? ' disabled' : '') + '>&rsaquo;</button>' +
-                    '</span>' +
-                '</div>';
-            }
+            /* Rule (2026-07-18): the footer/pager is ALWAYS rendered - even
+               when the rows fit on one page - so every table tab has the
+               exact same height; on a single page both arrows are simply
+               disabled. */
+            var pager = '<div class="MPC-product-search-table-footer">' +
+                '<span>' + escapeHtml(label('VAS_Showing', 'Showing')) + ' ' + (start + 1) + '\u2013' + (start + pageRows.length) + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + rows.length + '</span>' +
+                '<span class="MPC-product-search-table-pager">' +
+                    '<button type="button" class="MPC-product-search-table-page" data-direction="previous" aria-label="' + escapeHtml(label('VAS_PreviousPage', 'Previous page')) + '"' + (page === 1 ? ' disabled' : '') + '>&lsaquo;</button>' +
+                    '<span>' + page + ' ' + escapeHtml(label('VAS_Of', 'of')) + ' ' + totalPages + '</span>' +
+                    '<button type="button" class="MPC-product-search-table-page" data-direction="next" aria-label="' + escapeHtml(label('VAS_NextPage', 'Next page')) + '"' + (page === totalPages ? ' disabled' : '') + '>&rsaquo;</button>' +
+                '</span>' +
+            '</div>';
 
             return '<div class="MPC-product-search-table-wrap"><table class="MPC-product-search-table"><thead><tr>' + head + '</tr></thead><tbody>' + body + '</tbody></table></div>' + pager;
         }

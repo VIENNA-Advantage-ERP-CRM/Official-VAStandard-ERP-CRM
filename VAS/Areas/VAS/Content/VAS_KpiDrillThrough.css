@@ -1,0 +1,253 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * VAS KPI Drill-Through — shared modal for KPI tile drill-downs (VAS_122/124/125).
+ * A paged list of the records contributing to a KPI value; each row opens the
+ * record. Overlay in px. All selectors MPC-kpidrill-* (MPC prefix rule).
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Clickable KPI tile affordance (added to the KPI card by each widget). */
+.MPC-kpi-clickable {
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+    .MPC-kpi-clickable:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.12);
+    }
+
+    .MPC-kpi-clickable:focus-visible {
+        outline: 2px solid #1F83FF;
+        outline-offset: 2px;
+    }
+
+/* Modal shell. */
+.MPC-kpidrill {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;                              /* px */
+    font-family: Roboto, sans-serif;
+    color: #102C3F;
+}
+
+    .MPC-kpidrill.is-open {
+        display: flex;
+    }
+
+    .MPC-kpidrill *,
+    .MPC-kpidrill {
+        box-sizing: border-box;
+    }
+
+.MPC-kpidrill-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 20, 34, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.MPC-kpidrill-panel {
+    position: relative;
+    width: 100%;
+    max-width: 600px;                           /* px */
+    max-height: 84vh;
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 18px;                        /* px */
+    box-shadow: 0 30px 80px rgba(2, 20, 34, 0.35);
+    overflow: hidden;
+}
+
+.MPC-kpidrill-head {
+    flex-shrink: 0;
+    height: 56px;                               /* px */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;                            /* px */
+    border-bottom: 1px solid #E4EDF4;           /* px */
+}
+
+.MPC-kpidrill-title {
+    font-size: 16px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-head-r {
+    display: flex;
+    align-items: center;
+    gap: 14px;                                  /* px */
+    flex-shrink: 0;
+}
+
+.MPC-kpidrill-count {
+    font-size: 13px;                            /* px */
+    color: #748494;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;                         /* px */
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    color: #102C3F;
+    cursor: pointer;
+}
+
+    .MPC-kpidrill-close:hover {
+        background: #F2F6FA;
+    }
+
+    .MPC-kpidrill-close svg {
+        width: 20px;
+        height: 20px;
+    }
+
+.MPC-kpidrill-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 14px 8px;                      /* px */
+}
+
+.MPC-kpidrill-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-kpidrill-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;                                  /* px */
+    width: 100%;
+    padding: 10px 8px;                          /* px */
+    border: none;
+    border-bottom: 1px solid #EDF2F6;           /* px */
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+}
+
+    .MPC-kpidrill-row:last-child {
+        border-bottom: none;
+    }
+
+    .MPC-kpidrill-row:hover {
+        background: rgba(31, 131, 255, 0.05);
+    }
+
+.MPC-kpidrill-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;                        /* px */
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    font-size: 12px;                            /* px */
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.MPC-kpidrill-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-kpidrill-rtitle {
+    font-size: 14px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-rmeta {
+    font-size: 12px;                            /* px */
+    color: #5F7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-rval {
+    font-size: 13px;                            /* px */
+    font-weight: 700;
+    color: #102C3F;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.MPC-kpidrill-val-danger {
+    color: #8F2D2D;
+}
+
+.MPC-kpidrill-state {
+    padding: 18px 8px;                          /* px */
+    font-size: 13px;                            /* px */
+    color: #748494;
+    text-align: center;
+}
+
+.MPC-kpidrill-foot {
+    flex-shrink: 0;
+    padding: 10px 20px 16px;                    /* px */
+    border-top: 1px solid #E4EDF4;              /* px */
+    background: #FBFDFF;
+}
+
+.MPC-kpidrill-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;                                  /* px */
+}
+
+.MPC-kpidrill-pglabel {
+    font-size: 13px;                            /* px */
+    color: #5F7283;
+}
+
+.MPC-kpidrill-pgbtn {
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: none;
+    background: #1F83FF;
+    color: #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(31, 131, 255, 0.28);
+}
+
+    .MPC-kpidrill-pgbtn:disabled {
+        background: #C7D6E2;
+        box-shadow: none;
+        cursor: default;
+    }
+
+    .MPC-kpidrill-pgbtn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+body.MPC-kpidrill-open {
+    overflow: hidden;
+}
