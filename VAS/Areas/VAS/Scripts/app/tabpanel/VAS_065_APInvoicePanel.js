@@ -607,7 +607,7 @@
             $sec.find(".js-c-desc").text(lbl("VAS_065_Items", "Item"));
             $sec.find(".js-c-qty").text(lbl("Quantity"));
             $sec.find(".js-c-uom").text(lbl("VAS_065_UOM", "UOM"));
-            $sec.find(".js-c-rate").text(lbl("VAS_065_Rate", "Rate"));
+            $sec.find(".js-c-rate").text(lbl("VAS_065_PriceEntered", "Price"));
             $sec.find(".js-c-tax").text(lbl("VAS_065_Tax", "Tax"));
             $sec.find(".js-c-amt").text(lbl("Amount"));
             if (!anyTax) $sec.addClass("no-tax");

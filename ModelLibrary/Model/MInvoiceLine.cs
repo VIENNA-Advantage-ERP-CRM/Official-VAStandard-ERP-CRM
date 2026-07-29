@@ -604,11 +604,11 @@ namespace VAdvantage.Model
                 SetPriceActual(_productPricing.GetPriceStd());
                 SetPriceList(_productPricing.GetPriceList());
                 SetPriceLimit(_productPricing.GetPriceLimit());
-                //
-                if (Decimal.Compare(GetQtyEntered(), GetQtyInvoiced()) == 0)
-                    SetPriceEntered(GetPriceActual());
-                else
-                    SetPriceEntered(Decimal.Multiply(GetPriceActual(), Decimal.Round(Decimal.Divide(GetQtyInvoiced(), GetQtyEntered()), 6)));
+                // VAI_145: 29-July-2026, Already converted value 
+                //if (Decimal.Compare(GetQtyEntered(), GetQtyInvoiced()) == 0)
+                //    SetPriceEntered(GetPriceActual());
+                //else
+                //    SetPriceEntered(Decimal.Multiply(GetPriceActual(), Decimal.Round(Decimal.Divide(GetQtyInvoiced(), GetQtyEntered()), 6)));
 
                 //
                 if (GetC_UOM_ID() == 0)

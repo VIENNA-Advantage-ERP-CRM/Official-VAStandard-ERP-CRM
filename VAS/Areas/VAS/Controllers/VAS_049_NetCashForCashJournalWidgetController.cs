@@ -466,35 +466,25 @@ CashData AS
         CashHeader.AD_Org_ID,
         CashHeader.StatementDate,
         CashHeader.DateAcct,
-
         CashBook.C_Currency_ID
-
     FROM CashLineAccess CashLine
-
     INNER JOIN C_Cash CashHeader ON
     (
         CashLine.C_Cash_ID =
         CashHeader.C_Cash_ID
     )
-
     INNER JOIN C_CashBook CashBook ON
     (
         CashHeader.C_CashBook_ID =
         CashBook.C_CashBook_ID
     )
-
     WHERE CashHeader.IsActive = 'Y'
-
-    AND CashBook.IsActive = 'Y'
-
     AND CashHeader.AD_Client_ID =
     (
         SELECT
             QueryParameters.AD_Client_ID
-
         FROM QueryParameters QueryParameters
     )
-
     AND CashHeader.DocStatus IN
     (
         'CO',

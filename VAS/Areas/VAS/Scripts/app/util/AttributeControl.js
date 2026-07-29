@@ -354,10 +354,13 @@
             // Purchase side (IsSOTrx = false): a framework Search lookup on M_Lot (text box + search
             // button opening the paged info window), so it scales to any number of lots. Built into
             // this slot by buildLotSearch() after the form renders; picking a lot fills the Lot value
-            // field (#vasCilAttrLot). Sales side keeps just the text + "New" (lots generated there).
+            // field (#vasCilAttrLot), plus a "New" button to generate one.
+            // Sales side (IsSOTrx = true): no lot creation - the Lot is just the plain text field
+            // (lots come from the stock being sold), so the "New" button is not rendered at all.
+            var lotBtn = st.IsSOTrx ? null : attrFieldBtn("attr-newlot", L("VAS_074_NewLot", "New"));
             if (!st.IsSOTrx)
                 html += '<div id="vasCilAttrLotSearchSlot" class="input-group vis-input-wrap vas-cil-attr-lotsearch"></div>';
-            html += attrField(attrTextInput("vasCilAttrLot", true), L("VAS_074_Lot", "Lot"), attrFieldBtn("attr-newlot", L("VAS_074_NewLot", "New")), false);
+            html += attrField(attrTextInput("vasCilAttrLot", !!lotBtn), L("VAS_074_Lot", "Lot"), lotBtn, false);
         }
         if (info.IsSerNo) { any = true; html += attrField(attrTextInput("vasCilAttrSerNo", true), L("VAS_074_SerialNo", "Serial No"), attrFieldBtn("attr-genserno", L("VAS_074_Generate", "Generate")), false); }
         if (info.IsGuaranteeDate) {
