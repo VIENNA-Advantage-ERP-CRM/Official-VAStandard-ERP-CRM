@@ -664,6 +664,12 @@ AND Payment.AD_Client_ID =
 
 AND Payment.IsReceipt = 'N'
 
+AND Payment.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+
 AND Payment.TenderType = 'K'
 
 " + bouncedStatusFilter;
@@ -983,6 +989,12 @@ AND Payment.AD_Client_ID =
     " + clientIdSql + @"
 
 AND Payment.IsReceipt = 'N'
+
+AND Payment.DocStatus IN
+(
+    'CO',
+    'CL'
+)
 
 AND Payment.TenderType = 'K'
 
