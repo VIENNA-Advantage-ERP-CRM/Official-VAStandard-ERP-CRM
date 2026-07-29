@@ -194,3 +194,14 @@
 @import "../VAS_074_CreateInvoiceLinePanel.css";
 @import "../VAS_105_AccountRightPanel.css";
 @import "../VAS_106_OverviewSalesOrder.css";
+@import "../VAS_156_CountedMTDWidget.css";
+@import "../VAS_157_VarianceLinesWidget.css";
+@import "../VAS_158_OpenCountSheetsWidget.css";
+@import "../VAS_159_PositiveVarianceQtyWidget.css";
+@import "../VAS_160_NegativeVarianceQtyWidget.css";
+@import "../VAS_161_WHWiseCountWidget.css";
+@import "../VAS_162_AdjustmentWiseCountWidget.css";
+@import "../VAS_163_InventoryAgingReportWidget.css";
+@import "../VAS_164_StockSearchWidget.css";
+@import "../VAS_165_LocationWiseInventoryCountWidget.css";
+@import "../VAS_166_NewCycleCountWidget.css";

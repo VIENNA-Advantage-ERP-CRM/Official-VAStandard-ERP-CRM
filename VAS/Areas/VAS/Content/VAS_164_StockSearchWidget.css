@@ -1,0 +1,502 @@
+/* ==========================================================
+   VAS_164_StockSearchWidget.css
+
+   Full-width dashboard search bar widget with body-appended
+   fixed suggestions popover panel and Stock Detail Modal.
+   ========================================================== */
+
+.vas-stocksearch-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-root {
+    position: relative;
+    overflow: hidden;
+    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 380px) * 0.045), 24px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75em 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-family: 'Roboto', sans-serif;
+    user-select: none;
+}
+
+/* Glass Search Bar (80% width) */
+.vas-stocksearch-bar {
+    width: 80%;
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    padding: 0.7em 0.8em;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vas-stocksearch-bar.vas-stocksearch-bar-focus {
+    border-color: #B6DEFB;
+    box-shadow: 0 6px 18px rgba(0, 131, 218, 0.16);
+}
+
+.vas-stocksearch-icon {
+    width: 1.125em;
+    height: 1.125em;
+    color: #0083DA;
+    flex-shrink: 0;
+    font-size: 1.1em;
+}
+
+.vas-stocksearch-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.875em !important;
+    color: #102C3F;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.4 !important;
+}
+
+.vas-stocksearch-input::placeholder {
+    color: #748494;
+    opacity: 1;
+}
+
+.vas-stocksearch-clear {
+    width: 1.25em;
+    height: 1.25em;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #748494;
+    cursor: pointer;
+    font-size: 1em;
+    padding: 0;
+    line-height: 1;
+    border-radius: 50%;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.vas-stocksearch-clear:hover {
+    color: #102C3F;
+    background-color: rgba(16, 44, 63, 0.08);
+}
+
+.vas-stocksearch-bar.vas-stocksearch-has-text .vas-stocksearch-clear {
+    display: flex;
+}
+
+.vas-stocksearch-hint {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Suggestions Popover Panel (Appended to <body>) */
+.vas-stocksearch-panel {
+    position: fixed;
+    background-color: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(15, 61, 97, 0.14);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 10000;
+    display: none;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-stocksearch-panel.vas-stocksearch-open {
+    display: block;
+}
+
+.vas-stocksearch-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid #EDF2F6;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-item:last-child {
+    border-bottom: none;
+}
+
+.vas-stocksearch-item:hover,
+.vas-stocksearch-item.active {
+    background-color: #EEF6FF;
+}
+
+.vas-stocksearch-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-stocksearch-pkg-tile {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background-color: rgba(0, 131, 218, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.vas-stocksearch-item-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-stocksearch-item-name {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-stocksearch-item-meta {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.72rem;
+    color: #748494;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-stocksearch-item-qty {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #0083DA;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-stocksearch-empty {
+    padding: 14px;
+    text-align: center;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #748494;
+}
+
+/* Modal Overlay & Dialog */
+.vas-stocksearch-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(8, 30, 48, 0.45);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-stocksearch-modal-dialog {
+    width: clamp(340px, 85vw, 1400px);
+    height: clamp(420px, 85vh, 900px);
+    font-size: clamp(14px, 1.2vw, 22px);
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(4, 22, 38, 0.28);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* Modal Header (56px) */
+.vas-stocksearch-modal-header {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 20px;
+    border-bottom: 1px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-stocksearch-modal-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    color: #141414;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-stocksearch-code-pill {
+    background-color: #DFF1FF;
+    color: #106AB0;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.75em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.vas-stocksearch-status-active {
+    background-color: #E2F6EF;
+    color: #0B6B45;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.75em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.vas-stocksearch-status-inactive {
+    background-color: #EEF2F6;
+    color: #5F7283;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.75em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.vas-stocksearch-status-discontinued {
+    background-color: #FBE3E4;
+    color: #A33F3F;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.75em;
+    padding: 0.16em 0.66em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.vas-stocksearch-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: #141414;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    padding: 0;
+}
+
+.vas-stocksearch-modal-close:hover {
+    background-color: #EEF6FF;
+    color: #0083DA;
+}
+
+/* Form Grid (3 equal columns) */
+.vas-stocksearch-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: 22px;
+    row-gap: 0;
+    padding: 12px 20px 8px;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-field {
+    display: flex;
+    flex-direction: column;
+    padding: 9px 0 7px;
+    border-bottom: 1px solid #D7D7D7;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-label {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.7em;
+    color: #748494;
+    margin-bottom: 5px;
+}
+
+.vas-stocksearch-val {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.875em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-stocksearch-val-bold {
+    font-weight: 700;
+}
+
+/* Locators Section */
+.vas-stocksearch-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 20px 16px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-stocksearch-section-head {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.9em;
+    color: #000000;
+    padding: 14px 0 6px;
+}
+
+.vas-stocksearch-table {
+    width: 100%;
+    border-collapse: collapse;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-table th {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.7em;
+    color: #748494;
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.vas-stocksearch-table th.right {
+    text-align: right;
+}
+
+.vas-stocksearch-table td {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.8125em;
+    padding: 6px 8px;
+    border-bottom: 1px solid #EDF2F6;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-table td.loc-code {
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-stocksearch-table td.wh-name {
+    font-weight: 400;
+    color: #5F7283;
+}
+
+.vas-stocksearch-table td.qty-val {
+    font-weight: 700;
+    color: #102C3F;
+    text-align: right;
+}
+
+.vas-stocksearch-pager-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    box-sizing: border-box;
+}
+
+.vas-stocksearch-pager-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #748494;
+}
+
+.vas-stocksearch-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+.vas-stocksearch-pager-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #E4EDF4;
+    background-color: #FFFFFF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    transition: background-color 0.15s ease;
+}
+
+.vas-stocksearch-pager-btn:hover:not(:disabled) {
+    background-color: #E7F4FF;
+}
+
+.vas-stocksearch-pager-btn:disabled {
+    color: #B8C6D2;
+    cursor: not-allowed;
+}
+
+.vas-stocksearch-pager-info {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.875em;
+    color: #102C3F;
+    padding: 0 0.25em;
+}

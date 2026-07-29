@@ -1,0 +1,500 @@
+/* VAS_163_InventoryAgingReportWidget.css */
+
+.vas-invaging-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-invaging-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 380px) * 0.045), 20px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.65em 0.75em;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Roboto', sans-serif;
+    user-select: none;
+}
+
+/* Header Row */
+.vas-invaging-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-invaging-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-invaging-icon-well {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+    flex-shrink: 0;
+}
+
+.vas-invaging-title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-invaging-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-wh-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-size: 0.75em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #102C3F;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    min-width: 5.5em;
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    max-width: 160px;
+}
+
+.vas-invaging-wh-select:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+/* 4 Age Bucket Rows Container */
+.vas-invaging-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin-top: 0.4em;
+    gap: 0.25em;
+    overflow: hidden;
+}
+
+.vas-invaging-bucket-btn {
+    width: 100%;
+    flex: 1 1 0;
+    min-height: 0;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0.25em 0.4em;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15em;
+    outline: none;
+}
+
+
+.vas-invaging-bucket-btn:hover,
+.vas-invaging-bucket-btn:focus-visible {
+    background-color: rgba(234, 248, 255, 0.7);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px #0083DA;
+    outline: none;
+}
+
+
+.vas-invaging-top-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.vas-invaging-label-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    min-width: 0;
+}
+
+.vas-invaging-dot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.vas-invaging-bucket-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-count-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.vas-invaging-meta-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Distribution Progress Bar */
+.vas-invaging-bar-track {
+    width: 100%;
+    height: 0.375em;
+    background-color: #E2EAF1;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.vas-invaging-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+/* Modal Overlay & Dialog */
+.vas-invaging-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(4, 22, 38, 0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-invaging-modal-dialog {
+    width: clamp(340px, 85vw, 1400px);
+    height: clamp(420px, 85vh, 900px);
+    font-size: clamp(14px, 1.2vw, 22px);
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(4, 22, 38, 0.28);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+
+/* Modal Header Chrome (56px) */
+.vas-invaging-modal-header {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 16px;
+    border-bottom: 2px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-invaging-modal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-invaging-modal-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    color: #102C3F;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-modal-pill {
+    background-color: #DFF1FF;
+    color: #106AB0;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.6875em;
+    padding: 0.25em 0.625em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.vas-invaging-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: #141414;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background-color 0.15s ease;
+    padding: 0;
+}
+
+.vas-invaging-modal-close:hover {
+    background-color: #EEF6FF;
+}
+
+/* Summary Field Row (4 columns) */
+.vas-invaging-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0.75em 1em;
+    border-bottom: 1px solid #D7D7D7;
+    background-color: #FAFAFA;
+    box-sizing: border-box;
+}
+
+.vas-invaging-summary-cell {
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-invaging-summary-label {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #5F7283;
+}
+
+.vas-invaging-summary-val {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: #102C3F;
+    margin-top: 2px;
+}
+
+/* Modal Body & Product Table */
+.vas-invaging-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.875em 0.875em 0.5em;
+    container-type: inline-size;
+    font-size: clamp(14px, 1.2vw, 22px);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-invaging-table-header {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.875em;
+    color: #102C3F;
+    margin-bottom: 0.5em;
+}
+
+.vas-invaging-modal-grid-template {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.7fr);
+    gap: 0.75em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-invaging-modal-th {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.6875em;
+    color: #5F7283;
+    text-transform: uppercase;
+}
+
+.vas-invaging-modal-th-right {
+    text-align: right;
+}
+
+.vas-invaging-modal-data-row {
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #EDF2F6;
+    box-sizing: border-box;
+}
+
+.vas-invaging-modal-data-row:last-child {
+    border-bottom: none;
+}
+
+.vas-invaging-prod-name {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: #102C3F;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-prod-attr {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.2;
+    margin-top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-cell-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #41576A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-invaging-cell-qty {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Modal Footer */
+.vas-invaging-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #D9E2EB;
+    padding: 0.5em 0.875em;
+    box-sizing: border-box;
+}
+
+.vas-invaging-modal-footer-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.vas-invaging-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+.vas-invaging-pager-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #D9E2EB;
+    background-color: #FFFFFF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    transition: background-color 0.15s ease;
+}
+
+.vas-invaging-pager-btn:hover:not(:disabled) {
+    background-color: #EEF6FF;
+}
+
+.vas-invaging-pager-btn:disabled {
+    color: #B8C6D2;
+    cursor: not-allowed;
+}
+
+.vas-invaging-pager-info {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.8125em;
+    color: #102C3F;
+    padding: 0 0.25em;
+}
+
+.vas-invaging-message {
+    text-align: center;
+    padding: 2em 1em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+}

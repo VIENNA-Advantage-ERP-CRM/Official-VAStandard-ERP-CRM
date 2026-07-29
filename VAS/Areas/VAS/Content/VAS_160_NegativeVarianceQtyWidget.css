@@ -1,0 +1,382 @@
+/* Negative Variance Qty Widget & Modal Scoped CSS (VAS_000_) */
+
+.vas-neg-var-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    position: relative;
+    container-type: inline-size; /* Parent Container Query Anchor */
+}
+
+.vas-neg-var-root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
+    /* Widget-level container query scaling using 4.5cqi / --widget-inline-size */
+    font-size: clamp(14px, 4.5cqi, 36px);
+    font-size: clamp(14px, calc(var(--widget-inline-size, 320px) * 0.045), 36px);
+}
+
+.vas-neg-var-clickable {
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.vas-neg-var-clickable:hover,
+.vas-neg-var-clickable:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.13);
+}
+
+.vas-neg-var-clickable:focus-visible {
+    outline: 2px solid #1F83FF;
+    outline-offset: 2px;
+}
+
+.vas-neg-var-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.85em;
+    gap: 0.25em;
+    box-sizing: border-box;
+    background: linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+}
+
+.vas-neg-var-label {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    line-height: 1.3;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-neg-var-value {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 600;
+    font-size: 1.75em;
+    line-height: 1.05;
+    color: #A33F3F; /* Danger Red for negative variance */
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-neg-var-meta {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    line-height: 1.3;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Loading busy overlay */
+.vas-neg-var-busy {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: 14px;
+}
+
+.vas-neg-var-hidden {
+    display: none !important;
+}
+
+/* ==========================================================================
+   MODAL OVERLAY & DIALOG SPECIFICATIONS
+   ========================================================================== */
+
+.vas-neg-var-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+}
+
+.vas-neg-var-overlay.vas-neg-var-modal-open {
+    display: flex;
+}
+
+.vas-neg-var-modal-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.42);
+    backdrop-filter: blur(2px);
+}
+
+.vas-neg-var-dialog {
+    position: relative;
+    width: clamp(340px, 85vw, 1400px);
+    height: clamp(420px, 85vh, 900px);
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(8, 30, 48, 0.35);
+    overflow: hidden;
+    font-size: clamp(14px, 1.2vw, 22px);
+    box-sizing: border-box;
+    z-index: 10001;
+}
+
+
+
+.vas-neg-var-modal-header {
+    flex: 0 0 auto;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: #FFFFFF;
+    border-bottom: 2px solid #1F83FF;
+    box-sizing: border-box;
+}
+
+.vas-neg-var-modal-header h3 {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    font-size: 1em;
+    font-weight: 700;
+    color: #102C3F;
+}
+
+.vas-neg-var-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: #141414;
+    font-size: 20px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    padding: 0;
+}
+
+.vas-neg-var-modal-close:hover {
+    background: #EEF6FF;
+}
+
+.vas-neg-var-modal-grid-header {
+    display: grid;
+    grid-template-columns: minmax(0,1.3fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+    gap: 12px;
+    padding: 0.5em 1em;
+    background: transparent;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #5F7283;
+    text-transform: uppercase;
+    border-bottom: 1px solid #C5D2DD;
+    box-sizing: border-box;
+}
+
+.vas-neg-var-modal-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Strict no-scroll contract */
+    padding: 0 1em;
+    box-sizing: border-box;
+}
+
+.vas-neg-var-row {
+    display: grid;
+    grid-template-columns: minmax(0,1.3fr) minmax(0,2fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.7fr) minmax(0,0.7fr);
+    gap: 12px;
+    align-items: center;
+    padding: 0.625em 0;
+    border-bottom: 1px solid #E2EAF1;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+    box-sizing: border-box;
+}
+
+.vas-neg-var-row:last-child {
+    border-bottom: none;
+}
+
+.vas-neg-var-row:hover,
+.vas-neg-var-row:focus-visible {
+    background: #EEF6FF;
+    outline: none;
+}
+
+.vas-neg-var-cell-doc {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.vas-neg-var-cell {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-neg-var-cell-diff {
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #A33F3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-neg-var-tr {
+    text-align: right;
+}
+
+.vas-neg-var-modal-footer {
+    height: 48px;
+    flex: 0 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-top: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    box-sizing: border-box;
+}
+
+.vas-neg-var-footer-helper {
+    font-family: 'Roboto', sans-serif;
+    font-size: 12px;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-neg-var-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vas-neg-var-pgbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #D9E2EB;
+    background: #FFFFFF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.vas-neg-var-pgbtn:hover:not(:disabled) {
+    background: #E7F4FF;
+}
+
+.vas-neg-var-pgbtn:disabled {
+    color: #B8C6D2;
+    cursor: default;
+    opacity: 0.6;
+}
+
+.vas-neg-var-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vas-neg-var-pgtext {
+    font-family: 'Roboto', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #41576A;
+}
+
+/* Skeleton & empty states */
+.vas-neg-var-skel-row {
+    height: 36px;
+}
+
+.vas-neg-var-skel-bar {
+    width: 100%;
+    height: 16px;
+    background: linear-gradient(90deg, #E2EAF1 25%, #F0F5F9 50%, #E2EAF1 75%);
+    background-size: 200% 100%;
+    animation: vasNegVarShimmer 1.5s infinite;
+    border-radius: 4px;
+    grid-column: 1 / -1;
+}
+
+@keyframes vasNegVarShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.vas-neg-var-empty,
+.vas-neg-var-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.75em;
+    color: #5F7283;
+    padding: 2em;
+}
+
+.vas-neg-var-retry-btn {
+    margin-left: 8px;
+    color: #1F83FF;
+    background: none;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+}
