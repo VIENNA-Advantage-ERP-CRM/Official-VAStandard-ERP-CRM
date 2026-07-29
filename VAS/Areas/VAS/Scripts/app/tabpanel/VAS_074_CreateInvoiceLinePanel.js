@@ -2123,27 +2123,77 @@
                 return (val === null || val === undefined) ? whole : val;
             });
         }
-        /* Evaluate one comparison; an unresolved token (still contains '@') yields
-           <dflt> so display logic can default to visible and read-only to editable. */
+        /* The comparison operators of a logic tuple (VIS's StringTokenizer delimiters). */
+        var LOGIC_OPS = "=!^<>";
+
+        /* Split "<left><op><right>" into its three parts, or null when the tuple does not
+           hold EXACTLY ONE operator with a non-empty operand on each side - the framework
+           requires StringTokenizer(tuple, "!=^><", true).countTokens() == 3 and treats
+           anything else as false (so e.g. "@X@!=0" or ">=" is malformed, not a comparison). */
+        function splitLogicTuple(tuple) {
+            var idx = -1, count = 0;
+            for (var i = 0; i < tuple.length; i++) {
+                if (LOGIC_OPS.indexOf(tuple.charAt(i)) >= 0) { count++; if (idx < 0) idx = i; }
+            }
+            if (count !== 1) return null;
+            var left = tuple.substring(0, idx).trim(), right = tuple.substring(idx + 1).trim();
+            if (!left.length || !right.length) return null;
+            return [left, tuple.charAt(idx), right];
+        }
+
+        /* Quotes are stripped from an operand (VIS replaces ' and " with a space, then trims). */
+        function stripLogicQuotes(s) { return String(s).replace(/['"]/g, " ").trim(); }
+
+        /* Numeric value of an operand, or 0 when it isn't a number (VIS: an empty / quoted /
+           non-numeric operand is 0, and 0 disables the numeric comparison - see below). */
+        function logicNum(s) {
+            if (s.charAt(0) === "'") return 0;
+            var n = Number(s);
+            return isNaN(n) ? 0 : n;
+        }
+
+        /* Evaluate ONE comparison tuple exactly as the framework does - VIS.Evaluator's
+           evaluateLogicDouble + evaluateLogicTuple (VIS.all.min.js) - so a column behaves in
+           this panel the same as on the standard window:
+             - an @Token@ operand resolves to its context value; null / absent -> "";
+             - quotes are stripped from both operands;
+             - an EMPTY value whose operand NAME contains "_ID" becomes "0". This is the rule
+               that was missing: an unset FK must read as 0, so "@VAFAM_AssetDisposal_ID@!0"
+               is FALSE on an empty column instead of comparing "" !== "0" -> true and
+               wrongly locking / hiding the field;
+             - left "0" with an empty or "null" right -> right "0"; empty left with a "null"
+               right -> right "";
+             - the comparison is NUMERIC only when BOTH sides parse to a NON-ZERO number,
+               otherwise it is a string comparison (so "0" vs "0" compares as text).
+           <dflt> is still returned for a token this panel cannot resolve at all (the value
+           came back with its @ markers intact). */
         function evalLogicTuple(line, tuple, dflt) {
-            tuple = (tuple || "").trim();
-            if (!tuple) return true;
-            var m = tuple.match(/^(.*?)(=|!|\^|<|>)(.*)$/);
-            if (!m) return true;
-            var lv = resolveLogicTokens(line, m[1]).trim().replace(/^['"]|['"]$/g, "");
-            var rv = resolveLogicTokens(line, m[3]).trim().replace(/^['"]|['"]$/g, "");
+            var parts = splitLogicTuple((tuple || "").trim());
+            if (!parts) return false;   // malformed tuple - the framework yields false
+            var lname = parts[0], op = parts[1], rname = parts[2];
+            var lv = resolveLogicTokens(line, lname);
+            var rv = resolveLogicTokens(line, rname);
             if (lv.indexOf("@") >= 0 || rv.indexOf("@") >= 0) return dflt;   // unresolved
-            var ln = parseFloat(lv), rn = parseFloat(rv);
-            var numeric = lv !== "" && rv !== "" && !isNaN(ln) && !isNaN(rn);
-            switch (m[2]) {
+            lv = stripLogicQuotes(lv);
+            rv = stripLogicQuotes(rv);
+            // "_ID" is tested on the operand NAME (@ markers dropped), not on its value.
+            if (lname.replace(/@/g, " ").indexOf("_ID") >= 0 && !lv.length) lv = "0";
+            if (rname.replace(/@/g, " ").indexOf("_ID") >= 0 && !rv.length) rv = "0";
+            if (lv === "0" && (rv === "" || rv === "null")) rv = "0";
+            if (!lv.length && rv === "null") rv = "";
+            var ln = logicNum(lv), rn = logicNum(rv);
+            var numeric = ln !== 0 && rn !== 0;
+            switch (op) {
                 case "=": return numeric ? ln === rn : lv === rv;
-                case "!": case "^": return numeric ? ln !== rn : lv !== rv;
                 case "<": return numeric ? ln < rn : lv < rv;
                 case ">": return numeric ? ln > rn : lv > rv;
             }
-            return true;
+            return numeric ? ln !== rn : lv !== rv;   // "!" / "^"
         }
-        /* <dflt> (default false) is used for any tuple whose tokens can't be resolved. */
+        /* Combine the tuples with & / |. Like the framework (VIS.Evaluator.evaluateLogic) the
+           operators are applied STRICTLY LEFT TO RIGHT with no precedence - "A | B & C" is
+           "(A | B) & C", NOT "A | (B & C)".
+           <dflt> (default false) is used for any tuple whose tokens can't be resolved. */
         function evalLogic(line, logic, dflt) {
             if (dflt === undefined) dflt = false;
             var parts = String(logic).match(/[^&|]+|[&|]/g);
