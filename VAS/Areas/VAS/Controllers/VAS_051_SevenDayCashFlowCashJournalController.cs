@@ -586,17 +586,12 @@ CashData AS
     )
 
     WHERE CashHeader.IsActive = 'Y'
-
-    AND CashBook.IsActive = 'Y'
-
     AND CashHeader.AD_Client_ID =
     (
         SELECT
             QueryParameters.AD_Client_ID
-
         FROM QueryParameters QueryParameters
     )
-
     AND CashHeader.DocStatus IN
     (
         'CO',

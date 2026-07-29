@@ -55,6 +55,11 @@
         var uomList = [], taxList = [], taxRateById = {};
         /* AD_Column metadata cache (callout code + validation), keyed by column */
         var columnMeta = {};
+        /* true when the metadata carries at least one REAL window-tab field (IsTabField).
+           False only in the standalone fallback where no invoice-line tab resolved and every
+           meta is a merged table column - there the "shown on the window" filter used by
+           additionalInfoColumns is skipped (nothing would qualify). Set with columnMeta. */
+        var anyTabField = false;
         /* lower-cased ColumnName -> canonical (dictionary-cased) ColumnName. Used to
            canonicalise a DB-cased line.values key (PostgreSQL lowercases, Oracle uppercases)
            back to the dictionary case when priming the window context - so we never emit two
@@ -332,10 +337,12 @@
                     // Cache the AD_Column meta (callout code + validation) once per load.
                     columnMeta = {};
                     columnNameByLc = {};
+                    anyTabField = false;
                     var cols = (parent && parent.Columns) || [];
                     for (var c = 0; c < cols.length; c++) {
                         columnMeta[cols[c].ColumnName] = cols[c];
                         columnNameByLc[String(cols[c].ColumnName).toLowerCase()] = cols[c].ColumnName;
+                        if (cols[c].IsTabField) anyTabField = true;
                     }
                     // A validated MLookup caches its list at first load; drop the cache on a
                     // new invoice so its val rule re-resolves against the new header context
@@ -2116,27 +2123,77 @@
                 return (val === null || val === undefined) ? whole : val;
             });
         }
-        /* Evaluate one comparison; an unresolved token (still contains '@') yields
-           <dflt> so display logic can default to visible and read-only to editable. */
+        /* The comparison operators of a logic tuple (VIS's StringTokenizer delimiters). */
+        var LOGIC_OPS = "=!^<>";
+
+        /* Split "<left><op><right>" into its three parts, or null when the tuple does not
+           hold EXACTLY ONE operator with a non-empty operand on each side - the framework
+           requires StringTokenizer(tuple, "!=^><", true).countTokens() == 3 and treats
+           anything else as false (so e.g. "@X@!=0" or ">=" is malformed, not a comparison). */
+        function splitLogicTuple(tuple) {
+            var idx = -1, count = 0;
+            for (var i = 0; i < tuple.length; i++) {
+                if (LOGIC_OPS.indexOf(tuple.charAt(i)) >= 0) { count++; if (idx < 0) idx = i; }
+            }
+            if (count !== 1) return null;
+            var left = tuple.substring(0, idx).trim(), right = tuple.substring(idx + 1).trim();
+            if (!left.length || !right.length) return null;
+            return [left, tuple.charAt(idx), right];
+        }
+
+        /* Quotes are stripped from an operand (VIS replaces ' and " with a space, then trims). */
+        function stripLogicQuotes(s) { return String(s).replace(/['"]/g, " ").trim(); }
+
+        /* Numeric value of an operand, or 0 when it isn't a number (VIS: an empty / quoted /
+           non-numeric operand is 0, and 0 disables the numeric comparison - see below). */
+        function logicNum(s) {
+            if (s.charAt(0) === "'") return 0;
+            var n = Number(s);
+            return isNaN(n) ? 0 : n;
+        }
+
+        /* Evaluate ONE comparison tuple exactly as the framework does - VIS.Evaluator's
+           evaluateLogicDouble + evaluateLogicTuple (VIS.all.min.js) - so a column behaves in
+           this panel the same as on the standard window:
+             - an @Token@ operand resolves to its context value; null / absent -> "";
+             - quotes are stripped from both operands;
+             - an EMPTY value whose operand NAME contains "_ID" becomes "0". This is the rule
+               that was missing: an unset FK must read as 0, so "@VAFAM_AssetDisposal_ID@!0"
+               is FALSE on an empty column instead of comparing "" !== "0" -> true and
+               wrongly locking / hiding the field;
+             - left "0" with an empty or "null" right -> right "0"; empty left with a "null"
+               right -> right "";
+             - the comparison is NUMERIC only when BOTH sides parse to a NON-ZERO number,
+               otherwise it is a string comparison (so "0" vs "0" compares as text).
+           <dflt> is still returned for a token this panel cannot resolve at all (the value
+           came back with its @ markers intact). */
         function evalLogicTuple(line, tuple, dflt) {
-            tuple = (tuple || "").trim();
-            if (!tuple) return true;
-            var m = tuple.match(/^(.*?)(=|!|\^|<|>)(.*)$/);
-            if (!m) return true;
-            var lv = resolveLogicTokens(line, m[1]).trim().replace(/^['"]|['"]$/g, "");
-            var rv = resolveLogicTokens(line, m[3]).trim().replace(/^['"]|['"]$/g, "");
+            var parts = splitLogicTuple((tuple || "").trim());
+            if (!parts) return false;   // malformed tuple - the framework yields false
+            var lname = parts[0], op = parts[1], rname = parts[2];
+            var lv = resolveLogicTokens(line, lname);
+            var rv = resolveLogicTokens(line, rname);
             if (lv.indexOf("@") >= 0 || rv.indexOf("@") >= 0) return dflt;   // unresolved
-            var ln = parseFloat(lv), rn = parseFloat(rv);
-            var numeric = lv !== "" && rv !== "" && !isNaN(ln) && !isNaN(rn);
-            switch (m[2]) {
+            lv = stripLogicQuotes(lv);
+            rv = stripLogicQuotes(rv);
+            // "_ID" is tested on the operand NAME (@ markers dropped), not on its value.
+            if (lname.replace(/@/g, " ").indexOf("_ID") >= 0 && !lv.length) lv = "0";
+            if (rname.replace(/@/g, " ").indexOf("_ID") >= 0 && !rv.length) rv = "0";
+            if (lv === "0" && (rv === "" || rv === "null")) rv = "0";
+            if (!lv.length && rv === "null") rv = "";
+            var ln = logicNum(lv), rn = logicNum(rv);
+            var numeric = ln !== 0 && rn !== 0;
+            switch (op) {
                 case "=": return numeric ? ln === rn : lv === rv;
-                case "!": case "^": return numeric ? ln !== rn : lv !== rv;
                 case "<": return numeric ? ln < rn : lv < rv;
                 case ">": return numeric ? ln > rn : lv > rv;
             }
-            return true;
+            return numeric ? ln !== rn : lv !== rv;   // "!" / "^"
         }
-        /* <dflt> (default false) is used for any tuple whose tokens can't be resolved. */
+        /* Combine the tuples with & / |. Like the framework (VIS.Evaluator.evaluateLogic) the
+           operators are applied STRICTLY LEFT TO RIGHT with no precedence - "A | B & C" is
+           "(A | B) & C", NOT "A | (B & C)".
+           <dflt> (default false) is used for any tuple whose tokens can't be resolved. */
         function evalLogic(line, logic, dflt) {
             if (dflt === undefined) dflt = false;
             var parts = String(logic).match(/[^&|]+|[&|]/g);
@@ -2310,18 +2367,31 @@
             return true;
         }
 
-        /* Curated CANDIDATE column metas for this line (skips missing columns + unmet
-           `when` conditions - module presence / product type - keeps list order). NOTE:
-           DisplayLogic is NOT applied here: the field is still BUILT, and its show/hide is
-           decided AFTER buildDynField by applyDynDisplay (per the design - build the control
-           first, then apply display logic), so a control keeps its state and just toggles
-           visibility instead of being dropped/rebuilt. */
+        /* A curated field is offered only when it is actually SHOWN on the window's
+           invoice-line tab: a real AD_Field on that tab (IsTabField) whose AD_Field.IsDisplayed
+           is 'Y'. So a column the window hides - or that isn't on the window at all (merged-in
+           table column) - never appears in the Additional Info modal either.
+           Skipped entirely when no tab resolved (anyTabField == false, the standalone
+           fallback), where nothing carries field metadata and the modal would come up empty. */
+        function dynColOnScreen(m) {
+            if (!anyTabField) return true;
+            return !!(m && m.IsTabField && m.IsDisplayed);
+        }
+
+        /* Curated CANDIDATE column metas for this line (skips missing columns, columns not
+           displayed on the window tab, and unmet `when` conditions - module presence /
+           product type - keeps list order). NOTE: DisplayLogic is NOT applied here: the
+           field is still BUILT, and its show/hide is decided AFTER buildDynField by
+           applyDynDisplay (per the design - build the control first, then apply display
+           logic), so a control keeps its state and just toggles visibility instead of being
+           dropped/rebuilt. */
         function additionalInfoColumns(line) {
             var out = [];
             for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++) {
                 var spec = ADDITIONAL_INFO_FIELDS[i];
                 var m = columnMeta[spec.col];
                 if (!m) continue;
+                if (!dynColOnScreen(m)) continue;
                 if (!dynCondMet(line, spec.when)) continue;
                 out.push(m);
             }
@@ -2366,6 +2436,7 @@
                 $(this).toggleClass("vas-cil-dyn-hidden", !show);
                 if (show) visible++;
             });
+            syncGroupHeaders($body);   // a group left with no visible field loses its header
             return visible;
         }
 
@@ -2409,15 +2480,43 @@
         // user's expand/collapse choice survives value-change reconciles within the session.
         var moreGroupCollapsed = {};
 
-        // Idempotently (re)insert every group header before its anchor field, then apply the
-        // collapse state. Safe to call after any (re)build of #vasCilMoreBody.
+        /* Position of a curated column in ADDITIONAL_INFO_FIELDS (-1 when absent). */
+        function dynSpecIndex(col) {
+            for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++)
+                if (ADDITIONAL_INFO_FIELDS[i].col === col) return i;
+            return -1;
+        }
+
+        /* The curated columns a group owns: from its anchor's slot in ADDITIONAL_INFO_FIELDS
+           up to (not including) the next group's anchor. Lets the header be placed on the
+           group's first field that actually made it into the modal, so a group whose ANCHOR
+           column is hidden on the window still titles the fields it owns. */
+        function groupCols(gi) {
+            var start = dynSpecIndex(MORE_FIELD_GROUPS[gi].anchor);
+            if (start < 0) return [];
+            var end = ADDITIONAL_INFO_FIELDS.length;
+            for (var g = gi + 1; g < MORE_FIELD_GROUPS.length; g++) {
+                var idx = dynSpecIndex(MORE_FIELD_GROUPS[g].anchor);
+                if (idx > start && idx < end) end = idx;
+            }
+            var out = [];
+            for (var k = start; k < end; k++) out.push(ADDITIONAL_INFO_FIELDS[k].col);
+            return out;
+        }
+
+        // Idempotently (re)insert every group header before the first field it owns, then
+        // apply the collapse state. Safe to call after any (re)build of #vasCilMoreBody.
         function applyFieldGroups($body) {
             if (!$body || !$body.length) return;
             $body.children(".vas-cil-fldgrp").remove();   // drop prior headers first
             for (var g = 0; g < MORE_FIELD_GROUPS.length; g++) {
                 var grp = MORE_FIELD_GROUPS[g];
-                var $anchor = $body.children('[data-col="' + grp.anchor + '"]');
-                if (!$anchor.length) continue;            // group's lead field absent -> skip
+                var owned = groupCols(g), $anchor = null;
+                for (var oc = 0; oc < owned.length; oc++) {
+                    var $f = $body.children('[data-col="' + owned[oc] + '"]');
+                    if ($f.length) { $anchor = $f; break; }
+                }
+                if (!$anchor) continue;                   // none of the group's fields built -> skip
                 var collapsed = (grp.anchor in moreGroupCollapsed) ? moreGroupCollapsed[grp.anchor] : !!grp.collapsed;
                 $anchor.before(
                     '<div class="vas-cil-fldgrp" data-grp="' + grp.anchor + '"' + (collapsed ? ' data-collapsed="1"' : "") + '>' +
@@ -2428,6 +2527,7 @@
                     "</button></div>");
             }
             applyGroupCollapse($body);
+            syncGroupHeaders($body);   // headers just (re)inserted -> drop the empty ones
         }
 
         // Hide/show each group's members (the wrappers between its header and the next
@@ -2437,6 +2537,20 @@
             $body.children(".vas-cil-fldgrp").each(function () {
                 var $hdr = $(this);
                 $hdr.nextUntil(".vas-cil-fldgrp").toggleClass("vas-cil-grp-collapsed", $hdr.attr("data-collapsed") === "1");
+            });
+        }
+
+        /* Hide a section header that currently owns NO visible field - every field it owns
+           was either dropped (not shown on the window) or hidden by DisplayLogic, and an
+           empty group title must not show. Judged on .vas-cil-dyn-hidden only, so a
+           COLLAPSED group (members hidden by the user) keeps its header. Called from
+           applyDynDisplay, so every path that toggles field visibility re-syncs. */
+        function syncGroupHeaders($body) {
+            if (!$body || !$body.length) return;
+            $body.children(".vas-cil-fldgrp").each(function () {
+                var $hdr = $(this);
+                var live = $hdr.nextUntil(".vas-cil-fldgrp", "[data-col]").not(".vas-cil-dyn-hidden").length;
+                $hdr.toggleClass("vas-cil-fldgrp-empty", !live);
             });
         }
 
@@ -2943,6 +3057,7 @@
             for (var i = 0; i < ADDITIONAL_INFO_FIELDS.length; i++) {
                 var mm = columnMeta[ADDITIONAL_INFO_FIELDS[i].col];
                 if (!mm || mm.ColumnName === col) continue;
+                if (!dynColOnScreen(mm)) continue;   // never rendered -> its logic can't need a refresh
                 if ((mm.DisplayLogic && mm.DisplayLogic.indexOf(tok) >= 0) ||
                     (mm.ReadOnlyLogic && mm.ReadOnlyLogic.indexOf(tok) >= 0)) {
                     refreshMoreDialog(line);
@@ -3130,8 +3245,10 @@
                 // the product's existing M_Lots; picking one fills the Lot field.
                 IsSOTrx: !!(parent && parent.IsSOTrx),
                 // true -> open straight on the New-attribute form; false -> instance list.
-                // Set this per your own requirement.
-                newAttribute: true,
+                // Sales invoice (IsSOTrx = true): open the "Select attribute" LIST - a sales
+                // line picks from the attribute instances already in stock. Purchase invoice:
+                // open the New-attribute form directly (the instance is usually being created).
+                newAttribute: !(parent && parent.IsSOTrx),
                 // Default state of the instance list's "Show All (include zero and (-ve) qty)"
                 // checkbox for THIS screen. true -> show all; false -> only QtyOnHand > 0.
                 showAll: true,

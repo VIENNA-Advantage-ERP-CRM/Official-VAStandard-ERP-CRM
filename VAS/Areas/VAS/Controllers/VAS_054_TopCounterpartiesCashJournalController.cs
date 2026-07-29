@@ -725,9 +725,6 @@ CounterpartyLines AS
     )
 
     WHERE CashHeader.IsActive = 'Y'
-
-    AND HeaderCashBook.IsActive = 'Y'
-
     AND CashHeader.AD_Client_ID =
     (
         SELECT

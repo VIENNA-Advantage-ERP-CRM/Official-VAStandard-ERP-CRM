@@ -31,6 +31,11 @@
  * 18  | Session Expired                       | VAS_052_SessionExpired
  * 19  | + Entry                               | VAS_052_Entry
  * 20  | Cash Entry                            | VAS_052_CashEntry
+ * 21  | Document No                           | VAS_052_DocumentNo
+ * 22  | Charge                                | VAS_052_Charge
+ * 23  | Cashbook                              | VAS_052_CashBook
+ * 24  | Today's Cash Journals in Base Currency| VAS_052_Subtitle
+ * 25  | Open Record                           | VAS_052_OpenRecord
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -291,6 +296,73 @@
                 );
         }
 
+        /* The framework navigates IN-PLACE (no new window) only when the payload's
+           ActionName equals the name of the window currently HOSTING this widget;
+           otherwise it opens a new window. Resolve the host window name from the
+           listener chain and pass it as ActionName. */
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+
+                for (
+                    var index = 0;
+                    index < 6 && listener;
+                    index++
+                ) {
+                    if (
+                        listener.apanel &&
+                        listener.apanel.gridWindow &&
+                        listener.apanel.gridWindow.getName
+                    ) {
+                        return listener.apanel.gridWindow.getName();
+                    }
+
+                    if (
+                        listener.gridWindow &&
+                        listener.gridWindow.getName
+                    ) {
+                        return listener.gridWindow.getName();
+                    }
+
+                    listener = listener.listener;
+                }
+            }
+            catch (e) { }
+
+            return '';
+        }
+
+        /* Open the cash journal record (C_Cash) behind the clicked document number -
+           same contract as the sibling cash-journal widgets (VAS_053 / VAS_069). */
+        function zoomToCashJournal(recordId) {
+            recordId = safeNumber(recordId);
+
+            if (!recordId) {
+                return;
+            }
+
+            try {
+                $self.widgetFirevalueChanged({
+                    'TabWhereClause':
+                        'C_Cash.C_Cash_ID=' + recordId,
+
+                    'TabLayout':
+                        'Y',   /* 'N' Grid, 'Y' Single, 'C' Card */
+
+                    'TabIndex':
+                        '0',
+
+                    'ActionName':
+                        hostWindowName() ||
+                        'VAS_CashJournal',
+
+                    'ActionType':
+                        'W'
+                });
+            }
+            catch (e) { /* zoom is best-effort */ }
+        }
+
         function showBusy(show) {
             if (!$root) {
                 return;
@@ -405,6 +477,32 @@
                         )
                 });
 
+            /* Subtitle under the title (dashboard-widgets.md > "Widget Header"):
+               states that every amount on the card is converted to the accounting
+               schema's base currency. */
+            var $subtitle =
+                $('<span>', {
+                    'class':
+                        'VAS_052_cashbook-subtitle',
+
+                    'id':
+                        'VAS_052_cashbook-subtitle-' +
+                        widgetId,
+
+                    'text':
+                        lbl(
+                            'VAS_052_Subtitle',
+                            "Today's Cash Journals in Base Currency"
+                        )
+                });
+
+            /* Title + subtitle stack beside the icon well. */
+            var $labelGroup =
+                $('<div>', {
+                    'class':
+                        'VAS_052_cashbook-label-group'
+                });
+
             var $meta =
                 $('<span>', {
                     'class':
@@ -437,6 +535,12 @@
                     lbl(
                         'VAS_052_DocumentNo',
                         'Document No'
+                    ) +
+                    '</th>' +
+                    '<th class="VAS_052_cashbook-col-cashbook">' +
+                    lbl(
+                        'VAS_052_CashBook',
+                        'Cashbook'
                     ) +
                     '</th>' +
                     '<th class="VAS_052_cashbook-col-category">' +
@@ -508,7 +612,7 @@
 
                     'aria-label':
                         lbl(
-                                        'VAS_052_Previous',
+                            'VAS_052_Previous',
                             'Previous'
                         ),
 
@@ -532,7 +636,7 @@
 
                     'aria-label':
                         lbl(
-                                        'VAS_052_Next',
+                            'VAS_052_Next',
                             'Next'
                         ),
 
@@ -588,12 +692,47 @@
                 .append($pageInfo)
                 .append($pager);
 
+            $labelGroup
+                .append($title)
+                .append($subtitle);
+
             $titleRow
                 .append($icon)
-                .append($title);
+                .append($labelGroup);
 
             $header.append($titleRow).append($meta);
             $body.append($table);
+
+            /* Delegated on the body — the rows are replaced on every page / refresh.
+               Enter / Space activate the link too (it is a real anchor, so the browser
+               fires a click for Enter; Space is handled explicitly). */
+            $body.on(
+                'click',
+                '.VAS_052_cashbook-doc-link',
+                function (event) {
+                    event.preventDefault();
+
+                    zoomToCashJournal(
+                        $(this).attr('data-cash-id')
+                    );
+                }
+            );
+
+            $body.on(
+                'keydown',
+                '.VAS_052_cashbook-doc-link',
+                function (event) {
+                    if (event.key !== ' ') {
+                        return;
+                    }
+
+                    event.preventDefault();
+
+                    zoomToCashJournal(
+                        $(this).attr('data-cash-id')
+                    );
+                }
+            );
 
             $card
                 .append($busy)
@@ -819,19 +958,71 @@
             var $row =
                 $('<tr>');
 
-          
+            var documentNo =
+                entry.documentNo ||
+                '-';
+
+            var cashJournalId =
+                safeNumber(
+                    entry.cCashId
+                );
+
+            var $documentCell =
+                $('<td>', {
+                    'class':
+                        'VAS_052_cashbook-col-doc-no',
+
+                    'title':
+                        documentNo
+                }).appendTo($row);
+
+            /* Document No is a hyperlink that opens the cash journal record.
+               Rendered as plain text when the row carries no C_Cash_ID (there is
+               nothing to open). */
+            if (cashJournalId > 0) {
+                $('<a>', {
+                    'href':
+                        '#',
+
+                    'class':
+                        'VAS_052_cashbook-doc-link',
+
+                    'role':
+                        'link',
+
+                    'data-cash-id':
+                        cashJournalId,
+
+                    'text':
+                        documentNo,
+
+                    'title':
+                        lbl(
+                            'VAS_052_OpenRecord',
+                            'Open record'
+                        ) +
+                        ' - ' +
+                        documentNo
+                }).appendTo($documentCell);
+            }
+            else {
+                $documentCell.text(documentNo);
+            }
+
+            var cashBookText =
+                entry.cashBookName ||
+                '-';
 
             $('<td>', {
                 'class':
-                    'VAS_052_cashbook-col-doc-no',
+                    'VAS_052_cashbook-cashbook-cell ' +
+                    'VAS_052_cashbook-col-cashbook',
 
                 'text':
-                    entry.documentNo ||
-                    '-',
+                    cashBookText,
 
                 'title':
-                    entry.documentNo ||
-                    '-'
+                    cashBookText
             }).appendTo($row);
 
             // Charge and Cash type read as plain text (no chip / pill). The cell
@@ -985,6 +1176,20 @@
                     lbl(
                         'VAS_052_TodaysCashbook',
                         "Today's Cashbook"
+                    )
+                );
+
+            $root
+                .find(
+                    '#VAS_052_cashbook-subtitle-' +
+                    widgetId
+                )
+                .text(
+                    data.subtitle ||
+                    data.Subtitle ||
+                    lbl(
+                        'VAS_052_Subtitle',
+                        "Today's Cash Journals in Base Currency"
                     )
                 );
 
@@ -1230,65 +1435,51 @@
             };
     };
 
-    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.init =
-        function (
-            windowNo,
-            frame
-        ) {
-            this.frame =
-                frame;
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
 
-            this.windowNo =
-                windowNo;
+    /* Relay a fired value (e.g. zoom TabWhereClause) to the registered host. */
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) {
+            this.listener.widgetFirevalueChanged(value);
+        }
+    };
 
-            if (
-                frame &&
-                frame.widgetInfo
-            ) {
-                this.AD_UserHomeWidgetID =
-                    frame.widgetInfo.AD_UserHomeWidgetID;
-            }
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.windowNo = windowNo;
 
-            if (!this.AD_UserHomeWidgetID) {
-                this.AD_UserHomeWidgetID =
-                    windowNo ||
-                    new Date().getTime();
-            }
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
 
-            this.initalize();
+        if (!this.AD_UserHomeWidgetID) {
+            this.AD_UserHomeWidgetID = windowNo || new Date().getTime();
+        }
 
-            if (
-                this.frame &&
-                this.frame.getContentGrid
-            ) {
-                this.frame
-                    .getContentGrid()
-                    .append(
-                        this.getRoot()
-                    );
-            }
+        this.initalize();
 
-            ensureDashInlineSizeVar(this.getRoot());
-        };
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
 
-    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.widgetSizeChange =
-        function (
-            height,
-            width
-        ) {
-            if (this.handleSizeChange) {
-                this.handleSizeChange();
-            }
-        };
+        ensureDashInlineSizeVar(this.getRoot());
+    };
 
-    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.dispose =
-        function () {
-            this.disposeComponent();
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.widgetSizeChange = function (height, width) {
+        if (this.handleSizeChange) {
+            this.handleSizeChange();
+        }
+    };
 
-            if (this.frame) {
-                this.frame.dispose();
-            }
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.dispose = function () {
+        this.disposeComponent();
 
-            this.frame = null;
-        };
+        if (this.frame) {
+            this.frame.dispose();
+        }
+
+        this.frame = null;
+    };
 })(VAS, jQuery);

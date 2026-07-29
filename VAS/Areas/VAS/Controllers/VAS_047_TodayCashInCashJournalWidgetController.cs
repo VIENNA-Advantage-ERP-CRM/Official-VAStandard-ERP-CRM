@@ -608,32 +608,24 @@ SchemaCurrency AS
                     )
                 )
         END AS Cur_Symbol
-
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_AcctSchema AcctSchema ON
     (
         ClientInfo.C_AcctSchema1_ID =
         AcctSchema.C_AcctSchema_ID
     )
-
     INNER JOIN C_Currency Currency ON
     (
         AcctSchema.C_Currency_ID =
         Currency.C_Currency_ID
     )
-
     WHERE ClientInfo.IsActive = 'Y'
-
     AND AcctSchema.IsActive = 'Y'
-
     AND Currency.IsActive = 'Y'
-
     AND ClientInfo.AD_Client_ID =
     (
         SELECT
             QueryParameters.AD_Client_ID
-
         FROM QueryParameters QueryParameters
     )
 )";
@@ -645,24 +637,9 @@ SELECT
     CashJournal.AD_Org_ID,
     CashJournal.C_Currency_ID,
     CashJournal.StatementDate
-
 FROM C_Cash CashJournal
-
-WHERE CashJournal.IsActive = 'Y'
-
-AND CashJournal.DocStatus IN
-(
-    'CO',
-    'CL'
-)
-
-AND CashJournal.AD_Client_ID =
-(
-    SELECT
-        QueryParameters.AD_Client_ID
-
-    FROM QueryParameters QueryParameters
-)";
+WHERE CashJournal.DocStatus IN ('CO','CL')
+AND CashJournal.AD_Client_ID = (SELECT QueryParameters.AD_Client_ID FROM QueryParameters QueryParameters)";
 
             /*
              * Apply MRole only to the physical C_Cash table query.
@@ -693,19 +670,10 @@ CashFiltered AS
         CashJournal.StatementDate,
         CashLine.C_CashLine_ID,
         CashLine.Amount
-
     FROM CashAccess CashJournal
-
-    INNER JOIN C_CashLine CashLine ON
-    (
-        CashJournal.C_Cash_ID =
-        CashLine.C_Cash_ID
-    )
-
+    INNER JOIN C_CashLine CashLine ON (CashJournal.C_Cash_ID = CashLine.C_Cash_ID)
     WHERE CashLine.IsActive = 'Y'
-
-    AND CashLine.Amount > 0
-)";
+    AND CashLine.Amount > 0 )";
 
             string convertedAmountSql = @"
 CASE
@@ -1024,32 +992,24 @@ SchemaCurrency AS
         ClientInfo.AD_Client_ID,
         AcctSchema.C_Currency_ID,
         Currency.StdPrecision
-
     FROM AD_ClientInfo ClientInfo
-
     INNER JOIN C_AcctSchema AcctSchema ON
     (
         AcctSchema.C_AcctSchema_ID =
         ClientInfo.C_AcctSchema1_ID
     )
-
     INNER JOIN C_Currency Currency ON
     (
         Currency.C_Currency_ID =
         AcctSchema.C_Currency_ID
     )
-
     WHERE ClientInfo.IsActive = 'Y'
-
     AND AcctSchema.IsActive = 'Y'
-
     AND Currency.IsActive = 'Y'
-
     AND ClientInfo.AD_Client_ID =
     (
         SELECT
             QueryParameters.AD_Client_ID
-
         FROM QueryParameters QueryParameters
     )
 )";
@@ -1063,22 +1023,12 @@ SELECT
     CashJournal.C_CashBook_ID,
     CashJournal.DocumentNo,
     CashJournal.StatementDate
-
 FROM C_Cash CashJournal
-
-WHERE CashJournal.IsActive = 'Y'
-
-AND CashJournal.DocStatus IN
-(
-    'CO',
-    'CL'
-)
-
+WHERE CashJournal.DocStatus IN ('CO','CL')
 AND CashJournal.AD_Client_ID =
 (
     SELECT
         QueryParameters.AD_Client_ID
-
     FROM QueryParameters QueryParameters
 )";
 
@@ -1109,7 +1059,6 @@ CashTypeReference AS
                 AS " + textType + @"
             )
         ) AS ReferenceValue,
-
         TRIM
         (
             CAST
@@ -1118,7 +1067,6 @@ CashTypeReference AS
                 AS " + textType + @"
             )
         ) AS BaseName,
-
         TRIM
         (
             CAST
@@ -1127,15 +1075,12 @@ CashTypeReference AS
                 AS " + textType + @"
             )
         ) AS TranslatedName
-
     FROM AD_Table TableInfo
-
     INNER JOIN AD_Column ColumnInfo ON
     (
         ColumnInfo.AD_Table_ID =
         TableInfo.AD_Table_ID
     )
-
     INNER JOIN AD_Reference ReferenceInfo ON
     (
         ReferenceInfo.AD_Reference_ID =
@@ -1147,7 +1092,6 @@ CashTypeReference AS
         RefList.AD_Reference_ID =
         ReferenceInfo.AD_Reference_ID
     )
-
     LEFT OUTER JOIN AD_Ref_List_Trl RefListTrl ON
     (
         RefListTrl.AD_Ref_List_ID =
@@ -1157,21 +1101,14 @@ CashTypeReference AS
         (
             SELECT
                 QueryParameters.AD_Language
-
             FROM QueryParameters QueryParameters
         )
     )
-
     WHERE TableInfo.TableName = 'C_CashLine'
-
     AND ColumnInfo.ColumnName = 'CashType'
-
     AND TableInfo.IsActive = 'Y'
-
     AND ColumnInfo.IsActive = 'Y'
-
     AND ReferenceInfo.IsActive = 'Y'
-
     AND RefList.IsActive = 'Y'
 )";
 
@@ -1186,12 +1123,10 @@ CashFiltered AS
         CashJournal.C_CashBook_ID,
         CashJournal.DocumentNo,
         CashJournal.StatementDate,
-
         CashLine.C_CashLine_ID,
         CashLine.Description,
         CashLine.Amount,
         CashLine.C_Charge_ID,
-
         TRIM
         (
             CAST
@@ -1200,17 +1135,13 @@ CashFiltered AS
                 AS " + textType + @"
             )
         ) AS CashTypeValue
-
     FROM CashAccess CashJournal
-
     INNER JOIN C_CashLine CashLine ON
     (
         CashLine.C_Cash_ID =
         CashJournal.C_Cash_ID
     )
-
     WHERE CashLine.IsActive = 'Y'
-
     AND CashLine.Amount > 0
 )";
 
@@ -1218,14 +1149,12 @@ CashFiltered AS
 CASE
     WHEN CashData.C_Currency_ID =
         SchemaCurrency.C_Currency_ID
-
     THEN
         COALESCE
         (
             CashData.Amount,
             0
         )
-
     ELSE
         CurrencyConvert
         (
@@ -1253,19 +1182,14 @@ TodayRows AS
         CashData.StatementDate,
         CashData.Description,
         CashData.CashTypeValue,
-
         CashTypeReference.BaseName
             AS CashTypeBaseName,
-
         CashTypeReference.TranslatedName
             AS CashTypeTranslatedName,
-
         Charge.Name
             AS ChargeName,
-
         CashBook.Name
             AS CashBookName,
-
         ROUND
         (
             CAST
@@ -1273,7 +1197,6 @@ TodayRows AS
                 " + convertedAmountSql + @"
                 AS " + numericType + @"
             ),
-
             CAST
             (
                 COALESCE
@@ -1284,15 +1207,12 @@ TodayRows AS
                 AS INTEGER
             )
         ) AS ConvertedAmount,
-
         COALESCE
         (
             SchemaCurrency.StdPrecision,
             2
         ) AS StdPrecision
-
     FROM CashFiltered CashData
-
     INNER JOIN DateRange DateRange ON
     (
         CAST
@@ -1309,25 +1229,21 @@ TodayRows AS
         ) <
         DateRange.TodayEnd
     )
-
     INNER JOIN SchemaCurrency SchemaCurrency ON
     (
         SchemaCurrency.AD_Client_ID =
         CashData.AD_Client_ID
     )
-
     LEFT OUTER JOIN C_CashBook CashBook ON
     (
         CashBook.C_CashBook_ID =
         CashData.C_CashBook_ID
     )
-
     LEFT OUTER JOIN C_Charge Charge ON
     (
         Charge.C_Charge_ID =
         CashData.C_Charge_ID
     )
-
     LEFT OUTER JOIN CashTypeReference CashTypeReference ON
     (
         CashTypeReference.ReferenceValue =
@@ -1351,12 +1267,10 @@ NumberedRows AS
         TodayRows.CashBookName,
         TodayRows.ConvertedAmount,
         TodayRows.StdPrecision,
-
         COUNT
         (
             1
         ) OVER () AS TotalRecords,
-
         ROUND
         (
             CAST
@@ -1367,7 +1281,6 @@ NumberedRows AS
                 ) OVER ()
                 AS " + numericType + @"
             ),
-
             CAST
             (
                 COALESCE
@@ -1378,14 +1291,12 @@ NumberedRows AS
                 AS INTEGER
             )
         ) AS TotalAmount,
-
         ROW_NUMBER() OVER
         (
             ORDER BY
                 TodayRows.StatementDate DESC,
                 TodayRows.C_CashLine_ID DESC
         ) AS RowNo
-
     FROM TodayRows TodayRows
 )";
 
@@ -1414,17 +1325,13 @@ SELECT
     NumberedRows.TotalRecords,
     NumberedRows.TotalAmount,
     NumberedRows.StdPrecision
-
 FROM NumberedRows NumberedRows
-
 WHERE NumberedRows.RowNo >=
 (
     SELECT
         QueryParameters.StartRow
-
     FROM QueryParameters QueryParameters
 )
-
 AND NumberedRows.RowNo <=
 (
     SELECT
@@ -1432,7 +1339,6 @@ AND NumberedRows.RowNo <=
 
     FROM QueryParameters QueryParameters
 )
-
 ORDER BY
     NumberedRows.RowNo";
 

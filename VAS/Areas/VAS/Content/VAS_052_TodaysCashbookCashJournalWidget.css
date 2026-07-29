@@ -79,6 +79,26 @@
     max-width: 100%;
 }
 
+/* Title + subtitle stacked next to the icon (dashboard-widgets.md §"Widget Header") */
+.VAS_052_cashbook-label-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Shared width-anchored subtitle clamp — matches the other widget subtitles. */
+.VAS_052_cashbook-subtitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 0.125em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .00963), 13px);
+    line-height: 1.3;
+    font-weight: 400;
+    color: #5F7283;
+}
+
 .VAS_052_cashbook-icon {
     flex: 0 0 auto;
     width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
@@ -184,24 +204,60 @@
         border-bottom: 0;
     }
 
-/* ── Proportional column widths (fit, then truncate) ──────────────────── */
-.VAS_052_cashbook-col-doc-no {
-    width: 16%;
+/* ── Proportional column widths (fit, then truncate) ──────────────────────
+   Doc No / Cashbook / Charge / Cash Type / In / Out total 81%; the remainder
+   goes to the (auto-width) Description column. */
+.VAS_052_cashbook-col-doc-no,
+.VAS_052_cashbook-col-cashbook,
+.VAS_052_cashbook-col-category {
+    width: 14%;
 }
 
-.VAS_052_cashbook-col-category,
 .VAS_052_cashbook-col-cash-type {
-    width: 15%;
+    width: 13%;
 }
 
 .VAS_052_cashbook-col-amount {
-    width: 15%;
+    width: 13%;
 }
 
 /* Identity cell — document no, bold dark */
 .VAS_052_cashbook-col-doc-no {
     color: #102C3F;
     font-weight: 700;
+}
+
+/* Document No hyperlink — opens the cash journal record. Inherits the identity
+   cell's weight; the accent colour and underline-on-hover mark it actionable. */
+.VAS_052_cashbook-doc-link {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+    color: #0083DA;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+    .VAS_052_cashbook-doc-link:hover,
+    .VAS_052_cashbook-doc-link:focus {
+        color: #0069AE;
+        text-decoration: underline;
+    }
+
+    .VAS_052_cashbook-doc-link:focus-visible {
+        outline: 2px solid #9ED1FF;
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
+/* Cashbook name — standard muted cell */
+.VAS_052_cashbook-cashbook-cell {
+    color: #5F7283;
 }
 
 .VAS_052_cashbook-cash-type-cell {
