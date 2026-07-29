@@ -182,6 +182,23 @@ namespace VAS.Controllers
                                     "C_CashLine_ID"
                                 ),
 
+                            /* Cash journal header behind the line - the widget's
+                               Document No hyperlink opens THIS record (C_Cash). */
+                            cCashId =
+                                GetInt(
+                                    reader,
+                                    "C_Cash_ID"
+                                ),
+
+                            cCashBookId =
+                                rowCashBookId,
+
+                            cashBookName =
+                                GetString(
+                                    reader,
+                                    "CashBookName"
+                                ),
+
                             timeText =
                                 FormatTime(
                                     reader["Created"]
@@ -255,6 +272,14 @@ namespace VAS.Controllers
                             ctx,
                             "VAS_052_TodaysCashbook",
                             "Today's Cashbook"
+                        ),
+
+                        /* Every amount is converted to the accounting schema's
+                           base currency (see the CurrencyConvert in the SQL). */
+                        subtitle = GetMsg(
+                            ctx,
+                            "VAS_052_Subtitle",
+                            "Today's Cash Journals in Base Currency"
                         ),
 
                         metaText =
@@ -610,6 +635,7 @@ CashRows AS
 (
     SELECT
         CashLine.C_CashLine_ID,
+        CashLine.C_Cash_ID,
         CashLine.Created,
         CashLine.Description,
         CashLine.Amount,
@@ -783,6 +809,7 @@ PagedRows AS
 (
     SELECT
         CashRows.C_CashLine_ID,
+        CashRows.C_Cash_ID,
         CashRows.Created,
         CashRows.Description,
         CashRows.ConvertedAmount,
@@ -825,6 +852,7 @@ WITH
 " + cashRowsSql + @"
 SELECT
     PagedRows.C_CashLine_ID,
+    PagedRows.C_Cash_ID,
     PagedRows.Created,
     PagedRows.Description,
     PagedRows.ConvertedAmount,
