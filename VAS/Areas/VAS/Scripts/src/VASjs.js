@@ -202,6 +202,21 @@ import "../app/widgets/VAS_043_GLJournalTopMovementWidget.js";
 import "../app/widgets/VAS_045_GLJournalPendingWidget.js";
 
 import "../app/widgets/SalesInvoiceCustomerSearchWidget.js";
+import "../app/widgets/VAS_KpiDrillThrough.js";
+import "../app/widgets/VAS_120_CustomerSearchWidget.js";
+import "../app/widgets/VAS_121_NewCustomerWidget.js";
+import "../app/widgets/VAS_122_TotalCustomersWidget.js";
+import "../app/widgets/VAS_124_DelayedPaymentsWidget.js";
+import "../app/widgets/VAS_125_OpenPipelineWidget.js";
+import "../app/widgets/VAS_126_OpenTicketsWidget.js";
+import "../app/widgets/VAS_127_OpenTicketsListWidget.js";
+import "../app/widgets/VAS_135_ActiveProjectsWidget.js";
+import "../app/widgets/VAS_136_OnboardingStatusWidget.js";
+import "../app/widgets/VAS_137_NeedsAttentionWidget.js";
+import "../app/widgets/VAS_138_DelayedPaymentsListWidget.js";
+import "../app/widgets/VAS_139_HighValuePipelineWidget.js";
+import "../app/widgets/VAS_140_ContractsExpiringWidget.js";
+import "../app/widgets/VAS_141_CustomersBySegmentWidget.js";
 
 import "../app/widgets/VAS_073_LowStockCountWidget.js";
 import "../app/widgets/VAS_074_PendingGRNsWidget.js";
@@ -274,24 +289,13 @@ import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
 import "../app/tabpanel/VAS_105_AccountRightPanel.js";
 import "../app/tabpanel/VAS_106_OverviewSalesOrder.js";
 import "../app/widgets/VAS_156_CountedMTDWidget.js";
-import "../app/widgets/VAS_166_NewCycleCountWidget.js";
 import "../app/widgets/VAS_157_VarianceLinesWidget.js";
+import "../app/widgets/VAS_158_OpenCountSheetsWidget.js";
 import "../app/widgets/VAS_159_PositiveVarianceQtyWidget.js";
 import "../app/widgets/VAS_160_NegativeVarianceQtyWidget.js";
-import "../app/widgets/VAS_158_OpenCountSheetsWidget.js";
-import "../app/widgets/VAS_162_AdjustmentWiseCountWidget.js";
 import "../app/widgets/VAS_161_WHWiseCountWidget.js";
+import "../app/widgets/VAS_162_AdjustmentWiseCountWidget.js";
 import "../app/widgets/VAS_163_InventoryAgingReportWidget.js";
 import "../app/widgets/VAS_164_StockSearchWidget.js";
 import "../app/widgets/VAS_165_LocationWiseInventoryCountWidget.js";
-
-
-
-
-
-
-
-
-
-
-
+import "../app/widgets/VAS_166_NewCycleCountWidget.js";

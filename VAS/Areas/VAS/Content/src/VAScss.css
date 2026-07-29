@@ -60,6 +60,7 @@
 @import "../VAS_CreateNewReceipt.css";
 @import "../VAS_CreateARInvoice.css";
 @import "../VAS_CreateGLJournal.css";
+@import "../VAS_NewCashJournalWidget.css";
 @import "../VAS_ReceiptSearch.css";
 @import "../TotalAmountReceivedThisMonthWidget.css";
 @import "../ExpectedThisWeekWidget.css";
@@ -95,9 +96,27 @@
 @import "../VAS_042_GLJournalVolumeWidget.css";
 @import "../VAS_043_GLJournalTopMovementWidget.css";
 @import "../VAS_045_GLJournalPendingWidget.css";
+/* RTL (Arabic) overrides for the GL dashboard family — MUST stay after the
+   widget stylesheets above so its equal-specificity rules win. */
+@import "../VAS_GLDashboard_RTL.css";
 @import "../VAS_118_QuickJournalWidget.css";
 
 @import "../SalesInvoiceCustomerSearchWidget.css";
+@import "../VAS_KpiDrillThrough.css";
+@import "../VAS_120_CustomerSearchWidget.css";
+@import "../VAS_121_NewCustomerWidget.css";
+@import "../VAS_122_TotalCustomersWidget.css";
+@import "../VAS_124_DelayedPaymentsWidget.css";
+@import "../VAS_125_OpenPipelineWidget.css";
+@import "../VAS_126_OpenTicketsWidget.css";
+@import "../VAS_127_OpenTicketsListWidget.css";
+@import "../VAS_135_ActiveProjectsWidget.css";
+@import "../VAS_136_OnboardingStatusWidget.css";
+@import "../VAS_137_NeedsAttentionWidget.css";
+@import "../VAS_138_DelayedPaymentsListWidget.css";
+@import "../VAS_139_HighValuePipelineWidget.css";
+@import "../VAS_140_ContractsExpiringWidget.css";
+@import "../VAS_141_CustomersBySegmentWidget.css";
 
 @import "../VAS_073_LowStockCountWidget.css";
 @import "../VAS_074_PendingGRNsWidget.css";
@@ -173,13 +192,13 @@
 @import "../VAS_105_AccountRightPanel.css";
 @import "../VAS_106_OverviewSalesOrder.css";
 @import "../VAS_156_CountedMTDWidget.css";
-@import "../VAS_166_NewCycleCountWidget.css";
 @import "../VAS_157_VarianceLinesWidget.css";
+@import "../VAS_158_OpenCountSheetsWidget.css";
 @import "../VAS_159_PositiveVarianceQtyWidget.css";
 @import "../VAS_160_NegativeVarianceQtyWidget.css";
-@import "../VAS_158_OpenCountSheetsWidget.css";
-@import "../VAS_162_AdjustmentWiseCountWidget.css";
 @import "../VAS_161_WHWiseCountWidget.css";
+@import "../VAS_162_AdjustmentWiseCountWidget.css";
 @import "../VAS_163_InventoryAgingReportWidget.css";
 @import "../VAS_164_StockSearchWidget.css";
 @import "../VAS_165_LocationWiseInventoryCountWidget.css";
+@import "../VAS_166_NewCycleCountWidget.css";
