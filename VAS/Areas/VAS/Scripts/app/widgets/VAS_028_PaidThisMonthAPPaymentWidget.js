@@ -1218,20 +1218,20 @@
                 }
             }
 
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
             if ($pagerText) {
                 $pagerText.text(
-                    totalPages > 0
-                        ? (
-                            pageNo +
-                            ' ' +
-                            lbl(
-                                'VAS_Of',
-                                'of'
-                            ) +
-                            ' ' +
-                            totalPages
-                        )
-                        : ''
+                    pageNo +
+                    ' ' +
+                    lbl(
+                        'VAS_Of',
+                        'of'
+                    ) +
+                    ' ' +
+                    Math.max(1, totalPages)
                 );
             }
 

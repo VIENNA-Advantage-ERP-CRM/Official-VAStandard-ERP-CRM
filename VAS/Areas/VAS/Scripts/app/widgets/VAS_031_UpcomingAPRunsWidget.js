@@ -1446,9 +1446,11 @@
                 pageNo >= totalPages
             );
 
-            $pager.toggle(
-                totalPages > 1
-            );
+            /* The pager stays on the page whatever the count. Pulling it out
+               at one page made the footer jump as the list was filtered, and
+               it took the position read-out with it -- the disabled arrows
+               above already say there is nowhere to go. */
+            $pager.show();
         }
 
         function renderPage() {
