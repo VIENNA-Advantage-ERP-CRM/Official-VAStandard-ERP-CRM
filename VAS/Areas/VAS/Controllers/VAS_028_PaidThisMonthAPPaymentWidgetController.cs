@@ -8,7 +8,7 @@ using System;
  * ---+--------------------------------------+--------------------------------
  * 1  | Paid this month                      | VAS_028_MessagePaidThisMonth
  * 2  | Cash paid                            | VAS_028_MessageCashPaid
- * 3  | Could not load data                  | VAS_ErrorLoading
+ * 3  | No Data                              | VAS_ErrorLoading
  * 4  | Session Expired                      | SessionExpired
  * 5  | Paid to                              | VAS_028_MessagePaidTo
  * 6  | so far this month.                   | VAS_028_MessageSoFarThisMonth
@@ -168,7 +168,7 @@ namespace VAS.Controllers
 
                         description = GetMsg(
                             ctx,
-                            "VAS_028_MessageOutgoingPaymentsPostedSoFar",
+                            "VAS_028_OutgoingPaymentsPostedSoFar",
                             "Outgoing Payments Posted So Far"
                         ),
 
@@ -196,7 +196,7 @@ namespace VAS.Controllers
                 string errorMessage = GetMsg(
                     ctx,
                     "VAS_ErrorLoading",
-                    "Could Not Load Data"
+                    "No Data"
                 );
 
                 return Json(
@@ -560,6 +560,16 @@ namespace VAS.Controllers
                     ? " FROM DUAL"
                     : string.Empty;
 
+            string periodEndExclusiveSql =
+                DB.IsOracle()
+                    ? "Period.EndDate + 1"
+                    : "Period.EndDate + INTERVAL '1 DAY'";
+
+            string currentPeriodEndExclusiveSql =
+                DB.IsOracle()
+                    ? "CurrentPeriod.DateTo + 1"
+                    : "CurrentPeriod.DateTo + INTERVAL '1 DAY'";
+
             bool hasExecutionStatus =
                 HasPaymentExecutionStatusColumn();
 
@@ -718,7 +728,7 @@ CurrentPeriod AS
         Period.StartDate
 
     AND CURRENT_DATE <
-        Period.EndDate + 1
+        " + periodEndExclusiveSql + @"
 
     GROUP BY
         ClientInfo.AD_Client_ID
@@ -751,7 +761,7 @@ PaymentFiltered AS
         CurrentPeriod.DateFrom
 
     AND Payment.DateAcct <
-        CurrentPeriod.DateTo + 1
+        " + currentPeriodEndExclusiveSql + @"
 ),
 PaidThisMonthData AS
 (
@@ -891,6 +901,16 @@ LEFT OUTER JOIN PaidThisMonthData PaidThisMonthData ON
                 DB.IsOracle()
                     ? " FROM DUAL"
                     : string.Empty;
+
+            string periodEndExclusiveSql =
+                DB.IsOracle()
+                    ? "Period.EndDate + 1"
+                    : "Period.EndDate + INTERVAL '1 DAY'";
+
+            string currentPeriodEndExclusiveSql =
+                DB.IsOracle()
+                    ? "CurrentPeriod.DateTo + 1"
+                    : "CurrentPeriod.DateTo + INTERVAL '1 DAY'";
 
             int startRow =
                 ((pageNo - 1) * pageSize) + 1;
@@ -1135,7 +1155,7 @@ CurrentPeriod AS
         Period.StartDate
 
     AND CURRENT_DATE <
-        Period.EndDate + 1
+        " + periodEndExclusiveSql + @"
 
     GROUP BY
         ClientInfo.AD_Client_ID
@@ -1175,7 +1195,7 @@ PaymentFiltered AS
         CurrentPeriod.DateFrom
 
     AND Payment.DateAcct <
-        CurrentPeriod.DateTo + 1
+        " + currentPeriodEndExclusiveSql + @"
 )"
         + statusListCte + @",
 PaidRows AS

@@ -1,7 +1,7 @@
 ﻿/**
  * VAS_031 Upcoming AP Runs Widget
  * Purpose - Displays upcoming AP invoices due within the next seven days,
- * groups them by due date, payment method and currency, displays invoice
+ * groups them by due date, business partner, payment method and currency, displays invoice
  * details, and creates an AP payment linked to the selected invoice.
  *
  * ── Labels / Message Keys ─────────────────────────────────────────────
@@ -20,7 +20,7 @@
  * 11  | Not Specified                        | VAS_031_MessageNotSpecified
  * 12  | Pay                                  | VAS_031_MessagePay
  * 13  | Create Payment                       | VAS_031_MessageCreatePayment
- * 14  | Pre-filled from upcoming             | VAS_031_MessagePrefilledFromUpcoming
+ * 14  | Pre-filled from upcoming             | VAS_031_PrefilledFromUpcoming
  * 15  | Loading invoice details              | VAS_031_MessageLoadingDetails
  * 16  | Invoices                             | VAS_031_MessageInvoices
  * 17  | Invoice                              | VAS_031_MessageInvoice
@@ -35,7 +35,6 @@
  * 26  | Payment Amount                       | VAS_031_MessagePaymentAmount
  * 27  | Payment Document No.                 | VAS_031_MessageDocumentNo
  * 28  | pre-filled                           | VAS_031_MessagePrefilled
- * 29  | Select                               | VAS_Select
  * 30  | Pre-filled for invoice               | VAS_031_MessagePrefilledForInvoice
  * 31  | Review and save.                     | VAS_031_MessageReviewAndSave
  * 32  | Saving                               | VAS_031_MessageSaving
@@ -43,7 +42,7 @@
  * 34  | Cancel                               | VAS_Cancel
  * 35  | Close                                | VAS_Close
  * 36  | Could not load data                  | VAS_ErrorLoading
- * 37  | Could not save AP payment            | VAS_031_MessageCouldNotSaveAPPayment
+ * 37  | Could not save AP payment            | VAS_031_CouldNotSaveAPPayment
  * ─────────────────────────────────────────────────────────────────────
  */
 
@@ -52,9 +51,7 @@
 ; (function (VAS, $) {
     "use strict";
 
-    function lbl(key, fallback) {
-        var text =
-            VIS.Msg.getMsg(key);
+    VAS.VAS_031_UpcomingAPRunsWidget = function () {
 
         var $self = this;
 
@@ -94,6 +91,7 @@
         var runsData = [];
         var invoiceRows = [];
         var popupLookups = null;
+        var popupOriginalValues = null;
 
         var selectedRun = null;
         var selectedInvoiceRow = null;
@@ -104,6 +102,8 @@
         var totalPages = 0;
 
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
 
         /*
          * Two-line widget row:
@@ -111,6 +111,7 @@
          */
         var widgetRowHeight = 65;
         var widgetMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -177,6 +178,36 @@
 
             if (!response) {
                 return fallback;
+            }
+
+            return getResponseMessage(
+                response,
+                fallback
+            );
+        }
+
+        function getResponseMessage(
+            response,
+            fallback
+        ) {
+            var key;
+
+            if (!response) {
+                return fallback;
+            }
+
+            key =
+                response.errorKey ||
+                response.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    response.error ||
+                    response.errorText ||
+                    response.message ||
+                    fallback
+                );
             }
 
             return (
@@ -398,7 +429,11 @@
                 precision = 2;
             }
 
-            amountText = numericValue.toLocaleString(
+            var sign = numericValue < 0 ? '-' : '';
+
+            amountText = Math.abs(
+                numericValue
+            ).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits: precision,
@@ -412,8 +447,49 @@
                 '';
 
             return currencyText
-                ? currencyText + ' ' + amountText
-                : amountText;
+                ? sign + currencyText + amountText
+                : sign + amountText;
+        }
+
+        function formatWidgetCurrencyAmount(
+            value,
+            currencySymbol,
+            currencyISO,
+            stdPrecision
+        ) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+            var precision = Number(stdPrecision);
+            var amountText;
+
+            if (
+                isNaN(precision) ||
+                precision < 0
+            ) {
+                precision = 2;
+            }
+
+            amountText =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        precision
+                    )
+                    : formatCurrencyAmount(
+                        Math.abs(numericValue),
+                        '',
+                        '',
+                        precision
+                    );
+
+            return currencySymbol
+                ? sign + currencySymbol + amountText
+                : currencyISO
+                    ? sign + amountText + ' ' + currencyISO
+                    : sign + amountText;
         }
 
         function normalizeNumber(value) {
@@ -422,6 +498,30 @@
             return isNaN(numericValue)
                 ? '0'
                 : String(numericValue);
+        }
+
+        function normalizeNumberOrEmpty(value) {
+            var numericValue = Number(value || 0);
+
+            return (
+                isNaN(numericValue) ||
+                numericValue === 0
+            )
+                ? ''
+                : String(numericValue);
+        }
+
+        function normalizePrecision(value) {
+            var precision = Number(value);
+
+            if (
+                isNaN(precision) ||
+                precision < 0
+            ) {
+                precision = 2;
+            }
+
+            return precision;
         }
 
         function getInvoiceLabel(count) {
@@ -437,11 +537,18 @@
         }
 
         function showBusy(show) {
-            if ($busy) {
-                $busy.toggleClass(
-                    'is-visible',
-                    !!show
-                );
+            var $b = $root.find(
+                '#VAS-gljtm-busy-' +
+                $self.AD_UserHomeWidgetID
+            );
+
+            if (show) {
+                $b.show();
+                $b.addClass('is-visible');
+            }
+            else {
+                $b.hide();
+                $b.removeClass('is-visible');
             }
         }
 
@@ -721,16 +828,11 @@
                 ) +
                 '>';
 
-            html +=
-                '<option value="">' +
-                escapeHtml(
-                    lbl(
-                        'VAS_Select',
-                        'Select'
-                    )
-                ) +
-                '</option>';
-
+            /*
+             * All popup dropdowns are mandatory on the backend,
+             * so no empty "Select" placeholder option is rendered.
+             * The first real option becomes the default selection.
+             */
             for (
                 index = 0;
                 index < items.length;
@@ -960,10 +1062,10 @@
                 ' ' +
                 getInvoiceLabel(paymentCount);
 
-            amountText = formatCurrencyAmount(
+            amountText = formatWidgetCurrencyAmount(
                 amount,
                 run.currencySymbol,
-                run.currencyISO,
+                run.currencyISO || run.currencyISOCode || run.isoCode,
                 run.stdPrecision
             );
 
@@ -1074,11 +1176,28 @@
             return $row;
         }
 
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $body
+                ? $body.find('.vas-upcoming-ap-runs-row').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
+        }
+
         function calculatePageSize() {
             var availableHeight;
             var calculatedRows;
             var newPageSize;
             var newTotalPages;
+            var firstVisibleRecord;
 
             if (
                 !$body ||
@@ -1096,7 +1215,7 @@
 
             calculatedRows = Math.floor(
                 availableHeight /
-                widgetRowHeight
+                measureWidgetRowHeight()
             );
 
             newPageSize = Math.max(
@@ -1105,8 +1224,22 @@
             );
 
             if (newPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
 
             pageSize = newPageSize;
 
@@ -1124,7 +1257,10 @@
             pageNo = Math.max(
                 1,
                 Math.min(
-                    pageNo,
+                    Math.ceil(
+                        firstVisibleRecord /
+                        pageSize
+                    ),
                     newTotalPages || 1
                 )
             );
@@ -1134,32 +1270,53 @@
 
         function startAdaptiveRowObserver() {
             if (
-                resizeObserver ||
                 !$body ||
                 !$body.length
             ) {
                 return;
             }
 
-            if (
-                typeof ResizeObserver ===
-                'undefined'
-            ) {
-                calculatePageSize();
-                return;
-            }
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
 
-            resizeObserver = new ResizeObserver(
-                function () {
-                    window.requestAnimationFrame(
-                        calculatePageSize
+                    adaptiveResizeFrame = window.requestAnimationFrame(
+                        function () {
+                            adaptiveResizeFrame = null;
+                            adaptiveAdjustCount = 0;
+                            calculatePageSize();
+                        }
+                    );
+                };
+
+                window.addEventListener(
+                    'resize',
+                    adaptiveResizeHandler
+                );
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener(
+                        'resize',
+                        adaptiveResizeHandler
                     );
                 }
-            );
+            }
 
-            resizeObserver.observe(
-                $body[0]
-            );
+            if (
+                typeof ResizeObserver !==
+                    'undefined' &&
+                !resizeObserver
+            ) {
+                resizeObserver = new ResizeObserver(
+                    adaptiveResizeHandler
+                );
+
+                resizeObserver.observe(
+                    $body[0]
+                );
+            }
 
             calculatePageSize();
         }
@@ -1168,6 +1325,29 @@
             if (resizeObserver) {
                 resizeObserver.disconnect();
                 resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener(
+                    'resize',
+                    adaptiveResizeHandler
+                );
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener(
+                        'resize',
+                        adaptiveResizeHandler
+                    );
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(
+                    adaptiveResizeFrame
+                );
+                adaptiveResizeFrame = null;
             }
         }
 
@@ -1327,6 +1507,9 @@
             }
 
             updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            calculatePageSize();
         }
 
         function renderData(data) {
@@ -1404,16 +1587,12 @@
                     ) {
                         showState(
                             true,
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load data'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load data'
                             )
                         );
 
@@ -1511,7 +1690,15 @@
                 );
         }
 
-        function ensurePopupLookups(callback) {
+        function ensurePopupLookups(
+            currencyId,
+            callback
+        ) {
+            if (typeof currencyId === 'function') {
+                callback = currencyId;
+                currencyId = 0;
+            }
+
             if (popupLookups) {
                 callback(true);
                 return;
@@ -1525,6 +1712,10 @@
                 type: 'GET',
                 dataType: 'json',
                 cache: false,
+                data: {
+                    currencyId:
+                        Number(currencyId || 0)
+                },
 
                 success: function (response) {
                     var data = normalizeResponse(
@@ -1539,16 +1730,12 @@
                         popupLookups = null;
 
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load lookup data.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load lookup data.'
                             )
                         );
 
@@ -1577,6 +1764,118 @@
                     callback(false);
                 }
             });
+        }
+
+        function refreshPopupBankAccounts(
+            currencyId,
+            callback
+        ) {
+            $.ajax({
+                url:
+                    VIS.Application.contextUrl +
+                    'VAS_031_UpcomingAPRunsWidget/GetPaymentPopupLookups',
+
+                type: 'GET',
+                dataType: 'json',
+                cache: false,
+                data: {
+                    currencyId:
+                        Number(currencyId || 0)
+                },
+
+                success: function (response) {
+                    var data = normalizeResponse(
+                        response
+                    );
+
+                    if (
+                        !data ||
+                        data.success === false ||
+                        data.error
+                    ) {
+                        showPayError(
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load lookup data.'
+                                )
+                            )
+                        );
+
+                        callback(false);
+                        return;
+                    }
+
+                    popupLookups =
+                        popupLookups || {};
+
+                    popupLookups.bankAccounts =
+                        $.isArray(
+                            data.bankAccounts
+                        )
+                            ? data.bankAccounts
+                            : [];
+
+                    callback(true);
+                },
+
+                error: function (xhr) {
+                    showPayError(
+                        getAjaxErrorMessage(
+                            xhr,
+                            lbl(
+                                'VAS_ErrorLoading',
+                                'Could not load lookup data.'
+                            )
+                        )
+                    );
+
+                    callback(false);
+                }
+            });
+        }
+
+        function updatePopupBankAccountField() {
+            var bankAccounts;
+            var selectedBankAccountId;
+            var validBankAccountId;
+
+            if (
+                !$payDialogGrid ||
+                !getPayField('bankAccountId').length
+            ) {
+                return;
+            }
+
+            bankAccounts =
+                getLookup('bankAccounts');
+
+            selectedBankAccountId = Number(
+                getPayField('bankAccountId').val() || 0
+            );
+
+            validBankAccountId =
+                getValidLookupValue(
+                    bankAccounts,
+                    selectedBankAccountId
+                );
+
+            if (!validBankAccountId) {
+                validBankAccountId =
+                    getFirstPositiveLookupValue(
+                        bankAccounts
+                    );
+            }
+
+            getPayField('bankAccountId').replaceWith(
+                selectHtml(
+                    'bankAccountId',
+                    bankAccounts,
+                    validBankAccountId,
+                    false
+                )
+            );
         }
 
         function renderInvoiceRows(rows) {
@@ -1637,7 +1936,11 @@
                             Number(
                                 selectedInvoiceRow.invoiceId
                             ) ===
-                            Number(row.invoiceId)
+                            Number(row.invoiceId) &&
+                            Number(
+                                selectedInvoiceRow.invoicePayScheduleId
+                            ) ===
+                            Number(row.invoicePayScheduleId)
                             ? ' is-selected'
                             : ''
                     ) +
@@ -1806,6 +2109,685 @@
             }
         }
 
+        function getPopupBasePaymentAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'payAmt'
+                )
+            ) {
+                return popupOriginalValues.payAmt;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.payAmt,
+                    row && row.openAmount,
+                    row && row.amount,
+                    0
+                )
+            );
+
+            return isNaN(amount)
+                ? 0
+                : amount;
+        }
+
+        function getPopupBaseDiscountAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'discountAmt'
+                )
+            ) {
+                return popupOriginalValues.discountAmt;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.discountAmt,
+                    row && row.discountAmount,
+                    0
+                )
+            );
+
+            /*
+             * Negative (outflow) amounts are kept as entered; only an
+             * unparsable value falls back to zero.
+             */
+            return isNaN(amount)
+                ? 0
+                : amount;
+        }
+
+        function getPopupBaseOpenAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'openAmount'
+                )
+            ) {
+                return popupOriginalValues.openAmount;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.openAmount,
+                    row && row.scheduleOpenAmount,
+                    row && row.amount,
+                    0
+                )
+            );
+
+            /*
+             * Negative (outflow) amounts are kept as entered; only an
+             * unparsable value falls back to zero.
+             */
+            return isNaN(amount)
+                ? 0
+                : amount;
+        }
+
+        function getPopupBaseWriteOffAmount(row) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'writeOffAmt'
+                )
+            ) {
+                return popupOriginalValues.writeOffAmt;
+            }
+
+            var amount = Number(
+                firstValue(
+                    row && row.writeOffAmt,
+                    row && row.writeOffAmount,
+                    0
+                )
+            );
+
+            /*
+             * Negative (outflow) amounts are kept as entered; only an
+             * unparsable value falls back to zero.
+             */
+            return isNaN(amount)
+                ? 0
+                : amount;
+        }
+
+        function getPopupOriginalCurrencyId(
+            row
+        ) {
+            if (
+                popupOriginalValues &&
+                popupOriginalValues.hasOwnProperty(
+                    'currencyId'
+                )
+            ) {
+                return popupOriginalValues.currencyId;
+            }
+
+            return Number(
+                firstPositiveValue(
+                    row && row.currencyId,
+                    row && row.cCurrencyId
+                )
+            );
+        }
+
+        function setPopupOriginalValues(row) {
+            row = row || {};
+
+            popupOriginalValues = {
+                payAmt: Number(
+                    firstValue(
+                        row.payAmt,
+                        row.openAmount,
+                        row.amount,
+                        0
+                    )
+                ) || 0,
+                discountAmt: Number(
+                    firstValue(
+                        row.discountAmt,
+                        row.discountAmount,
+                        0
+                    )
+                ) || 0,
+                openAmount: Number(
+                    firstValue(
+                        row.openAmount,
+                        row.scheduleOpenAmount,
+                        row.amount,
+                        0
+                    )
+                ) || 0,
+                writeOffAmt: Number(
+                    firstValue(
+                        row.writeOffAmt,
+                        row.writeOffAmount,
+                        0
+                    )
+                ) || 0,
+                currencyId:
+                    Number(
+                        firstPositiveValue(
+                            row.currencyId,
+                            row.cCurrencyId
+                        )
+                    )
+            };
+        }
+
+        function getPopupAmountPrecision() {
+            var currencyId;
+            var currencies;
+            var index;
+            var item;
+
+            currencyId = Number(
+                getPayField('currencyId').val() || 0
+            );
+
+            currencies = getLookup('currencies');
+
+            for (index = 0; index < currencies.length; index++) {
+                item = currencies[index] || {};
+
+                if (
+                    Number(getLookupItemValue(item)) ===
+                    currencyId
+                ) {
+                    return normalizePrecision(
+                        firstValue(
+                            item.stdPrecision,
+                            item.StdPrecision,
+                            selectedInvoiceRow &&
+                            selectedInvoiceRow.stdPrecision,
+                            2
+                        )
+                    );
+                }
+            }
+
+            return normalizePrecision(
+                firstValue(
+                    selectedInvoiceRow &&
+                    selectedInvoiceRow.stdPrecision,
+                    2
+                )
+            );
+        }
+
+        function roundPopupAmount(value) {
+            var numericValue = Number(value || 0);
+            var precision = getPopupAmountPrecision();
+            var factor;
+
+            if (isNaN(numericValue)) {
+                return 0;
+            }
+
+            factor = Math.pow(10, precision);
+
+            return Math.round(numericValue * factor) / factor;
+        }
+
+        /*
+         * AP amounts are outflows and may be typed negative, so the entered
+         * figure keeps its own sign and only its magnitude is capped by the
+         * open amount.
+         */
+        function clampPopupMagnitude(value, limit) {
+            var numericValue = Number(value);
+            var numericLimit = Number(limit);
+            var magnitude;
+
+            if (isNaN(numericValue)) {
+                return 0;
+            }
+
+            if (isNaN(numericLimit)) {
+                return numericValue;
+            }
+
+            magnitude = Math.min(
+                Math.abs(numericValue),
+                Math.abs(numericLimit)
+            );
+
+            return numericValue < 0 ? -magnitude : magnitude;
+        }
+
+        function getPopupConversionContext(
+            sourceCurrencyId
+        ) {
+            var targetCurrencyId;
+            var conversionTypeId;
+            var transactionDate;
+            var adOrgId;
+            var adClientId;
+
+            if (!selectedInvoiceRow) {
+                return null;
+            }
+
+            sourceCurrencyId = Number(
+                sourceCurrencyId || 0
+            );
+
+            if (sourceCurrencyId <= 0) {
+                sourceCurrencyId =
+                    getPopupOriginalCurrencyId(
+                        selectedInvoiceRow
+                    );
+            }
+
+            targetCurrencyId = Number(
+                getPayField('currencyId').val() || 0
+            );
+
+            conversionTypeId = Number(
+                getPayField('conversionTypeId').val() || 0
+            );
+
+            transactionDate = String(
+                getPayField('transactionDate').val() || ''
+            ).trim();
+
+            adOrgId = Number(
+                getPayField('adOrgId').val() ||
+                firstPositiveValue(
+                    selectedInvoiceRow.adOrgId,
+                    selectedInvoiceRow.organizationId
+                ) ||
+                (VIS.Env &&
+                    VIS.Env.getCtx &&
+                    VIS.Env.getCtx() &&
+                    VIS.Env.getCtx().getAD_Org_ID
+                    ? VIS.Env.getCtx().getAD_Org_ID()
+                    : 0)
+            );
+
+            adClientId =
+                VIS.Env &&
+                    VIS.Env.getCtx &&
+                    VIS.Env.getCtx() &&
+                    VIS.Env.getCtx().getAD_Client_ID
+                    ? Number(
+                        VIS.Env.getCtx().getAD_Client_ID()
+                    )
+                    : 0;
+
+            return {
+                sourceCurrencyId:
+                    sourceCurrencyId,
+                targetCurrencyId:
+                    targetCurrencyId,
+                conversionTypeId:
+                    conversionTypeId,
+                transactionDate:
+                    transactionDate,
+                adOrgId: adOrgId,
+                adClientId: adClientId
+            };
+        }
+
+        function convertPopupAmount(
+            amount,
+            sourceCurrencyId
+        ) {
+            var context;
+            var paramString;
+            var convertedAmount;
+
+            context = getPopupConversionContext(
+                sourceCurrencyId
+            );
+
+            if (
+                !context ||
+                context.sourceCurrencyId <= 0 ||
+                context.targetCurrencyId <= 0
+            ) {
+                return null;
+            }
+
+            if (
+                !context.transactionDate ||
+                context.conversionTypeId <= 0 ||
+                context.adClientId <= 0 ||
+                context.adOrgId < 0
+            ) {
+                return roundPopupAmount(amount);
+            }
+
+            if (
+                context.sourceCurrencyId ===
+                context.targetCurrencyId
+            ) {
+                return roundPopupAmount(amount);
+            }
+
+            paramString =
+                amount.toString() + "," +
+                context.sourceCurrencyId.toString() + "," +
+                context.targetCurrencyId.toString() + "," +
+                context.transactionDate + "," +
+                context.conversionTypeId.toString() + "," +
+                context.adClientId.toString() + "," +
+                context.adOrgId.toString();
+
+            convertedAmount = Number(
+                VIS.dataContext.getJSONRecord(
+                    "MConversionRate/CurrencyConvert",
+                    paramString
+                )
+            );
+
+            if (isNaN(convertedAmount)) {
+                return null;
+            }
+
+            return roundPopupAmount(convertedAmount);
+        }
+
+        function convertPopupBaseAmount(baseAmount) {
+            return convertPopupAmount(
+                baseAmount,
+                getPopupOriginalCurrencyId(
+                    selectedInvoiceRow
+                )
+            );
+        }
+
+        function getPopupCurrentOpenAmount() {
+            return convertPopupBaseAmount(
+                getPopupBaseOpenAmount(
+                    selectedInvoiceRow
+                )
+            );
+        }
+
+        function syncPopupAmountsFromBase() {
+            var convertedPayAmount;
+            var convertedDiscountAmount;
+            var convertedWriteOffAmount;
+
+            convertedPayAmount =
+                convertPopupBaseAmount(
+                    getPopupBasePaymentAmount(
+                        selectedInvoiceRow
+                    )
+                );
+
+            convertedDiscountAmount =
+                convertPopupBaseAmount(
+                    getPopupBaseDiscountAmount(
+                        selectedInvoiceRow
+                    )
+                );
+
+            convertedWriteOffAmount =
+                convertPopupBaseAmount(
+                    getPopupBaseWriteOffAmount(
+                        selectedInvoiceRow
+                    )
+                );
+
+            if (
+                convertedPayAmount == null ||
+                convertedDiscountAmount == null ||
+                convertedWriteOffAmount == null
+            ) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+
+                getPayField('discountAmt').val('');
+                getPayField('payAmt').val('0');
+                return false;
+            }
+
+            getPayField('discountAmt').val(
+                normalizeNumberOrEmpty(
+                    convertedDiscountAmount
+                )
+            );
+
+            getPayField('writeOffAmt').val(
+                normalizeNumberOrEmpty(
+                    convertedWriteOffAmount
+                )
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(
+                    convertedPayAmount
+                )
+            );
+
+            $payDialogNotice.removeClass(
+                'vas-upcoming-ap-runs-pay-error'
+            );
+
+            return true;
+        }
+
+        function recalculatePopupFromDiscount() {
+            var openAmount;
+            var discountAmt;
+            var writeOffAmt;
+            var payAmt;
+
+            openAmount =
+                getPopupCurrentOpenAmount();
+
+            if (openAmount == null) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+                return;
+            }
+
+            discountAmt = Number(
+                getPayField('discountAmt').val() || 0
+            );
+
+            discountAmt = clampPopupMagnitude(
+                discountAmt,
+                openAmount
+            );
+
+            writeOffAmt = Number(
+                getPayField('writeOffAmt').val() || 0
+            );
+
+            writeOffAmt = clampPopupMagnitude(
+                writeOffAmt,
+                Math.abs(openAmount) -
+                Math.abs(discountAmt)
+            );
+
+            payAmt = roundPopupAmount(
+                Math.abs(openAmount) -
+                Math.abs(discountAmt) -
+                Math.abs(writeOffAmt)
+            );
+
+            if (openAmount < 0) {
+                payAmt = -payAmt;
+            }
+
+            getPayField('discountAmt').val(
+                normalizeNumberOrEmpty(
+                    roundPopupAmount(discountAmt)
+                )
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(payAmt)
+            );
+
+            getPayField('writeOffAmt').val(
+                normalizeNumberOrEmpty(
+                    roundPopupAmount(writeOffAmt)
+                )
+            );
+        }
+
+        function recalculatePopupFromPayAmt() {
+            var openAmount;
+            var payAmt;
+            var discountAmt;
+            var writeOffAmt;
+            var maximumPayAmt;
+
+            openAmount =
+                getPopupCurrentOpenAmount();
+
+            if (openAmount == null) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+                return;
+            }
+
+            payAmt = Number(
+                getPayField('payAmt').val() || 0
+            );
+
+            payAmt = clampPopupMagnitude(
+                payAmt,
+                openAmount
+            );
+
+            writeOffAmt = Number(
+                getPayField('writeOffAmt').val() || 0
+            );
+
+            discountAmt = Number(
+                getPayField('discountAmt').val() || 0
+            );
+
+            if (isNaN(writeOffAmt)) {
+                writeOffAmt = 0;
+            }
+
+            if (isNaN(discountAmt)) {
+                discountAmt = 0;
+            }
+
+            maximumPayAmt = roundPopupAmount(
+                Math.max(
+                    Math.abs(openAmount) -
+                    Math.abs(discountAmt) -
+                    Math.abs(writeOffAmt),
+                    0
+                )
+            );
+
+            payAmt = clampPopupMagnitude(
+                payAmt,
+                maximumPayAmt
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(
+                    roundPopupAmount(payAmt)
+                )
+            );
+
+            getPayField('writeOffAmt').val(
+                normalizeNumberOrEmpty(
+                    roundPopupAmount(writeOffAmt)
+                )
+            );
+        }
+
+        function recalculatePopupFromWriteOff() {
+            var openAmount;
+            var discountAmt;
+            var writeOffAmt;
+            var payAmt;
+
+            openAmount =
+                getPopupCurrentOpenAmount();
+
+            if (openAmount == null) {
+                showPayError(
+                    lbl(
+                        'NoCurrencyConversion',
+                        'No currency conversion found.'
+                    )
+                );
+                return;
+            }
+
+            discountAmt = Number(
+                getPayField('discountAmt').val() || 0
+            );
+
+            writeOffAmt = Number(
+                getPayField('writeOffAmt').val() || 0
+            );
+
+            discountAmt = clampPopupMagnitude(
+                discountAmt,
+                openAmount
+            );
+
+            writeOffAmt = clampPopupMagnitude(
+                writeOffAmt,
+                Math.abs(openAmount) -
+                Math.abs(discountAmt)
+            );
+
+            payAmt = clampPopupMagnitude(
+                roundPopupAmount(
+                    Math.abs(openAmount) -
+                    Math.abs(discountAmt) -
+                    Math.abs(writeOffAmt)
+                ),
+                openAmount
+            );
+
+            if (openAmount < 0) {
+                payAmt = -Math.abs(payAmt);
+            }
+
+            getPayField('writeOffAmt').val(
+                normalizeNumberOrEmpty(
+                    roundPopupAmount(writeOffAmt)
+                )
+            );
+
+            getPayField('payAmt').val(
+                normalizeNumber(payAmt)
+            );
+        }
+
+        function updatePopupConvertedPaymentAmount() {
+            if (
+                !selectedInvoiceRow ||
+                !$payDialogGrid ||
+                !getPayField('payAmt').length
+            ) {
+                return;
+            }
+
+            syncPopupAmountsFromBase();
+        }
+
         function renderPayDialogGrid(row) {
             var organizations;
             var bankAccounts;
@@ -1832,6 +2814,8 @@
             ) {
                 return;
             }
+
+            setPopupOriginalValues(row);
 
             organizations =
                 getLookup('organizations');
@@ -1878,14 +2862,12 @@
                     )
                 );
 
-            currencyId =
-                getValidLookupValue(
-                    currencies,
-                    firstPositiveValue(
-                        row.currencyId,
-                        row.cCurrencyId
-                    )
-                );
+            /*
+             * Display exactly the currency returned by
+             * GetUpcomingAPRunDetails SQL query.
+             * Do not validate, replace, or select a fallback currency.
+             */
+            currencyId = row.currencyId;
 
             bankAccountId =
                 getValidLookupValue(
@@ -1943,46 +2925,9 @@
                     );
             }
 
-            paymentMethodId =
-                getValidLookupValue(
-                    paymentMethods,
-                    firstPositiveValue(
-                        row.paymentMethodId,
-                        row.va009PaymentMethodId,
-                        selectedRun &&
-                        selectedRun.paymentMethodId
-                    )
-                );
-
-            if (!paymentMethodId) {
-                paymentMethodId =
-                    getFirstPositiveLookupValue(
-                        paymentMethods
-                    );
-            }
+            paymentMethodId = 0;
 
             html =
-                fieldHtml(
-                    lbl(
-                        'VAS_031_MessageInvoice',
-                        'Invoice'
-                    ),
-
-                    inputHtml(
-                        'invoiceDocumentNo',
-                        'text',
-                        firstValue(
-                            row.invoiceDocumentNo,
-                            row.documentNo,
-                            ''
-                        ),
-                        null,
-                        true
-                    ),
-
-                    true
-                ) +
-
                 fieldHtml(
                     lbl(
                         'VAS_031_MessageOrganization',
@@ -2025,10 +2970,10 @@
                         'currencyId',
                         currencies,
                         currencyId,
-                        true
+                        false
                     ),
 
-                    true
+                    false
                 ) +
 
                 fieldHtml(
@@ -2120,6 +3065,52 @@
 
                 fieldHtml(
                     lbl(
+                        'DiscountAmt',
+                        'Discount'
+                    ),
+
+                    inputHtml(
+                        'discountAmt',
+                        'number',
+                        normalizeNumberOrEmpty(
+                            firstValue(
+                                row.discountAmt,
+                                row.discountAmount,
+                                0
+                            )
+                        ),
+                        '0.01',
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'WriteOffAmt',
+                        'Write Off Amount'
+                    ),
+
+                    inputHtml(
+                        'writeOffAmt',
+                        'number',
+                        normalizeNumberOrEmpty(
+                            firstValue(
+                                row.writeOffAmt,
+                                row.writeOffAmount,
+                                0
+                            )
+                        ),
+                        '0.01',
+                        false
+                    ),
+
+                    false
+                ) +
+
+                fieldHtml(
+                    lbl(
                         'VAS_031_MessageCheckNo',
                         'Check No.'
                     ),
@@ -2167,9 +3158,9 @@
                         'number',
                         normalizeNumber(
                             firstValue(
+                                row.payAmt,
                                 row.openAmount,
                                 row.amount,
-                                row.payAmt,
                                 0
                             )
                         ),
@@ -2178,6 +3169,49 @@
                     ),
 
                     true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'VAS_031_MessageInvoice',
+                        'Invoice'
+                    ),
+
+                    inputHtml(
+                        'invoiceDocumentNo',
+                        'text',
+                        firstValue(
+                            row.invoiceDocumentNo,
+                            row.documentNo,
+                            ''
+                        ),
+                        null,
+                        true
+                    ),
+
+                    true
+                ) +
+
+                fieldHtml(
+                    lbl(
+                        'Description',
+                        'Description'
+                    ),
+
+                    inputHtml(
+                        'invoiceDescription',
+                        'text',
+                        firstValue(
+                            row.description,
+                            row.invoiceDescription,
+                            ''
+                        ),
+                        null,
+                        true
+                    ),
+
+                    true,
+                    'data-full-span="true"'
                 );
 
             $payDialogGrid.html(html);
@@ -2192,7 +3226,115 @@
                     }
                 );
 
+            getPayField('currencyId')
+                .off('change.vasCurrencyConvert')
+                .on(
+                    'change.vasCurrencyConvert',
+                    function () {
+                        var selectedCurrencyId = Number(
+                            $(this).val() || 0
+                        );
+
+                        refreshPopupBankAccounts(
+                            selectedCurrencyId,
+                            function (loaded) {
+                                if (!loaded) {
+                                    return;
+                                }
+
+                                updatePopupBankAccountField();
+                                updatePopupConvertedPaymentAmount();
+                            }
+                        );
+                    }
+                );
+
+            getPayField('conversionTypeId')
+                .off('change.vasCurrencyConvert')
+                .on(
+                    'change.vasCurrencyConvert',
+                    function () {
+                        syncPopupAmountsFromBase();
+                    }
+                );
+
+            getPayField('transactionDate')
+                .off('change.vasCurrencyConvert')
+                .on(
+                    'change.vasCurrencyConvert',
+                    function () {
+                        syncPopupAmountsFromBase();
+                    }
+                );
+
+            getPayField('discountAmt')
+                .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
+                .on(
+                    'input.vasRecalculate change.vasRecalculate',
+                    function (event) {
+                        if (
+                            event.type === 'input' &&
+                            isPayFieldMidEntry('discountAmt')
+                        ) {
+                            return;
+                        }
+
+                        recalculatePopupFromDiscount();
+                    }
+                )
+                .on(
+                    'blur.vasRecalculate',
+                    function () {
+                        recalculatePopupFromDiscount();
+                    }
+                );
+
+            getPayField('payAmt')
+                .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
+                .on(
+                    'input.vasRecalculate change.vasRecalculate',
+                    function (event) {
+                        if (
+                            event.type === 'input' &&
+                            isPayFieldMidEntry('payAmt')
+                        ) {
+                            return;
+                        }
+
+                        recalculatePopupFromPayAmt();
+                    }
+                )
+                .on(
+                    'blur.vasRecalculate',
+                    function () {
+                        recalculatePopupFromPayAmt();
+                    }
+                );
+
+            getPayField('writeOffAmt')
+                .off('input.vasRecalculate change.vasRecalculate blur.vasRecalculate')
+                .on(
+                    'input.vasRecalculate change.vasRecalculate',
+                    function (event) {
+                        if (
+                            event.type === 'input' &&
+                            isPayFieldMidEntry('writeOffAmt')
+                        ) {
+                            return;
+                        }
+
+                        recalculatePopupFromWriteOff();
+                    }
+                )
+                .on(
+                    'blur.vasRecalculate',
+                    function () {
+                        recalculatePopupFromWriteOff();
+                    }
+                );
+
             updateCheckFieldsVisibility();
+            syncPopupAmountsFromBase();
         }
 
         function updatePayNotice(row) {
@@ -2271,8 +3413,31 @@
                     )
                 );
         }
-
         function loadRunInvoiceDetails(run) {
+            var cBPartnerId = Number(
+                firstValue(
+                    run && run.cBPartnerId,
+                    run && run.vendorId,
+                    0
+                )
+            );
+
+            if (cBPartnerId <= 0) {
+                showPayError(
+                    lbl(
+                        'VAS_031_BusinessPartnerRequired',
+                        'Business partner is required.'
+                    )
+                );
+
+                setPayDialogBusy(
+                    false,
+                    false
+                );
+
+                return;
+            }
+
             $.ajax({
                 url:
                     VIS.Application.contextUrl +
@@ -2291,17 +3456,24 @@
 
                     paymentMethodId:
                         Number(
-                            run.paymentMethodId ||
-                            0
+                            firstValue(
+                                run.paymentMethodId,
+                                run.va009PaymentMethodId,
+                                0
+                            )
                         ),
 
                     currencyId:
                         Number(
-                            firstPositiveValue(
+                            firstValue(
                                 run.currencyId,
-                                run.cCurrencyId
+                                run.cCurrencyId,
+                                0
                             )
-                        )
+                        ),
+
+                    cBPartnerId:
+                        cBPartnerId
                 },
 
                 success: function (response) {
@@ -2315,16 +3487,12 @@
                         data.error
                     ) {
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.errorText ||
-                                    data.error
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_ErrorLoading',
+                                    'Could not load invoice details.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_ErrorLoading',
-                                'Could not load invoice details.'
                             )
                         );
 
@@ -2393,7 +3561,7 @@
 
             $payDialogSub.text(
                 lbl(
-                    'VAS_031_MessagePrefilledFromUpcoming',
+                    'VAS_031_PrefilledFromUpcoming',
                     'Pre-filled from upcoming'
                 ) +
                 ' · ' +
@@ -2435,6 +3603,12 @@
             );
 
             ensurePopupLookups(
+                firstPositiveValue(
+                    run &&
+                    run.currencyId,
+                    run &&
+                    run.cCurrencyId
+                ),
                 function (loaded) {
                     if (!loaded) {
                         setPayDialogBusy(
@@ -2460,6 +3634,7 @@
 
             selectedRun = null;
             selectedInvoiceRow = null;
+            popupOriginalValues = null;
             invoiceRows = [];
 
             getPayField('checkNo').val('');
@@ -2487,6 +3662,32 @@
                 name +
                 '"]'
             );
+        }
+
+        /*
+         * A number input reports an empty value while the entry is still
+         * incomplete, and a lone minus sign is exactly that case. Rewriting
+         * the field on such a keystroke would erase the sign before the
+         * digits arrive, so those keystrokes are left alone; change and blur
+         * still normalize the value.
+         */
+        function isPayFieldMidEntry(name) {
+            var element = getPayField(name)[0];
+
+            if (!element) {
+                return false;
+            }
+
+            if (
+                element.validity &&
+                element.validity.badInput
+            ) {
+                return true;
+            }
+
+            return String(
+                element.value == null ? '' : element.value
+            ) === '';
         }
 
         function bindDatePickers() {
@@ -2610,6 +3811,24 @@
 
                 documentNo: '',
 
+                paymentDescription: String(
+                    getPayField(
+                        'invoiceDescription'
+                    ).val() || ''
+                ).trim(),
+
+                discountAmt: Number(
+                    getPayField(
+                        'discountAmt'
+                    ).val() || 0
+                ),
+
+                writeOffAmt: Number(
+                    getPayField(
+                        'writeOffAmt'
+                    ).val() || 0
+                ),
+
                 payAmt: Number(
                     getPayField(
                         'payAmt'
@@ -2620,7 +3839,7 @@
             if (payload.invoiceId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageSourceInvoiceRequired',
+                        'VAS_031_SourceInvoiceRequired',
                         'Source invoice is required.'
                     )
                 );
@@ -2631,7 +3850,7 @@
             if (payload.invoicePayScheduleId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageInvoicePayScheduleRequired',
+                        'VAS_031_InvoicePayScheduleRequired',
                         'Invoice payment schedule is required.'
                     )
                 );
@@ -2642,7 +3861,7 @@
             if (payload.adOrgId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageOrganizationRequired',
+                        'VAS_031_OrganizationRequired',
                         'Organization is required.'
                     )
                 );
@@ -2686,7 +3905,7 @@
             if (payload.conversionTypeId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageConversionTypeRequired',
+                        'VAS_031_ConversionTypeRequired',
                         'Currency type is required.'
                     )
                 );
@@ -2697,7 +3916,7 @@
             if (payload.docTypeId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageDocumentTypeRequired',
+                        'VAS_031_DocumentTypeRequired',
                         'Document type is required.'
                     )
                 );
@@ -2708,7 +3927,7 @@
             if (payload.paymentMethodId <= 0) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessagePaymentMethodRequired',
+                        'VAS_031_PaymentMethodRequired',
                         'Payment method is required.'
                     )
                 );
@@ -2753,7 +3972,7 @@
             if (!payload.transactionDate) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessageTransactionDateRequired',
+                        'VAS_031_TransactionDateRequired',
                         'Transaction date is required.'
                     )
                 );
@@ -2761,38 +3980,56 @@
                 return null;
             }
 
-            if (
-                isNaN(payload.payAmt) ||
-                payload.payAmt <= 0
-            ) {
+            if (isNaN(payload.discountAmt)) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessagePaymentAmountRequired',
-                        'Payment amount must be greater than zero.'
+                        'VAS_031_MessageDiscountInvalid',
+                        'Discount amount must be a number.'
                     )
                 );
 
                 return null;
             }
 
-            maximumAmount = Number(
-                firstValue(
-                    selectedInvoiceRow.openAmount,
-                    selectedInvoiceRow.amount,
-                    selectedInvoiceRow.payAmt,
-                    0
-                )
-            );
-
+            /*
+             * AP amounts are outflows and may be entered negative, so the
+             * pay amount only has to be a non-zero number and the totals
+             * are compared against the open amount by magnitude.
+             */
             if (
-                !isNaN(maximumAmount) &&
-                maximumAmount > 0 &&
-                payload.payAmt > maximumAmount
+                isNaN(payload.payAmt) ||
+                payload.payAmt === 0
             ) {
                 showPayError(
                     lbl(
-                        'VAS_031_MessagePaymentExceedsOpenAmount',
-                        'Payment amount exceeds invoice open amount.'
+                        'VAS_031_PaymentAmountRequired',
+                        'Payment amount must not be zero.'
+                    )
+                );
+
+                return null;
+            }
+
+            maximumAmount =
+                getPopupCurrentOpenAmount();
+
+            if (
+                !isNaN(maximumAmount) &&
+                maximumAmount !== 0 &&
+                (
+                    Math.abs(payload.payAmt) >
+                    Math.abs(maximumAmount) ||
+                    (
+                        Math.abs(payload.payAmt) +
+                        Math.abs(payload.discountAmt) +
+                        Math.abs(payload.writeOffAmt)
+                    ) > Math.abs(maximumAmount)
+                )
+            ) {
+                showPayError(
+                    lbl(
+                        'VAS_031_PaymentExceedsOpenAmount',
+                        'Payment amount and discount exceed invoice open amount.'
                     )
                 );
 
@@ -2847,17 +4084,12 @@
                         data.error
                     ) {
                         showPayError(
-                            (
-                                data &&
-                                (
-                                    data.error ||
-                                    data.errorText ||
-                                    data.message
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_031_CouldNotSaveAPPayment',
+                                    'Could not save AP payment.'
                                 )
-                            ) ||
-                            lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
-                                'Could not save AP payment.'
                             )
                         );
 
@@ -2880,17 +4112,29 @@
 
                     loadData();
 
+
                     if (
                         VIS &&
                         VIS.ADialog &&
                         VIS.ADialog.info
                     ) {
-                        VIS.ADialog.info(
-                            data.message ||
-                            lbl(
-                                'VAS_031_MessagePaymentCreatedSuccessfully',
-                                'AP payment created successfully.'
+
+                        var msg = String(
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_031_PaymentCreatedSuccessfully',
+                                    'AP payment created successfully.'
+                                )
                             )
+                        )
+                            .replace(/[\[\]]/g, '')
+                            .replace(/\s{2,}/g, ' ')
+                            .trim();
+
+
+                        VIS.ADialog.info(
+                          null , null ,    msg
                         );
                     }
                 },
@@ -2900,7 +4144,7 @@
                         getAjaxErrorMessage(
                             xhr,
                             lbl(
-                                'VAS_031_MessageCouldNotSaveAPPayment',
+                                'VAS_031_CouldNotSaveAPPayment',
                                 'Could not save AP payment.'
                             )
                         )
@@ -3115,12 +4359,15 @@
 
         function createLayout() {
             var $head;
+
+            if ($card && $card.length) {
+                return;
+            }
             var $headLeft;
-            var $titleRow;
+            var $headText;
             var $iconBox;
             var $icon;
             var $title;
-            var $arrow;
             var $sub;
 
             $card = $(
@@ -3135,8 +4382,8 @@
                 '<div class="vas-upcoming-ap-runs-head-left">'
             );
 
-            $titleRow = $(
-                '<div class="vas-upcoming-ap-runs-title-row">'
+            $headText = $(
+                '<div class="vas-upcoming-ap-runs-head-text">'
             );
 
             $iconBox = $(
@@ -3170,26 +4417,6 @@
                 )
             );
 
-            $arrow = $(
-                '<span ' +
-                'class="vas-upcoming-ap-runs-arrow" ' +
-                'aria-hidden="true">' +
-
-                '<svg ' +
-                'viewBox="0 0 24 24" ' +
-                'fill="none" ' +
-                'stroke="currentColor" ' +
-                'stroke-width="2.4" ' +
-                'stroke-linecap="round" ' +
-                'stroke-linejoin="round">' +
-
-                '<path d="M9 18l6-6-6-6"></path>' +
-
-                '</svg>' +
-
-                '</span>'
-            );
-
             $sub = $(
                 '<div class="vas-upcoming-ap-runs-sub">'
             ).text(
@@ -3201,19 +4428,22 @@
 
             $iconBox.append($icon);
 
-            $titleRow
-                .append($iconBox)
+            $headText
                 .append($title)
-                .append($arrow);
+                .append($sub);
 
             $headLeft
-                .append($titleRow)
-                .append($sub);
+                .append($iconBox)
+                .append($headText);
 
             $head.append($headLeft);
 
             $busy = $(
-                '<div class="vas-upcoming-ap-runs-busy">' +
+                '<div ' +
+                'id="VAS-gljtm-busy-' +
+                escapeHtml($self.AD_UserHomeWidgetID) +
+                '" ' +
+                'class="vas-upcoming-ap-runs-busy">' +
                 '<div class="vis-busyindicatorinnerwrap">' +
                 '<i class="vis_widgetloader"></i>' +
                 '</div>' +
@@ -3351,11 +4581,24 @@
             $self.frame =
                 frame || null;
 
+            if (
+                frame &&
+                frame.widgetInfo
+            ) {
+                $self.AD_UserHomeWidgetID =
+                    Number(
+                        frame.widgetInfo
+                            .AD_UserHomeWidgetID ||
+                        0
+                    );
+            }
+
             createLayout();
 
             if (
                 $self.frame &&
-                $self.frame.getContentGrid
+                $self.frame.getContentGrid &&
+                !$root.parent().length
             ) {
                 $self.frame
                     .getContentGrid()
@@ -3370,12 +4613,13 @@
          * VIS widget lifecycle compatibility.
          */
         this.initialize = function () {
-            if (!$root.parent().length) {
-                createLayout();
-            }
-
+            createLayout();
             startAdaptiveRowObserver();
             loadData();
+        };
+
+        this.Initalize = function () {
+            $self.initialize();
         };
 
         this.refresh = function () {
@@ -3457,6 +4701,74 @@
             $self.frame = null;
         }
     };
+
+
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.init =
+        function (windowNo, frame) {
+            if (
+                typeof this.init === 'function' &&
+                Object.prototype.hasOwnProperty.call(
+                    this,
+                    'init'
+                )
+            ) {
+                return this.init(
+                    windowNo,
+                    frame
+                );
+            }
+        };
+
+    /**
+     * Handles widget size changes.
+     */
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype
+        .widgetSizeChange =
+        function (height, width) {
+            var $root =
+                this.getRoot();
+
+            if (!$root) {
+                return;
+            }
+
+            $root.toggleClass(
+                'vas-upcoming-ap-runs-compact',
+                (
+                    width &&
+                    width < 240
+                ) ||
+                (
+                    height &&
+                    height < 160
+                )
+            );
+        };
+
+    /**
+     * Refreshes widget.
+     */
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype
+        .refreshWidget =
+        function () {
+            if (
+                typeof this.refresh === 'function'
+            ) {
+                this.refresh();
+            }
+        };
+
+    /**
+     * Disposes widget.
+     */
+    VAS.VAS_031_UpcomingAPRunsWidget.prototype.dispose =
+        function () {
+            if (
+                typeof this.disposeComponent === 'function'
+            ) {
+                this.disposeComponent();
+            }
+        };
 
 })(VAS, jQuery);
 

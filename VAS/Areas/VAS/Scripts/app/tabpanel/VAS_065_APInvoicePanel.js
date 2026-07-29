@@ -604,7 +604,7 @@
             );
             $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_LineItems", "Line Items"));
             $sec.find(".js-count").text(lbl("VAS_065_GoodsLinesCount", "{0} goods lines").replace("{0}", goodsCount));
-            $sec.find(".js-c-desc").text(lbl("Description"));
+            $sec.find(".js-c-desc").text(lbl("VAS_065_Items", "Item"));
             $sec.find(".js-c-qty").text(lbl("Quantity"));
             $sec.find(".js-c-uom").text(lbl("VAS_065_UOM", "UOM"));
             $sec.find(".js-c-rate").text(lbl("VAS_065_Rate", "Rate"));
@@ -736,7 +736,7 @@
                 : lbl("VAS_065_VarianceFound", "Variance found"));
             $sec.find(".vas-apinv-insight-b").text(
                 retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
-                       "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
+                    "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                     .replace("{0}", gr.ReceiptDocumentNo || "")
                     .replace("{1}", gr.OrderDocumentNo || ""));
             $sec.append(chip(clean ? lbl("VAS_065_CleanMatch", "Clean match") : lbl("VAS_065_VarianceFound", "Variance found"),
@@ -844,15 +844,15 @@
                 ? gr.ReceivedDates.map(function (d) { return fmtDate(d); }).join(", ")
                 : fmtDate(gr.ReceivedDate);
             kvRow($kv, retLbl("VAS_065_ReceiptGRN", "Receipt (GRN)",
-                              "VAS_065_VendorReturn", "Vendor Return"), gr.ReceiptDocumentNo);
+                "VAS_065_VendorReturn", "Vendor Return"), gr.ReceiptDocumentNo);
             kvRow($kv, retLbl("VAS_065_PurchaseOrder", "Purchase order",
-                              "VAS_065_VendorRMA", "Vendor RMA"), gr.OrderDocumentNo);
+                "VAS_065_VendorRMA", "Vendor RMA"), gr.OrderDocumentNo);
             kvRow($kv, retLbl("VAS_065_ReceivedOn", "Received On",
-                              "VAS_065_ReturnedOn", "Returned On"), receivedOn);
+                "VAS_065_ReturnedOn", "Returned On"), receivedOn);
             // "QtyReceived" is an existing dictionary key, so it carries no inline
             // fallback (undefined keeps lbl's raw-key behaviour unchanged).
             kvRow($kv, retLbl("QtyReceived", undefined,
-                              "VAS_065_QtyReturned", "Quantity Returned"),
+                "VAS_065_QtyReturned", "Quantity Returned"),
                 fmtNumber(gr.TotalReceived, 0) + " " +
                 lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim());
             kvRow($kv, lbl("VAS_065_Warehouse", "Warehouse"), gr.WarehouseName);
@@ -969,10 +969,10 @@
                 steps.push({
                     // Return transaction -> matched against a vendor return, not a receipt.
                     st: retLbl("VAS_065_MatchedToReceipt", "Matched to receipt",
-                               "VAS_065_MatchedToVendorReturn", "Matched to vendor return"),
+                        "VAS_065_MatchedToVendorReturn", "Matched to vendor return"),
                     mt: fmtDate(data.GoodsReceipt.ReceivedDate),
                     nt: retLbl("VAS_065_MatchedToReceiptOrder", "Matched to receipt {0} and order {1}",
-                               "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
+                        "VAS_065_MatchedToVendorReturnOrder", "Matched to vendor return {0} and order {1}")
                         .replace("{0}", data.GoodsReceipt.ReceiptDocumentNo || "")
                         .replace("{1}", data.GoodsReceipt.OrderDocumentNo || ""), done: true
                 });
@@ -1608,14 +1608,16 @@
                 return (decSep !== ".") ? s.replace(".", decSep) : s;
             }
 
-            // Strip anything that is not a digit or the locale decimal separator (keeping at
-            // most one), so the value is always a clean non-negative amount.
+            // Strip anything that is not a digit, the locale decimal separator (keeping at
+            // most one) or a LEADING minus - a negative payment (and its matching negative
+            // discount) is a valid entry.
             function sanitizeAmount(s) {
                 s = String(s);
                 var out = "", seenDec = false;
                 for (var i = 0; i < s.length; i++) {
                     var c = s.charAt(i);
-                    if (c >= "0" && c <= "9") out += c;
+                    if (c === "-" && out.length === 0) out += c;   // leading sign only
+                    else if (c >= "0" && c <= "9") out += c;
                     else if (c === decSep && !seenDec) { out += decSep; seenDec = true; }
                     // grouping separators and any other characters are dropped
                 }
@@ -1630,6 +1632,11 @@
                     var ch = String.fromCharCode(e.which);
                     if (ch === decSep) { if (this.value.indexOf(decSep) !== -1) e.preventDefault(); return; }
                     if (ch === grpSep) return;                  // allow grouping separators
+                    // A single leading minus is allowed (negative payment / discount).
+                    if (ch === "-") {
+                        if (this.selectionStart !== 0 || this.value.indexOf("-") !== -1) e.preventDefault();
+                        return;
+                    }
                     if (!/[0-9]/.test(ch)) e.preventDefault();
                 });
                 $inp.on("paste drop", function () {
@@ -1659,11 +1666,18 @@
             }
 
             // Reflect the payment-currency symbol/precision in the amount + discount
-            // fields and reset the amount to the (converted) open balance.
+            // fields and reset the amount to the (converted) open balance. A reset also
+            // clears the discount (it was typed in the previous currency) and re-bases
+            // the settled amount the discount rules work against.
             function syncPayUI(resetAmount) {
                 $payAmt.closest(".control").find(".pfx").text(payCtx.sym);
                 $payDisc.closest(".control").find(".pfx").text(payCtx.sym);
-                if (resetAmount) $payAmt.val(fmtAmtInput(payRemaining(), payCtx.prec));
+                if (resetAmount) {
+                    $payAmt.val(fmtAmtInput(payRemaining(), payCtx.prec));
+                    $payDisc.val(fmtAmtInput(0, payCtx.prec));
+                    $payDisc.closest(".control").removeClass("invalid");
+                }
+                rebaseSettleAmount();
             }
 
             // Resolve the payment currency from the selected currency + conversion type and
@@ -1709,6 +1723,8 @@
                             payCtx.noRate = true;
                             syncPayUI(false);
                             $payAmt.val(fmtAmtInput(0, payCtx.prec));
+                            $payDisc.val(fmtAmtInput(0, payCtx.prec));
+                            rebaseSettleAmount();
                             recompute();
                             error((resp && resp.Message) || lbl("VAS_065_NoConversionRate", "No conversion rate found for the selected currency."));
                         }
@@ -1754,8 +1770,23 @@
                 var rate = payCtx.rate, prec = payCtx.prec, sym = payCtx.sym;
                 var creditPay = roundTo(state.applied * rate, prec);
                 var totalBase = payTotalBase();
-                var disc = parseNum($payDisc.val());
                 var pay = parseNum($payAmt.val());
+
+                // Rule 1: a discount can only be entered while this payment line has
+                // something to settle (cash + discount, either sign). The test uses the
+                // settled amount, not the cash amount, so a discount that drove the
+                // payment to zero can still be reduced again.
+                if (!fullySettled) {
+                    var canDiscount = Math.abs(settleAmount || 0) > 0;
+                    $payDisc.prop("disabled", !canDiscount);
+                    $payDisc.closest(".vas-apinv-field").toggleClass("is-disabled", !canDiscount);
+                    if (!canDiscount && parseNum($payDisc.val()) !== 0) {
+                        $payDisc.val(fmtAmtInput(0, payCtx.prec));
+                        $payDisc.closest(".control").removeClass("invalid");
+                    }
+                }
+
+                var disc = parseNum($payDisc.val());
                 var settle = Math.min(creditPay + pay + disc, totalBase);
                 var over = Math.max(0, (creditPay + pay + disc) - totalBase);
                 var remain = Math.max(0, totalBase - creditPay - pay - disc);
@@ -1783,7 +1814,7 @@
                 // Nothing open -> no payment can be recorded (section is read-only).
                 var $submit = $scrim.find(".js-submit");
                 $submit.prop("disabled", exceedsOpen || noRate || fullySettled)
-                    .text(pay <= 0 && creditPay > 0 ? lbl("VAS_065_CompleteSettlement", "Complete settlement") : lbl("VAS_065_RecordPayment", "Record payment"));
+                    .text(Math.abs(pay) <= 1e-6 && creditPay > 0 ? lbl("VAS_065_CompleteSettlement", "Complete settlement") : lbl("VAS_065_RecordPayment", "Record payment"));
 
                 var $foot = $scrim.find(".js-foot-msg");
                 if (fullySettled) { $foot.text(lbl("VAS_065_InvoiceFullySettled", "Invoice fully settled")); }
@@ -1840,13 +1871,96 @@
             // non-negative decimal before the live recompute runs.
             bindAmountInput($payAmt);
             bindAmountInput($payDisc);
-            $payAmt.on("input", recompute);
-            $payDisc.on("input", recompute);
+
+            // Payment / discount rules (New Payment):
+            //  1. the discount can only be entered while there is an amount to settle,
+            //  2. it can never exceed that amount,
+            //  3. entering it REDUCES the payment amount by the same value,
+            //  4. payment + discount can never exceed the open amount, and
+            //  5. raising the payment trims an already-entered discount to fit.
+            // All comparisons are on magnitudes, so a negative payment line behaves the
+            // same way with a negative discount.
+            // `settleAmount` is what this payment line settles in total - cash paid plus
+            // discount. Editing the payment amount re-bases it; editing the discount
+            // keeps it fixed and moves the split between cash and discount.
+            var settleAmount = 0;
+
+            function rebaseSettleAmount() {
+                settleAmount = roundTo(parseNum($payAmt.val()) + parseNum($payDisc.val()), payCtx.prec);
+            }
+
+            // Amount still open on this invoice, in the payment currency - the ceiling
+            // for payment + discount together. Magnitude only: a negative payment line
+            // is compared on its absolute value.
+            function openToSettle() {
+                return Math.abs(payRemaining());
+            }
+
+            // Payment amount edited: cap it at the open amount and, when a discount is
+            // already entered, trim that discount to whatever room is left so
+            // |payment| + |discount| never exceeds the open amount.
+            function applyPaymentAmountChange() {
+                var open = openToSettle();
+                var pay = parseNum($payAmt.val());
+                var disc = parseNum($payDisc.val());
+                var paySign = pay < 0 ? -1 : 1;
+                var discSign = disc < 0 ? -1 : 1;
+                var payCapped = Math.abs(pay) > open + 1e-6;
+
+                if (payCapped) {
+                    pay = paySign * open;
+                    $payAmt.val(fmtAmtInput(pay, payCtx.prec));
+                }
+
+                // Room left for the discount after the payment takes its share.
+                var room = Math.max(0, roundTo(open - Math.abs(pay), payCtx.prec));
+                var discTrimmed = Math.abs(disc) > room + 1e-6;
+
+                if (discTrimmed) {
+                    disc = discSign * room;
+                    $payDisc.val(fmtAmtInput(disc, payCtx.prec));
+                }
+
+                rebaseSettleAmount();
+                recompute();
+
+                // After recompute (which owns the payment field's invalid state) so the
+                // clamp feedback is not immediately cleared.
+                $payAmt.closest(".control").toggleClass("invalid", payCapped);
+                $payDisc.closest(".control").toggleClass("invalid", discTrimmed);
+            }
+
+            // Rule 3 (+2): pay = settle - discount. A negative payment takes a negative
+            // discount, so the sign always follows the settled amount and only the
+            // MAGNITUDES are compared - the discount can never be larger than the amount
+            // being settled, and the payment never flips sign.
+            function applyDiscountToPayment() {
+                var base = settleAmount || 0;
+                var sign = base < 0 ? -1 : 1;
+                var entered = parseNum($payDisc.val());
+                var disc = sign * Math.min(Math.abs(entered), Math.abs(base));
+                // Capped, or typed with the wrong sign against a negative payment.
+                var wasFixed = Math.abs(entered - disc) > 1e-6;
+
+                if (wasFixed) {
+                    $payDisc.val(fmtAmtInput(disc, payCtx.prec));
+                }
+
+                $payAmt.val(fmtAmtInput(roundTo(base - disc, payCtx.prec), payCtx.prec));
+                recompute();
+                // Flag the over-discount / wrong-sign attempt (the value itself is fixed).
+                $payDisc.closest(".control").toggleClass("invalid", wasFixed);
+            }
+
+            $payAmt.on("input", applyPaymentAmountChange);
+            $payDisc.on("input", applyDiscountToPayment);
+
             // On blur, round the entered amount / discount to the selected currency's
             // precision and show it with that many decimals.
             function roundFieldToCurrency($inp) {
                 $inp.val(fmtAmtInput(parseNum($inp.val()), payCtx.prec));
-                recompute();
+                if ($inp === $payDisc) { applyDiscountToPayment(); }
+                else { applyPaymentAmountChange(); }
             }
             $payAmt.on("blur", function () { roundFieldToCurrency($payAmt); });
             $payDisc.on("blur", function () { roundFieldToCurrency($payDisc); });
@@ -1876,6 +1990,9 @@
                 $pay.addClass("is-readonly")
                     .find("input, select").prop("disabled", true).attr("tabindex", "-1");
             }
+
+            // Seed the settled amount (cash + discount) the discount rules work against.
+            rebaseSettleAmount();
 
             updateCreditSummary();
             recompute();
@@ -2041,13 +2158,22 @@
                 return;
             }
 
-            if (pay <= 0 && st.state.applied > 0) {
+            if (Math.abs(pay) <= 1e-6 && st.state.applied > 0) {
                 // Settlement is fully covered by the already-created allocation (shown in
                 // the invoice currency - the allocation is in invoice currency).
                 var cur = meta.CurSymbol || meta.ISO_Code || "";
                 showSuccess(lbl("VAS_065_CreditApplied", "Credit applied"), lbl("VAS_065_CreditAppliedMsg", "The selected on-account payment and credit have been allocated to this invoice."), [
                     { k: lbl("VAS_065_AllocationCreated", "Allocation created"), v: fmtAmountCur(st.state.applied, cur, meta.StdPrecision) }
                 ]);
+                return;
+            }
+
+            // A discount rides along with an actual payment - it never stands on its
+            // own (the field itself caps the value at the amount being settled, so a
+            // 100% discount lands here with a zero payment). Signs can be negative, so
+            // both sides are tested on their magnitude.
+            if (Math.abs(disc) > 1e-6 && Math.abs(pay) <= 1e-6) {
+                error(lbl("VAS_065_DiscountNeedsPayment", "Enter a payment amount before recording a discount."));
                 return;
             }
 
@@ -2223,10 +2349,10 @@
                 .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
         }
         function info(msg) {
-            if (VIS && VIS.ADialog && VIS.ADialog.info) VIS.ADialog.info("", "" , msg); else console.log(msg);
+            if (VIS && VIS.ADialog && VIS.ADialog.info) VIS.ADialog.info("", "", msg); else console.log(msg);
         }
         function error(msg) {
-            if (VIS && VIS.ADialog && VIS.ADialog.error) VIS.ADialog.error("", "" , msg); else console.log(msg);
+            if (VIS && VIS.ADialog && VIS.ADialog.error) VIS.ADialog.error("", "", msg); else console.log(msg);
         }
 
         // Generate the invoice PDF via the framework print process and download it.

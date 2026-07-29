@@ -35,6 +35,7 @@
         var $pagerPrev;
         var $pagerNext;
         var $pagerText;
+        var $showingText;
         var $busy;
         var $state;
         var isDisposed = false;
@@ -43,8 +44,11 @@
         var pageSize = 3;
         var totalPages = 0;
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
         var widgetRowHeight = 50;
         var widgetMinimumRows = 2;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -94,7 +98,9 @@
           
             var $whyText = $('<span class="vas-payment-methods-foot-text">').text(lbl('VAS_033_MessagePaymentMethodWhy', 'Upi is cheapest - shift small payments where possible'));
 
-            $foot.append($whyText).append($pager);
+            $showingText = $('<span class="vas-payment-methods-showing">');
+
+            $foot.append($whyText).append($showingText).append($pager);
             $busy = $('<div class="vas-payment-methods-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-payment-methods-state-message">');
 
@@ -215,6 +221,36 @@
             }
 
             updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize();
+        }
+
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $body
+                ? $body.find('.vas-payment-methods-row').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
+        }
+
+        function measureWidgetRowGap() {
+            if (!$body || !$body[0] || !window.getComputedStyle) {
+                return 0;
+            }
+
+            var bodyStyle = window.getComputedStyle($body[0]);
+            var measuredGap = parseFloat(bodyStyle.rowGap || bodyStyle.gap);
+
+            return isNaN(measuredGap) ? 0 : measuredGap;
         }
 
         function updateAdaptivePageSize() {
@@ -222,14 +258,27 @@
                 return;
             }
 
+            var rowHeight = measureWidgetRowHeight();
+            var rowGap = measureWidgetRowGap();
             var nextPageSize = Math.max(
                 widgetMinimumRows,
-                Math.floor($body[0].clientHeight / widgetRowHeight)
+                Math.floor(($body[0].clientHeight + rowGap) / (rowHeight + rowGap))
             );
 
             if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
 
@@ -259,11 +308,67 @@
 
                 resizeObserver.observe($body[0]);
             }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
+            }
         }
 
         function updatePager() {
             if (!$pager) {
                 return;
+            }
+
+            if ($showingText) {
+                var count = methodsData.length;
+                var startIndex = count > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
+                var endIndex = count > 0 ? Math.min(pageNo * pageSize, count) : 0;
+
+                $showingText.text(
+                    count > 0
+                        ? lbl('VAS_Showing', 'Showing') + ' ' +
+                          startIndex + '–' + endIndex + ' ' +
+                          lbl('VAS_Of', 'of') + ' ' + count
+                        : ''
+                );
             }
 
             if ($pagerText) {
@@ -287,10 +392,10 @@
         function createMethodRow(method) {
             var methodName = method.paymentMethodName || lbl('VAS_033_MessageNotSpecified', 'Not Specified');
             var percentage = Number(method.percentage || 0);
-            var amountText = formatCurrencyAmount(
+            var amountText = formatWidgetCompactAmount(
                 method.paymentAmount,
                 method.currencySymbol || method.symbol,
-                method.currencyISO,
+                method.currencyISO || method.currencyISOCode || method.isoCode,
                 method.stdPrecision
             );
 
@@ -355,11 +460,10 @@
 
         function formatPercentage(value) {
             var numericValue = Number(value || 0);
-            var stdPrecision = getStdPrecision();
 
             return numericValue.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
             }) + '%';
         }
 
@@ -373,6 +477,31 @@
                 minimumFractionDigits: stdPrecision,
                 maximumFractionDigits: stdPrecision
             });
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function formatWidgetCompactAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var stdPrecision = normalizePrecision(precision);
+            var sign = numericValue < 0 ? '-' : '';
+            var amount =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        stdPrecision
+                    )
+                    : Math.abs(numericValue).toLocaleString(window.navigator.language, {
+                        minimumFractionDigits: stdPrecision,
+                        maximumFractionDigits: stdPrecision
+                    });
 
             if (currencySymbol) {
                 return sign + currencySymbol + amount;
@@ -444,10 +573,7 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-                resizeObserver = null;
-            }
+            teardownAdaptivePagination();
 
             $root.remove();
             $card = null;

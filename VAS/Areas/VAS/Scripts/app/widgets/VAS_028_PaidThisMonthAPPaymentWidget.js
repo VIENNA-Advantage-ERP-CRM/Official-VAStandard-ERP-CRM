@@ -6,7 +6,7 @@
  * ----+---------------------------------------------------+------------------------------
  *  1  | Paid this month                                   | VAS_028_MessagePaidThisMonth
  *  2  | Loading                                           | VAS_028_MessageLoading
- *  3  | Could not load data                               | VAS_ErrorLoading
+ *  3  | No Data                                           | VAS_ErrorLoading
  *  4  | vendor                                            | VAS_028_MessageVendor
  *  5  | vendors                                           | VAS_028_MessageVendors
  *  6  | Paid to                                           | VAS_028_MessagePaidTo
@@ -99,6 +99,7 @@
         var $dialog = null;
         var $dialogTitle = null;
         var $dialogSubtitle = null;
+        var $dialogBody = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
 
@@ -117,9 +118,22 @@
         var rowsLoading = false;
 
         var pageNo = 1;
-        var pageSize = 10;
+        var pageSize = 8;
         var totalPages = 0;
         var totalRecords = 0;
+
+        /*
+         * The dialog body is a flex scroll area, so the number of rows that
+         * fit follows the popup's rendered height instead of a fixed page
+         * size. The row height is measured from a real row when one exists
+         * and falls back to this estimate while the table is still empty.
+         */
+        var dialogResizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var dialogRowHeightEstimate = 44;
+        var dialogMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         var lastData = null;
 
@@ -216,16 +230,8 @@
                 )
             );
 
-            var $arrow = $(
-                '<span class="vas-ptm-arrow" aria-hidden="true">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M9 18l6-6-6-6"></path>' +
-                '</svg>' +
-                '</span>'
-            );
-
             $headerText.append($title);
-            $header.append($icon).append($headerText).append($arrow);
+            $header.append($icon).append($headerText);
 
             $body = $('<div class="vas-ptm-body">');
 
@@ -312,7 +318,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'Could not load data'
+                                'No Data'
                             )
                         );
 
@@ -328,7 +334,7 @@
                             true,
                             lbl(
                                 'VAS_ErrorLoading',
-                                'Could not load data'
+                                'No Data'
                             )
                         );
                     }
@@ -355,7 +361,11 @@
                 amount = Number(data.value);
             }
 
-            if (isNaN(amount) || amount <= 0) {
+            /*
+             * AP amounts are outflows and arrive negative, so only a
+             * missing or zero total means there is nothing to show.
+             */
+            if (isNaN(amount) || amount === 0) {
                 setNoData();
                 return;
             }
@@ -370,6 +380,11 @@
             var precision = normalizePrecision(
                 data.precision
             );
+            var currencyISO =
+                data.currencyISO ||
+                data.currencyISOCode ||
+                data.isoCode ||
+                '';
 
             /*
              * The current controller returns customerCount.
@@ -387,6 +402,7 @@
                     formatMetric(
                         amount,
                         symbol,
+                        currencyISO,
                         precision
                     )
                 );
@@ -446,18 +462,28 @@
             );
         }
 
-        function formatMetric(value, symbol, precision) {
+        function formatMetric(value, symbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var sign = numericValue < 0 ? '-' : '';
             var absoluteValue = Math.abs(numericValue);
+            var amountText =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        absoluteValue,
+                        currencyISO,
+                        precision
+                    )
+                    : formatAmount(
+                        absoluteValue,
+                        precision
+                    );
 
             return (
                 sign +
                 symbol +
-                formatAmount(
-                    absoluteValue,
-                    precision
-                )
+                amountText
             );
         }
 
@@ -542,6 +568,8 @@
                 'vas-ptm-body-lock'
             );
 
+            setupAdaptivePagination();
+
             if (!rowsLoaded) {
                 pageNo = 1;
                 loadRows();
@@ -553,6 +581,8 @@
                 return;
             }
 
+            teardownAdaptivePagination();
+
             $dialog.hide();
 
             $('body').removeClass(
@@ -562,6 +592,180 @@
             pageNo = 1;
             rowsLoaded = false;
         }
+
+        function measureDialogRowHeight() {
+            var $row = $dialogTbody
+                ? $dialogTbody
+                    .find('tr')
+                    .not(':has(.vas-ptm-dialog-empty)')
+                    .first()
+                : null;
+
+            var measured =
+                $row && $row.length
+                    ? $row.outerHeight()
+                    : 0;
+
+            return measured > 0
+                ? measured
+                : dialogRowHeightEstimate;
+        }
+
+        function updateAdaptivePageSize() {
+            if (
+                isDisposed ||
+                !$dialogBody ||
+                !$dialogBody[0] ||
+                !$dialogTbody ||
+                !$dialogTbody[0] ||
+                !$dialog ||
+                !$dialog.is(':visible')
+            ) {
+                return;
+            }
+
+            var container = $dialogBody[0];
+
+            if (container.clientHeight <= 0) {
+                return;
+            }
+
+            /*
+             * Whatever sits above the first row inside the scroll area - the
+             * table header, padding, any summary strip - is measured from the
+             * tbody's own position rather than assumed, so the row space left
+             * over is exact.
+             */
+            var headerOffset =
+                (
+                    $dialogTbody[0].getBoundingClientRect().top -
+                    container.getBoundingClientRect().top
+                ) + container.scrollTop;
+
+            var availableHeight = Math.max(
+                0,
+                container.clientHeight - headerOffset
+            );
+
+            var rowHeight = measureDialogRowHeight();
+
+            if (rowHeight <= 0) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                dialogMinimumRows,
+                Math.floor(availableHeight / rowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            // Keep the record the user is looking at on screen.
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+
+            pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            loadRows();
+        }
+
+        function setupAdaptivePagination() {
+            if (!$dialogBody || !$dialogBody[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+              if (
+                  window.ResizeObserver &&
+                  !dialogResizeObserver
+              ) {
+                dialogResizeObserver = new ResizeObserver(
+                    function () {
+                        updateAdaptivePageSize();
+                    }
+                );
+
+                dialogResizeObserver.observe($dialogBody[0]);
+
+                /*
+                 * The scroll area keeps a fixed height, so only the row
+                 * container changes size when rows arrive. Watching it is
+                 * what corrects the estimate the first pass had to use.
+                 */
+                if ($dialogTbody && $dialogTbody[0]) {
+                      dialogResizeObserver.observe($dialogTbody[0]);
+                  }
+              }
+
+              if (!adaptiveResizeHandler) {
+                  adaptiveResizeHandler = function () {
+                      if (adaptiveResizeFrame !== null) {
+                          return;
+                      }
+
+                      adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                          adaptiveResizeFrame = null;
+                          adaptiveAdjustCount = 0;
+                          updateAdaptivePageSize();
+                      });
+                  };
+
+                  window.addEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                  }
+              }
+          }
+
+          function teardownAdaptivePagination() {
+            if (dialogResizeObserver) {
+                  dialogResizeObserver.disconnect();
+                  dialogResizeObserver = null;
+              }
+
+              if (adaptiveResizeHandler) {
+                  window.removeEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                  }
+
+                  adaptiveResizeHandler = null;
+              }
+
+              if (adaptiveResizeFrame !== null) {
+                  window.cancelAnimationFrame(adaptiveResizeFrame);
+                  adaptiveResizeFrame = null;
+              }
+          }
 
         function loadRows() {
             if (
@@ -628,6 +832,7 @@
                     if (!isDisposed) {
                         rowsLoading = false;
                         showDialogBusy(false);
+                        updateAdaptivePageSize();
                         updatePagerFromCurrent();
                     }
                 }
@@ -732,10 +937,6 @@
                 lastData.currencySymbol ||
                 '';
 
-            var precision = normalizePrecision(
-                lastData.precision
-            );
-
             return (
                 paymentCount +
                 ' ' +
@@ -744,11 +945,10 @@
                     'payments'
                 ) +
                 ' · MTD ' +
-                formatCurrencyAmount(
+                formatHeaderAmount(
                     amount,
                     symbol,
-                    lastData.currencyISO,
-                    precision
+                    lastData.currencyISO
                 )
             );
         }
@@ -807,22 +1007,12 @@
                 firstRow.paymentCurrency ||
                 '';
 
-            var precision = normalizePrecision(
-                firstRow.stdPrecision ||
-                (
-                    lastData
-                        ? lastData.precision
-                        : null
-                )
-            );
-
             if ($summaryTotal) {
                 $summaryTotal.text(
-                    formatCurrencyAmount(
+                    formatHeaderAmount(
                         totalAmount,
                         symbol,
-                        iso,
-                        precision
+                        iso
                     )
                 );
             }
@@ -842,22 +1032,20 @@
              */
             if ($summaryAvg) {
                 $summaryAvg.text(
-                    formatCurrencyAmount(
+                    formatHeaderAmount(
                         averagePayment,
                         symbol,
-                        iso,
-                        precision
+                        iso
                     )
                 );
             }
 
             if ($summaryLargest) {
                 $summaryLargest.text(
-                    formatCurrencyAmount(
+                    formatHeaderAmount(
                         largestPayment,
                         symbol,
-                        iso,
-                        precision
+                        iso
                     )
                 );
             }
@@ -987,6 +1175,8 @@
                     '</tr>'
                 );
             }
+        
+            updateAdaptivePageSize();
         }
 
         function updatePagerFromCurrent() {
@@ -1063,6 +1253,50 @@
             }
         }
 
+        /*
+         * Amounts shown in the dialog header are rounded to whole
+         * numbers and the currency symbol is printed without the
+         * trailing separator that comes from the currency setup,
+         * for example ID12,000. Table cells keep the exact amount.
+         */
+        function formatHeaderAmount(
+            value,
+            symbol,
+            iso
+        ) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0
+                ? '-'
+                : '';
+
+            var amount = Math.abs(
+                numericValue
+            ).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }
+            );
+
+            var cleanSymbol = String(
+                symbol || ''
+            ).replace(/[\s-]+$/, '');
+
+            if (cleanSymbol) {
+                return sign + cleanSymbol + amount;
+            }
+
+            return iso
+                ? sign + amount + ' ' + iso
+                : sign + amount;
+        }
+
         function formatCurrencyAmount(
             value,
             symbol,
@@ -1071,7 +1305,17 @@
         ) {
             var numericValue = Number(value || 0);
 
-            var amount = numericValue.toLocaleString(
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0
+                ? '-'
+                : '';
+
+            var amount = Math.abs(
+                numericValue
+            ).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits: precision,
@@ -1080,12 +1324,12 @@
             );
 
             if (symbol) {
-                return symbol + amount;
+                return sign + symbol + amount;
             }
 
             return iso
-                ? amount + ' ' + iso
-                : amount;
+                ? sign + amount + ' ' + iso
+                : sign + amount;
         }
 
         function formatDate(value) {
@@ -1435,6 +1679,10 @@
                 '.vas-ptm-dialog-subtitle'
             );
 
+            $dialogBody = $dialog.find(
+                '.vas-ptm-dialog-body'
+            );
+
             $dialogTbody = $dialog.find(
                 '.vas-ptm-dialog-tbody'
             );
@@ -1549,6 +1797,8 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
+            teardownAdaptivePagination();
+
             $(document).off(
                 'keydown.vas-ptm-dialog-' +
                 self.AD_UserHomeWidgetID
@@ -1574,6 +1824,7 @@
 
             $dialogTitle = null;
             $dialogSubtitle = null;
+            $dialogBody = null;
             $dialogTbody = null;
             $dialogBusy = null;
 

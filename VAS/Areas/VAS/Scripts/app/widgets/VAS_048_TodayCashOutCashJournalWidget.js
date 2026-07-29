@@ -223,7 +223,7 @@
                     '<tr>' +
                     '<td class="VAS-047-cash-in-td-document" style="text-align:left" title="' + escapeHtml(documentNo) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(documentNo) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-date" style="text-align:left" title="' + escapeHtml(dateText) + '">' + escapeHtml(dateText) + '</td>' +
-                    '<td class="VAS-047-cash-in-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
+                    '<td class="VAS-047-cash-in-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashType) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-book" style="text-align:left" title="' + escapeHtml(cashBook) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashBook) + '</span></td>' +
                     '<td class="VAS-047-cash-in-td-amount" style="text-align:right" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
@@ -474,16 +474,20 @@
                 'class': 'VAS_today-cash-out-cash-journal-title-wrap'
             });
 
+            // Title / subtitle truncate on narrow cards: the full text is exposed
+            // through the native tooltip (no hover overlay box).
             var $title = $('<span>', {
                 'class': 'VAS_today-cash-out-cash-journal-label',
                 'id': 'VAS_048_today-cash-out-title-' + widgetId,
-                'text': lbl('VAS_048_CashOut', 'Cash out')
+                'text': lbl('VAS_048_CashOut', 'Cash out'),
+                'title': lbl('VAS_048_CashOut', 'Cash out')
             });
 
             var $date = $('<span>', {
                 'class': 'VAS_today-cash-out-cash-journal-date',
                 'id': 'VAS_048_today-cash-out-date-' + widgetId,
-                'text': lbl('VAS_048_DialogSubtitle', 'Disbursements completed today')
+                'text': lbl('VAS_048_DialogSubtitle', 'Disbursements completed today'),
+                'title': lbl('VAS_048_DialogSubtitle', 'Disbursements completed today')
             });
 
             var $value = $('<div>', {

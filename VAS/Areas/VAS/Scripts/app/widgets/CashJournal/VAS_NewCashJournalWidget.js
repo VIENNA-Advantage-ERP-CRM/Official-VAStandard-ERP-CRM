@@ -1,25 +1,56 @@
 /************************************************************
  * Module Name    : VAS
- * Purpose        : Onfinity Cash Journal dashboard quick-action widget
- *                  "New Cash Journal".
- *                  Footprint : 2x1 (col-span-2 row-span-1).
- *                  Single button-tile. Every click opens the Cash
- *                  Journal window in new-record mode via the standard
- *                  widget firevalue-change event - no data fetch, no
- *                  popup. The host frame (listener) decides which
- *                  window to render based on its widget binding.
- *                  Spec ref: PROMPT.md / widget.html supplied with
- *                  the Cash Journal module dashboard.
+ * Purpose        : Quick-action dashboard widget that opens a
+ *                  C_Cash record (cash journal) in new-record mode
+ *                  on the host Cash Journal screen via
+ *                  widgetFirevalueChanged.
+ *
+ *                  A cash journal carries no IsSoTrx flag, so the
+ *                  fired descriptor only asks the host window for a
+ *                  new record on its first tab.
+ *
+ *                  Design: dashboard-widgets.md §"Quick Action Widget" —
+ *                    2px #9ED1FF border
+ *                    pale blue-to-white gradient surface
+ *                    14px radius, 0.85em padding
+ *                    solid-blue icon well (top-left) with white "+" glyph
+ *                    Regular title pinned to the bottom
+ *                  Internal type/spacing in em; borders/radii/shadows in px.
+ *                  Mirrors VAS_064_CreateARInvoice.
+ *
  * Chronological development:
  *   VIS_045        Created  Date 2026-05-22
+ *   VIS_145        Rebuilt on the VAS_064 quick-action pattern  Date 2026-07-28
  ***********************************************************/
 ; VAS = window.VAS || {};
+
 ; (function (VAS, $) {
 
-    /* Stylesheet for this widget lives in VAS/Areas/VAS/Content/style.css
-     * (block: "Onfinity New Cash Journal quick-action widget"). All
-     * variables and classes are namespaced `vas-cj-` so they cannot
-     * collide with the app shell or sibling dashboard widgets. */
+    /* CSS lives in VAS/Areas/VAS/Content/VAS_NewCashJournalWidget.css.
+       All classes namespaced `vas-ncj-` so they never collide with
+       sibling dashboard widgets. */
+
+    /* design.md §Widget Header / §Measurement Setup: keep --dash-inline-size on
+       :root equal to the dashboard container's current pixel width so the title
+       clamp resolves against the dashboard's visible content area, not the
+       viewport. A single document-level ResizeObserver serves every widget (the
+       var is global); without a marked container — or without ResizeObserver —
+       the CSS falls back to 100vw. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
 
     VAS.VAS_NewCashJournalWidget = function () {
         this.frame;
@@ -43,58 +74,68 @@
             buildSkeleton();
         };
 
-        /* The tile has no data to refresh - keep the hook so the host
-         * widget framework's contract is satisfied. */
+        /* No data to refresh — keep the hook so the host framework's
+           contract is satisfied. */
         this.refreshWidget = function () { /* no-op */ };
 
         /* ------------------------------------------------------------ */
         /* DOM skeleton                                                 */
         /* ------------------------------------------------------------ */
         function buildSkeleton() {
-            $root = $('<div class="vas-cj-qa-root" id="vas-cj-root-' + widgetID + '"></div>');
+            $root = $('<div class="vas-ncj-root" id="vas-ncj-root-' + widgetID + '"></div>');
 
-            // Plus glyph SVG (Onfinity quick-action style).
+            var title = getMsg("VAS_NewCashJournal", "New Cash Journal");
+
+            /* Plus glyph — white "+" on the blue icon well. The icon-well CSS
+               already sets color:#FFFFFF on the wrapper, so stroke="currentColor"
+               keeps the glyph white on the blue square. Inline width/height are
+               omitted because .vas-ncj-icon svg already sizes the SVG in em. */
             var iconSvg =
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
-                ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                ' stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"' +
+                ' aria-hidden="true" focusable="false">' +
                 '<line x1="12" y1="5" x2="12" y2="19"></line>' +
                 '<line x1="5" y1="12" x2="19" y2="12"></line>' +
                 '</svg>';
 
-            var title = getMsg("VAS_NewCashJournal", "New Cash Journal");
-            var copy = getMsg("VAS_NewCashJournalCopy",
-                "Open a cash journal or add cash-in / cash-out lines.");
-
+            /* A div (not a button) by request — role/tabindex keep it operable
+               and focusable, and the keydown handler restores the Enter / Space
+               activation a native button would have given for free. */
             $btn = $(
-                '<button type="button" class="vas-cj-qa-btn"' +
-                ' aria-label="' + escapeAttr(title) + '">' +
-                '<span class="vas-cj-qa-icon">' + iconSvg + '</span>' +
-                '<span class="vas-cj-qa-text">' +
-                '<span class="vas-cj-qa-title"></span>' +
-                '<span class="vas-cj-qa-copy"></span>' +
-                '</span>' +
-                '</button>'
+                '<div class="vas-ncj-card" role="button" tabindex="0" aria-label="' + escapeAttr(title) + '">' +
+                '<span class="vas-ncj-icon">' + iconSvg + '</span>' +
+                '<span class="vas-ncj-title"></span>' +
+                '</div>'
             );
-            $btn.find(".vas-cj-qa-title").text(title);
-            $btn.find(".vas-cj-qa-copy").text(copy);
+            $btn.find(".vas-ncj-title").text(title);
 
             $btn.on("click", onTileClick);
+            $btn.on("keydown", function (e) {
+                if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+                    onTileClick(e);
+                }
+            });
             $root.append($btn);
         }
 
         /* ------------------------------------------------------------ */
-        /* Click - fire new-record event                                */
+        /* Click — fire new-record event                                */
         /* ------------------------------------------------------------ */
         function onTileClick(e) {
             e.preventDefault();
             e.stopPropagation();
             try {
+                /* Standard new-mode descriptor used across VAS quick-action
+                   widgets. The host frame registers via addChangeListener and
+                   opens the Cash Journal window in new-record mode. A cash
+                   journal carries no IsSoTrx flag. */
                 var windowParam = {
                     "IsTabInNewMode": "true",
                     "TabIndex": "0"
                 };
                 $self.widgetFirevalueChanged(windowParam);
-            } catch (err) {
+            }
+            catch (err) {
                 if (window.console) {
                     console.error("VAS_NewCashJournalWidget firevalue failed", err);
                 }
@@ -114,9 +155,10 @@
             try {
                 if (VIS.Msg && typeof VIS.Msg.getMsg === "function") {
                     var v = VIS.Msg.getMsg(key);
-                    if (v && v !== key) { return v; }
+                    if (v && v !== key && v.charAt(0) !== "[") { return v; }
                 }
-            } catch (e) { /* ignore */ }
+            }
+            catch (e) { /* ignore */ }
             return fallback;
         }
 
@@ -132,15 +174,18 @@
         this.windowNo = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        /* Self-wire the dashboard-width CSS variable the title clamp reads. */
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_NewCashJournalWidget.prototype.refreshWidget = function () {
         this.refreshWidget();
     };
 
-    /* Fired by the widget on click. The host frame registers itself as
-     * the listener and reacts by opening the Cash Journal window in
-     * new-record mode using the passed windowParam descriptor. */
+    /* Fired on click. The host frame registers itself as the listener
+       via addChangeListener() and opens the Cash Journal window in
+       new-record mode using the passed windowParam descriptor. */
     VAS.VAS_NewCashJournalWidget.prototype.widgetFirevalueChanged = function (value) {
         if (this.listener && typeof this.listener.widgetFirevalueChanged === "function") {
             this.listener.widgetFirevalueChanged(value);

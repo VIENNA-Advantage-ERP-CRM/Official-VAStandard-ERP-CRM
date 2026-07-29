@@ -18,8 +18,9 @@
     contain: layout style;
     container-type: inline-size;
     color: #102c3f;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
+    font-size: clamp(16px, 1.2cqi, 20px);
 }
 
 /* =========================================================
@@ -38,7 +39,7 @@
     overflow: hidden;
     border: 2px solid #ffffff;
     border-radius: 14px;
-    background: linear-gradient( 180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49) );
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
 
@@ -58,15 +59,16 @@
 
 .vas-upcoming-ap-runs-head-left {
     flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.vas-upcoming-ap-runs-title-row {
     display: flex;
     align-items: center;
     min-width: 0;
     gap: 0.625em;
+    overflow: hidden;
+}
+
+.vas-upcoming-ap-runs-head-text {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
 }
 
@@ -96,7 +98,8 @@
     min-width: 0;
     overflow: hidden;
     color: #102c3f;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     text-overflow: ellipsis;
@@ -111,7 +114,7 @@
     width: 1em;
     height: 1em;
     margin-left: auto;
-    color: #748494;
+    color: #5f7283;
     opacity: 0.55;
 }
 
@@ -123,12 +126,12 @@
 .vas-upcoming-ap-runs-sub {
     min-width: 0;
     margin-top: 0.125em;
-    padding-left: 2.375em;
     overflow: hidden;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.6875em;
     font-weight: 400;
     line-height: 1.3;
+    letter-spacing: 0.02em;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -156,7 +159,7 @@
     padding: 0.5em;
     gap: 0.75em;
     overflow: hidden;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     border-radius: 0.375em;
     cursor: pointer;
     outline: none;
@@ -212,7 +215,7 @@
     overflow: hidden;
     color: #102c3f;
     font-size: 0.75em;
-    font-weight: 700;
+    font-weight: 400;
     line-height: 1.35;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -222,7 +225,7 @@
     min-width: 0;
     margin-top: 0.1875em;
     overflow: hidden;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.6875em;
     font-weight: 400;
     line-height: 1.3;
@@ -246,7 +249,7 @@
     overflow: hidden;
     color: #102c3f;
     font-size: 0.75em;
-    font-weight: 700;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     line-height: 1.35;
     text-align: left;
@@ -301,7 +304,7 @@
     min-height: 0;
     padding: 1em;
     overflow: hidden;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.4;
@@ -343,14 +346,14 @@
     padding-top: 0.5em;
     gap: 0.75em;
     overflow: hidden;
-    border-top: 1px solid #edf2f6;
+    border-top: 1px solid #d9e2eb;
 }
 
 .vas-upcoming-ap-runs-showing {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.6875em;
     font-weight: 400;
     line-height: 1.3;
@@ -402,7 +405,7 @@
 
 .vas-upcoming-ap-runs-page-text {
     min-width: 3.75em;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.6875em;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -432,7 +435,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.5em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
     font-weight: 400;
     color: #102c3f;
@@ -476,7 +480,7 @@
     min-width: 0;
     padding: 1em 1.25em;
     gap: 1em;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     background: #ffffff;
 }
 
@@ -498,7 +502,7 @@
 .vas-upcoming-ap-runs-pay-sub {
     margin-top: 0.125em;
     overflow: hidden;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.35;
@@ -517,9 +521,10 @@
     border: none;
     border-radius: 0.375em;
     background: transparent;
-    color: #5f7283;
+    color: #41576a;
     cursor: pointer;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1.375em;
     font-weight: 400;
     line-height: 1;
@@ -603,7 +608,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
 }
 
 .vas-upcoming-ap-runs-invoice-list-body {
@@ -620,7 +625,7 @@
     padding: 0.625em 0.5em;
     gap: 0.75em;
     border: none;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     background: transparent;
     color: #102c3f;
     cursor: pointer;
@@ -653,7 +658,7 @@
         overflow: hidden;
         color: #102c3f;
         font-size: 0.8125em;
-        font-weight: 700;
+        font-weight: 400;
         line-height: 1.35;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -664,7 +669,7 @@
         display: block;
         margin-top: 0.1875em;
         overflow: hidden;
-        color: #748494;
+        color: #5f7283;
         font-size: 0.75em;
         font-weight: 400;
         line-height: 1.35;
@@ -699,6 +704,10 @@
     transition: border-color 0.15s ease;
 }
 
+    .vas-upcoming-ap-runs-field[data-full-span="true"] {
+        grid-column: 1 / -1;
+    }
+
     .vas-upcoming-ap-runs-field:hover,
     .vas-upcoming-ap-runs-field:focus-within {
         border-bottom-color: #0083da;
@@ -709,7 +718,7 @@
     align-items: center;
     min-width: 0;
     gap: 0.5em;
-    color: #5f7283;
+    color: #41576a;
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.3;
@@ -792,8 +801,8 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
 
 .vas-upcoming-ap-runs-edit-control:disabled,
 .vas-upcoming-ap-runs-edit-control[readonly] {
-    color: #748494;
-    -webkit-text-fill-color: #748494;
+    color: #5f7283;
+    -webkit-text-fill-color: #5f7283;
     background-color: transparent;
     cursor: default;
     opacity: 1;
@@ -810,7 +819,7 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
     justify-content: flex-end;
     padding: 0.75em 1.25em;
     gap: 0.625em;
-    border-top: 1px solid #edf2f6;
+    border-top: 1px solid #d9e2eb;
     background: #fbfdff;
 }
 
@@ -825,7 +834,7 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
     border-radius: 999px;
     cursor: pointer;
     font-family: inherit;
-    font-size: 0.875em;
+    font-size: 0.75em;
     font-weight: 700;
     line-height: 1.2;
 }
@@ -898,7 +907,7 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
         padding-right: 0;
         padding-bottom: 1em;
         border-right: none;
-        border-bottom: 1px solid #edf2f6;
+        border-bottom: 1px solid #e2eaf1;
     }
 
     .vas-upcoming-ap-runs-pay-grid {
@@ -945,8 +954,8 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #748494;
-    font-size: 0.8125rem;
+    color: #5f7283;
+    font-size: 0.75rem;
     font-weight: 400;
 }
 
@@ -975,4 +984,145 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
 .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"] {
     text-align: right;
     font-variant-numeric: tabular-nums;
+}
+
+/* --- RTL: pagination -------------------------------------------------------
+   Switching the UI to Arabic flips the footer, which swaps the prev/next
+   buttons while their chevrons keep pointing the same way -- so the arrows
+   end up contradicting what they do. Pin the pager itself to LTR: prev stays
+   on the left, next on the right, and the page indicator keeps "1 of 35" in
+   order instead of having its leading digit pushed to the far end by the
+   bidi algorithm. `plaintext` lets a translated indicator ("1 من 35") still
+   lay itself out by its own script. */
+html[dir="rtl"] .vas-upcoming-ap-runs-pager {
+    direction: ltr;
+}
+
+html[dir="rtl"] .vas-upcoming-ap-runs-page-text {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: money -----------------------------------------------------------
+   A formatted amount is "-ID1,800.000": the minus is a neutral character, so
+   in an RTL paragraph the bidi algorithm parks it at the far (right) end and
+   the cell reads "ID1,800.000-". `plaintext` lets each amount pick its own
+   direction from its first strong character -- LTR for a Latin currency code,
+   RTL for a translated one -- so the sign stays glued to the number. */
+html[dir="rtl"] .vas-upcoming-ap-runs-amount {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: the rest of the value surfaces -----------------------------------
+   The amount columns were only the visible half of this. Any string that
+   mixes digits with a neutral character -- the minus in "-ID1.104B", the
+   currency code, a trailing full stop, the en dash in "1-4 of 30" -- gets
+   that character dragged to the far end of an RTL paragraph. Rather than
+   chase one class at a time, hand every cell, summary tile and caption back
+   to its own script: `plaintext` reads the first strong character and lays
+   the string out accordingly, so Latin-and-digits stays LTR and translated
+   text stays RTL. */
+html[dir="rtl"] .vas-upcoming-ap-runs-root td,
+html[dir="rtl"] .vas-upcoming-ap-runs-root th,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-dialog td,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-dialog th,
+html[dir="rtl"] .vas-upcoming-ap-runs-sub,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-sub,
+html[dir="rtl"] .vas-upcoming-ap-runs-showing {
+    unicode-bidi: plaintext;
+}
+
+/* Card rows are divs here rather than a table, so the same treatment has to
+   name them directly. */
+html[dir="rtl"] .vas-upcoming-ap-runs-run-title,
+html[dir="rtl"] .vas-upcoming-ap-runs-meta,
+html[dir="rtl"] .vas-upcoming-ap-runs-info,
+html[dir="rtl"] .vas-upcoming-ap-runs-invoice-list-title,
+html[dir="rtl"] .vas-upcoming-ap-runs-invoice-main,
+html[dir="rtl"] .vas-upcoming-ap-runs-invoice-side,
+html[dir="rtl"] .vas-upcoming-ap-runs-field-label,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-title,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-heading,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-notice,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-error,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-save-label {
+    unicode-bidi: plaintext;
+}
+/* --- RTL: the truncation spans inside the cells ----------------------------
+   Cell text is wrapped in a `display: block` span so it can ellipsis, and a
+   block is its own bidi paragraph -- which means the rules above stopped at
+   the cell and never reached the string that actually renders. Repeat the
+   treatment for whatever sits inside. */
+html[dir="rtl"] .vas-upcoming-ap-runs-root td *,
+html[dir="rtl"] .vas-upcoming-ap-runs-root th *,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-dialog td *,
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-dialog th *,
+html[dir="rtl"] .vas-upcoming-ap-runs-run-title *,
+html[dir="rtl"] .vas-upcoming-ap-runs-meta *,
+html[dir="rtl"] .vas-upcoming-ap-runs-info *,
+html[dir="rtl"] .vas-upcoming-ap-runs-amount *,
+html[dir="rtl"] .vas-upcoming-ap-runs-invoice-main *,
+html[dir="rtl"] .vas-upcoming-ap-runs-invoice-side * {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: the "Pay >" affordance -------------------------------------------
+   The chevron is U+203A, which Unicode marks as mirrored: the browser draws
+   it reversed on its own once it resolves to an RTL run, so flipping it with
+   a transform would only turn it back the wrong way. Pinning the span to RTL
+   makes that resolution explicit instead of leaving it to whatever text
+   happens to sit beside it. */
+html[dir="rtl"] .vas-upcoming-ap-runs-pay-arrow {
+    direction: rtl;
+    unicode-bidi: isolate;
+}
+
+
+/* The earlier `plaintext` rules cover prose, but on an amount they would win
+   over the `direction` above -- plaintext derives direction from content and
+   ignores the declared one. Take the amounts back out of that scheme, cells
+   and ellipsis spans alike. */
+html[dir="rtl"] .vas-upcoming-ap-runs-amount,
+html[dir="rtl"] .vas-upcoming-ap-runs-amount * {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* --- RTL: the amount inputs ------------------------------------------------
+   A field you type a figure into is not a read-out: it keeps the left, and it
+   has to be pinned LTR or the minus lands behind the digits ("100000-") as
+   soon as the form is opened in Arabic. */
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
+    direction: ltr;
+    text-align: left !important;
+}
+
+/* --- Form inputs ------------------------------------------------------------
+   Every control you type into sits on the inline-end edge: the right in
+   English, the left once the session flips to Arabic. Two things force the
+   shape of this rule: the attribute selector that aligns the amount fields
+   outranks a bare class, so they are named explicitly; and VIS.rtl.css ships
+   a blanket `html[dir="rtl"] * { text-align: right !important }`, so the
+   Arabic half has to carry weight of its own or it never lands. */
+.vas-upcoming-ap-runs-edit-control,
+.vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
+.vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
+.vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
+    text-align: right;
+}
+
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control,
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
+    text-align: left !important;
+}
+
+/* The date pickers are the exception: they carry no sign to keep in front and
+   they read as part of the form's prose, so in Arabic they stay on the reading
+   side rather than following the amount fields to the left. */
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="transactionDate"],
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="checkDate"] {
+    text-align: right !important;
 }

@@ -36,7 +36,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.875em;
+    gap: 0.625em;
     padding: 0.85em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
@@ -59,6 +59,15 @@
     align-items: center;
     gap: 0.625em;
     min-width: 0;
+}
+
+/* Title + subtitle stack next to the header icon. */
+.VAS_054_counterparties-title-wrap {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
 }
 
 .VAS_054_counterparties-icon {
@@ -92,18 +101,18 @@
     color: #102C3F;
 }
 
-/* Header meta ("Last 30 Days") — neutral Chip token */
-.VAS_054_counterparties-meta {
-    flex: 0 0 auto;
-    padding: 0.25em 0.625em;
-    border-radius: 999px;
-    background: #F1F4F8;
-    font-size: 0.6875em;
-    line-height: 1.2;
-    font-weight: 500;
+/* Header subtitle — shared Widget Header subtitle clamp (replaces the former
+   "Last 30 Days" meta chip). */
+.VAS_054_counterparties-subtitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    line-height: 1.3;
+    font-weight: 400;
     letter-spacing: 0;
-    text-transform: none;
-    color: #41576A;
+    color: #717182;
 }
 
 .VAS_054_counterparties-action {
@@ -137,10 +146,11 @@
     border-spacing: 0;
 }
 
+/* Cell rhythm mirrors VAS_052 (Today's Cashbook) so the two cash-journal grids
+   read at the same scale side by side. */
 .VAS_054_counterparties-table th,
 .VAS_054_counterparties-table td {
     min-width: 0;
-    padding: 0.375em 0.5em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -149,10 +159,10 @@
 
 /* Column-header rail */
 .VAS_054_counterparties-table th {
+    padding: 0.5em 0.75em;
     background: transparent;
-    padding-top: 0.5em;
-    padding-bottom: 0.5em;
     color: #41576A;
+    font-family: Roboto, Arial, sans-serif;
     font-size: 0.6875em;
     line-height: 1.2;
     font-weight: 500;
@@ -164,15 +174,13 @@
 
 /* Body cells — sm token, muted regular by default */
 .VAS_054_counterparties-table td {
+    padding: 0.625em 0.75em;
     color: #5F7283;
     font-size: 0.75em;
+    line-height: 1.2;
     font-weight: 400;
     text-align: left !important;
     border-bottom: 1px solid #E2EAF1;
-}
-
-.VAS_054_counterparties-table tbody tr {
-    height: 2em;
 }
 
 .VAS_054_counterparties-table tbody tr:last-child td {
@@ -195,7 +203,7 @@
 
 .VAS_054_counterparties-col-type,
 .VAS_054_counterparties-cell-type {
-    width: 13%;
+    width: 16%;
 }
 
 .VAS_054_counterparties-col-txns,
@@ -206,7 +214,7 @@
 
 .VAS_054_counterparties-col-trend,
 .VAS_054_counterparties-spark-wrap {
-    width: 20%;
+    width: 16%;
 }
 
 .VAS_054_counterparties-col-volume,
@@ -223,7 +231,8 @@
     justify-content: center;
     border-radius: 10px;
     color: #FFFFFF;
-    font-size: 0.75em;
+    /* Sized off the cell text (see the note on -name) rather than compounding. */
+    font-size: 1em;
     line-height: 1;
     font-weight: 800;
     letter-spacing: 0;
@@ -249,56 +258,30 @@
     background: #7C8795;
 }
 
+/* Cell content sits INSIDE the td (already 0.75em), so an em font-size here
+   compounds and renders smaller than VAS_052's cells. Inherit the cell size
+   (1em) and let weight / colour carry the emphasis, exactly like VAS_052. */
 .VAS_054_counterparties-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     unicode-bidi: plaintext;
-    font-size: 0.8125em;
+    font-size: 1em;
     line-height: 1.2;
     font-weight: 400;
     color: #102C3F;
 }
 
-.VAS_054_counterparties-chip {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0.3em 0.75em;
-    border-radius: 7px;
-    border: 1px solid transparent;
-    font-size: 0.625em;
-    line-height: 1.1;
-    font-weight: 800;
-    letter-spacing: 0;
+/* Type — plain text (no chip / pill), like the Cash Type column in the other
+   cash-journal widgets. Truncation comes from the shared cell rule. */
+.VAS_054_counterparties-cell-type {
     text-transform: capitalize;
-}
-
-.VAS_054_counterparties-chip-vendor {
-    background: rgba(164, 67, 67, 0.08);
-    border-color: rgba(164, 67, 67, 0.35);
-    color: #9F4545;
-}
-
-.VAS_054_counterparties-chip-customer {
-    background: rgba(12, 116, 87, 0.07);
-    border-color: rgba(12, 116, 87, 0.35);
-    color: #2D7555;
-}
-
-.VAS_054_counterparties-chip-bank,
-.VAS_054_counterparties-chip-cashbook,
-.VAS_054_counterparties-chip-other {
-    background: rgba(0, 120, 212, 0.07);
-    border-color: rgba(0, 120, 212, 0.30);
-    color: #2C6EAA;
 }
 
 .VAS_054_counterparties-count {
     color: #5F7283;
-    font-size: 0.8125em;
+    font-size: 1em;
     font-weight: 400;
 }
 
@@ -342,8 +325,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: right;
-    font-size: 0.8125em;
-    line-height: 1;
+    font-size: 1em;
+    line-height: 1.2;
     font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
@@ -461,17 +444,24 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Container steps mirror VAS_052 so both cash-journal grids condense at the
+   same widths. */
 @container (max-width: 38em) {
-    .VAS_054_counterparties-meta {
+    .VAS_054_counterparties-card {
+        padding: 0.75em;
+        gap: 0.5em;
+        border-radius: 12px;
+    }
+
+    .VAS_054_counterparties-subtitle {
         display: none;
     }
 }
 
 @container (max-width: 26em) {
     .VAS_054_counterparties-card {
-        padding: 0.75em;
+        padding: 0.625em;
         gap: 0.375em;
-        border-radius: 12px;
     }
 
     .VAS_054_counterparties-action {
