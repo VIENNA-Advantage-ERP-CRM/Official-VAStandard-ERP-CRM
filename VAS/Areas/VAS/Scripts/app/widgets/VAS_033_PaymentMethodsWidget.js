@@ -183,6 +183,11 @@
                 })
                 : [];
 
+            methodsData.sort(function (left, right) {
+                return Math.abs(Number(right.paymentAmount || 0)) -
+                    Math.abs(Number(left.paymentAmount || 0));
+            });
+
             if (methodsData.length === 0) {
                 setNoData();
                 return;
@@ -427,7 +432,7 @@
 
             $fill.css('width', percentage + '%');
 
-            $metrics.append($percent).append($amount);
+            $metrics.append($amount).append($percent);
             $top.append($name).append($metrics);
             $track.append($fill);
             $row.append($top).append($track).append($tooltip);
@@ -530,7 +535,7 @@
                 stdPrecision = getStdPrecision();
             }
 
-            return Math.min(stdPrecision, 2);
+            return stdPrecision;
         }
 
         function showBusy(show) {
