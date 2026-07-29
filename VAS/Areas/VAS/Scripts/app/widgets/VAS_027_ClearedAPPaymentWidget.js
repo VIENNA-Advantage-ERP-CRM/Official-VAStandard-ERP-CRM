@@ -7,6 +7,7 @@
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+------------------------------
  *  1  | Unreconciled                                      | VAS_027_messageCleared
+ *  1b | All-time Payments not yet reconciled              | VAS_027_messageAllTimeNotReconciled
  *  2  | Of last month                                     | VAS_027_messageAPPaymentClearedWhy
  *  3  | No Data                                           | VAS_027_messageNoData
  *  4  | payments                                          | VAS_027_messagePayments
@@ -477,11 +478,31 @@
                 )
             );
 
+            var $sub = $(
+                '<div class="vas-finance-kpi-sub">'
+            ).text(
+                lbl(
+                    'VAS_027_messageAllTimeNotReconciled',
+                    'All-time Payments not yet reconciled'
+                )
+            );
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $(
+                '<div class="vas-finance-kpi-header-text">'
+            );
+
+            $headerText
+                .append($title)
+                .append($sub);
+
             $iconBox.append($icon);
 
             $header
                 .append($iconBox)
-                .append($title);
+                .append($headerText);
 
             $body = $(
                 '<div class="vas-finance-kpi-body">'

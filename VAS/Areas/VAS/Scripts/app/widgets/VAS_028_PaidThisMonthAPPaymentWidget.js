@@ -5,6 +5,7 @@
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+------------------------------
  *  1  | Paid this month                                   | VAS_028_MessagePaidThisMonth
+ *  1b | Total Vendor Payments                             | VAS_028_MessageTotalVendorPayments
  *  2  | Loading                                           | VAS_028_MessageLoading
  *  3  | No Data                                           | VAS_ErrorLoading
  *  4  | vendor                                            | VAS_028_MessageVendor
@@ -230,7 +231,14 @@
                 )
             );
 
-            $headerText.append($title);
+            var $sub = $('<div class="vas-ptm-sub">').text(
+                lbl(
+                    'VAS_028_MessageTotalVendorPayments',
+                    'Total Vendor Payments'
+                )
+            );
+
+            $headerText.append($title).append($sub);
             $header.append($icon).append($headerText);
 
             $body = $('<div class="vas-ptm-body">');

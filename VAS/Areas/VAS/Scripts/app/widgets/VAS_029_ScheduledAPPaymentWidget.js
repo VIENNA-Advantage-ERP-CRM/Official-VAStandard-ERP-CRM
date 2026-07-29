@@ -7,6 +7,7 @@
 * # | Current Text                         | Message Key
 * ----+--------------------------------------+--------------------------------
 * 1  | Due This Week                        | VAS_029_MessageScheduled
+* 1b | Payables Due this week               | VAS_029_MessagePayablesDueThisWeek
 * 2  | Scheduled for payment this week      | VAS_029_ScheduledForPaymentThisWeek
 * 3  | Loading                              | VAS_029_MessageLoading
 * 4  | No Data                              | VAS_029_MessageNoData
@@ -121,8 +122,19 @@
                 lbl('VAS_029_MessageScheduled', 'Due This Week')
             );
 
+            var $sub = $('<div class="vas-scheduled-ap-payment-sub">').text(
+                lbl('VAS_029_MessagePayablesDueThisWeek', 'Payables Due this week')
+            );
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $('<div class="vas-scheduled-ap-payment-header-text">');
+
+            $headerText.append($title).append($sub);
+
             $iconBox.append($icon);
-            $header.append($iconBox).append($title);
+            $header.append($iconBox).append($headerText);
 
             $body = $('<div class="vas-scheduled-ap-payment-body">');
             $value = $('<div class="vas-scheduled-ap-payment-value">');

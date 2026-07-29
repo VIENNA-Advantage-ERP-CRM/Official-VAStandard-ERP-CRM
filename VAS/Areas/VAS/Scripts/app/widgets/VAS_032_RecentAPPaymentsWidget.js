@@ -7,9 +7,10 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
- *  2  | Date                                 | VAS_032_MessageDate
+ *  1b | Receipts in last 30 days             | VAS_032_MessageReceiptsLast30Days
+ *  2  | Account Date                         | VAS_032_MessageDate
  *  3  | Vendor                               | VAS_032_MessageVendor
- *  4  | Value (Document Number)              | VAS_032_MessageValueDocumentNumber
+ *  4  | Document Number                      | VAS_032_MessageValueDocumentNumber
  *  5  | Method                               | VAS_032_MessageMethod
  *  6  | Bank Account Name                    | VAS_032_MessageBankAccountName
  *  7  | Status                               | VAS_032_MessageStatus
@@ -149,6 +150,12 @@
             );
 
             var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_032_MessageRecentPayments', 'Recent payments'));
+            var $sub = $('<div class="vas-recent-ap-payments-sub">').text(lbl('VAS_032_MessageReceiptsLast30Days', 'Receipts in last 30 days'));
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the title wrap is a centred flex row. */
+            var $headText = $('<div class="vas-recent-ap-payments-head-text">').append($title).append($sub);
 
             $pager = $('<div class="vas-recent-ap-payments-pager">');
             $pagerPrev = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
@@ -166,7 +173,7 @@
             $pager.append($pagerPrev).append($pagerText).append($pagerNext);
 
             $iconBox.append($icon);
-            $titleWrap.append($iconBox).append($title);
+            $titleWrap.append($iconBox).append($headText);
 
             $head.append($titleWrap);
 
@@ -417,8 +424,8 @@
             var $headerRow = $('<tr>');
 
             $headerRow
-                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Date')))
-                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Value')))
+                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Account Date')))
+                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
                 .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
                 .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
                 .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name')))

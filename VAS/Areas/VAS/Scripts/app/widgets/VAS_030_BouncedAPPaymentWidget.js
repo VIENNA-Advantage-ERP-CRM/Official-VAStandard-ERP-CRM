@@ -7,6 +7,7 @@
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+------------------------------
  *  1  | Bounced                                           | VAS_030_MessageBounced
+ *  1b | Cheques Dishonored                                | VAS_030_MessageChequesDishonored
  *  2  | Need re-issue                                     | VAS_030_MessageNeedReissue
  *  3  | Loading                                           | VAS_030_MessageLoading
  *  4  | No Data                                           | VAS_030_MessageNoData
@@ -148,11 +149,31 @@
                 )
             );
 
+            var $sub = $(
+                '<div class="vas-bounced-ap-payment-sub">'
+            ).text(
+                lbl(
+                    'VAS_030_MessageChequesDishonored',
+                    'Cheques Dishonored'
+                )
+            );
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $(
+                '<div class="vas-bounced-ap-payment-header-text">'
+            );
+
+            $headerText
+                .append($title)
+                .append($sub);
+
             $iconBox.append($icon);
 
             $header
                 .append($iconBox)
-                .append($title);
+                .append($headerText);
 
             $body = $(
                 '<div class="vas-bounced-ap-payment-body">'
