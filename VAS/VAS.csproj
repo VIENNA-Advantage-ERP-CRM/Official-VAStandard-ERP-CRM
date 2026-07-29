@@ -867,6 +867,41 @@
     <Folder Include="Areas\VAS\Views\Shared\" />
     <Folder Include="Areas\VAS\Views\VAS_Request\" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Areas\VAS\Controllers\VAS_156_CountedMTDWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_157_VarianceLinesWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_158_OpenCountSheetsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_159_PositiveVarianceQtyWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_160_NegativeVarianceQtyWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_161_WHWiseCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_162_AdjustmentWiseCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_163_InventoryAgingReportWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_164_StockSearchWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_165_LocationWiseInventoryCountWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_166_NewCycleCountWidgetController.cs" />
+    <Content Include="Areas\VAS\Content\VAS_156_CountedMTDWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_156_CountedMTDWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_157_VarianceLinesWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_157_VarianceLinesWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_158_OpenCountSheetsWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_158_OpenCountSheetsWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_159_PositiveVarianceQtyWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_159_PositiveVarianceQtyWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_160_NegativeVarianceQtyWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_160_NegativeVarianceQtyWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_161_WHWiseCountWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_161_WHWiseCountWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_162_AdjustmentWiseCountWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_162_AdjustmentWiseCountWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_163_InventoryAgingReportWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_163_InventoryAgingReportWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_164_StockSearchWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_164_StockSearchWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_165_LocationWiseInventoryCountWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_165_LocationWiseInventoryCountWidget.js" />
+    <Content Include="Areas\VAS\Content\VAS_166_NewCycleCountWidget.css" />
+    <Content Include="Areas\VAS\Scripts\app\widgets\VAS_166_NewCycleCountWidget.js" />
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
