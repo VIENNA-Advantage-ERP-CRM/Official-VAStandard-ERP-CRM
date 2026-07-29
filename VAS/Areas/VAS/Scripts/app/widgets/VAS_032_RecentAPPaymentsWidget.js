@@ -1016,10 +1016,19 @@
                 return value;
             }
 
-            return date.toLocaleDateString(window.navigator.language, {
-                day: '2-digit',
-                month: 'short'
-            });
+            /* MM/DD/YYYY, assembled by hand rather than handed to
+               toLocaleDateString. "25 Jul" dropped the year, which is what
+               made two payments a year apart read as the same day, and a
+               localised format would follow the session language -- Arabic
+               renders its own digits, so the column stopped matching the date
+               inputs on the payment form. Padding keeps the column aligned. */
+            return pad2(date.getMonth() + 1) + '/' +
+                pad2(date.getDate()) + '/' +
+                date.getFullYear();
+        }
+
+        function pad2(value) {
+            return value < 10 ? '0' + value : String(value);
         }
 
         function formatCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {

@@ -329,8 +329,11 @@
         background: #f8fbfe;
     }
 
+/* Wide enough for a full MM/DD/YYYY. The 9% this used to be was measured
+   against "25 Jul"; the column is nowrap, so a year's worth of extra digits
+   would have pushed the neighbouring columns rather than wrapping. */
 .vas-recent-ap-payments-date {
-    width: 9%;
+    width: 12%;
     color: #41576a;
     white-space: nowrap;
 }
