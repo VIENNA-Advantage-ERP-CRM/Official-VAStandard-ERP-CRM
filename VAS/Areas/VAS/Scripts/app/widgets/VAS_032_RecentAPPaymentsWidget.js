@@ -1017,21 +1017,39 @@
                 return '';
             }
 
-            var date = new Date(value);
+            var match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+            var date = match
+                ? new Date(
+                    Number(match[1]),
+                    Number(match[2]) - 1,
+                    Number(match[3])
+                )
+                : new Date(value);
 
             if (isNaN(date.getTime())) {
                 return value;
             }
 
-            /* MM/DD/YYYY, assembled by hand rather than handed to
-               toLocaleDateString. "25 Jul" dropped the year, which is what
-               made two payments a year apart read as the same day, and a
-               localised format would follow the session language -- Arabic
-               renders its own digits, so the column stopped matching the date
-               inputs on the payment form. Padding keeps the column aligned. */
-            return pad2(date.getMonth() + 1) + '/' +
-                pad2(date.getDate()) + '/' +
+            return getShortMonthName(date.getMonth()) + ' ' +
+                pad2(date.getDate()) + ', ' +
                 date.getFullYear();
+        }
+
+        function getShortMonthName(monthIndex) {
+            return [
+                'Jan',
+                'Feb',
+                'Mar',
+                'Apr',
+                'May',
+                'Jun',
+                'Jul',
+                'Aug',
+                'Sep',
+                'Oct',
+                'Nov',
+                'Dec'
+            ][monthIndex] || '';
         }
 
         function pad2(value) {

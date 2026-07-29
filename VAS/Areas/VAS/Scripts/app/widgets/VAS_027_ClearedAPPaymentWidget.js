@@ -1080,7 +1080,7 @@
                 $dialogTbody.html(
                     '<tr>' +
                     '<td class="vas-cpa-dialog-empty" ' +
-                    'colspan="8">' +
+                    'colspan="7">' +
                     escapeHtml(
                         lbl(
                             'VAS_027_NoUnreconciledPayments',
