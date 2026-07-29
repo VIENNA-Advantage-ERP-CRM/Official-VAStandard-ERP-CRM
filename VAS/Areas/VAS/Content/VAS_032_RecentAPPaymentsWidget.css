@@ -1260,10 +1260,20 @@ html[dir="rtl"] .vas-summary-label * {
    leaving it to the bidi heuristics is what kept pushing the minus to the
    far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
    inherits into the ellipsis spans the cells wrap their text in, which a
-   rule on the cell alone never reached. The column then flips to the
-   inline-start edge the way the rest of the RTL layout does. */
+   rule on the cell alone never reached. Only the direction is pinned: the
+   list's own amount column stays on the right, the side Arabic reads from,
+   so the figures line up under their own headers. */
 html[dir="rtl"] .vas-recent-ap-payments-amount,
-html[dir="rtl"] .vas-recent-ap-payments-table th.vas-recent-ap-payments-amount,
+html[dir="rtl"] .vas-recent-ap-payments-table th.vas-recent-ap-payments-amount {
+    direction: ltr;
+    text-align: right !important;
+}
+
+/* The allocation table in the detail popup is the exception. Its four money
+   columns -- Allocated, Discount, Write-Off, Total -- sit at the far end of
+   a mirrored table, and the header cell above each figure goes to the left
+   with them, so the column reads as one block there rather than splitting
+   its heading from its numbers the way a right pin did. */
 html[dir="rtl"] .vas-recent-ap-payments-alloc-num,
 html[dir="rtl"] .vas-recent-ap-payments-alloc-total-cell {
     direction: ltr;
@@ -1301,7 +1311,13 @@ html[dir="rtl"] .vas-summary-value {
    is its own alignment context -- name it too instead of trusting the cell to
    carry the alignment down. */
 html[dir="rtl"] .vas-recent-ap-payments-amount *,
-html[dir="rtl"] .vas-recent-ap-payments-table th.vas-recent-ap-payments-amount *,
+html[dir="rtl"] .vas-recent-ap-payments-table th.vas-recent-ap-payments-amount * {
+    text-align: right !important;
+}
+
+/* Same split as above: the allocation columns take the left, and the `strong`
+   the total row wraps its figures in has to be named or it keeps the blanket
+   right from VIS.rtl.css. */
 html[dir="rtl"] .vas-recent-ap-payments-alloc-num *,
 html[dir="rtl"] .vas-recent-ap-payments-alloc-total-cell * {
     text-align: left !important;
@@ -1319,13 +1335,13 @@ html[dir="rtl"] .vas-recent-ap-payments-alloc-total-cell * {
     text-align: left !important;
 }
 
+/* In Arabic every read-out sits on the reading side, the amount included: the
+   label above it is already there, and a figure sent to the opposite edge
+   read as a field that had lost its label. `direction: ltr` above is what
+   keeps the minus in front of the digits, so pinning the alignment here
+   costs nothing. */
 html[dir="rtl"] .vas-recent-ap-payments-dialog-amount-field .vas-recent-ap-payments-dialog-value,
-html[dir="rtl"] .vas-recent-ap-payments-dialog-amount {
-    text-align: left !important;
-}
-
-/* The document number is a plain reference, not a figure -- it stays on the
-   reading side so it lines up with the payment date across from it. */
+html[dir="rtl"] .vas-recent-ap-payments-dialog-amount,
 html[dir="rtl"] .vas-recent-ap-payments-dialog-mono {
     text-align: right !important;
 }
