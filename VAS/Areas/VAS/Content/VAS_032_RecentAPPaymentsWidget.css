@@ -1156,7 +1156,7 @@ td.vas-recent-ap-payments-amount {
 .vas-recent-ap-payments-dialog-amount-field .vas-recent-ap-payments-dialog-value,
 .vas-recent-ap-payments-dialog-amount {
     display: block;
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1308,14 +1308,15 @@ html[dir="rtl"] .vas-recent-ap-payments-alloc-total-cell * {
 }
 
 /* --- Field read-outs, both directions --------------------------------------
-   The document number and the amount in the detail popup are entry fields,
-   not summary tiles: they follow the inputs, so the right in English and the
-   left in Arabic. The summary strip above them stays on the reading side --
-   that rule is separate on purpose. */
+   The document number and the amount in the detail popup sit in the same
+   two-column grid as every other read-out in the summary, so they start on
+   the same edge those do: the left in English and any other LTR language,
+   which is what the label above them already does. The Arabic half below is
+   deliberately left untouched. */
 .vas-recent-ap-payments-dialog-amount-field .vas-recent-ap-payments-dialog-value,
 .vas-recent-ap-payments-dialog-amount,
 .vas-recent-ap-payments-dialog-mono {
-    text-align: right !important;
+    text-align: left !important;
 }
 
 html[dir="rtl"] .vas-recent-ap-payments-dialog-amount-field .vas-recent-ap-payments-dialog-value,

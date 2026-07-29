@@ -457,13 +457,12 @@
                 );
             }
 
+            /* A single page still says where you are: blanking the indicator
+               left the two arrows framing an empty gap, which reads as a pager
+               that failed to load rather than one with nowhere to go. The
+               arrows below already carry that by being disabled. */
             if ($pagerText) {
-                if (totalPages > 1) {
-                    $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
-                }
-                else {
-                    $pagerText.text('');
-                }
+                $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + Math.max(1, totalPages));
             }
 
             if ($pagerPrev) {

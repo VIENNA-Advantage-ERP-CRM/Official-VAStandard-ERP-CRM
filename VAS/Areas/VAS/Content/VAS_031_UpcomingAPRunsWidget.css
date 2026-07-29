@@ -982,7 +982,7 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
 }
 
 .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"] {
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1099,17 +1099,17 @@ html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"]
 }
 
 /* --- Form inputs ------------------------------------------------------------
-   Every control you type into sits on the inline-end edge: the right in
-   English, the left once the session flips to Arabic. Two things force the
-   shape of this rule: the attribute selector that aligns the amount fields
-   outranks a bare class, so they are named explicitly; and VIS.rtl.css ships
-   a blanket `html[dir="rtl"] * { text-align: right !important }`, so the
-   Arabic half has to carry weight of its own or it never lands. */
+   Every control you type into starts on the same edge its label does: the
+   left in English and in every other LTR language, so the column reads down
+   one straight edge instead of the label and its value sitting on opposite
+   sides. The attribute selector that aligns the amount fields outranks a bare
+   class, so they are named explicitly. The Arabic half below keeps the
+   behaviour it already had. */
 .vas-upcoming-ap-runs-edit-control,
 .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
 .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
 .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
-    text-align: right;
+    text-align: left;
 }
 
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control,
