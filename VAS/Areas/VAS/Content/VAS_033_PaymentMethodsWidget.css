@@ -163,6 +163,7 @@
     flex-direction: column;
     justify-content: flex-start;
     gap: 1.2em;
+    margin-top: 8px;
     overflow: hidden;
 }
 
@@ -300,8 +301,7 @@
     transform: translateX(-50%) rotate(45deg);
 }
 
-.vas-payment-methods-track:hover + .vas-payment-methods-tooltip,
-.vas-payment-methods-track:focus + .vas-payment-methods-tooltip {
+.vas-payment-methods-track:focus-visible + .vas-payment-methods-tooltip {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }

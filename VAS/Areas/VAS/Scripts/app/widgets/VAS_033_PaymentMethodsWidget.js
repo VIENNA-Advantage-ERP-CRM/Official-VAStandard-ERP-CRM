@@ -422,6 +422,7 @@
             var $track = $('<div class="vas-payment-methods-track">').attr({
                 role: 'progressbar',
                 tabindex: '0',
+                title: tooltipText,
                 'aria-label': tooltipText,
                 'aria-valuemin': 0,
                 'aria-valuemax': 100,
