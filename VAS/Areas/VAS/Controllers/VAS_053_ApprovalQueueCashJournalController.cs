@@ -200,9 +200,7 @@ ApprovalQueue AS
         ProtectedCash.C_Cash_ID
     )
 
-    WHERE CashBook.IsActive = 'Y'
-
-    AND Currency.IsActive = 'Y'
+    WHERE Currency.IsActive = 'Y'
 )";
 
                 string sql = @"

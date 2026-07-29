@@ -772,8 +772,6 @@ RawCashOut AS
 
     WHERE CashHeader.IsActive = 'Y'
 
-    AND CashBook.IsActive = 'Y'
-
     AND CashHeader.AD_Client_ID =
     (
         SELECT

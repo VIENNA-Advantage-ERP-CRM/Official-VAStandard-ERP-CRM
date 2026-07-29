@@ -1047,6 +1047,11 @@
 .vas-cil-more-grid > .vas-cil-grp-collapsed {
     display: none !important;
 }
+/* Section header whose fields are ALL hidden (not on the window / DisplayLogic) - an empty
+   group title must not show. Set by syncGroupHeaders; a collapsed group is NOT empty. */
+.vas-cil-more-grid > .vas-cil-fldgrp-empty {
+    display: none !important;
+}
 /* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
 .vas-cil-fk-popover {
     min-width: 0;
