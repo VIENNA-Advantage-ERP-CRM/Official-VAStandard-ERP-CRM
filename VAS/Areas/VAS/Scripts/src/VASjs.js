@@ -112,6 +112,7 @@ import "../model/CalloutChartOfAccount.js";
 import "../app/forms/VAS_MonthlyAvBankBalWidget.js";
 import "../app/tabpanel/VAS_LeadConversation.js";
 import "../app/tabpanel/VAS_092_OverviewPurchaseOrder.js";
+import "../app/tabpanel/VAS_123_QuotationRightPanel.js";
 
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/VAS_025_TotalPurchasesWidget.js";
@@ -228,6 +229,8 @@ import "../app/widgets/VAS_054_TopCounterpartiesCashJournalWidget.js";
 import "../app/widgets/VAS_055_CashByCategoryCashJournalWidget.js";
 import "../app/tabpanel/VAS_065_APInvoicePanel.js";
 import "../app/tabpanel/VAS_074_CreateInvoiceLinePanel.js";
+import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
 import "../app/widgets/VAS_056_AutoAllocatedAPPaymentWidget.js";
 import "../app/widgets/VAS_072_MatchSuggestionAPPayment.js";
 import "../app/tabpanel/VAS_105_AccountRightPanel.js";
+import "../app/tabpanel/VAS_107_CreateOrderBottomPanel.js";
