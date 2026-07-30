@@ -15,6 +15,25 @@
  *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
  *                        columns with a divider between them (stacking to a
  *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-29  Enlarged the panel title (.MPC-vasiu-hdrTitle
+ *                        1.25em -> 1.4em), matching VAS_099_OverviewGRN. Added
+ *                        the References card (.MPC-vasiu-refCard) and the status
+ *                        card caption (.MPC-vasiu-statSub) that carries the line
+ *                        count now the Partial / Short values are quantities.
+ *                        Dropped the segmented filter, the action buttons and the
+ *                        empty-table row — all three are gone from the panel.
+ *   VAI163   2026-07-29  Added the Notes card (.MPC-vasiu-textCard) and the
+ *                        Activity list (.MPC-vasiu-actList) with its tag tones,
+ *                        plus the purple tone the "posted" tag needs.
+ *   VAI163   2026-07-29  Added the line-item Attribute Set Instance sub-line
+ *                        (.MPC-vasiu-itAttr) and the issue-lines pager
+ *                        (.MPC-vasiu-pager), a sibling of the table so the
+ *                        controls stay put while the table scrolls.
+ *   VAI163   2026-07-29  References card reworked: icon-bubble entries
+ *                        (.MPC-vasiu-refItem / -refIco / -refTxt) that only
+ *                        render for links that exist, plus the "nothing linked"
+ *                        line (.MPC-vasiu-refEmpty) that replaces the old row of
+ *                        N/A cells.
  ***********************************************************/
 
 .MPC-vasiu-root {
@@ -33,6 +52,7 @@
     --iu-success-bg:  #E9F6EE;  --iu-success-tx: #0B6B45;
     --iu-warning-bg:  #FFF6E2;  --iu-warning-tx: #9A6500;
     --iu-risk-bg:     #FCEFEF;  --iu-risk-tx:    #D14545;
+    --iu-purple-bg:   #EDE9FF;  --iu-purple-tx:  #5F4AA6;
     --iu-neutral-bg:  #EEF1F4;  --iu-neutral-tx: #5F7283;
 
     position: relative;
@@ -114,7 +134,7 @@
 .MPC-vasiu-hdrTitleWrap { min-width: 0; }
 
 .MPC-vasiu-hdrTitle {
-    font-size: 1.25em;
+    font-size: 1.4em;
     font-weight: 700;
     color: var(--iu-text);
     line-height: 1.2;
@@ -236,6 +256,56 @@
 .MPC-vasiu-contactBit .MPC-vasiu-ic { color: var(--iu-action); }
 
 /* ----------------------------------------------------------- */
+/*  References card (work order / requisition links)            */
+/* ----------------------------------------------------------- */
+/* Each reference is an icon bubble + label + value. Only links that exist are
+   rendered, so the grid sizes itself to the real content instead of stretching
+   a row of empty cells across the panel. */
+.MPC-vasiu-refCard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13em, 1fr));
+    gap: 0.875em 1.25em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+.MPC-vasiu-refCard.is-empty { display: block; }
+
+.MPC-vasiu-refItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.MPC-vasiu-refIco {
+    flex: none;
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--iu-info-bg);
+    color: var(--iu-info-tx);
+    margin-top: 0.0625em;
+}
+
+.MPC-vasiu-refTxt { min-width: 0; }
+.MPC-vasiu-refTxt .MPC-vasiu-fVal { white-space: nowrap; }
+
+/* Nothing linked: one explanatory line, not a wall of N/A. */
+.MPC-vasiu-refEmpty {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.8125em;
+    color: var(--iu-muted);
+}
+.MPC-vasiu-refEmpty .MPC-vasiu-ic { color: var(--iu-muted); }
+
+/* ----------------------------------------------------------- */
 /*  Snapshot (KPI metric grid)                                  */
 /* ----------------------------------------------------------- */
 .MPC-vasiu-snap {
@@ -329,6 +399,14 @@
 }
 .MPC-vasiu-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--iu-text); }
 .MPC-vasiu-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--iu-muted); margin-top: 0.25em; }
+.MPC-vasiu-statSub {
+    font-size: 0.625em;
+    color: var(--iu-muted);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .MPC-vasiu-statCard.tone-full    .MPC-vasiu-statVal { color: var(--iu-success-tx); }
 .MPC-vasiu-statCard.tone-partial .MPC-vasiu-statVal { color: #9A6500; }
@@ -425,28 +503,6 @@
 .MPC-vasiu-step.is-active .MPC-vasiu-stepMeta { color: #E08A1E; font-weight: 600; }
 
 /* ----------------------------------------------------------- */
-/*  Segmented filter (All lines / Pending only)                */
-/* ----------------------------------------------------------- */
-.MPC-vasiu-seg {
-    flex: none;
-    display: inline-flex;
-    border: 1px solid #BFE4FF;
-    border-radius: 999px;
-    overflow: hidden;
-}
-.MPC-vasiu-seg button {
-    border: none;
-    background: #fff;
-    color: var(--iu-link);
-    font-family: inherit;
-    font-size: 0.6875em;
-    font-weight: 700;
-    padding: 0.4375em 0.875em;
-    cursor: pointer;
-}
-.MPC-vasiu-seg button.on { background: var(--iu-info-bg); color: var(--iu-info-tx); }
-
-/* ----------------------------------------------------------- */
 /*  Issue line table                                           */
 /* ----------------------------------------------------------- */
 .MPC-vasiu-table {
@@ -504,6 +560,16 @@
     white-space: nowrap;
 }
 
+/* Attribute set instance (lot / serial / attributes) */
+.MPC-vasiu-itAttr {
+    font-size: 0.9231em;
+    color: var(--iu-sub);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Status tag */
 .MPC-vasiu-tag {
     display: inline-flex;
@@ -518,14 +584,6 @@
 .MPC-vasiu-tag.s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
 .MPC-vasiu-tag.s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
 .MPC-vasiu-tag.s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
-
-.MPC-vasiu-tEmpty {
-    padding: 1.25em 0.875em;
-    text-align: center;
-    font-size: 0.8125em;
-    color: var(--iu-muted);
-    border-bottom: 1px solid var(--iu-row-div);
-}
 
 /* Totals footer */
 .MPC-vasiu-tFoot {
@@ -550,52 +608,131 @@
 }
 
 /* ----------------------------------------------------------- */
-/*  Actions (visual buttons)                                    */
+/*  Pager (issue lines)                                         */
 /* ----------------------------------------------------------- */
-.MPC-vasiu-actions {
+/* Deliberately a sibling of the table, not a child: the table scrolls
+   horizontally on narrow panels and the controls must stay put. */
+.MPC-vasiu-pager {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     flex-wrap: wrap;
-    gap: 0.625em;
-    padding-top: 0.125em;
+    gap: 0.5em 0.875em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--iu-muted);
 }
 
-.MPC-vasiu-btn {
+.MPC-vasiu-pgCtrls {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375em;
-    height: 2.25em;
-    padding: 0 1.125em;
+    gap: 0.5em;
+}
+
+.MPC-vasiu-pgPos { color: var(--iu-text); font-weight: 700; }
+
+.MPC-vasiu-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--iu-card-bd);
     border-radius: 999px;
-    font-size: 0.8125em;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--iu-action);
     font-weight: 700;
     line-height: 1;
     cursor: pointer;
     user-select: none;
+    white-space: nowrap;
 }
-.MPC-vasiu-btn .MPC-vasiu-ic { color: currentColor; }
-
-.MPC-vasiu-btn.btn-pri {
-    background: var(--iu-action);
-    border: 1px solid var(--iu-action);
-    color: #fff;
-}
-.MPC-vasiu-btn.btn-pri:hover { background: var(--iu-action-dk); border-color: var(--iu-action-dk); }
-
-.MPC-vasiu-btn.btn-sec {
-    background: #fff;
-    border: 1px solid var(--iu-action);
-    color: var(--iu-action);
-}
-.MPC-vasiu-btn.btn-sec:hover { background: var(--iu-info-bg); }
-
-.MPC-vasiu-btn.is-disabled {
-    background: #F1F4F7;
-    border-color: #DCE5EE;
-    color: #A6B2BD;
+.MPC-vasiu-pgBtn:hover { background: var(--iu-info-bg); border-color: var(--iu-action); }
+.MPC-vasiu-pgBtn .MPC-vasiu-ic { color: currentColor; }
+.MPC-vasiu-pgBtn.is-disabled {
+    opacity: .45;
     cursor: default;
     pointer-events: none;
+    color: var(--iu-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Notes card (issue header description)                       */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-textCard {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.75em 1em;
+    font-size: 0.8125em;
+    color: var(--iu-sub);
+    line-height: 1.55;
+}
+.MPC-vasiu-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.MPC-vasiu-textCard p + p { margin-top: 0.5em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity (audit trail)                                      */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-actList {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* tag | what happened | when · by whom */
+.MPC-vasiu-actRow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.5625em 0.875em;
+    border-bottom: 1px solid var(--iu-row-div);
+    font-size: 0.8125em;
+}
+.MPC-vasiu-actRow:last-child { border-bottom: none; }
+.MPC-vasiu-actRow:hover { background: #FAFCFE; }
+
+.MPC-vasiu-actTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    flex: none;
+    border-radius: 999px;
+    padding: 0.25em 0.625em;
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.MPC-vasiu-actTag .MPC-vasiu-ic { color: currentColor; }
+.MPC-vasiu-actTag.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.MPC-vasiu-actTag.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.MPC-vasiu-actTag.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.MPC-vasiu-actTag.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.MPC-vasiu-actTag.tone-purple  { background: var(--iu-purple-bg);  color: var(--iu-purple-tx); }
+.MPC-vasiu-actTag.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+
+.MPC-vasiu-actTitle {
+    min-width: 0;
+    color: var(--iu-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-actWhen {
+    flex: none;
+    text-align: right;
+    color: var(--iu-muted);
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    white-space: nowrap;
+}
+
+/* Narrow panels: drop the timestamp onto its own line under the description. */
+@container (max-width: 460px) {
+    .MPC-vasiu-actRow { grid-template-columns: auto 1fr; }
+    .MPC-vasiu-actWhen { grid-column: 2; text-align: left; }
 }
 
 /* ----------------------------------------------------------- */
@@ -606,4 +743,6 @@
 [dir="rtl"] .MPC-vasiu-tFoot { justify-content: flex-start; }
 [dir="rtl"] .MPC-vasiu-tf b { margin-left: 0; margin-right: 0.375em; }
 [dir="rtl"] .MPC-vasiu-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
-[dir="rtl"] .MPC-vasiu-actions { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasiu-actRow { text-align: right; }
+[dir="rtl"] .MPC-vasiu-actWhen { text-align: left; }
+[dir="rtl"] .MPC-vasiu-pgBtn .MPC-vasiu-ic svg { transform: scaleX(-1); }
