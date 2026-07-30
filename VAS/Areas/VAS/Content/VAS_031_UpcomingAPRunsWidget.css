@@ -982,7 +982,7 @@ select.vas-upcoming-ap-runs-edit-control:disabled {
 }
 
 .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"] {
-    text-align: right;
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1088,40 +1088,36 @@ html[dir="rtl"] .vas-upcoming-ap-runs-amount * {
 }
 
 /* --- RTL: the amount inputs ------------------------------------------------
-   A field you type a figure into is not a read-out: it keeps the left, and it
-   has to be pinned LTR or the minus lands behind the digits ("100000-") as
-   soon as the form is opened in Arabic. */
+   The figure has to be pinned LTR or the minus lands behind the digits
+   ("100000-") as soon as the form is opened in Arabic. The alignment is a
+   separate question, and it follows the rest of the form: the reading side,
+   under the label. */
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
     direction: ltr;
-    text-align: left !important;
+    text-align: right !important;
 }
 
 /* --- Form inputs ------------------------------------------------------------
-   Every control you type into sits on the inline-end edge: the right in
-   English, the left once the session flips to Arabic. Two things force the
-   shape of this rule: the attribute selector that aligns the amount fields
-   outranks a bare class, so they are named explicitly; and VIS.rtl.css ships
-   a blanket `html[dir="rtl"] * { text-align: right !important }`, so the
-   Arabic half has to carry weight of its own or it never lands. */
+   Every control you type into starts on the same edge its label does: the
+   left in English and in every other LTR language, so the column reads down
+   one straight edge instead of the label and its value sitting on opposite
+   sides. The attribute selector that aligns the amount fields outranks a bare
+   class, so they are named explicitly. In Arabic the whole form mirrors and
+   every control sits on the right, its label's side -- the date pickers
+   included, so there is no exception left to carve out. */
 .vas-upcoming-ap-runs-edit-control,
 .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
 .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
 .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
-    text-align: right;
+    text-align: left;
 }
 
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control,
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="payAmt"],
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="discountAmt"],
-html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"] {
-    text-align: left !important;
-}
-
-/* The date pickers are the exception: they carry no sign to keep in front and
-   they read as part of the form's prose, so in Arabic they stay on the reading
-   side rather than following the amount fields to the left. */
+html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="writeOffAmt"],
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="transactionDate"],
 html[dir="rtl"] .vas-upcoming-ap-runs-edit-control[data-pay-field="checkDate"] {
     text-align: right !important;

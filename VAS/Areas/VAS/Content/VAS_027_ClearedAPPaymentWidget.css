@@ -79,8 +79,15 @@
     color: currentColor;
 }
 
-.vas-finance-kpi-title {
+/* Carries the flex share the title used to hold on its own, now that the
+   title and the subtitle share one box inside the header row. */
+.vas-finance-kpi-header-text {
     flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas-finance-kpi-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -90,6 +97,19 @@
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
+}
+
+.vas-finance-kpi-sub {
+    min-width: 0;
+    margin-top: 0.125em;
+    overflow: hidden;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vas-finance-kpi-arrow {
@@ -442,6 +462,7 @@
 .vas-cpa-dialog-body {
     position: relative;
     flex: 1 1 auto;
+    width: 100%;
     min-height: 0;
     overflow: auto;
     padding: 0 1.5em;
@@ -466,7 +487,7 @@
 
 .vas-cpa-dialog-table {
     width: 100%;
-    min-width: 72em;
+    min-width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -509,7 +530,7 @@
 
 .vas-cpa-dialog-table th:nth-child(1),
 .vas-cpa-td-doc {
-    width: 10em;
+    width: 13%;
 }
 
 .vas-cpa-td-doc {
@@ -520,13 +541,13 @@
 
 .vas-cpa-dialog-table th:nth-child(2),
 .vas-cpa-td-date {
-    width: 9em;
+    width: 11%;
     color: #60748a;
 }
 
 .vas-cpa-dialog-table th:nth-child(3),
 .vas-cpa-td-vendor {
-    width: 14em;
+    width: 18%;
 }
 
 .vas-cpa-td-vendor {
@@ -535,20 +556,20 @@
 
 .vas-cpa-dialog-table th:nth-child(4),
 .vas-cpa-td-bank {
-    width: 13em;
+    width: 20%;
     color: #60748a;
 }
 
 .vas-cpa-dialog-table th:nth-child(5),
 .vas-cpa-td-currency {
-    width: 6em;
+    width: 10%;
     color: #60748a;
 }
 
 .vas-cpa-dialog-table th:nth-child(6),
-.vas-cpa-td-amount {
-    width: 16%;
-    text-align: left;
+.vas-cpa-td-method {
+    width: 13%;
+    color: #60748a;
 }
 
 .vas-cpa-td-amount {
@@ -557,15 +578,9 @@
 }
 
 .vas-cpa-dialog-table th:nth-child(7),
-.vas-cpa-td-method {
-    width: 8em;
-    color: #60748a;
-}
-
-.vas-cpa-dialog-table th:nth-child(8),
-.vas-cpa-td-reason {
-    width: 12em;
-    color: #60748a;
+.vas-cpa-td-amount {
+    width: 15%;
+    text-align: left;
 }
 
 .vas-cpa-truncate {
@@ -823,6 +838,7 @@ html[dir="rtl"] .vas-cpa-dialog th,
 html[dir="rtl"] .vas-cpa-summary span,
 html[dir="rtl"] .vas-cpa-summary strong,
 html[dir="rtl"] .vas-cpa-dialog-subtitle,
+html[dir="rtl"] .vas-finance-kpi-sub,
 html[dir="rtl"] .vas-finance-kpi-desc {
     unicode-bidi: plaintext;
 }

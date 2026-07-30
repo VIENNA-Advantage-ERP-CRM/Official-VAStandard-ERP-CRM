@@ -901,7 +901,7 @@ SELECT
 FROM PaymentData PaymentData
 
 ORDER BY
-    PaymentData.PaymentAmount DESC,
+    ABS(PaymentData.PaymentAmount) DESC,
     PaymentData.PaymentMethodName ASC";
 
             SqlParameter[] parameters =

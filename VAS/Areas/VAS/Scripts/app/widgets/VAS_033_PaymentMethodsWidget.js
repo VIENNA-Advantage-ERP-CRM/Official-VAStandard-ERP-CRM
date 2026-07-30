@@ -183,6 +183,11 @@
                 })
                 : [];
 
+            methodsData.sort(function (left, right) {
+                return Math.abs(Number(right.paymentAmount || 0)) -
+                    Math.abs(Number(left.paymentAmount || 0));
+            });
+
             if (methodsData.length === 0) {
                 setNoData();
                 return;
@@ -371,13 +376,12 @@
                 );
             }
 
+            /* A single page still says where you are: blanking the indicator
+               left the two arrows framing an empty gap, which reads as a pager
+               that failed to load rather than one with nowhere to go. The
+               arrows below already carry that by being disabled. */
             if ($pagerText) {
-                if (totalPages > 1) {
-                    $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
-                }
-                else {
-                    $pagerText.text('');
-                }
+                $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + Math.max(1, totalPages));
             }
 
             if ($pagerPrev) {
@@ -418,6 +422,7 @@
             var $track = $('<div class="vas-payment-methods-track">').attr({
                 role: 'progressbar',
                 tabindex: '0',
+                title: tooltipText,
                 'aria-label': tooltipText,
                 'aria-valuemin': 0,
                 'aria-valuemax': 100,
@@ -428,7 +433,7 @@
 
             $fill.css('width', percentage + '%');
 
-            $metrics.append($percent).append($amount);
+            $metrics.append($amount).append($percent);
             $top.append($name).append($metrics);
             $track.append($fill);
             $row.append($top).append($track).append($tooltip);
@@ -531,7 +536,7 @@
                 stdPrecision = getStdPrecision();
             }
 
-            return Math.min(stdPrecision, 2);
+            return stdPrecision;
         }
 
         function showBusy(show) {

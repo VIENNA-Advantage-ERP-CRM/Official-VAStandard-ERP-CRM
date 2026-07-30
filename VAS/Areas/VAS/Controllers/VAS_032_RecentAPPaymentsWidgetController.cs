@@ -1041,49 +1041,6 @@ QueryParameters AS
         + queryParametersFrom + @"
 )";
 
-            string schemaCurrencyCte = @"
-SchemaCurrency AS
-(
-    SELECT
-        ClientInfo.AD_Client_ID,
-
-        AcctSchema.C_Currency_ID,
-
-        Currency.StdPrecision,
-
-        Currency.ISO_Code,
-
-        CASE
-            WHEN Currency.CurSymbol IS NOT NULL
-            THEN Currency.CurSymbol
-            ELSE Currency.ISO_Code
-        END AS CurSymbol
-
-    FROM AD_ClientInfo ClientInfo
-
-    INNER JOIN C_AcctSchema AcctSchema ON
-    (
-        AcctSchema.C_AcctSchema_ID =
-        ClientInfo.C_AcctSchema1_ID
-    )
-
-    INNER JOIN C_Currency Currency ON
-    (
-        Currency.C_Currency_ID =
-        AcctSchema.C_Currency_ID
-    )
-
-    WHERE ClientInfo.IsActive = 'Y'
-
-    AND ClientInfo.AD_Client_ID =
-    (
-        SELECT
-            QueryParameters.AD_Client_ID
-
-        FROM QueryParameters QueryParameters
-    )
-)";
-
             string paymentAccessSql = @"
 SELECT
     Payment.C_Payment_ID,
@@ -1143,38 +1100,13 @@ AND Payment.DocStatus IN
             string amountExpression = @"
 COALESCE
 (
-    CASE
-        WHEN Payment.C_Currency_ID =
-             SchemaCurrency.C_Currency_ID
-
-        THEN COALESCE
-        (
-            Payment.PayAmt,
-            0
-        )
-
-        ELSE CurrencyConvert
-        (
-            COALESCE
-            (
-                Payment.PayAmt,
-                0
-            ),
-            Payment.C_Currency_ID,
-            SchemaCurrency.C_Currency_ID,
-            Payment.DateAcct,
-            Payment.C_ConversionType_ID,
-            Payment.AD_Client_ID,
-            Payment.AD_Org_ID
-        )
-    END,
+    Payment.PayAmt,
     0
 )";
 
             string sql = @"
 WITH
 " + queryParametersSql + @",
-" + schemaCurrencyCte + @",
 PaymentFiltered AS
 (
 " + paymentAccessSql + @"
@@ -1248,7 +1180,7 @@ SELECT
             (
                 MAX
                 (
-                    SchemaCurrency.StdPrecision
+                    Currency.StdPrecision
                 ),
                 2
             ) AS INTEGER
@@ -1257,31 +1189,29 @@ SELECT
 
     MAX
     (
-        SchemaCurrency.C_Currency_ID
+        Payment.C_Currency_ID
     ) AS C_Currency_ID,
 
     MAX
     (
-        SchemaCurrency.StdPrecision
+        Currency.StdPrecision
     ) AS StdPrecision,
 
     MAX
     (
-        SchemaCurrency.ISO_Code
+        Currency.ISO_Code
     ) AS CurrencyISO,
 
     MAX
     (
-        SchemaCurrency.CurSymbol
+        CASE
+            WHEN Currency.CurSymbol IS NOT NULL
+            THEN Currency.CurSymbol
+            ELSE Currency.ISO_Code
+        END
     ) AS CurrencySymbol
 
 FROM PaymentFiltered Payment
-
-INNER JOIN SchemaCurrency SchemaCurrency ON
-(
-    SchemaCurrency.AD_Client_ID =
-    Payment.AD_Client_ID
-)
 
 LEFT OUTER JOIN C_BPartner BPartner ON
 (
@@ -1300,6 +1230,12 @@ LEFT OUTER JOIN C_Bank Bank ON
 (
     Bank.C_Bank_ID =
     BankAccount.C_Bank_ID
+)
+
+LEFT OUTER JOIN C_Currency Currency ON
+(
+    Currency.C_Currency_ID =
+    Payment.C_Currency_ID
 )
 
 LEFT OUTER JOIN C_AllocationLine AllocationLine ON
@@ -1335,8 +1271,7 @@ GROUP BY
     Payment.C_Currency_ID,
     Payment.C_ConversionType_ID,
     Payment.AD_Client_ID,
-    Payment.AD_Org_ID,
-    SchemaCurrency.C_Currency_ID"
+    Payment.AD_Org_ID"
     + paymentMethodGroupBy
     + executionStatusGroupBy + @"
 
