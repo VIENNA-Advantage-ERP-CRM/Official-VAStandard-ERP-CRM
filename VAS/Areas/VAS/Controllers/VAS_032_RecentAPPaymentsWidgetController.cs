@@ -27,14 +27,30 @@ using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VASLogic.Models;
 using VIS.Filters;
 
 namespace VAS.Controllers
 {
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
+        private const string ZoomWindowNameNew = "VAS_APPayment";
+        private const string ZoomWindowNameOld = "Payment";
+
+        private int GetZoomWindowId()
+        {
+            try
+            {
+                PoReceiptTabPanelModel windowResolver = new PoReceiptTabPanelModel();
+                return windowResolver.GetWindowId(ZoomWindowNameNew, ZoomWindowNameOld);
+            }
+            catch (Exception ex)
+            {
+                VLogger.Get().SaveError("VAS_032_GetZoomWindowId", ex);
+                return 0;
+            }
+        }
+
         public JsonResult GetRecentAPPayments()
         {
             Ctx ctx = GetContext();
@@ -106,6 +122,12 @@ namespace VAS.Controllers
 
                         autoMatchedRefs =
                             autoMatchedRefs,
+
+                        /* AD_Window_ID the Value hyperlink zooms to. Resolved
+                           server-side and shipped with the rows so the click
+                           handler needs no extra round trip. */
+                        zoomWindowId =
+                            GetZoomWindowId(),
 
                         payments =
                             payments

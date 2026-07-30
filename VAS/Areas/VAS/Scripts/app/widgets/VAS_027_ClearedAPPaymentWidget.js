@@ -28,7 +28,7 @@
  * 19  | Vendor (table header)                             | VAS_027_messageVendor
  * 20  | Bank Account (table header)                       | VAS_027_messageBankAccount
  * 21  | Currency (table header)                           | VAS_027_messageCurrency
- * 22  | Method (table header)                             | VAS_027_messageMethod
+ * 22  | Payment Method (table header)                     | VAS_027_messageMethod
  * 23  | Auto-match remaining (button)                     | VAS_027_messageAutoMatchRemaining
  * 24  | Open reconciliation (button)                      | VAS_027_messageOpenReconciliation
  * ──────────────────────────────────────────────────────────────────────────────
@@ -1415,7 +1415,7 @@
                 '<th>' + lbl('VAS_027_messageVendor', 'Vendor') + '</th>' +
                 '<th>' + lbl('VAS_027_messageBankAccount', 'Bank Account') + '</th>' +
                 '<th>' + lbl('VAS_027_messageCurrency', 'Currency') + '</th>' +
-                '<th>' + lbl('VAS_027_messageMethod', 'Method') + '</th>' +
+                '<th>' + lbl('VAS_027_messageMethod', 'Payment Method') + '</th>' +
                 '<th>' + lbl('VAS_027_messageAmount', 'Amount') + '</th>' +
                 '</tr>' +
                 '</thead>' +

@@ -1773,7 +1773,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_Method',
-                        'Method'
+                        'Payment Method'
                     )
                 ) +
                 '</th>' +
@@ -1782,7 +1782,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_Status',
-                        'Status'
+                        'Execution Status'
                     )
                 ) +
                 '</th>' +
