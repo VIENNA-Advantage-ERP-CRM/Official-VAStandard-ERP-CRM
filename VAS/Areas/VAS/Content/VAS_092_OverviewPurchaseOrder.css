@@ -24,6 +24,26 @@
  *                        pills (.MPC-vaspo-hdrPill), and a white two-column
  *                        details card (.MPC-vaspo-hdrCard) for vendor + terms.
  *                        Replaces the Hero Status Card and 2-col Metric Grid.
+ *   VAI163   2026-07-29  Recent Activity: e-mail rows carry a recipient sub-line
+ *                        (.MPC-vaspo-actLead / -actSub) and open their message
+ *                        body on click (.MPC-vaspo-actRow.is-openable /
+ *                        .MPC-vaspo-actCaret / .MPC-vaspo-actBody).
+ *   VAI163   2026-07-29  Line-items table gained a trailing action column (2em)
+ *                        holding the icon-only history toggle
+ *                        (.MPC-vaspo-itAct / .MPC-vaspo-histBtn), moved out of the
+ *                        item cell to the right-hand edge of the row.
+ *   VAI163   2026-07-29  Line history moved under the line it belongs to: the
+ *                        per-line toggle chip (.MPC-vaspo-histBtn) and the drawer
+ *                        it opens (.MPC-vaspo-lineHist / -lhTable / -lhWhen), a
+ *                        tinted, accent-railed sibling of the line row. The drawer
+ *                        reuses the line table's own grid so a past version lines
+ *                        up column-for-column with the line above it. The
+ *                        standalone history table now only carries removed lines.
+ *   VAI163   2026-07-29  Details card re-proportioned: vendor column fixed at 40%
+ *                        and the terms column (.MPC-vaspo-hdrColR) is now a
+ *                        two-across grid instead of a single tall stack, so the
+ *                        card is shorter and the vendor side is no longer mostly
+ *                        blank. Collapses to one field column under 460px.
  *   VAI163   2026-07-01  Replaced the Compact List with a Generated From chip
  *                        strip (.MPC-vaspo-genfrom / .MPC-vaspo-chip) and added
  *                        a four-card metric snapshot (.MPC-vaspo-snap /
@@ -60,6 +80,12 @@
  *                        right-aligned via margin-left:auto, so on a narrow panel
  *                        it drops to its own line instead of being clipped off the
  *                        right edge.
+ *   VAI163   2026-07-30  Line history drawer: the Received column was replaced by
+ *                        Updated By (.MPC-vaspo-lhBy), which truncates instead of
+ *                        widening the drawer out of alignment with its line. The
+ *                        Removed lines table gained the same column, last in the
+ *                        row to match the drawer, so its grid went from five
+ *                        tracks to six.
  ***********************************************************/
 
 .MPC-vaspo-root {
@@ -251,9 +277,12 @@
 /* ----------------------------------------------------------- */
 /*  Header — details card (vendor | terms)                      */
 /* ----------------------------------------------------------- */
+/* Vendor identity takes 40% of the card; the terms take the rest and run two
+   fields wide, so five short fields sit three rows deep instead of stacking into
+   a tall column that leaves the vendor half empty. */
 .MPC-vaspo-hdrCard {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 40% 1fr;
     gap: 0.875em 1.75em;
     border: 1px solid var(--vaspo-card-bd);
     border-radius: var(--vaspo-card-radius);
@@ -265,9 +294,10 @@
 
 .MPC-vaspo-hdrColR {
     min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625em;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75em 1.5em;
+    align-content: start;
 }
 
 .MPC-vaspo-hdrField { min-width: 0; }
@@ -288,12 +318,15 @@
     color: var(--vaspo-text);
     line-height: 1.35;
     margin-top: 0.125em;
+    overflow-wrap: break-word;   /* a long term / e-mail wraps instead of spilling */
 }
 
 /* Narrow panels: stack the two columns and drop the pills below the title. */
 @container (max-width: 460px) {
     .MPC-vaspo-hdrCard { grid-template-columns: 1fr; }
     .MPC-vaspo-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--vaspo-row-div); padding-bottom: 0.75em; }
+    /* Two field columns are too cramped this narrow — back to a single stack. */
+    .MPC-vaspo-hdrColR { grid-template-columns: 1fr; }
     .MPC-vaspo-hdrTop  { flex-direction: column; }
     .MPC-vaspo-hdrPills { justify-content: flex-start; }
 }
@@ -639,10 +672,58 @@
     font-size: 0.8125em;
     color: var(--vaspo-text);
     line-height: 1.35;
+}
+
+/* The headline (note text / e-mail subject) and, for an e-mail, the recipient
+   beneath it. Each line clips on its own so the row height stays predictable. */
+.MPC-vaspo-actLead,
+.MPC-vaspo-actSub {
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+.MPC-vaspo-actSub {
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    color: var(--vaspo-muted);
+    margin-top: 0.125em;
+}
+
+/* An activity carrying a body (e-mail) opens on click. */
+.MPC-vaspo-actRow.is-openable { cursor: pointer; }
+.MPC-vaspo-actRow.is-openable:hover { background: #F7FBFE; }
+
+.MPC-vaspo-actCaret {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    color: var(--vaspo-muted);
+    transition: transform .15s ease;
+}
+.MPC-vaspo-actRow.is-open .MPC-vaspo-actCaret {
+    transform: rotate(90deg);
+    color: var(--vaspo-action);
+}
+
+/* The message body, revealed under its row. */
+.MPC-vaspo-actBody {
+    background: #F7FAFD;
+    border-bottom: 1px solid var(--vaspo-row-div);
+    padding: 0.625em 0.875em 0.75em 2.5em;
+    font-size: 0.8125em;
+    color: var(--vaspo-text);
+    line-height: 1.55;
+}
+.MPC-vaspo-actBody p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.MPC-vaspo-actMeta {
+    font-size: 0.8462em;
+    color: var(--vaspo-muted);
+    margin-bottom: 0.3125em;
+}
+
+[dir="rtl"] .MPC-vaspo-actBody { padding-left: 0.875em; padding-right: 2.5em; }
+[dir="rtl"] .MPC-vaspo-actCaret svg { transform: scaleX(-1); }
+[dir="rtl"] .MPC-vaspo-actRow.is-open .MPC-vaspo-actCaret { transform: rotate(-90deg); }
 
 .MPC-vaspo-actWhen {
     flex: none;
@@ -673,14 +754,17 @@
 }
 
 /* Per-table column templates */
+/* Six data columns + a narrow trailing action column (per-line history toggle).
+   The history drawer reuses this same template, so a past version lines up
+   column-for-column with the line above it. */
 .MPC-vaspo-itTable .MPC-vaspo-tRow {
-    grid-template-columns: 2.3fr 0.9fr 0.6fr 1.05fr 0.95fr 1.15fr;
+    grid-template-columns: 2.3fr 0.9fr 0.6fr 1.05fr 0.95fr 1.15fr 2em;
 }
 .MPC-vaspo-ldTable .MPC-vaspo-tRow {
     grid-template-columns: 1.9fr 1.15fr 0.95fr 1.15fr 0.95fr;
 }
 .MPC-vaspo-histTable .MPC-vaspo-tRow {
-    grid-template-columns: 2.3fr 1.2fr 0.7fr 1.0fr 1.0fr;
+    grid-template-columns: 2.3fr 1.2fr 0.7fr 1.0fr 1.0fr 1.1fr;
 }
 .MPC-vaspo-docTable .MPC-vaspo-tRow {
     grid-template-columns: 2.3fr 1.1fr 1.0fr 1.1fr;
@@ -688,6 +772,89 @@
 .MPC-vaspo-budgetTable .MPC-vaspo-tRow {
     grid-template-columns: 2.6fr 1.0fr;
 }
+
+/* ----------------------------------------------------------- */
+/*  Per-line history (drawer under the line it belongs to)      */
+/* ----------------------------------------------------------- */
+/* The toggle sits in the row's trailing action cell, at the right-hand edge.
+   Icon-only — its tooltip (title/aria-label) names the action and the number of
+   changes, so the column stays narrow. */
+.MPC-vaspo-itAct {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.MPC-vaspo-histBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9em;
+    height: 1.9em;
+    border: 1px solid var(--vaspo-card-bd);
+    border-radius: 50%;
+    background: #fff;
+    padding: 0;
+    font-family: inherit;
+    line-height: 1;
+    color: var(--vaspo-action);
+    cursor: pointer;
+}
+.MPC-vaspo-histBtn:hover { background: var(--vaspo-info-bg); border-color: var(--vaspo-action); }
+.MPC-vaspo-histBtn.is-open {
+    background: var(--vaspo-info-bg);
+    border-color: var(--vaspo-action);
+    color: var(--vaspo-action);
+}
+.MPC-vaspo-histBtn .MPC-vaspo-ic { color: currentColor; }
+
+/* The drawer: a sibling of the line row, tinted with a left accent rail so it
+   reads as belonging to the line above. It carries NO padding of its own and the
+   table inside drops its border — the version rows then sit on exactly the same
+   column grid as the line row above them. */
+.MPC-vaspo-lineHist {
+    background: #F7FAFD;
+    border-bottom: 1px solid var(--vaspo-row-div);
+    box-shadow: inset 3px 0 0 var(--vaspo-action);
+}
+
+.MPC-vaspo-lhTable {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+.MPC-vaspo-lhTable .MPC-vaspo-tHead {
+    background: transparent;
+    border-bottom: 1px solid var(--vaspo-row-div);
+}
+.MPC-vaspo-lhTable .MPC-vaspo-tBody { border-bottom: 1px solid var(--vaspo-row-div); }
+.MPC-vaspo-lhTable .MPC-vaspo-tBody:last-child { border-bottom: none; }
+.MPC-vaspo-lhTable .MPC-vaspo-tBody:hover { background: rgba(255, 255, 255, .65); }
+
+/* Author cell: who made the change. Used by both the per-line history drawer and
+   the Removed lines table; truncates rather than widening its row. */
+.MPC-vaspo-lhBy {
+    min-width: 0;
+    color: var(--vaspo-sub);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Timestamp cell: the change moment, with that version's line note beneath. */
+.MPC-vaspo-lhWhen { min-width: 0; }
+.MPC-vaspo-lhWhen small {
+    display: block;
+    color: var(--vaspo-muted);
+    font-size: 0.9231em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+[dir="rtl"] .MPC-vaspo-lineHist { box-shadow: inset -3px 0 0 var(--vaspo-action); }
 
 /* Document identity cell: kind icon + doc no / caption + open affordance */
 .MPC-vaspo-docItem {

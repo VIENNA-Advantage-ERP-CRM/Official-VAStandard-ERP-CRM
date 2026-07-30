@@ -119,6 +119,7 @@ import "../app/tabpanel/VAS_101_OverviewInventoryCount.js";
 import "../app/tabpanel/VAS_102_OverviewInternalUse.js";
 import "../app/tabpanel/VAS_103_MaterialTransfer.js";
 import "../app/tabpanel/VAS_104_OverviewShipGRNConfirmation.js";
+import "../app/tabpanel/VAS_167_PurchaseOrderLandedCost.js";
 
 import "../app/widgets/RequestWidget.js";
 import "../app/widgets/VAS_025_TotalPurchasesWidget.js";
