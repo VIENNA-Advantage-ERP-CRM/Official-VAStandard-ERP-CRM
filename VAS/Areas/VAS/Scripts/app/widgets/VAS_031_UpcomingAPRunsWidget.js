@@ -1419,21 +1419,20 @@
                 );
             }
 
-            if (totalPages > 1) {
-                $pagerText.text(
-                    pageNo +
-                    ' ' +
-                    lbl(
-                        'VAS_Of',
-                        'of'
-                    ) +
-                    ' ' +
-                    totalPages
-                );
-            }
-            else {
-                $pagerText.text('');
-            }
+            /* A single page still says where you are: blanking the indicator
+               left the two arrows framing an empty gap, which reads as a pager
+               that failed to load rather than one with nowhere to go. The
+               arrows below already carry that by being disabled. */
+            $pagerText.text(
+                pageNo +
+                ' ' +
+                lbl(
+                    'VAS_Of',
+                    'of'
+                ) +
+                ' ' +
+                Math.max(1, totalPages)
+            );
 
             $pagerPrev.prop(
                 'disabled',
@@ -1447,9 +1446,11 @@
                 pageNo >= totalPages
             );
 
-            $pager.toggle(
-                totalPages > 1
-            );
+            /* The pager stays on the page whatever the count. Pulling it out
+               at one page made the footer jump as the list was filtered, and
+               it took the position read-out with it -- the disabled arrows
+               above already say there is nowhere to go. */
+            $pager.show();
         }
 
         function renderPage() {

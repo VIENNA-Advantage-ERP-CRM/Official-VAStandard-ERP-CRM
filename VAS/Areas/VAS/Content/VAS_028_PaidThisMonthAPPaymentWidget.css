@@ -199,6 +199,19 @@
     color: #102c3f;
 }
 
+.vas-ptm-ap-root .vas-ptm-sub {
+    min-width: 0;
+    margin-top: 0.125em;
+    overflow: hidden;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .vas-ptm-ap-root .vas-ptm-arrow {
     align-items: center;
     color: #5f7283;
@@ -873,6 +886,7 @@ html[dir="rtl"] .vas-ptm-summary strong,
 html[dir="rtl"] .vas-ptm-dialog-summary span,
 html[dir="rtl"] .vas-ptm-dialog-summary strong,
 html[dir="rtl"] .vas-ptm-metric,
+html[dir="rtl"] .vas-ptm-sub,
 html[dir="rtl"] .vas-ptm-why-text,
 html[dir="rtl"] .vas-ptm-subtitle,
 html[dir="rtl"] .vas-ptm-dialog-subtitle {
