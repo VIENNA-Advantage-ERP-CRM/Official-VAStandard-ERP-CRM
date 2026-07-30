@@ -120,6 +120,34 @@
 ///                          instance (M_AttributeSetInstance_ID > 0) so a line
 ///                          with no ASI no longer picks up the zero-record's "--"
 ///                          description.
+///   VAI163   2026-07-29  - Line history now also carries the snapshot's promised
+///                          date and delivered quantity (both AD_Column-guarded),
+///                          so the panel can show a past version under its line
+///                          using the same columns as the line itself.
+///                        - Chat-note activity resolves its author from
+///                          CM_ChatEntry.AD_User_ID falling back to CreatedBy —
+///                          platform-logged notes leave AD_User_ID null, which
+///                          printed a note with no user name against it.
+///   VAI163   2026-07-29  - Actual landed cost realigned to the agreed query:
+///                          driven from C_LandedCost -> its invoice line (charge
+///                          lines only) on a completed invoice, with the receipt
+///                          line taken as NVL(lca.M_InOutLine_ID,
+///                          lc.M_InOutLine_ID). Requiring the allocation to carry
+///                          the receipt line, and the extra receipt-side filters,
+///                          were dropping real costs out of the actual column.
+///   VAI163   2026-07-29  - Actual landed cost now also reconciles onto the
+///                          expected row by DISTRIBUTION when the landed cost
+///                          carries a different cost element (or none), matching
+///                          the agreed expected/actual join; and the IsActive
+///                          filters that query does not have were removed.
+///                        - Recent Activity now includes e-mails sent against the
+///                          order (MailAttachment1 by AD_Table_ID + Record_ID):
+///                          recipient, subject, body, when and who sent it.
+///   VAI163   2026-07-29  - Those e-mails also travel as their own collection
+///                          (Emails / EmailData) for the panel's Emails section:
+///                          the complete list, newest first, where the activity
+///                          feed only carries what survives its cap. One query
+///                          feeds both.
 /// </summary>
 
 using System;
@@ -385,8 +413,13 @@ namespace VASLogic.Models
             // ----- Notes (order header + per-line, mirrors Sales Order overview) -----
             result.Notes = LoadNotes(C_Order_ID);
 
+            // ----- E-mails sent against the order (MailAttachment1) -----
+            // Loaded once: the Emails section lists them all, the activity feed
+            // merges the same rows in with everything else.
+            result.Emails = LoadEmails(C_Order_ID);
+
             // ----- Recent activity (CM_ChatEntry + document milestones) -----
-            result.Activity = LoadActivity(C_Order_ID);
+            result.Activity = LoadActivity(C_Order_ID, result.Emails);
 
             // ----- Documents raised from this PO (openable GRNs / invoices) -----
             result.Documents = LoadDocuments(C_Order_ID);
@@ -795,9 +828,21 @@ namespace VASLogic.Models
                 //  platform snapshot) and LEFT JOIN the current order line, so a
                 //  line that was later removed still shows its history — falling
                 //  back to the snapshot's own Line sequence for display.
+                // The panel draws a version beneath its line using the SAME columns
+                // as the line itself, so the snapshot's promised date and delivered
+                // quantity are read too. Both are guarded — a schema whose history
+                // table omits them simply reports no date / no receipt.
+                string promisedExpr = ColumnExists("C_OrderLineHistory", "DatePromised")
+                    ? "olh.DatePromised" : "CAST(NULL AS DATE)";
+                string deliveredExpr = ColumnExists("C_OrderLineHistory", "QtyDelivered")
+                    ? "NVL(olh.QtyDelivered, 0)" : "0";
+
                 string sql = @"SELECT olh.C_OrderLine_ID,
                                       NVL(ol.Line, olh.Line) AS LineNo,
                                       olh.Updated      AS ChangedOn,
+                                      uu.Name          AS UpdatedByName,
+                                      " + promisedExpr + @"  AS DatePromised,
+                                      " + deliveredExpr + @" AS QtyDelivered,
                                       NVL(olh.QtyEntered, olh.QtyOrdered) AS QtyEntered,
                                       olh.QtyOrdered,
                                       olh.PriceActual,
@@ -815,6 +860,7 @@ namespace VASLogic.Models
                                  LEFT OUTER JOIN M_Product p ON (p.M_Product_ID = olh.M_Product_ID)
                                  LEFT OUTER JOIN C_Charge  ch ON (ch.C_Charge_ID = olh.C_Charge_ID)
                                  LEFT OUTER JOIN C_UOM uom   ON (uom.C_UOM_ID = olh.C_UOM_ID)
+                                 LEFT OUTER JOIN AD_User uu  ON (uu.AD_User_ID = olh.UpdatedBy)
                                  INNER JOIN C_Currency cur   ON (cur.C_Currency_ID = o.C_Currency_ID)
                                 WHERE olh.C_Order_ID = @C_Order_ID
                                 ORDER BY NVL(ol.Line, olh.Line), olh.Updated DESC";
@@ -827,6 +873,9 @@ namespace VASLogic.Models
                     h.C_OrderLine_ID = Util.GetValueOfInt(r["C_OrderLine_ID"]);
                     h.LineNo         = Util.GetValueOfInt(r["LineNo"]);
                     h.ChangedOn      = Util.GetValueOfDateTime(r["ChangedOn"]);
+                    h.UpdatedByName  = Util.GetValueOfString(r["UpdatedByName"]);
+                    h.DatePromised   = Util.GetValueOfDateTime(r["DatePromised"]);
+                    h.QtyDelivered   = Util.GetValueOfDecimal(r["QtyDelivered"]);
                     h.QtyEntered     = Util.GetValueOfDecimal(r["QtyEntered"]);
                     h.QtyOrdered     = Util.GetValueOfDecimal(r["QtyOrdered"]);
                     h.PriceActual    = Util.GetValueOfDecimal(r["PriceActual"]);
@@ -864,12 +913,13 @@ namespace VASLogic.Models
         /// </summary>
         /// <param name="C_Order_ID">Owning purchase order id.</param>
         /// <returns>Activity rows ordered newest-first (may be empty).</returns>
-        private List<ActivityData> LoadActivity(int C_Order_ID)
+        private List<ActivityData> LoadActivity(int C_Order_ID, List<EmailData> emails)
         {
             const int MAX_ENTRIES = 12;
 
             List<ActivityData> activity = new List<ActivityData>();
             LoadNoteActivity(C_Order_ID, activity);
+            LoadEmailActivity(emails, activity);
             LoadReceiptActivity(C_Order_ID, activity);
             LoadInvoiceActivity(C_Order_ID, activity);
             LoadPaymentActivity(C_Order_ID, activity);
@@ -886,22 +936,144 @@ namespace VASLogic.Models
         }
 
         /// <summary>
+        /// Loads the e-mails sent against this order (MailAttachment1, joined by
+        /// AD_Table_ID = C_Order + Record_ID = the order id), newest first:
+        /// recipient (MailAddress), subject (Title), body (TextMsg), when (Created)
+        /// and who sent it (CreatedBy). The body travels with the row so the panel
+        /// can reveal it on click without a second round trip.
+        ///
+        /// Feeds both the Emails section (complete list) and the Recent Activity
+        /// feed (merged and capped with everything else).
+        /// </summary>
+        /// <param name="C_Order_ID">Owning purchase order id.</param>
+        /// <returns>E-mail rows, newest first (may be empty).</returns>
+        private List<EmailData> LoadEmails(int C_Order_ID)
+        {
+            List<EmailData> emails = new List<EmailData>();
+            try
+            {
+                // AttachmentType 'M' is a mail (platform convention); anything else
+                // on this table is a letter / inbound document, not an e-mail.
+                string sql = @"SELECT ma.MailAttachment1_ID,
+                                      ma.MailAddress,
+                                      ma.MailAddressFrom,
+                                      ma.Title,
+                                      ma.TextMsg,
+                                      ma.Created,
+                                      ma.IsMailSent,
+                                      u.Name AS UserName
+                                 FROM MailAttachment1 ma
+                                 LEFT OUTER JOIN AD_User u ON (u.AD_User_ID = ma.CreatedBy)
+                                WHERE ma.AD_Table_ID =
+                                      (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
+                                  AND ma.Record_ID          = @C_Order_ID
+                                  AND NVL(ma.IsActive, 'Y') = 'Y'
+                                  AND NVL(ma.AttachmentType, 'M') = 'M'
+                                ORDER BY ma.Created DESC";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@C_Order_ID", C_Order_ID)
+                };
+                DataSet ds = DB.ExecuteDataset(sql, param, null);
+                if (ds == null || ds.Tables.Count == 0) return emails;
+
+                foreach (DataRow r in ds.Tables[0].Rows)
+                {
+                    emails.Add(new EmailData
+                    {
+                        MailAttachment1_ID = Util.GetValueOfInt(r["MailAttachment1_ID"]),
+                        Subject    = Util.GetValueOfString(r["Title"]),
+                        Body       = Util.GetValueOfString(r["TextMsg"]),
+                        MailTo     = Util.GetValueOfString(r["MailAddress"]),
+                        MailFrom   = Util.GetValueOfString(r["MailAddressFrom"]),
+                        IsMailSent = Util.GetValueOfString(r["IsMailSent"]) == "Y",
+                        SentBy     = Util.GetValueOfString(r["UserName"]),
+                        Created    = Util.GetValueOfDateTime(r["Created"])
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-fatal: a schema without MailAttachment1 just shows no e-mails.
+                _log.Severe("LoadEmails (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
+            }
+            return emails;
+        }
+
+        /// <summary>
+        /// Adds the order's e-mails to the activity feed as "email" rows.
+        /// </summary>
+        private void LoadEmailActivity(List<EmailData> emails, List<ActivityData> list)
+        {
+            if (emails == null) return;
+            foreach (EmailData m in emails)
+            {
+                list.Add(new ActivityData
+                {
+                    Type       = "email",
+                    // Text is the row's headline everywhere in this feed; for an
+                    // e-mail that is its subject.
+                    Text       = m.Subject,
+                    Body       = m.Body,
+                    MailTo     = m.MailTo,
+                    MailFrom   = m.MailFrom,
+                    IsMailSent = m.IsMailSent,
+                    UserName   = m.SentBy,
+                    Created    = m.Created
+                });
+            }
+        }
+
+        /// <summary>
+        /// Returns true when the given column exists on the given table, using the
+        /// AD_Column dictionary. A DB issue degrades to "absent" (false) so a
+        /// lookup failure never breaks the overview.
+        /// </summary>
+        private bool ColumnExists(string tableName, string columnName)
+        {
+            try
+            {
+                string sql = @"SELECT COUNT(*) FROM AD_Column
+                                WHERE UPPER(ColumnName) = UPPER(@ColumnName)
+                                  AND AD_Table_ID = (SELECT AD_Table_ID FROM AD_Table
+                                                      WHERE UPPER(TableName) = UPPER(@TableName))";
+                SqlParameter[] param = new SqlParameter[]
+                {
+                    new SqlParameter("@ColumnName", columnName),
+                    new SqlParameter("@TableName", tableName)
+                };
+                return Util.GetValueOfInt(DB.ExecuteScalar(sql, param, null)) > 0;
+            }
+            catch (Exception ex)
+            {
+                _log.Severe("ColumnExists (" + tableName + "." + columnName + "): " + ex.Message);
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Loads free-text chat notes (CM_ChatEntry) logged against this order
         /// (via CM_Chat where AD_Table_ID = C_Order's table id and Record_ID =
         /// the order id) as "note" activity rows.
+        ///
+        /// The author is taken from CM_ChatEntry.AD_User_ID, falling back to
+        /// CreatedBy: an entry logged through the platform's own chat plumbing
+        /// often leaves AD_User_ID null, which left the activity feed printing a
+        /// bare timestamp with no name against the note.
         /// </summary>
         private void LoadNoteActivity(int C_Order_ID, List<ActivityData> list)
         {
             try
             {
                 string sql = @"SELECT ce.CM_ChatEntry_ID,
-                                      ce.AD_User_ID,
+                                      NVL(ce.AD_User_ID, ce.CreatedBy) AS AD_User_ID,
                                       ce.CharacterData,
                                       ce.Created,
-                                      u.Name AS UserName
+                                      NVL(u.Name, cu.Name) AS UserName
                                  FROM CM_ChatEntry ce
-                                 INNER JOIN CM_Chat ch     ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
-                                 LEFT OUTER JOIN AD_User u ON (ce.AD_User_ID = u.AD_User_ID)
+                                 INNER JOIN CM_Chat ch      ON (ce.CM_Chat_ID = ch.CM_Chat_ID)
+                                 LEFT OUTER JOIN AD_User u  ON (ce.AD_User_ID = u.AD_User_ID)
+                                 LEFT OUTER JOIN AD_User cu ON (ce.CreatedBy  = cu.AD_User_ID)
                                 WHERE ch.AD_Table_ID =
                                       (SELECT t.AD_Table_ID FROM AD_Table t WHERE t.TableName = 'C_Order')
                                   AND ch.Record_ID = @C_Order_ID
@@ -1586,20 +1758,32 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Loads the actual landed-cost components from invoice-linked
-        /// C_LandedCostAllocation rows, reached through the GRN line
-        /// (M_InOutLine) back to this PO's order lines and grouped by cost
-        /// element + distribution. Only allocations that resolve to a vendor
-        /// invoice line are treated as actualised; the actual amount is
+        /// Loads the actual landed-cost components: the landed costs charged on
+        /// completed vendor invoices (C_LandedCost -> C_InvoiceLine, charge lines
+        /// only) whose allocations reach this PO's order lines through the GRN
+        /// line, grouped by cost element + distribution. The actual amount is
         /// SUM(C_LandedCostAllocation.Amt). Component name prefers
         /// M_CostElement.Name then C_Charge.Name then C_LandedCost.Description;
         /// the source sub-label prefers the invoice vendor / reference.
+        ///
+        /// The receipt line is resolved as NVL(lca.M_InOutLine_ID,
+        /// lc.M_InOutLine_ID): an allocation does not always carry the receipt
+        /// line itself, and requiring it dropped those costs from the actuals
+        /// entirely. Reaching the order line through the receipt already scopes
+        /// this to the PO, so no extra receipt-side filtering is applied.
         /// </summary>
         private void LoadActualComponents(
             int C_Order_ID, Dictionary<string, LandedCostComponentData> map)
         {
             try
             {
+                // The receipt line lives on the allocation, and on the landed cost
+                // itself in schemas that carry it there — guarded so the column is
+                // only referenced where it exists.
+                string inOutLineExpr = ColumnExists("C_LandedCost", "M_InOutLine_ID")
+                    ? "NVL(lca.M_InOutLine_ID, lc.M_InOutLine_ID)"
+                    : "lca.M_InOutLine_ID";
+
                 string sql = @"SELECT lc.M_CostElement_ID      AS CostElementId,
                                       lc.LandedCostDistribution AS DistCode,
                                       MAX(NVL(ce.Name, NVL(ch.Name, lc.Description)))                       AS ComponentName,
@@ -1608,37 +1792,26 @@ namespace VASLogic.Models
                                       MAX(inv.DocumentNo)       AS InvoiceNo,
                                       MAX(inv.InvoiceReference) AS InvoiceReference,
                                       MAX(inv.DateInvoiced)     AS LatestInvoiceDate
-                                 FROM C_LandedCostAllocation lca
-                                 INNER JOIN C_LandedCost lc
-                                        ON (lc.C_LandedCost_ID = lca.C_LandedCost_ID
-                                            AND lc.IsActive = 'Y')
+                                 FROM C_LandedCost lc
+                                 INNER JOIN C_InvoiceLine il
+                                        ON (il.C_InvoiceLine_ID = lc.C_InvoiceLine_ID)
+                                 INNER JOIN C_Invoice inv
+                                        ON (inv.C_Invoice_ID = il.C_Invoice_ID
+                                            AND inv.DocStatus IN ('CO', 'CL'))
+                                 INNER JOIN C_LandedCostAllocation lca
+                                        ON (lca.C_LandedCost_ID = lc.C_LandedCost_ID)
                                  INNER JOIN M_InOutLine iol
-                                        ON (iol.M_InOutLine_ID = lca.M_InOutLine_ID
-                                            AND iol.IsActive = 'Y')
-                                 INNER JOIN M_InOut io
-                                        ON (io.M_InOut_ID = iol.M_InOut_ID
-                                            AND io.IsActive = 'Y'
-                                            AND io.IsSoTrx = 'N'
-                                            AND io.DocStatus IN ('CO', 'CL'))
+                                        ON (iol.M_InOutLine_ID = " + inOutLineExpr + @")
                                  INNER JOIN C_OrderLine ol
                                         ON (ol.C_OrderLine_ID = iol.C_OrderLine_ID
                                             AND ol.C_Order_ID = @C_Order_ID)
-                                 LEFT OUTER JOIN C_InvoiceLine il
-                                        ON (il.C_InvoiceLine_ID = NVL(lca.C_InvoiceLine_ID,
-                                                                      NVL(lc.C_InvoiceLine_ID, lc.Ref_InvoiceLine_ID))
-                                            AND il.IsActive = 'Y')
-                                 INNER JOIN C_Invoice inv
-                                        ON (inv.C_Invoice_ID = il.C_Invoice_ID
-                                            AND inv.IsActive = 'Y'
-                                            AND inv.IsSoTrx = 'N'
-                                            AND inv.DocStatus IN ('CO', 'CL'))
                                  LEFT OUTER JOIN C_BPartner bp
                                         ON (bp.C_BPartner_ID = inv.C_BPartner_ID)
                                  LEFT OUTER JOIN M_CostElement ce
                                         ON (ce.M_CostElement_ID = NVL(lc.M_CostElement_ID, lca.M_CostElement_ID))
                                  LEFT OUTER JOIN C_Charge ch
                                         ON (ch.C_Charge_ID = il.C_Charge_ID)
-                                WHERE lca.IsActive = 'Y'
+                                WHERE il.C_Charge_ID IS NOT NULL
                                 GROUP BY lc.M_CostElement_ID, lc.LandedCostDistribution";
                 SqlParameter[] param = new SqlParameter[]
                 {
@@ -1648,7 +1821,7 @@ namespace VASLogic.Models
                 if (ds == null || ds.Tables.Count == 0) return;
                 foreach (DataRow r in ds.Tables[0].Rows)
                 {
-                    LandedCostComponentData c = GetOrAddComponent(
+                    LandedCostComponentData c = ResolveActualComponent(
                         map, Util.GetValueOfInt(r["CostElementId"]),
                         Util.GetValueOfString(r["DistCode"]));
 
@@ -1671,6 +1844,36 @@ namespace VASLogic.Models
                 // Non-fatal: keep the overview working, just drop actual costs.
                 _log.Severe("LoadActualComponents (C_Order_ID=" + C_Order_ID + "): " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// Finds the component an actual amount belongs to.
+        ///
+        /// Cost element + distribution first. Failing that, the actual is matched
+        /// on the DISTRIBUTION alone against a component that has no actual yet —
+        /// the agreed reconciliation joins expected to actual on the distribution,
+        /// and the landed cost (C_LandedCost) often carries a different cost
+        /// element than the expected cost, or none at all. Without this the actual
+        /// landed on a row of its own and the expected row read "awaiting invoice"
+        /// even though the cost had been invoiced. Only when neither matches does
+        /// a new component row appear.
+        /// </summary>
+        private LandedCostComponentData ResolveActualComponent(
+            Dictionary<string, LandedCostComponentData> map, int costElementId, string distCode)
+        {
+            string key = costElementId + "|" + (distCode ?? "");
+            LandedCostComponentData c;
+            if (map.TryGetValue(key, out c)) return c;
+
+            if (!string.IsNullOrEmpty(distCode))
+            {
+                foreach (LandedCostComponentData candidate in map.Values)
+                {
+                    if (candidate.DistributionCode == distCode && !candidate.ActualAmt.HasValue)
+                        return candidate;
+                }
+            }
+            return GetOrAddComponent(map, costElementId, distCode);
         }
 
         /// <summary>
@@ -1781,8 +1984,11 @@ namespace VASLogic.Models
             public int      C_OrderLine_ID { get; set; }
             public int      LineNo         { get; set; }
             public DateTime? ChangedOn     { get; set; }
+            public string   UpdatedByName  { get; set; }   // who made the change (C_OrderLineHistory.UpdatedBy)
+            public DateTime? DatePromised  { get; set; }   // snapshot expected delivery
             public decimal  QtyEntered     { get; set; }   // snapshot C_OrderLineHistory.QtyEntered (entered UOM)
             public decimal  QtyOrdered     { get; set; }
+            public decimal  QtyDelivered   { get; set; }   // snapshot received quantity
             public decimal  PriceActual    { get; set; }
             public decimal  LineNetAmt     { get; set; }
             public decimal  Discount       { get; set; }
@@ -1796,14 +2002,33 @@ namespace VASLogic.Models
 
         public class ActivityData
         {
-            public string    Type            { get; set; }   // note | grn | invoice | payment | approval | created
+            public string    Type            { get; set; }   // note | email | grn | invoice | payment | approval | created
             public int       CM_ChatEntry_ID { get; set; }
             public int       AD_User_ID      { get; set; }
             public string    UserName        { get; set; }   // actor
-            public string    Text            { get; set; }   // free text (notes only)
+            public string    Text            { get; set; }   // note text / e-mail subject
             public string    DocumentNo      { get; set; }   // related document (grn / invoice / payment)
             public int       Count           { get; set; }   // grn line count (0 otherwise)
             public DateTime? Created         { get; set; }
+
+            // E-mail (MailAttachment1) — the body is revealed on click.
+            public string    Body            { get; set; }
+            public string    MailTo          { get; set; }
+            public string    MailFrom        { get; set; }
+            public bool      IsMailSent      { get; set; }
+        }
+
+        /// <summary>An e-mail sent against the order (MailAttachment1).</summary>
+        public class EmailData
+        {
+            public int       MailAttachment1_ID { get; set; }
+            public string    Subject    { get; set; }   // Title
+            public string    Body       { get; set; }   // TextMsg
+            public string    MailTo     { get; set; }   // MailAddress
+            public string    MailFrom   { get; set; }   // MailAddressFrom
+            public bool      IsMailSent { get; set; }
+            public string    SentBy     { get; set; }   // CreatedBy
+            public DateTime? Created    { get; set; }
         }
 
         public class PurchaseOrderOverviewData
@@ -1887,6 +2112,7 @@ namespace VASLogic.Models
             public List<PurchaseOrderLineData> Lines     { get; set; }
             public List<NoteData>              Notes     { get; set; }
             public List<ActivityData>          Activity  { get; set; }
+            public List<EmailData>             Emails    { get; set; }
             public List<HistoryData>           History   { get; set; }
             public List<DocumentData>          Documents { get; set; }
 

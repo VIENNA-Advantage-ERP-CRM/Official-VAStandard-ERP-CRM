@@ -18,6 +18,25 @@
  *                        to a bottom rule when narrow). Panel keeps its own px
  *                        units and widget shadow, which the em-based overview
  *                        panels do not use.
+ *   VAI163   2026-07-28  Panel heading enlarged (20px -> 24px). Root is now an
+ *                        inline-size container that never scrolls horizontally,
+ *                        and the responsive rules moved from viewport @media to
+ *                        @container so the layout is correct in a narrow side
+ *                        panel at any browser zoom (80% included) — the old
+ *                        900px / 560px viewport breakpoints never matched there.
+ *   VAI163   2026-07-28  People block gains a heading and a per-name role caption
+ *                        (.MPC-vasrq-peopleLbl / -personRole / -personName). Line
+ *                        items gain the Attribute Set Instance sub-line
+ *                        (.MPC-vasrq-itattr) and ellipsis on the name / key cells.
+ *   VAI163   2026-07-28  Items / Activity / Notes tab bar replaced by stacked
+ *                        sections (.MPC-vasrq-lowerhead / -lowersec); the tab
+ *                        styles and the count badge are gone. Product-category
+ *                        chip replaced by a plain UOM cell (.MPC-vasrq-uom).
+ *   VAI163   2026-07-28  Priority tones now match the requisition window (urgent
+ *                        red / high orange / medium blue / low green / minor
+ *                        grey). Convert strip wraps instead of overflowing the
+ *                        panel. Added the line-items pager (.MPC-vasrq-pager) and
+ *                        the PO / GRN activity badges.
  ***********************************************************/
 
 .MPC-vasrq-root {
@@ -35,7 +54,17 @@
 
     position: relative;
     height: 100%;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
+    /* Never let the panel itself scroll horizontally (e.g. at 80% browser zoom);
+       the item table keeps its own inner overflow-x scroll when narrow. */
+    overflow-x: hidden;
+    /* The responsive rules below are @container, not @media: this is a side panel
+       a few hundred px wide, so the viewport width says nothing about how much
+       room it actually has. Anchoring them to the panel's own inline size is what
+       makes the layout correct at any browser zoom. */
+    container-type: inline-size;
     color: var(--rq-text);
     font-family: Roboto, "Segoe UI", Arial, sans-serif;
     box-sizing: border-box;
@@ -62,10 +91,14 @@
 .MPC-vasrq-ic svg { display:block }
 
 /* ---------- Priority pill ---------- */
+/* Tones mirror the colours the requisition window uses for PriorityRule:
+   urgent red, high orange, medium blue, low green, minor grey. */
 .MPC-vasrq-prio { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:5px 11px; font-size:12px; font-weight:700; line-height:1 }
+.MPC-vasrq-prio.urgent{background:#FAD7D7;color:#B44045}
 .MPC-vasrq-prio.high{background:#FCE3D2;color:#A8430F}
 .MPC-vasrq-prio.med{background:#E4F0FF;color:#0E5DA8}
-.MPC-vasrq-prio.low{background:#E9EDF1;color:#5A6B79}
+.MPC-vasrq-prio.low{background:#CCEFDD;color:#0C5D38}
+.MPC-vasrq-prio.minor{background:#E9EDF1;color:#5A6B79}
 
 /* ---------- Header — title strip ---------- */
 /* Untinted strip carrying the title + subtitle and the priority / type /
@@ -74,7 +107,8 @@
 .MPC-vasrq-hdr { border-radius:14px; padding:14px 16px }
 .MPC-vasrq-hdrTop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px }
 .MPC-vasrq-hdrTitleWrap { min-width:0 }
-.MPC-vasrq-hdrTitle { font-size:20px; font-weight:700; color:var(--rq-text); line-height:1.15 }
+/* Panel heading — enlarged 20px -> 24px so it reads as the section title. */
+.MPC-vasrq-hdrTitle { font-size:24px; font-weight:700; color:var(--rq-text); line-height:1.15 }
 .MPC-vasrq-hdrSub { font-size:12px; color:var(--rq-text-2); margin-top:4px }
 .MPC-vasrq-hdrPills { flex:none; display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px }
 
@@ -87,22 +121,31 @@
 .MPC-vasrq-fLabel { font-size:10.5px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:var(--rq-text-muted); line-height:1.3 }
 .MPC-vasrq-fVal { font-size:13px; font-weight:600; color:var(--rq-text); line-height:1.35; margin-top:2px }
 .MPC-vasrq-srcName { font-size:16px; font-weight:700; color:var(--rq-text); margin-top:3px }
-.MPC-vasrq-srcRoute { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--rq-text-2); margin-top:5px }
-.MPC-vasrq-srcRoute .MPC-vasrq-ic { color:var(--rq-primary) }
-.MPC-vasrq-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:9px }
-.MPC-vasrq-personBit { display:inline-flex; align-items:center; gap:7px }
-.MPC-vasrq-personBit .MPC-vasrq-ic { color:var(--rq-primary) }
+/* .MPC-vasrq-srcRoute removed with the duplicated requester-warehouse line. */
+.MPC-vasrq-peopleLbl { margin-top:11px }
+.MPC-vasrq-srcPeople { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color:var(--rq-text); margin-top:4px }
+.MPC-vasrq-personBit { display:inline-flex; align-items:baseline; gap:7px; min-width:0 }
+.MPC-vasrq-personBit .MPC-vasrq-ic { color:var(--rq-primary); align-self:center }
+/* Role reads as a quiet caption; the name carries the weight. */
+.MPC-vasrq-personRole { color:var(--rq-text-muted); font-size:11px; font-weight:700;
+    letter-spacing:.3px; text-transform:uppercase; white-space:nowrap; flex:none }
+.MPC-vasrq-personName { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .MPC-vasrq-hdrField { min-width:0 }
 
 /* ---------- Convert strip ---------- */
-.MPC-vasrq-convert { display:flex; align-items:center; justify-content:space-between; gap:14px;
+/* The strip must wrap inside the panel. It used to be a single non-wrapping flex
+   row with flex:none actions, so three buttons that cannot shrink pushed straight
+   past the panel's right edge. */
+.MPC-vasrq-convert { display:flex; align-items:center; justify-content:space-between;
+    gap:10px 14px; flex-wrap:wrap;
     background:linear-gradient(180deg,rgba(230,243,252,0.55),rgba(245,250,253,0.7));
     border:1px solid var(--rq-border); border-radius:12px; padding:10px 14px; margin-bottom:13px }
-.MPC-vasrq-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px }
-.MPC-vasrq-cvnote .MPC-vasrq-ok { color:var(--rq-success-tx); display:flex }
-.MPC-vasrq-cvactions { display:flex; gap:9px; flex:none; flex-wrap:wrap }
+.MPC-vasrq-cvnote { font-size:12.5px; color:var(--rq-text-2); display:flex; align-items:center; gap:7px;
+    min-width:0; flex:1 1 auto }
+.MPC-vasrq-cvnote .MPC-vasrq-ok { color:var(--rq-success-tx); display:flex; flex:none }
+.MPC-vasrq-cvactions { display:flex; gap:9px; flex:0 1 auto; flex-wrap:wrap; justify-content:flex-end; min-width:0 }
 .MPC-vasrq-btn { height:34px; padding:0 15px; border-radius:999px; font-size:13px; font-weight:500; font-family:inherit;
-    cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap }
+    cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; max-width:100% }
 .MPC-vasrq-btn.primary { background:var(--rq-action); color:#fff; border:none }
 .MPC-vasrq-btn.primary:hover:not(:disabled) { background:#0069AE }
 .MPC-vasrq-btn.secondary { background:#fff; color:var(--rq-primary); border:1px solid var(--rq-action) }
@@ -155,31 +198,34 @@
 .MPC-vasrq-ssub2 { margin-top:2px; font-size:10.5px; color:var(--rq-text-muted) }
 .MPC-vasrq-step.active .MPC-vasrq-ssub2 { color:var(--nf); font-weight:700 }
 
-/* ---------- Tabs ---------- */
-.MPC-vasrq-tabbar { display:flex; border-bottom:1px solid var(--rq-border); gap:0; flex-wrap:wrap }
-.MPC-vasrq-tab { display:flex; align-items:center; gap:8px; padding:12px 16px; cursor:pointer; background:none; border:none;
-    border-bottom:2px solid transparent; font-family:inherit; font-size:14px; letter-spacing:.25px; color:#141414 }
-.MPC-vasrq-tab .MPC-vasrq-tic { display:flex; color:#586575 }
-.MPC-vasrq-tab:hover { color:#0069AE } .MPC-vasrq-tab:hover .MPC-vasrq-tic { color:#0069AE }
-.MPC-vasrq-badge { height:20px; min-width:28px; padding:0 8px; border-radius:999px; background:var(--rq-primary); color:#fff;
-    font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center }
-.MPC-vasrq-tab.active { border-bottom-color:#141414; font-weight:500 }
-.MPC-vasrq-tab.active .MPC-vasrq-tic { color:var(--rq-primary) }
-.MPC-vasrq-tabbody { padding-top:14px }
-.MPC-vasrq-tabpanel { display:none } .MPC-vasrq-tabpanel.show { display:block; animation:MPC-vasrq-fade .25s ease both }
+/* ---------- Lower region (Items / Activity / Notes, stacked) ---------- */
+/* Replaced the Items / Activity / Notes tab bar: all three are sections down the
+   panel now, so Activity and Notes are visible without a click. */
+.MPC-vasrq-lowerhead { margin-top:16px }
+.MPC-vasrq-lowersec { margin-bottom:2px; animation:MPC-vasrq-fade .25s ease both }
 @keyframes MPC-vasrq-fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
 
 /* ---------- Items ---------- */
 .MPC-vasrq-items { background:#fff; border:1px solid var(--rq-border); border-radius:13px; overflow:hidden; box-shadow:var(--rq-widget-shadow) }
 .MPC-vasrq-itrow { display:grid; grid-template-columns:2.2fr 1fr 0.6fr 1.2fr 1fr 1fr; align-items:center; padding:9px 14px; gap:10px }
+/* Grid items default to min-width:auto, which blocks the ellipsis on the cells
+   below from ever kicking in. */
+.MPC-vasrq-itrow > * { min-width:0 }
 .MPC-vasrq-ithead { background:var(--rq-faint-blue); font-size:12px; color:var(--rq-text-muted); border-bottom:1px solid var(--rq-border) }
 .MPC-vasrq-itbody { font-size:13.5px; border-bottom:1px solid var(--rq-divider) }
 .MPC-vasrq-itbody:last-of-type { border-bottom:none }
 .MPC-vasrq-itbody:hover { background:#FAFCFE }
-.MPC-vasrq-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2 }
-.MPC-vasrq-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px }
+.MPC-vasrq-itname { font-weight:700; color:var(--rq-text); font-size:13.5px; line-height:1.2;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.MPC-vasrq-itsku { font-size:11px; color:var(--rq-text-muted); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* Attribute Set Instance sub-line (lot / serial / size ...). */
+.MPC-vasrq-itattr { font-size:11px; color:var(--rq-text-2); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .MPC-vasrq-items .ta-r { text-align:right } .MPC-vasrq-items .ta-c { text-align:center }
-.MPC-vasrq-cat { display:inline-block; font-size:11px; padding:3px 8px; border-radius:6px; background:#EEF3F8; color:#5A6B79; font-weight:500 }
+/* Unit of measure cell (replaced the product-category chip). */
+.MPC-vasrq-uom { display:inline-block; font-size:12.5px; color:var(--rq-text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .MPC-vasrq-src { display:inline-flex; align-items:center; gap:6px; justify-content:flex-end; font-size:12.5px }
 .MPC-vasrq-src .MPC-vasrq-bar { width:40px; height:5px; border-radius:99px; background:#E7EEF4; overflow:hidden; flex:none }
 .MPC-vasrq-src .MPC-vasrq-bar i { display:block; height:100%; border-radius:99px }
@@ -192,6 +238,19 @@
 .MPC-vasrq-grand b { color:var(--rq-primary); margin-left:8px; font-size:16px }
 .MPC-vasrq-itempty { padding:20px 16px; text-align:center; color:var(--rq-text-muted); font-size:13px }
 
+/* ---------- Pager (line items) ---------- */
+/* Sibling of the items box, not a child: that box takes its own horizontal
+   scroll on narrow panels and the controls must stay put. */
+.MPC-vasrq-pager { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+    gap:8px 14px; margin-top:9px; font-size:12px; color:var(--rq-text-muted) }
+.MPC-vasrq-pgCtrls { display:inline-flex; align-items:center; gap:8px }
+.MPC-vasrq-pgPos { color:var(--rq-text); font-weight:700 }
+.MPC-vasrq-pgBtn { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--rq-border);
+    border-radius:999px; background:#fff; padding:5px 12px; color:var(--rq-primary);
+    font-weight:700; line-height:1; cursor:pointer; user-select:none; white-space:nowrap }
+.MPC-vasrq-pgBtn:hover { background:var(--rq-faint-blue); border-color:var(--rq-action) }
+.MPC-vasrq-pgBtn.is-disabled { opacity:.45; cursor:default; pointer-events:none; color:var(--rq-text-muted) }
+
 /* ---------- Activity ---------- */
 .MPC-vasrq-panelcard { background:var(--rq-glass-grad); border:2px solid #fff; border-radius:13px; padding:8px 18px; box-shadow:var(--rq-widget-shadow) }
 .MPC-vasrq-actrow { display:flex; align-items:flex-start; gap:10px; padding:9px 0 }
@@ -202,6 +261,9 @@
 .MPC-vasrq-actbadge.status { background:#E4F5EC; color:#0C5D38 }
 .MPC-vasrq-actbadge.comment { background:#EFEAFF; color:#5F4AA6 }
 .MPC-vasrq-actbadge.link { background:#E0F2F1; color:#0B7A6B }
+/* Downstream lifecycle documents. */
+.MPC-vasrq-actbadge.po  { background:#E4F0FF; color:#0E5DA8 }
+.MPC-vasrq-actbadge.grn { background:#CCEFDD; color:#0C5D38 }
 .MPC-vasrq-actmain { flex:1; min-width:0 }
 .MPC-vasrq-atwrap { display:flex; justify-content:space-between; gap:12px; align-items:baseline }
 .MPC-vasrq-at { font-size:13.5px; color:var(--rq-text) }
@@ -212,26 +274,53 @@
 .MPC-vasrq-notesbody { font-size:13.5px; color:var(--rq-text); line-height:1.55 }
 .MPC-vasrq-notesbody p { margin:0 } .MPC-vasrq-notesbody p + p { margin-top:9px }
 
+/* ---------- Toast (convert-action feedback) ---------- */
+.MPC-vasrq-toast {
+    position:absolute; left:50%; bottom:16px; transform:translate(-50%, 12px);
+    max-width:90%; padding:8px 14px; border-radius:8px;
+    background:#102C3F; color:#fff; font-size:13px; line-height:1.4;
+    box-shadow:0 6px 18px rgba(16,44,63,0.25);
+    opacity:0; z-index:1000; pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+}
+.MPC-vasrq-toast.show { opacity:1; transform:translate(-50%, 0) }
+.MPC-vasrq-toast.err  { background:#B23636 }
+.MPC-vasrq-toast.ok   { background:#0C5D38 }
+
+/* Disabled convert buttons still need to read as deliberately unavailable. */
+.MPC-vasrq-btn:disabled { opacity:.45; cursor:default }
+
 /* ---------- Reveal ---------- */
-.MPC-vasrq-hdr,.MPC-vasrq-hdrCard,.MPC-vasrq-convert,.MPC-vasrq-stats,.MPC-vasrq-stepper,.MPC-vasrq-tabbar { animation:MPC-vasrq-rise .4s ease both }
+.MPC-vasrq-hdr,.MPC-vasrq-hdrCard,.MPC-vasrq-convert,.MPC-vasrq-stats,.MPC-vasrq-stepper { animation:MPC-vasrq-rise .4s ease both }
 @keyframes MPC-vasrq-rise { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 900px) {
-    .MPC-vasrq-hdrCard { grid-template-columns:1fr }
-    .MPC-vasrq-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
+/* Container queries, measured against .MPC-vasrq-root's own width. The former
+   @media breakpoints (900px / 560px) were viewport-based: in a ~400px side panel
+   on a desktop screen they never matched, so the six-column item row and the
+   four-up stat strip stayed crammed at every zoom level. Breakpoints are aligned
+   with VAS_099_OverviewGRN so the two panels collapse at the same widths. */
+@container (max-width: 620px) {
     .MPC-vasrq-stats { grid-template-columns:repeat(2,1fr) }
-    .MPC-vasrq-hdrTop { flex-direction:column }
-    .MPC-vasrq-hdrPills { justify-content:flex-start }
     .MPC-vasrq-itrow { grid-template-columns:1.8fr 1fr 0.6fr 1.1fr; }
     .MPC-vasrq-itrow > :nth-child(5), .MPC-vasrq-itrow > :nth-child(6) { display:none }
 }
-@media (max-width: 560px) {
+@container (max-width: 460px) {
+    .MPC-vasrq-hdrCard { grid-template-columns:1fr }
+    .MPC-vasrq-hdrColL { border-right:none; padding-right:0; border-bottom:1px solid var(--rq-divider); padding-bottom:12px }
+    .MPC-vasrq-hdrTop { flex-direction:column }
+    .MPC-vasrq-hdrPills { justify-content:flex-start }
+}
+@container (max-width: 400px) {
     .MPC-vasrq-stats { grid-template-columns:1fr }
     .MPC-vasrq-convert { flex-direction:column; align-items:stretch }
+    /* Last resort: let the four remaining item columns scroll rather than crush. */
+    .MPC-vasrq-items { overflow-x:auto; overflow-y:hidden }
+    .MPC-vasrq-itrow { min-width:360px }
 }
 
 /* ---------- RTL ---------- */
 /* Mirrors the header column divider only; the rest of this panel has no RTL
    overrides yet. */
 [dir="rtl"] .MPC-vasrq-hdrColL { border-right:none; border-left:1px solid var(--rq-divider); padding-right:0; padding-left:20px }
+[dir="rtl"] .MPC-vasrq-pgBtn .MPC-vasrq-ic svg { transform:scaleX(-1) }

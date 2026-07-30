@@ -537,6 +537,14 @@ namespace VAS.Models
                     hasReqLines = true;
             }
 
+            // VAI163 2026-07-29: the reference can also be a VA075 service work
+            // order, not just a requisition. When it is, every line created here
+            // stores it in VA075_WorkOrder_ID — that is what lets the Inventory Use
+            // overview panel show the work order instead of reading "Manual Issue".
+            int VA075_WorkOrder_ID = 0;
+            if (!hasReqLines && !string.IsNullOrEmpty(RefNo))
+                VA075_WorkOrder_ID = GetVA075WorkOrderID(RefNo);
+
             try
             {
                 if (lstInventoryLines != null)
@@ -564,6 +572,10 @@ namespace VAS.Models
                         lines.Set_Value("C_UOM_ID", lstInventoryLines[i].UOMId);
                         lines.SetC_Charge_ID(_charge);
                         lines.CartInventoryForm = true;
+                        if (VA075_WorkOrder_ID > 0 && lines.Get_ColumnIndex("VA075_WorkOrder_ID") >= 0)
+                        {
+                            lines.Set_Value("VA075_WorkOrder_ID", VA075_WorkOrder_ID);
+                        }
                         if (hasReqLines)
                         {
                             if (sbLine.Length > 0)
@@ -621,6 +633,34 @@ namespace VAS.Models
                 }
             }
             return msg;
+        }
+
+        /// <summary>
+        /// VAI163-Returns the VA075 service work order carrying this document no,
+        /// or 0 when the reference is not a work order (or the VA075 module is not
+        /// installed). Used to stamp VA075_WorkOrder_ID on Inventory Use lines
+        /// created against a work order.
+        /// </summary>
+        /// <param name="documentNo">Reference document no entered on the cart.</param>
+        /// <returns>VA075_WorkOrder_ID, or 0.</returns>
+        private int GetVA075WorkOrderID(string documentNo)
+        {
+            if (!Env.IsModuleInstalled("VA075_")) return 0;
+            try
+            {
+                SqlParameter[] param = new SqlParameter[1];
+                param[0] = new SqlParameter("@param1", documentNo);
+                return Util.GetValueOfInt(DB.ExecuteScalar(
+                    "SELECT MAX(VA075_WorkOrder_ID) FROM VA075_WorkOrder WHERE DocumentNo=@param1 AND IsActive='Y'",
+                    param, null));
+            }
+            catch (Exception ex)
+            {
+                // Not a work order reference (or no such table) — the line simply
+                // keeps no work order link.
+                _log.Info("GetVA075WorkOrderID (" + documentNo + "): " + ex.Message);
+                return 0;
+            }
         }
 
         /// <summary>
