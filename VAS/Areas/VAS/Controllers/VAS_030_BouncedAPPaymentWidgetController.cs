@@ -664,6 +664,12 @@ AND Payment.AD_Client_ID =
 
 AND Payment.IsReceipt = 'N'
 
+AND Payment.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+
 AND Payment.TenderType = 'K'
 
 " + bouncedStatusFilter;
@@ -984,6 +990,12 @@ AND Payment.AD_Client_ID =
 
 AND Payment.IsReceipt = 'N'
 
+AND Payment.DocStatus IN
+(
+    'CO',
+    'CL'
+)
+
 AND Payment.TenderType = 'K'
 
 " + bouncedStatusFilter;
@@ -1247,9 +1259,16 @@ AND Payment.VA009_ExecutionStatus IN
             string columnName
         )
         {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + columnName
+                    + " AS DATE) + 1";
+            }
+
             return "CAST("
                 + columnName
-                + " AS DATE) + 1";
+                + " AS DATE) + INTERVAL '1 DAY'";
         }
 
         private bool HasPaymentExecutionStatusColumn()

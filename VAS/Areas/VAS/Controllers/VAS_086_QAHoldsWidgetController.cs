@@ -26,9 +26,6 @@ namespace VIS.Controllers
     /// </summary>
     public class VAS_086_QAHoldsWidgetController : Controller
     {
-        private const string ActualWorkingFine = "Working Fine";
-        private const string ActualNotSatisfactory = "Not Satisfactory";
-
         /// <summary>
         /// One page of unresolved QA holds for vendor GRN confirmation lines.
         /// </summary>
@@ -51,7 +48,7 @@ namespace VIS.Controllers
 
             if (pageNo <= 0) { pageNo = 1; }
             if (pageSize <= 0) { pageSize = 5; }
-            if (pageSize > 5) { pageSize = 5; }
+            if (pageSize > 50) { pageSize = 50; }
 
             string schemaMessage;
             if (!HasRequiredQASchema(out schemaMessage))
@@ -70,6 +67,28 @@ namespace VIS.Controllers
 
             int offset = (pageNo - 1) * pageSize;
 
+            string lineConfirmTable = GetQATableName("M_InOutLineConfirm");
+            string confirmTable = GetQATableName("M_InOutConfirm");
+            string inOutLineTable = GetQATableName("M_InOutLine");
+            string inOutTable = GetQATableName("M_InOut");
+            string bPartnerTable = GetQATableName("C_BPartner");
+            string productTable = GetQATableName("M_Product");
+            string qaTable = GetQATableName("VA010_ShipConfParameters");
+            string testParamTable = GetQATableName("VA010_TestParameter");
+            string acceptableTable = GetQATableName("VA010_TestPrmtrList");
+
+            string testParamDisplayColumn = FindDisplayColumn(testParamTable, new[] { "VA010_TestPrmtrName", "Name", "Description", "Value" });
+            string acceptableDisplayColumn = FindDisplayColumn(acceptableTable, new[] { "VA010_ParameterValue", "Name", "Description", "Value" });
+
+            string testParamNameExpr = !string.IsNullOrEmpty(testParamDisplayColumn) ? "TestParam." + testParamDisplayColumn : "CAST(NULL AS VARCHAR(255))";
+            string acceptableNameExpr = !string.IsNullOrEmpty(acceptableDisplayColumn) ? "AcceptableVal." + acceptableDisplayColumn : "CAST(NULL AS VARCHAR(255))";
+            string testParamJoin = !string.IsNullOrEmpty(testParamDisplayColumn)
+                ? "LEFT OUTER JOIN " + testParamTable + " TestParam ON (TestParam.VA010_TestParameter_ID=QAParam.VA010_TestParameter_ID AND TestParam.IsActive='Y')"
+                : "";
+            string acceptableJoin = !string.IsNullOrEmpty(acceptableDisplayColumn)
+                ? "LEFT OUTER JOIN " + acceptableTable + " AcceptableVal ON (AcceptableVal.VA010_TestPrmtrList_ID=QAParam.VA010_TestPrmtrList_ID AND AcceptableVal.IsActive='Y')"
+                : "";
+
             string holdSql = @"
                 SELECT LineConfirm.M_InOutLineConfirm_ID AS GRN_Confirmation_Line_ID,
                        QAParam.VA010_ShipConfParameters_ID AS QA_Record_ID,
@@ -81,27 +100,34 @@ namespace VIS.Controllers
                        QAParam.M_Product_ID AS QA_Product_ID,
                        QAParam.VA010_QuantityToVerify AS Quantity_To_Verify,
                        QAParam.VA010_TestParameter_ID AS Test_Parameter_ID,
+                       " + testParamNameExpr + @" AS Test_Parameter_Name,
                        QAParam.VA010_TestPrmtrList_ID AS Acceptable_Value_ID,
+                       " + acceptableNameExpr + @" AS Acceptable_Value_Name,
                        QAParam.VA010_QAQCDate AS QA_QC_Date,
                        QAParam.Remark AS Description,
                        QAParam.VA010_ActualValue AS Actual_Value,
                        LineConfirm.ConfirmationNo AS Confirmation_No,
                        InOutLine.Line AS Line_No,
                        COALESCE(QAProduct.Name, Product.Name) AS Product_Name
-                FROM M_InOutLineConfirm LineConfirm
-                INNER JOIN M_InOutConfirm Confirm ON (Confirm.M_InOutConfirm_ID=LineConfirm.M_InOutConfirm_ID AND Confirm.IsActive='Y')
-                INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID AND InOutLine.IsActive='Y')
-                INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
-                INNER JOIN C_BPartner BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
-                INNER JOIN M_Product Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
-                LEFT OUTER JOIN VA010_ShipConfParameters QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y' AND QAParam.AD_Client_ID=@QA_AD_Client_ID)
-                LEFT OUTER JOIN M_Product QAProduct ON (QAProduct.M_Product_ID=QAParam.M_Product_ID AND QAProduct.IsActive='Y')
+                FROM " + lineConfirmTable + @" LineConfirm
+                INNER JOIN " + confirmTable + @" Confirm ON (Confirm.M_InOutConfirm_ID=LineConfirm.M_InOutConfirm_ID AND Confirm.IsActive='Y')
+                INNER JOIN " + inOutLineTable + @" InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID AND InOutLine.IsActive='Y')
+                INNER JOIN " + inOutTable + @" InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
+                INNER JOIN " + bPartnerTable + @" BPartner ON (BPartner.C_BPartner_ID=InOut.C_BPartner_ID AND BPartner.IsActive='Y')
+                INNER JOIN " + productTable + @" Product ON (Product.M_Product_ID=InOutLine.M_Product_ID AND Product.IsActive='Y')
+                LEFT OUTER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y' AND QAParam.AD_Client_ID=@QA_AD_Client_ID)
+                LEFT OUTER JOIN " + productTable + @" QAProduct ON (QAProduct.M_Product_ID=QAParam.M_Product_ID AND QAProduct.IsActive='Y')
+                " + testParamJoin + @"
+                " + acceptableJoin + @"
                 WHERE LineConfirm.IsActive='Y'
                   AND LineConfirm.AD_Client_ID=@AD_Client_ID
                   AND InOut.IsSOTrx='N'
                   AND InOut.MovementType='V+'
                   AND LineConfirm.VA010_QualCheckMArk='Y'
-                  AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='')";
+                  AND (QAParam.VA010_ActualValue IS NULL OR QAParam.VA010_ActualValue='')
+                  AND COALESCE(Confirm.Processed,'N')<>'Y'
+                  AND COALESCE(Confirm.IsApproved,'N')='N'
+                  AND COALESCE(Confirm.DocStatus,'DR') IN ('DR','IP')";
 
             holdSql = MRole.GetDefault(ctx).AddAccessSQL(
                 holdSql,
@@ -121,7 +147,9 @@ namespace VIS.Controllers
                        HoldData.QA_Product_ID,
                        HoldData.Quantity_To_Verify,
                        HoldData.Test_Parameter_ID,
+                       HoldData.Test_Parameter_Name,
                        HoldData.Acceptable_Value_ID,
+                       HoldData.Acceptable_Value_Name,
                        HoldData.QA_QC_Date,
                        HoldData.Description,
                        HoldData.Actual_Value,
@@ -156,6 +184,8 @@ namespace VIS.Controllers
                     DateTime? qaQcDate = Util.GetValueOfDateTime(dr["QA_QC_Date"]);
                     int testParameterId = Util.GetValueOfInt(dr["Test_Parameter_ID"]);
                     int acceptableValueId = Util.GetValueOfInt(dr["Acceptable_Value_ID"]);
+                    string testParameterName = Util.GetValueOfString(dr["Test_Parameter_Name"]);
+                    string acceptableValueName = Util.GetValueOfString(dr["Acceptable_Value_Name"]);
                     int lineNo = Util.GetValueOfInt(dr["Line_No"]);
 
                     rows.Add(new
@@ -170,9 +200,9 @@ namespace VIS.Controllers
                         qaProductId = Util.GetValueOfInt(dr["QA_Product_ID"]),
                         quantityToVerify = Util.GetValueOfDecimal(dr["Quantity_To_Verify"]),
                         testParameterId = testParameterId,
-                        testParameter = FormatReferenceFallback(testParameterId),
+                        testParameter = !string.IsNullOrEmpty(testParameterName) ? testParameterName : FormatReferenceFallback(testParameterId),
                         acceptableValueId = acceptableValueId,
-                        acceptableValue = FormatReferenceFallback(acceptableValueId),
+                        acceptableValue = !string.IsNullOrEmpty(acceptableValueName) ? acceptableValueName : FormatReferenceFallback(acceptableValueId),
                         qaQcDate = qaQcDate.HasValue ? qaQcDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "",
                         description = Util.GetValueOfString(dr["Description"]),
                         actualValue = Util.GetValueOfString(dr["Actual_Value"]),
@@ -206,10 +236,81 @@ namespace VIS.Controllers
         }
 
         /// <summary>
+        /// Value list of one test parameter (VA010_TestPrmtrList) for the QA
+        /// popup's Actual Value choice - the options come from the database
+        /// instead of a fixed pair of texts. Schema-guarded like the rest of
+        /// the widget so databases without the VA010 module return an empty
+        /// list (the client then falls back to its default options).
+        /// </summary>
+        /// <param name="testParameterId">VA010_TestParameter_ID of the record.</param>
+        /// <returns>JSON { rows[] } of valueId / valueName.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetTestParameterValues(int testParameterId = 0)
+        {
+            if (Session["ctx"] == null)
+            {
+                return Json(new { error = Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired" }, JsonRequestBehavior.AllowGet);
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+            List<object> rows = new List<object>();
+            if (testParameterId <= 0) { return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet); }
+
+            string listTable = GetQATableName("VA010_TestPrmtrList");
+            if (!HasTable(listTable))
+            {
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+
+            string displayColumn = FindDisplayColumn(listTable, new[] { "VA010_ParameterValue", "Name", "Description", "Value" });
+            if (string.IsNullOrEmpty(displayColumn))
+            {
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+
+            string sql = @"
+                SELECT ValueList.VA010_TestPrmtrList_ID AS Value_ID,
+                       ValueList." + displayColumn + @" AS Value_Name
+                FROM " + listTable + @" ValueList
+                WHERE ValueList.IsActive='Y'
+                  AND ValueList.AD_Client_ID=@AD_Client_ID
+                  AND ValueList.VA010_TestParameter_ID=@Test_Parameter_ID
+                ORDER BY ValueList." + displayColumn;
+
+            IDataReader dr = null;
+            try
+            {
+                dr = DB.ExecuteReader(sql, new SqlParameter[]
+                {
+                    new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                    new SqlParameter("@Test_Parameter_ID", testParameterId)
+                });
+                while (dr != null && dr.Read())
+                {
+                    rows.Add(new
+                    {
+                        valueId = Util.GetValueOfInt(dr["Value_ID"]),
+                        valueName = Util.GetValueOfString(dr["Value_Name"])
+                    });
+                }
+                return Json(JsonConvert.SerializeObject(new { rows = rows }), JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(JsonConvert.SerializeObject(new { error = ex.Message }), JsonRequestBehavior.AllowGet);
+            }
+            finally
+            {
+                if (dr != null) { dr.Close(); dr.Dispose(); }
+            }
+        }
+
+        /// <summary>
         /// Saves the QA actual value, QA/QC date and remark for one QA parameter record.
         /// </summary>
         /// <param name="qaRecordId">VA010_ShipConfParameters_ID.</param>
-        /// <param name="actualValue">Working Fine or Not Satisfactory.</param>
+        /// <param name="actualValue">A value from the parameter's value list.</param>
         /// <param name="qaQcDate">QA/QC date in yyyy-MM-dd format.</param>
         /// <param name="description">Optional QA note.</param>
         /// <returns>JSON { success, updated } or { error }.</returns>
@@ -234,8 +335,12 @@ namespace VIS.Controllers
                 return Json(new { error = "QA inspection record is missing." });
             }
 
+            // VA010_ActualValue is a Table reference (VARCHAR2(10)) that stores the
+            // chosen VA010_TestPrmtrList_ID, not free text - the actual value must be
+            // one of the record's test-parameter values (validated below).
             actualValue = (actualValue ?? "").Trim();
-            if (actualValue != ActualWorkingFine && actualValue != ActualNotSatisfactory)
+            int actualValueId;
+            if (!int.TryParse(actualValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out actualValueId) || actualValueId <= 0)
             {
                 return Json(new { error = "Select a valid QA actual value." });
             }
@@ -254,7 +359,7 @@ namespace VIS.Controllers
             Ctx ctx = Session["ctx"] as Ctx;
 
             string sql = @"
-                UPDATE VA010_ShipConfParameters
+                UPDATE " + GetQATableName("VA010_ShipConfParameters") + @"
                 SET VA010_ActualValue=@ActualValue,
                     VA010_QAQCDate=@QAQCDate,
                     Remark=@Description,
@@ -266,7 +371,7 @@ namespace VIS.Controllers
 
             SqlParameter[] parameters =
             {
-                new SqlParameter("@ActualValue", actualValue),
+                new SqlParameter("@ActualValue", actualValueId.ToString(CultureInfo.InvariantCulture)),
                 new SqlParameter("@QAQCDate", qaDateValue),
                 new SqlParameter("@Description", string.IsNullOrWhiteSpace(description) ? (object)DBNull.Value : description.Trim()),
                 new SqlParameter("@UpdatedBy", ctx.GetAD_User_ID()),
@@ -279,6 +384,11 @@ namespace VIS.Controllers
                 if (!CanUpdateQARecord(ctx, qaRecordId))
                 {
                     return Json(new { error = "QA inspection record was not found." });
+                }
+
+                if (!IsValidActualValue(ctx, qaRecordId, actualValueId))
+                {
+                    return Json(new { error = "Select a valid QA actual value." });
                 }
 
                 int updated = DB.ExecuteQuery(sql, parameters);
@@ -297,17 +407,27 @@ namespace VIS.Controllers
 
         private bool CanUpdateQARecord(Ctx ctx, int qaRecordId)
         {
+            string lineConfirmTable = GetQATableName("M_InOutLineConfirm");
+            string confirmTable = GetQATableName("M_InOutConfirm");
+            string inOutLineTable = GetQATableName("M_InOutLine");
+            string inOutTable = GetQATableName("M_InOut");
+            string qaTable = GetQATableName("VA010_ShipConfParameters");
+
             string sql = @"
                 SELECT QAParam.VA010_ShipConfParameters_ID
-                FROM M_InOutLineConfirm LineConfirm
-                INNER JOIN VA010_ShipConfParameters QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
-                INNER JOIN M_InOutLine InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID AND InOutLine.IsActive='Y')
-                INNER JOIN M_InOut InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
+                FROM " + lineConfirmTable + @" LineConfirm
+                INNER JOIN " + qaTable + @" QAParam ON (QAParam.M_InOutLineConfirm_ID=LineConfirm.M_InOutLineConfirm_ID AND QAParam.IsActive='Y')
+                INNER JOIN " + confirmTable + @" Confirm ON (Confirm.M_InOutConfirm_ID=LineConfirm.M_InOutConfirm_ID AND Confirm.IsActive='Y')
+                INNER JOIN " + inOutLineTable + @" InOutLine ON (InOutLine.M_InOutLine_ID=LineConfirm.M_InOutLine_ID AND InOutLine.IsActive='Y')
+                INNER JOIN " + inOutTable + @" InOut ON (InOut.M_InOut_ID=InOutLine.M_InOut_ID AND InOut.IsActive='Y')
                 WHERE LineConfirm.IsActive='Y'
                   AND QAParam.VA010_ShipConfParameters_ID=@QARecordId
                   AND QAParam.AD_Client_ID=@AD_Client_ID
                   AND InOut.IsSOTrx='N'
-                  AND InOut.MovementType='V+'";
+                  AND InOut.MovementType='V+'
+                  AND COALESCE(Confirm.Processed,'N')<>'Y'
+                  AND COALESCE(Confirm.IsApproved,'N')='N'
+                  AND COALESCE(Confirm.DocStatus,'DR') IN ('DR','IP')";
 
             sql = MRole.GetDefault(ctx).AddAccessSQL(
                 sql,
@@ -325,22 +445,126 @@ namespace VIS.Controllers
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) == qaRecordId;
         }
 
+        /// <summary>
+        /// True when the chosen actual value is an active VA010_TestPrmtrList entry
+        /// belonging to the QA record's own test parameter (same client). The QA
+        /// actual value is a reference into that value list, so only its own values
+        /// are accepted.
+        /// </summary>
+        private bool IsValidActualValue(Ctx ctx, int qaRecordId, int actualValueId)
+        {
+            string qaTable = GetQATableName("VA010_ShipConfParameters");
+            string listTable = GetQATableName("VA010_TestPrmtrList");
+            if (!HasTable(listTable)) { return false; }
+
+            string sql = @"
+                SELECT COUNT(1)
+                FROM " + qaTable + @" QAParam
+                INNER JOIN " + listTable + @" ValueList
+                    ON (ValueList.VA010_TestParameter_ID=QAParam.VA010_TestParameter_ID AND ValueList.IsActive='Y')
+                WHERE QAParam.VA010_ShipConfParameters_ID=@QARecordId
+                  AND QAParam.AD_Client_ID=@AD_Client_ID
+                  AND QAParam.IsActive='Y'
+                  AND ValueList.VA010_TestPrmtrList_ID=@ActualValueId
+                  AND ValueList.AD_Client_ID=@AD_Client_ID";
+
+            SqlParameter[] parameters =
+            {
+                new SqlParameter("@QARecordId", qaRecordId),
+                new SqlParameter("@AD_Client_ID", ctx.GetAD_Client_ID()),
+                new SqlParameter("@ActualValueId", actualValueId)
+            };
+
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) > 0;
+        }
+
         private string FormatReferenceFallback(int id)
         {
             return id > 0 ? id.ToString(CultureInfo.InvariantCulture) : "";
+        }
+
+        private string GetQATableName(string tableName)
+        {
+            string owner = GetQASchemaOwner();
+            return string.IsNullOrEmpty(owner) ? tableName : owner + "." + tableName;
+        }
+
+        private string GetQASchemaOwner()
+        {
+            if (HasColumn("M_InOutLineConfirm", "VA010_QualCheckMArk") && HasTable("VA010_ShipConfParameters"))
+            {
+                return "";
+            }
+
+            if (DB.IsPostgreSQL())
+            {
+                return "";
+            }
+
+            string sql = @"
+                SELECT OwnerName
+                FROM (
+                    SELECT LineConfirmColumns.Owner AS OwnerName
+                    FROM ALL_TAB_COLUMNS LineConfirmColumns
+                    INNER JOIN ALL_TABLES QAParams
+                        ON QAParams.Owner=LineConfirmColumns.Owner
+                       AND QAParams.Table_Name='VA010_SHIPCONFPARAMETERS'
+                    WHERE LineConfirmColumns.Table_Name='M_INOUTLINECONFIRM'
+                      AND LineConfirmColumns.Column_Name='VA010_QUALCHECKMARK'
+                    ORDER BY CASE WHEN LineConfirmColumns.Owner=USER THEN 0 ELSE 1 END
+                )
+                WHERE ROWNUM=1";
+
+            string owner = Util.GetValueOfString(DB.ExecuteScalar(sql, null, null));
+            return IsSafeDbIdentifier(owner) ? owner : "";
+        }
+
+        private string FindDisplayColumn(string tableName, string[] columnNames)
+        {
+            for (int i = 0; i < columnNames.Length; i++)
+            {
+                if (HasColumn(tableName, columnNames[i]))
+                {
+                    return columnNames[i];
+                }
+            }
+
+            return "";
+        }
+
+        private bool IsSafeDbIdentifier(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                if (!char.IsLetterOrDigit(c) && c != '_')
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private bool HasRequiredQASchema(out string message)
         {
             message = "";
 
-            if (!HasTable("M_InOutLineConfirm"))
+            string lineConfirmTable = GetQATableName("M_InOutLineConfirm");
+            string qaTable = GetQATableName("VA010_ShipConfParameters");
+
+            if (!HasTable(lineConfirmTable))
             {
                 message = "M_InOutLineConfirm is not available.";
                 return false;
             }
 
-            if (!HasTable("VA010_ShipConfParameters"))
+            if (!HasTable(qaTable))
             {
                 message = "VA010 quality inspection schema is not available.";
                 return false;
@@ -379,7 +603,7 @@ namespace VIS.Controllers
 
             for (int i = 0; i < lineConfirmColumns.Length; i++)
             {
-                if (!HasColumn("M_InOutLineConfirm", lineConfirmColumns[i]))
+                if (!HasColumn(lineConfirmTable, lineConfirmColumns[i]))
                 {
                     message = "M_InOutLineConfirm." + lineConfirmColumns[i] + " is not available.";
                     return false;
@@ -388,7 +612,7 @@ namespace VIS.Controllers
 
             for (int i = 0; i < qaColumns.Length; i++)
             {
-                if (!HasColumn("VA010_ShipConfParameters", qaColumns[i]))
+                if (!HasColumn(qaTable, qaColumns[i]))
                 {
                     message = "VA010_ShipConfParameters." + qaColumns[i] + " is not available.";
                     return false;
@@ -400,6 +624,10 @@ namespace VIS.Controllers
 
         private bool HasTable(string tableName)
         {
+            string owner;
+            string name;
+            SplitTableName(tableName, out owner, out name);
+
             string sql;
             if (DB.IsPostgreSQL())
             {
@@ -410,18 +638,30 @@ namespace VIS.Controllers
             }
             else
             {
-                sql = @"
-                    SELECT COUNT(1)
-                    FROM USER_TABLES
-                    WHERE TABLE_NAME=UPPER(@TableName)";
+                sql = string.IsNullOrEmpty(owner)
+                    ? @"
+                        SELECT COUNT(1)
+                        FROM USER_TABLES
+                        WHERE TABLE_NAME=UPPER(@TableName)"
+                    : @"
+                        SELECT COUNT(1)
+                        FROM ALL_TABLES
+                        WHERE OWNER=UPPER(@Owner)
+                          AND TABLE_NAME=UPPER(@TableName)";
             }
 
-            SqlParameter[] parameters = { new SqlParameter("@TableName", tableName) };
+            SqlParameter[] parameters = string.IsNullOrEmpty(owner)
+                ? new SqlParameter[] { new SqlParameter("@TableName", name) }
+                : new SqlParameter[] { new SqlParameter("@Owner", owner), new SqlParameter("@TableName", name) };
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) > 0;
         }
 
         private bool HasColumn(string tableName, string columnName)
         {
+            string owner;
+            string name;
+            SplitTableName(tableName, out owner, out name);
+
             string sql;
             if (DB.IsPostgreSQL())
             {
@@ -433,19 +673,53 @@ namespace VIS.Controllers
             }
             else
             {
-                sql = @"
-                    SELECT COUNT(1)
-                    FROM USER_TAB_COLUMNS
-                    WHERE TABLE_NAME=UPPER(@TableName)
-                      AND COLUMN_NAME=UPPER(@ColumnName)";
+                sql = string.IsNullOrEmpty(owner)
+                    ? @"
+                        SELECT COUNT(1)
+                        FROM USER_TAB_COLUMNS
+                        WHERE TABLE_NAME=UPPER(@TableName)
+                          AND COLUMN_NAME=UPPER(@ColumnName)"
+                    : @"
+                        SELECT COUNT(1)
+                        FROM ALL_TAB_COLUMNS
+                        WHERE OWNER=UPPER(@Owner)
+                          AND TABLE_NAME=UPPER(@TableName)
+                          AND COLUMN_NAME=UPPER(@ColumnName)";
             }
 
-            SqlParameter[] parameters =
-            {
-                new SqlParameter("@TableName", tableName),
-                new SqlParameter("@ColumnName", columnName)
-            };
+            SqlParameter[] parameters = string.IsNullOrEmpty(owner)
+                ? new SqlParameter[]
+                {
+                    new SqlParameter("@TableName", name),
+                    new SqlParameter("@ColumnName", columnName)
+                }
+                : new SqlParameter[]
+                {
+                    new SqlParameter("@Owner", owner),
+                    new SqlParameter("@TableName", name),
+                    new SqlParameter("@ColumnName", columnName)
+                };
             return Util.GetValueOfInt(DB.ExecuteScalar(sql, parameters, null)) > 0;
+        }
+
+        private void SplitTableName(string tableName, out string owner, out string name)
+        {
+            owner = "";
+            name = tableName;
+
+            if (string.IsNullOrEmpty(tableName))
+            {
+                return;
+            }
+
+            int dotIndex = tableName.IndexOf('.');
+            if (dotIndex <= 0 || dotIndex >= tableName.Length - 1)
+            {
+                return;
+            }
+
+            owner = tableName.Substring(0, dotIndex);
+            name = tableName.Substring(dotIndex + 1);
         }
     }
 }

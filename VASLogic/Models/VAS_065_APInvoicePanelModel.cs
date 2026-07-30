@@ -238,7 +238,7 @@ namespace VASLogic.Models
             // amount to the invoice currency on the allocation accounting date, using the
             // allocation conversion type and org, before summing.
             string sql = @"SELECT COALESCE(SUM(ABS(
-                                 currencyConvert(al.Amount, ah.C_Currency_ID, i.C_Currency_ID,
+                                 currencyConvert((al.Amount + al.writeoffamt+al.discountamt), ah.C_Currency_ID, i.C_Currency_ID,
                                                  ah.DateAcct, i.C_ConversionType_ID,
                                                  ah.AD_Client_ID, ah.AD_Org_ID))), 0)
                              FROM C_AllocationLine al
@@ -637,19 +637,21 @@ namespace VASLogic.Models
                                INNER JOIN AD_ClientInfo ci ON (i.AD_Client_ID = ci.AD_Client_ID)
                                INNER JOIN C_AcctSchema acs ON (ci.C_AcctSchema1_ID = acs.C_AcctSchema_ID)
                                INNER JOIN C_LandedCostAllocation lca ON (il.m_inoutline_id  = lca.m_inoutline_id
-                               and lca.m_product_id = il.m_product_id and lca.m_attributesetinstance_id = il.m_attributesetinstance_id)
+                               AND lca.m_product_id = il.m_product_id AND NVL(lca.m_attributesetinstance_id, 0) = NVL(il.m_attributesetinstance_id, 0))
                                INNER JOIN c_invoiceline lcail ON (lcail.c_invoiceline_id = lca.c_invoiceline_id and lcail.vas_islandedcost = 'Y')
                                INNER JOIN c_invoice lcaci ON (lcail.c_invoice_id = lcaci.c_invoice_id)
                                INNER JOIN M_Product pr ON (il.M_Product_ID = pr.M_Product_ID)
-                               INNER JOIN C_UOM uom ON (il.C_UOM_ID     = uom.C_UOM_ID)
+                               INNER JOIN C_UOM uom ON (il.C_UOM_ID = uom.C_UOM_ID)
                                WHERE il.C_Invoice_ID = @C_Invoice_ID
                                  AND il.IsActive = 'Y'
                                  AND il.M_Product_ID IS NOT NULL
                                ORDER BY il.Line";
 
-                DataSet ds = DB.ExecuteDataset(sql,
-                    new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
-                if (ds == null || ds.Tables.Count == 0) return lc;
+                DataSet ds = DB.ExecuteDataset(sql, new SqlParameter[] { new SqlParameter("@C_Invoice_ID", C_Invoice_ID) }, null);
+                if (ds == null || ds.Tables.Count == 0)
+                {
+                    return lc;
+                }
 
                 decimal totPv = 0m, totLc = 0m, totIv = 0m;
                 // A single receipt line (M_InOutLine_ID) can receive landed cost from
@@ -860,6 +862,11 @@ namespace VASLogic.Models
             {
                 meta.NetOpenAmount = head.OpenAmount;
             }
+
+            // Nothing left to settle: the invoice is flagged paid or every pay schedule
+            // is marked paid (open amount consumed by payments / allocations). The modal
+            // uses this to render the New Payment section read-only.
+            meta.IsFullySettled = meta.NetOpenAmount <= 0m || (!head.IsAPCreditNote && head.IsPaid);
 
             // First page of on-account payments (server-side paged). The page rows are
             // converted for display; total count + "Available to apply" come from a
@@ -1277,7 +1284,7 @@ namespace VASLogic.Models
             // restricted to the orgs the role can access.
             string sql = @"SELECT pm.VA009_PaymentMethod_ID, pm.VA009_Name, pm.VA009_PaymentBaseType
                              FROM VA009_PaymentMethod pm
-                            WHERE pm.IsActive = 'Y'
+                            WHERE pm.IsActive = 'Y' AND pm.VA009_PaymentBaseType NOT IN ('B' , 'C')
                               AND pm.AD_Org_ID IN (0, @AD_Org_ID)
                             ORDER BY pm.VA009_Name";
             try
@@ -2056,6 +2063,7 @@ namespace VASLogic.Models
                 }
                 if (!processed)
                 {
+                    result.Message = payment.GetProcessMsg();
                     if (string.IsNullOrEmpty(result.Message))
                     {
                         result.Message = RetrieveErr(ctx, "VAS_065_PaymentCompleteFailed");
@@ -2529,6 +2537,9 @@ namespace VASLogic.Models
             public decimal Withholding { get; set; }
             public decimal NetPayable { get; set; }
             public decimal NetOpenAmount { get; set; }
+            // True when nothing is left to settle (invoice flagged paid or every pay
+            // schedule paid). The modal then shows the New Payment section read-only.
+            public bool IsFullySettled { get; set; }
             public decimal AvailableToApply { get; set; }
             public decimal CreditNoteAmount { get; set; }
             public decimal OpenInvoicesAvailable { get; set; }

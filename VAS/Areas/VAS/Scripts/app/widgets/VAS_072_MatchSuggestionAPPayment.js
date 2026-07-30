@@ -62,6 +62,8 @@
  * 54  | Close                                             | VAS_Close
  * 55  | High-confidence — safe to apply                   | VAS_072_HighConfidenceSafe
  * 56  | Skip                                              | VAS_072_Skip
+ * 57  | Document type                                     | VAS_072_DocumentType
+ * 58  | Return                                            | VAS_072_ReturnCycle
  * ──────────────────────────────────────────────────────────────────────────────
  */
 
@@ -94,6 +96,7 @@
         var $stateText = null;
         var $applyHigh = null;
         var $footerSummary = null;
+        var $showingText = null;
         var $pagerPrev = null;
         var $pagerNext = null;
         var $pagerText = null;
@@ -107,7 +110,7 @@
         var $reviewApply = null;
 
         var pageNo = 1;
-        var pageSize = 5;
+        var pageSize = 6;
         var totalPages = 0;
         var totalRecords = 0;
         var totalReadyAmount = 0;
@@ -126,8 +129,11 @@
         var activeActionRequest = null;
         var activeDetailRequest = null;
         var resizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
         var widgetRowHeight = 54;
         var widgetMinimumRows = 2;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = null;
@@ -267,8 +273,25 @@
             data,
             fallback
         ) {
+            var key;
+
             if (!data) {
                 return fallback || "";
+            }
+
+            key =
+                data.errorKey ||
+                data.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    data.error ||
+                    data.errorText ||
+                    data.message ||
+                    fallback ||
+                    ""
+                );
             }
 
             if (data.error) {
@@ -385,6 +408,30 @@
             return getContextPrecision();
         }
 
+        /**
+         * True when the session runs a right-to-left culture
+         * (Arabic/Farsi); the login sets dir on <html>.
+         */
+        function isRtl() {
+            return (
+                document.documentElement &&
+                document.documentElement.dir ===
+                "rtl"
+            );
+        }
+
+        /**
+         * Arrow that points the way the eye travels, so
+         * "payment leads to invoice" keeps agreeing with the
+         * order the two documents are laid out in. A fixed
+         * "→" contradicts itself once the UI flips.
+         */
+        function flowArrow() {
+            return isRtl()
+                ? "←"
+                : "→";
+        }
+
         function formatAmount(
             value,
             precision
@@ -494,15 +541,23 @@
                 row.currencyISOCode ||
                 "";
 
+            var numericValue =
+                toNumber(value, 0);
+
+            var sign =
+                numericValue < 0
+                    ? "-"
+                    : "";
+
             var amount =
                 formatAmount(
-                    value,
+                    Math.abs(numericValue),
                     getAmountPrecision(row)
                 );
 
             return symbol
-                ? symbol + " " + amount
-                : amount;
+                ? sign + symbol + amount
+                : sign + amount;
         }
 
         function renderRows(rows) {
@@ -546,6 +601,9 @@
                 var isHigh =
                     confidence === "HIGH";
 
+                var isReturnCycle =
+                    !!row.isReturnCycle;
+
                 var rowClass =
                     classPrefix +
                     "row" +
@@ -555,7 +613,28 @@
                             : " " +
                             classPrefix +
                             "row-review"
+                    ) +
+                    (
+                        isReturnCycle
+                            ? " " +
+                            classPrefix +
+                            "row-return"
+                            : ""
                     );
+
+                var returnTagHtml =
+                    isReturnCycle
+                        ? '<span class="' +
+                        classPrefix +
+                        'return-tag">' +
+                        escapeHtml(
+                            lbl(
+                                "VAS_072_ReturnCycle",
+                                "Return"
+                            )
+                        ) +
+                        "</span>"
+                        : "";
 
                 var confidenceClass =
                     classPrefix +
@@ -596,24 +675,40 @@
                         row.dueDate
                     );
 
-                var metaText =
+                /*
+                 * Built as markup rather than plain text so each
+                 * value can be isolated on its own: the separators
+                 * and labels then follow the reading direction while
+                 * the amount and the date keep their internal order.
+                 */
+                var metaHtml =
                     " · " +
-                    lbl(
-                        "VAS_072_Open",
-                        "Open"
+                    escapeHtml(
+                        lbl(
+                            "VAS_072_Open",
+                            "Open"
+                        )
                     ) +
-                    " " +
-                    invoiceOpenAmount;
+                    " <bdi>" +
+                    escapeHtml(
+                        invoiceOpenAmount
+                    ) +
+                    "</bdi>";
 
                 if (dueDate) {
-                    metaText +=
+                    metaHtml +=
                         " · " +
-                        lbl(
-                            "VAS_072_Due",
-                            "Due"
+                        escapeHtml(
+                            lbl(
+                                "VAS_072_Due",
+                                "Due"
+                            )
                         ) +
-                        " " +
-                        dueDate;
+                        " <bdi>" +
+                        escapeHtml(
+                            dueDate
+                        ) +
+                        "</bdi>";
                 }
 
                 var $row = $(
@@ -637,13 +732,22 @@
                         row.vendorName || ""
                     ) +
 
+                    /*
+                     * The separator belongs to the line, not to the
+                     * figure: keeping it outside the isolate lets it
+                     * sit between the vendor and the amount the way
+                     * the sentence reads, while the amount itself
+                     * stays a left-to-right token.
+                     */
                     '<span class="' +
                     classPrefix +
                     'amount"> · ' +
 
+                    "<bdi>" +
                     escapeHtml(
                         paymentAmount
                     ) +
+                    "</bdi>" +
 
                     "</span>" +
 
@@ -666,7 +770,9 @@
 
                     '<span class="' +
                     classPrefix +
-                    'arrow">→</span>' +
+                    'arrow">' +
+                    flowArrow() +
+                    "</span>" +
 
                     '<span class="' +
                     classPrefix +
@@ -685,9 +791,7 @@
                     classPrefix +
                     'meta">' +
 
-                    escapeHtml(
-                        metaText
-                    ) +
+                    metaHtml +
 
                     "</span>" +
 
@@ -697,6 +801,8 @@
                     '<div class="' +
                     classPrefix +
                     'actions">' +
+
+                    returnTagHtml +
 
                     '<span class="' +
                     confidenceClass +
@@ -758,6 +864,9 @@
 
                 $rows.append($row);
             }
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize(true);
         }
 
         function renderResult(data) {
@@ -865,12 +974,19 @@
 
             var displayAmount =
                 (
+                    Number(totalReadyAmount || 0) < 0
+                        ? "-"
+                        : ""
+                ) +
+                (
                     symbol
-                        ? symbol + " "
+                        ? symbol
                         : ""
                 ) +
                 formatAmount(
-                    totalReadyAmount,
+                    Math.abs(
+                        Number(totalReadyAmount || 0)
+                    ),
                     serverStdPrecision
                 );
 
@@ -904,20 +1020,40 @@
         }
 
         function updatePager() {
+            if ($showingText) {
+                var startIndex =
+                    totalRecords > 0
+                        ? ((pageNo - 1) * pageSize) + 1
+                        : 0;
+
+                var endIndex =
+                    totalRecords > 0
+                        ? Math.min(pageNo * pageSize, totalRecords)
+                        : 0;
+
+                $showingText.text(
+                    totalRecords > 0
+                        ? lbl("VAS_Showing", "Showing") + " " +
+                          startIndex + "–" + endIndex + " " +
+                          lbl("VAS_Of", "of") + " " + totalRecords
+                        : ""
+                );
+            }
+
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
             if ($pagerText) {
                 $pagerText.text(
-                    totalPages > 0
-                        ? (
-                            pageNo +
-                            " " +
-                            lbl(
-                                "VAS_Of",
-                                "of"
-                            ) +
-                            " " +
-                            totalPages
-                        )
-                        : ""
+                    pageNo +
+                    " " +
+                    lbl(
+                        "VAS_Of",
+                        "of"
+                    ) +
+                    " " +
+                    Math.max(1, totalPages)
                 );
             }
 
@@ -1132,7 +1268,9 @@
                     ) +
                     (
                         row.invoiceDocumentNo
-                            ? " → " +
+                            ? " " +
+                              flowArrow() +
+                              " " +
                               row.invoiceDocumentNo
                             : ""
                     )
@@ -1315,15 +1453,23 @@
                     ? detail.invoicePrecision
                     : detail.paymentPrecision;
 
+            var numericValue =
+                toNumber(value, 0);
+
+            var sign =
+                numericValue < 0
+                    ? "-"
+                    : "";
+
             var amount =
                 formatAmount(
-                    value,
+                    Math.abs(numericValue),
                     normalizePrecision(precision)
                 );
 
             return symbol
-                ? symbol + " " + amount
-                : amount;
+                ? sign + symbol + amount
+                : sign + amount;
         }
 
         function formatBankAccount(detail) {
@@ -1350,7 +1496,7 @@
                 bankName &&
                 last4
             ) {
-                return bankName + " · ****" + last4;
+                return bankName + " ****" + last4;
             }
 
             if (bankName) {
@@ -1566,7 +1712,9 @@
             var balanceText =
                 formatDetailAmount(
                     detail,
-                    Math.abs(balance),
+                    detail.isReturnCycle
+                        ? -Math.abs(balance)
+                        : Math.abs(balance),
                     "payment"
                 );
 
@@ -1591,6 +1739,13 @@
                 ) +
                 "</strong>" +
                 "</div>" +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_072_DocumentType",
+                        "Document type"
+                    ),
+                    detail.paymentDocTypeName
+                ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_PaymentDate",
@@ -1662,6 +1817,13 @@
                 ) +
                 "</strong>" +
                 "</div>" +
+                reviewPaneRow(
+                    lbl(
+                        "VAS_072_DocumentType",
+                        "Document type"
+                    ),
+                    detail.invoiceDocTypeName
+                ) +
                 reviewPaneRow(
                     lbl(
                         "VAS_072_InvoiceDate",
@@ -1818,7 +1980,9 @@
                     ) +
                     (
                         detail.dueDate
-                            ? " → " +
+                            ? " " +
+                              flowArrow() +
+                              " " +
                               formatDate(detail.dueDate)
                             : ""
                     )
@@ -1845,7 +2009,7 @@
             if ($reviewApply) {
                 $reviewApply
                     .text(
-                        balance > 0
+                        Math.abs(balance) > 0
                             ? lbl(
                                 "VAS_072_ApplyPartPayment",
                                 "Apply as part-payment"
@@ -1905,6 +2069,8 @@
                 payScheduleId <= 0
             ) {
                 VIS.ADialog.error(
+                    null,
+                    null,
                     lbl(
                         "VAS_072_ApplyError",
                         "Could not complete allocation"
@@ -1972,6 +2138,8 @@
                         );
 
                         VIS.ADialog.error(
+                            null,
+                            null,
                             message
                         );
 
@@ -1979,10 +2147,14 @@
                     }
 
                     VIS.ADialog.info(
-                        data.message ||
-                        lbl(
-                            "VAS_072_ApplySuccess",
-                            "Allocation completed successfully"
+                        null,
+                        null,
+                        getServerMessage(
+                            data,
+                            lbl(
+                                "VAS_072_ApplySuccess",
+                                "Allocation completed successfully"
+                            )
                         )
                     );
 
@@ -2026,6 +2198,8 @@
                     );
 
                     VIS.ADialog.error(
+                        null,
+                        null,
                         message
                     );
                 },
@@ -2102,6 +2276,8 @@
                         );
 
                         VIS.ADialog.error(
+                            null,
+                            null,
                             message
                         );
 
@@ -2109,10 +2285,14 @@
                     }
 
                     VIS.ADialog.info(
-                        data.message ||
-                        lbl(
-                            "VAS_072_ApplySuccess",
-                            "Allocation completed successfully"
+                        null,
+                        null,
+                        getServerMessage(
+                            data,
+                            lbl(
+                                "VAS_072_ApplySuccess",
+                                "Allocation completed successfully"
+                            )
                         )
                     );
 
@@ -2148,6 +2328,8 @@
                     );
 
                     VIS.ADialog.error(
+                        null,
+                        null,
                         message
                     );
                 },
@@ -2283,6 +2465,8 @@
 
             if (!opened) {
                 VIS.ADialog.error(
+                    null,
+                    null,
                     lbl(
                         "VAS_072_OpenFormError",
                         "Could not open allocation form"
@@ -2352,13 +2536,6 @@
                 'review-dialog-body">' +
                 '<div class="' +
                 classPrefix +
-                'review-busy">' +
-                '<div class="vis-busyindicatorinnerwrap">' +
-                '<i class="vis_widgetloader"></i>' +
-                "</div>" +
-                "</div>" +
-                '<div class="' +
-                classPrefix +
                 'review-banner"></div>' +
                 '<div class="' +
                 classPrefix +
@@ -2402,6 +2579,18 @@
                 ) +
                 "</span>" +
                 "</button>" +
+                "</div>" +
+                "</div>" +
+                /*
+                 * The busy overlay is a direct child of the card so it
+                 * covers the whole dialog (header, body and footer)
+                 * instead of only the scrollable body.
+                 */
+                '<div class="' +
+                classPrefix +
+                'review-busy">' +
+                '<div class="vis-busyindicatorinnerwrap">' +
+                '<i class="vis_widgetloader"></i>' +
                 "</div>" +
                 "</div>" +
                 "</div>" +
@@ -2601,7 +2790,9 @@
                     )
                 ) +
 
-                " →</button>" +
+                " " +
+                flowArrow() +
+                "</button>" +
 
                 "</div>" +
 
@@ -2620,6 +2811,10 @@
                 '<div class="' +
                 classPrefix +
                 'footer-right">' +
+
+                '<span class="' +
+                classPrefix +
+                'showing"></span>' +
 
                 '<div class="' +
                 classPrefix +
@@ -2718,6 +2913,13 @@
                     "." +
                     classPrefix +
                     "pager-text"
+                );
+
+            $showingText =
+                $card.find(
+                    "." +
+                    classPrefix +
+                    "showing"
                 );
 
             $openForm =
@@ -2830,19 +3032,64 @@
             );
         }
 
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $rows
+                ? $rows.find("." + classPrefix + "row").first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
+        }
+
+        function measureWidgetRowGap() {
+            if (!$rows || !$rows[0] || !window.getComputedStyle) {
+                return 0;
+            }
+
+            var rowsStyle = window.getComputedStyle($rows[0]);
+            var measuredGap = parseFloat(
+                rowsStyle.rowGap || rowsStyle.gap
+            );
+
+            return isNaN(measuredGap) ? 0 : measuredGap;
+        }
+
         function updateAdaptivePageSize(shouldReload) {
             if (!$rows || !$rows[0]) {
                 return;
             }
 
+            var rowHeight = measureWidgetRowHeight();
+            var rowGap = measureWidgetRowGap();
             var nextPageSize = Math.max(
                 widgetMinimumRows,
-                Math.floor($rows[0].clientHeight / widgetRowHeight)
+                Math.floor(
+                    ($rows[0].clientHeight + rowGap) /
+                    (rowHeight + rowGap)
+                )
             );
 
             if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             var firstVisibleRecord =
                 ((pageNo - 1) * pageSize) + 1;
@@ -2854,6 +3101,21 @@
             );
 
             if (shouldReload) {
+                /*
+                 * A request kicked off with the pre-layout (wrong)
+                 * pageSize may still be in flight here. Without
+                 * aborting it first, loadData()'s isLoading guard
+                 * silently drops this corrective reload and the
+                 * widget is stuck showing the wrong row count until
+                 * the user manually refreshes.
+                 */
+                abortRequest(activeListRequest);
+                activeListRequest = null;
+
+                if (!activeActionRequest) {
+                    setBusy(false);
+                }
+
                 loadData();
             }
         }
@@ -2865,9 +3127,17 @@
 
             updateAdaptivePageSize(false);
 
-            window.setTimeout(function () {
-                updateAdaptivePageSize(true);
-            }, 0);
+            var scheduleReflow = window.requestAnimationFrame
+                ? window.requestAnimationFrame.bind(window)
+                : function (callback) {
+                    window.setTimeout(callback, 0);
+                };
+
+            scheduleReflow(function () {
+                scheduleReflow(function () {
+                    updateAdaptivePageSize(true);
+                });
+            });
 
             if (window.ResizeObserver) {
                 resizeObserver = new ResizeObserver(function () {
@@ -2875,6 +3145,29 @@
                 });
 
                 resizeObserver.observe($rows[0]);
+            }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize(true);
+                    });
+                };
+
+                window.addEventListener("resize", adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener(
+                        "resize",
+                        adaptiveResizeHandler
+                    );
+                }
             }
         }
 
@@ -2945,6 +3238,29 @@
             if (resizeObserver) {
                 resizeObserver.disconnect();
                 resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener(
+                    "resize",
+                    adaptiveResizeHandler
+                );
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener(
+                        "resize",
+                        adaptiveResizeHandler
+                    );
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(
+                    adaptiveResizeFrame
+                );
+                adaptiveResizeFrame = null;
             }
 
             activeListRequest = null;

@@ -1,0 +1,148 @@
+/* Shipping Method Widget (VAS_154) - 3x2 read-only donut + legend + DO
+   drill-down modal.
+
+   ===== DYNAMIC SIZING MODEL (why this scales and earlier builds did not) =====
+   The ONE font anchor on the card is expressed in viewport width (vw), and every
+   internal dimension (font, padding, gap, icon, border, radius, shadow) is an em
+   derived from it - so the whole widget is scale-invariant and grows/shrinks with
+   the SCREEN at any resolution. This deliberately does NOT use the JS-written
+   custom property --dash-inline-size (it is measured from a dashboard container
+   whose width does not track the screen in this app, so it froze the old build)
+   nor container-query cqi units (they anchor to the widget's own wrapper, which
+   has the same problem). The reference-good KPI (Active Items) works precisely
+   because its anchor falls back to 100vw; this widget uses vw directly for the
+   same reason. The SVG donut's centre text is in the donut's own 0 0 120 120
+   viewBox space (scales with the rendered SVG). The modal is a fixed <body>
+   overlay and also anchors to the viewport. */
+
+.vas-shm-root { width: 100%; height: 100%; position: relative; }
+.vas-shm-root, .vas-shm-root * { box-sizing: border-box; }
+
+.vas-shm-card {
+    font-family: Roboto, Arial, sans-serif;
+    /* THE single dynamic anchor - viewport-based so it tracks the screen. ~1.3vw
+       reproduces the reference design size on a normal dashboard width; the rem
+       floor only guards very narrow windows. Every em below scales from this. */
+    font-size: max(0.9rem, 1.3vw);
+    width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden;
+    border: 0.1em solid #fff; border-radius: 0.72em; box-shadow: 0 0.5em 1.2em rgba(15, 61, 97, .06);
+    backdrop-filter: blur(0.5em); padding: .875em;
+}
+
+/* ---- header ---- */
+.vas-shm-head { display: flex; align-items: center; justify-content: space-between; gap: .625em; flex-shrink: 0; }
+.vas-shm-head-l { display: flex; align-items: center; gap: .625em; min-width: 0; }
+.vas-shm-ico { width: 2em; height: 2em; flex: 0 0 2em; border-radius: 0.5em; background: #EEF6FF; border: 0.05em solid #E4EDF4; display: flex; align-items: center; justify-content: center; }
+.vas-shm-ico svg { width: 1em; height: 1em; }
+.vas-shm-titles { min-width: 0; }
+.vas-shm-title { font-weight: 500; color: #102C3F; line-height: 1.2; font-size: .8125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-shm-sub { font-weight: 400; font-size: .6875em; color: #748494; line-height: 1.25; margin-top: .125em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.vas-shm-filters { display: flex; align-items: center; gap: .375em; flex-shrink: 0; }
+.vas-shm-sel { position: relative; display: inline-flex; }
+.vas-shm-sel select {
+    appearance: none; -webkit-appearance: none; font-family: inherit; font-weight: 500; font-size: .75em; color: #102C3F;
+    background: rgba(255, 255, 255, .9); border: 0.05em solid #E4EDF4; border-radius: 0.4em;
+    padding: .375em 1.625em .375em .625em; cursor: pointer; line-height: 1.2;
+}
+.vas-shm-sel select:hover { background: #EAF4FD; }
+.vas-shm-sel select:focus { outline: 0.1em solid #9ED1FF; outline-offset: 0.05em; }
+.vas-shm-chev { position: absolute; right: .4375em; top: 50%; transform: translateY(-50%); pointer-events: none; width: .875em; height: .875em; }
+
+/* ---- body: donut + legend side by side. No gap between them (per feedback -
+   the donut's own box already has breathing room via its own size below); the
+   legend stretches to the full body height so it grows with the card. The donut
+   is capped well under 100% height so, combined with its 1:1 aspect-ratio, it
+   never balloons wide enough to squeeze the legend's numbers/currency off the
+   edge - that was the direct cause of the amount column getting clipped. */
+.vas-shm-body { flex: 1; min-height: 0; overflow: hidden; margin-top: .5em; display: flex; align-items: stretch; gap: 0; }
+.vas-shm-donut { flex: 0 0 auto; height: 65%; align-self: center; display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1; }
+.vas-shm-svg { height: 100%; width: auto; }
+.vas-shm-loading { color: #748494; font-size: 1.2em; }
+
+.vas-shm-seg { cursor: pointer; transition: opacity .12s; outline: none; }
+.vas-shm-seg:hover { opacity: .85; }
+.vas-shm-seg:focus-visible { opacity: .85; stroke-width: 16; }
+/* SVG centre text - values are in the donut's 0 0 120 120 viewBox space (SVG user
+   units, not layout px), so they scale with the rendered donut, not the page. */
+.vas-shm-ctr-num { font-size: 20px; font-weight: 700; fill: #102C3F; }
+.vas-shm-ctr-lab { font-size: 8px; font-weight: 500; fill: #748494; letter-spacing: .04em; }
+
+/* 3 equal dynamic tracks so every legend row fills its share of the body height
+   and grows with the widget (parent stretches; legend fills height:100%). */
+.vas-shm-legend { flex: 1; min-width: 0; height: 100%; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); row-gap: .35em; }
+.vas-shm-lg {
+    /* Only the method name is allowed to shrink (down to a 2em floor, with its
+       own ellipsis below) - count/pct/amt are "auto" so the grid protects their
+       full min-content width first. That is what stops the currency amount from
+       ever getting squeezed/clipped when the row gets tight. */
+    display: grid; grid-template-columns: .8em minmax(2em, 1fr) auto auto auto; column-gap: .35em; align-items: center;
+    width: 100%; height: 100%; background: transparent; border: none; border-radius: 0.4em; padding: .35em .4em; cursor: pointer; text-align: left; font-family: inherit;
+}
+.vas-shm-lg:hover { background: rgba(234, 244, 253, .7); }
+.vas-shm-lg:focus-visible { outline: 0.1em solid #9ED1FF; outline-offset: 0.05em; }
+.vas-shm-sw { width: .8em; height: .8em; border-radius: 0.15em; flex-shrink: 0; }
+.vas-shm-lg-name { font-size: .75em; font-weight: 500; color: #102C3F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-shm-lg-count { font-size: .75em; font-weight: 700; color: #102C3F; text-align: right; min-width: 1.5em; }
+.vas-shm-lg-pct { font-size: .6875em; font-weight: 400; color: #748494; text-align: right; min-width: 1.9em; }
+.vas-shm-lg-amt { font-size: .75em; font-weight: 700; color: #0083DA; text-align: right; white-space: nowrap; }
+
+.vas-shm-errbox { grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5em; }
+.vas-shm-errmsg { color: #748494; font-size: .8125em; }
+.vas-shm-retry { font-family: inherit; font-size: .75em; font-weight: 500; color: #0083DA; background: rgba(255, 255, 255, .9); border: 0.05em solid #E4EDF4; border-radius: 0.4em; padding: .3em .8em; cursor: pointer; }
+.vas-shm-retry:hover { background: #EAF4FD; }
+
+/* ---- footer ---- */
+.vas-shm-foot { display: flex; align-items: center; justify-content: space-between; gap: .5em; padding-top: .5em; flex-shrink: 0; }
+.vas-shm-foot-l { font-weight: 500; font-size: .75em; color: #102C3F; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-shm-foot-r { font-weight: 400; font-size: .6875em; color: #748494; white-space: nowrap; }
+
+/* ===================== MODAL ===================== */
+.vas-shm-overlay {
+    /* Viewport-anchored (the overlay lives on <body>, outside the widget's query
+       container, so cqi is unavailable here). vw scales the whole pop-up with the
+       screen; rem bounds keep it readable on very narrow / very wide displays -
+       all dynamic units, no fixed px. Internals below are em off this anchor. */
+    font-size: clamp(0.9rem, 1.6vw, 2.2rem);
+    position: fixed; inset: 0; background: rgba(16, 44, 63, .35);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 2em; font-family: Roboto, Arial, sans-serif;
+}
+.vas-shm-overlay.vas-shm-hidden { display: none; }
+.vas-shm-body-lock { overflow: hidden; }
+
+.vas-shm-modal { background: #fff; border-radius: 0.875em; box-shadow: 0 1.875em 4.375em rgba(2, 38, 64, .30); width: min(51.25em, calc(100vw - 2em)); max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+.vas-shm-mhead { display: flex; align-items: center; justify-content: space-between; gap: 0.75em; padding: 0.875em 1.125em; border-bottom: 0.0625em solid #E4EDF4; flex-shrink: 0; }
+.vas-shm-mhead-l { min-width: 0; }
+.vas-shm-mtitle { font-weight: 700; font-size: 1em; color: #102C3F; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-shm-msub { font-weight: 400; font-size: .8em; color: #748494; margin-top: 0.25em; }
+.vas-shm-mclose { width: 2em; height: 2em; display: flex; align-items: center; justify-content: center; border: none; background: transparent; border-radius: 0.5em; cursor: pointer; flex-shrink: 0; color: #141414; }
+.vas-shm-mclose:hover { background: #EEF6FF; }
+.vas-shm-mclose svg { width: 1.25em; height: 1.25em; }
+
+.vas-shm-mbody { overflow: hidden; padding: 0.25em 1.125em 0.625em; }
+.vas-shm-mloading { padding: 1.5em; text-align: center; color: #748494; }
+.vas-shm-empty { padding: 1.5em; text-align: center; color: #748494; font-size: .8em; }
+
+/* Fixed 5-row grid so the modal body is sized for 5 rows and never shrinks when
+   a page has fewer (the drill-down pages 5 orders at a time). */
+.vas-shm-dolist { display: grid; grid-template-rows: repeat(5, 2.4em); }
+.vas-shm-dolist .vas-shm-empty { grid-row: 1 / -1; display: flex; align-items: center; justify-content: center; }
+
+.vas-shm-dohead, .vas-shm-dorow { display: grid; grid-template-columns: 1.2fr 1.2fr 2fr 1.1fr 1fr; column-gap: 0.625em; align-items: center; padding: 0.45em 0; }
+.vas-shm-dohead { border-bottom: 0.0625em solid #EDF2F6; position: sticky; top: 0; background: #fff; }
+.vas-shm-dohead > div { font-weight: 400; font-size: .72em; color: #748494; text-transform: capitalize; }
+.vas-shm-dohead > div.r { text-align: right; }
+.vas-shm-dorow { border-bottom: 0.0625em solid #EDF2F6; }
+.vas-shm-dorow:last-child { border-bottom: none; }
+.vas-shm-doid { font-weight: 700; font-size: .8em; color: #0083DA; white-space: nowrap; }
+.vas-shm-docell { font-weight: 400; font-size: .8em; color: #5F7283; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vas-shm-doamount { font-weight: 700; font-size: .8em; color: #102C3F; text-align: right; white-space: nowrap; }
+
+.vas-shm-mfoot { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: 0.625em 1.125em; border-top: 0.0625em solid #E4EDF4; flex-shrink: 0; }
+.vas-shm-mtot { font-weight: 700; font-size: .8em; color: #102C3F; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vas-shm-pager { display: flex; align-items: center; gap: 0.4em; flex: 0 0 auto; }
+.vas-shm-pgbtn { width: 1.1em; height: 1.1em; display: flex; align-items: center; justify-content: center; border-radius: 0.4em; border: 0.0625em solid #E4EDF4; background: rgba(255, 255, 255, .9); cursor: pointer; padding: 0; color: #0083DA; }
+.vas-shm-pgbtn:hover:not(:disabled) { background: #EAF4FD; }
+.vas-shm-pgbtn:disabled { background: rgba(255, 255, 255, .6); cursor: default; color: #B8C6D2; }
+.vas-shm-pgbtn svg { width: 0.65em; height: 0.65em; }
+.vas-shm-pgtext { font-weight: 500; font-size: 0.75em; color: #102C3F; }

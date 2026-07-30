@@ -21,21 +21,30 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
 .vas-ar-nodata {
     text-align: center;
     padding: 1em;
-    color: #717182;
-    font-size: 0.8125em;
+    color: #5F7283;
+    font-size: 0.75em;
 }
 
+/* Bucket row: label + amount + track bar. Rows are separated by the body
+   divider (design.md > Grid Data Widget > Row And Header Separators). */
 .vas-ar-bucket {
     display: flex;
     flex-direction: column;
     gap: 0.4375em;
+    /*padding-bottom: 0.5em;*/
+    /*border-bottom: 1px solid #E2EAF1;*/
+}
+
+.vas-ar-bucket:last-of-type {
+    padding-bottom: 0;
+    border-bottom: 0;
 }
 
 .vas-ar-bucket-label-wrap {
@@ -43,15 +52,19 @@
     justify-content: space-between;
     align-items: baseline;
     gap: 0.75em;
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    color: #102C3F;
+    /* Row cell text one step below the widget title (sm token). Label = standard
+       muted cell; the amount carries the emphasis (see .vas-ar-bucket-val). */
+    font-size: 0.75em;
+    color: #5F7283;
 }
 
 .vas-ar-bucket-val {
-    font-weight: 700;
+    font-weight: 400;
+    color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     flex-shrink: 0;
+    text-align: right;
 }
 
 /* Base-currency symbol prefixed before the amount */
@@ -63,20 +76,21 @@
 
 .vas-ar-bucket-track {
     height: 0.4375em;
-    background: #E2EDE4;
-    border-radius: 999em;
+    background: #E2EAF1;
+    border-radius: 999px;
     overflow: hidden;
 }
 
 .vas-ar-bucket-bar {
     height: 100%;
-    border-radius: 999em;
+    border-radius: 999px;
     transition: width 0.8s ease-out;
 }
 
 .vas-ar-why-block {
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    color: #717182;
+    /* Explanatory helper caption — secondary metadata (xs token), muted. */
+    font-size: 0.6875em;
+    color: #5F7283;
     margin-top: 0.375em;
     line-height: 1.3;
     font-style: normal;
@@ -100,17 +114,17 @@
     display: flex;
     flex-direction: column;
     gap: 0.875em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 0.875em;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    /* Card base font-size unit; resolves against the dashboard's visible width
-       (--dash-inline-size), falling back to the viewport when unset. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    /* Widget root em-lever (dashboard-widgets.md > Widget Root Anchor):
+       one knob rescales every internal em. Ceiling 20px on 2K dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
 }
 
 .vas-ar-header {
@@ -125,9 +139,9 @@
     height: 2em;
     min-width: 2em;
     flex-shrink: 0;
-    border-radius: 0.5625em;
+    border-radius: 12px;
     background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #0C7DB4;
     display: flex;
     align-items: center;
@@ -140,20 +154,21 @@
 }
 
 .vas-ar-title {
-    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
-       Header"): same resolved px in every widget at any screen size. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    /* Shared width-anchored title clamp (dashboard-widgets.md > Widget Header):
+       same resolved px in every widget at any screen size; ceiling 17px. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
 
 .vas-ar-subtitle {
-    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
-       the subtitle renders the same px in every widget at any screen size. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    /* Shared width-anchored subtitle clamp (dashboard-widgets.md > Widget
+       Header): ceiling 13px, muted. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     line-height: 1.3;
+    margin-top: 2px;
 }
 
 .vas-ar-content-area {
@@ -166,8 +181,8 @@
 
 .vas-ar-loading {
     text-align: center;
-    color: #717182;
-    font-size: 0.8125em;
+    color: #5F7283;
+    font-size: 0.75em;
 }
 
 /* ── Cell-based responsive steps (reference list-card pattern) ── */

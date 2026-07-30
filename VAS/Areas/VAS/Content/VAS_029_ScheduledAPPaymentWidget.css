@@ -6,8 +6,9 @@
     box-sizing: border-box;
     container-type: inline-size;
     contain: layout style;
-    font-family: Roboto, Arial, sans-serif;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
+    font-size: clamp(16px, 1.2cqi, 20px);
     position: relative;
     overflow: hidden;
 }
@@ -31,27 +32,27 @@
     width: 1.5em;
 }
 
-.vas-scheduled-ap-payment-pager-btn svg {
-    height: 0.875em;
-    width: 0.875em;
-}
+    .vas-scheduled-ap-payment-pager-btn svg {
+        height: 0.875em;
+        width: 0.875em;
+    }
 
-.vas-scheduled-ap-payment-pager-btn:hover:not(:disabled),
-.vas-scheduled-ap-payment-pager-btn:focus-visible:not(:disabled) {
-    background: #eaf8ff;
-    border-color: #bfe4ff;
-    box-shadow: none;
-    outline: none;
-}
+    .vas-scheduled-ap-payment-pager-btn:hover:not(:disabled),
+    .vas-scheduled-ap-payment-pager-btn:focus-visible:not(:disabled) {
+        background: #eaf8ff;
+        border-color: #bfe4ff;
+        box-shadow: none;
+        outline: none;
+    }
 
-.vas-scheduled-ap-payment-pager-btn:disabled {
-    background: rgba(255, 255, 255, 0.64);
-    color: #b8c6d2;
-    cursor: default;
-}
+    .vas-scheduled-ap-payment-pager-btn:disabled {
+        background: rgba(255, 255, 255, 0.64);
+        color: #b8c6d2;
+        cursor: default;
+    }
 
 .vas-scheduled-ap-payment-pager-text {
-    font-size: 0.85em;
+    font-size: 0.8125em;
     font-weight: 500;
     min-width: 3.75em;
 }
@@ -60,10 +61,10 @@
     background: rgba(255, 255, 255, 0.55);
 }
 
-    .vas-scheduled-ap-payment-root,
-    .vas-scheduled-ap-payment-root * {
-        box-sizing: border-box;
-    }
+.vas-scheduled-ap-payment-root,
+.vas-scheduled-ap-payment-root * {
+    box-sizing: border-box;
+}
 
 .vas-scheduled-ap-payment-card {
     width: 100%;
@@ -78,7 +79,7 @@
     gap: 0.5em;
     border: 2px solid #ffffff;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102c3f;
     position: relative;
@@ -86,14 +87,14 @@
     transition: box-shadow 0.18s ease;
 }
 
-.vas-scheduled-ap-payment-card:hover {
-    box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
-}
+    .vas-scheduled-ap-payment-card:hover {
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
+    }
 
-.vas-scheduled-ap-payment-card:focus-visible {
-    outline: 2px solid #0083da;
-    outline-offset: 2px;
-}
+    .vas-scheduled-ap-payment-card:focus-visible {
+        outline: 2px solid #0083da;
+        outline-offset: 2px;
+    }
 
 .vas-scheduled-ap-payment-header {
     flex: 0 0 auto;
@@ -130,34 +131,55 @@
     stroke-linejoin: round;
 }
 
-.vas-scheduled-ap-payment-title {
+/* Carries the flex share the title used to hold on its own, now that the
+   title and the subtitle share one box inside the header row. */
+.vas-scheduled-ap-payment-header-text {
     flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vas-scheduled-ap-payment-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .01138), 17px);
+    font-family: var(--v-c-font-family);
     font-weight: 400;
     line-height: 1.2;
     color: #102c3f;
 }
 
+.vas-scheduled-ap-payment-sub {
+    min-width: 0;
+    margin-top: 0.125em;
+    overflow: hidden;
+    color: #5f7283;
+    font-size: 0.6875em;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .vas-scheduled-ap-payment-arrow {
     align-items: center;
-    color: #748494;
+    color: #5f7283;
     display: flex;
     flex-shrink: 0;
-    font-size: .875em;
+    font-size: 0.75em;
     margin-left: auto;
     opacity: .55;
     text-decoration: none !important;
     transition: opacity .15s, color .15s;
 }
 
-.vas-scheduled-ap-payment-arrow svg {
-    width: 1em;
-    height: 1em;
-}
+    .vas-scheduled-ap-payment-arrow svg {
+        width: 1em;
+        height: 1em;
+    }
 
 .vas-scheduled-ap-payment-body {
     flex: 1 1 auto;
@@ -177,7 +199,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 1.375em;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.1;
     letter-spacing: 0;
     font-variant-numeric: tabular-nums;
@@ -192,7 +214,7 @@
     align-items: center;
     gap: 0.5em;
     overflow: hidden;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-scheduled-ap-payment-badge {
@@ -222,7 +244,7 @@
     font-size: 0.75em;
     font-weight: 400;
     line-height: 1.3;
-    color: #5f7283;
+    color: #41576a;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -233,7 +255,7 @@
     font-size: 0.75em;
     font-weight: 500;
     letter-spacing: 0;
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-scheduled-ap-payment-busy,
@@ -247,17 +269,18 @@
     padding: 0.875em;
     border-radius: 14px;
     text-align: center;
-    color: #5f7283;
-    font-family: Roboto, Arial, sans-serif;
+    color: #41576a;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 0.8125em;
     font-weight: 600;
     line-height: 1.35;
 }
 
-.vas-scheduled-ap-payment-busy.is-visible,
-.vas-scheduled-ap-payment-state-message.is-visible {
-    display: flex;
-}
+    .vas-scheduled-ap-payment-busy.is-visible,
+    .vas-scheduled-ap-payment-state-message.is-visible {
+        display: flex;
+    }
 
 .vas-scheduled-ap-payment-root.vas-scheduled-ap-payment-compact .vas-scheduled-ap-payment-card {
     padding: 0.75em;
@@ -285,9 +308,7 @@
         gap: 0.375em;
     }
 
-    .vas-scheduled-ap-payment-title {
-        font-size: 0.8125em;
-    }
+
 
     .vas-scheduled-ap-payment-value {
         font-size: 1.375em;
@@ -311,9 +332,7 @@
         height: 0.8125em;
     }
 
-    .vas-scheduled-ap-payment-title {
-        font-size: 0.75em;
-    }
+
 
     .vas-scheduled-ap-payment-value {
         font-size: 1em;
@@ -342,7 +361,8 @@
     align-items: center;
     justify-content: center;
     padding: 1.25em;
-    font-family: Roboto, Arial, sans-serif;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
     font-size: 1em;
 }
 
@@ -372,7 +392,7 @@
     align-items: flex-start;
     gap: 0.75em;
     padding: 1.25em 2em;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
 }
 
 .vas-scheduled-ap-payment-dialog-icon {
@@ -389,14 +409,14 @@
     color: #0083da;
 }
 
-.vas-scheduled-ap-payment-dialog-icon svg {
-    width: 1.125em;
-    height: 1.125em;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 2;
-}
+    .vas-scheduled-ap-payment-dialog-icon svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2;
+    }
 
 .vas-scheduled-ap-payment-dialog-title-group {
     flex: 1 1 auto;
@@ -441,15 +461,15 @@
     cursor: pointer;
 }
 
-.vas-scheduled-ap-payment-dialog-close svg {
-    width: 1.125em;
-    height: 1.125em;
-    stroke: currentColor;
-}
+    .vas-scheduled-ap-payment-dialog-close svg {
+        width: 1.125em;
+        height: 1.125em;
+        stroke: currentColor;
+    }
 
-.vas-scheduled-ap-payment-dialog-close:hover {
-    background: #f3f7fb;
-}
+    .vas-scheduled-ap-payment-dialog-close:hover {
+        background: #f3f7fb;
+    }
 
 .vas-scheduled-ap-payment-dialog-summary {
     flex: 0 0 auto;
@@ -457,43 +477,43 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1.25em;
     padding: 1.25em 2em;
-    border-bottom: 1px solid #edf2f6;
+    border-bottom: 1px solid #e2eaf1;
     background: #fbfdff;
 }
 
-.vas-scheduled-ap-payment-dialog-summary div {
-    min-width: 0;
-}
+    .vas-scheduled-ap-payment-dialog-summary div {
+        min-width: 0;
+    }
 
-.vas-scheduled-ap-payment-dialog-summary span,
-.vas-scheduled-ap-payment-dialog-summary strong {
-    display: block;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+    .vas-scheduled-ap-payment-dialog-summary span,
+    .vas-scheduled-ap-payment-dialog-summary strong {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 
-.vas-scheduled-ap-payment-dialog-summary span {
-    color: #748494;
-    font-size: 0.75em;
-    font-weight: 700;
-    line-height: 1.2;
-}
+    .vas-scheduled-ap-payment-dialog-summary span {
+        color: #5f7283;
+        font-size: 0.75em;
+        font-weight: 700;
+        line-height: 1.2;
+    }
 
-.vas-scheduled-ap-payment-dialog-summary strong {
-    margin-top: 0.5em;
-    color: #102c3f;
-    font-size: 1.25em;
-    font-weight: 800;
-    line-height: 1.15;
-    font-variant-numeric: tabular-nums;
-}
+    .vas-scheduled-ap-payment-dialog-summary strong {
+        margin-top: 0.5em;
+        color: #102c3f;
+        font-size: 1.25em;
+        font-weight: 800;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+    }
 
-.vas-scheduled-ap-payment-dialog-summary div:first-child strong {
-    color: #102c3f;
-    font-weight: 700;
-}
+    .vas-scheduled-ap-payment-dialog-summary div:first-child strong {
+        color: #102c3f;
+        font-weight: 700;
+    }
 
 .vas-scheduled-ap-payment-dialog-body {
     flex: 1 1 auto;
@@ -513,9 +533,9 @@
     background: rgba(255, 255, 255, 0.62);
 }
 
-.vas-scheduled-ap-payment-dialog-busy.is-visible {
-    display: flex;
-}
+    .vas-scheduled-ap-payment-dialog-busy.is-visible {
+        display: flex;
+    }
 
 .vas-scheduled-ap-payment-dialog-table {
     width: 100%;
@@ -524,39 +544,41 @@
     table-layout: fixed;
 }
 
-.vas-scheduled-ap-payment-dialog-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    padding: 1em 0.75em;
-    border-bottom: 1px solid #edf2f6;
-    background: #ffffff;
-    color: #748494;
-    font-size: 0.75em;
-    font-weight: 700;
-    line-height: 1.2;
-    text-align: left;
-    text-transform: capitalize;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+    .vas-scheduled-ap-payment-dialog-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: 0.5em 0.75em;
+        border-bottom: 1px solid #c5d2dd;
+        background: transparent;
+        color: #41576a;
+        font-size: 0.6875em;
+        font-weight: 500;
+        line-height: 1.2;
+        text-align: left;
+        text-transform: capitalize;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-.vas-scheduled-ap-payment-dialog-table tbody td {
-    padding: 0.875em 0.75em;
-    border-bottom: 1px solid #edf2f6;
-    color: #102c3f;
-    font-size: 0.875em;
-    line-height: 1.2;
-    vertical-align: middle;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+    .vas-scheduled-ap-payment-dialog-table tbody td {
+        --v-c-font-family: 'NoirPro-Regular', sans-serif;
+        padding: 0.875em 0.75em;
+        border-bottom: 1px solid #e2eaf1;
+        color: #5f7283;
+        font-family: var(--v-c-font-family);
+        font-size: 0.75em;
+        line-height: 1.2;
+        vertical-align: middle;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
 
-.vas-scheduled-ap-payment-dialog-table tbody tr:hover td {
-    background: #f8fbfe;
-}
+    .vas-scheduled-ap-payment-dialog-table tbody tr:hover td {
+        background: #f8fbfe;
+    }
 
 .vas-scheduled-ap-payment-th-doc,
 .vas-scheduled-ap-payment-td-doc {
@@ -586,7 +608,7 @@
 
 .vas-scheduled-ap-payment-th-amount,
 .vas-scheduled-ap-payment-td-amount {
-    width: 14em;
+    width: 16%;
     text-align: left;
 }
 
@@ -604,30 +626,31 @@
 }
 
 .vas-scheduled-ap-payment-td-doc {
-    font-family: "Roboto Mono", "Roboto", monospace;
-    font-weight: 700;
+    --v-c-font-family: 'NoirPro-Regular', sans-serif;
+    font-family: var(--v-c-font-family);
+    font-weight: 400;
 }
 
 .vas-scheduled-ap-payment-td-invdate,
 .vas-scheduled-ap-payment-td-duedate,
 .vas-scheduled-ap-payment-td-currency,
 .vas-scheduled-ap-payment-td-method {
-    color: #5f7283;
+    color: #41576a;
 }
 
 .vas-scheduled-ap-payment-td-vendor {
-    font-weight: 700;
+    font-weight: 400;
 }
 
 .vas-scheduled-ap-payment-td-amount {
-    font-weight: 800;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
     overflow: visible !important;
     text-overflow: clip !important;
 }
 
 .vas-scheduled-ap-payment-cur-inline {
-    margin-inline-end: 0.2em;
+    margin-inline-end: 0;
     font-weight: inherit;
     color: inherit;
 }
@@ -635,7 +658,7 @@
 .vas-scheduled-ap-payment-dialog-empty {
     padding: 2.25em 1em !important;
     text-align: center;
-    color: #748494 !important;
+    color: #5f7283 !important;
 }
 
 .vas-scheduled-ap-payment-dialog-footer {
@@ -645,7 +668,7 @@
     justify-content: space-between;
     gap: 1em;
     padding: 0.875em 2em;
-    border-top: 1px solid #edf2f6;
+    border-top: 1px solid #d9e2eb;
     background: #fbfdff;
 }
 
@@ -656,7 +679,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.8125em;
-    color: #748494;
+    color: #5f7283;
 }
 
 .vas-scheduled-ap-payment-pager {
@@ -680,22 +703,22 @@
     cursor: pointer;
 }
 
-.vas-scheduled-ap-payment-pager-btn svg {
-    width: 1em;
-    height: 1em;
-    stroke: currentColor;
-}
+    .vas-scheduled-ap-payment-pager-btn svg {
+        width: 1em;
+        height: 1em;
+        stroke: currentColor;
+    }
 
-.vas-scheduled-ap-payment-pager-btn:hover:not(:disabled) {
-    background: #eaf8ff;
-    border-color: #9ed1ff;
-}
+    .vas-scheduled-ap-payment-pager-btn:hover:not(:disabled) {
+        background: #eaf8ff;
+        border-color: #9ed1ff;
+    }
 
-.vas-scheduled-ap-payment-pager-btn:disabled {
-    color: #b8c6d2;
-    background: rgba(255, 255, 255, 0.64);
-    cursor: default;
-}
+    .vas-scheduled-ap-payment-pager-btn:disabled {
+        color: #b8c6d2;
+        background: rgba(255, 255, 255, 0.64);
+        cursor: default;
+    }
 
 .vas-scheduled-ap-payment-pager-text {
     min-width: 4.25em;
@@ -781,7 +804,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: #748494;
+    color: #5f7283;
     font-size: 0.8125rem;
     font-weight: 400;
 }
@@ -791,14 +814,14 @@
     height: 24px;
 }
 
-.vas-scheduled-ap-payment-pager-btn svg {
-    width: 14px;
-    height: 14px;
-}
+    .vas-scheduled-ap-payment-pager-btn svg {
+        width: 14px;
+        height: 14px;
+    }
 
 .vas-scheduled-ap-payment-pager-text {
     min-width: 3.5rem;
-    font-size: 0.85rem;
+    font-size: 0.8125rem;
 }
 
 .vas-scheduled-ap-payment-th-amount,
@@ -817,3 +840,125 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* --- RTL: pagination -------------------------------------------------------
+   Switching the UI to Arabic flips the footer, which swaps the prev/next
+   buttons while their chevrons keep pointing the same way -- so the arrows
+   end up contradicting what they do. Pin the pager itself to LTR: prev stays
+   on the left, next on the right, and the page indicator keeps "1 of 35" in
+   order instead of having its leading digit pushed to the far end by the
+   bidi algorithm. `plaintext` lets a translated indicator ("1 من 35") still
+   lay itself out by its own script. */
+html[dir="rtl"] .vas-scheduled-ap-payment-pager {
+    direction: ltr;
+}
+
+html[dir="rtl"] .vas-scheduled-ap-payment-pager-text {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: money -----------------------------------------------------------
+   A formatted amount is "-ID1,800.000": the minus is a neutral character, so
+   in an RTL paragraph the bidi algorithm parks it at the far (right) end and
+   the cell reads "ID1,800.000-". `plaintext` lets each amount pick its own
+   direction from its first strong character -- LTR for a Latin currency code,
+   RTL for a translated one -- so the sign stays glued to the number. */
+html[dir="rtl"] .vas-scheduled-ap-payment-td-amount,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary-total,
+html[dir="rtl"] .vas-scheduled-ap-payment-value {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: the rest of the value surfaces -----------------------------------
+   The amount columns were only the visible half of this. Any string that
+   mixes digits with a neutral character -- the minus in "-ID1.104B", the
+   currency code, a trailing full stop, the en dash in "1-4 of 30" -- gets
+   that character dragged to the far end of an RTL paragraph. Rather than
+   chase one class at a time, hand every cell, summary tile and caption back
+   to its own script: `plaintext` reads the first strong character and lays
+   the string out accordingly, so Latin-and-digits stays LTR and translated
+   text stays RTL. */
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog td,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog th,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary span,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary strong,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary span,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong,
+html[dir="rtl"] .vas-scheduled-ap-payment-sub,
+html[dir="rtl"] .vas-scheduled-ap-payment-desc,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-subtitle {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: the truncation spans inside the cells ----------------------------
+   Cell text is wrapped in a `display: block` span so it can ellipsis, and a
+   block is its own bidi paragraph -- which means the rules above stopped at
+   the cell and never reached the string that actually renders. Repeat the
+   treatment for whatever sits inside. */
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog td *,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog th *,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary span *,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary strong *,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary span *,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong * {
+    unicode-bidi: plaintext;
+}
+
+/* --- RTL: amounts ----------------------------------------------------------
+   Money is not prose. "-ID743,000.000" is one left-to-right token, and
+   leaving it to the bidi heuristics is what kept pushing the minus to the
+   far end ("ID743,000.000-"); `direction: ltr` settles it outright, and it
+   inherits into the ellipsis spans the cells wrap their text in, which a
+   rule on the cell alone never reached. The column then flips to the
+   inline-start edge the way the rest of the RTL layout does. */
+html[dir="rtl"] .vas-scheduled-ap-payment-th-amount,
+html[dir="rtl"] .vas-scheduled-ap-payment-td-amount,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-table thead th.vas-scheduled-ap-payment-th-amount,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-table tbody td.vas-scheduled-ap-payment-td-amount {
+    direction: ltr;
+    text-align: left !important;
+}
+
+/* The earlier `plaintext` rules cover prose, but on an amount they would win
+   over the `direction` above -- plaintext derives direction from content and
+   ignores the declared one. Take the amounts back out of that scheme, cells
+   and ellipsis spans alike. */
+html[dir="rtl"] .vas-scheduled-ap-payment-th-amount,
+html[dir="rtl"] .vas-scheduled-ap-payment-th-amount *,
+html[dir="rtl"] .vas-scheduled-ap-payment-td-amount,
+html[dir="rtl"] .vas-scheduled-ap-payment-td-amount *,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary-total,
+html[dir="rtl"] .vas-scheduled-ap-payment-summary-total *,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong *,
+html[dir="rtl"] .vas-scheduled-ap-payment-value,
+html[dir="rtl"] .vas-scheduled-ap-payment-value * {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* The card headline is not a table column: it keeps the side it always sat
+   on -- inline-end, so the right in Arabic and the left in English. It still
+   needs the LTR pin above so the minus stays in front of the figure, and
+   that pin is what would otherwise drag it to the left here, since these
+   elements never declared an alignment of their own. */
+html[dir="rtl"] .vas-scheduled-ap-payment-value {
+    text-align: right;
+}
+
+/* Summary tiles and popup read-outs are not table columns -- they sit under a
+   right-aligned label, so the figure belongs on the same side. Only the
+   direction stays pinned, to keep the sign in front of the number. */
+html[dir="rtl"] .vas-scheduled-ap-payment-summary-total,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong {
+    text-align: right !important;
+}
+
+/* The figure sits in a `display: block` ellipsis span inside the cell, which
+   is its own alignment context -- name it too instead of trusting the cell to
+   carry the alignment down. */
+html[dir="rtl"] .vas-scheduled-ap-payment-th-amount *,
+html[dir="rtl"] .vas-scheduled-ap-payment-td-amount *,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-table thead th.vas-scheduled-ap-payment-th-amount *,
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog-table tbody td.vas-scheduled-ap-payment-td-amount * {
+    text-align: left !important;
+}

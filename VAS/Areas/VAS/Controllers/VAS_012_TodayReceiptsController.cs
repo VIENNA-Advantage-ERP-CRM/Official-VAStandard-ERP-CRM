@@ -54,6 +54,7 @@ namespace VIS.Controllers
                 SELECT ClientInfo.AD_Client_ID,
                        AcctSchema.C_Currency_ID AS C_Currency_ID,
                        Currency.StdPrecision,
+                       Currency.ISO_Code AS ISO_Code,
                        CASE WHEN Currency.CurSymbol IS NOT NULL THEN Currency.CurSymbol ELSE Currency.ISO_Code END AS Cur_Symbol
                 FROM AD_ClientInfo ClientInfo
                 INNER JOIN C_AcctSchema AcctSchema ON (ClientInfo.C_AcctSchema1_ID=AcctSchema.C_AcctSchema_ID)
@@ -62,12 +63,13 @@ namespace VIS.Controllers
 
             /* Today's receipts. Amount uses PaymentAmount (net of withholding) per the
                supplied source query, converted to the schema currency when the
-               receipt is in another currency. */
+               receipt is in another currency. Aggregated with NO GROUP BY so it
+               always yields exactly one row (SUM/COUNT = 0 when nothing matches);
+               CROSS JOINing it with the single-row SchemaCurrency CTE below then
+               always carries the base-currency symbol/ISO/precision — even at zero
+               receipts (mirrors OverdueController). */
             string todayReceiptsSql = @"
-                SELECT SchemaCurrency.C_Currency_ID,
-                       SchemaCurrency.StdPrecision,
-                       SchemaCurrency.Cur_Symbol,
-                       SUM(
+                SELECT COALESCE(SUM(
                            CASE
                                WHEN Payment.C_Currency_ID = SchemaCurrency.C_Currency_ID
                                THEN COALESCE(Payment.PaymentAmount, 0)
@@ -81,7 +83,7 @@ namespace VIS.Controllers
                                    Payment.AD_Org_ID
                                )
                            END
-                       ) AS TotalAmountReceived,
+                       ), 0) AS TotalAmountReceived,
                        COUNT(Payment.C_Payment_ID) AS Receipt_Count,
                        COUNT(DISTINCT Payment.C_BPartner_ID) AS Customer_Count
                 FROM C_Payment Payment
@@ -99,11 +101,6 @@ namespace VIS.Controllers
                 MRole.SQL_RO
             );
 
-            todayReceiptsSql += @"
-                GROUP BY SchemaCurrency.C_Currency_ID,
-                         SchemaCurrency.StdPrecision,
-                         SchemaCurrency.Cur_Symbol";
-
             string sql = @"
                 WITH SchemaCurrency AS (
                     " + schemaCurrencySql + @"
@@ -111,23 +108,30 @@ namespace VIS.Controllers
                 TodayReceipts AS (
                     " + todayReceiptsSql + @"
                 )
-                SELECT TodayReceipts.C_Currency_ID,
-                       TodayReceipts.Cur_Symbol,
+                SELECT SchemaCurrency.C_Currency_ID,
+                       SchemaCurrency.Cur_Symbol,
+                       SchemaCurrency.ISO_Code,
+                       SchemaCurrency.StdPrecision,
                        TodayReceipts.Receipt_Count,
                        TodayReceipts.Customer_Count,
                        ROUND(
                            COALESCE(TodayReceipts.TotalAmountReceived, 0),
-                           TodayReceipts.StdPrecision
+                           SchemaCurrency.StdPrecision
                        ) AS TodayReceiptAmount
-                FROM TodayReceipts";
+                FROM SchemaCurrency
+                CROSS JOIN TodayReceipts";
 
             decimal amount = 0;
             int currencyId = 0;
             int receiptCount = 0;
             int customerCount = 0;
-            /* Base-currency symbol (accounting schema); the amount above is
-               already converted to this currency by CurrencyConvert. */
+            /* Base-currency symbol/ISO/precision (accounting schema); the amount
+               above is already converted to this currency by CurrencyConvert. The
+               CROSS JOIN with the single-row SchemaCurrency CTE keeps these
+               populated even when there are no receipts today. */
             string currencySymbol = "";
+            string isoCode = "";
+            int stdPrecision = 2;
 
             IDataReader dr = null;
 
@@ -142,6 +146,11 @@ namespace VIS.Controllers
                     receiptCount = Util.GetValueOfInt(dr["Receipt_Count"]);
                     customerCount = Util.GetValueOfInt(dr["Customer_Count"]);
                     currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
+                    isoCode = Util.GetValueOfString(dr["ISO_Code"]);
+                    if (dr["StdPrecision"] != null && dr["StdPrecision"] != System.DBNull.Value)
+                    {
+                        stdPrecision = Util.GetValueOfInt(dr["StdPrecision"]);
+                    }
                 }
 
                 var result = new
@@ -150,7 +159,9 @@ namespace VIS.Controllers
                     amount = amount,
                     receiptCount = receiptCount,
                     customerCount = customerCount,
-                    symbol = currencySymbol
+                    symbol = currencySymbol,
+                    isoCode = isoCode,
+                    stdPrecision = stdPrecision
                 };
 
                 return Json(JsonConvert.SerializeObject(result), JsonRequestBehavior.AllowGet);

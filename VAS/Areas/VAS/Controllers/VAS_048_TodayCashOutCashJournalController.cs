@@ -662,24 +662,18 @@ SchemaCurrency AS
         ClientInfo.C_AcctSchema1_ID =
         AcctSchema.C_AcctSchema_ID
     )
-
     INNER JOIN C_Currency Currency ON
     (
         AcctSchema.C_Currency_ID =
         Currency.C_Currency_ID
     )
-
     WHERE ClientInfo.IsActive = 'Y'
-
     AND AcctSchema.IsActive = 'Y'
-
     AND Currency.IsActive = 'Y'
-
     AND ClientInfo.AD_Client_ID =
     (
         SELECT
             QueryParameters.AD_Client_ID
-
         FROM QueryParameters QueryParameters
     )
 )";
@@ -689,11 +683,8 @@ SELECT
     CashLine.C_CashLine_ID,
     CashLine.C_Cash_ID,
     CashLine.Amount
-
 FROM C_CashLine CashLine
-
 WHERE CashLine.IsActive = 'Y'
-
 AND CashLine.Amount < 0";
 
             /*
@@ -736,44 +727,31 @@ CashData AS
         CashLine.C_Cash_ID =
         CashHeader.C_Cash_ID
     )
-
     INNER JOIN C_CashBook CashBook ON
     (
         CashHeader.C_CashBook_ID =
         CashBook.C_CashBook_ID
     )
-
     WHERE CashHeader.IsActive = 'Y'
-
-    AND CashBook.IsActive = 'Y'
-
     AND CashHeader.AD_Client_ID =
     (
         SELECT
             QueryParameters.AD_Client_ID
-
         FROM QueryParameters QueryParameters
     )
-
-    AND CashHeader.DocStatus IN
-    (
-        'CO',
-        'CL'
-    )
+    AND CashHeader.DocStatus IN ('CO','CL')
 )";
 
             string convertedAmountExpression = @"
 CASE
     WHEN CashData.C_Currency_ID =
         SchemaCurrency.C_Currency_ID
-
     THEN
         COALESCE
         (
             CashData.Amount,
             0
         )
-
     ELSE
         CurrencyConvert
         (
@@ -811,20 +789,17 @@ CashOutData AS
                                     AS TIMESTAMP
                                 ) >=
                                 DateRange.TodayStart
-
                                 AND CAST
                                 (
                                     CashData.StatementDate
                                     AS TIMESTAMP
                                 ) <
                                 DateRange.TodayEnd
-
                             THEN
                                 0 -
                                 (
                                     " + convertedAmountExpression + @"
                                 )
-
                             ELSE 0
                         END
                     ),
@@ -832,7 +807,6 @@ CashOutData AS
                 )
                 AS " + numericType + @"
             ),
-
             CAST
             (
                 COALESCE
@@ -846,7 +820,6 @@ CashOutData AS
                 AS INTEGER
             )
         ) AS TodayAmount,
-
         COUNT
         (
             CASE
@@ -857,20 +830,16 @@ CashOutData AS
                         AS TIMESTAMP
                     ) >=
                     DateRange.TodayStart
-
                     AND CAST
                     (
                         CashData.StatementDate
                         AS TIMESTAMP
                     ) <
                     DateRange.TodayEnd
-
                 THEN CashData.C_CashLine_ID
-
                 ELSE NULL
             END
         ) AS DisbursementCount,
-
         ROUND
         (
             CAST
@@ -894,13 +863,11 @@ CashOutData AS
                                     AS TIMESTAMP
                                 ) <
                                 DateRange.SevenDayEnd
-
                             THEN
                                 0 -
                                 (
                                     " + convertedAmountExpression + @"
                                 )
-
                             ELSE 0
                         END
                     ),
@@ -1298,9 +1265,6 @@ TodayRows AS
     )
 
     WHERE CashHeader.IsActive = 'Y'
-
-    AND CashBook.IsActive = 'Y'
-
     AND CashHeader.AD_Client_ID =
     (
         SELECT QueryParameters.AD_Client_ID

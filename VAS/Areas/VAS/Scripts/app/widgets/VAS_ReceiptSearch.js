@@ -71,6 +71,12 @@
         var reqSeq = 0;            /* guards against out-of-order responses */
         var cursor = -1;
         var matches = [];
+        /* Scroll paging: the dropdown loads 25 rows per page and appends more as
+           the user scrolls to the bottom. */
+        var curQuery = '';         /* the active query the paging tracks */
+        var curPage = 1;           /* last page loaded */
+        var hasMore = false;       /* server signalled another page exists */
+        var loadingMore = false;   /* a next-page fetch is in flight */
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -207,6 +213,15 @@
                 var idx = parseInt($(this).attr('data-index'), 10);
                 if (matches[idx]) zoomReceipt(matches[idx].cPaymentId);
             });
+
+            /* Infinite scroll: once near the bottom, pull the next 25-row page. */
+            $suggest.on('scroll', function () {
+                if (!hasMore || loadingMore) { return; }
+                var el = this;
+                if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+                    fetchPage(curPage + 1, true);
+                }
+            });
         }
 
         /* Anchor the dropdown to the input pill (fixed positioning). */
@@ -287,7 +302,7 @@
             return data;
         }
 
-        /* ── Run the search and render the dropdown ── */
+        /* ── Run a fresh search (resets to page 1) and render the dropdown ── */
         function runSearch() {
             var q = $input.val().trim();
             if (!q) { closeSuggest(); return; }
@@ -296,50 +311,72 @@
             $suggest.html('<div class="vas-rsw-state">' + escapeHtml(lbl('VAS_Searching', 'Searching…')) + '</div>');
             openSuggest();
 
+            curQuery = q;
+            curPage = 1;
+            hasMore = false;
+            loadingMore = false;
+            matches = [];
+            fetchPage(1, false);
+        }
+
+        /* Fetch one 25-row page. append=false replaces the list (fresh search);
+           append=true adds the next page's rows to the bottom (infinite scroll). */
+        function fetchPage(page, append) {
+            var q = curQuery;
+            if (!q) { return; }
+            if (append) { loadingMore = true; showLoadMore(true); }
+
             var mySeq = ++reqSeq;
             $.ajax({
                 url: VIS.Application.contextUrl + 'Receipts/SearchReceipts',
                 type: 'GET',
-                data: { q: q, max: 25 },
+                data: { q: q, max: 25, page: page },
                 success: function (res) {
-                    /* Ignore stale responses (a newer keystroke already fired). */
+                    /* Ignore stale responses (a newer keystroke / page already fired). */
                     if (mySeq !== reqSeq) return;
                     var data = parseResponse(res);
                     var rows = (data && data.rows) ? data.rows : [];
-                    renderSuggest(rows, q);
+                    hasMore = !!(data && data.hasMore);
+                    curPage = (data && data.page) ? data.page : page;
+                    if (append) { appendSuggest(rows, q); loadingMore = false; }
+                    else { renderSuggest(rows, q); }
                 },
                 error: function () {
                     if (mySeq !== reqSeq) return;
-                    renderSuggest([], q);
+                    hasMore = false;
+                    if (append) { loadingMore = false; showLoadMore(false); }
+                    else { renderSuggest([], q); }
                 }
             });
         }
 
-        function renderSuggest(rows, q) {
-            matches = rows || [];
-            cursor = -1;
-            ensureSuggest();
-
-            if (matches.length === 0) {
-                $suggest.html('<div class="vas-rsw-empty">' + lbl('VAS_NoReceiptsMatch', 'No receipts match') + ' "<strong>' + escapeHtml(q) + '</strong>".</div>');
-                openSuggest();
-                return;
-            }
-
+        /* Header count line. Shows "N+" while more pages remain — the exact total is
+           not counted (the server signals hasMore via a single look-ahead row). */
+        function metaHtml(q) {
             var word = matches.length === 1 ? lbl('VAS_Match', 'match') : lbl('VAS_Matches', 'matches');
-            var html = '<div class="vas-rsw-meta"><strong>' + matches.length + '</strong> ' + word + ' ' + lbl('VAS_For', 'for') + ' "' + escapeHtml(q) + '"</div>';
+            var count = matches.length + (hasMore ? '+' : '');
+            return '<div class="vas-rsw-meta"><strong>' + count + '</strong> ' + word + ' ' + lbl('VAS_For', 'for') + ' "' + escapeHtml(q) + '"</div>';
+        }
 
-            $.each(matches, function (i, r) {
+        function updateMeta(q) {
+            if (!$suggest) return;
+            var $meta = $suggest.find('.vas-rsw-meta');
+            if ($meta.length) { $meta.replaceWith(metaHtml(q)); }
+        }
+
+        /* Build row markup for a slice, using absolute indices (startIndex + j) so
+           data-index maps into `matches` for click / keyboard selection.
+           Per-row meta order: status-dot + docNo · bank · currency · date · amount ·
+           status · invoice ref · [allocated / reconciled badges] — data first, tags last. */
+        function rowsHtml(rows, startIndex, q) {
+            var html = '';
+            $.each(rows, function (j, r) {
+                var i = startIndex + j;
                 var color = PALETTE[i % PALETTE.length];
 
-                /* Build the per-row meta. Order:
-                     status-dot + docNo · amount · status · bank · currency ·
-                     invoice ref · date · [reconciled / allocated badges]
-                   The reconciled / allocated pills sit at the END so the row
-                   reads as data first, status tags last. */
                 var pieces = [];
                 pieces.push('<span class="vas-rsw-dot" style="background:' + statusColor(r.docStatus) + ';"></span>' + highlight(r.documentNo || '', q));
-                
+
                 var bankText = formatBank(r.bankName, r.accountNo);
                 if (bankText) {
                     pieces.push(highlight(bankText, q));
@@ -367,7 +404,7 @@
                 if (r.isReconciled) {
                     pieces.push('<span class="vas-rsw-flag is-on">' + escapeHtml(lbl('VAS_Reconciled', 'Reconciled')) + '</span>');
                 }
-                
+
                 var meta = pieces.join(' · ');
 
                 html += '<div class="vas-rsw-line" data-index="' + i + '" role="option">' +
@@ -378,9 +415,54 @@
                     '</div>' +
                     '</div>';
             });
+            return html;
+        }
 
-            $suggest.html(html);
+        /* Fresh render (page 1): replace the whole dropdown body. */
+        function renderSuggest(rows, q) {
+            matches = rows || [];
+            cursor = -1;
+            ensureSuggest();
+
+            if (matches.length === 0) {
+                hasMore = false;
+                $suggest.html('<div class="vas-rsw-empty">' + lbl('VAS_NoReceiptsMatch', 'No receipts match') + ' "<strong>' + escapeHtml(q) + '</strong>".</div>');
+                openSuggest();
+                return;
+            }
+
+            $suggest.html(metaHtml(q) + '<div class="vas-rsw-list">' + rowsHtml(matches, 0, q) + '</div>');
+            $suggest.scrollTop(0);
             openSuggest();
+        }
+
+        /* Append the next page's rows to the bottom (infinite scroll). */
+        function appendSuggest(rows, q) {
+            ensureSuggest();
+            showLoadMore(false);
+            if (!rows || rows.length === 0) { updateMeta(q); return; }
+
+            var startIndex = matches.length;
+            matches = matches.concat(rows);
+
+            var $list = $suggest.find('.vas-rsw-list');
+            if ($list.length === 0) { renderSuggest(matches, q); return; }
+
+            $list.append(rowsHtml(rows, startIndex, q));
+            updateMeta(q);
+        }
+
+        /* Show / hide the bottom "Loading more…" indicator during a page fetch. */
+        function showLoadMore(show) {
+            if (!$suggest) return;
+            var $more = $suggest.find('.vas-rsw-more');
+            if (show) {
+                if ($more.length === 0) {
+                    $suggest.append('<div class="vas-rsw-more">' + escapeHtml(lbl('VAS_LoadingMore', 'Loading more…')) + '</div>');
+                }
+            } else {
+                $more.remove();
+            }
         }
 
         /* ── Zoom: fire the value the host listens for to open this receipt in the

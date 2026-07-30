@@ -25,12 +25,38 @@
  * 18  | Previous                             | VAS_053_Previous
  * 19  | Next                                 | VAS_053_Next
  * 20  | Of                                   | VAS_053_Of
+ * 21  | Pending for Approval                 | VAS_053_Subtitle
  * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_053_ApprovalQueueCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -52,10 +78,22 @@
             return isNaN(numberValue) ? 0 : numberValue;
         }
 
+        /* ── Currency label helper ──────────────────────────────────────
+           Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
+            }
+
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
+        }
+
         function formatAmount(item) {
             var precision = Number(item && item.stdPrecision);
-            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
-            var iso = item && item.currencyISO ? item.currencyISO : '';
+            var currency = getCurrencyLabel(item && item.currencySymbol, item && item.currencyISO);
 
             if (isNaN(precision) || precision < 0) {
                 precision = 2;
@@ -68,17 +106,12 @@
             });
             var sign = numericValue < 0 ? '-' : '';
 
-            if (symbol) {
-                return sign + symbol + amount;
-            }
-
-            return iso ? sign + iso + amount : sign + amount;
+            return sign + currency + amount;
         }
 
         function renderAmount($target, item) {
             var precision = Number(item && item.stdPrecision);
-            var symbol = item && item.currencySymbol ? item.currencySymbol : '';
-            var iso = item && item.currencyISO ? item.currencyISO : '';
+            var currency = getCurrencyLabel(item && item.currencySymbol, item && item.currencyISO);
 
             if (isNaN(precision) || precision < 0) {
                 precision = 2;
@@ -94,7 +127,7 @@
             $target.empty()
                 .append($('<span>', {
                     'class': 'VAS-cash-amount-prefix',
-                    'text': (numericValue < 0 ? '-' : '') + (symbol || iso)
+                    'text': (numericValue < 0 ? '-' : '') + currency
                 }))
                 .append($('<span>', {
                     'class': 'VAS-cash-amount-main',
@@ -117,6 +150,47 @@
                 '<line x1="18" y1="6" x2="6" y2="18"></line>' +
                 '<line x1="6" y1="6" x2="18" y2="18"></line>' +
                 '</svg>';
+        }
+
+        /* The framework navigates IN-PLACE (no new window) only when the payload's
+           ActionName equals the name of the window currently HOSTING this widget;
+           otherwise it opens a new window. Resolve the host window name from the
+           listener chain and pass it as ActionName. */
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+                for (var index = 0; index < 6 && listener; index++) {
+                    if (listener.apanel && listener.apanel.gridWindow && listener.apanel.gridWindow.getName) {
+                        return listener.apanel.gridWindow.getName();
+                    }
+                    if (listener.gridWindow && listener.gridWindow.getName) {
+                        return listener.gridWindow.getName();
+                    }
+                    listener = listener.listener;
+                }
+            } catch (e) { }
+            return '';
+        }
+
+        /* Zoom to the cash journal record (C_Cash) behind the queue row — same
+           contract as the Cash Journal search widget (VAS_069). */
+        function zoomToCashJournal(recordId) {
+            recordId = safeNumber(recordId);
+
+            if (!recordId) {
+                return;
+            }
+
+            try {
+                $self.widgetFirevalueChanged({
+                    'TabWhereClause': 'C_Cash.C_Cash_ID=' + recordId,
+                    'TabLayout': 'Y',   /* 'N' Grid, 'Y' Single, 'C' Card */
+                    'TabIndex': '0',
+                    'ActionName': hostWindowName() || 'VAS_CashJournal',
+                    'ActionType': 'W'
+                });
+            }
+            catch (e) { /* zoom is best-effort */ }
         }
 
         function showBusy(show) {
@@ -200,11 +274,27 @@
                 '</span>'
             );
 
+            // Title + subtitle stack (shared Widget Header pattern).
+            var $titleWrap = $('<div>', {
+                'class': 'VAS_053_approval-title-wrap'
+            });
+
             var $title = $('<span>', {
                 'class': 'VAS_053_approval-title',
                 'id': 'VAS_053_approval-title-' + widgetId,
                 'text': lbl('VAS_053_ApprovalQueue', 'Approval Queue')
             });
+
+            var subtitleText = lbl('VAS_053_Subtitle', 'Pending for Approval');
+
+            var $subtitle = $('<span>', {
+                'class': 'VAS_053_approval-subtitle',
+                'id': 'VAS_053_approval-subtitle-' + widgetId,
+                'text': subtitleText,
+                'title': subtitleText
+            });
+
+            $titleWrap.append($title).append($subtitle);
 
             var $meta = $('<span>', {
                 'class': 'VAS_053_approval-meta',
@@ -241,7 +331,7 @@
                 'id': 'VAS_053_approval-state-' + widgetId
             });
 
-            $titleRow.append($icon).append($title).append($meta);
+            $titleRow.append($icon).append($titleWrap).append($meta);
             $header.append($titleRow);
             $footer.append($pager);
             $card.append($busy).append($header).append($list).append($state).append($footer);
@@ -393,11 +483,45 @@
                     'class': 'VAS_053_approval-row-top'
                 });
 
+                // Document title — only the document number is a hyperlink (zooms to
+                // the cash journal record); the rest of the title (" - Cash book")
+                // stays plain text. Falls back to plain text without a record id.
+                var titleText = item.title || item.documentNo || '-';
+                var documentNo = item.documentNo || '';
+                var canZoom = safeNumber(item.cCashId) > 0 && documentNo.length > 0;
+
                 var $title = $('<span>', {
                     'class': 'VAS_053_approval-row-title',
-                    'text': item.title || item.documentNo || '-',
-                    'title': item.title || item.documentNo || '-'
+                    'title': titleText
                 });
+
+                if (canZoom) {
+                    var $docLink = $('<a>', {
+                        'class': 'VAS_053_approval-row-link',
+                        'href': 'javascript:void(0)',
+                        'text': documentNo
+                    });
+
+                    $docLink.on('click', function (event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        zoomToCashJournal(item.cCashId);
+                    });
+
+                    $title.append($docLink);
+
+                    // Remainder of the composed title (cash book name and separator).
+                    var restText = titleText.indexOf(documentNo) === 0
+                        ? titleText.substring(documentNo.length)
+                        : '';
+
+                    if (restText) {
+                        $title.append($('<span>', { 'text': restText }));
+                    }
+                }
+                else {
+                    $title.text(titleText);
+                }
 
                 var $priority = $('<span>', {
                     'class': 'VAS_053_approval-priority VAS_053_approval-priority-' + (item.priorityClass || 'low'),
@@ -559,6 +683,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_053_ApprovalQueueCashJournalWidget.prototype.widgetSizeChange = function (height, width) {

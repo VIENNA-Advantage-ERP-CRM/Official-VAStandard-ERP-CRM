@@ -33,12 +33,7 @@ namespace VIS.Controllers
                 AND Payment.IsActive='Y'
                 AND Payment.TenderType='K'
                 AND Payment.VA009_ExecutionStatus IN ('{X_C_Payment.VA009_EXECUTIONSTATUS_Bounced}' , '{X_C_Payment.VA009_EXECUTIONSTATUS_Rejected}')
-                /*AND (
-                    Payment.VA009_IsCancelled='Y'
-                    OR Payment.IsReversal='Y'
-                    OR Payment.ReversalDoc_ID IS NOT NULL
-                    OR Payment.DocStatus IN ('VO', 'RE')
-                )*/";
+                AND Payment.DocStatus NOT IN ('VO', 'RE')";
 
             bouncedChequesSql = MRole.GetDefault(ctx).AddAccessSQL(
                 bouncedChequesSql,

@@ -28,7 +28,7 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
@@ -40,7 +40,7 @@
        against .vas-aa-root (container-type: inline-size), so the spec's 1.4cqi is
        retuned for the 2-col cell width (≈5.6cqi) and the ceiling raised to 32px so
        content keeps pace with the grid on 2560-wide dashboards. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     display: flex;
@@ -49,23 +49,23 @@
     gap: 0.25em;                     /* spec stack gap between label/value/meta */
     /* Shared neutral glass surface across all KPI cards (dashboard-widgets.md: keep the
        default surface; semantic meaning comes from icon/text/border, not a tinted surface). */
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;                 /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
     cursor: pointer;
     transition: box-shadow 180ms ease;
 }
 
     .vas-aa-card:hover {
-        box-shadow: 0 0.875em 1.875em rgba(15, 61, 97, 0.10);
+        box-shadow: 0 14px 30px rgba(15, 61, 97, 0.10);
     }
 
     .vas-aa-card:focus-visible {
-        outline: 0.125em solid #0083DA;
-        outline-offset: 0.125em;
+        outline: 2px solid #0083DA;
+        outline-offset: 2px;
     }
 
 .vas-aa-head {
@@ -84,13 +84,33 @@
     flex: 1 1 auto;
 }
 
+/* Title + subtitle stacked next to the icon */
+.vas-aa-label-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-aa-subtitle {
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .00963), 13px);
+    font-weight: 400;
+    color: #5F7283;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.125em;
+}
+
 .vas-aa-icon {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
+    /* Widget Header icon well — scales off the same --dash-inline-size lever as
+       the title (2× coefficient), ceiling 40px; radius fixed in px. */
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
     background: linear-gradient(180deg, #FFFFFF, #E5F5EA);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #0B6B45;
     display: flex;
     align-items: center;
@@ -99,8 +119,8 @@
 }
 
     .vas-aa-icon svg {
-        width: 1.125em;
-        height: 1.125em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
         stroke: currentColor;
     }
 
@@ -111,10 +131,10 @@
        anchored on --dash-inline-size (the dashboard's visible content width;
        spec §Widget Header / §Measurement Setup; falls back to 100vw when
        unset). Bounds = 0.97 × the 16–32px root range. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     color: #102C3F;
     font-weight: 400;
-    line-height: 1.3;
+    line-height: 1.2;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -123,14 +143,14 @@
 
 /* Big percentage — success green to match the tint. */
 .vas-aa-metric {
-    padding-left: 0.3125em;           /* ~10px — em resolves on the 2em metric scale */
+    padding-left: 0.3125em;           /* em resolves on the metric scale */
     /* dashboard-widgets.md §"Widget Stat Values": canonical KPI stat —
-       2em, line-height 1.1. Per project request the weight is Bold
-       (700) instead of the spec's Medium (500). */
-    font-size: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.025), 64px);
-    font-weight: 700;
+       1.75em, SemiBold (600), line-height 1.05, on the widget-root lever.
+       Auto-allocation success reads green #0B6B45. */
+    font-size: 1.75em;
+    font-weight: 600;
     color: #0B6B45;
-    line-height: 1.1;
+    line-height: 1.05;
     letter-spacing: -0.025em;
     font-variant-numeric: tabular-nums;
     min-width: 0;
@@ -146,8 +166,8 @@
     max-width: 100%;
     /* dashboard-widgets.md KPI meta: xs token, muted, one step below the
        label so the explanation reads as secondary. */
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    color: #717182;
+    font-size: 0.6875em;
+    color: #5F7283;
     font-weight: 400;
     line-height: 1.3;
     overflow: hidden;
@@ -207,7 +227,7 @@
        fit inside without forcing the body to show a scrollbar. The body still
        has `overflow: auto` as a safety net but should rarely engage at the
        default pageSize of 10. */
-    height: min(34em, 100%);
+    height: min(32em, 100%);
     background: #FFFFFF;
     border-radius: 1em;
     box-shadow: 0 1.5em 3em rgba(15, 61, 97, 0.22);
@@ -253,18 +273,18 @@
 }
 
 .vas-aa-dialog-title {
-    /* Shared viewport-anchored title clamp — matches the widget titles. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    /* Shared title clamp — matches the widget titles (ceiling 17px). */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
     line-height: 1.2;
 }
 
 .vas-aa-dialog-subtitle {
-    margin-top: 0.125em;
-    /* Shared viewport-anchored sm clamp — matches the widget subtitles. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    color: #748494;
+    margin-top: 2px;
+    /* Shared subtitle clamp — matches the widget subtitles (ceiling 13px). */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
     line-height: 1.3;
 }
 
@@ -318,7 +338,7 @@
        token, so the tab labels match the family at every screen size. */
     font-size: 0.875em;
     font-weight: 400;
-    color: #748494;
+    color: #5F7283;
 }
 
     .vas-aa-tab:hover { color: #102C3F; }
@@ -393,13 +413,14 @@
     .vas-aa-dialog-table thead th {
         position: sticky;
         top: 0;
-        background: #FFFFFF;
-        font-size: 0.75em;            /* sm — 0.75em of the dialog base = shared data clamp */
-        font-weight: 400;
-        color: #748494;
+        background: #FFFFFF;         /* surface (not a tint) so rows don't show through the sticky header */
+        font-size: 0.6875em;         /* grid-header rail token */
+        font-weight: 500;
+        color: #41576A;
+        text-transform: capitalize;
         text-align: left;
-        padding: 0.875em 0.75em;
-        border-bottom: 0.0625em solid #EDF2F6;
+        padding: 0.5em 0.75em;
+        border-bottom: 1px solid #C5D2DD;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -417,13 +438,17 @@
         /* Tight row padding so 10 rows + thead fit inside the fixed body
            height without forcing a scrollbar. */
         padding: 0.6875em 0.75em;
-        border-bottom: 0.0625em solid #EDF2F6;
+        border-bottom: 1px solid #E2EAF1;
         font-size: 0.75em;            /* sm — matches widget data px */
         color: #102C3F;
         vertical-align: middle;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .vas-aa-dialog-table tbody tr:last-child td {
+        border-bottom: none;
     }
 
     .vas-aa-dialog-table tbody tr:hover td {
@@ -449,7 +474,7 @@
 }
 
 .vas-aa-td-date {
-    color: #748494;
+    color: #5F7283;
 }
 
 .vas-aa-td-doc {
@@ -459,6 +484,7 @@
 }
 
 .vas-aa-td-customer {
+    /* primary identity cell — bold dark */
     font-weight: 400;
     color: #102C3F;
 }
@@ -475,6 +501,7 @@
 }
 
 .vas-aa-td-amount {
+    /* emphasized value cell — bold, right-aligned */
     text-align: right;
     font-weight: 400;
     color: #0B6B45;
@@ -491,11 +518,59 @@
     color: inherit;
 }
 
-/* Empty / loading states */
+/* ── Unallocated amount column (Unallocated tab only) ─────────────────
+   Rendered for every row but hidden until the table carries
+   .vas-aa-show-unalloc (toggled from the JS on the Unallocated tab). */
+.vas-aa-th-unallocated,
+.vas-aa-td-unallocated {
+    display: none;
+    width: 9em;
+}
+
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-unallocated,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-unallocated {
+    display: table-cell;
+}
+
+.vas-aa-dialog-table thead th.vas-aa-th-unallocated {
+    text-align: right;
+}
+
+.vas-aa-td-unallocated {
+    /* emphasized value cell — bold, right-aligned; distinct dark tone from the
+       green Amount so the "still open" figure reads as its own value. */
+    text-align: right;
+    font-weight: 400;
+    color: #102C3F;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* When the 7th column is visible, reclaim horizontal room from the flexible
+   text columns so the row fits the dialog width without a horizontal scroll. */
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-customer,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-customer { width: 11em; }
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-bank,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-bank { width: 11em; }
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-th-amount,
+.vas-aa-dialog-table.vas-aa-show-unalloc .vas-aa-td-amount { width: 9em; }
+
+/* Empty / loading states — stretch the table to fill the fixed-height dialog
+   body so the single empty cell centers vertically (vertical-align: middle) as
+   well as horizontally (text-align: center): one muted line sitting in the
+   middle of the free space between the sticky header and the footer. `:has()`
+   scopes this to the empty state only, so data rows keep their natural height. */
+.vas-aa-dialog-table:has(.vas-aa-dialog-empty) {
+    height: 100%;
+}
+
 .vas-aa-dialog-empty {
     padding: 2.25em 1em;
     text-align: center;
-    color: #748494;
+    vertical-align: middle;          /* center in the stretched row */
+    color: #5F7283;
     font-size: 0.75em;               /* sm — matches the table data */
     background: #FFFFFF;
 }
@@ -507,14 +582,14 @@
     justify-content: space-between;
     gap: 1em;
     padding: 0.75em 1.125em;
-    border-top: 0.0625em solid #EDF2F6;
+    border-top: 1px solid #D9E2EB;
     background: #FAFCFE;
     flex-shrink: 0;
 }
 
 .vas-aa-pager-helper {
-    font-size: 0.8125em;
-    color: #748494;
+    font-size: 0.75em;               /* footer helper token */
+    color: #5F7283;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -564,8 +639,8 @@
 .vas-aa-pager-text {
     min-width: 3em;
     text-align: center;
-    font-size: 0.875em;
-    font-weight: 400;
+    font-size: 0.8125em;             /* footer page-text token */
+    font-weight: 500;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

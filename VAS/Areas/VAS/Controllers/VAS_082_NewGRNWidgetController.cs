@@ -259,7 +259,7 @@ namespace VIS.Controllers
         [HttpPost]
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult CreateGRN(int poId = 0, string linesJson = null)
+        public JsonResult CreateGRN(int poId = 0, string linesJson = null, int warehouseId = 0)
         {
             if (Session["ctx"] == null)
             {
@@ -281,6 +281,8 @@ namespace VIS.Controllers
                 inputs = new List<NewGRNLineInput>();
             }
             Dictionary<int, decimal> qtyByLine = new Dictionary<int, decimal>();
+            // Review #49: optional locator per PO line from the receive form.
+            Dictionary<int, int> locatorByLine = new Dictionary<int, int>();
 
             foreach (NewGRNLineInput input in inputs)
             {
@@ -295,6 +297,11 @@ namespace VIS.Controllers
                 else
                 {
                     qtyByLine[input.PoLineId] = input.ReceivedQty;
+                }
+
+                if (input.LocatorId > 0)
+                {
+                    locatorByLine[input.PoLineId] = input.LocatorId;
                 }
             }
 
@@ -332,13 +339,15 @@ namespace VIS.Controllers
                     return Fail("Purchase Order is not available for receiving.");
                 }
 
-                int warehouseId = order.GetM_Warehouse_ID();
-                if (warehouseId <= 0)
+                // Review #49: the receive form may pick another warehouse of the
+                // PO's org; without a selection the PO's own warehouse is used.
+                int receiptWarehouseId = warehouseId > 0 ? warehouseId : order.GetM_Warehouse_ID();
+                if (receiptWarehouseId <= 0)
                 {
-                    warehouseId = openLines.Values.First().WarehouseId;
+                    receiptWarehouseId = openLines.Values.First().WarehouseId;
                 }
 
-                int locatorId = GetDefaultLocatorId(warehouseId, trx);
+                int locatorId = GetDefaultLocatorId(receiptWarehouseId, trx);
                 int docTypeId = GetDocTypeId(order.GetAD_Org_ID(), ctx.GetAD_Client_ID());
 
                 if (docTypeId <= 0)
@@ -354,7 +363,7 @@ namespace VIS.Controllers
                 receipt.SetIsReturnTrx(false);
                 receipt.SetMovementType(MInOut.MOVEMENTTYPE_VendorReceipts);
                 receipt.SetC_DocType_ID(docTypeId);
-                receipt.SetM_Warehouse_ID(warehouseId);
+                receipt.SetM_Warehouse_ID(receiptWarehouseId);
                 receipt.SetC_Order_ID(poId);
                 if (locatorId > 0)
                 {
@@ -377,8 +386,13 @@ namespace VIS.Controllers
                     }
 
                     decimal receivedQty = selectedLine.Value;
+                    // Review #49: line-level locator from the form when chosen,
+                    // otherwise the receipt warehouse's default locator.
+                    int lineLocatorId = locatorByLine.ContainsKey(selectedLine.Key) && locatorByLine[selectedLine.Key] > 0
+                        ? locatorByLine[selectedLine.Key]
+                        : locatorId;
                     MInOutLine receiptLine = new MInOutLine(receipt);
-                    receiptLine.SetOrderLine(orderLine, locatorId, receivedQty);
+                    receiptLine.SetOrderLine(orderLine, lineLocatorId, receivedQty);
                     receiptLine.SetQty(receivedQty);
 
                     if (orderLine.GetQtyOrdered() != 0 && orderLine.GetQtyEntered() != orderLine.GetQtyOrdered())
@@ -601,6 +615,60 @@ namespace VIS.Controllers
             return string.IsNullOrEmpty(error) ? fallback : error;
         }
 
+        /// <summary>
+        /// Review #17: resolves the Material Receipt (GRN) window so the widget
+        /// navigates straight to it instead of opening a modal.
+        /// </summary>
+        /// <returns>JSON { windowId }.</returns>
+        [AjaxAuthorizeAttribute]
+        [AjaxSessionFilterAttribute]
+        public JsonResult GetGrnWindowId()
+        {
+            if (Session["ctx"] == null)
+            {
+                return Fail(Msg.GetMsg(Env.GetCtx(), "SessionExpired") ?? "Session Expired");
+            }
+
+            Ctx ctx = Session["ctx"] as Ctx;
+
+            try
+            {
+                int windowId = GetWindowIdByName(ctx, "VAS_MaterialReceipt");
+                if (windowId <= 0) { windowId = GetWindowIdByName(ctx, "Material Receipt"); }
+                return Ok(new { windowId = windowId });
+            }
+            catch (Exception ex)
+            {
+                return Fail(ex.Message);
+            }
+        }
+
+        /// <summary>Active, role-accessible AD_Window id for one window name, or 0.</summary>
+        private int GetWindowIdByName(Ctx ctx, string windowName)
+        {
+            string sql = @"
+                SELECT GrnWindow.AD_Window_ID
+                FROM AD_Window GrnWindow
+                WHERE GrnWindow.IsActive='Y'
+                  AND GrnWindow.Name=@Window_Name
+                  AND GrnWindow.AD_Client_ID IN (0,@Window_Client_ID)";
+
+            sql = MRole.GetDefault(ctx).AddAccessSQL(
+                sql,
+                "GrnWindow",
+                MRole.SQL_FULLYQUALIFIED,
+                MRole.SQL_RO
+            );
+            sql += " ORDER BY GrnWindow.AD_Window_ID DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY";
+
+            // Parameter order matches placeholder appearance (positional binding).
+            return Util.GetValueOfInt(DB.ExecuteScalar(sql, new SqlParameter[]
+            {
+                new SqlParameter("@Window_Name", windowName),
+                new SqlParameter("@Window_Client_ID", ctx.GetAD_Client_ID())
+            }, null));
+        }
+
         /// <summary>Wraps a success payload as a serialized JSON result.</summary>
         /// <param name="result">Anonymous payload object to serialize.</param>
         /// <returns>JSON result.</returns>
@@ -629,6 +697,11 @@ namespace VIS.Controllers
 
             [JsonProperty("receivedQty")]
             public decimal ReceivedQty { get; set; }
+
+            // Review #49: optional line-level locator chosen on the receive
+            // form (0 = use the receipt warehouse's default locator).
+            [JsonProperty("locatorId")]
+            public int LocatorId { get; set; }
         }
 
         private sealed class NewGRNLineInfo

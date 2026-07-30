@@ -442,7 +442,10 @@
                 '<div class="vas-unr-head">' +
                 '<div class="vas-unr-head-left">' +
                 '<div class="vas-unr-icon">' + reconcileIconSvg() + '</div>' +
+                '<div class="vas-unr-label-group">' +
                 '<span class="vas-unr-label">' + escapeHtml(lbl("VAS_011_UnreconciledReceipts", "Unreconciled receipts")) + '</span>' +
+                '<span class="vas-unr-subtitle">' + escapeHtml(lbl("VAS_011_AllTimeNotReconciled", "All-time receipts not yet reconciled")) + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

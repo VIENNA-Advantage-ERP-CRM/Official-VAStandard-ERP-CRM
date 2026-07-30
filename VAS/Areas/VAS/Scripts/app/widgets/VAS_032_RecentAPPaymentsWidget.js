@@ -7,9 +7,10 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Recent payments                      | VAS_032_MessageRecentPayments
- *  2  | Date                                 | VAS_032_MessageDate
+ *  1b | Receipts in last 30 days             | VAS_032_MessageReceiptsLast30Days
+ *  2  | Account Date                         | VAS_032_MessageDate
  *  3  | Vendor                               | VAS_032_MessageVendor
- *  4  | Value (Document Number)              | VAS_032_MessageValueDocumentNumber
+ *  4  | Document Number                      | VAS_032_MessageValueDocumentNumber
  *  5  | Method                               | VAS_032_MessageMethod
  *  6  | Bank Account Name                    | VAS_032_MessageBankAccountName
  *  7  | Status                               | VAS_032_MessageStatus
@@ -53,6 +54,7 @@
         var $pagerPrev;
         var $pagerNext;
         var $pagerText;
+        var $showingText;
         var $busy;
         var $state;
         var $dialog;
@@ -68,8 +70,11 @@
         var pageSize = 7;
         var totalPages = 0;
         var resizeObserver = null;
-        var widgetRowHeight = 36;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var widgetRowHeight = 44;
         var widgetMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -83,6 +88,46 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+        }
+
+        function normalizeResponse(response) {
+            if (typeof response !== 'string') {
+                return response;
+            }
+
+            try {
+                return JSON.parse(response);
+            }
+            catch (error) {
+                return null;
+            }
+        }
+
+        function getResponseMessage(data, fallback) {
+            var key;
+
+            if (!data) {
+                return fallback;
+            }
+
+            key = data.errorKey || data.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    data.error ||
+                    data.errorText ||
+                    data.message ||
+                    fallback
+                );
+            }
+
+            return (
+                data.error ||
+                data.errorText ||
+                data.message ||
+                fallback
+            );
         }
 
         this.Initalize = function () {
@@ -105,6 +150,12 @@
             );
 
             var $title = $('<div class="vas-recent-ap-payments-title">').text(lbl('VAS_032_MessageRecentPayments', 'Recent payments'));
+            var $sub = $('<div class="vas-recent-ap-payments-sub">').text(lbl('VAS_032_MessageReceiptsLast30Days', 'Receipts in last 30 days'));
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the title wrap is a centred flex row. */
+            var $headText = $('<div class="vas-recent-ap-payments-head-text">').append($title).append($sub);
 
             $pager = $('<div class="vas-recent-ap-payments-pager">');
             $pagerPrev = $('<button type="button" class="vas-recent-ap-payments-page-btn" aria-label="' + lbl('VAS_Previous', 'Previous') + '">' +
@@ -122,16 +173,17 @@
             $pager.append($pagerPrev).append($pagerText).append($pagerNext);
 
             $iconBox.append($icon);
-            $titleWrap.append($iconBox).append($title);
+            $titleWrap.append($iconBox).append($headText);
 
             $head.append($titleWrap);
 
             $tableWrap = $('<div class="vas-recent-ap-payments-table-wrap">');
             var $foot = $('<div class="vas-recent-ap-payments-footer">');
+            $showingText = $('<div class="vas-recent-ap-payments-showing">');
             $busy = $('<div class="vas-recent-ap-payments-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $state = $('<div class="vas-recent-ap-payments-state-message">');
 
-            $foot.append($pager);
+            $foot.append($showingText).append($pager);
             $card.append($head).append($tableWrap).append($foot).append($busy).append($state);
             $root.empty().append($card);
             createDialog();
@@ -205,12 +257,13 @@
             });
         }
 
+
         function renderData(data) {
             paymentsData = $.isArray(data.payments)
                 ? $.grep(data.payments, function (payment) {
                     var amount = Number(payment.amount || 0);
 
-                    return !isNaN(amount) && amount > 0;
+                    return !isNaN(amount);
                 })
                 : [];
 
@@ -223,6 +276,7 @@
             totalPages = Math.ceil(paymentsData.length / pageSize);
             renderPage();
         }
+
 
         function renderPage() {
             if (!paymentsData || paymentsData.length === 0) {
@@ -245,6 +299,25 @@
 
             renderTable(pagePayments);
             updatePager();
+
+            // Real rows exist now, so re-check the fit against their height.
+            updateAdaptivePageSize();
+        }
+
+        /*
+         * The fixed height is only a starting guess; once a row is on screen
+         * its real height is used so the count matches what actually fits.
+         */
+        function measureWidgetRowHeight() {
+            var $row = $tableWrap
+                ? $tableWrap.find('tbody tr').first()
+                : null;
+
+            var measured = $row && $row.length
+                ? $row.outerHeight(true)
+                : 0;
+
+            return measured > 0 ? measured : widgetRowHeight;
         }
 
         function updateAdaptivePageSize() {
@@ -254,11 +327,22 @@
 
             var headerHeight = $tableWrap.find('thead').outerHeight() || 34;
             var availableHeight = Math.max(0, $tableWrap[0].clientHeight - headerHeight);
-            var nextPageSize = Math.max(widgetMinimumRows, Math.floor(availableHeight / widgetRowHeight));
+            var nextPageSize = Math.max(widgetMinimumRows, Math.floor(availableHeight / measureWidgetRowHeight()));
 
             if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
                 return;
             }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
 
             var firstVisibleRecord = ((pageNo - 1) * pageSize) + 1;
 
@@ -288,6 +372,48 @@
 
                 resizeObserver.observe($tableWrap[0]);
             }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+                resizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
+            }
         }
 
         function renderTable(payments) {
@@ -298,8 +424,8 @@
             var $headerRow = $('<tr>');
 
             $headerRow
-                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Date')))
-                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Value')))
+                .append($('<th class="vas-recent-ap-payments-date">').text(lbl('VAS_032_MessageDate', 'Account Date')))
+                .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
                 .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
                 .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
                 .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name')))
@@ -324,13 +450,26 @@
                 return;
             }
 
+            if ($showingText) {
+                var count = paymentsData.length;
+                var startIndex = count > 0 ? ((pageNo - 1) * pageSize) + 1 : 0;
+                var endIndex = count > 0 ? Math.min(pageNo * pageSize, count) : 0;
+
+                $showingText.text(
+                    count > 0
+                        ? lbl('VAS_Showing', 'Showing') + ' ' +
+                          startIndex + '–' + endIndex + ' ' +
+                          lbl('VAS_Of', 'of') + ' ' + count
+                        : ''
+                );
+            }
+
+            /* A single page still says where you are: blanking the indicator
+               left the two arrows framing an empty gap, which reads as a pager
+               that failed to load rather than one with nowhere to go. The
+               arrows below already carry that by being disabled. */
             if ($pagerText) {
-                if (totalPages > 1) {
-                    $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages);
-                }
-                else {
-                    $pagerText.text('');
-                }
+                $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + Math.max(1, totalPages));
             }
 
             if ($pagerPrev) {
@@ -351,7 +490,7 @@
             var bankAccountText = getBankAccountText(payment);
             var vendorName = payment.vendorName || lbl('VAS_032_MessageNotSpecified', '-');
             var paymentMethodName = payment.paymentMethodName || lbl('VAS_032_MessageNotSpecified', '-');
-            var amountText = formatCurrencyAmount(
+            var amountText = formatWidgetCurrencyAmount(
                 payment.amount,
                 payment.currencySymbol,
                 payment.currencyISO,
@@ -424,17 +563,53 @@
         function getBankAccountText(payment) {
             var accountName = String(payment.bankAccountName || '').trim();
             var bankName = String(payment.bankName || '').trim();
-            var accountTail = last4(payment.bankAccountNo);
+            var accountTail = last4(
+                payment.bankAccountNo ||
+                payment.accountNo ||
+                payment.AccountNo
+            );
+            var parsedAccount = parseBankAccountLabel(accountName);
+            var accountLabel = parsedAccount.label || bankName;
 
-            if (accountName) {
-                return accountName;
+            if (!accountTail) {
+                accountTail = parsedAccount.tail;
             }
 
-            if (bankName) {
-                return bankName;
+            if (accountLabel && accountTail) {
+                return accountLabel + ' ****' + accountTail;
+            }
+
+            if (accountLabel) {
+                return accountLabel;
             }
 
             return accountTail ? '****' + accountTail : '';
+        }
+
+        function parseBankAccountLabel(value) {
+            var text = String(value || '').trim();
+            var match;
+
+            if (!text) {
+                return {
+                    label: '',
+                    tail: ''
+                };
+            }
+
+            match = /^(\d+)\s*[-–—]\s*(.+)$/.exec(text);
+
+            if (match) {
+                return {
+                    label: match[2].trim(),
+                    tail: last4(match[1])
+                };
+            }
+
+            return {
+                label: text,
+                tail: ''
+            };
         }
 
         function fieldHtml(label, valueHtml, extraClass, title) {
@@ -753,7 +928,10 @@
         }
 
         function formatAllocAmount(value, currencySymbol, stdPrecision) {
-            var amount = Number(value || 0).toLocaleString(
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+
+            var amount = Math.abs(numericValue).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits: stdPrecision,
@@ -763,8 +941,8 @@
 
             return escapeHtml(
                 currencySymbol
-                    ? currencySymbol + amount
-                    : amount
+                    ? sign + currencySymbol + amount
+                    : sign + amount
             );
         }
 
@@ -839,16 +1017,43 @@
                 return '';
             }
 
-            var date = new Date(value);
+            var match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));
+            var date = match
+                ? new Date(
+                    Number(match[1]),
+                    Number(match[2]) - 1,
+                    Number(match[3])
+                )
+                : new Date(value);
 
             if (isNaN(date.getTime())) {
                 return value;
             }
 
-            return date.toLocaleDateString(window.navigator.language, {
-                day: '2-digit',
-                month: 'short'
-            });
+            return getShortMonthName(date.getMonth()) + ' ' +
+                pad2(date.getDate()) + ', ' +
+                date.getFullYear();
+        }
+
+        function getShortMonthName(monthIndex) {
+            return [
+                'Jan',
+                'Feb',
+                'Mar',
+                'Apr',
+                'May',
+                'Jun',
+                'Jul',
+                'Aug',
+                'Sep',
+                'Oct',
+                'Nov',
+                'Dec'
+            ][monthIndex] || '';
+        }
+
+        function pad2(value) {
+            return value < 10 ? '0' + value : String(value);
         }
 
         function formatCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {
@@ -863,16 +1068,30 @@
                 precision = 2;
             }
 
-            var amount = numericValue.toLocaleString(window.navigator.language, {
+            var sign = numericValue < 0 ? '-' : '';
+
+            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
                 minimumFractionDigits: precision,
                 maximumFractionDigits: precision
             });
 
             if (currencySymbol) {
-                return currencySymbol + amount;
+                return sign + currencySymbol + amount;
             }
 
-            return currencyISO ? amount + ' ' + currencyISO : amount;
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function formatWidgetCurrencyAmount(value, currencySymbol, currencyISO, stdPrecision) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+
+            return sign + formatCurrencyAmount(
+                Math.abs(numericValue),
+                currencySymbol,
+                currencyISO,
+                stdPrecision
+            );
         }
         function renderAllocationLinesTable(
             lines,
@@ -1021,7 +1240,10 @@
 
             if (!paymentId || paymentId <= 0) {
                 VIS.ADialog.error(
-                    'Payment ID is required.'
+                    lbl(
+                        'VAS_032_MessagePaymentIdRequired',
+                        'Payment ID is required.'
+                    )
                 );
                 return;
             }
@@ -1048,14 +1270,13 @@
                         data.error
                     ) {
                         VIS.ADialog.error(
-                            (
-                                data &&
-                                (
-                                    data.error ||
-                                    data.errorText
+                            getResponseMessage(
+                                data,
+                                lbl(
+                                    'VAS_032_CouldNotLoadAllocationDetails',
+                                    'Could not load allocation details.'
                                 )
-                            ) ||
-                            'Could not load allocation details.'
+                            )
                         );
                         return;
                     }
@@ -1065,7 +1286,10 @@
 
                 error: function () {
                     VIS.ADialog.error(
-                        'Could not load allocation details.'
+                        lbl(
+                            'VAS_032_CouldNotLoadAllocationDetails',
+                            'Could not load allocation details.'
+                        )
                     );
                 }
             });
@@ -1268,10 +1492,7 @@
         this.disposeComponent = function () {
             isDisposed = true;
 
-            if (resizeObserver) {
-                resizeObserver.disconnect();
-                resizeObserver = null;
-            }
+            teardownAdaptivePagination();
 
             $root.remove();
             closeDialog();

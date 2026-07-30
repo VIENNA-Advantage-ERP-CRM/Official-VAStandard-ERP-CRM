@@ -12,6 +12,10 @@
     height: 100%;
     container-type: inline-size;
     position: relative;
+    /* Review #39: own text colour + font so the tile cannot inherit a
+       different look from each deployment's page styles. */
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
 }
 
     .vas-ogrn-root,
@@ -30,11 +34,16 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     text-align: left;
+    overflow: hidden;
     border: 2px solid #FFFFFF;          /* px — physical edge, not scaled */
     border-radius: 14px;                /* px */
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06); /* px */
+    /* Review #39: same glass surface as the Overall Inventory KPI tiles —
+       without it the card is transparent and looks different per deployment. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
     padding: 0.875em;                   /* Widget Edge Spacing default */
     cursor: pointer;
     transition: box-shadow 180ms ease, transform 180ms ease;
@@ -62,8 +71,9 @@
 /* Stat label = widget title (Widget Header). No subtitle on stat cards.
    Anchored to the dashboard-container width, not the widget-root em. */
 .vas-ogrn-label {
-    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 16px);
-    font-weight: 500;                   /* Roboto Medium */
+    /* Review #39: same label spec as the Overall Inventory KPI tiles. */
+    font-size: 1em;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.3;
 }
@@ -85,7 +95,7 @@
 .vas-ogrn-meta {
     font-size: 0.6875em;
     font-weight: 400;                   /* Roboto Regular */
-    color: #5F7283;
+    color: #748494;
     line-height: 1.3;
     margin-top: 0.25em;                 /* value/meta stack gap */
     overflow: hidden;

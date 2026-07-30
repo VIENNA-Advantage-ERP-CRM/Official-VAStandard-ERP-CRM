@@ -193,13 +193,14 @@
             });
         }
 
-        /* Compact "18 May" used by the row meta line (image_1). */
+        /* Compact "18 May 2026" used by the row meta line (image_1) — the year
+           is kept so the invoice due date is unambiguous across year boundaries. */
         function formatShortDate(value) {
             if (!value) { return ""; }
             var d = new Date(value);
             if (isNaN(d.getTime())) { return value; }
             return d.toLocaleDateString(window.navigator.language, {
-                day: "numeric", month: "short"
+                day: "numeric", month: "short", year: "numeric"
             });
         }
 
@@ -444,7 +445,17 @@
         }
 
         function renderDetail(data) {
-            var balance = Number(data.BalanceAfterApply || 0);
+            /* AR credit memos (DocBaseType ARC) offset receivables — the invoice's
+               grand total / open amount display as negative, and the balance and
+               amount signal use the signed open amount. */
+            var isCreditMemo = data.InvoiceDocBaseType === 'ARC';
+            var openInvSigned = isCreditMemo ? -Math.abs(Number(data.OpenAmount || 0)) : Number(data.OpenAmount || 0);
+            var grandSigned = isCreditMemo ? -Math.abs(Number(data.GrandTotal || 0)) : Number(data.GrandTotal || 0);
+            var openPaySigned = isCreditMemo ? -Math.abs(Number(data.OpenAmountPay || 0)) : Number(data.OpenAmountPay || 0);
+
+            var balance = isCreditMemo
+                ? (openPaySigned - Number(data.ReceiptAmount || 0))
+                : Number(data.BalanceAfterApply || 0);
             var isShort = balance > 0;       /* receipt < open: schedule stays partly open */
             var isOver = balance < 0;        /* receipt > open: remainder stays on the receipt */
 
@@ -463,16 +474,17 @@
 
             /* 2 — two-pane compare with a link arrow between them. */
             var receiptAmt = formatAmount(data.ReceiptAmount, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
-            var grandTotal = formatAmount(data.GrandTotal, data.InvoiceCurrencySymbol, data.InvoicePrecision);
-            var openAmt = formatAmount(data.OpenAmount, data.InvoiceCurrencySymbol, data.InvoicePrecision);
+            var grandTotal = formatAmount(grandSigned, data.InvoiceCurrencySymbol, data.InvoicePrecision);
+            var openAmt = formatAmount(openInvSigned, data.InvoiceCurrencySymbol, data.InvoicePrecision);
             /* Open amount converted to the receipt currency at the payment date —
                basis of the compare, balance line and amount signal. */
-            var openAmtPay = formatAmount(data.OpenAmountPay, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
+            var openAmtPay = formatAmount(openPaySigned, data.ReceiptCurrencySymbol, data.ReceiptPrecision);
 
             var paymentPane =
                 '<div class="vas-msug-pane">' +
                 '<div class="vas-msug-pane-head">' + escapeHtml(lbl("VAS_035_PaymentReceipt", "Payment · Receipt")) +
                 '<span class="vas-msug-pane-doc">' + escapeHtml(data.ReceiptNo || '') + '</span></div>' +
+                paneRow(lbl("VAS_035_DocumentType", "Document Type"), data.ReceiptDocType) +
                 paneRow(lbl("VAS_035_ReceiptDate", "Receipt Date"), formatDate(data.ReceiptDate)) +
                 paneRow(lbl("VAS_Customer", "Customer"), data.ReceiptCustomer) +
                 paneRow(lbl("VAS_035_PaymentMethod", "Payment Method"), data.PaymentMethod) +
@@ -486,6 +498,7 @@
                 '<div class="vas-msug-pane">' +
                 '<div class="vas-msug-pane-head">' + escapeHtml(lbl("VAS_035_SuggestedInvoice", "Suggested Invoice")) +
                 '<span class="vas-msug-pane-doc">' + escapeHtml(data.InvoiceNo || '') + '</span></div>' +
+                paneRow(lbl("VAS_035_DocumentType", "Document Type"), data.InvoiceDocType) +
                 paneRow(lbl("VAS_035_InvoiceDate", "Invoice Date"), formatDate(data.InvoiceDate)) +
                 paneRow(lbl("VAS_Customer", "Customer"), data.InvoiceCustomer) +
                 paneRow(lbl("VAS_035_PaymentTerms", "Payment Terms"), data.PaymentTerms) +

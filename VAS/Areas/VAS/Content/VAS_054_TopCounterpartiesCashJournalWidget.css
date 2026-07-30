@@ -17,13 +17,17 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    /* Query container only — no font-size (see card), so container-query em
+       breakpoints resolve against 16px like ExpectedThisWeek. */
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
     color: #102C3F;
 }
 
 .VAS_054_counterparties-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -32,11 +36,11 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.875em;
-    padding: 0.875em;
+    gap: 0.625em;
+    padding: 0.85em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102C3F;
 }
@@ -57,23 +61,32 @@
     min-width: 0;
 }
 
+/* Title + subtitle stack next to the header icon. */
+.VAS_054_counterparties-title-wrap {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
 .VAS_054_counterparties-icon {
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #E4EDF4;
-    border-radius: 0.375em;
-    background: rgba(0, 131, 218, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
     color: #4F83D8;
 }
 
     .VAS_054_counterparties-icon svg {
-        width: 1em;
-        height: 1em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     }
 
 .VAS_054_counterparties-title {
@@ -81,20 +94,25 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     line-height: 1.2;
     font-weight: 400;
     letter-spacing: 0;
     color: #102C3F;
 }
 
-.VAS_054_counterparties-meta {
-    flex: 0 0 auto;
-    font-size: 0.6875em;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: #748494;
+/* Header subtitle — shared Widget Header subtitle clamp (replaces the former
+   "Last 30 Days" meta chip). */
+.VAS_054_counterparties-subtitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    line-height: 1.3;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: #717182;
 }
 
 .VAS_054_counterparties-action {
@@ -111,109 +129,98 @@
     cursor: pointer;
 }
 
-/* Scroll body — wraps col-headers + rows so both scroll together */
+/* Body — rows fit the cell; the footer pager handles overflow (no inner
+   scrollbars). Overflow is clipped rather than scrolled. */
 .VAS_054_counterparties-body {
     min-width: 0;
     min-height: 0;
     flex: 1 1 auto;
-    overflow: auto;
+    overflow: hidden;
     direction: ltr;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(16, 44, 63, 0.18) transparent;
-}
-
-.VAS_054_counterparties-body::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-}
-
-.VAS_054_counterparties-body::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.VAS_054_counterparties-body::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: rgba(16, 44, 63, 0.18);
 }
 
 .VAS_054_counterparties-table {
     width: 100%;
-    min-width: 46em;
     table-layout: fixed;
     border-collapse: collapse;
     border-spacing: 0;
 }
 
+/* Cell rhythm mirrors VAS_052 (Today's Cashbook) so the two cash-journal grids
+   read at the same scale side by side. */
 .VAS_054_counterparties-table th,
 .VAS_054_counterparties-table td {
     min-width: 0;
-    padding: 0.375em 0.5em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     vertical-align: middle;
-    border-bottom: 1px solid rgba(212, 225, 234, 0.66);
 }
 
+/* Column-header rail */
 .VAS_054_counterparties-table th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background: #FFFFFF;
-    padding-top: 0;
-    padding-bottom: 0.5em;
-    color: #748494;
-    font-size: 0.75em;
+    padding: 0.5em 0.75em;
+    background: transparent;
+    color: #41576A;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.6875em;
     line-height: 1.2;
-    font-weight: 400;
+    font-weight: 500;
     letter-spacing: 0;
     text-align: left;
     text-transform: capitalize;
-    border-bottom-color: rgba(212, 225, 234, 0.72);
+    border-bottom: 1px solid #C5D2DD;
 }
 
+/* Body cells — sm token, muted regular by default */
 .VAS_054_counterparties-table td {
+    padding: 0.625em 0.75em;
+    color: #5F7283;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 400;
     text-align: left !important;
-}
-
-.VAS_054_counterparties-table tbody tr {
-    height: 3em;
+    border-bottom: 1px solid #E2EAF1;
 }
 
 .VAS_054_counterparties-table tbody tr:last-child td {
     border-bottom: 0;
 }
 
+/* Column widths are percentages that sum to 100% so the fixed-layout table
+   fits the card width exactly. Fixed em widths made the columns sum wider than
+   the card, so the table overflowed and the right-most Volume column was
+   clipped by the card's overflow:hidden. */
 .VAS_054_counterparties-col-avatar,
 .VAS_054_counterparties-cell-avatar {
-    width: 2em;
+    width: 7%;
 }
 
 .VAS_054_counterparties-col-party,
 .VAS_054_counterparties-cell-party {
-    width: 12em;
+    width: 28%;
 }
 
 .VAS_054_counterparties-col-type,
 .VAS_054_counterparties-cell-type {
-    width: 7em;
+    width: 16%;
 }
 
 .VAS_054_counterparties-col-txns,
 .VAS_054_counterparties-count {
-    width: 3em;
-    text-align: left !important;
+    width: 8%;
+    text-align: right !important;
 }
 
 .VAS_054_counterparties-col-trend,
 .VAS_054_counterparties-spark-wrap {
-    width: 9em;
+    width: 16%;
 }
 
 .VAS_054_counterparties-col-volume,
 .VAS_054_counterparties-cell-volume {
-    width: 20em;
-    text-align: left !important;
+    width: 24%;
+    text-align: right !important;
 }
 
 .VAS_054_counterparties-avatar {
@@ -224,7 +231,8 @@
     justify-content: center;
     border-radius: 10px;
     color: #FFFFFF;
-    font-size: 0.75em;
+    /* Sized off the cell text (see the note on -name) rather than compounding. */
+    font-size: 1em;
     line-height: 1;
     font-weight: 800;
     letter-spacing: 0;
@@ -250,57 +258,31 @@
     background: #7C8795;
 }
 
+/* Cell content sits INSIDE the td (already 0.75em), so an em font-size here
+   compounds and renders smaller than VAS_052's cells. Inherit the cell size
+   (1em) and let weight / colour carry the emphasis, exactly like VAS_052. */
 .VAS_054_counterparties-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     unicode-bidi: plaintext;
-    font-size: 0.8125em;
+    font-size: 1em;
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 400;
     color: #102C3F;
 }
 
-.VAS_054_counterparties-chip {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0.3em 0.75em;
-    border-radius: 7px;
-    border: 1px solid transparent;
-    font-size: 0.625em;
-    line-height: 1.1;
-    font-weight: 800;
-    letter-spacing: 0;
+/* Type — plain text (no chip / pill), like the Cash Type column in the other
+   cash-journal widgets. Truncation comes from the shared cell rule. */
+.VAS_054_counterparties-cell-type {
     text-transform: capitalize;
 }
 
-.VAS_054_counterparties-chip-vendor {
-    background: rgba(164, 67, 67, 0.08);
-    border-color: rgba(164, 67, 67, 0.35);
-    color: #9F4545;
-}
-
-.VAS_054_counterparties-chip-customer {
-    background: rgba(12, 116, 87, 0.07);
-    border-color: rgba(12, 116, 87, 0.35);
-    color: #2D7555;
-}
-
-.VAS_054_counterparties-chip-bank,
-.VAS_054_counterparties-chip-cashbook,
-.VAS_054_counterparties-chip-other {
-    background: rgba(0, 120, 212, 0.07);
-    border-color: rgba(0, 120, 212, 0.30);
-    color: #2C6EAA;
-}
-
 .VAS_054_counterparties-count {
-    color: #748494;
-    font-size: 0.8125em;
-    font-weight: 600;
+    color: #5F7283;
+    font-size: 1em;
+    font-weight: 400;
 }
 
 .VAS_054_counterparties-spark-wrap {
@@ -311,7 +293,7 @@
     width: 100%;
     height: 100%;
     display: block;
-    overflow: visible;
+    overflow: hidden;
 }
 
     .VAS_054_counterparties-sparkline polyline {
@@ -322,11 +304,11 @@
     }
 
 .VAS_054_counterparties-sparkline-up polyline {
-    stroke: #519B67;
+    stroke: #0083DA;
 }
 
 .VAS_054_counterparties-sparkline-down polyline {
-    stroke: #B94E4B;
+    stroke: #D14545;
 }
 
 .VAS_054_counterparties-sparkline-flat polyline {
@@ -335,66 +317,19 @@
 }
 
 .VAS_054_counterparties-amount {
+    display: block;
+    width: 100%;
     min-width: 0;
     max-width: 100%;
-    overflow: visible;
-    text-overflow: clip;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: left;
-    display: inline-flex;
-    align-items: baseline;
-    justify-content: flex-start;
-    gap: 0;
-    font-size: 0.8125em;
-    line-height: 1;
-    font-weight: 700;
+    text-align: right;
+    font-size: 1em;
+    line-height: 1.2;
+    font-weight: 400;
     color: #102C3F;
-}
-
-.VAS_054_counterparties-amount .VAS-cash-amount-prefix {
-    flex: 0 0 auto;
-    margin-top: 0.08em;
-    font-size: 0.72em;
-    line-height: 1;
-    font-weight: 500;
-    color: currentColor;
-    opacity: 0.78;
-}
-
-.VAS_054_counterparties-amount .VAS-cash-amount-prefix:empty,
-.VAS_054_counterparties-amount .VAS-cash-amount-decimal:empty {
-    display: none;
-    margin: 0;
-}
-
-.VAS_054_counterparties-amount .VAS-cash-amount-main {
-    min-width: 0;
-    overflow: visible;
-    text-overflow: clip;
-    font-size: 1em;
-    line-height: 1;
-    font-weight: 700;
-    color: currentColor;
-}
-
-.VAS_054_counterparties-amount .VAS-cash-amount-decimal {
-    flex: 0 0 auto;
-    margin-top: 0.26em;
-    font-size: 0.72em;
-    line-height: 1;
-    font-weight: 500;
-    color: currentColor;
-    opacity: 0.66;
-}
-
-.VAS_054_counterparties-amount .VAS-cash-amount-prefix,
-.VAS_054_counterparties-amount .VAS-cash-amount-decimal {
-    align-self: baseline;
-    margin-top: 0;
-    color: currentColor;
-    font-size: 1em;
-    font-weight: 700;
-    opacity: 1;
+    font-variant-numeric: tabular-nums;
 }
 
 .VAS_054_counterparties-busy {
@@ -448,7 +383,7 @@
     gap: 0.625em;
     margin-top: 0.25em;
     padding-top: 0.5em;
-    border-top: 1px solid rgba(212, 225, 234, 0.66);
+    border-top: 1px solid #D9E2EB;
 }
 
 .VAS_054_counterparties-footer-info {
@@ -494,7 +429,7 @@
     }
 
     .VAS_054_counterparties-page-btn:disabled {
-        color: #c7d3df;
+        color: #B8C6D2;
         background: rgba(255, 255, 255, 0.64);
         cursor: default;
     }
@@ -509,17 +444,24 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Container steps mirror VAS_052 so both cash-journal grids condense at the
+   same widths. */
 @container (max-width: 38em) {
-    .VAS_054_counterparties-meta {
+    .VAS_054_counterparties-card {
+        padding: 0.75em;
+        gap: 0.5em;
+        border-radius: 12px;
+    }
+
+    .VAS_054_counterparties-subtitle {
         display: none;
     }
 }
 
 @container (max-width: 26em) {
     .VAS_054_counterparties-card {
-        padding: 0.75em;
+        padding: 0.625em;
         gap: 0.375em;
-        border-radius: 12px;
     }
 
     .VAS_054_counterparties-action {
@@ -569,7 +511,7 @@
 }
 
 .VAS_054_counterparties-page-btn:disabled {
-    color: #c7d3df;
+    color: #B8C6D2;
     background: rgba(255, 255, 255, 0.64);
 }
 
@@ -601,13 +543,14 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #748494;
-    font-size: 0.8125rem;
+    font-size: 0.75em;
     font-weight: 400;
 }
 
 .VAS_054_counterparties-page-btn {
     width: 24px;
     height: 24px;
+    color: #0083DA;
 }
 
 .VAS_054_counterparties-page-btn svg {
@@ -616,12 +559,26 @@
 }
 
 .VAS_054_counterparties-page-text {
-    font-size: 0.85rem;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
 }
 
+.VAS_054_counterparties-table .VAS_054_counterparties-col-txns,
+.VAS_054_counterparties-table .VAS_054_counterparties-count,
 .VAS_054_counterparties-table .VAS_054_counterparties-col-volume,
 .VAS_054_counterparties-table .VAS_054_counterparties-cell-volume,
 .VAS_054_counterparties-table thead th:last-child,
 .VAS_054_counterparties-table tbody td:last-child {
     text-align: right !important;
+}
+
+/* Responsive shrink — VAS_012 pattern: step the whole card font-size down on
+   narrow cells so all em-based content scales together. */
+@container (max-width: 18.75em) {
+    .VAS_054_counterparties-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {
+    .VAS_054_counterparties-card { font-size: 0.6875em; }
 }

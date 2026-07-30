@@ -117,7 +117,7 @@
             if ($listBody) {
                 $listBody.html(
                     '<div class="vas-cpm-nodata">' +
-                    lbl("VIS_NoData", "No data") +
+                    lbl("VAS_034_NoData", "No Data Found") +
                     '</div>'
                 );
             }
@@ -153,7 +153,7 @@
                 return;
             }
 
-            var maxRows = Math.min(rows.length, 4);
+            var maxRows = Math.min(rows.length, 5);
             var topMethodName = "";
 
             for (var i = 0; i < maxRows; i++) {
@@ -168,7 +168,7 @@
                 var color = METHOD_COLORS[i % METHOD_COLORS.length];
 
                 var absVal = percent;
-                var stdPrecision = VIS.Env.getCtx().getStdPrecision();
+                var stdPrecision = 2;
                 var formattedPercent = absVal.toLocaleString(window.navigator.language, {
                     minimumFractionDigits: stdPrecision,
                     maximumFractionDigits: stdPrecision

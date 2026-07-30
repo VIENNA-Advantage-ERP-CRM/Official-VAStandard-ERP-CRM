@@ -39,35 +39,44 @@ namespace VIS.Controllers
 
             string cteSchemaCurrency = @"SELECT ci.AD_Client_ID, cs.C_Currency_ID AS Acct_Currency_ID, cur.StdPrecision, cur.ISO_Code AS ISO_Code,
                     CASE WHEN cur.CurSymbol IS NOT NULL THEN cur.CurSymbol ELSE cur.ISO_Code END AS Cur_Symbol
-                    FROM AD_ClientInfo ci 
-                    INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID) 
-                    INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)";
+                    FROM AD_ClientInfo ci
+                    INNER JOIN C_AcctSchema cs ON (cs.C_AcctSchema_ID=ci.C_AcctSchema1_ID)
+                    INNER JOIN C_Currency cur ON (cur.C_Currency_ID=cs.C_Currency_ID)
+                    WHERE ci.AD_Client_ID=" + ctx.GetAD_Client_ID();
 
-            string mainQuery = @"SELECT ROUND(COALESCE(SUM(CASE 
-                    WHEN i.IsReturnTrx='N' THEN 
+            /* Aggregate the overdue figures in their own subquery. An aggregate
+               with no GROUP BY always yields exactly one row (SUM/COUNT = 0 when
+               nothing matches), so CROSS JOINing it with the single-row currency
+               CTE below always carries the currency — even at zero overdue. */
+            string overdueQuery = @"SELECT COALESCE(SUM(CASE
+                    WHEN i.IsReturnTrx='N' THEN
                      CurrencyConvert(COALESCE(ips.DueAmt, 0), i.C_Currency_ID, sc.Acct_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
-                    WHEN i.IsReturnTrx='Y' THEN 
+                    WHEN i.IsReturnTrx='Y' THEN
                      -CurrencyConvert(COALESCE(ips.DueAmt, 0), i.C_Currency_ID, sc.Acct_Currency_ID, i.DateAcct, i.C_ConversionType_ID, i.AD_Client_ID, i.AD_Org_ID)
-                    ELSE 0 END), 0), MAX(sc.StdPrecision)) AS Total_Overdue_Outstanding_Amount, COUNT(DISTINCT i.C_Invoice_ID) AS Overdue_Invoice_Count,
-                    MAX(sc.Cur_Symbol) AS Cur_Symbol, MAX(sc.ISO_Code) AS ISO_Code, MAX(sc.StdPrecision) AS Std_Precision
-                    FROM C_InvoicePaySchedule ips 
-                    INNER JOIN C_Invoice i ON (ips.C_Invoice_ID=i.C_Invoice_ID) 
-                    INNER JOIN schema_currency sc ON (sc.AD_Client_ID=i.AD_Client_ID) 
+                    ELSE 0 END), 0) AS Total_Raw, COUNT(DISTINCT i.C_Invoice_ID) AS Overdue_Invoice_Count
+                    FROM C_InvoicePaySchedule ips
+                    INNER JOIN C_Invoice i ON (ips.C_Invoice_ID=i.C_Invoice_ID)
+                    INNER JOIN schema_currency sc ON (sc.AD_Client_ID=i.AD_Client_ID)
                     WHERE ips.VA009_IsPaid='N'" + overdueDateCondition + " AND i.DocStatus IN ('CO', 'CL') AND i.IsSOTrx='Y' AND i.AD_Client_ID=" + ctx.GetAD_Client_ID();
 
-            mainQuery = MRole.GetDefault(ctx).AddAccessSQL(
-                mainQuery,
+            overdueQuery = MRole.GetDefault(ctx).AddAccessSQL(
+                overdueQuery,
                 "C_InvoicePaySchedule",
                 MRole.SQL_FULLYQUALIFIED,
                 MRole.SQL_RO
             );
 
-            string sql = "WITH schema_currency AS (" + cteSchemaCurrency + ") " + mainQuery;
+            string sql = "WITH schema_currency AS (" + cteSchemaCurrency + "), overdue AS (" + overdueQuery + ") "
+                    + @"SELECT ROUND(o.Total_Raw, sc.StdPrecision) AS Total_Overdue_Outstanding_Amount,
+                    o.Overdue_Invoice_Count AS Overdue_Invoice_Count,
+                    sc.Cur_Symbol AS Cur_Symbol, sc.ISO_Code AS ISO_Code, sc.StdPrecision AS Std_Precision
+                    FROM schema_currency sc CROSS JOIN overdue o";
 
             decimal totalOverdue = 0;
             int invoiceCount = 0;
             /* Base-currency symbol (accounting schema currency); amounts above are
-               already converted to this currency. Carried by the schema_currency CTE. */
+               already converted to this currency. The CROSS JOIN with the
+               schema_currency CTE keeps these populated even at zero overdue. */
             string currencySymbol = "";
             string isoCode = "";
             int stdPrecision = 2;
@@ -82,7 +91,7 @@ namespace VIS.Controllers
                     invoiceCount = Util.GetValueOfInt(dr["Overdue_Invoice_Count"]);
                     currencySymbol = Util.GetValueOfString(dr["Cur_Symbol"]);
                     isoCode = Util.GetValueOfString(dr["ISO_Code"]);
-                    /* No overdue rows -> MAX returns NULL; keep the default precision of 2. */
+                    /* CROSS JOIN always carries the schema precision; guard anyway. */
                     if (dr["Std_Precision"] != null && dr["Std_Precision"] != System.DBNull.Value)
                     {
                         stdPrecision = Util.GetValueOfInt(dr["Std_Precision"]);

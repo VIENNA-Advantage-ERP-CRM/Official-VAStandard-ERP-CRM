@@ -25,13 +25,13 @@
 
     /* Compact-scale tiers, largest divisor first. */
     var INDIAN_TIERS = [
-        [1e9, 'Ar'],  // 1,00,00,00,000 -> 1Ar
+        /*[1e9, 'Ar'],*/  // 1,00,00,00,000 -> 1Ar
         [1e7, 'Cr'],  //    5,00,00,000 -> 5Cr
         [1e5, 'L'],   //      2,50,000   -> 2.5L
         [1e3, 'K']    //        25,000   -> 25K
     ];
     var INTL_TIERS = [
-        [1e12, 'T'],  // 1,000,000,000,000 -> 1T
+        /*[1e12, 'T'],*/  // 1,000,000,000,000 -> 1T
         [1e9, 'B'],   //     5,000,000,000 -> 5B
         [1e6, 'M'],   //         2,500,000 -> 2.5M
         [1e3, 'K']    //            25,000 -> 25K
@@ -46,7 +46,7 @@
 
         for (var i = 0; i < tiers.length; i++) {
             if (absVal >= tiers[i][0]) {
-                return parseFloat((absVal / tiers[i][0]).toFixed(precision)) + tiers[i][1];
+                return (absVal / tiers[i][0]).toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision }) + tiers[i][1];
             }
         }
         return absVal.toLocaleString(window.navigator.language, { minimumFractionDigits: precision, maximumFractionDigits: precision });

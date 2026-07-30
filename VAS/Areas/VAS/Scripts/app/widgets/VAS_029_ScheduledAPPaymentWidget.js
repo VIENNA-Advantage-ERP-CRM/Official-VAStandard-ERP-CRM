@@ -1,36 +1,38 @@
 ﻿/**
- * Scheduled
- * Purpose - Displays AP invoice outstanding due amounts scheduled for payment during the current week, grouped by payment method.
- *
- * ── Labels / Message Keys ─────────────────────────────────────────────
- *  #  | Current Text                         | Message Key
- * ----+--------------------------------------+--------------------------------
- *  1  | Due This Week                        | VAS_029_MessageScheduled
- *  2  | Queued for {0} run this week         | VAS_029_MessageQueuedForPaymentMethodRunThisWeek
- *  3  | Scheduled for payment this week      | VAS_029_MessageScheduledForPaymentThisWeek
- *  4  | Loading                              | VAS_029_MessageLoading
- *  5  | No Data                              | VAS_029_MessageNoData
- *  6  | Could not load data                  | VAS_ErrorLoading
- *  7  | Not Specified                        | VAS_029_MessageNotSpecified
- *  8  | invoices                             | VAS_029_MessageInvoices
- *  9  | Showing                              | VAS_Showing
- * 10  | Of                                   | VAS_Of
- * 11  | Close                                | VAS_Close
- * 12  | Total due                            | VAS_029_MessageTotalDue
- * 13  | Vendors                              | VAS_029_MessageVendors
- * 14  | Payment methods                      | VAS_029_MessagePaymentMethods
- * 15  | Invoice No.                          | VIS_InvoiceNo
- * 16  | Invoice date                         | VIS_InvoiceDate
- * 17  | Vendor                               | VAS_029_MessageVendor
- * 18  | Due date                             | VIS_DueDate
- * 19  | Currency                             | VAS_PaymentCurrency
- * 20  | Amount                               | VAS_029_MessageAmount
- * 21  | Method                               | VAS_029_MessageMethod
- * 22  | Previous                             | VAS_Previous
- * 23  | Next                                 | VAS_Next
- * 24  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
- * ─────────────────────────────────────────────────────────────────────
- */
+
+* Scheduled
+* Purpose - Displays AP invoice outstanding due amounts scheduled for payment during the current week, grouped by payment method.
+*
+* ── Labels / Message Keys ─────────────────────────────────────────────
+* # | Current Text                         | Message Key
+* ----+--------------------------------------+--------------------------------
+* 1  | Due This Week                        | VAS_029_MessageScheduled
+* 1b | Payables Due this week               | VAS_029_MessagePayablesDueThisWeek
+* 2  | Scheduled for payment this week      | VAS_029_ScheduledForPaymentThisWeek
+* 3  | Loading                              | VAS_029_MessageLoading
+* 4  | No Data                              | VAS_029_MessageNoData
+* 5  | Could not load data                  | VAS_ErrorLoading
+* 6  | Not Specified                        | VAS_029_MessageNotSpecified
+* 7  | invoices                             | VAS_029_MessageInvoices
+* 8  | Showing                              | VAS_Showing
+* 9  | Of                                   | VAS_Of
+* 10  | Close                                | VAS_Close
+* 11  | Total due                            | VAS_029_MessageTotalDue
+* 12  | Vendors                              | VAS_029_MessageVendors
+* 13  | Payment methods                      | VAS_029_MessagePaymentMethods
+* 14  | Invoice No.                          | VIS_InvoiceNo
+* 15  | Invoice date                         | VIS_InvoiceDate
+* 16  | Vendor                               | VAS_029_MessageVendor
+* 17  | Due date                             | VIS_DueDate
+* 18  | Currency                             | VAS_PaymentCurrency
+* 19  | Amount                               | VAS_029_MessageAmount
+* 20  | Method                               | VAS_029_MessageMethod
+* 21  | Previous                             | VAS_Previous
+* 22  | Next                                 | VAS_Next
+* 23  | Payments due this week               | VAS_029_MessagePaymentsDueThisWeek
+* ─────────────────────────────────────────────────────────────────────
+  */
+
 
 
 ; VAS = window.VAS || {};
@@ -56,6 +58,7 @@
         var $dialog = null;
         var $dialogTitle = null;
         var $dialogSubtitle = null;
+        var $dialogBody = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
         var $summaryTotal = null;
@@ -67,17 +70,27 @@
         var $pagerNext = null;
         var $pagerText = null;
 
-        var groups = [];
-        var groupIndex = 0;
-        var rotationTimer = null;
         var isDisposed = false;
         var rowsLoaded = false;
         var rowsLoading = false;
         var pageNo = 1;
-        var pageSize = 10;
+        var pageSize = 8;
         var totalPages = 0;
         var totalRecords = 0;
         var lastData = null;
+
+        /*
+         * The dialog body is a flex scroll area, so the number of rows that
+         * fit follows the popup's rendered height instead of a fixed page
+         * size. The row height is measured from a real row when one exists
+         * and falls back to this estimate while the table is still empty.
+         */
+        var dialogResizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var dialogRowHeightEstimate = 44;
+        var dialogMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -109,23 +122,26 @@
                 lbl('VAS_029_MessageScheduled', 'Due This Week')
             );
 
-            var $arrow = $(
-                '<span class="vas-scheduled-ap-payment-arrow" aria-hidden="true">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M9 18l6-6-6-6"></path>' +
-                '</svg>' +
-                '</span>'
+            var $sub = $('<div class="vas-scheduled-ap-payment-sub">').text(
+                lbl('VAS_029_MessagePayablesDueThisWeek', 'Payables Due this week')
             );
 
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $('<div class="vas-scheduled-ap-payment-header-text">');
+
+            $headerText.append($title).append($sub);
+
             $iconBox.append($icon);
-            $header.append($iconBox).append($title).append($arrow);
+            $header.append($iconBox).append($headerText);
 
             $body = $('<div class="vas-scheduled-ap-payment-body">');
             $value = $('<div class="vas-scheduled-ap-payment-value">');
             $body.append($value);
 
             $footer = $('<div class="vas-scheduled-ap-payment-footer">');
-         
+
 
             $description = $('<div class="vas-scheduled-ap-payment-desc">');
 
@@ -155,7 +171,6 @@
                 return;
             }
 
-            stopRotation();
             showBusy(true);
             showState(false, '');
 
@@ -215,25 +230,6 @@
 
         function renderData(data) {
             lastData = data || {};
-            groups = $.isArray(data.groups)
-                ? $.grep(data.groups, function (group) {
-                    var amount = Number(group.value);
-
-                    if (isNaN(amount)) {
-                        amount = Number(group.scheduledAmount);
-                    }
-
-                    return !isNaN(amount) && amount > 0;
-                })
-                : [];
-            groupIndex = 0;
-
-            if (groups.length > 0) {
-                renderGroup(groups[groupIndex], data);
-                startRotation(data);
-                refreshOpenDialog();
-                return;
-            }
 
             var totalAmount = Number(data.value);
 
@@ -241,22 +237,30 @@
                 totalAmount = Number(data.scheduledAmountThisWeek);
             }
 
-            if (isNaN(totalAmount) || totalAmount <= 0) {
+            /*
+             * AP amounts are outflows and arrive negative, so only a
+             * missing or zero total means there is nothing to show.
+             */
+            if (isNaN(totalAmount) || totalAmount === 0) {
                 setNoData();
                 return;
             }
 
             showState(false, '');
 
-            $value.text(formatCurrencyAmount(
+            $value.text(formatWidgetCompactAmount(
                 totalAmount,
                 data.currencySymbol || data.symbol,
-                data.currencyISO,
+                data.currencyISO || data.currencyISOCode || data.isoCode,
                 data.precision
             ));
 
             $description.text(
-                data.description || lbl('VAS_029_MessageScheduledForPaymentThisWeek', 'Scheduled for payment this week')
+                data.description ||
+                lbl(
+                    'VAS_029_ScheduledForPaymentThisWeek',
+                    'Scheduled for payment this week'
+                )
             );
 
             refreshOpenDialog();
@@ -267,6 +271,169 @@
                 rowsLoaded = false;
                 pageNo = 1;
                 loadRows();
+            }
+        }
+
+        function measureDialogRowHeight() {
+            var $row = $dialogTbody
+                ? $dialogTbody.find('tr').not('.vas-scheduled-ap-payment-dialog-empty-row').first()
+                : null;
+
+            var measured = $row && $row.length ? $row.outerHeight() : 0;
+
+            return measured > 0 ? measured : dialogRowHeightEstimate;
+        }
+
+        function updateAdaptivePageSize() {
+            if (
+                isDisposed ||
+                !$dialogBody ||
+                !$dialogBody[0] ||
+                !$dialogTbody ||
+                !$dialogTbody[0] ||
+                !$dialog ||
+                !$dialog.is(':visible')
+            ) {
+                return;
+            }
+
+            var container = $dialogBody[0];
+
+            if (container.clientHeight <= 0) {
+                return;
+            }
+
+            /*
+             * Whatever sits above the first row inside the scroll area - the
+             * table header, padding, any summary strip - is measured from the
+             * tbody's own position rather than assumed, so the row space left
+             * over is exact.
+             */
+            var headerOffset =
+                (
+                    $dialogTbody[0].getBoundingClientRect().top -
+                    container.getBoundingClientRect().top
+                ) + container.scrollTop;
+
+            var availableHeight = Math.max(
+                0,
+                container.clientHeight - headerOffset
+            );
+
+            var rowHeight = measureDialogRowHeight();
+
+            if (rowHeight <= 0) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                dialogMinimumRows,
+                Math.floor(availableHeight / rowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            // Keep the record the user is looking at on screen.
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+
+            pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            loadRows();
+        }
+
+        function setupAdaptivePagination() {
+            adaptiveAdjustCount = 0;
+
+            if (!$dialogBody || !$dialogBody[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+            if (window.ResizeObserver && !dialogResizeObserver) {
+                dialogResizeObserver = new ResizeObserver(function () {
+                    updateAdaptivePageSize();
+                });
+
+                dialogResizeObserver.observe($dialogBody[0]);
+
+                /*
+                 * The scroll area keeps a fixed height, so only the row
+                 * container changes size when rows arrive. Watching it is
+                 * what corrects the estimate the first pass had to use.
+                 */
+                if ($dialogTbody && $dialogTbody[0]) {
+                    dialogResizeObserver.observe($dialogTbody[0]);
+                }
+            }
+
+            if (!adaptiveResizeHandler) {
+                adaptiveResizeHandler = function () {
+                    if (adaptiveResizeFrame !== null) {
+                        return;
+                    }
+
+                    adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                        adaptiveResizeFrame = null;
+                        adaptiveAdjustCount = 0;
+                        updateAdaptivePageSize();
+                    });
+                };
+
+                window.addEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                }
+            }
+        }
+
+        function teardownAdaptivePagination() {
+            if (dialogResizeObserver) {
+                dialogResizeObserver.disconnect();
+                dialogResizeObserver = null;
+            }
+
+            if (adaptiveResizeHandler) {
+                window.removeEventListener('resize', adaptiveResizeHandler);
+
+                if (window.visualViewport) {
+                    window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                }
+
+                adaptiveResizeHandler = null;
+            }
+
+            if (adaptiveResizeFrame !== null) {
+                window.cancelAnimationFrame(adaptiveResizeFrame);
+                adaptiveResizeFrame = null;
             }
         }
 
@@ -312,6 +479,7 @@
                     if (!isDisposed) {
                         rowsLoading = false;
                         showDialogBusy(false);
+                        updateAdaptivePageSize();
                         updatePagerControls(
                             totalRecords === 0 ? 0 : (pageNo - 1) * pageSize,
                             Math.min((pageNo - 1) * pageSize + ($dialogTbody ? $dialogTbody.find('tr').not('.vas-scheduled-ap-payment-dialog-empty-row').length : 0), totalRecords)
@@ -394,21 +562,22 @@
                     '<td class="vas-scheduled-ap-payment-td-method" title="' + escapeHtml(paymentMethodName) + '">' +
                     '<span class="vas-scheduled-ap-payment-truncate">' + escapeHtml(paymentMethodName) + '</span>' +
                     '</td>' +
-                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml((sym ? sym + ' ' : '') + amountText) + '">' + amountHtml + '</td>' +
+                    '<td class="vas-scheduled-ap-payment-td-amount" title="' + escapeHtml(sign + (sym ? sym : '') + amountText) + '">' + amountHtml + '</td>' +
                     '</tr>'
                 );
             }
+        
+            updateAdaptivePageSize();
         }
 
         function renderDialogSummary(data) {
             var totalAmount = Number((lastData && (lastData.value || lastData.scheduledAmountThisWeek)) || 0);
             var symbol = (lastData && (lastData.currencySymbol || lastData.symbol)) || '';
-            var precision = normalizePrecision(lastData && lastData.precision);
             var vendorCount = Number((data && data.vendorCount) || 0);
-            var methodCount = Number((data && data.paymentMethodCount) || groups.length || 0);
+            var methodCount = Number((data && data.paymentMethodCount) || 0);
 
             if ($summaryTotal) {
-                $summaryTotal.text(formatCurrencyAmount(totalAmount, symbol, lastData && lastData.currencyISO, precision));
+                $summaryTotal.text(formatHeaderAmount(totalAmount, symbol, lastData && lastData.currencyISO));
             }
 
             if ($summaryInvoices) {
@@ -435,7 +604,7 @@
                     totalRecords.toLocaleString(window.navigator.language) + ' ' +
                     lbl('VAS_029_MessageInvoices', 'invoices') +
                     ' · ' +
-                    formatCurrencyAmount(totalAmount, symbol, lastData && lastData.currencyISO, precision)
+                    formatHeaderAmount(totalAmount, symbol, lastData && lastData.currencyISO)
                 );
             }
         }
@@ -456,8 +625,12 @@
                 }
             }
 
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
             if ($pagerText) {
-                $pagerText.text(totalPages > 0 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+                $pagerText.text(pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + Math.max(1, totalPages));
             }
 
             if ($pagerPrev) {
@@ -469,73 +642,6 @@
             }
         }
 
-        function renderGroup(group, data) {
-            if (!group) {
-                setNoData();
-                return;
-            }
-
-            var amount = Number(group.value);
-
-            if (isNaN(amount)) {
-                amount = Number(group.scheduledAmount);
-            }
-
-            if (isNaN(amount) || amount <= 0) {
-                setNoData();
-                return;
-            }
-
-            showState(false, '');
-
-            var precision = normalizePrecision(group.precision || data.precision);
-            var paymentMethodName = group.paymentMethodName || lbl('VAS_029_MessageNotSpecified', 'Not Specified');
-
-            var footerText = lbl(
-                'VAS_029_MessageQueuedForPaymentMethodRunThisWeek',
-                'Queued for {0} run this week'
-            ).replace('{0}', paymentMethodName);
-
-            $value.text(formatCurrencyAmount(
-                amount,
-                group.currencySymbol || data.currencySymbol || data.symbol,
-                group.currencyISO || data.currencyISO,
-                precision
-            ));
-
-            $description.text(footerText);
-        }
-
-        function startRotation(data) {
-            stopRotation();
-
-            if (groups.length <= 1) {
-                return;
-            }
-
-            rotationTimer = window.setInterval(function () {
-                if (isDisposed) {
-                    stopRotation();
-                    return;
-                }
-
-                groupIndex += 1;
-
-                if (groupIndex >= groups.length) {
-                    groupIndex = 0;
-                }
-
-                renderGroup(groups[groupIndex], data);
-            }, 5000);
-        }
-
-        function stopRotation() {
-            if (rotationTimer) {
-                window.clearInterval(rotationTimer);
-                rotationTimer = null;
-            }
-        }
-
         function openDialog() {
             if (!$dialog || ($state && $state.hasClass('is-visible'))) {
                 return;
@@ -543,6 +649,8 @@
 
             $dialog.show();
             $('body').addClass('vas-scheduled-ap-payment-body-lock');
+
+            setupAdaptivePagination();
 
             if (!rowsLoaded) {
                 pageNo = 1;
@@ -554,6 +662,8 @@
             if (!$dialog) {
                 return;
             }
+
+            teardownAdaptivePagination();
 
             $dialog.hide();
             $('body').removeClass('vas-scheduled-ap-payment-body-lock');
@@ -630,6 +740,7 @@
 
             $dialogTitle = $dialog.find('.vas-scheduled-ap-payment-dialog-title');
             $dialogSubtitle = $dialog.find('.vas-scheduled-ap-payment-dialog-subtitle');
+            $dialogBody = $dialog.find('.vas-scheduled-ap-payment-dialog-body');
             $dialogTbody = $dialog.find('.vas-scheduled-ap-payment-dialog-tbody');
             $dialogBusy = $dialog.find('.vas-scheduled-ap-payment-dialog-busy');
             $summaryTotal = $dialog.find('.vas-scheduled-ap-payment-summary-total');
@@ -712,11 +823,60 @@
             });
         }
 
+        /*
+         * Amounts shown in the dialog header are rounded to whole
+         * numbers and the currency symbol is printed without the
+         * trailing separator that comes from the currency setup,
+         * for example ID12,000. Table cells keep the exact amount.
+         */
+        function formatHeaderAmount(value, currencySymbol, currencyISO) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign = numericValue < 0 ? '-' : '';
+            var amount = formatAmount(Math.abs(numericValue), 0);
+            var cleanSymbol = String(currencySymbol || '').replace(/[\s-]+$/, '');
+
+            if (cleanSymbol) {
+                return sign + cleanSymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
         function formatCurrencyAmount(value, currencySymbol, currencyISO, precision) {
             var numericValue = Number(value || 0);
             var sign = numericValue < 0 ? '-' : '';
             var absValue = Math.abs(numericValue);
             var amount = formatAmount(absValue, normalizePrecision(precision));
+
+            if (currencySymbol) {
+                return sign + currencySymbol + amount;
+            }
+
+            return currencyISO ? sign + amount + ' ' + currencyISO : sign + amount;
+        }
+
+        function formatWidgetCompactAmount(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value || 0);
+            var sign = numericValue < 0 ? '-' : '';
+            var stdPrecision = normalizePrecision(precision);
+            var amount =
+                VIS &&
+                    VIS.Util &&
+                    VIS.Util.formatCompactAmount
+                    ? VIS.Util.formatCompactAmount(
+                        Math.abs(numericValue),
+                        currencyISO,
+                        stdPrecision
+                    )
+                    : formatAmount(
+                        Math.abs(numericValue),
+                        stdPrecision
+                    );
 
             if (currencySymbol) {
                 return sign + currencySymbol + amount;
@@ -795,7 +955,7 @@
 
         this.disposeComponent = function () {
             isDisposed = true;
-            stopRotation();
+            teardownAdaptivePagination();
             $(document).off('keydown.vas-scheduled-ap-payment-dialog-' + self.AD_UserHomeWidgetID);
             $('body').removeClass('vas-scheduled-ap-payment-body-lock');
 
@@ -815,6 +975,7 @@
             $state = null;
             $dialogTitle = null;
             $dialogSubtitle = null;
+            $dialogBody = null;
             $dialogTbody = null;
             $dialogBusy = null;
             $summaryTotal = null;
@@ -825,7 +986,6 @@
             $pagerPrev = null;
             $pagerNext = null;
             $pagerText = null;
-            groups = [];
             lastData = null;
         };
     };

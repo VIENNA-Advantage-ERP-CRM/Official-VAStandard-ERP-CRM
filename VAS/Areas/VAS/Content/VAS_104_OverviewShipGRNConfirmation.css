@@ -1,0 +1,520 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Ship / GRN Confirmation Overview tab panel
+ *               (VAS.VAS_104_OverviewShipGRNConfirmation). All classes are
+ *               MPC-prefixed (MPC-vasgc-*) and scoped under the panel root to
+ *               avoid global collisions. Shares the Onfinity windows-and-panels
+ *               em-anchored body language with VAS_101 / VAS_102 / VAS_103 —
+ *               Roboto, white surfaces, soft blue borders, KPI tiles with accent
+ *               rails, status/QC badges and a flat line table. A `no-quality`
+ *               modifier on the root hides every `.qc-only` element and reflows
+ *               the KPI grid / line table to their no-quality column counts, so a
+ *               single template serves both document modes.
+ * Chronological development:
+ *   VAI163   2026-07-07  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
+ ***********************************************************/
+
+.MPC-vasgc-root {
+    /* Canonical palette */
+    --gc-text:        #102C3F;
+    --gc-muted:       #5F7283;
+    --gc-sub:         #41576A;
+    --gc-action:      #0083DA;
+    --gc-action-dk:   #005FA3;
+    --gc-link:        #106AB0;
+    --gc-card-bd:     #D9E2EB;
+    --gc-row-div:     #E2EAF1;
+    --gc-card-radius: 12px;
+    /* Semantic tones */
+    --gc-info-bg:     #EAF8FF;  --gc-info-tx:    #0083DA;
+    --gc-success-bg:  #E9F6EE;  --gc-success-tx: #0B6B45;
+    --gc-warning-bg:  #FFF6E2;  --gc-warning-tx: #9A6500;
+    --gc-risk-bg:     #FCEFEF;  --gc-risk-tx:    #D14545;
+    --gc-neutral-bg:  #EEF1F4;  --gc-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--gc-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasgc-root * { box-sizing: border-box; }
+
+/* Quality-mode gate: hide all QC-only elements when quality does not apply. */
+.MPC-vasgc-root.no-quality .qc-only { display: none !important; }
+
+.MPC-vasgc-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasgc-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--gc-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-sec { display: block; }
+
+.MPC-vasgc-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasgc-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--gc-text);
+    margin: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+}
+
+.MPC-vasgc-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--gc-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasgc-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasgc-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasgc-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasgc-hdrEyebrow {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+    color: var(--gc-action);
+    margin-bottom: 0.1875em;
+}
+
+.MPC-vasgc-hdrTitle {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--gc-text);
+    line-height: 1.2;
+}
+
+.MPC-vasgc-hdrSub {
+    font-size: 0.75em;
+    color: var(--gc-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasgc-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasgc-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasgc-hdrPill.tone-info    { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.MPC-vasgc-hdrPill.tone-success { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.MPC-vasgc-hdrPill.tone-warning { background: var(--gc-warning-bg); color: var(--gc-warning-tx); }
+.MPC-vasgc-hdrPill.tone-risk    { background: var(--gc-risk-bg);    color: var(--gc-risk-tx); }
+.MPC-vasgc-hdrPill.tone-neutral { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
+
+.MPC-vasgc-hdrPill .MPC-vasgc-ic { color: currentColor; }
+
+.MPC-vasgc-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — source & receipt details card                     */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-hdrCard {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--gc-card-bd);
+    border-radius: var(--gc-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasgc-hdrColL { min-width: 0; border-right: 1px solid var(--gc-row-div); padding-right: 1.25em; }
+
+.MPC-vasgc-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasgc-hdrField { min-width: 0; }
+
+.MPC-vasgc-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--gc-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasgc-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--gc-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasgc-fVal.is-link { color: var(--gc-link); }
+
+@container (max-width: 460px) {
+    .MPC-vasgc-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasgc-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--gc-row-div); padding-bottom: 0.75em; }
+    .MPC-vasgc-hdrTop  { flex-direction: column; }
+    .MPC-vasgc-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Party identity                                             */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--gc-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasgc-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--gc-text);
+    margin-top: 0.375em;
+}
+.MPC-vasgc-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasgc-contactBit .MPC-vasgc-ic { color: var(--gc-action); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (KPI metric grid)                                  */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-snap {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.75em;
+}
+.MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: repeat(5, 1fr); }
+
+.MPC-vasgc-metric {
+    min-width: 0;
+    border: 1px solid var(--gc-card-bd);
+    border-left: 3px solid var(--gc-neutral-tx);
+    border-radius: var(--gc-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasgc-metric.tone-lines      { border-left-color: var(--gc-neutral-tx); }
+.MPC-vasgc-metric.tone-target     { border-left-color: var(--gc-info-tx); }
+.MPC-vasgc-metric.tone-confirmed  { border-left-color: var(--gc-success-tx); }
+.MPC-vasgc-metric.tone-difference { border-left-color: #E08A1E; }
+.MPC-vasgc-metric.tone-scrapped   { border-left-color: var(--gc-risk-tx); }
+.MPC-vasgc-metric.tone-qcpass     { border-left-color: var(--gc-success-tx); }
+
+.MPC-vasgc-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasgc-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--gc-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasgc-metric.tone-lines      .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-neutral-tx); }
+.MPC-vasgc-metric.tone-target     .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-info-tx); }
+.MPC-vasgc-metric.tone-confirmed  .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-success-tx); }
+.MPC-vasgc-metric.tone-difference .MPC-vasgc-mHead .MPC-vasgc-ic { color: #E08A1E; }
+.MPC-vasgc-metric.tone-scrapped   .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-risk-tx); }
+.MPC-vasgc-metric.tone-qcpass     .MPC-vasgc-mHead .MPC-vasgc-ic { color: var(--gc-success-tx); }
+
+.MPC-vasgc-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--gc-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasgc-metric.tone-confirmed  .MPC-vasgc-mVal { color: var(--gc-success-tx); }
+.MPC-vasgc-metric.tone-difference .MPC-vasgc-mVal { color: #9A6500; }
+.MPC-vasgc-metric.tone-scrapped   .MPC-vasgc-mVal { color: var(--gc-risk-tx); }
+.MPC-vasgc-metric.tone-qcpass     .MPC-vasgc-mVal { color: var(--gc-success-tx); }
+
+.MPC-vasgc-mSub {
+    font-size: 0.6875em;
+    color: var(--gc-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 720px) {
+    .MPC-vasgc-snap,
+    .MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: repeat(3, 1fr); }
+}
+@container (max-width: 460px) {
+    .MPC-vasgc-snap,
+    .MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 300px) {
+    .MPC-vasgc-snap,
+    .MPC-vasgc-root.no-quality .MPC-vasgc-snap { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Confirmation line table                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-table {
+    border: 1px solid var(--gc-card-bd);
+    border-radius: var(--gc-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Quality mode: 9 columns (QC mark column present). */
+.MPC-vasgc-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.2fr 1fr 0.6fr 0.8fr 0.85fr 0.85fr 0.85fr 0.8fr 0.95fr;
+}
+/* No-quality mode: 8 columns (QC mark column hidden). */
+.MPC-vasgc-root.no-quality .MPC-vasgc-tRow {
+    grid-template-columns: 2.2fr 1fr 0.6fr 0.9fr 0.95fr 0.95fr 0.95fr 1fr;
+}
+
+.MPC-vasgc-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--gc-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--gc-muted);
+}
+
+.MPC-vasgc-tBody {
+    border-bottom: 1px solid var(--gc-row-div);
+    font-size: 0.8125em;
+    color: var(--gc-text);
+}
+.MPC-vasgc-tBody:last-of-type { border-bottom: none; }
+.MPC-vasgc-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasgc-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasgc-table .ta-c { text-align: center; justify-content: center; }
+
+.MPC-vasgc-itItem { min-width: 0; }
+.MPC-vasgc-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--gc-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasgc-itSku {
+    font-size: 0.9231em;
+    color: var(--gc-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Signed difference cell */
+.MPC-vasgc-diff { font-weight: 700; }
+.MPC-vasgc-diff.neg  { color: var(--gc-risk-tx); }
+.MPC-vasgc-diff.pos  { color: #9A6500; }
+.MPC-vasgc-diff.zero { color: var(--gc-muted); font-weight: 500; }
+
+/* Scrapped cell — red when non-zero */
+.MPC-vasgc-scrap { color: var(--gc-muted); font-weight: 500; }
+.MPC-vasgc-scrap.has { color: var(--gc-risk-tx); font-weight: 700; }
+
+.MPC-vasgc-dash { color: var(--gc-muted); }
+
+/* Status / QC tags */
+.MPC-vasgc-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasgc-tag.s-cleared { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.MPC-vasgc-tag.s-partial { background: var(--gc-info-bg);    color: var(--gc-info-tx); }
+.MPC-vasgc-tag.s-hold    { background: var(--gc-warning-bg); color: var(--gc-warning-tx); }
+.MPC-vasgc-tag.s-pending { background: var(--gc-neutral-bg); color: var(--gc-neutral-tx); }
+.MPC-vasgc-tag.s-pass    { background: var(--gc-success-bg); color: var(--gc-success-tx); }
+.MPC-vasgc-tag.s-fail    { background: var(--gc-risk-bg);    color: var(--gc-risk-tx); }
+
+.MPC-vasgc-tEmpty {
+    padding: 1.25em 0.875em;
+    text-align: center;
+    font-size: 0.8125em;
+    color: var(--gc-muted);
+    border-bottom: 1px solid var(--gc-row-div);
+}
+
+/* Totals footer */
+.MPC-vasgc-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--gc-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasgc-tf { color: var(--gc-muted); }
+.MPC-vasgc-tf b { color: var(--gc-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasgc-tf.is-grand { color: var(--gc-text); font-weight: 700; }
+.MPC-vasgc-tf.is-grand b { color: var(--gc-risk-tx); margin-left: 0.375em; }
+
+@container (max-width: 760px) {
+    .MPC-vasgc-table { overflow-x: auto; }
+    .MPC-vasgc-tRow,
+    .MPC-vasgc-root.no-quality .MPC-vasgc-tRow { min-width: 760px; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasgc-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.MPC-vasgc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.MPC-vasgc-btn .MPC-vasgc-ic { color: currentColor; }
+
+.MPC-vasgc-btn.btn-pri {
+    background: var(--gc-action);
+    border: 1px solid var(--gc-action);
+    color: #fff;
+}
+.MPC-vasgc-btn.btn-pri:hover { background: var(--gc-action-dk); border-color: var(--gc-action-dk); }
+
+.MPC-vasgc-btn.btn-sec {
+    background: #fff;
+    border: 1px solid var(--gc-action);
+    color: var(--gc-action);
+}
+.MPC-vasgc-btn.btn-sec:hover { background: var(--gc-info-bg); }
+
+.MPC-vasgc-btn.is-disabled {
+    background: #F1F4F7;
+    border-color: #DCE5EE;
+    color: #A6B2BD;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasgc-hdrColL { border-right: none; border-left: 1px solid var(--gc-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .MPC-vasgc-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasgc-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasgc-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasgc-actions { justify-content: flex-start; }

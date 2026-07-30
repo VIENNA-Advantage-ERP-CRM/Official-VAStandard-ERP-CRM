@@ -1,0 +1,748 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Internal Use / Material Issue Overview tab panel
+ *               (VAS.VAS_102_OverviewInternalUse). All classes are MPC-prefixed
+ *               (MPC-vasiu-*) and scoped under the panel root to avoid global
+ *               collisions. Shares the Onfinity windows-and-panels em-anchored
+ *               body language with VAS_100 / VAS_101 — Roboto, white surfaces,
+ *               soft blue borders, KPI tiles with accent rails, pastel stepper,
+ *               segmented filter, status-summary cards and a flat issue-lines
+ *               table with Full / Partial / Short status tags.
+ * Chronological development:
+ *   VAI163   2026-07-07  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-29  Enlarged the panel title (.MPC-vasiu-hdrTitle
+ *                        1.25em -> 1.4em), matching VAS_099_OverviewGRN. Added
+ *                        the References card (.MPC-vasiu-refCard) and the status
+ *                        card caption (.MPC-vasiu-statSub) that carries the line
+ *                        count now the Partial / Short values are quantities.
+ *                        Dropped the segmented filter, the action buttons and the
+ *                        empty-table row — all three are gone from the panel.
+ *   VAI163   2026-07-29  Added the Notes card (.MPC-vasiu-textCard) and the
+ *                        Activity list (.MPC-vasiu-actList) with its tag tones,
+ *                        plus the purple tone the "posted" tag needs.
+ *   VAI163   2026-07-29  Added the line-item Attribute Set Instance sub-line
+ *                        (.MPC-vasiu-itAttr) and the issue-lines pager
+ *                        (.MPC-vasiu-pager), a sibling of the table so the
+ *                        controls stay put while the table scrolls.
+ *   VAI163   2026-07-29  References card reworked: icon-bubble entries
+ *                        (.MPC-vasiu-refItem / -refIco / -refTxt) that only
+ *                        render for links that exist, plus the "nothing linked"
+ *                        line (.MPC-vasiu-refEmpty) that replaces the old row of
+ *                        N/A cells.
+ ***********************************************************/
+
+.MPC-vasiu-root {
+    /* Canonical palette */
+    --iu-text:        #102C3F;
+    --iu-muted:       #5F7283;
+    --iu-sub:         #41576A;
+    --iu-action:      #0083DA;
+    --iu-action-dk:   #005FA3;
+    --iu-link:        #106AB0;
+    --iu-card-bd:     #D9E2EB;
+    --iu-row-div:     #E2EAF1;
+    --iu-card-radius: 12px;
+    /* Semantic tones */
+    --iu-info-bg:     #EAF8FF;  --iu-info-tx:    #0083DA;
+    --iu-success-bg:  #E9F6EE;  --iu-success-tx: #0B6B45;
+    --iu-warning-bg:  #FFF6E2;  --iu-warning-tx: #9A6500;
+    --iu-risk-bg:     #FCEFEF;  --iu-risk-tx:    #D14545;
+    --iu-purple-bg:   #EDE9FF;  --iu-purple-tx:  #5F4AA6;
+    --iu-neutral-bg:  #EEF1F4;  --iu-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    overflow-y: auto;
+    color: var(--iu-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasiu-root * { box-sizing: border-box; }
+
+.MPC-vasiu-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasiu-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--iu-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-sec { display: block; }
+
+.MPC-vasiu-secHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasiu-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--iu-text);
+    margin: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+}
+
+.MPC-vasiu-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--iu-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasiu-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasiu-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasiu-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasiu-hdrTitle {
+    font-size: 1.4em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.2;
+}
+
+.MPC-vasiu-hdrSub {
+    font-size: 0.75em;
+    color: var(--iu-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasiu-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasiu-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-hdrPill.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.MPC-vasiu-hdrPill.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.MPC-vasiu-hdrPill.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.MPC-vasiu-hdrPill.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.MPC-vasiu-hdrPill.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+
+.MPC-vasiu-hdrPill .MPC-vasiu-ic { color: currentColor; }
+
+.MPC-vasiu-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (warehouse | document)               */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-hdrCard {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasiu-hdrColL { min-width: 0; border-right: 1px solid var(--iu-row-div); padding-right: 1.25em; }
+
+.MPC-vasiu-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasiu-hdrField { min-width: 0; }
+
+.MPC-vasiu-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasiu-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasiu-fVal.is-link { color: var(--iu-link); }
+
+@container (max-width: 460px) {
+    .MPC-vasiu-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasiu-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--iu-row-div); padding-bottom: 0.75em; }
+    .MPC-vasiu-hdrTop  { flex-direction: column; }
+    .MPC-vasiu-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Warehouse identity                                          */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--iu-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasiu-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--iu-text);
+    margin-top: 0.375em;
+}
+.MPC-vasiu-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasiu-contactBit .MPC-vasiu-ic { color: var(--iu-action); }
+
+/* ----------------------------------------------------------- */
+/*  References card (work order / requisition links)            */
+/* ----------------------------------------------------------- */
+/* Each reference is an icon bubble + label + value. Only links that exist are
+   rendered, so the grid sizes itself to the real content instead of stretching
+   a row of empty cells across the panel. */
+.MPC-vasiu-refCard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13em, 1fr));
+    gap: 0.875em 1.25em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+.MPC-vasiu-refCard.is-empty { display: block; }
+
+.MPC-vasiu-refItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.MPC-vasiu-refIco {
+    flex: none;
+    width: 1.875em;
+    height: 1.875em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--iu-info-bg);
+    color: var(--iu-info-tx);
+    margin-top: 0.0625em;
+}
+
+.MPC-vasiu-refTxt { min-width: 0; }
+.MPC-vasiu-refTxt .MPC-vasiu-fVal { white-space: nowrap; }
+
+/* Nothing linked: one explanatory line, not a wall of N/A. */
+.MPC-vasiu-refEmpty {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.8125em;
+    color: var(--iu-muted);
+}
+.MPC-vasiu-refEmpty .MPC-vasiu-ic { color: var(--iu-muted); }
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (KPI metric grid)                                  */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasiu-metric {
+    min-width: 0;
+    border: 1px solid var(--iu-card-bd);
+    border-left: 3px solid var(--iu-neutral-tx);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasiu-metric.tone-total   { border-left-color: var(--iu-info-tx); }
+.MPC-vasiu-metric.tone-issued  { border-left-color: var(--iu-success-tx); }
+.MPC-vasiu-metric.tone-lines   { border-left-color: var(--iu-neutral-tx); }
+.MPC-vasiu-metric.tone-pending { border-left-color: #E08A1E; }
+
+.MPC-vasiu-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasiu-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-metric.tone-total   .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-info-tx); }
+.MPC-vasiu-metric.tone-issued  .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-success-tx); }
+.MPC-vasiu-metric.tone-lines   .MPC-vasiu-mHead .MPC-vasiu-ic { color: var(--iu-neutral-tx); }
+.MPC-vasiu-metric.tone-pending .MPC-vasiu-mHead .MPC-vasiu-ic { color: #E08A1E; }
+
+.MPC-vasiu-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasiu-metric.tone-issued  .MPC-vasiu-mVal { color: var(--iu-success-tx); }
+.MPC-vasiu-metric.tone-pending .MPC-vasiu-mVal { color: #9A6500; }
+
+.MPC-vasiu-mSub {
+    font-size: 0.6875em;
+    color: var(--iu-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@container (max-width: 620px) {
+    .MPC-vasiu-snap { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasiu-snap { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Status summary cards (Full / Partial / Short / Lines)       */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-status {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasiu-statCard {
+    min-width: 0;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #FBFDFF;
+    padding: 0.625em 0.75em;
+    text-align: center;
+}
+.MPC-vasiu-statVal { font-size: 1.25em; font-weight: 700; line-height: 1.1; color: var(--iu-text); }
+.MPC-vasiu-statLbl { font-size: 0.6875em; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--iu-muted); margin-top: 0.25em; }
+.MPC-vasiu-statSub {
+    font-size: 0.625em;
+    color: var(--iu-muted);
+    margin-top: 0.1875em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-statCard.tone-full    .MPC-vasiu-statVal { color: var(--iu-success-tx); }
+.MPC-vasiu-statCard.tone-partial .MPC-vasiu-statVal { color: #9A6500; }
+.MPC-vasiu-statCard.tone-short   .MPC-vasiu-statVal { color: var(--iu-risk-tx); }
+
+@container (max-width: 620px) {
+    .MPC-vasiu-status { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasiu-status { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Issue timeline (3-node stepper)                             */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.MPC-vasiu-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.MPC-vasiu-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.MPC-vasiu-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.MPC-vasiu-step:first-child .MPC-vasiu-stepLine-l,
+.MPC-vasiu-step:last-child  .MPC-vasiu-stepLine-r { visibility: hidden; }
+
+.MPC-vasiu-step.is-done   .MPC-vasiu-stepLine-r,
+.MPC-vasiu-step.is-done   .MPC-vasiu-stepLine-l,
+.MPC-vasiu-step.is-active .MPC-vasiu-stepLine-l { background: #67B98A; }
+
+.MPC-vasiu-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.MPC-vasiu-stepDot .MPC-vasiu-ic { display: inline-flex; }
+
+.MPC-vasiu-step.is-done .MPC-vasiu-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.MPC-vasiu-step.is-active .MPC-vasiu-stepDot {
+    background: #fff;
+    color: #E08A1E;
+    border: 2px solid #F0A93D;
+}
+
+.MPC-vasiu-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+.MPC-vasiu-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--iu-text);
+}
+
+.MPC-vasiu-stepMeta {
+    font-size: 0.6875em;
+    color: var(--iu-muted);
+    margin-top: 0.25em;
+}
+.MPC-vasiu-step.is-active .MPC-vasiu-stepMeta { color: #E08A1E; font-weight: 600; }
+
+/* ----------------------------------------------------------- */
+/*  Issue line table                                           */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-table {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.MPC-vasiu-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.2fr 1fr 0.7fr 0.9fr 0.9fr 0.9fr 1.1fr 0.9fr;
+}
+
+.MPC-vasiu-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--iu-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--iu-muted);
+}
+
+.MPC-vasiu-tBody {
+    border-bottom: 1px solid var(--iu-row-div);
+    font-size: 0.8125em;
+    color: var(--iu-text);
+}
+.MPC-vasiu-tBody:last-of-type { border-bottom: none; }
+.MPC-vasiu-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasiu-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasiu-table .ta-c { text-align: center; justify-content: center; }
+
+.MPC-vasiu-itItem { min-width: 0; }
+.MPC-vasiu-itName {
+    font-size: 1.0769em;
+    font-weight: 700;
+    color: var(--iu-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasiu-itSku {
+    font-size: 0.9231em;
+    color: var(--iu-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Attribute set instance (lot / serial / attributes) */
+.MPC-vasiu-itAttr {
+    font-size: 0.9231em;
+    color: var(--iu-sub);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Status tag */
+.MPC-vasiu-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasiu-tag.s-full    { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.MPC-vasiu-tag.s-partial { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.MPC-vasiu-tag.s-short   { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+
+/* Totals footer */
+.MPC-vasiu-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--iu-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasiu-tf { color: var(--iu-muted); }
+.MPC-vasiu-tf b { color: var(--iu-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasiu-tf.is-grand { color: var(--iu-text); font-weight: 700; }
+.MPC-vasiu-tf.is-grand b { color: var(--iu-action); margin-left: 0.5em; font-size: 1.15em; }
+
+@container (max-width: 720px) {
+    .MPC-vasiu-table { overflow-x: auto; }
+    .MPC-vasiu-tRow { min-width: 720px; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Pager (issue lines)                                         */
+/* ----------------------------------------------------------- */
+/* Deliberately a sibling of the table, not a child: the table scrolls
+   horizontally on narrow panels and the controls must stay put. */
+.MPC-vasiu-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5em 0.875em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--iu-muted);
+}
+
+.MPC-vasiu-pgCtrls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.MPC-vasiu-pgPos { color: var(--iu-text); font-weight: 700; }
+
+.MPC-vasiu-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--iu-card-bd);
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--iu-action);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.MPC-vasiu-pgBtn:hover { background: var(--iu-info-bg); border-color: var(--iu-action); }
+.MPC-vasiu-pgBtn .MPC-vasiu-ic { color: currentColor; }
+.MPC-vasiu-pgBtn.is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--iu-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Notes card (issue header description)                       */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-textCard {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    padding: 0.75em 1em;
+    font-size: 0.8125em;
+    color: var(--iu-sub);
+    line-height: 1.55;
+}
+.MPC-vasiu-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.MPC-vasiu-textCard p + p { margin-top: 0.5em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity (audit trail)                                      */
+/* ----------------------------------------------------------- */
+.MPC-vasiu-actList {
+    border: 1px solid var(--iu-card-bd);
+    border-radius: var(--iu-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* tag | what happened | when · by whom */
+.MPC-vasiu-actRow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.5625em 0.875em;
+    border-bottom: 1px solid var(--iu-row-div);
+    font-size: 0.8125em;
+}
+.MPC-vasiu-actRow:last-child { border-bottom: none; }
+.MPC-vasiu-actRow:hover { background: #FAFCFE; }
+
+.MPC-vasiu-actTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    flex: none;
+    border-radius: 999px;
+    padding: 0.25em 0.625em;
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.MPC-vasiu-actTag .MPC-vasiu-ic { color: currentColor; }
+.MPC-vasiu-actTag.tone-info    { background: var(--iu-info-bg);    color: var(--iu-info-tx); }
+.MPC-vasiu-actTag.tone-success { background: var(--iu-success-bg); color: var(--iu-success-tx); }
+.MPC-vasiu-actTag.tone-warning { background: var(--iu-warning-bg); color: var(--iu-warning-tx); }
+.MPC-vasiu-actTag.tone-risk    { background: var(--iu-risk-bg);    color: var(--iu-risk-tx); }
+.MPC-vasiu-actTag.tone-purple  { background: var(--iu-purple-bg);  color: var(--iu-purple-tx); }
+.MPC-vasiu-actTag.tone-neutral { background: var(--iu-neutral-bg); color: var(--iu-neutral-tx); }
+
+.MPC-vasiu-actTitle {
+    min-width: 0;
+    color: var(--iu-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasiu-actWhen {
+    flex: none;
+    text-align: right;
+    color: var(--iu-muted);
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    white-space: nowrap;
+}
+
+/* Narrow panels: drop the timestamp onto its own line under the description. */
+@container (max-width: 460px) {
+    .MPC-vasiu-actRow { grid-template-columns: auto 1fr; }
+    .MPC-vasiu-actWhen { grid-column: 2; text-align: left; }
+}
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasiu-hdrColL { border-right: none; border-left: 1px solid var(--iu-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .MPC-vasiu-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasiu-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasiu-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasiu-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .MPC-vasiu-actRow { text-align: right; }
+[dir="rtl"] .MPC-vasiu-actWhen { text-align: left; }
+[dir="rtl"] .MPC-vasiu-pgBtn .MPC-vasiu-ic svg { transform: scaleX(-1); }

@@ -27,7 +27,7 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
@@ -35,21 +35,23 @@
 
 .vas-ovr-card {
     /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
-       every inner value is em so the whole card rescales with the cell. cqi resolves
-       against .vas-ovr-root (container-type: inline-size), so the spec's 1.4cqi is
-       retuned for the 6-col cell width (≈1.9cqi) and the ceiling raised to 32px so
-       content keeps pace with the grid on 2560-wide dashboards. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+       every inner value is em so the whole card rescales with the cell. The root
+       declares its own container-type, so use the shared --dash-inline-size lever
+       (not cqi, which would pin to the floor against the cell). 2K Calibration
+       clamp — content stops growing at 20px on wide dashboards. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     gap: 0.625em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    /* Canonical glass surface (foundations.md §"Standard Gradients"): top pulled to
+       fully opaque white. Borders/radii/shadows stay px. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;                 /* dashboard-widgets.md §"Widget Edge Spacing" */
     overflow: hidden;
 }
 
@@ -73,12 +75,14 @@
 }
 
 .vas-ovr-icon {
+    /* Fixed 2em well (dashboard-widgets.md §"Widget Header"): equivalent to the
+       32–40px title-lever well at the 16–20 base. Radius/border stay px. */
     width: 2em;
     height: 2em;
     min-width: 2em;
-    border-radius: 0.5625em;
-    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #1F83FF;
     display: flex;
     align-items: center;
@@ -97,15 +101,14 @@
     flex: 1 1 auto;
 }
 
-/* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
-   Medium (500) per project request. Shared dashboard-width-anchored title clamp so
-   every widget's title resolves to the same px at any screen size. Bounds =
-   0.97 × the 16–32px root range. */
+/* dashboard-widgets.md §"Widget Header": dark #102C3F title, Roboto Regular (400).
+   Shared dashboard-width-anchored title clamp (ceiling 17px on 2K) so every
+   widget's title resolves to the same px at any screen size. */
 .vas-ovr-title {
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
-    line-height: 1.3;
+    line-height: 1.2;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -113,10 +116,10 @@
 }
 
 .vas-ovr-subtitle {
-    margin-top: 0.125em;
-    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
-       the subtitle renders the same px in every widget at any screen size. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    margin-top: 2px; /* fixed — pairs the two lines at every width */
+    /* Shared width-anchored subtitle clamp (dashboard-widgets.md §"Widget
+       Header"): ceiling 13px, muted. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     line-height: 1.3;
     overflow: hidden;
@@ -180,13 +183,13 @@
     transform: translate(-50%, calc(-100% - 0.625em));
     background: #102C3F;
     color: #FFFFFF;
-    border-radius: 0.375em;
+    border-radius: 6px;
     padding: 0.4375em 0.5625em;
     font-size: 0.6875em;
     line-height: 1.35;
     white-space: nowrap;
     pointer-events: none;
-    box-shadow: 0 0.25em 0.75em rgba(15, 61, 97, 0.25);
+    box-shadow: 0 4px 12px rgba(15, 61, 97, 0.25);
     z-index: 5;
     display: flex;
     flex-direction: column;
@@ -236,7 +239,8 @@
 }
 
 .vas-ovr-axis-label {
-    fill: #748494;
+    /* Chart axis labels: xs token, muted (foundations.md §"Text"). */
+    fill: #5F7283;
     /*font-family: Roboto, sans-serif;*/
     font-size: 0.6875em;
 }
@@ -247,8 +251,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #748494;
-    font-size: 0.8125em;
+    color: #5F7283;
+    font-size: 0.75em;               /* sm — canonical no-data size, matches sibling widgets */
 }
 
 /* ── Legend ───────────────────────────────────────────────────────── */
@@ -266,9 +270,8 @@
     display: inline-flex;
     align-items: center;
     gap: 0.375em;
-    /* Shared xs token (0.6875em), dashboard-width-anchored — label + value
-       inherit this. Matches the family detail-text size. */
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
+    /* xs token on the widget-root em lever — legend reads as chart chrome. */
+    font-size: 0.6875em;
     min-width: 0;
 }
 

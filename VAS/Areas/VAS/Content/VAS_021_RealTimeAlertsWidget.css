@@ -5,6 +5,19 @@
 .vas-rtawdg-root {
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
+    /* Named query container so the card can step its base font down on narrow / zoomed
+       cells (see the @container rules at the bottom). Without this the card only had the
+       --dash-inline-size clamp, which floors at 16px and overflows a narrow cell —
+       mirrors VIS.OutstandingSalesOrderWidget. */
+    container: vas-rtawdg / inline-size;
+    /* Canonical Onfinity glass surface (latest spec) — implemented explicitly on the
+       widget root so it never depends on the shared .vas-widget-bg being loaded. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: none;
+    /* borders / radii / shadows stay in px — they must not scale with the em anchor */
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -17,13 +30,12 @@
 }
 
 .vas-rtawdg-container {
-    font-size: 14px;
+    /* Widget root anchor: every internal value below is em against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     display: flex;
     flex-direction: column;
     height: 100%;
     padding: 1em 1.14em 0.86em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
-    border-radius: 12px;
     box-sizing: border-box;
     overflow: hidden;
 }
@@ -39,7 +51,7 @@
 .vas-rtawdg-spinner {
     width: 2em;
     height: 2em;
-    border: 2px solid rgba(0, 131, 218, 0.15);
+    border: 0.125em solid rgba(0, 131, 218, 0.15);
     border-top-color: #0083DA;
     border-radius: 50%;
     animation: vas-rtawdg-spin 0.7s linear infinite;
@@ -55,6 +67,8 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 0.65em;
+    padding-bottom: 0.5em;
+    border-bottom: 1px solid #C5D2DD;   /* header divider — darker than body rows (non-negotiable) */
     flex-shrink: 0;
 }
 
@@ -62,57 +76,117 @@
     display: flex;
     align-items: center;
     gap: 0.4em;
-    font-size: 0.86em;
-    font-weight: 700;
+    /* Shared Widget Header clamp, Roboto Regular. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
     color: #102C3F;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    line-height: 1.2;
+    line-height: 1.3;
 }
 
 .vas-rtawdg-title-icon {
     width: 1.1em;
     height: 1.1em;
     flex-shrink: 0;
-    color: #5F7283;
+    color: #41576A;
 }
 
-.vas-rtawdg-badge {
-    background: #ED1C24;
-    color: #fff;
-    font-size: 0.72em;
-    font-weight: 700;
+/* ---- Footer pager band (canonical Widget Footer Pager, server-side, 5 rows/page) ----
+   Full-width footer: left result-range helper text, right compact pager control.
+   Only rendered when the dataset spans more than one page. */
+.vas-rtawdg-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    flex-shrink: 0;
+    margin-top: 0.625em;              /* 10px primary-to-footer gap */
+    padding-top: 0.5em;               /* 8px footer top padding */
+    border-top: 1px solid #D9E2EB;    /* footer boundary tone */
+}
+
+.vas-rtawdg-foot-helper {
+    font-size: 0.75em;                /* ~12px — supporting metadata */
+    font-weight: 400;
+    color: #748494;
     line-height: 1;
-    padding: 0.22em 0.55em;
-    border-radius: 999px;
-    min-width: 1.6em;
-    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
-/* ---- Scrollable list ---- */
+.vas-rtawdg-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.35em;
+    flex-shrink: 0;
+}
+
+.vas-rtawdg-page-text {
+    font-size: 0.8125em;              /* ~13px — one notch above the helper */
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.vas-rtawdg-page-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;                     /* 24px square */
+    height: 1.5em;
+    padding: 0;
+    border: 1px solid #D9E2EB;
+    border-radius: 6px;
+    background: #fff;
+    color: #0083DA;                   /* primary-blue chevron */
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.vas-rtawdg-page-btn:hover:not(:disabled) {
+    background: #EAF4FC;              /* blue-tinted hover surface */
+    border-color: #C6D6E4;
+}
+
+.vas-rtawdg-page-btn:disabled,
+.vas-rtawdg-page-btn.vas-rtawdg-page-dis {
+    color: #B8C6D2;                   /* muted disabled chevron */
+    cursor: default;
+}
+
+.vas-rtawdg-page-btn svg {
+    width: 0.875em;                   /* 14px chevron */
+    height: 0.875em;
+}
+
+/* ---- Alert list ----
+   Owns the available row height and NEVER scrolls (No-Inner-Scrollbars rule):
+   the visible row count is adapted to this height by the widget JS, which measures
+   clientHeight and re-pages via a ResizeObserver. Overflow is clipped, not scrolled. */
 .vas-rtawdg-list {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 0.5em;
+    gap: 0;
     min-height: 0;
 }
-
-.vas-rtawdg-list::-webkit-scrollbar        { width: 4px; }
-.vas-rtawdg-list::-webkit-scrollbar-track  { background: transparent; }
-.vas-rtawdg-list::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.14); border-radius: 999px; }
 
 /* ---- Alert row ---- */
 .vas-rtawdg-alert {
     display: flex;
     align-items: flex-start;
     gap: 0.6em;
-    background: #fff;
-    border-radius: 8px;
-    padding: 0.6em 0.65em;
-    border-left: 3px solid transparent;
+    padding: 0.325em 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+    border-left: 3px solid transparent; /* per-severity semantic accent (kept) */
     flex-shrink: 0;
+}
+
+.vas-rtawdg-alert:last-child {
+    border-bottom: 0;
 }
 
 .vas-rtawdg-al-err  { border-left-color: #ED1C24; }
@@ -144,8 +218,8 @@
 }
 
 .vas-rtawdg-al-title {
-    font-size: 0.86em;
-    font-weight: 700;
+    font-size: 0.75em;
+    font-weight: 400;
     color: #102C3F;
     line-height: 1.3;
     margin-bottom: 0.18em;
@@ -154,7 +228,8 @@
 }
 
 .vas-rtawdg-al-sub {
-    font-size: 0.78em;
+    font-size: 0.6875em;   /* xs — secondary metadata one step below the row title (sm) */
+    font-weight: 400;
     color: #5F7283;
     line-height: 1.3;
 }
@@ -166,7 +241,7 @@
     cursor: pointer;
     font-family: inherit;
     font-size: 0.95em;
-    color: #748494;
+    color: #5F7283;
     padding: 0;
     line-height: 1;
     flex-shrink: 0;
@@ -184,7 +259,7 @@
     align-items: center;
     gap: 0.5em;
     font-size: 0.84em;
-    color: #748494;
+    color: #5F7283;
     padding: 1.2em 0.5em;
     justify-content: center;
     flex: 1;
@@ -197,12 +272,19 @@
     flex-shrink: 0;
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 1920px) { .vas-rtawdg-container { font-size: 14px; } }
-@media (max-width: 1366px) { .vas-rtawdg-container { font-size: 13px; } }
-@media (max-width: 1024px) { .vas-rtawdg-container { font-size: 12px; } }
-@media (max-width: 900px)  { .vas-rtawdg-container { font-size: 11.5px; } }
-@media (max-width: 768px)  { .vas-rtawdg-container { font-size: 11px; } }
-@media (max-width: 680px)  { .vas-rtawdg-container { font-size: 10.5px; } }
-@media (max-width: 480px)  { .vas-rtawdg-container { font-size: 10px; } }
-@media (max-width: 320px)  { .vas-rtawdg-container { font-size: 9px; } }
+/* ---- Responsive ----
+   The card base size follows the --dash-inline-size clamp, but that clamp floors at
+   16px; on a narrow / zoomed-in cell the content overflows at 16px. Step the base font
+   down on narrow cells (query the .vas-rtawdg-root container), mirroring
+   VIS.OutstandingSalesOrderWidget so zoom-in/out stays clean. */
+@container vas-rtawdg (max-width: 300px) {
+    .vas-rtawdg-container {
+        font-size: 13px;
+    }
+}
+
+@container vas-rtawdg (max-width: 220px) {
+    .vas-rtawdg-container {
+        font-size: 11px;
+    }
+}

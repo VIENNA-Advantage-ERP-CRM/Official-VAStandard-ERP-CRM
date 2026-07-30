@@ -2,22 +2,21 @@
    VAS_TotalPurchasesWidget — scoped styles
    All custom tokens are prefixed vas-tpwidg- to avoid
    clashing with app-shell or parent-page variables.
-   Content uses em units so the widget scales gracefully.
-   Base font-size is set on .vas-tpwidg-container and all
-   inner sizes derive from it.
+   UNITS (design.md / dashboard-widgets.md): every dimension
+   (border, radius, shadow, padding, width, gap, font-size) is
+   in em so it scales with the surface font-size. The only px
+   allowed are the scaling anchors themselves — the widget-body
+   clamp() min/max guardrails and the dialog's baseline anchor —
+   plus media-query breakpoints.
    ============================================================ */
 
 .vas-tpwidg-root {
-    height: 100%;
-    width: 100%;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.07);
-    transition: box-shadow 0.18s ease;
-}
-
-.vas-tpwidg-root:hover {
-    box-shadow: 0 12px 28px rgba(15, 61, 97, 0.11);
+    box-sizing: border-box;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-tpwidg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -30,82 +29,90 @@
 }
 
 .vas-tpwidg-container {
+    /* Widget root anchor: every internal em value below is against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    box-sizing: border-box;
     height: 100%;
     width: 100%;
-    padding: 1em 1em 1.125em;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: space-between;
+    gap: 0.5em; /* spec stack gap between header / value / why */
+    padding: 0.875em; /* Widget Edge Spacing */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 100%);
+    /*border: 2px solid #FFFFFF;*/
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     position: relative;
     overflow: hidden;
     isolation: isolate;
-    font-size: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
-    border-radius: 0.85em;
-    box-sizing: border-box;
 }
 
-.vas-tpwidg-container > :not(.vas-tpwidg-sparkline):not(.vas-tpwidg-open) {
+.vas-tpwidg-container > :not(.vas-tpwidg-open) {
     position: relative;
     z-index: 1;
 }
 
-/* ---- Label (top) ---- */
-.vas-tpwidg-label {
-    font-size: 0.8125em;
-    font-weight: 400;
-    color: #748494;
-    font-family: Roboto, sans-serif;
-    line-height: 1.3;
-    letter-spacing: 0;
+/* ---- Header (icon well + title/subtitle), structure mirrors VAS_018 ---- */
+.vas-tpwidg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
     margin-bottom: 0.375em;
+}
+
+/* Blue-tinted glass tile — purchases semantic; the SVG stroke inherits this via
+   currentColor. */
+.vas-tpwidg-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    background: linear-gradient(180deg, #FFFFFF, #EAF3FC);
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-tpwidg-icon svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+.vas-tpwidg-head-text {
+    min-width: 0;
+}
+
+/* ---- Title = KPI title (shared Widget Header clamp), Roboto Regular ---- */
+.vas-tpwidg-label {
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    font-weight: 400;
+    color: #102C3F;
+    font-family: Roboto, sans-serif;
+    line-height: 1.2;
+    margin-bottom: 0;
+}
+
+.vas-tpwidg-subtitle {
+    font-size: 0.75em;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 0.0625em;
 }
 
 /* ---- Primary KPI value ---- */
 .vas-tpwidg-value {
-    font-size: 2.28em;
-    font-weight: 700;
+    font-size: 1.75em;
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
     color: #0B5EA8;
-    line-height: 1;
-    letter-spacing: 0;
-    margin-bottom: 0.25em;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.5em;
     font-family: Roboto, sans-serif;
-}
-
-/* ---- Pills row ---- */
-.vas-tpwidg-pills-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-    flex-wrap: wrap;
-    margin-bottom: 0.375em;
-}
-
-.vas-tpwidg-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25em;
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid #B6D4EE;
-    border-radius: 999px;
-    padding: 0.22em 0.64em;
-    font-size: 0.78em;
-    font-family: Roboto, sans-serif;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-.vas-tpwidg-pill-label {
-    color: #5F7283;
-    font-weight: 700;
-    font-size: 0.82em;
-    text-transform: uppercase;
-    letter-spacing: 0;
-}
-
-.vas-tpwidg-pill-value {
-    color: #0B5EA8;
-    font-weight: 700;
+    padding-left: .3125em;
 }
 
 /* ---- Trend row (bottom-left) ---- */
@@ -134,18 +141,6 @@
     color: #ED1C24;
 }
 
-/* ---- Sparkline (bottom-right, decorative) ---- */
-.vas-tpwidg-sparkline {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 6.43em;
-    height: auto;
-    opacity: 0.16;
-    pointer-events: none;
-    z-index: 0;
-}
-
 .vas-tpwidg-open {
     position: absolute;
     inset: 0;
@@ -160,8 +155,8 @@
 }
 
 .vas-tpwidg-open:focus-visible {
-    outline: 2px solid #0083DA;
-    outline-offset: -4px;
+    outline: 0.125em solid #0083DA;
+    outline-offset: -0.25em;
 }
 
 .vis-editModeWidget .vas-tpwidg-open {
@@ -169,21 +164,24 @@
 }
 
 .vas-tpwidg-dialog-shell {
+    /* Baseline em anchor for the drill-down dialog (a document-baseline surface,
+       not --dash-inline-size scaled): every em inside resolves against this. */
+    font-size: 16px;
     background: #FFFFFF;
-    border: 1px solid #ECEFF3 !important;
-    border-radius: 14px !important;
-    box-shadow: 0 20px 60px rgba(10, 28, 45, 0.25) !important;
+    border: 0.0625em solid #ECEFF3 !important;
+    border-radius: 0.875em !important;
+    box-shadow: 0 1.25em 3.75em rgba(10, 28, 45, 0.25) !important;
     overflow: hidden !important;
 }
 
 .vas-tpwidg-dialog-shell .ui-dialog-titlebar {
     background: #FFFFFF !important;
     border: 0;
-    border-bottom: 1px solid #E4EDF4;
+    border-bottom: 0.0625em solid #E4EDF4;
     color: #102C3F;
     font-family: Roboto, sans-serif;
     letter-spacing: 0;
-    padding: 18px 20px 14px;
+    padding: 1.125em 1.25em 0.875em;
     position: relative;
     overflow: visible;
 }
@@ -191,7 +189,7 @@
 .vas-tpwidg-dialog-shell .ui-dialog-title {
     color: #102C3F !important;
     font-family: Roboto, sans-serif;
-    font-size: 15px;
+    font-size: 0.9375em;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.2;
@@ -203,23 +201,23 @@
     align-items: center;
     background: transparent;
     border: 0;
-    border-radius: 8px;
+    border-radius: 0.5em;
     box-shadow: none;
     box-sizing: border-box;
     color: #6B7280;
     cursor: pointer;
     display: flex;
-    height: 30px;
+    height: 1.875em;
     justify-content: center;
     line-height: 0;
     margin: 0;
     outline: 0;
     padding: 0;
     position: absolute;
-    right: 14px;
+    right: 0.875em;
     top: 50%;
     transform: translateY(-50%);
-    width: 30px;
+    width: 1.875em;
 }
 
 .vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close:hover,
@@ -231,33 +229,33 @@
 .vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close svg {
     display: block;
     fill: currentColor;
-    height: 14px;
+    height: 0.875em;
     pointer-events: none;
-    width: 14px;
+    width: 0.875em;
 }
 
 .vas-tpwidg-dialog-shell .ui-dialog-content {
-    padding: 18px 20px;
+    padding: 1.125em 1.25em;
 }
 
 .vas-tpwidg-dialog-shell .ui-dialog-buttonpane {
     background: #FFFFFF;
-    border-top: 1px solid #E4EDF4;
+    border-top: 0.0625em solid #E4EDF4;
     margin: 0;
-    padding: 12px 20px;
+    padding: 0.75em 1.25em;
 }
 
 .vas-tpwidg-dialog-shell .ui-dialog-buttonset button {
     background: rgba(255, 255, 255, 0.6);
-    border: 1px solid #E4EDF4;
-    border-radius: 999px;
-    color: #5F7283;
+    border: 0.0625em solid #E4EDF4;
+    border-radius: 62.5em;
+    color: #41576A;
     font-family: Roboto, sans-serif;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.2;
-    padding: 0.45rem 0.9rem;
+    padding: 0.6em 1.2em;
 }
 
 .vas-tpwidg-dialog-shell .ui-dialog-buttonset button:hover,
@@ -267,19 +265,24 @@
     outline: 0;
 }
 
+/* The dialog content element (= .ui-dialog-content) is given a fixed height by the
+   jQuery UI dialog; make it a flex column so whichever single state is inside — busy
+   spinner, empty/error message, or the drill body — stretches to fill it. This keeps
+   the popup a constant height across loading and paging (no fluctuation). */
 .vas-tpwidg-dialog {
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    min-height: 220px;
+    display: flex;
+    flex-direction: column;
 }
 
 .vas-tpwidg-drill-state {
     align-items: center;
-    color: #748494;
+    color: #5F7283;
     display: flex;
-    font-size: 14px;
+    flex: 1 1 auto;
+    font-size: 0.875em;
     justify-content: center;
-    min-height: 180px;
     text-align: center;
 }
 
@@ -287,45 +290,56 @@
     color: #D14545;
 }
 
+/* Modal busy state — core spinner shown while a page is fetched (server-side paging). */
+.vas-tpwidg-drill-busy {
+    align-items: center;
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: center;
+    position: relative;
+}
+
 .vas-tpwidg-drill {
     align-items: flex-start;
     display: flex;
-    gap: 16px;
+    flex: 1 1 auto;
+    gap: 1em;
+    min-height: 0;
 }
 
 .vas-tpwidg-drill-card {
     background: rgba(0, 131, 218, 0.094);
-    border-radius: 10px;
+    border-radius: 0.625em;
     flex: 1 1 0;
     min-width: 0;
-    padding: 14px 16px;
+    padding: 0.875em 1em;
 }
 
 .vas-tpwidg-drill-card-label {
-    color: #5F7283;
+    color: #41576A;
     display: block;
-    font-size: 11px;
+    font-size: 0.6875em;
     line-height: 1.25;
-    margin-bottom: 4px;
+    margin-bottom: 0.25em;
 }
 
 .vas-tpwidg-drill-card-value {
     color: #0083DA;
     display: block;
-    font-size: 34px;
+    font-size: 2.125em;
     font-weight: 700;
-    letter-spacing: -1px;
+    letter-spacing: -0.0625em;
     line-height: 1;
 }
 
 .vas-tpwidg-drill-card-trend {
     color: #0083DA;
     display: block;
-    font-size: 11px;
+    font-size: 0.6875em;
     font-style: normal;
     font-weight: 700;
     line-height: 1.25;
-    margin-top: 4px;
+    margin-top: 0.25em;
 }
 
 .vas-tpwidg-drill-copy {
@@ -334,14 +348,14 @@
 }
 
 .vas-tpwidg-drill-desc {
-    color: #5F7283;
-    font-size: 12px;
+    color: #41576A;
+    font-size: 0.75em;
     line-height: 1.6;
-    margin: 0 0 12px;
+    margin: 0 0 0.75em;
 }
 
 .vas-tpwidg-drill-row {
-    margin-bottom: 7px;
+    margin-bottom: 0.4375em;
 }
 
 .vas-tpwidg-drill-row:last-child {
@@ -355,15 +369,15 @@
 
 .vas-tpwidg-drill-row-head {
     display: flex;
-    font-size: 11px;
-    gap: 10px;
+    font-size: 0.6875em;
+    gap: 0.625em;
     justify-content: space-between;
-    margin-bottom: 3px;
+    margin-bottom: 0.1875em;
 }
 
 .vas-tpwidg-drill-row-name {
     color: #102C3F;
-    font-weight: 700;
+    font-weight: 400;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -379,15 +393,15 @@
 
 .vas-tpwidg-drill-track {
     background: rgba(0, 0, 0, 0.07);
-    border-radius: 3px;
-    height: 6px;
+    border-radius: 0.1875em;
+    height: 0.375em;
     overflow: hidden;
     width: 100%;
 }
 
 .vas-tpwidg-drill-fill {
     background: #0083DA;
-    border-radius: 3px;
+    border-radius: 0.1875em;
     height: 100%;
 }
 
@@ -413,17 +427,17 @@
 
 .vas-tpwidg-drill-pager-btn {
     align-items: center;
-    background: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(16, 44, 63, 0.18);
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 0.0625em solid rgba(16, 44, 63, 0.18);
+    border-radius: 0.375em;
     color: #102C3F;
     cursor: pointer;
     display: flex;
-    height: 24px;
+    height: 1.5em;
     justify-content: center;
     padding: 0;
     transition: background 0.15s ease, border-color 0.15s ease;
-    width: 24px;
+    width: 1.5em;
 }
 
 .vas-tpwidg-drill-pager-btn:hover:not([disabled]) {
@@ -443,62 +457,23 @@
     text-align: center;
 }
 
-/* ============================================================
-   Responsive — matches the pattern in VAS_ProductWidgets.css
-   ============================================================ */
-@media screen and (max-width: 1920px) {
-    .vis-editModeWidget .vas-tpwidg-container {
-        font-size: 10px;
-    }
+/* ---- Responsive ----
+   Widget interior scales via the em anchor clamp on .vas-tpwidg-container, so no
+   per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
+   document-baseline surface) reflows at narrow widths. */
+/* Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-tpwidg (max-width: 300px) {
+    .vas-tpwidg-container { font-size: 13px; }
 }
 
-@media screen and (max-width: 1366px) {
-    .vas-tpwidg-container {
-        font-size: 12px;
-    }
-
-    .vis-editModeWidget .vas-tpwidg-container {
-        font-size: 8px;
-    }
+@container vas-tpwidg (max-width: 220px) {
+    .vas-tpwidg-container { font-size: 11px; }
 }
 
-@media screen and (max-width: 1024px) {
-    .vas-tpwidg-container {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .vas-tpwidg-container {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 900px) {
-    .vas-tpwidg-container {
-        font-size: 11px;
-    }
-
-    .vis-editModeWidget .vas-tpwidg-container {
-        font-size: 8px;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .vas-tpwidg-container {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .vas-tpwidg-container {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 680px) {
-    .vas-tpwidg-container {
-        font-size: 9px;
-    }
-
+@media (max-width: 680px) {
     .vas-tpwidg-dialog-shell .ui-dialog-content {
-        padding: 0.875rem;
+        padding: 0.875em;
     }
 
     .vas-tpwidg-drill {
@@ -511,14 +486,34 @@
     }
 }
 
-@media screen and (max-width: 480px) {
-    .vas-tpwidg-container {
-        font-size: 12px;
-    }
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-tpwidg-dialog-shell .vas-tpwidg-dialog-close {
+    right: auto;
+    left: 0.875em;
 }
 
-@media screen and (max-width: 320px) {
-    .vas-tpwidg-container {
-        font-size: 9px;
-    }
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-tpwidg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-tpwidg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-tpwidg-drill-pager-btn svg {
+    transform: scaleX(-1);
 }

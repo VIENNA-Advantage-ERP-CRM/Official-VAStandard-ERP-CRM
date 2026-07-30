@@ -31,12 +31,42 @@
  * 18  | Session Expired                       | VAS_052_SessionExpired
  * 19  | + Entry                               | VAS_052_Entry
  * 20  | Cash Entry                            | VAS_052_CashEntry
+ * 21  | Document No                           | VAS_052_DocumentNo
+ * 22  | Charge                                | VAS_052_Charge
+ * 23  | Cashbook                              | VAS_052_CashBook
+ * 24  | Today's Cash Journals in Base Currency| VAS_052_Subtitle
+ * 25  | Open Record                           | VAS_052_OpenRecord
  * ─────────────────────────────────────────────────────────────────────
  */
 
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_052_TodaysCashbookCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -53,6 +83,9 @@
 
         var pageNo = 1;
         var pageSize = 3;
+        /* Row-height guess used only before the first row is rendered; from then
+           on the real height is measured (see measureRowHeight). */
+        var ROW_HEIGHT_FALLBACK = 42;
         var totalPages = 0;
         var totalRecords = 0;
 
@@ -132,28 +165,11 @@
             var precision =
                 getPrecision(data);
 
-            var symbol =
-                data &&
-                data.currencySymbol
-                    ? data.currencySymbol
-                    : '';
-
-            var iso =
-                data &&
-                (
-                    data.currencyISO ||
-                    data.currencyISOCode
-                )
-                    ? (
-                        data.currencyISO ||
-                        data.currencyISOCode
-                    )
-                    : '';
-
             if (numericValue === 0) {
                 return '-';
             }
 
+            /* Line-item amounts keep full precision (never compacted). */
             var amount =
                 Math.abs(numericValue)
                     .toLocaleString(
@@ -172,35 +188,32 @@
                     ? '-'
                     : '';
 
-            if (symbol) {
-                return sign +
-                    symbol +
-                    amount;
-            }
+            var currency = getCurrencyLabel(data);
 
-            return iso
-                ? sign + iso + amount
+            return currency
+                ? sign + currency + amount
                 : sign + amount;
         }
 
+        /* Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
         function getCurrencyLabel(data) {
-            if (
-                data &&
-                data.currencySymbol
-            ) {
-                return data.currencySymbol;
+            var symbol = String(
+                (data && data.currencySymbol) || ''
+            ).trim();
+
+            if (symbol) {
+                return symbol;
             }
 
-            return data &&
+            var iso = String(
                 (
-                    data.currencyISO ||
-                    data.currencyISOCode
-                )
-                ? (
-                    data.currencyISO ||
-                    data.currencyISOCode
-                )
-                : '';
+                    data &&
+                    (data.currencyISO || data.currencyISOCode)
+                ) || ''
+            ).trim();
+
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
         }
 
         function renderCurrencyAmount(
@@ -281,6 +294,73 @@
                                 : ''
                     })
                 );
+        }
+
+        /* The framework navigates IN-PLACE (no new window) only when the payload's
+           ActionName equals the name of the window currently HOSTING this widget;
+           otherwise it opens a new window. Resolve the host window name from the
+           listener chain and pass it as ActionName. */
+        function hostWindowName() {
+            try {
+                var listener = $self.listener;
+
+                for (
+                    var index = 0;
+                    index < 6 && listener;
+                    index++
+                ) {
+                    if (
+                        listener.apanel &&
+                        listener.apanel.gridWindow &&
+                        listener.apanel.gridWindow.getName
+                    ) {
+                        return listener.apanel.gridWindow.getName();
+                    }
+
+                    if (
+                        listener.gridWindow &&
+                        listener.gridWindow.getName
+                    ) {
+                        return listener.gridWindow.getName();
+                    }
+
+                    listener = listener.listener;
+                }
+            }
+            catch (e) { }
+
+            return '';
+        }
+
+        /* Open the cash journal record (C_Cash) behind the clicked document number -
+           same contract as the sibling cash-journal widgets (VAS_053 / VAS_069). */
+        function zoomToCashJournal(recordId) {
+            recordId = safeNumber(recordId);
+
+            if (!recordId) {
+                return;
+            }
+
+            try {
+                $self.widgetFirevalueChanged({
+                    'TabWhereClause':
+                        'C_Cash.C_Cash_ID=' + recordId,
+
+                    'TabLayout':
+                        'Y',   /* 'N' Grid, 'Y' Single, 'C' Card */
+
+                    'TabIndex':
+                        '0',
+
+                    'ActionName':
+                        hostWindowName() ||
+                        'VAS_CashJournal',
+
+                    'ActionType':
+                        'W'
+                });
+            }
+            catch (e) { /* zoom is best-effort */ }
         }
 
         function showBusy(show) {
@@ -397,6 +477,32 @@
                         )
                 });
 
+            /* Subtitle under the title (dashboard-widgets.md > "Widget Header"):
+               states that every amount on the card is converted to the accounting
+               schema's base currency. */
+            var $subtitle =
+                $('<span>', {
+                    'class':
+                        'VAS_052_cashbook-subtitle',
+
+                    'id':
+                        'VAS_052_cashbook-subtitle-' +
+                        widgetId,
+
+                    'text':
+                        lbl(
+                            'VAS_052_Subtitle',
+                            "Today's Cash Journals in Base Currency"
+                        )
+                });
+
+            /* Title + subtitle stack beside the icon well. */
+            var $labelGroup =
+                $('<div>', {
+                    'class':
+                        'VAS_052_cashbook-label-group'
+                });
+
             var $meta =
                 $('<span>', {
                     'class':
@@ -424,11 +530,17 @@
                 $(
                     '<table class="VAS_052_cashbook-table">' +
                     '<thead>' +
-                
+                    '<tr>' +
                     '<th class="VAS_052_cashbook-col-doc-no">' +
                     lbl(
                         'VAS_052_DocumentNo',
                         'Document No'
+                    ) +
+                    '</th>' +
+                    '<th class="VAS_052_cashbook-col-cashbook">' +
+                    lbl(
+                        'VAS_052_CashBook',
+                        'Cashbook'
                     ) +
                     '</th>' +
                     '<th class="VAS_052_cashbook-col-category">' +
@@ -441,12 +553,6 @@
                     lbl(
                         'VAS_052_CashType',
                         'Cash Type'
-                    ) +
-                    '</th>' +
-                    '<th>' +
-                    lbl(
-                        'VAS_052_PostedBy',
-                        'Posted by'
                     ) +
                     '</th>' +
                     '<th class="VAS_052_cashbook-col-amount">' +
@@ -506,7 +612,7 @@
 
                     'aria-label':
                         lbl(
-                                        'VAS_052_Previous',
+                            'VAS_052_Previous',
                             'Previous'
                         ),
 
@@ -530,7 +636,7 @@
 
                     'aria-label':
                         lbl(
-                                        'VAS_052_Next',
+                            'VAS_052_Next',
                             'Next'
                         ),
 
@@ -586,13 +692,47 @@
                 .append($pageInfo)
                 .append($pager);
 
+            $labelGroup
+                .append($title)
+                .append($subtitle);
+
             $titleRow
                 .append($icon)
-                .append($title)
-                .append($meta);
+                .append($labelGroup);
 
-            $header.append($titleRow);
+            $header.append($titleRow).append($meta);
             $body.append($table);
+
+            /* Delegated on the body — the rows are replaced on every page / refresh.
+               Enter / Space activate the link too (it is a real anchor, so the browser
+               fires a click for Enter; Space is handled explicitly). */
+            $body.on(
+                'click',
+                '.VAS_052_cashbook-doc-link',
+                function (event) {
+                    event.preventDefault();
+
+                    zoomToCashJournal(
+                        $(this).attr('data-cash-id')
+                    );
+                }
+            );
+
+            $body.on(
+                'keydown',
+                '.VAS_052_cashbook-doc-link',
+                function (event) {
+                    if (event.key !== ' ') {
+                        return;
+                    }
+
+                    event.preventDefault();
+
+                    zoomToCashJournal(
+                        $(this).attr('data-cash-id')
+                    );
+                }
+            );
 
             $card
                 .append($busy)
@@ -739,6 +879,26 @@
             }
         }
 
+        /* Height of one rendered body row. Measured from the DOM so the capacity
+           tracks the card's actual font scale (rows are ~34px at the default
+           clamp, not the 42px the fallback assumes) — a fixed guess left a row
+           or two of unused space on tall widgets. */
+        function measureRowHeight() {
+            var $sampleRow =
+                $body
+                    ? $body.find('tbody tr').first()
+                    : null;
+
+            var rowHeight =
+                ($sampleRow && $sampleRow.length)
+                    ? $sampleRow.outerHeight()
+                    : 0;
+
+            return rowHeight > 0
+                ? rowHeight
+                : ROW_HEIGHT_FALLBACK;
+        }
+
         function updateAdaptivePageSize(shouldReload) {
             if (!$body || !$body[0]) {
                 return;
@@ -749,7 +909,7 @@
             var availableHeight =
                 Math.max(0, $body[0].clientHeight - headerHeight);
             var nextPageSize =
-                Math.max(3, Math.floor(availableHeight / 42));
+                Math.max(3, Math.floor(availableHeight / measureRowHeight()));
 
             if (nextPageSize === pageSize) {
                 return;
@@ -789,10 +949,6 @@
             entry,
             data
         ) {
-            var categoryClass =
-                entry.categoryClass ||
-                'other';
-
             var cashTypeText =
                 entry.cashTypeName ||
                 entry.cashType ||
@@ -802,99 +958,107 @@
             var $row =
                 $('<tr>');
 
-          
+            var documentNo =
+                entry.documentNo ||
+                '-';
+
+            var cashJournalId =
+                safeNumber(
+                    entry.cCashId
+                );
+
+            var $documentCell =
+                $('<td>', {
+                    'class':
+                        'VAS_052_cashbook-col-doc-no',
+
+                    'title':
+                        documentNo
+                }).appendTo($row);
+
+            /* Document No is a hyperlink that opens the cash journal record.
+               Rendered as plain text when the row carries no C_Cash_ID (there is
+               nothing to open). */
+            if (cashJournalId > 0) {
+                $('<a>', {
+                    'href':
+                        '#',
+
+                    'class':
+                        'VAS_052_cashbook-doc-link',
+
+                    'role':
+                        'link',
+
+                    'data-cash-id':
+                        cashJournalId,
+
+                    'text':
+                        documentNo,
+
+                    'title':
+                        lbl(
+                            'VAS_052_OpenRecord',
+                            'Open record'
+                        ) +
+                        ' - ' +
+                        documentNo
+                }).appendTo($documentCell);
+            }
+            else {
+                $documentCell.text(documentNo);
+            }
+
+            var cashBookText =
+                entry.cashBookName ||
+                '-';
 
             $('<td>', {
                 'class':
-                    'VAS_052_cashbook-col-doc-no',
+                    'VAS_052_cashbook-cashbook-cell ' +
+                    'VAS_052_cashbook-col-cashbook',
 
                 'text':
-                    entry.documentNo ||
+                    cashBookText,
+
+                'title':
+                    cashBookText
+            }).appendTo($row);
+
+            // Charge and Cash type read as plain text (no chip / pill). The cell
+            // itself truncates with an ellipsis, so the full value rides along as
+            // the native tooltip.
+            var chargeText =
+                entry.charge ||
+                lbl(
+                    'VAS_052_Other',
+                    'Other'
+                );
+
+            $('<td>', {
+                'class':
+                    'VAS_052_cashbook-category-cell ' +
+                    'VAS_052_cashbook-col-category',
+
+                'text':
+                    chargeText,
+
+                'title':
+                    chargeText
+            }).appendTo($row);
+
+            $('<td>', {
+                'class':
+                    'VAS_052_cashbook-cash-type-cell ' +
+                    'VAS_052_cashbook-col-cash-type',
+
+                'text':
+                    cashTypeText ||
                     '-',
 
                 'title':
-                    entry.documentNo ||
+                    cashTypeText ||
                     '-'
-            }).appendTo($row);
-
-            var $categoryCell =
-                $('<td>', {
-                    'class':
-                        'VAS_052_cashbook-category-cell ' +
-                        'VAS_052_cashbook-col-category'
-                });
-
-            $categoryCell.append(
-                $('<span>', {
-                    'class':
-                        'VAS_052_cashbook-chip ' +
-                        'VAS_052_cashbook-chip-' +
-                        categoryClass,
-
-                    'text':
-                        entry.charge ||
-                        lbl(
-                            'VAS_052_Other',
-                            'Other'
-                        ),
-
-                    'title':
-                        entry.charge ||
-                        lbl(
-                            'VAS_052_Other',
-                            'Other'
-                        )
-                })
-            );
-
-            $categoryCell.appendTo($row);
-
-            var $cashTypeCell =
-                $('<td>', {
-                    'class':
-                        'VAS_052_cashbook-cash-type-cell ' +
-                        'VAS_052_cashbook-col-cash-type'
-                });
-
-            if (cashTypeText) {
-                $cashTypeCell.append(
-                    $('<span>', {
-                        'class':
-                            'VAS_052_cashbook-chip ' +
-                            'VAS_052_cashbook-chip-other ' +
-                            'VAS_052_cashbook-cash-type',
-
-                        'text':
-                            cashTypeText,
-
-                        'title':
-                            cashTypeText
-                    })
-                );
-            }
-            else {
-                $cashTypeCell.text('-');
-            }
-
-            $cashTypeCell.appendTo($row);
-
-            $('<td>', {
-                'class':
-                    'VAS_052_cashbook-posted',
-
-                'text':
-                    entry.postedBy ||
-                    lbl(
-                        'VAS_052_System',
-                        'System'
-                    ),
-
-                'title':
-                    entry.postedBy ||
-                    lbl(
-                        'VAS_052_System',
-                        'System'
-                    )
             }).appendTo($row);
 
             var $cashIn =
@@ -1017,6 +1181,20 @@
 
             $root
                 .find(
+                    '#VAS_052_cashbook-subtitle-' +
+                    widgetId
+                )
+                .text(
+                    data.subtitle ||
+                    data.Subtitle ||
+                    lbl(
+                        'VAS_052_Subtitle',
+                        "Today's Cash Journals in Base Currency"
+                    )
+                );
+
+            $root
+                .find(
                     '#VAS_052_cashbook-meta-' +
                     widgetId
                 )
@@ -1060,6 +1238,11 @@
             }
 
             updatePager();
+
+            /* Rows are on screen now, so the capacity can be measured for real.
+               updateAdaptivePageSize() no-ops when the size is unchanged, so this
+               settles after at most one extra fetch. */
+            updateAdaptivePageSize(true);
         }
 
         function loadData() {
@@ -1209,6 +1392,17 @@
                 loadData();
             };
 
+        /* Re-measure the row capacity when the dashboard resizes the widget —
+           the framework's own size hook, in addition to the ResizeObserver. */
+        this.handleSizeChange =
+            function () {
+                if (isDisposed) {
+                    return;
+                }
+
+                updateAdaptivePageSize(true);
+            };
+
         this.disposeComponent =
             function () {
                 isDisposed = true;
@@ -1241,60 +1435,51 @@
             };
     };
 
-    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.init =
-        function (
-            windowNo,
-            frame
-        ) {
-            this.frame =
-                frame;
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
 
-            this.windowNo =
-                windowNo;
+    /* Relay a fired value (e.g. zoom TabWhereClause) to the registered host. */
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener) {
+            this.listener.widgetFirevalueChanged(value);
+        }
+    };
 
-            if (
-                frame &&
-                frame.widgetInfo
-            ) {
-                this.AD_UserHomeWidgetID =
-                    frame.widgetInfo.AD_UserHomeWidgetID;
-            }
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.init = function (windowNo, frame) {
+        this.frame = frame;
+        this.windowNo = windowNo;
 
-            if (!this.AD_UserHomeWidgetID) {
-                this.AD_UserHomeWidgetID =
-                    windowNo ||
-                    new Date().getTime();
-            }
+        if (frame && frame.widgetInfo) {
+            this.AD_UserHomeWidgetID = frame.widgetInfo.AD_UserHomeWidgetID;
+        }
 
-            this.initalize();
+        if (!this.AD_UserHomeWidgetID) {
+            this.AD_UserHomeWidgetID = windowNo || new Date().getTime();
+        }
 
-            if (
-                this.frame &&
-                this.frame.getContentGrid
-            ) {
-                this.frame
-                    .getContentGrid()
-                    .append(
-                        this.getRoot()
-                    );
-            }
-        };
+        this.initalize();
 
-    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.widgetSizeChange =
-        function (
-            height,
-            width
-        ) {
-        };
+        if (this.frame && this.frame.getContentGrid) {
+            this.frame.getContentGrid().append(this.getRoot());
+        }
 
-    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.dispose =
-        function () {
-            this.disposeComponent();
+        ensureDashInlineSizeVar(this.getRoot());
+    };
 
-            if (this.frame) {
-                this.frame.dispose();
-            }
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.widgetSizeChange = function (height, width) {
+        if (this.handleSizeChange) {
+            this.handleSizeChange();
+        }
+    };
 
-            this.frame = null;
-        };
+    VAS.VAS_052_TodaysCashbookCashJournalWidget.prototype.dispose = function () {
+        this.disposeComponent();
+
+        if (this.frame) {
+            this.frame.dispose();
+        }
+
+        this.frame = null;
+    };
 })(VAS, jQuery);

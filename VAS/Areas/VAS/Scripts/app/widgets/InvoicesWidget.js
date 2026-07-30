@@ -32,7 +32,7 @@
  *  -  | Review-dialog keys (English fallbacks via lbl): VAS_062_DupBannerSub, VAS_062_DuplicateInvoiceReview,
  *     | VAS_062_DuplicateSets, VAS_062_SwitchTabsReview, VAS_062_MatchingField, VAS_062_DifferingField, VAS_062_PotentialDup,
  *     | VAS_062_DoubleBill, VAS_062_TripleBill, VAS_062_Newer, VAS_062_Newest, VAS_062_Original, VAS_062_Issued, VAS_062_Organization,
- *     | VAS_062_CustomerName, VAS_062_InvoiceDate, VAS_062_SalesOrderNo, VAS_062_DeliveryOrder, VAS_062_PaymentTerm,
+ *     | VAS_062_DocumentType, VAS_062_CustomerName, VAS_062_InvoiceDate, VAS_062_SalesOrderNo, VAS_062_DeliveryOrder, VAS_062_PaymentTerm,
  *     | VAS_062_DeliveryLocation, VAS_062_LineItems, VAS_062_NoLineItems, VAS_062_Product, VAS_062_AttributeSet, VAS_062_Charge,
  *     | VAS_062_Qty, VAS_062_UnitPrice, VAS_062_Amount, VAS_062_GrandTotal,
  *     | VAS_062_ReverseNewerInvoice, VAS_062_KeepBoth, VAS_Close, VAS_062_Confirm, VAS_062_ErrorOccurred, VAS_062_DupFooterNote
@@ -79,10 +79,14 @@
         var $root = $('<div class="vas-inv-root">');
 
         var $tableBody;
+        /* Scroll region (holds the sticky head + body) and the head itself — both measured by the
+           adaptive capacity sync, so they are widget-scoped (not locals of createWidget). */
+        var $tableWrap;
+        var $tableHead;
         var $alertBanner;
         /* Busy/loading overlay shown while the attention rows are being fetched. */
         var $busy;
-        /* Footer pager (server-side paging, 5 rows per page) — design.md "Widget Footer Pager":
+        /* Footer pager (server-side paging) — design.md "Widget Footer Pager":
            left result-range helper + right compact pager control. */
         var $footer;
         var $pageInfo;
@@ -90,9 +94,20 @@
         var $prevBtn;
         var $nextBtn;
         var pageNo = 1;
-        var pageSize = 5;
+        /* Adaptive server-side paging (mirrors VAS_021_RealTimeAlertsWidget): the client measures how
+           many invoice rows physically fit the list region and sends that as pageSize; the server
+           clamps + echoes it back. A ResizeObserver re-measures and re-pages on resize, so the list
+           never grows an inner scrollbar (design.md "Internal Content Must Not Resize The Widget"). */
+        var pageSize = 5;        // initial guess; replaced by the adaptive measure + server echo
         var totalPages = 0;
         var totalRecords = 0;
+        var measuredRowH = 0;    // last measured invoice-row height (px)
+        var loading = false;     // a fetch is in flight — suppress re-entrant capacity syncs
+        var bodyObserver = null;
+        var needsCapacitySync = true; // measure capacity on first load only; resize is the observer's job
+        var pendingSync = false; // a resize arrived mid-fetch — re-measure once the fetch finishes
+        var MIN_ROWS = 1;        // never force more rows than physically fit (no clipping)
+        var ROW_H_FALLBACK = 44; // px, used only before a real row is measured
         /* Base-currency symbol from the backend; rendered before every amount. */
         var currencySymbol = '';
         /* Duplicate sets (grouped by customer) and the open review-dialog overlay. */
@@ -130,31 +145,31 @@
         /* Attention-status chips (keyed by the backend attention_status text), per design.md §8.
            These are distinct from the document-status codes in STATUS_CONFIG below. */
         var ATTENTION_STATUS = {
-            'Overdue': { key: 'VAS_062_Overdue', fallback: 'Overdue', bg: '#FAD7D7', color: '#8F2D2D' },
-            'Due soon': { key: 'VAS_DueSoon', fallback: 'Due soon', bg: '#FCEFC7', color: '#9A6500' },
-            'Sent': { key: 'VAS_062_Sent', fallback: 'Sent', bg: '#D9ECFF', color: '#0E5DA8' }
+            'Overdue': { key: 'VAS_062_Overdue', fallback: 'Overdue', bg: '#FFE4E4', color: '#A33F3F' },
+            'Due soon': { key: 'VAS_DueSoon', fallback: 'Due soon', bg: '#FFF6E2', color: '#9A6500' },
+            'Sent': { key: 'VAS_062_Sent', fallback: 'Sent', bg: '#EEF6FF', color: '#0F69AC' }
         };
 
         /* Email-state chips for the 'Sent' category: completed invoices now appear whether or not the
            invoice e-mail has gone out. 'Y' = already e-mailed (done, green); otherwise the e-mail is
            still pending (amber, needs action). */
         var SENT_EMAIL_STATUS = {
-            'Y': { key: 'VAS_062_EmailSent', fallback: 'Email sent', bg: '#CCEFDD', color: '#0C5D38' },
-            'N': { key: 'VAS_062_EmailNotSent', fallback: 'Not sent', bg: '#FCEFC7', color: '#9A6500' }
+            'Y': { key: 'VAS_062_EmailSent', fallback: 'Email sent', bg: '#DDF4E8', color: '#0B6B45' },
+            'N': { key: 'VAS_062_EmailNotSent', fallback: 'Not sent', bg: '#FFF6E2', color: '#9A6500' }
         };
 
         var STATUS_CONFIG = {
-            DR: { label: lbl("VAS_062_StatusDraft", 'Draft'), bg: '#EDEDED', color: '#505050' },
-            IP: { label: lbl("VAS_062_StatusInProgress", 'In Progress'), bg: '#FFF3CD', color: '#9A6500' },
-            CO: { label: lbl("VAS_062_StatusCompleted", 'Completed'), bg: '#CCEFDD', color: '#0C5D38' },
-            CL: { label: lbl("VAS_062_StatusClosed", 'Closed'), bg: '#DFF1FF', color: '#0E5DA8' },
-            AP: { label: lbl("VAS_062_StatusApproved", 'Approved'), bg: '#CCEFDD', color: '#0C5D38' },
-            NA: { label: lbl("VAS_062_StatusNotApproved", 'Not Approved'), bg: '#FFE8E8', color: '#C0392B' },
-            WP: { label: lbl("VAS_062_StatusWaitingPayment", 'Waiting Payment'), bg: '#FFF3CD', color: '#9A6500' },
-            WC: { label: lbl("VAS_062_StatusWaitingConfirm", 'Waiting Confirm'), bg: '#FFF3CD', color: '#9A6500' },
-            RE: { label: lbl("VAS_062_StatusReversed", 'Reversed'), bg: '#FFE8E8', color: '#C0392B' },
-            VO: { label: lbl("VAS_062_StatusVoided", 'Voided'), bg: '#FFE8E8', color: '#C0392B' },
-            IN: { label: lbl("VAS_062_StatusInvalid", 'Invalid'), bg: '#FFE8E8', color: '#C0392B' }
+            DR: { label: lbl("VAS_062_StatusDraft", 'Draft'), bg: '#F1F4F8', color: '#41576A' },
+            IP: { label: lbl("VAS_062_StatusInProgress", 'In Progress'), bg: '#FFF6E2', color: '#9A6500' },
+            CO: { label: lbl("VAS_062_StatusCompleted", 'Completed'), bg: '#E7F7EF', color: '#0B6B45' },
+            CL: { label: lbl("VAS_062_StatusClosed", 'Closed'), bg: '#EEF6FF', color: '#0F69AC' },
+            AP: { label: lbl("VAS_062_StatusApproved", 'Approved'), bg: '#E7F7EF', color: '#0B6B45' },
+            NA: { label: lbl("VAS_062_StatusNotApproved", 'Not Approved'), bg: '#FCEFEF', color: '#A33F3F' },
+            WP: { label: lbl("VAS_062_StatusWaitingPayment", 'Waiting Payment'), bg: '#FFF6E2', color: '#9A6500' },
+            WC: { label: lbl("VAS_062_StatusWaitingConfirm", 'Waiting Confirm'), bg: '#FFF6E2', color: '#9A6500' },
+            RE: { label: lbl("VAS_062_StatusReversed", 'Reversed'), bg: '#FCEFEF', color: '#A33F3F' },
+            VO: { label: lbl("VAS_062_StatusVoided", 'Voided'), bg: '#FCEFEF', color: '#A33F3F' },
+            IN: { label: lbl("VAS_062_StatusInvalid", 'Invalid'), bg: '#FCEFEF', color: '#A33F3F' }
         };
 
         /* ── Initialize ── */
@@ -178,6 +193,7 @@
 
         /* ── Load the attention rows (Overdue / Due soon / Sent), one page at a time ── */
         function loadAttention() {
+            loading = true;
             showBusy(true);
             $.ajax({
                 url: VIS.Application.contextUrl + 'Invoices/GetAttentionInvoices',
@@ -192,6 +208,7 @@
                         renderRows();
                         updatePager();
                         showBusy(false);
+                        loading = false;
                         return;
                     }
                     /* Symbol from whichever endpoint answers first; both report the same base currency. */
@@ -199,6 +216,16 @@
                     pageNo = Number(data.pageNo || pageNo);
                     totalPages = Number(data.totalPages || 0);
                     totalRecords = Number(data.totalRecords || 0);
+
+                    /* Requested a page past the last one (e.g. a zoom-out enlarged the page after the
+                       measure used a stale count): the server returns an empty slice rather than
+                       clamping. Step back to the real last page and re-fetch instead of flashing "No
+                       data". pageNo is now <= totalPages, so this can run at most once. */
+                    if (totalRecords > 0 && pageNo > totalPages) {
+                        pageNo = totalPages;
+                        loadAttention();
+                        return;
+                    }
 
                     var rows = data.rows || [];
                     INVOICES = $.map(rows, function (r) {
@@ -218,6 +245,16 @@
                     renderRows();
                     updatePager();
                     showBusy(false);
+                    loading = false;
+
+                    /* Measure capacity on the first load (adapt from the initial guess of 5) or when a
+                       resize arrived while this fetch was in flight (pendingSync). Manual paging alone
+                       does not re-measure — that would flip pageSize mid-navigation; genuine size
+                       changes come through the ResizeObserver. */
+                    if (needsCapacitySync || pendingSync) {
+                        pendingSync = false;
+                        scheduleCapacitySync();
+                    }
                 },
                 error: function () {
                     INVOICES = [];
@@ -226,6 +263,8 @@
                     renderRows();
                     updatePager();
                     showBusy(false);
+                    loading = false;
+                    pendingSync = false;
                 }
             });
         }
@@ -242,8 +281,11 @@
                     var pairs = (data && data.pairs) ? data.pairs : (Array.isArray(data) ? data : []);
                     if (pairs.length > 0) {
                         /* Group the pairs into duplicate sets (one per customer) for the
-                           Review dialog, and headline the banner with the set count. */
-                        reviewSets = buildSets(pairs);
+                           Review dialog, and headline the banner with the set count. The
+                           dialog tabs (vas-dup-tabs) are ordered by customer name. */
+                        reviewSets = buildSets(pairs).sort(function (a, b) {
+                            return String(a.customer || '').localeCompare(String(b.customer || ''), undefined, { sensitivity: 'base' });
+                        });
                         var title = reviewSets.length + ' ' + lbl("VAS_062_DuplicateSuspectedBased", 'duplicate suspected based on Amount and Customer');
                         var sub = lbl("VAS_062_DupBannerSub", 'Same customer and amount — open Review to compare.');
                         $alertBanner.find('.vis-inv-dup-title').text(title);
@@ -272,12 +314,15 @@
                 '<div class="vas-inv-header">' +
                 '<div class="vas-inv-header-left">' +
                 '<div class="vas-inv-icon">' +
-                '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0083DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>' +
-                '<polyline points="14 2 14 8 20 8"/>' +
-                '<line x1="16" y1="13" x2="8" y2="13"/>' +
-                '<line x1="16" y1="17" x2="8" y2="17"/>' +
-                '<polyline points="10 9 9 9 8 9"/>' +
+                '<svg viewBox="0 0 40 40" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">' +
+                '<rect width="40" height="40" rx="10" fill="#EAF8FF"/>' +
+                '<rect x="10" y="9" width="16" height="21" rx="2" fill="none" stroke="#0083DA" stroke-width="1.6" stroke-linejoin="round"/>' +
+                '<line x1="13.5" y1="15" x2="22.5" y2="15" stroke="#0083DA" stroke-width="1.3" stroke-linecap="round"/>' +
+                '<line x1="13.5" y1="19" x2="22.5" y2="19" stroke="#0083DA" stroke-width="1.3" stroke-linecap="round"/>' +
+                '<line x1="13.5" y1="23" x2="19" y2="23" stroke="#0083DA" stroke-width="1.3" stroke-linecap="round"/>' +
+                '<circle cx="28" cy="28" r="8" fill="#0083DA"/>' +
+                '<line x1="28" y1="24.5" x2="28" y2="28.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>' +
+                '<circle cx="28" cy="31" r="1" fill="#FFFFFF"/>' +
                 '</svg>' +
                 '</div>' +
                 '<span class="vas-inv-title">' + lbl("VAS_062_InvoicesNeedingAttention", 'Invoices needing your attention') + '</span>' +
@@ -308,10 +353,10 @@
             );
 
             /* Table wrapper */
-            var $tableWrap = $('<div class="vas-inv-table-wrap">');
+            $tableWrap = $('<div class="vas-inv-table-wrap">');
 
             /* Table header row — frozen above the scrolling body (CSS sticky). */
-            var $tableHead = $(
+            $tableHead = $(
                 '<div class="vas-inv-table-head" style="grid-template-columns:' + COL_TMPL + ';">' +
                 '<span class="vas-inv-th">' + lbl("VAS_062_Invoice", 'Invoice') + '</span>' +
                 '<span class="vas-inv-th-customer">' + lbl("VAS_062_Customer", 'Customer') + '</span>' +
@@ -330,8 +375,8 @@
             /* Footer pager (design.md "Widget Footer Pager"): two zones — left result-range helper
                ("Showing X–Y of Z") and a right-aligned compact pager (prev · "X of N" · next) with
                rounded-square buttons. Hidden while there is only a single page. */
-            var chevL = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
-            var chevR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            var chevL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+            var chevR = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
             $footer = $(
                 '<div class="vas-inv-footer" style="display:none;">' +
                 '<span class="vas-inv-footer-info"></span>' +
@@ -355,12 +400,74 @@
             $busy = $('<div class="vas-inv-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>');
             $busy[0].style.visibility = 'hidden';
             $root.append($busy);
+
+            /* Watch the scroll region so a resize re-measures how many rows fit and re-pages. */
+            observeBody();
         }
 
         /* Toggle the busy/loading overlay. */
         function showBusy(show) {
             if (!$busy || !$busy[0]) { return; }
             $busy[0].style.visibility = show ? 'visible' : 'hidden';
+        }
+
+        /* ── Adaptive row count (No-Inner-Scrollbars rule, mirrors VAS_021) ── */
+
+        function scheduleCapacitySync() {
+            var raf = window.requestAnimationFrame || function (cb) { return window.setTimeout(cb, 16); };
+            raf(function () { syncCapacity(); });
+        }
+
+        /* Measure how many invoice rows physically fit the list region (the scroll wrapper minus its
+           sticky header) and, when that differs from the page size we last requested, adopt it and
+           reload the current page. Converges in one step (a re-render yields the same fit). */
+        function syncCapacity() {
+            if (loading || !$tableWrap || !$tableWrap[0]) { return; }
+            if (totalRecords <= 0) { return; }  // no real data row to size from yet
+
+            var headH = ($tableHead && $tableHead[0]) ? $tableHead[0].offsetHeight : 0;
+            var avail = $tableWrap[0].clientHeight - headH;
+            if (avail <= 0) {
+                // Layout not settled yet — retry next frame while an initial sync is pending.
+                if (needsCapacitySync) { scheduleCapacitySync(); }
+                return;
+            }
+
+            // Rows are variable-height (the customer cell wraps to 1–2 lines), so size capacity off the
+            // TALLEST rendered row — sizing off the shortest row would let a two-line row overflow and
+            // clip. Guarantees the whole page fits, never scrolls.
+            var rows = $tableBody[0].querySelectorAll('.vas-inv-row');
+            var maxH = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].offsetHeight > maxH) { maxH = rows[i].offsetHeight; }
+            }
+            if (maxH > 0) { measuredRowH = maxH; }
+            var rowH = measuredRowH > 0 ? measuredRowH : ROW_H_FALLBACK;
+
+            needsCapacitySync = false;  // measurement succeeded — stop the initial one-shot
+            var capacity = Math.max(MIN_ROWS, Math.floor(avail / rowH));
+            if (capacity !== pageSize) {
+                pageSize = capacity;
+                /* A larger page (zoom-out) can leave the current page past the new last page. The
+                   server does not clamp pageNo, so step back to the last page that still has data
+                   before reloading (totalRecords is from the last load; the load handler backstops
+                   any residual mismatch). */
+                var newTotalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+                if (pageNo > newTotalPages) { pageNo = newTotalPages; }
+                loadAttention();
+            }
+        }
+
+        function observeBody() {
+            if (typeof ResizeObserver === 'undefined' || !$tableWrap || !$tableWrap[0]) { return; }
+            bodyObserver = new ResizeObserver(function () {
+                /* A resize that lands mid-fetch (e.g. the widget reaching its final size while the
+                   first page is still loading) must not be dropped, or the capacity stays stuck at the
+                   intermediate measure. Defer it and re-measure when the load finishes. */
+                if (loading) { pendingSync = true; return; }
+                syncCapacity();
+            });
+            bodyObserver.observe($tableWrap[0]);
         }
 
         /* Human-readable due value: "Today" for the current day, "Mon DD" otherwise, em dash when no
@@ -418,9 +525,11 @@
 
                 var $row = $(
                     '<div data-invid="' + safeId + '" ' +
+                    'data-cinvid="' + escapeHtml(inv.cInvoiceId) + '" ' +
                     'class="vas-inv-row' + (isLast ? '' : ' vas-inv-row-divided') + '" ' +
                     'style="grid-template-columns:' + COL_TMPL + ';">' +
-                    '<span class="vas-inv-cell-id">' + safeId + '</span>' +
+                    '<span class="vas-inv-cell-id vas-inv-doclink" role="link" tabindex="0" ' +
+                    'title="' + safeId + '">' + safeId + '</span>' +
                     '<span class="vas-inv-cell-customer" title="' + safeCustomer + '">' + safeCustomer + '</span>' +
                     '<span class="vas-inv-cell-due">' + formatDue(inv.due) + '</span>' +
                     '<span>' +
@@ -477,6 +586,18 @@
                 onNewInvoice();
             });
 
+            /* Document number — zoom the host window's invoice tab to that record. */
+            $root.on('click', '.vas-inv-doclink', function () {
+                zoomInvoice($(this).closest('.vas-inv-row').data('cinvid'));
+            });
+            /* Keyboard activation (Enter / Space) for the focusable doc-no link. */
+            $root.on('keydown', '.vas-inv-doclink', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.keyCode === 13 || e.keyCode === 32) {
+                    e.preventDefault();
+                    zoomInvoice($(this).closest('.vas-inv-row').data('cinvid'));
+                }
+            });
+
             /* Pager — previous / next page of attention rows. */
             $root.on('click', '.vas-inv-prev', function () {
                 if (pageNo <= 1) { return; }
@@ -501,6 +622,17 @@
                 "TabIndex": "0"
             };
             $self.widgetFirevalueChanged(windowParam);
+        }
+
+        /* Zoom: fire the value the host listens for to open the clicked invoice in the window's first
+           tab, filtered to the single record (single/form layout). */
+        function zoomInvoice(cInvoiceId) {
+            if (!cInvoiceId) { return; }
+            $self.widgetFirevalueChanged({
+                "TabWhereClause": "C_Invoice.C_Invoice_ID=" + cInvoiceId,
+                "TabLayout": "Y",   /* 'N' Grid, 'Y' Single, 'C' Card */
+                "TabIndex": "0"
+            });
         }
 
         /* ── Duplicate review dialog ────────────────────────────────────────────────
@@ -559,7 +691,8 @@
                     byInv[id] = {
                         id: id, no: r.invoiceDocumentNo, panelRole: r.panelRole,
                         docStatus: r.docStatus, invoiceStatus: r.invoiceStatus, date: r.invoiceDate,
-                        org: r.organizationName, customer: r.customerName,
+                        org: r.organizationName, docType: r.documentTypeName, docBaseType: r.docBaseType,
+                        customer: r.customerName,
                         salesOrderNo: r.salesOrderNo, deliveryOrderNo: r.deliveryOrderNo,
                         paymentTerm: r.paymentTermName, deliveryLocation: r.deliveryLocation,
                         grandTotal: r.grandTotal, currencyIso: r.currencyIso,
@@ -701,6 +834,10 @@
             function val(v) { return v ? escapeHtml(v) : dash; }
             var totalState = inv.isSameGrandTotal === 'Y' ? ' is-match' : (inv.isSameGrandTotal === 'N' ? ' is-diff' : '');
 
+            /* Credit memos (AR/AP) present their grand total as a reduction, so show it negative. */
+            var isCreditMemo = inv.docBaseType === 'ARC' || inv.docBaseType === 'APC';
+            var grandTotalDisplay = isCreditMemo ? -Math.abs(Number(inv.grandTotal) || 0) : inv.grandTotal;
+
             return '<div class="vas-dup-card">' +
                 '<div class="vas-dup-card-head">' +
                 '<div><div class="vas-dup-card-no">' + escapeHtml(inv.no || '—') + '</div>' +
@@ -709,6 +846,7 @@
                 '</div>' +
                 '<div class="vas-dup-fields">' +
                 fieldRow(lbl("VAS_062_Organization", 'Organization'), val(inv.org), null, inv.org) +
+                fieldRow(lbl("VAS_062_DocumentType", 'Document Type'), val(inv.docType), null, inv.docType) +
                 fieldRow(lbl("VAS_062_CustomerName", 'Customer Name'), val(inv.customer), flagState(inv.isSameCustomer), inv.customer) +
                 fieldRow(lbl("VAS_062_InvoiceDate", 'Invoice Date'), val(inv.date), flagState(inv.isSameInvoiceDate), inv.date) +
                 fieldRow(lbl("VAS_062_SalesOrderNo", 'Sales Order No.'), val(inv.salesOrderNo), null, inv.salesOrderNo) +
@@ -721,7 +859,7 @@
                 buildLineTable(inv) +
                 '</div>' +
                 '<div class="vas-dup-card-total"><span class="lbl">' + lbl("VAS_062_GrandTotal", 'Grand total') + '</span>' +
-                '<span class="val' + totalState + '">' + moneyIso(inv.grandTotal, inv.currencyIso) + '</span></div>' +
+                '<span class="val' + totalState + '">' + moneyIso(grandTotalDisplay, inv.currencyIso) + '</span></div>' +
                 '</div>';
         }
 
@@ -808,8 +946,8 @@
                 '<div class="vas-dup-footer">' +
                 '<div class="vas-dup-footer-note">' + infoSvg + '<span></span></div>' +
                 '<div class="vas-dup-actions">' +
-                '<button class="vas-dup-btn danger" type="button" data-dup-act="void">' + lbl("VAS_062_ReverseNewerInvoice", 'Reverse newer invoice') + '</button>' +
-                '<button class="vas-dup-btn primary" type="button" data-dup-act="keep">' + lbl("VAS_062_KeepBoth", 'Keep both') + '</button>' +
+                '<button class="vas-dup-btn danger" type="button" data-dup-act="void">' + lbl("VAS_062_ReverseNewerInvoice", 'Reverse Recent Invoice') + '</button>' +
+                '<button class="vas-dup-btn primary" type="button" data-dup-act="keep">' + lbl("VAS_062_KeepBoth", 'Keep All') + '</button>' +
                 '</div></div>' +
                 /* Busy overlay shown while a footer action (Keep both / Reverse) is in flight; reuses
                    the core spinner classes. */
@@ -962,7 +1100,7 @@
                 });
             }
 
-            /* "Reverse newer invoice" — confirm first (a reversal is hard to undo), then run the
+            /* "Reverse Recent Invoice" — confirm first (a reversal is hard to undo), then run the
                document Reverse-Correct action. The set's line detail carries the 'Newer' marker, so
                fetch it first if the tab's detail has not loaded yet. */
             function doReverseNewer(set) {
@@ -1034,6 +1172,7 @@
         };
 
         this.disposeComponent = function () {
+            if (bodyObserver) { bodyObserver.disconnect(); bodyObserver = null; }
             closeReview();
             $root.remove();
         };

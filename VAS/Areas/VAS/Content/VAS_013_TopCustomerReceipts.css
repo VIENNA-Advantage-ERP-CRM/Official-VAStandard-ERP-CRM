@@ -26,29 +26,29 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
-/* ── Glass card (pale green → white collections tint) ──────────────── */
+/* ── Glass card (neutral glass surface) ────────────────────────────── */
 
 .vas-tcr-card {
-    /* Widget root anchor: scale the whole card with the cell so it fills tall cells on
-       large dashboards instead of staying at the default 16px. cqi resolves against
-       .vas-tcr-root (container-type: inline-size). ~3-col list widget → 3cqi coefficient.
-       Shrink overrides below (@container max-width) reduce this further on narrow cells. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    /* Widget root anchor (dashboard-widgets.md §"Widget Root Anchor"): 2K
+       calibration clamp — floor 16px, ceiling 20px, dashboard-relative via
+       --dash-inline-size. Narrow-cell @container overrides reduce it below. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     gap: 0.875em;
-    /* Shared neutral glass surface (design.md): default widget surface, no semantic tint. */
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: .875em;
+    /* Canonical glass surface (foundations.md §"Standard Gradients"). Physical
+       edges (border/radius/shadow) stay in px. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
     overflow: hidden;
 }
 
@@ -63,12 +63,14 @@
 }
 
 .vas-tcr-icon {
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
-    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    /* Icon well tracks the title lever (dashboard-widgets.md §"Widget Header"):
+       ~2× the title clamp, capped at 40px. Radius stays px. */
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #106AB0;
     display: flex;
     align-items: center;
@@ -77,8 +79,8 @@
 }
 
     .vas-tcr-icon svg {
-        width: 1.125em;
-        height: 1.125em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
         stroke: currentColor;
     }
 
@@ -87,14 +89,13 @@
     flex: 1 1 auto;
 }
 
-/* Widget header — Medium (500). Shared dashboard-width-anchored title clamp
-   (dashboard-widgets.md §"Widget Header"): same resolved px in every widget
-   at any screen size. */
+/* Widget header — Roboto Regular (400). Shared dashboard-width-anchored title
+   clamp (dashboard-widgets.md §"Widget Header"): capped at 17px on 2K. */
 .vas-tcr-title {
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
-    line-height: 1.3;
+    line-height: 1.2;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -102,10 +103,10 @@
 }
 
 .vas-tcr-subtitle {
-    margin-top: 0.125em;
-    /* Shared viewport-anchored sm clamp (0.75 × the 16–32px root range) so
-       the subtitle renders the same px in every widget at any screen size. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    margin-top: 2px;
+    /* Shared viewport-anchored subtitle clamp (dashboard-widgets.md §"Widget
+       Header"), capped at 13px on 2K. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     color: #717182;
     line-height: 1.3;
     overflow: hidden;
@@ -153,10 +154,8 @@
 }
 
 .vas-tcr-name {
-    /* Shared sm data token (dashboard-width-anchored, same px as sibling
-       widgets' rows). Was 0.875em (= 0.0109 of the base) which rendered larger
-       than the family sm rows. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    /* Item label — sm token, Bold, dark (List Widget §"Item label"). */
+    font-size: 0.75em;
     font-weight: 400;
     color: #102C3F;
     min-width: 0;
@@ -166,9 +165,9 @@
 }
 
 .vas-tcr-amount {
-    /* Shared sm data token — matches .vas-tcr-name and sibling widgets' rows. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    font-weight: 700;
+    /* Item value — sm token, Bold, dark (List Widget §"Item value"). */
+    font-size: 0.75em;
+    font-weight: 400;
     color: #102C3F;
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
@@ -177,7 +176,7 @@
 
 .vas-tcr-cur {
     margin-inline-end: 0.1em;
-    font-weight: 700;
+    font-weight: 400;
 }
 
 /* Proportion bar — track + data-driven fill (width set in JS). Fill anchors to
@@ -185,23 +184,26 @@
 .vas-tcr-bar {
     width: 100%;
     height: 0.4375em;
-    border-radius: 999em;
-    background: #E2EDE4;
+    border-radius: 999px;
+    background: #E2EAF1;
     overflow: hidden;
 }
 
 .vas-tcr-bar-fill {
     height: 100%;
-    border-radius: 999em;
+    border-radius: 999px;
     background: linear-gradient(90deg, #2EA45A, #82D49E);
 }
 
-/* Empty state — top-anchored (same spacing from the top as a populated list),
-   not vertically centered in the card. */
+/* Empty state — centered both axes in the card body (the message sits in the
+   middle of the empty space, per the no-data reference). `margin:auto` absorbs
+   the free space of the flex-column list on both the main and cross axis. */
 .vas-tcr-empty {
     flex: 0 0 auto;
-    color: #748494;
-    font-size: 0.8125em;
+    margin: auto;
+    text-align: center;
+    color: #5F7283;
+    font-size: 0.75em;
     padding: 0.25em 0;
 }
 
@@ -214,6 +216,6 @@
 @container (max-width: 13.75em) {     /* < 220px */
     .vas-tcr-card {
         font-size: 0.75em;
-        padding: 0.875em;
+        padding: 0.85em;
     }
 }

@@ -16,6 +16,25 @@
 
 ; (function (VAS, $) {
 
+    /* Creates a single document-level ResizeObserver on the dashboard container
+       and mirrors its width into the global CSS var --dash-inline-size (px), so
+       the widget's clamp() sizing tracks the dashboard width, not the viewport. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
     // Labels   : VAS_039_GLJPosted, VAS_039_Why, VAS_039_PostedDocuments
@@ -40,7 +59,6 @@
             createBusyIndicator();
             showBusy(true);
             loadData();
-            setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {
@@ -80,6 +98,24 @@
             $kpiValue = $root.find('#VAS-gljp-val-' + id);
         }
 
+        /* Always two decimals, with the user's locale decimal separator (87.50 % /
+           87,50 %) — the same toLocaleString convention the amount widgets use. */
+        function formatPercentage(value) {
+            var number = Number(value);
+
+            if (isNaN(number)) {
+                number = 0;
+            }
+
+            return number.toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }
+            ) + '%';
+        }
+
         function loadData() {
             showBusy(true);
             $.ajax({
@@ -88,16 +124,23 @@
                 dataType : 'json',
                 cache    : false,
                 success  : function (result) {
-                    try {
-                        var data = JSON.parse(result);
-                        if (data) {
-                            $kpiValue.text(typeof data.Percentage === 'number' ? data.Percentage + '%' : '—');
-                        } else {
-                            $kpiValue.text('—');
+                    var data = result;
+
+                    if (typeof data === 'string') {
+                        try {
+                            data = JSON.parse(data);
+                        } catch (e) {
+                            data = null;
                         }
-                    } catch (e) {
-                        $kpiValue.text('—');
                     }
+
+                    var percentage = data ? Number(data.Percentage) : 0;
+
+                    if (isNaN(percentage)) {
+                        percentage = 0;
+                    }
+
+                    $kpiValue.text(formatPercentage(percentage));
                     showBusy(false);
                 },
                 error: function () {
@@ -122,6 +165,8 @@
         this.windowNo            = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_039_GLJournalPostedWidget.prototype.widgetSizeChange = function (height, width) {};

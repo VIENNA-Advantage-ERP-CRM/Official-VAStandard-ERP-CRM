@@ -1,0 +1,505 @@
+/* VAS_165_LocationWiseInventoryCountWidget.css */
+
+.vas-locwisecount-container {
+    width: 100%;
+    height: 100%;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-root {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    font-size: clamp(16px, 1.2cqi, 20px);
+    font-size: clamp(16px, calc(var(--widget-inline-size, 380px) * 0.045), 20px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'Roboto', sans-serif;
+    user-select: none;
+}
+
+/* Header Row */
+.vas-locwisecount-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-left-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-locwisecount-icon-well {
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083DA;
+    font-size: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+    flex-shrink: 0;
+}
+
+.vas-locwisecount-title-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.vas-locwisecount-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-locwisecount-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    color: #717182;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Filter Cluster */
+.vas-locwisecount-filter-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.vas-locwisecount-select {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    background-image: none !important;
+    font-size: 0.75em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    color: #102C3F;
+    background-color: #FFFFFF;
+    border: 1px solid #D9E2EB;
+    border-radius: 8px;
+    padding: 0.35em 0.75em;
+    min-width: 4.5em;
+    text-align: center;
+    text-align-last: center;
+    outline: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.vas-locwisecount-select:hover {
+    background-color: #EEF8FF;
+    border-color: #0083DA;
+}
+
+.vas-locwisecount-select:focus {
+    border-color: #0083DA;
+}
+
+
+
+/* Widget Body Grid */
+.vas-locwisecount-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 0.75em;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-locwisecount-grid-template {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1.4fr);
+    gap: 0.5em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-header-row {
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #C5D2DD;
+    background: transparent;
+}
+
+.vas-locwisecount-th {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.6875em;
+    color: #5F7283;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-locwisecount-th-right {
+    text-align: right;
+}
+
+
+.vas-locwisecount-rows-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.vas-locwisecount-row-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #E2EAF1;
+    padding: 0.375em 0.5em;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.vas-locwisecount-row-btn:last-child {
+    border-bottom: none;
+}
+
+.vas-locwisecount-row-btn:hover,
+.vas-locwisecount-row-btn:focus-visible {
+    background-color: rgba(234, 248, 255, 0.7);
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px #0083DA;
+    outline: none;
+}
+
+
+.vas-locwisecount-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-loc-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-locwisecount-wh-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+}
+
+.vas-locwisecount-counts-num {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #41576A;
+    text-align: right;
+}
+
+.vas-locwisecount-qty-num {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #0083DA;
+    text-align: right;
+}
+
+/* Footer Pager Band */
+.vas-locwisecount-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #D9E2EB;
+    padding-top: 8px;
+    margin-top: 10px;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-footer-text {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #748494;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-locwisecount-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+}
+
+.vas-locwisecount-pager-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid #D9E2EB;
+    background-color: #FFFFFF;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    transition: background-color 0.15s ease;
+}
+
+.vas-locwisecount-pager-btn:hover:not(:disabled) {
+    background-color: #EAF8FF;
+}
+
+.vas-locwisecount-pager-btn:disabled {
+    color: #B8C6D2;
+    cursor: not-allowed;
+}
+
+.vas-locwisecount-pager-info {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.8125em;
+    color: #102C3F;
+    padding: 0 0.25em;
+}
+
+/* Modal Overlay & Dialog */
+.vas-locwisecount-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(4, 22, 38, 0.45);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+.vas-locwisecount-modal-dialog {
+    width: clamp(340px, 85vw, 1400px);
+    height: clamp(420px, 85vh, 900px);
+    font-size: clamp(14px, 1.2vw, 22px);
+    background-color: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 24px 60px rgba(4, 22, 38, 0.28);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* Modal Header Chrome (56px) */
+.vas-locwisecount-modal-header {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 16px;
+    border-bottom: 2px solid #1F83FF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-modal-header-left {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-locwisecount-modal-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    color: #102C3F;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-locwisecount-modal-subtitle {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vas-locwisecount-modal-close {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: #141414;
+    cursor: pointer;
+    font-size: 20px;
+    transition: background-color 0.15s ease;
+    padding: 0;
+}
+
+.vas-locwisecount-modal-close:hover {
+    background-color: #EEF6FF;
+}
+
+/* Modal Body */
+.vas-locwisecount-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.875em 0.875em 0.5em;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+
+
+.vas-locwisecount-modal-grid-template {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 0.6fr);
+    gap: 0.75em;
+    align-items: center;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-modal-data-row {
+    padding: 0.5em 0.5em;
+    border-bottom: 1px solid #E2EAF1;
+    box-sizing: border-box;
+}
+
+.vas-locwisecount-modal-data-row:last-child {
+    border-bottom: none;
+}
+
+.vas-locwisecount-prod-title {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: #102C3F;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+.vas-locwisecount-prod-attr {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #5F7283;
+    line-height: 1.2;
+    margin-top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Inventory Type Chips */
+.vas-locwisecount-chip-info {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.6875em;
+    background-color: #EAF8FF;
+    color: #0083DA;
+    white-space: nowrap;
+}
+
+.vas-locwisecount-chip-neutral {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    font-size: 0.6875em;
+    background-color: #F1F4F8;
+    color: #41576A;
+    white-space: nowrap;
+}
+
+/* Modal Footer */
+.vas-locwisecount-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid #D9E2EB;
+    padding: 0.5em 0.875em;
+    box-sizing: border-box;
+    font-size: clamp(14px, 0.85vw, 16px);
+}
+
+.vas-locwisecount-modal-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    min-width: 0;
+    flex: 1;
+}
+
+.vas-locwisecount-modal-total-qty {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125em;
+    color: #0083DA;
+    white-space: nowrap;
+}
+
+.vas-locwisecount-message {
+    text-align: center;
+    padding: 2em 1em;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+}

@@ -1,0 +1,581 @@
+/* Delivery Orders by Representative (VAS_119) - 4x2 status-mix analytics
+   widget with Month/Year filters, 5-row paging and a delivery-order
+   drill-down modal. Widget size: 4 columns x 2 rows (the dashboard grid owns
+   the outer size). Internals in em on the widget root anchor; the modal is
+   fixed rem chrome; borders/radii/shadows px. Status colors: In Progress
+   #0083DA, Draft #C9D4DD, Completed #20A464, Voided #D14545. */
+
+.MPC-dor-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+.MPC-dor-root,
+.MPC-dor-root * {
+    box-sizing: border-box;
+}
+
+.MPC-dor-hidden {
+    display: none !important;
+}
+
+/* ---- Widget root (glass surface) ---- */
+.MPC-dor-card {
+    position: relative;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .014), 24px);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.875em;
+}
+
+/* ---- Header ---- */
+.MPC-dor-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625em;
+    flex-shrink: 0;
+}
+
+.MPC-dor-head-left {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
+
+.MPC-dor-ico {
+    width: 2em;
+    height: 2em;
+    border-radius: 10px;
+    background: #EEF6FF;
+    border: 1px solid #E4EDF4;
+    color: #0083DA;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.MPC-dor-ico svg {
+    width: 1em;
+    height: 1em;
+}
+
+.MPC-dor-titles {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.MPC-dor-title {
+    font-weight: 500;
+    color: #102C3F;
+    line-height: 1.2;
+    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * .011375), 16px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Legend rides in the subtitle slot */
+.MPC-dor-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    margin-top: 2px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.MPC-dor-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3125em;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #748494;
+    white-space: nowrap;
+}
+
+.MPC-dor-sw {
+    width: 0.625em;
+    height: 0.625em;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* ---- Month / Year filters ---- */
+.MPC-dor-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    flex-shrink: 0;
+}
+
+.MPC-dor-select {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    font-weight: 500;
+    font-size: 0.75em;
+    color: #102C3F;
+    background: rgba(255, 255, 255, 0.9) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230083DA' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 0.4375em center;
+    background-size: 1em 1em;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.375em 1.625em 0.375em 0.625em;
+    cursor: pointer;
+    line-height: 1.2;
+}
+
+.MPC-dor-select:hover {
+    background-color: #EAF4FD;
+}
+
+.MPC-dor-select:focus-visible {
+    outline: 2px solid #9ED1FF;
+    outline-offset: 1px;
+}
+
+/* ---- Status-mix rows (5 airy rows fill the body) ---- */
+.MPC-dor-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    margin-top: 0.25em;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+}
+
+.MPC-dor-row {
+    display: grid;
+    grid-template-columns: 6.25em 1fr 2.5em;
+    column-gap: 0.75em;
+    align-items: center;
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 0.375em 0.375em;
+    text-align: left;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
+.MPC-dor-mix-row {
+    cursor: pointer;
+}
+
+.MPC-dor-mix-row:hover {
+    background: rgba(234, 244, 253, 0.7);
+}
+
+.MPC-dor-mix-row:focus-visible {
+    outline: 2px solid #9ED1FF;
+    outline-offset: 1px;
+}
+
+.MPC-dor-mix-label {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dor-mix-track {
+    display: flex;
+    height: 0.75em;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #E4EDF4;
+}
+
+.MPC-dor-seg {
+    height: 100%;
+    display: block;
+}
+
+.MPC-dor-seg-inprogress { background: #0083DA; }
+.MPC-dor-seg-draft { background: #C9D4DD; }
+.MPC-dor-seg-completed { background: #20A464; }
+.MPC-dor-seg-voided { background: #D14545; }
+
+.MPC-dor-mix-total {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ---- Loading skeleton (same row height as loaded rows) ---- */
+.MPC-dor-skel {
+    display: block;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #E9F1F8 25%, #F5FAFF 50%, #E9F1F8 75%);
+    background-size: 200% 100%;
+    animation: MPC-dor-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes MPC-dor-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.MPC-dor-skel-label { height: 0.75em; width: 80%; }
+.MPC-dor-skel-track { height: 0.75em; width: 100%; }
+.MPC-dor-skel-total { height: 0.75em; width: 100%; }
+
+/* ---- Empty / error state ---- */
+.MPC-dor-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    font-size: 0.75em;
+    font-weight: 400;
+    color: #748494;
+    text-align: center;
+}
+
+.MPC-dor-retry {
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: 500;
+    color: #0083DA;
+    background: #FFFFFF;
+    border: 1px solid #E4EDF4;
+    border-radius: 8px;
+    padding: 0.35em 0.9em;
+    cursor: pointer;
+}
+
+.MPC-dor-retry:hover {
+    background: #EAF4FD;
+    border-color: #BFE4FF;
+}
+
+/* ---- Footer pager ---- */
+.MPC-dor-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.5em;
+    flex-shrink: 0;
+}
+
+.MPC-dor-helper {
+    font-weight: 400;
+    font-size: 0.8125rem;
+    color: #748494;
+}
+
+.MPC-dor-pager {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.MPC-dor-pgbtn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid #E4EDF4;
+    background: rgba(255, 255, 255, 0.9);
+    color: #0083DA;
+    cursor: pointer;
+    padding: 0;
+}
+
+.MPC-dor-pgbtn:hover:not(:disabled) {
+    background: #EAF4FD;
+}
+
+.MPC-dor-pgbtn:disabled {
+    background: rgba(255, 255, 255, 0.6);
+    color: #B8C6D2;
+    cursor: default;
+}
+
+.MPC-dor-pgbtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.MPC-dor-pgtext {
+    font-weight: 500;
+    font-size: 0.875em;
+    color: #102C3F;
+}
+
+/* ---- Drill-down modal (fixed rem chrome) ---- */
+.MPC-dor-body-lock {
+    overflow: hidden !important;
+}
+
+.MPC-dor-overlay {
+    /* The modal anchors its own font-size (up to 32px) so the whole pop-up scales
+       up like the Delivery Orders / GRN modal; internals below are all em. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 44, 63, 0.35);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10050;
+    padding: 2em;
+    font-family: Roboto, sans-serif;
+}
+
+.MPC-dor-overlay.MPC-dor-open {
+    display: flex;
+}
+
+.MPC-dor-modal {
+    background: #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 30px 70px rgba(2, 38, 64, 0.30);
+    width: min(51.25em, calc(100vw - 2em));
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-dor-m-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.875em 1.125em;
+    border-bottom: 1px solid #E4EDF4;
+    flex-shrink: 0;
+}
+
+.MPC-dor-m-title {
+    font-weight: 700;
+    font-size: 1em;
+    color: #102C3F;
+    line-height: 1.2;
+}
+
+.MPC-dor-m-sub {
+    font-weight: 400;
+    font-size: 0.8em;
+    color: #748494;
+    margin-top: 0.25em;
+}
+
+.MPC-dor-m-close {
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #141414;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.MPC-dor-m-close:hover {
+    background: #EEF6FF;
+    color: #0083DA;
+}
+
+.MPC-dor-m-close svg {
+    width: 1.25em;
+    height: 1.25em;
+}
+
+/* The body never scrolls: the rows area reserves a fixed 5-row height and
+   paginates, so the modal size stays constant regardless of row count. */
+.MPC-dor-m-body {
+    overflow: hidden;
+    padding: 0.25em 1.125em 0.625em;
+}
+
+/* Always reserve 5 row tracks so the pop-up doesn't shrink on a short page. */
+.MPC-dor-m-rows {
+    display: grid;
+    grid-template-rows: repeat(5, 2.3em);
+}
+
+.MPC-dor-m-rows .MPC-dor-m-state,
+.MPC-dor-m-rows .MPC-dor-m-skel-row:only-child {
+    grid-row: 1 / -1;
+}
+
+.MPC-dor-do-row {
+    display: grid;
+    grid-template-columns: 1.4fr 2fr 1.1fr 1.1fr 1fr;
+    column-gap: 0.625em;
+    align-items: center;
+    padding: 0.45em 0;
+    border-bottom: 1px solid #EDF2F6;
+}
+
+.MPC-dor-do-head {
+    position: sticky;
+    top: 0;
+    background: #FFFFFF;
+}
+
+.MPC-dor-do-head > div {
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #748494;
+}
+
+.MPC-dor-m-rows .MPC-dor-do-row:last-child {
+    border-bottom: none;
+}
+
+.MPC-dor-do-id {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #0083DA;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dor-do-cell {
+    font-weight: 400;
+    font-size: 0.75em;
+    color: #5F7283;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.MPC-dor-do-amount {
+    font-weight: 700;
+    font-size: 0.75em;
+    color: #102C3F;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+}
+
+.MPC-dor-do-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    font-weight: 500;
+    font-size: 0.6875em;
+    line-height: 1;
+    padding: 0.25em 0.5em;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+.MPC-dor-dot {
+    width: 0.4em;
+    height: 0.4em;
+    border-radius: 999px;
+}
+
+.MPC-dor-st-inprogress { background: #DFF1FF; color: #106AB0; }
+.MPC-dor-st-inprogress .MPC-dor-dot { background: #0083DA; }
+.MPC-dor-st-draft { background: #F1F4F7; color: #5F7283; }
+.MPC-dor-st-draft .MPC-dor-dot { background: #9AA9B6; }
+.MPC-dor-st-completed { background: #E3F6ED; color: #0B6B45; }
+.MPC-dor-st-completed .MPC-dor-dot { background: #20A464; }
+.MPC-dor-st-voided { background: #FBEAEA; color: #A33F3F; }
+.MPC-dor-st-voided .MPC-dor-dot { background: #D14545; }
+
+/* Modal loading skeleton / states */
+.MPC-dor-m-skel-row {
+    grid-template-columns: 1fr;
+}
+
+.MPC-dor-m-skel {
+    height: 0.75em;
+    width: 100%;
+}
+
+.MPC-dor-m-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    padding: 1.25em 0.25em;
+    font-size: 0.75em;
+    color: #748494;
+    text-align: center;
+}
+
+.MPC-dor-m-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    padding: 0.625em 1.125em;
+    border-top: 1px solid #E4EDF4;
+    font-weight: 400;
+    font-size: 0.6875em;
+    color: #748494;
+    flex-shrink: 0;
+}
+
+.MPC-dor-m-foot-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-dor-m-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-shrink: 0;
+}
+
+.MPC-dor-m-foot .MPC-dor-pgbtn {
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 0.4em;
+}
+
+.MPC-dor-m-foot .MPC-dor-pgbtn svg {
+    width: 0.65em;
+    height: 0.65em;
+}
+
+.MPC-dor-m-pgtext {
+    font-weight: 500;
+    font-size: 0.75em;
+    font-variant-numeric: tabular-nums;
+    color: #102C3F;
+}
+
+.MPC-dor-ta-r {
+    text-align: right;
+}

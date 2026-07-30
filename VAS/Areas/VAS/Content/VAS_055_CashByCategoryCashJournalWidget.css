@@ -17,13 +17,17 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    font-size: clamp(16px, 1.4cqi, 24px);
+    /* Query container only — no font-size (see card), so container-query em
+       breakpoints resolve against 16px like ExpectedThisWeek. */
     container-type: inline-size;
     font-family: Roboto, Arial, sans-serif;
     color: #102C3F;
 }
 
 .VAS_055_cash-category-card {
+    /* Widget root anchor on the dashboard-width lever (ExpectedThisWeek pattern):
+       lives on the card, not the query-container root. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -33,10 +37,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.875em;
-    padding: 0.875em;
+    padding: 0.85em;
     border: 2px solid #FFFFFF;
     border-radius: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     color: #102C3F;
 }
@@ -58,50 +62,62 @@
 }
 
 .VAS_055_cash-category-icon {
-    width: 1.75em;
-    height: 1.75em;
-    min-width: 1.75em;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
     flex: 0 0 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #E4EDF4;
-    border-radius: 0.375em;
-    background: rgba(79, 131, 216, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFFFFF, #E8F4FF);
     color: #4F83D8;
 }
 
     .VAS_055_cash-category-icon svg {
-        width: 1em;
-        height: 1em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
     }
 
+/* Title + subtitle stack */
+.VAS_055_cash-category-title-wrap {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+/* Widget title — shared Widget Header style (self-sufficient --dash-inline-size clamp) */
 .VAS_055_cash-category-title {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.875em;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     line-height: 1.2;
     font-weight: 400;
     color: #102C3F;
 }
 
-.VAS_055_cash-category-meta {
-    flex: 0 0 auto;
-    font-size: 0.6875em;
-    line-height: 1.2;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: #738090;
+/* Widget subtitle — shared Widget Header subtitle clamp */
+.VAS_055_cash-category-subtitle {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    line-height: 1.3;
+    font-weight: 400;
+    color: #717182;
 }
 
 .VAS_055_cash-category-body {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    gap: 1em;
+    gap: 0.6em;
     min-width: 0;
     min-height: 0;
     justify-content: flex-start;
@@ -123,97 +139,70 @@
     min-width: 0;
 }
 
-.VAS_055_cash-category-name,
-.VAS_055_cash-category-percent {
+/* Category label — sm token */
+.VAS_055_cash-category-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 0.75em;
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 500;
     color: #102C3F;
 }
 
+/* Amount + share ride on ONE line, right-aligned at the end of the row and
+   separated by a middle dot: "$1.069B · 82%". */
 .VAS_055_cash-category-metrics {
     flex: 0 1 auto;
     min-width: 0;
     max-width: 60%;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.125em;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 0.375em;
     overflow: hidden;
 }
 
-.VAS_055_cash-category-percent {
-    display: block;
-    max-width: 100%;
-    text-align: left;
-    font-size: 0.75em;
+/* Middle-dot separator between the amount and the share. */
+.VAS_055_cash-category-sep {
+    flex: 0 0 auto;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 400;
+    color: #A4B2BF;
 }
 
+/* Secondary meta (percent) — xs token, muted. Never squeezed: the amount is the
+   value that truncates. */
+.VAS_055_cash-category-percent {
+    flex: 0 0 auto;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    font-size: 0.6875em;
+    line-height: 1.2;
+    font-weight: 400;
+    color: #5F7283;
+}
+
+/* Category value — sm token, bold, right-aligned */
 .VAS_055_cash-category-amount {
-    display: inline-flex;
-    align-items: baseline;
-    justify-content: flex-start;
-    gap: 0;
+    flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: left;
-    font-size: 0.6875em;
-    line-height: 1;
-    font-weight: 600;
+    text-align: right;
+    font-size: 0.75em;
+    line-height: 1.2;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
-    color: #60748A;
-}
-
-.VAS_055_cash-category-amount .VAS-cash-amount-prefix {
-    flex: 0 0 auto;
-    margin-top: 0.08em;
-    font-size: 0.72em;
-    line-height: 1;
-    font-weight: 500;
-    color: currentColor;
-    opacity: 0.78;
-}
-
-.VAS_055_cash-category-amount .VAS-cash-amount-prefix:empty,
-.VAS_055_cash-category-amount .VAS-cash-amount-decimal:empty {
-    display: none;
-    margin: 0;
-}
-
-.VAS_055_cash-category-amount .VAS-cash-amount-main {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 1em;
-    line-height: 1;
-    color: currentColor;
-}
-
-.VAS_055_cash-category-amount .VAS-cash-amount-decimal {
-    flex: 0 0 auto;
-    margin-top: 0.26em;
-    font-size: 0.72em;
-    line-height: 1;
-    font-weight: 500;
-    color: currentColor;
-    opacity: 0.66;
-}
-
-.VAS_055_cash-category-amount .VAS-cash-amount-prefix,
-.VAS_055_cash-category-amount .VAS-cash-amount-decimal {
-    align-self: baseline;
-    margin-top: 0;
-    color: currentColor;
-    font-size: 1em;
-    font-weight: 600;
-    opacity: 1;
+    color: #0083DA;
 }
 
 .VAS_055_cash-category-track {
@@ -222,7 +211,7 @@
     min-width: 0;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(228, 237, 228, 0.78);
+    background: #EEF2F6;
 }
 
 .VAS_055_cash-category-fill {
@@ -234,15 +223,15 @@
 }
 
 .VAS_055_cash-category-bar-1 {
-    background: linear-gradient(90deg, #E6A85C, #D19537);
+    background: #0083DA;
 }
 
 .VAS_055_cash-category-bar-2 {
-    background: linear-gradient(90deg, #7DBEA7, #5DA38E);
+    background: #12B76A;
 }
 
 .VAS_055_cash-category-bar-3 {
-    background: linear-gradient(90deg, #A996FF, #8578F0);
+    background: #7A5AF8;
 }
 
 .VAS_055_cash-category-footer {
@@ -254,10 +243,10 @@
     flex-shrink: 0;
     margin-top: 0.25em;
     padding-top: 0.5em;
-    border-top: 1px solid rgba(212, 225, 234, 0.66);
+    border-top: 1px solid #D9E2EB;
     font-size: 0.75em;
     line-height: 1.3;
-    color: #60748A;
+    color: #748494;
 }
 
 .VAS_055_cash-category-footer-text {
@@ -271,28 +260,6 @@
 
 .VAS_055_cash-category-footer-info {
     display: none;
-}
-
-.VAS_055_cash-category-why {
-    flex: 0 0 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: 0.25em 0.625em;
-    border-radius: 7px;
-    background: rgba(0, 131, 218, 0.08);
-    color: #4F83D8;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-}
-
-.VAS_055_cash-category-why-text {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #60748A;
-    font-weight: 400;
 }
 
 .VAS_055_cash-category-pager {
@@ -334,7 +301,7 @@
 }
 
 .VAS_055_cash-category-page-btn:disabled {
-    color: #c7d3df;
+    color: #B8C6D2;
     background: rgba(255, 255, 255, 0.64);
     cursor: default;
 }
@@ -342,10 +309,9 @@
 .VAS_055_cash-category-page-text {
     min-width: 3em;
     text-align: center;
-    font-size: 1em;
     line-height: 1.2;
-    font-weight: 700;
-    color: #141414;
+    font-weight: 500;
+    color: #102C3F;
     font-variant-numeric: tabular-nums;
 }
 
@@ -407,14 +373,6 @@
         border-radius: 0.375em;
     }
 
-    .VAS_055_cash-category-title {
-        font-size: 0.875em;
-    }
-
-    .VAS_055_cash-category-meta {
-        display: none;
-    }
-
     .VAS_055_cash-category-body {
         gap: 0.75em;
     }
@@ -449,10 +407,6 @@
     .VAS_055_cash-category-icon {
         width: 1.75em;
         height: 1.75em;
-    }
-
-    .VAS_055_cash-category-title {
-        font-size: 0.875em;
     }
 
     .VAS_055_cash-category-body {
@@ -497,34 +451,19 @@
 }
 
 .VAS_055_cash-category-page-btn:disabled {
-    color: #c7d3df;
+    color: #B8C6D2;
     background: rgba(255, 255, 255, 0.64);
 }
 
 .VAS_055_cash-category-page-text {
     display: inline-block;
     min-width: 3em;
-    font-size: 1em;
-    font-weight: 700;
-    color: #141414;
+    font-weight: 500;
+    color: #102C3F;
 }
 
-/* ── Hover expand: show full category name on pointer-over ─────────────── */
 .VAS_055_cash-category-name {
     cursor: default;
-}
-
-.VAS_055_cash-category-name:hover {
-    overflow: visible;
-    white-space: normal;
-    word-break: break-word;
-    position: relative;
-    z-index: 30;
-    background: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 4px 16px rgba(15, 61, 97, 0.14);
-    border-radius: 6px;
-    padding: 0.25em 0.5em;
-    margin: -0.25em -0.5em;
 }
 
 /* Canonical dashboard widget footer pager. */
@@ -535,7 +474,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #748494;
-    font-size: 0.8125rem;
+    font-size: 0.75em;
     font-weight: 400;
 }
 
@@ -550,5 +489,17 @@
 }
 
 .VAS_055_cash-category-page-text {
-    font-size: 0.85rem;
+    font-size: 0.8125em;
+    font-weight: 500;
+    color: #102C3F;
+}
+
+/* Responsive shrink — VAS_012 pattern: step the whole card font-size down on
+   narrow cells so all em-based content scales together. */
+@container (max-width: 18.75em) {
+    .VAS_055_cash-category-card { font-size: 0.8125em; }
+}
+
+@container (max-width: 13.75em) {
+    .VAS_055_cash-category-card { font-size: 0.6875em; }
 }

@@ -23,6 +23,47 @@
         return value && value !== key && value !== '[' + key + ']' ? value : fallback;
     }
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the em-anchor clamps resolve against the dashboard's visible
+       width, not the viewport. One document-level ResizeObserver serves every widget;
+       without a marked container — or without ResizeObserver — the CSS falls back to
+       100vw. (Mirrors VAS_024_TotalOutstandingWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
+    /* Chart.js registers every chart against its canvas ELEMENT. Constructing a
+       second chart on a canvas that still owns a live instance throws
+       "Canvas is already in use. Chart with ID 'n' must be destroyed before the
+       canvas can be reused." A widget's own _chartInst only tracks charts THIS
+       instance created — one left behind by a previous instance (disposed without
+       destroy, or a widget id that repeats across dashboards) is invisible to it.
+       So ask Chart.js which instance owns the canvas and destroy that one too. */
+    function releaseCanvas(el) {
+        if (!el || typeof Chart === 'undefined') { return; }
+        var owner = null;
+        if (typeof Chart.getChart === 'function') {
+            owner = Chart.getChart(el);                       // Chart.js v3 / v4
+        } else if (Chart.instances) {                          // v2 fallback
+            for (var k in Chart.instances) {
+                if (Chart.instances[k] && Chart.instances[k].canvas === el) { owner = Chart.instances[k]; break; }
+            }
+        }
+        if (owner) { try { owner.destroy(); } catch (e) { } }
+    }
+
     /* Category colour palette (12 distinct colours) */
     var CAT_COLORS = [
         '#1976D2', '#6A1B9A', '#2E7D32', '#E65100',
@@ -40,9 +81,26 @@
         var widgetID     = null;
         var _currentView = 'bar';
         var _chartInst   = null;
+        var _drawTimer   = null;
 
         $self._kpiData   = null;
         $self._drawChart = null;
+        $self._disposed  = false;
+
+        /* Always resolve the canvas inside THIS widget's root. document.getElementById
+           returns the first match in the document, so two widget instances that end up
+           with the same widgetID would otherwise both draw onto the first canvas — the
+           other classic trigger of the "canvas is already in use" error. */
+        function canvasEl() { return $root.find('.vas-sbcwdg-canvas')[0] || null; }
+
+        /* Tear down this widget's chart plus any instance still holding its canvas,
+           and cancel a deferred draw so it cannot fire after the canvas is gone.
+           Bar and donut share one canvas, so every switch runs through here. */
+        function destroyChart() {
+            if (_drawTimer) { window.clearTimeout(_drawTimer); _drawTimer = null; }
+            if (_chartInst) { try { _chartInst.destroy(); } catch (e) { } _chartInst = null; }
+            releaseCanvas(canvasEl());
+        }
 
         /* ---- Initialise ---- */
         this.initalize = function () {
@@ -78,9 +136,11 @@
 
         /* ---- Render HTML shell then draw chart ---- */
         function renderWidget(data) {
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // release the OLD canvas before it is removed
             $container.empty();
             _currentView = 'bar';
+
+            var hasData = !!(data && data.Categories && data.Categories.length);
 
             var html = '<div class="vas-sbcwdg-header">'
                 +   '<div class="vas-sbcwdg-title">'
@@ -102,7 +162,9 @@
                 +   '</div>'
                 + '</div>'
                 + '<div class="vas-sbcwdg-chart-wrap">'
-                +   '<canvas class="vas-sbcwdg-canvas" id="vas_sbcwdg_cv_' + widgetID + '"></canvas>'
+                +   (hasData
+                        ? '<canvas class="vas-sbcwdg-canvas" id="vas_sbcwdg_cv_' + widgetID + '"></canvas>'
+                        : '<div class="vas-sbcwdg-nodata">' + msg('VIS_NoDataFound', 'No Data Found') + '</div>')
                 + '</div>';
 
             $container.html(html);
@@ -114,7 +176,11 @@
                 drawChart(data);
             });
 
-            window.setTimeout(function () { drawChart(data); }, 80);
+            /* Only draw when there is data; otherwise the chart-wrap shows a
+               centered "No Data Found" message. */
+            if (hasData) {
+                _drawTimer = window.setTimeout(function () { _drawTimer = null; drawChart(data); }, 80);
+            }
         }
 
         /* ---- Master draw dispatcher ---- */
@@ -124,11 +190,11 @@
 
         /* ---- Chart.js Horizontal Bar ---- */
         function drawBar(data) {
-            if (typeof Chart === 'undefined') { return; }
-            var el = document.getElementById('vas_sbcwdg_cv_' + widgetID);
+            if (typeof Chart === 'undefined' || $self._disposed) { return; }
+            var el = canvasEl();
             if (!el) { return; }
 
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // own instance + whoever else owns this canvas
 
             var cats = (data && data.Categories) || [];
             var sym  = (data && data.CurSymbol)  || '';
@@ -172,7 +238,7 @@
                             grid: { color: 'rgba(0,0,0,0.06)' },
                             ticks: {
                                 font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#748494',
+                                color: '#5F7283',
                                 maxTicksLimit: 6,
                                 callback: function (v) { return sym + fmtShort(v, data.StdPrecision); }
                             },
@@ -182,7 +248,7 @@
                             grid: { display: false },
                             ticks: {
                                 font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#5F7283'
+                                color: '#41576A'
                             },
                             border: { display: false }
                         }
@@ -193,11 +259,11 @@
 
         /* ---- Chart.js Donut ---- */
         function drawDonut(data) {
-            if (typeof Chart === 'undefined') { return; }
-            var el = document.getElementById('vas_sbcwdg_cv_' + widgetID);
+            if (typeof Chart === 'undefined' || $self._disposed) { return; }
+            var el = canvasEl();
             if (!el) { return; }
 
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // own instance + whoever else owns this canvas
 
             var cats = (data && data.Categories) || [];
             var sym  = (data && data.CurSymbol)  || '';
@@ -215,21 +281,28 @@
             var totalLabel = msg('VAS_022_Total', 'Total');
             var centerText = sym + fmtShort(total, data.StdPrecision);
 
+            // Legend font scales with the chart width so it's larger and stays responsive to
+            // widget resize / zoom (redrawn via widgetSizeChange; canvas scales on browser zoom).
+            var legFs = Math.max(11, Math.min(15, Math.round((el.parentNode ? el.parentNode.clientWidth : 300) * 0.03)));
+
             var centerPlugin = {
                 id: 'VAS_022_sbc_center_' + widgetID,
                 afterDraw: function (chart) {
                     var ctx = chart.ctx;
                     var cx  = (chart.chartArea.left + chart.chartArea.right)  / 2;
                     var cy  = (chart.chartArea.top  + chart.chartArea.bottom) / 2;
-                    var fs  = Math.max(9, Math.min(11, chart.width / 120));
+                    /* Scale with the rendered donut size so the center text is larger and keeps
+                       its proportion on zoom/resize (fs = "Total" label; amount is larger). */
+                    var fs    = Math.max(11, Math.min(18, chart.width / 11));
+                    var amtFs = fs + 2;
                     ctx.save();
                     ctx.textAlign    = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle    = '#102C3F';
-                    ctx.font         = 'bold ' + (fs + 1) + 'px Roboto, sans-serif';
-                    ctx.fillText(centerText, cx, cy - fs * 0.65);
+                    ctx.font         = 'bold ' + amtFs + 'px Roboto, sans-serif';
+                    ctx.fillText(centerText, cx, cy - fs * 0.55);
                     ctx.font      = fs + 'px Roboto, sans-serif';
-                    ctx.fillStyle = '#748494';
+                    ctx.fillStyle = '#5F7283';
                     ctx.fillText(totalLabel, cx, cy + fs * 0.85);
                     ctx.restore();
                 }
@@ -251,22 +324,24 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     cutout: '55%',
+                    // Shrink the ring within its area so the donut isn't as tall as the
+                    // full chart height — leaves a little breathing room top/bottom.
+                    radius: '82%',
                     layout: { padding: 4 },
                     plugins: {
                         legend: {
                             position: 'right',
                             labels: {
-                                font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#5F7283',
-                                boxWidth: 10,
-                                boxHeight: 10,
+                                font: { family: 'Roboto, sans-serif', size: legFs },
+                                color: '#41576A',
+                                boxWidth: legFs,
+                                boxHeight: legFs,
                                 padding: 8,
                                 generateLabels: function () {
                                     return catNames.map(function (name, i) {
-                                        var pct   = Math.round((catAmounts[i] / total) * 100);
-                                        var trunc = name.length > 14 ? name.slice(0, 14) + '…' : name;
                                         return {
-                                            text: trunc + '  ' + sym + fmtShort(catAmounts[i], data.StdPrecision) + '  ' + pct + '%',
+                                            /* Category name only (amount / % are shown on hover). */
+                                            text: name,
                                             fillStyle:   catColors[i],
                                             strokeStyle: catColors[i],
                                             hidden: false,
@@ -292,17 +367,13 @@
             });
         }
 
-        /* ---- Compact amount formatter ---- */
+        /* ---- Compact amount formatter ----
+             Delegates the compact scaling (Indian vs international, per base-currency ISO) to
+             the shared CurrencyFormat util VIS.Util.formatCompactAmount, exactly like
+             VAS_019/VAS_023. Returns the unsigned magnitude; callers prepend the symbol. */
         function fmtShort(val, stdPrecision) {
-            if (val === 0 || !val) { return '0'; }
-            var abs   = Math.abs(val);
-            var loc   = window.navigator.language;
-            var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + msg('VAS_022_Crore', 'Cr'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + msg('VAS_022_Lakh', 'L'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + msg('VAS_022_Thousand', 'K'); }
-            return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var d = $self._kpiData || {};
+            return VIS.Util.formatCompactAmount(val, d.CurIso || '', (d.StdPrecision != null ? d.StdPrecision : stdPrecision));
         }
 
         /* ---- Busy indicator ---- */
@@ -314,7 +385,7 @@
 
         /* ---- Refresh ---- */
         this.refreshWidget = function () {
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();
             $self._kpiData = null;
             $bsyDiv[0].style.visibility = 'visible';
             $container.empty();
@@ -323,7 +394,8 @@
 
         this.getRoot = function () { return $root; };
 
-        $self._drawChart = drawChart;
+        $self._drawChart    = drawChart;
+        $self._destroyChart = destroyChart;
     };
 
     /* ---- Prototype ---- */
@@ -333,6 +405,8 @@
         this.windowNo   = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
@@ -345,11 +419,18 @@
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
-            window.setTimeout(function () { self._drawChart(self._kpiData); }, 100);
+            window.setTimeout(function () {
+                if (!self._disposed) { self._drawChart(self._kpiData); }
+            }, 100);
         }
     };
 
     VAS.VAS_022_SpendByCategoryWidget.prototype.dispose = function () {
+        // Destroy the chart BEFORE the frame drops the DOM: a chart left registered
+        // against a removed canvas keeps that canvas "in use", so the next widget
+        // that reuses it fails with "Canvas is already in use".
+        this._disposed = true;
+        if (this._destroyChart) { this._destroyChart(); }
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

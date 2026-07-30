@@ -28,6 +28,47 @@
         return value && value !== key && value !== '[' + key + ']' ? value : fallback;
     }
 
+    /* Keep --dash-inline-size on :root equal to the dashboard container's current
+       pixel width so the em-anchor clamps resolve against the dashboard's visible
+       width, not the viewport. One document-level ResizeObserver serves every widget;
+       without a marked container — or without ResizeObserver — the CSS falls back to
+       100vw. (Mirrors VAS_024_TotalOutstandingWidget.) */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
+    /* Chart.js registers every chart against its canvas ELEMENT. Constructing a
+       second chart on a canvas that still owns a live instance throws
+       "Canvas is already in use. Chart with ID 'n' must be destroyed before the
+       canvas can be reused." A widget's own _chartInst only tracks charts THIS
+       instance created — one left behind by a previous instance (disposed without
+       destroy, or a widget id that repeats across dashboards) is invisible to it.
+       So ask Chart.js which instance owns the canvas and destroy that one too. */
+    function releaseCanvas(el) {
+        if (!el || typeof Chart === 'undefined') { return; }
+        var owner = null;
+        if (typeof Chart.getChart === 'function') {
+            owner = Chart.getChart(el);                       // Chart.js v3 / v4
+        } else if (Chart.instances) {                          // v2 fallback
+            for (var k in Chart.instances) {
+                if (Chart.instances[k] && Chart.instances[k].canvas === el) { owner = Chart.instances[k]; break; }
+            }
+        }
+        if (owner) { try { owner.destroy(); } catch (e) { } }
+    }
+
     VAS.VAS_017_MonthlyPurchaseSpendWidget = function () {
         this.frame;
         this.windowNo;
@@ -38,9 +79,25 @@
         var widgetID     = null;
         var _currentMode = 'monthly';
         var _chartInst   = null;
+        var _drawTimer   = null;
 
         $self._kpiData   = null;
         $self._drawChart = null;
+        $self._disposed  = false;
+
+        /* Always resolve the canvas inside THIS widget's root. document.getElementById
+           returns the first match in the document, so two widget instances that end up
+           with the same widgetID would otherwise both draw onto the first canvas — the
+           other classic trigger of the "canvas is already in use" error. */
+        function canvasEl() { return $root.find('.vas-mpswdg-canvas')[0] || null; }
+
+        /* Tear down this widget's chart plus any instance still holding its canvas,
+           and cancel a deferred draw so it cannot fire after the canvas is gone. */
+        function destroyChart() {
+            if (_drawTimer) { window.clearTimeout(_drawTimer); _drawTimer = null; }
+            if (_chartInst) { try { _chartInst.destroy(); } catch (e) { } _chartInst = null; }
+            releaseCanvas(canvasEl());
+        }
 
         /* ---- Initialise ---- */
         this.initalize = function () {
@@ -77,11 +134,9 @@
 
         /* ---- Render HTML frame then draw chart ---- */
         function renderWidget(data) {
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // release the OLD canvas before it is removed
             $container.empty();
             _currentMode = 'monthly';
-
-            var fyLbl = data.FyLabel || '';
 
             var html = '<div class="vas-mpswdg-header">'
                 +   '<div class="vas-mpswdg-title">'
@@ -90,19 +145,9 @@
                 +       '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>'
                 +       '<polyline points="17 6 23 6 23 12"/>'
                 +     '</svg>'
-                +     msg('VAS_017_MonthlyPurchaseSpend', 'Monthly Purchase Spend') + ' — ' + fyLbl
+                +     msg('VAS_017_MonthlyPurchaseSpend', 'Monthly Purchase Spend')
                 +   '</div>'
                 +   '<div class="vas-mpswdg-header-right">'
-                +     '<div class="vas-mpswdg-legend">'
-                +       '<span class="vas-mpswdg-legend-item">'
-                +         '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-solid"></span>'
-                +         msg('VAS_017_ThisYear', 'This year')
-                +       '</span>'
-                +       '<span class="vas-mpswdg-legend-item">'
-                +         '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-dashed"></span>'
-                +         msg('VAS_017_LastYear', 'Last year')
-                +       '</span>'
-                +     '</div>'
                 +     '<div class="vas-mpswdg-tabs">'
                 +       '<button class="vas-mpswdg-tab vas-mpswdg-tab-active" data-mode="monthly">'
                 +         msg('VAS_017_Monthly', 'Monthly')
@@ -115,6 +160,18 @@
                 + '</div>'
                 + '<div class="vas-mpswdg-chart-wrap">'
                 +   '<canvas class="vas-mpswdg-canvas" id="vas_mpswdg_cv_' + widgetID + '"></canvas>'
+                + '</div>'
+                + '<div class="vas-mpswdg-footer">'
+                +   '<div class="vas-mpswdg-legend">'
+                +     '<span class="vas-mpswdg-legend-item">'
+                +       '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-solid"></span>'
+                +       msg('VAS_017_ThisYear', 'This year')
+                +     '</span>'
+                +     '<span class="vas-mpswdg-legend-item">'
+                +       '<span class="vas-mpswdg-leg-line vas-mpswdg-leg-dashed"></span>'
+                +       msg('VAS_017_LastYear', 'Last year')
+                +     '</span>'
+                +   '</div>'
                 + '</div>';
 
             $container.html(html);
@@ -126,16 +183,16 @@
                 drawChart(data);
             });
 
-            window.setTimeout(function () { drawChart(data); }, 80);
+            _drawTimer = window.setTimeout(function () { _drawTimer = null; drawChart(data); }, 80);
         }
 
         /* ---- Chart.js Line Chart ---- */
         function drawChart(data) {
-            if (typeof Chart === 'undefined') { return; }
-            var el = document.getElementById('vas_mpswdg_cv_' + widgetID);
+            if (typeof Chart === 'undefined' || $self._disposed) { return; }
+            var el = canvasEl();
             if (!el) { return; }
 
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();          // own instance + whoever else owns this canvas
 
             var cy  = data.CurrentYear || [];
             var ly  = data.LastYear    || [];
@@ -162,11 +219,17 @@
                     msg('VAS_017_Q4', 'Q4')
                 ];
             } else {
-                /* Indian FY: Apr(3)→Mar(2); generate locale-aware month abbreviations */
-                var fyMonths = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2];
-                xLabels = fyMonths.map(function (m) {
-                    return new Date(2000, m, 1).toLocaleDateString(window.navigator.language, { month: 'short' });
-                });
+                /* Month axis driven by the client's fiscal calendar: 12 months from the FY
+                   start, labelled "MMM yy" (e.g. Apr 26 … Mar 27). */
+                var fyY = data.FyStartYear  || new Date().getFullYear();
+                var fyM = data.FyStartMonth || 4;   /* 1-based month */
+                xLabels = [];
+                for (var k = 0; k < 12; k++) {
+                    var dt  = new Date(fyY, (fyM - 1) + k, 1);
+                    var mon = dt.toLocaleDateString(window.navigator.language, { month: 'short' });
+                    var yy  = dt.getFullYear() % 100;
+                    xLabels.push(mon + ' ' + (yy < 10 ? '0' + yy : yy));
+                }
                 d1 = cy.slice(0, 12);
                 d2 = ly.slice(0, 12);
             }
@@ -204,6 +267,11 @@
                             spanGaps: false,
                             borderDash: [5, 4],
                             pointRadius: 0,
+                            /* Show a marker on hover so the previous-year value surfaces too. */
+                            pointHoverRadius: 3,
+                            pointHoverBackgroundColor: '#ffffff',
+                            pointHoverBorderColor: 'rgba(0,131,218,0.6)',
+                            pointHoverBorderWidth: 1.5,
                             borderWidth: 1.5
                         }
                     ]
@@ -211,9 +279,11 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    /* Hover a month to show BOTH this-year and last-year values at that point. */
+                    interaction: { mode: 'index', intersect: false },
                     layout: { padding: { top: 4, right: 8 } },
                     plugins: {
-                        legend: { display: false },   /* custom HTML legend in header */
+                        legend: { display: false },   /* custom HTML legend at the bottom */
                         tooltip: {
                             callbacks: {
                                 label: function (ctx) {
@@ -228,7 +298,7 @@
                             grid: { display: false },
                             ticks: {
                                 font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#748494'
+                                color: '#5F7283'
                             },
                             border: { display: false }
                         },
@@ -236,7 +306,7 @@
                             grid: { color: 'rgba(0,0,0,0.06)' },
                             ticks: {
                                 font: { family: 'Roboto, sans-serif', size: 10 },
-                                color: '#748494',
+                                color: '#5F7283',
                                 maxTicksLimit: 6,
                                 callback: function (v) { return sym + fmtShort(v, data.StdPrecision); }
                             },
@@ -247,17 +317,13 @@
             });
         }
 
-        /* ---- Compact amount formatter ---- */
+        /* ---- Compact amount formatter ----
+             Delegates the compact scaling (Indian vs international, per base-currency ISO) to
+             the shared CurrencyFormat util VIS.Util.formatCompactAmount, exactly like
+             VAS_019/VAS_023. Returns the unsigned magnitude; callers prepend the symbol. */
         function fmtShort(val, stdPrecision) {
-            if (!val || val === 0) { return '0'; }
-            var abs   = Math.abs(val);
-            var loc   = window.navigator.language;
-            var prec  = VIS.Env.getCtx().getStdPrecision() || stdPrecision || 2;
-            var opts1 = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            if (abs >= 10000000) { return (abs / 10000000).toLocaleString(loc, opts1) + msg('VAS_017_Crore', 'Cr'); }
-            if (abs >= 100000)   { return (abs / 100000).toLocaleString(loc, opts1)   + msg('VAS_017_Lakh', 'L'); }
-            if (abs >= 1000)     { return (abs / 1000).toLocaleString(loc, opts1)     + msg('VAS_017_Thousand', 'K'); }
-            return abs.toLocaleString(loc, { minimumFractionDigits: prec, maximumFractionDigits: prec });
+            var d = $self._kpiData || {};
+            return VIS.Util.formatCompactAmount(val, d.CurIso || '', (d.StdPrecision != null ? d.StdPrecision : stdPrecision));
         }
 
         /* ---- Busy indicator ---- */
@@ -269,7 +335,7 @@
 
         /* ---- Refresh ---- */
         this.refreshWidget = function () {
-            if (_chartInst) { _chartInst.destroy(); _chartInst = null; }
+            destroyChart();
             $self._kpiData = null;
             $bsyDiv[0].style.visibility = 'visible';
             $container.empty();
@@ -278,7 +344,8 @@
 
         this.getRoot = function () { return $root; };
 
-        $self._drawChart = drawChart;
+        $self._drawChart    = drawChart;
+        $self._destroyChart = destroyChart;
     };
 
     /* ---- Prototype ---- */
@@ -288,6 +355,8 @@
         this.windowNo   = windowNo;
         this.initalize();
         this.frame.getContentGrid().append(this.getRoot());
+        // Self-wire the dashboard-width CSS variable (--dash-inline-size) the clamps read.
+        ensureDashInlineSizeVar(this.getRoot());
         var self = this;
         window.setTimeout(function () { self.intialLoad(); }, 50);
     };
@@ -300,11 +369,18 @@
         this.widgetInfo = widget;
         var self = this;
         if (self._kpiData && self._drawChart) {
-            window.setTimeout(function () { self._drawChart(self._kpiData); }, 100);
+            window.setTimeout(function () {
+                if (!self._disposed) { self._drawChart(self._kpiData); }
+            }, 100);
         }
     };
 
     VAS.VAS_017_MonthlyPurchaseSpendWidget.prototype.dispose = function () {
+        // Destroy the chart BEFORE the frame drops the DOM: a chart left registered
+        // against a removed canvas keeps that canvas "in use", so the next widget
+        // that reuses it fails with "Canvas is already in use".
+        this._disposed = true;
+        if (this._destroyChart) { this._destroyChart(); }
         if (this.frame) { this.frame.dispose(); }
         this.frame    = null;
         this.windowNo = null;

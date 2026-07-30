@@ -82,6 +82,8 @@
         /* Latest KPI snapshot (kept so the dialog header/footer can re-use the
            same base-currency symbol and receipt count without a refetch). */
         var lastSymbol = "";
+        var lastIsoCode = "";
+        var lastPrecision;
         var lastPeriod = "";
         var lastCount = 0;
         var lastTotal = 0;
@@ -229,43 +231,8 @@
             lastCount = 0;
 
             if ($metricEl) {
-                $metricEl.text(formatMetric(0, lastSymbol));
+                $metricEl.html(formatMetric(0, lastSymbol, lastIsoCode, lastPrecision));
             }
-        }
-
-        /* Compact-amount formatter: 10M→Cr (Indian crore), 100K→L (lakh),
-           1K→K. Falls back to locale formatting with the std precision for
-           amounts under 1000 so cash registers still read naturally. */
-        function formatCompactAmount(value) {
-            value = Number(value || 0);
-
-            if (value >= 10000000) {
-                return (value / 10000000).toFixed(2).replace(/\.00$/, "") + "Cr";
-            }
-
-            if (value >= 100000) {
-                return (value / 100000).toFixed(2).replace(/\.00$/, "") + "L";
-            }
-
-            if (value >= 1000) {
-                return (value / 1000).toFixed(2).replace(/\.00$/, "") + "K";
-            }
-
-            var stdPrecision = 2;
-
-            try {
-                if (VIS.Env && VIS.Env.getCtx && VIS.Env.getCtx().getStdPrecision) {
-                    stdPrecision = VIS.Env.getCtx().getStdPrecision();
-                }
-            }
-            catch (e) {
-                stdPrecision = 2;
-            }
-
-            return value.toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
         }
 
         function formatExactAmount(value) {
@@ -290,11 +257,13 @@
 
         /* Place the currency symbol *before* the amount, sign before symbol
            (e.g. ₹1.2M or -₹1.2M). Negatives show '-'; positives and zero show no sign.
-           Matches design.md and image_2.png. */
-        function formatMetric(value, symbol) {
+           The compact magnitude (Indian vs international numbering by base currency,
+           kept to the currency precision) is delegated to VIS.Util.formatCompactAmount
+           (always non-negative). The symbol is shown even at zero. Matches OverdueWidget. */
+        function formatMetric(value, symbol, isoCode, precision) {
             value = Number(value || 0);
             var sign = value < 0 ? '-' : '';
-            var compact = formatCompactAmount(Math.abs(value));
+            var compact = VIS.Util.formatCompactAmount(value, isoCode, precision);
             var sym = symbol ? '<span class="vas-tarm-cur">' + escapeHtml(symbol) + '</span>' : '';
             return sign + sym + compact;
         }
@@ -307,11 +276,18 @@
 
             lastTotal = Number(total);
             lastSymbol = sym;
+            /* isoCode drives Indian vs international compact numbering; precision falls
+               back to the ctx std precision inside VIS.Util.formatCompactAmount when
+               the backend omits it. */
+            lastIsoCode = (data && data.isoCode) || "";
+            lastPrecision = (data && typeof data.stdPrecision !== "undefined" && data.stdPrecision !== null)
+                ? Number(data.stdPrecision)
+                : undefined;
             lastPeriod = period;
             lastCount = Number(count);
 
             if ($metricEl) {
-                $metricEl.html(formatMetric(lastTotal, lastSymbol));
+                $metricEl.html(formatMetric(lastTotal, lastSymbol, lastIsoCode, lastPrecision));
             }
 
             if ($dialogSubtitle) {
@@ -580,7 +556,10 @@
                 '<path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>' +
                 '</svg>' +
                 '</div>' +
+                '<div class="vas-tarm-label-group">' +
                 '<span class="vas-tarm-label">' + lbl("VIS_ReceivedThisMonth", "Received this month") + '</span>' +
+                '<span class="vas-tarm-subtitle">' + lbl("VAS_005_TotalCustomerReceipts", "Total Customer Receipts") + '</span>' +
+                '</div>' +
                 '</div>' +
                 '</div>' +
 

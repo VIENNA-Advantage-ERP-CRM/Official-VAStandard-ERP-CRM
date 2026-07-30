@@ -40,30 +40,30 @@
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.55);
-    border-radius: 0.875em;
+    border-radius: 14px;
     z-index: 999;
 }
 
 /* ── Glass card shell (design.md §Glass Widget) ──────────────────── */
 
 .vas-cpm-card {
-    /* dashboard-widgets.md §"Widget Root Anchor": one font-size lever per widget;
-       every inner value is em so the whole card rescales with the cell. cqi resolves
-       against .vas-cpm-root (container-type: inline-size), so the spec's 1.4cqi is
-       retuned for the 2-col cell width (≈5.6cqi) and the ceiling raised to 32px so
-       content keeps pace with the grid on 2560-wide dashboards. */
-    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.0125), 32px);
+    /* Widget root anchor (dashboard-widgets.md §"Widget Root Anchor"): 2K
+       calibration clamp — floor 16px, ceiling 20px, dashboard-relative via
+       --dash-inline-size. One lever rescales every internal em. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
     width: 100%;
     height: 100%;
     min-width: 0;
     min-height: 0;
     overflow: hidden;
     position: relative;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.58) 100%);
-    border: 0.125em solid #FFFFFF;
-    border-radius: 0.875em;
-    box-shadow: 0 0.625em 1.5em rgba(15, 61, 97, 0.06);
-    padding: 0.875em;                /* dashboard-widgets.md §"Widget Edge Spacing" */
+    /* Canonical glass surface (foundations.md §"Standard Gradients"). Physical
+       edges (border/radius/shadow) stay in px. */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 100%);
+    border: 2px solid #FFFFFF;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    padding: 0.85em;                 /* dashboard-widgets.md §"Widget Edge Spacing" */
     display: flex;
     flex-direction: column;
 }
@@ -80,13 +80,14 @@
 }
 
 .vas-cpm-icon-wrap {
-    /* Family glass icon well (dashboard-widgets.md §"Widget Header": 2em well, ~1em glyph). */
-    width: 2em;
-    height: 2em;
-    min-width: 2em;
-    border-radius: 0.5625em;
-    background: linear-gradient(180deg, #FFFFFF, #EAF4FE);
-    border: 0.0625em solid rgba(255, 255, 255, 0.9);
+    /* Icon well tracks the title lever (dashboard-widgets.md §"Widget Header"):
+       ~2× the title clamp, capped at 40px. Radius stays px. */
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    min-width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.02275), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    border: 1px solid rgba(255, 255, 255, 0.9);
     color: #0083DA;
     display: inline-flex;
     align-items: center;
@@ -95,8 +96,8 @@
 }
 
     .vas-cpm-icon-wrap svg {
-        width: 1.125em;
-        height: 1.125em;
+        width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
+        height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.0125), 22px);
         stroke: currentColor;
     }
 
@@ -106,28 +107,24 @@
 }
 
 .vas-cpm-title {
-    /* dashboard-widgets.md §"Widget Header": dark #102C3F title; weight is
-       Medium (500) per project request. Shared dashboard-width-anchored title
-       clamp so every widget's title resolves to the same px at any dashboard
-       width. Bounds = 0.97 × the 16–32px root range. */
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    /* Shared viewport-anchored title clamp (dashboard-widgets.md §"Widget
+       Header"): Roboto Regular, dark #102C3F, capped at 17px on 2K. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
     color: #102C3F;
-    line-height: 1.3;
+    line-height: 1.2;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .vas-cpm-subtitle {
-    /* Spec: Roboto Regular, muted #717182, tight gap to title (≈2px),
-       no caps/letter-spacing. Same shared viewport-anchored sm clamp as
-       the data text (0.75 × the 16–32px root range) so the subtitle
-       renders the same px as sibling widgets' data at every screen size. */
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    /* Shared viewport-anchored subtitle clamp (dashboard-widgets.md §"Widget
+       Header"): Roboto Regular, muted #717182, capped at 13px on 2K. */
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
     font-weight: 400;
     color: #717182;
-    margin-top: 0.125em;
+    margin-top: 2px;
     line-height: 1.3;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -143,7 +140,7 @@
     display: flex;
     flex-direction: column;
     justify-content: space-evenly;
-    gap: 0.875em;
+    gap: 0.375em;
     overflow: hidden;
 }
 
@@ -167,7 +164,8 @@
    viewport-anchored data clamp (0.75 × the 16–32px root range) so rows render
    the same px as sibling widgets' data at every screen size. */
 .vas-cpm-method {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
+    /* Row label — sm token, one step below the title (List/Grid Hierarchy Rule). */
+    font-size: 0.75em;
     font-weight: 400;
     color: #102C3F;
     min-width: 0;
@@ -177,8 +175,9 @@
 }
 
 .vas-cpm-percent {
-    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
-    font-weight: 700;
+    /* Emphasized value cell — sm token, Bold (Cell Types §"Emphasized value"). */
+    font-size: 0.75em;
+    font-weight: 400;
     color: #102C3F;
     font-variant-numeric: tabular-nums;
     flex-shrink: 0;
@@ -187,14 +186,14 @@
 .vas-cpm-track {
     width: 100%;
     height: 0.375em;
-    background: #EDF2F6;
-    border-radius: 999em;
+    background: #E2EAF1;
+    border-radius: 999px;
     overflow: hidden;
 }
 
 .vas-cpm-fill {
     height: 100%;
-    border-radius: 999em;
+    border-radius: 999px;
     transition: width 600ms ease;
 }
 
@@ -217,8 +216,10 @@
 /* ── Footer: WHY pill + explanatory copy ─────────────────────────── */
 
 .vas-cpm-divider {
-    height: 0.0625em;
-    background: #EDF2F6;
+    /* Footer boundary above the WHY caption (dashboard-widgets.md §"Row And
+       Header Separators": footer tone #D9E2EB). Physical edge stays px. */
+    height: 1px;
+    background: #D9E2EB;
     margin: 0.75em 0;
     flex-shrink: 0;
 }
@@ -233,19 +234,18 @@
        card root (1em). Previously this was 0.75em and .vas-cpm-desc was
        also 0.75em, which compounded to ~9px and made the footer text
        look much smaller than the body. */
-    color: #748494;
+    color: #5F7283;
 }
 
 .vas-cpm-desc {
-    /* Footer copy on the shared xs token (0.6875em), dashboard-width-anchored
-       so it matches the family's detail-text across widgets. */
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.0085938), 22px);
-    color: #748494;
+    /* Footer caption — xs token, muted (KPI meta / detail-text family). */
+    font-size: 0.6875em;
+    color: #5F7283;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    line-height: 1.45;
+    line-height: 1.3;
 }
 
 /* ── No data ────────────────────────────────────────────────────── */
@@ -256,9 +256,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #748494;
-    font-size: 0.8125em;
-    font-weight: 600;
+    color: #5F7283;
+    font-size: 0.75em;
+    font-weight: 400;
     text-align: center;
 }
 

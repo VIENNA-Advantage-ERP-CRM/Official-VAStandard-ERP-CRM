@@ -5,11 +5,11 @@
  * ── Labels / Message Keys ─────────────────────────────────────────────
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
- *  1  | Current cash                         | VAS_050_CurrentCash
+ *  1  | Cash on hand (widget title)          | VAS_050_WidgetTitle
  *  2  | Drawer                               | VAS_050_Drawer
  *  3  | Live                                 | VAS_050_Live
  *  4  | Loading                              | VAS_050_Loading
- *  5  | No data                              | VAS_050_NoData
+ *  5  | No Data Found                        | VAS_050_NoData
  *  6  | Unable to load current cash          | VAS_050_LoadError
  *  7  | short of float                       | VAS_050_ShortOfFloat
  *  8  | cash on hand                         | VAS_050_CashOnHand
@@ -17,6 +17,7 @@
  * 10  | Session Expired                      | VAS_050_SessionExpired
  * 11  | Cash Book Balance History            | VAS_050_DialogTitle
  * 12  | Journals for the selected cash book  | VAS_050_DialogSubtitle
+ *     | of last 15 days                      |
  * 13  | Document No.                         | VAS_050_DocumentNo
  * 14  | Beginning Balance                    | VAS_050_BeginningBalance
  * 15  | Ending Balance                       | VAS_050_EndingBalance
@@ -38,6 +39,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_050_CurrentCashForCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -55,10 +81,17 @@
         var $previousFocus = null;
         var rowsLoading = false;
         var pageNo = 1;
-        var pageSize = 6;
+        var pageSize = 6; /* fallback until the body is measured (see computePageSize) */
         var totalPages = 0;
         var totalRecords = 0;
         var eventNamespace = '';
+
+        /* Adaptive paging: page size is derived from the visible dialog body
+           height, clamped to a floor, and recomputed on resize. */
+        var MIN_ROWS = 3;
+        var ROW_HEIGHT = 44; /* px fallback: tbody row ≈ 13px*2 padding + ~17px line + 1px border */
+        var dialogResizeObserver = null;
+        var resizeDebounce = null;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -89,25 +122,16 @@
             return currencyLabel ? sign + currencyLabel + amount : sign + amount;
         }
 
+        /* Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            var label = String(currencyISO || currencySymbol || '').trim();
-            return label.toUpperCase() === 'IQD' ? 'ID' : label;
-        }
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
+            }
 
-        function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {
-            var numericValue = Number(value || 0);
-            var stdPrecision = getPrecision(precision);
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-            var decimalMatch = amount.match(/([.,]\d+)$/);
-
-            return {
-                prefix: signPrefix + getCurrencyLabel(currencySymbol, currencyISO),
-                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
-                decimal: decimalMatch ? decimalMatch[1] : ''
-            };
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
         }
 
         function showBusy(show) {
@@ -132,7 +156,7 @@
             var sign = '';
 
             if (numberValue < 0) {
-                sign = '−';
+                sign = '-';
             } else if (numberValue > 0 && showPositiveSign === true) {
                 sign = '+';
             }
@@ -140,19 +164,22 @@
             return sign + formatCurrencyAmount(Math.abs(numberValue), currencySymbol, currencyISO, precision);
         }
 
+        /*
+         * KPI hero value — compact, locale-aware magnitude via
+         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
+         * The formatter returns a non-negative magnitude, so we compose the
+         * final string ourselves: sign, then currency, then magnitude — a
+         * negative renders as e.g. -$200.56 (leading minus, before the symbol).
+         */
         function renderSignedAmount($target, value, currencySymbol, currencyISO, precision, showPositiveSign) {
-            var numberValue = safeNumber(value);
-            var sign = '';
+            var numericValue = safeNumber(value);
+            var sign = numericValue < 0
+                ? '-'
+                : (numericValue > 0 && showPositiveSign === true ? '+' : '');
+            var currency = getCurrencyLabel(currencySymbol, currencyISO);
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
-            if (numberValue < 0) {
-                sign = '−';
-            } else if (numberValue > 0 && showPositiveSign === true) {
-                sign = '+';
-            }
-
-            var parts = getAmountParts(Math.abs(numberValue), currencySymbol, currencyISO, precision, sign);
-
-            $target.text(parts.prefix + parts.main + parts.decimal);
+            $target.text(sign + currency + magnitude);
         }
 
         function getStatusText(balance) {
@@ -221,7 +248,7 @@
             $dialogTbody.empty();
 
             if (!rows || !rows.length) {
-                renderDialogMessage('No data');
+                renderDialogMessage(lbl('VAS_050_NoData', 'No Data Found'));
                 return;
             }
 
@@ -230,9 +257,11 @@
                 var cashDate = row.statementDate || '-';
                 var cashType = row.cashTypeName || row.cashTypeValue || '-';
                 var charge = row.chargeName || '-';
-                var amountText = formatAmount(row.amount, row.stdPrecision);
+                var numericAmount = safeNumber(row.amount);
+                var amountSign = numericAmount < 0 ? '-' : '';
                 var currencyLabel = getCurrencyLabel(row.currencySymbol, row.currencyISO);
-                var amountWithCurrency = currencyLabel ? currencyLabel + amountText : amountText;
+                var amountText = formatAmount(Math.abs(numericAmount), row.stdPrecision);
+                var amountWithCurrency = amountSign + currencyLabel + amountText;
                 var status = row.docStatusName || row.docStatusValue || '-';
                 var description = row.description || '-';
 
@@ -240,7 +269,7 @@
                     '<tr>' +
                     '<td class="VAS-050-current-cash-td-document" style="text-align:left" title="' + escapeHtml(documentNo) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(documentNo) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-date" style="text-align:left" title="' + escapeHtml(cashDate) + '">' + escapeHtml(cashDate) + '</td>' +
-                    '<td class="VAS-050-current-cash-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-type-pill">' + escapeHtml(cashType) + '</span></td>' +
+                    '<td class="VAS-050-current-cash-td-type" style="text-align:left" title="' + escapeHtml(cashType) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(cashType) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-charge" style="text-align:left" title="' + escapeHtml(charge) + '"><span class="VAS-047-cash-in-truncate">' + escapeHtml(charge) + '</span></td>' +
                     '<td class="VAS-050-current-cash-td-amount" style="text-align:right" title="' + escapeHtml(amountWithCurrency) + '">' + escapeHtml(amountWithCurrency) + '</td>' +
                     '<td class="VAS-050-current-cash-td-status" style="text-align:left" title="' + escapeHtml(status) + '"><span class="VAS-050-current-cash-status' + getStatusTone(row.docStatusValue) + '">' + escapeHtml(status) + '</span></td>' +
@@ -269,7 +298,7 @@
 
         function loadDialogRows() {
             if (!$dialogTbody || rowsLoading || selectedCashBookId <= 0) {
-                if (selectedCashBookId <= 0) { renderDialogMessage('No data'); }
+                if (selectedCashBookId <= 0) { renderDialogMessage(lbl('VAS_050_NoData', 'No Data Found')); }
                 return;
             }
 
@@ -304,6 +333,69 @@
             });
         }
 
+        /* Rows that fit the visible dialog body: (body content height − thead)
+           / row height, floored, clamped to MIN_ROWS. Uses an actual rendered
+           row's height once data exists; otherwise the ROW_HEIGHT fallback. */
+        function computePageSize() {
+            var bodyEl = $dialog && $dialog.find('.VAS-047-cash-in-dialog-body')[0];
+
+            if (!bodyEl) {
+                return pageSize;
+            }
+
+            var theadEl = $dialog.find('.VAS-047-cash-in-dialog-table thead')[0];
+            var styles = window.getComputedStyle(bodyEl);
+            var padY = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+            var theadH = theadEl ? theadEl.offsetHeight : 40;
+            var firstRow = totalRecords > 0
+                ? $dialog.find('.VAS-047-cash-in-dialog-tbody tr')[0]
+                : null;
+            var rowH = (firstRow && firstRow.offsetHeight) ? firstRow.offsetHeight : ROW_HEIGHT;
+            var avail = bodyEl.clientHeight - padY - theadH;
+
+            if (!(avail > 0) || !(rowH > 0)) {
+                return pageSize;
+            }
+
+            return Math.max(MIN_ROWS, Math.floor(avail / rowH));
+        }
+
+        /* Re-derive the page size when the dialog is resized; only re-fetch when
+           the fit actually changes, and keep the current page in range. */
+        function recomputeDialogPageSize() {
+            if (!$dialog || !$dialog.is(':visible')) {
+                return;
+            }
+
+            var next = computePageSize();
+
+            if (next === pageSize) {
+                return;
+            }
+
+            pageSize = next;
+
+            var pages = totalRecords > 0 ? Math.ceil(totalRecords / pageSize) : 1;
+
+            if (pageNo > pages) {
+                pageNo = pages;
+            }
+
+            if (pageNo < 1) {
+                pageNo = 1;
+            }
+
+            loadDialogRows();
+        }
+
+        function onDialogResize() {
+            if (resizeDebounce) {
+                clearTimeout(resizeDebounce);
+            }
+
+            resizeDebounce = setTimeout(recomputeDialogPageSize, 120);
+        }
+
         function openDialog() {
             if (!$dialog) { return; }
             $previousFocus = $(document.activeElement);
@@ -313,6 +405,7 @@
             $dialog.css('display', 'flex');
             $('body').addClass('VAS-047-cash-in-body-lock');
             $dialog.find('.VAS-047-cash-in-dialog-close').trigger('focus');
+            pageSize = computePageSize();
             loadDialogRows();
         }
 
@@ -340,7 +433,7 @@
                 '<div class="VAS-047-cash-in-dialog-header"><div class="VAS-047-cash-in-dialog-icon" aria-hidden="true">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M8 15h3"/></svg></div>' +
                 '<div class="VAS-047-cash-in-dialog-title-group"><div class="VAS-047-cash-in-dialog-title" id="' + titleId + '">' + escapeHtml(lbl('VAS_050_DialogTitle', 'Cash Book Balance History')) + '</div>' +
-                '<div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_050_DialogSubtitle', 'Journals for the selected cash book')) + '</div></div>' +
+                '<div class="VAS-047-cash-in-dialog-subtitle">' + escapeHtml(lbl('VAS_050_DialogSubtitle', 'Journals for the selected cash book of last 15 days')) + '</div></div>' +
                 '<button type="button" class="VAS-047-cash-in-dialog-close" aria-label="' + escapeHtml(lbl('VAS_050_Close', 'Close')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
                 '<div class="VAS-047-cash-in-dialog-body"><div class="VAS-047-cash-in-dialog-busy"><div class="vis-busyindicatorinnerwrap"><i class="vis_widgetloader"></i></div></div>' +
                 '<table class="VAS-047-cash-in-dialog-table VAS-050-current-cash-table"><thead><tr>' +
@@ -365,6 +458,12 @@
             $pagerNext = $dialog.find('.VAS-047-cash-in-pager-next');
             $pagerText = $dialog.find('.VAS-047-cash-in-pager-text');
             showDialogBusy(false);
+
+            if (typeof ResizeObserver !== 'undefined') {
+                dialogResizeObserver = new ResizeObserver(onDialogResize);
+                dialogResizeObserver.observe($dialog.find('.VAS-047-cash-in-dialog-body')[0]);
+            }
+
             $dialog.find('.VAS-047-cash-in-dialog-close, .VAS-047-cash-in-dialog-scrim').on('click', closeDialog);
             $pagerPrev.on('click', function () { if (!rowsLoading && pageNo > 1) { pageNo--; loadDialogRows(); } });
             $pagerNext.on('click', function () { if (!rowsLoading && pageNo < totalPages) { pageNo++; loadDialogRows(); } });
@@ -383,12 +482,8 @@
 
             var $card = $('<section>', {
                 'class': 'VAS_current-cash-cash-journal-card',
-                'aria-label': lbl('VAS_050_CurrentCash', 'Current cash')
-            });
-
-            var $action = $('<button>', {
-                'type': 'button',
-                'class': 'VAS_current-cash-cash-journal-action',
+                'role': 'button',
+                'tabindex': '0',
                 'aria-label': lbl('VAS_050_DialogTitle', 'Cash Book Balance History')
             });
 
@@ -405,7 +500,7 @@
             var $title = $('<span>', {
                 'class': 'VAS_current-cash-cash-journal-label',
                 'id': 'VAS_050_current-cash-title-' + widgetId,
-                'text': lbl('VAS_050_CurrentCash', 'Current cash')
+                'text': lbl('VAS_050_WidgetTitle', 'Cash on hand')
             });
 
             var $filter = $('<div>', {
@@ -416,18 +511,6 @@
                 'class': 'VAS_current-cash-cash-journal-select',
                 'id': 'VAS_050_current-cash-cashbook-' + widgetId,
                 'aria-label': lbl('VAS_050_Drawer', 'Drawer')
-            });
-
-            var $separator = $('<span>', {
-                'class': 'VAS_current-cash-cash-journal-filter-separator',
-                'text': '·'
-            });
-
-
-            var $zoom = $('<span>', {
-                'class': 'VAS-glje-zoom',
-                'aria-hidden': 'true',
-                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>'
             });
 
             var $headerTools = $('<div>', {
@@ -466,15 +549,40 @@
                 'id': 'VAS_050_current-cash-state-' + widgetId
             });
 
+            var $iconWell = $('<span>', {
+                'class': 'VAS_current-cash-cash-journal-icon',
+                'aria-hidden': 'true',
+                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M8 15h3"/></svg>'
+            });
+
+            var $titleCluster = $('<div>', {
+                'class': 'VAS_current-cash-cash-journal-title-cluster'
+            });
+
             $delta.html(getTrendIcon(0)).append($deltaText);
             $footer.append($delta).append($description);
             $filter.append($select);
-            $headerTools.append($filter).append($zoom);
-            $header.append($title).append($headerTools);
-            $card.append($action).append($busy).append($header).append($value).append($footer).append($state);
+            $headerTools.append($filter);
+            $titleCluster.append($iconWell).append($title);
+            $header.append($titleCluster).append($headerTools);
+            $card.append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
 
-            $action.on('click', openDialog);
+            /* The whole card is the interactive element (ExpectedThisWeek pattern) —
+               no absolute button overlay. Click or Enter/Space opens the dialog. */
+            $card.on('click', openDialog);
+            $card.on('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openDialog();
+                }
+            });
+
+            /* The cashbook selector is interactive on its own — keep its clicks/keys
+               from bubbling to the card (which would open the drill-down dialog). */
+            $select.on('click mousedown keydown', function (event) {
+                event.stopPropagation();
+            });
 
             $select.on('change', function () {
                 selectedCashBookId = Number($(this).val() || 0);
@@ -549,7 +657,6 @@
             }
 
             var widgetId = $self.AD_UserHomeWidgetID;
-            var title = data.cashBookName || data.title || lbl('VAS_050_CurrentCash', 'Current cash');
             var balance = safeNumber(data.mainMetric);
             var footerAmount = data.footerAmount !== null && data.footerAmount !== undefined ? safeNumber(data.footerAmount) : Math.abs(balance);
             var valueClass = getStateClass(balance, 'VAS_current-cash-cash-journal-value');
@@ -562,7 +669,6 @@
             renderCashBookOptions(data.cashBooks || []);
 
             $root.find('#VAS_050_current-cash-state-' + widgetId).removeClass('is-visible').text('');
-            $root.find('#VAS_050_current-cash-title-' + widgetId).text(title).attr('title', title);
 
             $root.find('#VAS_050_current-cash-value-' + widgetId)
                 .removeClass('VAS_current-cash-cash-journal-value-positive VAS_current-cash-cash-journal-value-negative VAS_current-cash-cash-journal-value-neutral')
@@ -671,6 +777,16 @@
                 $(document).off(eventNamespace);
             }
 
+            if (resizeDebounce) {
+                clearTimeout(resizeDebounce);
+                resizeDebounce = null;
+            }
+
+            if (dialogResizeObserver) {
+                dialogResizeObserver.disconnect();
+                dialogResizeObserver = null;
+            }
+
             $('body').removeClass('VAS-047-cash-in-body-lock');
 
             if ($dialog) {
@@ -712,6 +828,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_050_CurrentCashForCashJournalWidget.prototype.widgetSizeChange = function (height, width) {

@@ -6,7 +6,7 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Net cash                             | VAS_049_NetCash
- *  2  | Today                                | VAS_049_Today
+ *  2  | Today’s Net Cash Movement            | VAS_049_Subtitle
  *  3  | Loading                              | VAS_049_Loading
  *  4  | No data                              | VAS_049_NoData
  *  5  | Unable to load net cash              | VAS_049_LoadError
@@ -20,6 +20,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_049_NetCashForCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -37,25 +62,16 @@
             return isNaN(stdPrecision) || stdPrecision < 0 ? 2 : stdPrecision;
         }
 
+        /* Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
         function getCurrencyLabel(currencySymbol, currencyISO) {
-            var label = String(currencySymbol || currencyISO || '').trim();
-            return label.toUpperCase() === 'IQD' ? 'ID' : label;
-        }
+            var symbol = String(currencySymbol || '').trim();
+            if (symbol) {
+                return symbol;
+            }
 
-        function getAmountParts(value, currencySymbol, currencyISO, precision, signPrefix) {
-            var numericValue = Number(value || 0);
-            var stdPrecision = getPrecision(precision);
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-            var decimalMatch = amount.match(/([.,]\d+)$/);
-
-            return {
-                prefix: signPrefix + getCurrencyLabel(currencySymbol, currencyISO),
-                main: decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount,
-                decimal: decimalMatch ? decimalMatch[1] : ''
-            };
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
         }
 
         function showBusy(show) {
@@ -73,15 +89,25 @@
             return numberValue > 0 ? '+' : numberValue < 0 ? '−' : '';
         }
 
+        /*
+         * KPI hero value — compact, locale-aware magnitude via
+         * VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by base currency).
+         * The formatter returns a non-negative magnitude, so we compose the
+         * final string ourselves: sign, then currency, then magnitude. The net
+         * value is signed, so getSignPrefix carries the meaningful +/− marker —
+         * a negative net renders as e.g. -$200.56 (sign before the currency).
+         */
         function formatSignedAmount(value, currencySymbol, currencyISO, precision) {
-            var parts = getAmountParts(Math.abs(safeNumber(value)), currencySymbol, currencyISO, precision, getSignPrefix(value));
-            return parts.prefix + parts.main + parts.decimal;
+            var numericValue = safeNumber(value);
+            var sign = getSignPrefix(numericValue);
+            var currency = getCurrencyLabel(currencySymbol, currencyISO);
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
+
+            return sign + currency + magnitude;
         }
 
         function renderSignedAmount($target, value, currencySymbol, currencyISO, precision) {
-            var parts = getAmountParts(Math.abs(safeNumber(value)), currencySymbol, currencyISO, precision, getSignPrefix(value));
-
-            $target.text(parts.prefix + parts.main + parts.decimal);
+            $target.text(formatSignedAmount(value, currencySymbol, currencyISO, precision));
         }
 
         function getStatusText(value) {
@@ -135,16 +161,25 @@
                 'class': 'VAS_net-cash-cash-journal-row'
             });
 
+            var $titleWrap = $('<div>', {
+                'class': 'VAS_net-cash-cash-journal-title-wrap'
+            });
+
             var $title = $('<span>', {
                 'class': 'VAS_net-cash-cash-journal-label',
                 'id': 'VAS_049_net-cash-title-' + widgetId,
                 'text': lbl('VAS_049_NetCash', 'Net cash')
             });
 
+            // Static widget subtitle (not the server's badge text, which only
+            // carries the period name).
+            var subtitleText = lbl('VAS_049_Subtitle', 'Today’s Net Cash Movement');
+
             var $date = $('<span>', {
-                'class': 'VAS_net-cash-cash-journal-date',
+                'class': 'VAS_net-cash-cash-journal-subtitle',
                 'id': 'VAS_049_net-cash-date-' + widgetId,
-                'text': lbl('VAS_049_Today', 'Today')
+                'text': subtitleText,
+                'title': subtitleText
             });
 
             var $value = $('<div>', {
@@ -185,9 +220,16 @@
                 'id': 'VAS_049_net-cash-state-' + widgetId
             });
 
+            var $iconWell = $('<span>', {
+                'class': 'VAS_net-cash-cash-journal-icon',
+                'aria-hidden': 'true',
+                'html': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>'
+            });
+
             $delta.append($icon).append($deltaText);
             $footer.append($delta).append($description);
-            $header.append($title).append($date);
+            $titleWrap.append($title).append($date);
+            $header.append($iconWell).append($titleWrap);
             $card.append($busy).append($header).append($value).append($footer).append($state);
             $root.append($card);
         }
@@ -230,15 +272,14 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
             var title = data.title || lbl('VAS_049_NetCash', 'Net cash');
-            var dateText = data.badgeText || lbl('VAS_049_Today', 'Today');
             var netAmount = safeNumber(data.mainMetric);
             var deltaAmount = safeNumber(data.deltaAmount);
             var valueClass = getStateClass(netAmount, 'VAS_net-cash-cash-journal-value');
             var deltaClass = getStateClass(deltaAmount, 'VAS_net-cash-cash-journal-delta');
 
             $root.find('#VAS_049_net-cash-state-' + widgetId).removeClass('is-visible').text('');
+            // The subtitle is static (set in buildLayout) — nothing to refresh here.
             $root.find('#VAS_049_net-cash-title-' + widgetId).text(title).attr('title', title);
-            $root.find('#VAS_049_net-cash-date-' + widgetId).text(dateText).attr('title', dateText);
 
             $root.find('#VAS_049_net-cash-value-' + widgetId)
                 .removeClass('VAS_net-cash-cash-journal-value-positive VAS_net-cash-cash-journal-value-negative VAS_net-cash-cash-journal-value-neutral')
@@ -365,6 +406,8 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_049_NetCashForCashJournalWidget.prototype.widgetSizeChange = function (height, width) {

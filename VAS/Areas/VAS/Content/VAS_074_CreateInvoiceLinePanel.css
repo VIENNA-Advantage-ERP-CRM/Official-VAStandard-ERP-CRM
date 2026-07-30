@@ -68,10 +68,23 @@
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    padding: 0.75em;
+    /* overscroll-behavior:auto (NOT contain) so the wheel/trackpad CHAINS to the page once
+       this inner scroller hits its top/bottom. `contain` trapped the scroll here - when the
+       pointer was over the panel and it had reached its boundary, the page would not scroll,
+       so it felt stuck / dead ("not moving when it reaches the bottom panel"). Chaining lets
+       the page keep scrolling smoothly past the panel. */
+    overscroll-behavior: auto;
+    /*padding: 0.75em;*/
     font-family: var(--cil-font);
-    font-size: 0.9em;
+    /* Canonical panel anchor (windows-and-panels.md > Panel Foundation, Rules 1 + 3): a
+       VIEWPORT-stable font-size so the panel renders at the SAME physical size on every
+       screen resolution. The old `font-size: 0.9em` resolved against the framework host's
+       baseline (unknown, varies by resolution) -> inconsistent sizing. Every internal token
+       is em against this anchor; container-type lets inner primitives use cqi if needed.
+       Rendered range 16-18px: <=1600px vw -> 16px, 1600-1800px ramps 16->18px, >=1800px -> 18px. */
+    container-type: inline-size;
+    --panel-anchor: clamp(16px, 1vw, 18px);
+    font-size: var(--panel-anchor);
     color: var(--cil-text);
 }
 /* Same guard down the wrapper chain in case the host stretches an inner block as the
@@ -84,12 +97,46 @@
     box-sizing: border-box;
 }
 
+/* Panel Foundation Rule 4: force nested form controls to inherit the anchor. Without this,
+   any em inside a <button>/<input>/<select>/<textarea>/<optgroup> resolves against the UA
+   default (~13.33px in Chrome), NOT the panel anchor, so byte-identical tokens render at two
+   sizes. Wrapped in :where() so the reset has ZERO specificity - it's a pure baseline that
+   controls setting their OWN font-size (buttons, search/scan/cell/dialog inputs) always
+   win over. Scoped to the panel + body-level dialogs (not *) so host chrome stays its own. */
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) button,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) input,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) select,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) textarea,
+:where(.vas-cil-root, .vas-cil-dialog-backdrop) optgroup {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
 .vas-cil-empty {
     display: flex;
     height: 100%;
     align-items: center;
     justify-content: center;
     color: var(--cil-text-muted);
+}
+
+/* Applied to the framework tab title bar + content box (and our root as a fallback)
+   when no invoice is selected, so the whole tab is hidden. !important beats the
+   framework's inline .show()/setSize() display so it can't flash the empty tab back. */
+.vas-cil-tab-hidden {
+    display: none !important;
+}
+
+/* Permanently hide the framework "Invoice Lines" title bar. The framework appends
+   <div class="vis-ad-w-p-ap-tp-body-head"> immediately BEFORE our getRoot(), so this
+   adjacency selector targets ONLY this panel's head (scoped by + .vas-cil-root) and
+   never sibling panels'. It's redundant with the panel's own "Invoice Lines & Summary"
+   header. Timing-free (no JS needed for the head), unlike .vas-cil-tab-hidden which is
+   toggled after the head exists. */
+.vis-ad-w-p-ap-tp-body-head:has(+ .vas-cil-root) {
+    display: none !important;
 }
 
 .vas-cil-icon {
@@ -126,7 +173,7 @@
 
 .vas-cil-panel__title {
     margin: 0;
-    font-size: 1em;
+    font-size: 1.1em;
     font-weight: 700;
     color: var(--cil-text-strong);
 }
@@ -135,6 +182,7 @@
     margin: 0.125em 0 0;
     font-size: 0.8125em;
     color: var(--cil-text-muted);
+    display: none;
 }
 
 .vas-cil-panel__actions {
@@ -174,7 +222,7 @@
     background: var(--cil-surface);
     border-color: var(--cil-action-blue);
     color: var(--cil-action-blue);
-    font-size: 0.75em;
+    font-size: 0.8125em;
     font-weight: 600;
     padding: 0.375em 0.75em;
 }
@@ -237,10 +285,10 @@
 
 .vas-cil-row {
     display: grid;
-    grid-template-columns: 1.75em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
+    grid-template-columns: 2em minmax(0, 1.9fr) minmax(0, 2fr) minmax(0, 1fr) minmax(6em, 0.7fr) minmax(4.75em, 0.4fr) minmax(6.75em, 0.85fr) 3.5em;
     gap: 0.75em;
-    align-items: center;
-    padding: 0.75em 0;
+    align-items: start;
+    padding: 0.5em 0;
     border-bottom: 0.0625em solid var(--cil-divider);
     transition: background .12s;
 }
@@ -251,9 +299,20 @@
 }
 
     .vas-cil-row--head .vas-cil-cell {
-        font-size: 0.8125em;
-        font-weight: 700;
+        font-size: 0.9125em;
+        font-weight: 400;
         color: var(--cil-text);
+    }
+
+    /* "Incl. Tax" second line under the Price header - smaller + muted, stacks below
+       "Price" in the flex-column header cell and right-aligns with it. */
+    .vas-cil-hdr-price-sub {
+        display: block;
+        font-size: 0.75em;
+        font-weight: 400;
+        line-height: 1.1;
+        margin-top: 0.05em;
+        color: var(--cil-text-subtle, #5F7283);
     }
 
 .vas-cil-row--line {
@@ -314,6 +373,27 @@
     color: var(--cil-danger);
 }
 
+/* Blocking validation message shown in the "..." (Additional Info) modal when a
+   conditionally-mandatory field (e.g. Capital/Expense on an Asset-Related line) is empty -
+   the modal refuses to close until it's set. Sits just above the footer, spanning its width. */
+.vas-cil-more-error {
+    margin: 0 1.25em;
+    padding: 0.5em 0.75em;
+    border-radius: var(--cil-r-sm);
+    background: var(--cil-danger-bg);
+    box-shadow: inset 0.1875em 0 0 var(--cil-danger);
+    color: var(--cil-danger);
+    font-size: 0.75em;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Mandatory curated ("...") modal field: colour its label with the framework mandatory
+   colour (dictionary-mandatory fields AND conditional Capital/Expense-on-Asset-Related). */
+.vas-cil-dyn-mandatory label {
+    color: rgba(var(--v-c-mandatory), 1) !important;
+}
+
 .vas-cil-row--totals {
     border-top: 0.0625em solid var(--cil-divider-strong);
     border-bottom: none;
@@ -323,6 +403,65 @@
     align-items: baseline;
     gap: 1.5em;
 }
+
+/* Left-side hint on a treat-as-discount invoice (margin-right:auto keeps the summary
+   pinned to the right while this sits on the far left). */
+.vas-cil-totals-note {
+    margin-right: auto;
+    align-self: start;
+    max-width: 41em;
+    font-size: 0.8125em;
+    line-height: 1.35;
+    color: var(--cil-text-muted);
+}
+
+/* Vertical invoice summary (Sub Total / per-tax lines / Grand Total) rendered inside the
+   totals row, right-aligned - mirrors the VAS_InvoiceSummary design. */
+.vas-cil-summary {
+    min-width: 15em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25em;
+}
+
+.vas-cil-summary-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2.5em;
+    font-size: 1.1em;
+}
+
+.vas-cil-summary-label {
+    font-size: 0.8125em;
+    color: var(--cil-text-muted);
+    white-space: nowrap;
+}
+
+.vas-cil-summary-val {
+    min-width: 7em;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.vas-cil-summary-row--grand {
+    margin-top: 0.125em;
+}
+
+    .vas-cil-summary-row--grand .vas-cil-summary-label {
+        font-weight: 700;
+        color: var(--cil-text);
+    }
+
+    .vas-cil-summary-row--grand .vas-cil-summary-val {
+        font-weight: 700;
+        font-size: 1.05em;
+        color: var(--cil-text-strong);
+        border-top: 0.0625em solid var(--cil-divider-strong);
+        padding-top: 0.25em;
+    }
 
 .vas-cil-cell {
     display: flex;
@@ -335,6 +474,7 @@
 .vas-cil-cell--check {
     align-items: center;
     justify-content: center;
+    padding-top: 4px;
 }
 
 .vas-cil-cell--right {
@@ -442,7 +582,7 @@
     display: block;
     margin-top: 0.125em;
     font-size: 0.85em;
-    font-weight: 600;
+    font-weight: 400;
     color: var(--cil-action-blue);
     white-space: nowrap;
     overflow: hidden;
@@ -502,7 +642,7 @@
     }
 
 .vas-cil-cell-edit input.vas-cil-cell-edit__input {
-    font-weight: 700;
+    font-weight: 500;
     color: var(--cil-text);
 }
 
@@ -557,7 +697,7 @@
 
 .vas-cil-cell-edit input.vas-cil-qtyval {
     text-align: right;
-    font-weight: 700;
+    font-weight: 400;
     font-size: 1em;
 }
 
@@ -573,7 +713,7 @@
 }
 
 .vas-cil-amt {
-    font-weight: 700;
+    font-weight: 400;
     font-size: 0.975em;
     color: var(--cil-text);
     font-variant-numeric: tabular-nums;
@@ -708,6 +848,13 @@
         background: var(--cil-blue-soft);
         color: var(--cil-action-blue);
     }
+
+    /* Line already has additional-info values -> show the "..." focused/highlighted
+       (blue-soft fill + blue dots, like the open state) so it's identifiable at a glance. */
+    .vas-cil-more-btn.has-values {
+        background: var(--cil-blue-soft);
+        color: var(--cil-action-blue);
+    }
     /* Read-only invoice: the "..." button is disabled -> not-allowed (no hover tint). */
     .vas-cil-more-btn:disabled {
         cursor: not-allowed !important;
@@ -792,18 +939,34 @@
    The framework's vis-input-wrap CSS renders each field borderless (leading icon +
    floating label + value + trailing button); we only lay them out 2-up + prevent
    horizontal overflow - no control styling of our own. */
-/* Fixed body height so the modal does NOT resize between the loading spinner, the
-   loaded fields, and conditional show/hide of fields - content scrolls inside instead. */
-.vas-cil-more-body {
-    height: min(28em, 72vh);
+/* Fixed body height so the modal does NOT resize with content (collapsing a field group,
+   loading spinner vs loaded fields, DisplayLogic show/hide) - the fields scroll inside a
+   constant-height body instead.
+   The compound .vas-cil-dialog__body.vas-cil-more-body selector (0,2,0) is REQUIRED: the
+   base .vas-cil-dialog__body { flex:1 } rule is declared later in this file, so a plain
+   .vas-cil-more-body { flex:0 0 auto } (0,1,0) loses on source order and flex:1's
+   flex-basis:0% collapses the height. flex:0 0 auto pins the height; min-height:0 +
+   overflow-y:auto give the internal scroller. */
+.vas-cil-dialog__body.vas-cil-more-body {
+    height: min(29em, 72vh);
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .vas-cil-more-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.25em 2em;
-    padding: 1em 1.25em;
+    padding: 0.5em 1.25em;
     align-items: start;
+    /* Pack rows to the top at their natural height. Without this, a grid's default
+       align-content (normal = stretch) grows the rows to fill the fixed body height, so
+       collapsing a field group spreads the remaining controls apart (and leaves empty
+       space in the last track). align-content:start keeps inter-control spacing constant
+       and lets the leftover space sit as empty space at the bottom instead. */
+    align-content: start;
 }
 
     .vas-cil-more-grid > .input-group,
@@ -819,6 +982,74 @@
    (control + lookup preserved) and only toggled off, so it drops out of the grid layout
    without being re-created when the logic flips back to visible. */
 .vas-cil-dyn-hidden {
+    display: none !important;
+}
+
+/* ---------- collapsible field group (Additional Info modal) ----------
+   A reusable full-row section header injected before an anchor field (see
+   MORE_FIELD_GROUPS in VAS_074_CreateInvoiceLinePanel.js). Its Show More/Less toggle
+   collapses the group's member fields (the wrappers up to the next header). */
+.vas-cil-more-grid > .vas-cil-fldgrp {
+    grid-column: 1 / -1;              /* span both columns, break the 2-up flow */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75em;
+    /* Tight above the bar; roomy below so the next row's floated field labels
+       (which sit ~11px above their input) clear the bar instead of overlapping it. */
+    margin: 0.25em 0 1em;
+    padding: 0.5em 0.875em;
+    border-radius: var(--cil-r-sm);
+    background: linear-gradient(90deg, #cfe8ff 0%, #eaf6ff 55%, var(--cil-surface) 100%);
+}
+
+    /* First group sits directly under the modal header padding - no extra top gap. */
+    .vas-cil-more-grid > .vas-cil-fldgrp:first-child {
+        margin-top: 0;
+    }
+
+.vas-cil-fldgrp-name {
+    font-size: 0.875em;
+    font-weight: 600;
+    color: var(--cil-text);
+}
+
+.vas-cil-fldgrp-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    border: 0;
+    background: transparent;
+    color: var(--cil-action-blue);
+    font-family: inherit;
+    font-size: 0.8125em;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.125em 0.25em;
+}
+
+    .vas-cil-fldgrp-toggle:hover {
+        text-decoration: underline;
+    }
+
+.vas-cil-fldgrp-chev {
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+/* Expanded (default) -> chevron points up; collapsed -> flip to point down. */
+.vas-cil-fldgrp[data-collapsed="1"] .vas-cil-fldgrp-chev {
+    transform: rotate(180deg);
+}
+
+/* Member field hidden while its group is collapsed (independent of DisplayLogic). */
+.vas-cil-more-grid > .vas-cil-grp-collapsed {
+    display: none !important;
+}
+/* Section header whose fields are ALL hidden (not on the window / DisplayLogic) - an empty
+   group title must not show. Set by syncGroupHeaders; a collapsed group is NOT empty. */
+.vas-cil-more-grid > .vas-cil-fldgrp-empty {
     display: none !important;
 }
 /* FK dropdown must not force the (narrow) grid cell wider -> no horizontal scroll. */
@@ -841,6 +1072,13 @@
     color: rgba(var(--v-c-on-common), 1);
     background-color: transparent;
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
+/* "..." modal: small left padding on the field controls (aligns with the floating label). */
+.vas-cil-more-body .vis-input-wrap .vis-control-wrap input:not([type=button]):not([type="checkbox"]):not([type="radio"]),
+.vas-cil-more-body .vis-input-wrap .vis-control-wrap select,
+.vas-cil-more-body .vis-input-wrap .vis-control-wrap textarea {
+    padding-left: 10px !important;
 }
 
 .vas-cil-dialog .vis-input-wrap {
@@ -871,6 +1109,13 @@
 
     .vas-cil-dialog .vis-input-wrap:has(.vis-ev-col-readonly) {
         border-bottom: 1px solid #f3f3f3 !important;
+    }
+
+    /* Readonly control: no tinted fill inside the dialog. Overrides the framework's
+       .vis-ev-col-readonly { background: rgba(var(--v-c-on-secondary), .04) !important }
+       via a higher-specificity + !important rule so the field reads transparent. */
+    .vas-cil-dialog .vis-ev-col-readonly {
+        background-color: transparent !important;
     }
 
     .vas-cil-dialog .vis-input-wrap:has(input:focus), .vas-cil-dialog .vis-input-wrap:has(select:focus), .vas-cil-dialog .vis-input-wrap:has(textarea:focus) {
@@ -968,6 +1213,11 @@
 .vas-cil-more-body .vis-input-wrap input:focus ~ label, .vas-cil-more-body .vis-input-wrap input:not(:placeholder-shown) ~ label, .vas-cil-more-body .vis-input-wrap textarea:not(:placeholder-shown) ~ label, .vas-cil-more-body .vis-input-wrap select:focus ~ label, .vas-cil-more-body .vis-input-wrap textarea:focus ~ label, .vas-cil-more-body .vis-input-wrap select ~ label {
     top: -11px;
 }
+/* "..." modal only: align the field label's left inset with the control text (matches the
+   px-based framework label positioning; scoped so it never touches the global vis-input-wrap). */
+.vas-cil-more-body .vis-input-wrap label {
+    left: 5px !important;
+}
 /* "..." modal only: the checkbox's own caption (the static first-child label, not a
    floating label) stays at top: 0 so it sits inline with the checkbox. */
 .vas-cil-more-body .vis-control-wrap > label:first-child {
@@ -1030,6 +1280,29 @@
 
 /* Attribute create form: reuses the framework vis-input-wrap fields (2-up via
    .vas-cil-more-grid). Mandatory marker + the Lot/SerNo trailing utility action. */
+
+/* Float the field label higher/left (design), and nudge the select's text in. Scoped to
+   .vas-cil-attr-form (the AttributeControl create/edit form) so it doesn't affect other
+   vis-input-wrap usages - the "..." modal has its own float rule (.vas-cil-more-body). The
+   select variant has no :placeholder-shown, so its label stays floated (always-on). */
+.vas-cil-attr-form .vis-input-wrap input:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap input:not(:placeholder-shown) ~ label,
+.vas-cil-attr-form .vis-input-wrap select:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap select ~ label,
+.vas-cil-attr-form .vis-input-wrap textarea:focus ~ label,
+.vas-cil-attr-form .vis-input-wrap textarea:not(:placeholder-shown) ~ label {
+    top: -10px;
+    left: -3px;
+}
+
+.vas-cil-attr-form .vis-input-wrap select {
+    padding-left: 4px;
+}
+
+.vas-cil-attr-form .vis-input-wrap label {
+    left: 4px;
+}
+
 .vas-cil-req {
     font-style: normal;
     color: var(--cil-danger);
@@ -1179,7 +1452,10 @@
     padding: 1em;
     z-index: 99;
     font-family: var(--cil-font);
-    font-size: 0.9em;
+    /* Same canonical anchor as .vas-cil-root - dialogs mount on <body> (outside the root),
+       so they need their own viewport-stable anchor to render at the SAME physical size as
+       the panel on every resolution (was 0.9em of the host baseline). */
+    font-size: clamp(16px, 1vw, 18px);
     color: var(--cil-text);
 }
 
@@ -1197,7 +1473,7 @@
     background: var(--cil-surface);
     border-radius: 0.875em;
     box-shadow: var(--cil-shadow-dialog);
-    width: 45em;
+    width: 55em;
     max-width: 100%;
     max-height: 90vh;
     overflow: hidden;
@@ -1787,7 +2063,8 @@
     padding: 0.7em 1.2em;
     border-radius: var(--cil-r-sm);
     font-family: var(--cil-font);
-    font-size: 0.8em;
+    /* Body-mounted (outside .vas-cil-root): stable small anchor, not host-relative 0.8em. */
+    font-size: clamp(12px, 0.8vw, 14px);
     box-shadow: var(--cil-shadow-pop);
     opacity: 0;
     transition: opacity .25s, transform .25s;

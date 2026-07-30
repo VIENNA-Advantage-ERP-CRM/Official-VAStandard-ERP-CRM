@@ -1,0 +1,291 @@
+/* Product section "Top Sellers" (Highest / Lowest Selling) spotlight card.
+   All selectors are MPC-ts- prefixed. Internal sizing in em; borders / radii /
+   shadows in px. Widget number 114. */
+
+.MPC-ts-root {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    color: #102c3f;
+    font-family: Roboto, sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * .0125), 32px);
+}
+
+.MPC-ts-root,
+.MPC-ts-root * {
+    box-sizing: border-box;
+}
+
+.MPC-ts-hidden {
+    display: none !important;
+}
+
+.MPC-ts-busy-hidden {
+    visibility: hidden;
+}
+
+.MPC-ts-card {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0.875em;
+    overflow: hidden;
+    border: 2px solid #fff;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
+    backdrop-filter: blur(10px);
+}
+
+/* Header bar */
+.MPC-ts-head-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    margin-bottom: 0.625em;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.MPC-ts-ico {
+    width: 2em;
+    height: 2em;
+    flex: 0 0 2em;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 131, 218, 0.1);
+    color: #0083da;
+}
+
+    .MPC-ts-ico svg {
+        width: 1em;
+        height: 1em;
+    }
+
+.MPC-ts-title {
+    min-width: 0;
+    font-size: clamp(13px, 1.1375cqi, 16px);
+    font-weight: 500;
+    color: #102c3f;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-ts-spacer {
+    flex: 1;
+}
+
+.MPC-ts-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid #e4edf4;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.MPC-ts-seg {
+    font-family: inherit;
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #5f7283;
+    padding: 0.35em 0.7em;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+    .MPC-ts-seg.MPC-ts-active {
+        background: #0083da;
+        color: #fff;
+    }
+
+/* Body */
+.MPC-ts-wbody {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.MPC-ts-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.MPC-ts-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #748494;
+    font-size: 0.75em;
+    padding: 1em;
+}
+
+.MPC-ts-graphic {
+    position: absolute;
+    right: -0.2em;
+    top: 0;
+    opacity: 0.1;
+    color: #5f7283;
+    pointer-events: none;
+}
+
+    .MPC-ts-graphic svg {
+        width: 3.6em;
+        height: 3.6em;
+    }
+
+/* Actual product image (shown when available, replacing the faint graphic) */
+.MPC-ts-image {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 3.4em;
+    height: 3.4em;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid #e4edf4;
+    background: #fff;
+    box-shadow: 0 6px 14px rgba(16, 47, 74, 0.06);
+    pointer-events: none;
+}
+
+.MPC-ts-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    min-width: 0;
+    padding-inline-end: 3.8em;
+}
+
+.MPC-ts-rank {
+    font-size: 2.4em;
+    font-weight: 700;
+    line-height: 1;
+    flex: 0 0 auto;
+}
+
+.MPC-ts-name {
+    font-size: 0.9375em;
+    font-weight: 500;
+    color: #5f7283;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-ts-cols {
+    display: flex;
+    gap: 1.4em;
+    margin-top: 0.7em;
+    flex-wrap: wrap;
+}
+
+.MPC-ts-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.MPC-ts-v {
+    font-size: 0.95em;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+    .MPC-ts-v small {
+        font-size: 0.7em;
+        font-weight: 400;
+        color: #748494;
+    }
+
+.MPC-ts-last {
+    color: #d78b10;
+}
+
+.MPC-ts-cur {
+    color: #0083da;
+}
+
+    .MPC-ts-cur.MPC-ts-bad {
+        color: #d14545;
+    }
+
+.MPC-ts-l {
+    font-size: 0.625em;
+    color: #748494;
+    margin-top: 0.1em;
+}
+
+/* Footer + pager */
+.MPC-ts-foot {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5em;
+    padding-top: 0.6em;
+    margin-top: 0.4em;
+    border-top: 1px solid #edf2f6;
+}
+
+.MPC-ts-foot-spacer {
+    flex: 1;
+}
+
+.MPC-ts-pager {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
+
+.MPC-ts-pgbtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 1px solid #e4edf4;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0083da;
+    cursor: pointer;
+}
+
+    .MPC-ts-pgbtn:hover {
+        background: #e7f4ff;
+    }
+
+    .MPC-ts-pgbtn:disabled {
+        color: #b8c6d2;
+        cursor: default;
+    }
+
+    .MPC-ts-pgbtn svg {
+        width: 14px;
+        height: 14px;
+    }
+
+.MPC-ts-pgtext {
+    font-size: 0.6875em;
+    font-weight: 500;
+    color: #102c3f;
+}

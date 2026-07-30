@@ -3,8 +3,17 @@
    ========================================================== */
 
 .vas-opwdg-root {
+    /* Positioning context only (mirrors VIS.OutstandingSalesOrderWidget's root);
+       the glass surface lives on the card (.vas-opwdg-container) below. No
+       overflow:hidden here so the card's drop-shadow is not clipped. */
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
     position: relative;
-    overflow: hidden;
+    font-family: Roboto, sans-serif;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-opwdg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -16,107 +25,108 @@
     z-index: 999;
 }
 
+/* The card: glass surface + layout + base font-size anchor for all em sizing
+   (mirrors VIS.OutstandingSalesOrderWidget's .vas-oso-card). */
 .vas-opwdg-container {
-    font-size: 14px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 100%;
-    padding: 1.14em 1.14em 1.28em;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
-    border-radius: 12px;
-    box-sizing: border-box;
+    gap: 0.5em;                      /* spec stack gap between header / value / why */
+    padding: 0.875em;                /* Widget Edge Spacing */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     position: relative;
     overflow: hidden;
 }
 
-
 .vas-opwdg-label {
-    font-size: 0.86em;
-    color: #5F7283;
+    /* Widget title (shared Widget Header clamp), Roboto Regular. Sits in the header
+       stack above the subtitle, so no bottom margin here. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
+    color: #102C3F;
     font-weight: 400;
-    letter-spacing: 0.02em;
-    margin-bottom: 0.36em;
+    margin-bottom: 0;
     line-height: 1.2;
 }
 
 .vas-opwdg-value {
-    font-size: 2.2em;
-    font-weight: 700;
+    font-size: 1.75em;
+    font-weight: 700; /* Roboto Bold — 600/SemiBold is not in the spec weight palette */
     color: #D78B10;
-    line-height: 1.15;
-    margin-bottom: 0.5em;
+    line-height: 1.05;
     letter-spacing: -0.01em;
+    margin-bottom: 0.5em;   /* mirror VAS_025 value: sit in the space-between stack */
+    padding-left: 0.3125em;
 }
 
-/* ---- Pills row ---- */
-.vas-opwdg-pills-row {
-    display: flex;
-    gap: 0.5em;
-    margin-bottom: 0.5em;
-    flex-wrap: wrap;
+/* Currency symbol sits ahead of the amount, same size/weight (CurrencyFormat util). */
+.vas-opwdg-cur {
+    font-size: 1em;
+    font-weight: inherit;
+    margin-right: 0.08em;
+    vertical-align: baseline;
 }
 
-.vas-opwdg-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3em;
-    background: rgba(255, 255, 255, 0.78);
-    border: 1px solid #F5D98A;
-    border-radius: 999px;
-    padding: 0.28em 0.7em;
-    font-size: 0.78em;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-.vas-opwdg-pill-label {
-    color: #748494;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-size: 0.95em;
-}
-
-.vas-opwdg-pill-value {
-    color: #9A6500;
-    font-weight: 700;
-}
-
-/* ---- Trend row ---- */
-.vas-opwdg-trend-row {
+/* ---- Header: tinted icon well + title / subtitle (mirrors VIS.OverdueWidget) ---- */
+.vas-opwdg-header {
     display: flex;
     align-items: center;
-    gap: 0.3em;
-    font-size: 0.8em;
-    font-weight: 600;
-    padding-top: 0.3em;
+    gap: 0.625em;
+    min-width: 0;
 }
 
-/* Critical = danger red (financial health going down) */
-.vas-opwdg-trend-down {
-    color: #D14545;
-}
-
-/* Improving = success green */
-.vas-opwdg-trend-up {
-    color: #019D89;
-}
-
-.vas-opwdg-trend-icon {
-    width: 1.1em;
-    height: 1.1em;
+.vas-opwdg-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
     flex-shrink: 0;
+    border-radius: 0.5625em;
+    /* Amber tint to match this widget's semantic (overdue = amber); the SVG stroke
+       inherits this color via currentColor. */
+    background: linear-gradient(180deg, #FFFFFF, #FDF2E0);
+    color: #D78B10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* ---- Sparkline (bottom-right corner, decorative) ---- */
-.vas-opwdg-sparkline {
-    position: absolute;
-    bottom: 0.4em;
-    right: 0.5em;
-    opacity: 0.5;
-    pointer-events: none;
+.vas-opwdg-icon svg {
+    width: 1.125em;
+    height: 1.125em;
 }
+
+.vas-opwdg-head-text {
+    min-width: 0;
+}
+
+.vas-opwdg-subtitle {
+    font-size: 0.75em;
+    color: #5F7283;
+    line-height: 1.3;
+    margin-top: 0.0625em;
+}
+
+/* ---- WHY explanatory line (mirrors VIS.OverdueWidget's why-wrap) ---- */
+.vas-opwdg-why-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375em;
+    /* Was margin-top:auto (pinned the value to the top); mirror VAS_025 so the value
+       distributes via the container's justify-content:space-between (centers on zoom-out). */
+    margin-top: 0.125em;
+}
+
+.vas-opwdg-why-text {
+    font-size: 0.6875em;
+    color: #717182;
+    line-height: 1.3;
+}
+
 
 /* ---- Full-card click overlay (opens the drill-down) ---- */
 .vas-opwdg-open {
@@ -159,7 +169,7 @@
     color: #102C3F;
     font-family: Roboto, sans-serif;
     letter-spacing: 0;
-    padding: 18px 20px 14px;
+    padding: 1.125em 1.25em 0.875em;
     position: relative;
     overflow: visible;
 }
@@ -167,7 +177,7 @@
 .vas-opwdg-dialog-shell .ui-dialog-title {
     color: #102C3F !important;
     font-family: Roboto, sans-serif;
-    font-size: 15px;
+    font-size: 0.9375em;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.2;
@@ -185,17 +195,17 @@
     color: #6B7280;
     cursor: pointer;
     display: flex;
-    height: 30px;
+    height: 1.875em;
     justify-content: center;
     line-height: 0;
     margin: 0;
     outline: 0;
     padding: 0;
     position: absolute;
-    right: 14px;
+    right: 0.875em;
     top: 50%;
     transform: translateY(-50%);
-    width: 30px;
+    width: 1.875em;
 }
 
 .vas-opwdg-dialog-shell .vas-opwdg-dialog-close:hover,
@@ -207,33 +217,33 @@
 .vas-opwdg-dialog-shell .vas-opwdg-dialog-close svg {
     display: block;
     fill: currentColor;
-    height: 14px;
+    height: 0.875em;
     pointer-events: none;
-    width: 14px;
+    width: 0.875em;
 }
 
 .vas-opwdg-dialog-shell .ui-dialog-content {
-    padding: 18px 20px;
+    padding: 1.125em 1.25em;
 }
 
 .vas-opwdg-dialog-shell .ui-dialog-buttonpane {
     background: #FFFFFF;
     border-top: 1px solid #EDF2F6;
     margin: 0;
-    padding: 12px 20px;
+    padding: 0.75em 1.25em;
 }
 
 .vas-opwdg-dialog-shell .ui-dialog-buttonset button {
     background: rgba(255, 255, 255, 0.6);
     border: 1px solid #E4EDF4;
     border-radius: 999px;
-    color: #5F7283;
+    color: #41576A;
     font-family: Roboto, sans-serif;
-    font-size: 12px;
+    font-size: 0.75em;
     font-weight: 700;
     letter-spacing: 0;
     line-height: 1.2;
-    padding: 0.45rem 0.9rem;
+    padding: 0.5em 0.875em;
 }
 
 .vas-opwdg-dialog-shell .ui-dialog-buttonset button:hover,
@@ -246,17 +256,29 @@
 .vas-opwdg-dialog {
     color: #102C3F;
     font-family: Roboto, sans-serif;
-    min-height: 220px;
+    /* Panel-body anchor: all modal-body typography + spacing scale in em off this
+       (foundations.md §Responsive Unit Rules — panel body anchor). */
+    font-size: clamp(16px, 1vw, 18px);
+    min-height: 13.75em;
 }
 
 .vas-opwdg-drill-state {
     align-items: center;
-    color: #748494;
+    color: #5F7283;
     display: flex;
-    font-size: 14px;
+    font-size: 0.875em;
     justify-content: center;
-    min-height: 180px;
+    min-height: 11.25em;
     text-align: center;
+}
+
+/* Busy spinner shown while the drill-down data loads (core vis_widgetloader). */
+.vas-opwdg-drill-busy {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 11.25em;
+    position: relative;
 }
 
 .vas-opwdg-drill-error {
@@ -266,7 +288,7 @@
 .vas-opwdg-drill {
     align-items: flex-start;
     display: flex;
-    gap: 16px;
+    gap: 1em;
 }
 
 .vas-opwdg-drill-card {
@@ -274,42 +296,27 @@
     border-radius: 10px;
     flex: 1 1 0;
     min-width: 0;
-    padding: 14px 16px;
+    padding: 0.875em 1em;
 }
 
 .vas-opwdg-drill-card-label {
-    color: #5F7283;
+    color: #41576A;
     display: block;
-    font-size: 11px;
+    font-size: 0.6875em;
     line-height: 1.25;
-    margin-bottom: 4px;
+    margin-bottom: 0.25em;
 }
 
 .vas-opwdg-drill-card-value {
     color: #D78B10;
     display: block;
-    font-size: 34px;
+    font-size: 2.125em;
     font-weight: 700;
-    letter-spacing: -1px;
+    letter-spacing: -0.03em;
     line-height: 1;
 }
 
-.vas-opwdg-drill-card-trend {
-    display: block;
-    font-size: 11px;
-    font-style: normal;
-    font-weight: 700;
-    line-height: 1.25;
-    margin-top: 4px;
-}
 
-.vas-opwdg-drill-trend-bad {
-    color: #D78B10;
-}
-
-.vas-opwdg-drill-trend-good {
-    color: #019D89;
-}
 
 .vas-opwdg-drill-copy {
     flex: 2 1 0;
@@ -317,14 +324,14 @@
 }
 
 .vas-opwdg-drill-desc {
-    color: #5F7283;
-    font-size: 12px;
+    color: #41576A;
+    font-size: 0.75em;
     line-height: 1.6;
-    margin: 0 0 12px;
+    margin: 0 0 0.75em;
 }
 
 .vas-opwdg-drill-row {
-    margin-bottom: 7px;
+    margin-bottom: 0.4375em;
 }
 
 .vas-opwdg-drill-row:last-child {
@@ -338,15 +345,15 @@
 
 .vas-opwdg-drill-row-head {
     display: flex;
-    font-size: 11px;
-    gap: 10px;
+    font-size: 0.6875em;
+    gap: 0.625em;
     justify-content: space-between;
-    margin-bottom: 3px;
+    margin-bottom: 0.1875em;
 }
 
 .vas-opwdg-drill-row-name {
     color: #102C3F;
-    font-weight: 700;
+    font-weight: 400;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -363,7 +370,7 @@
 .vas-opwdg-drill-track {
     background: rgba(0, 0, 0, 0.07);
     border-radius: 3px;
-    height: 6px;
+    height: 0.375em;
     overflow: hidden;
     width: 100%;
 }
@@ -402,11 +409,11 @@
     color: #102C3F;
     cursor: pointer;
     display: flex;
-    height: 24px;
+    height: 1.5em;
     justify-content: center;
     padding: 0;
     transition: background 0.15s ease, border-color 0.15s ease;
-    width: 24px;
+    width: 1.5em;
 }
 
 .vas-opwdg-drill-pager-btn:hover:not([disabled]) {
@@ -426,33 +433,27 @@
     text-align: center;
 }
 
-/* ---- Responsive ---- */
-@media (max-width: 1920px) {
-    .vas-opwdg-container { font-size: 14px; }
-}
-
-@media (max-width: 1366px) {
+/* ---- Responsive ----
+   Widget interior scales via the em anchor clamp on .vas-opwdg-container, so no
+   per-breakpoint font-size stepping is needed. Only the drill-down dialog (a
+   document-baseline surface) reflows at narrow widths. */
+/* Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-opwdg (max-width: 300px) {
     .vas-opwdg-container { font-size: 13px; }
 }
 
-@media (max-width: 1024px) {
-    .vas-opwdg-container { font-size: 12px; }
-}
-
-@media (max-width: 900px) {
-    .vas-opwdg-container { font-size: 11.5px; }
+@container vas-opwdg (max-width: 220px) {
+    .vas-opwdg-container { font-size: 11px; }
 }
 
 @media (max-width: 768px) {
-    .vas-opwdg-container { font-size: 11px; }
     .vas-opwdg-pills-row { gap: 0.35em; }
 }
 
 @media (max-width: 680px) {
-    .vas-opwdg-container { font-size: 10.5px; }
-
     .vas-opwdg-dialog-shell .ui-dialog-content {
-        padding: 0.875rem;
+        padding: 0.875em;
     }
 
     .vas-opwdg-drill {
@@ -465,11 +466,34 @@
     }
 }
 
-@media (max-width: 480px) {
-    .vas-opwdg-container { font-size: 10px; }
-    .vas-opwdg-value { font-size: 2em; }
+/* ==========================================================
+   RTL — drill-down modal (dir="rtl" on <html>; the body-appended
+   jQuery UI dialog inherits it). Physical offsets/anchors that
+   don't auto-flip get mirrored here.
+   ========================================================== */
+
+/* Close button was pinned to the physical right, colliding with the right-aligned
+   RTL title — move it to the (mirrored) left. */
+[dir="rtl"] .vas-opwdg-dialog-shell .vas-opwdg-dialog-close {
+    right: auto;
+    left: 0.875em;
 }
 
-@media (max-width: 320px) {
-    .vas-opwdg-container { font-size: 9px; }
+/* Keep amounts as an isolated LTR run (sign · symbol · digits) so a negative like
+   -$1.153K doesn't reorder to $1.153K- inside the RTL modal. Placement stays at the
+   row's inline-end via the flex row; only the glyph order is forced LTR. */
+[dir="rtl"] .vas-opwdg-drill-row-val {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+/* Progress bar fills from the inline-start (right) edge in RTL. */
+[dir="rtl"] .vas-opwdg-drill-fill {
+    margin-left: auto;
+}
+
+/* The prev/next chevrons are fixed glyphs; mirror them so they point the right way
+   once the flex nav reverses. */
+[dir="rtl"] .vas-opwdg-drill-pager-btn svg {
+    transform: scaleX(-1);
 }

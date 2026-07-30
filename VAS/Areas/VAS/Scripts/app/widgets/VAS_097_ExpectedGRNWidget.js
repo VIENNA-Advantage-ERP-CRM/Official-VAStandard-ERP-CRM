@@ -33,6 +33,13 @@
  * 16  | Enter received quantity for at least one line.    | VAS_ReceivedQtyRequired
  * 17  | Received quantity cannot be greater than open...  | VAS_ReceivedQtyTooHigh
  * 18  | GRN could not be created.                         | VAS_GRNCouldNotBeCreated
+ * 19  | Attribute                                         | VAS_Attribute
+ * 20  | Purchase Order (modal document field)             | PurchaseOrder
+ *
+ * Correction 2026-07-18: the modal never scrolls (line rows fit the space and
+ * page instead), the line grid is tightened (attribute chip next to the item,
+ * managed column gaps, reduced row height) and the modal document field is
+ * labelled "Purchase Order".
  */
 ; VAS = window.VAS || {};
 
@@ -69,11 +76,22 @@
         var rowsById = {};
         var currentPO = null;
         var currentLines = [];
+        /* Line entry is paged, never scrolled: rcvPageSize adapts to the
+           height the modal can give the list (fitModalLines). Typed received
+           quantities live in lineEntry (poLineId -> value) so they survive
+           page switches. */
+        var RCV_PAGE_MAX = 4;
+        var rcvPageSize = RCV_PAGE_MAX;
+        var rcvPageNo = 1;
+        var lineEntry = {};
         var pageNo = 1;
-        var pageSize = 3;
+        var pageSize = 4;
         var totalPages = 0;
         var totalRecords = 0;
         var loading = false;
+        var rowResizeObserver = null;
+        var modalResizeObserver = null;
+        var modalFitRaf = null;
 
         function lbl(key, fallback) {
             var t = VIS.Msg.getMsg(key);
@@ -100,11 +118,19 @@
             return Number(value || 0).toLocaleString(window.navigator.language, { maximumFractionDigits: 2 });
         }
 
-        /* Format a currency amount using the precision read from the system (never hard-coded). */
-        function formatMoney(value, precision, symbol) {
+        /* Review #8 (common): digit grouping follows the currency's ISO 4217 family -
+           Indian grouping for INR/PKR/BDT/NPR/BTN/LKR, international otherwise.
+           Precision and symbol are read from the system (never hard-coded). */
+        var INDIAN_NUMBERING_CURRENCIES = ['INR', 'PKR', 'BDT', 'NPR', 'BTN', 'LKR'];
+
+        function currencyLocale(isoCode) {
+            return INDIAN_NUMBERING_CURRENCIES.indexOf(String(isoCode || '').toUpperCase()) >= 0 ? 'en-IN' : 'en-US';
+        }
+
+        function formatMoney(value, precision, symbol, isoCode) {
             var p = Number(precision);
             if (!isFinite(p) || p < 0) { p = 2; }
-            var num = Number(value || 0).toLocaleString(window.navigator.language, {
+            var num = Number(value || 0).toLocaleString(currencyLocale(isoCode), {
                 minimumFractionDigits: p,
                 maximumFractionDigits: p
             });
@@ -136,6 +162,29 @@
             $dialogBadge
                 .html('<span class="vas-egrn-pill ' + escapeHtml(cls || "info") + '">' + escapeHtml(text) + '</span>')
                 .removeClass('vas-egrn-hidden');
+        }
+
+        function measurePageSize() {
+            if (!$body || !$body[0]) { return pageSize; }
+
+            var $rows = $body.find('.vas-egrn-rows');
+            var listHeight = $rows.innerHeight();
+            var rowHeight = $rows.find('.vas-egrn-row').first().outerHeight(true) || 58;
+            if (!listHeight || !rowHeight) { return pageSize; }
+
+            /* Paged like the Material Receipt Register: at least 4 records on
+               the standard card; the count still grows with taller screens. */
+            return Math.max(4, Math.floor(listHeight / rowHeight));
+        }
+
+        function syncPageSize() {
+            var nextPageSize = measurePageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            pageNo = Math.max(1, Math.ceil(firstRecord / pageSize));
+            if (!loading) { loadExpected(pageNo); }
         }
 
         this.initalize = function () {
@@ -199,6 +248,13 @@
             $nextBtn.on('click', function () {
                 if (!loading && pageNo < totalPages) { loadExpected(pageNo + 1); }
             });
+
+            if (window.ResizeObserver) {
+                rowResizeObserver = new ResizeObserver(function () {
+                    window.setTimeout(syncPageSize, 0);
+                });
+                rowResizeObserver.observe($body.find('.vas-egrn-rows')[0]);
+            }
         }
 
         function loadExpected(page) {
@@ -268,7 +324,7 @@
                 var r = ROWS[i];
                 rowsById[r.poId] = r;
 
-                var valueText = formatMoney(r.poValue, r.stdPrecision, r.curSymbol);
+                var valueText = formatMoney(r.poValue, r.stdPrecision, r.curSymbol, r.currencyIso);
 
                 $rows.append(
                     '<button type="button" class="vas-egrn-row" data-poid="' + escapeHtml(r.poId) + '">' +
@@ -292,6 +348,7 @@
             }
 
             updatePager();
+            window.setTimeout(syncPageSize, 0);
         }
 
         function updatePager() {
@@ -342,8 +399,25 @@
             $dialog.find('.vas-egrn-scrim').on('click', closeDialog);
             $dialog.find('.vas-egrn-back').on('click', closeDialog);
 
-            $dialogBody.on('input', '.vas-egrn-rcv-in', validateLines);
+            $dialogBody.on('input', '.vas-egrn-rcv-in', function () {
+                var $row = $(this).closest('.vas-egrn-rcv-line[data-lineid]');
+                var lineId = Number($row.data('lineid') || 0);
+                if (lineId > 0) { lineEntry[lineId] = String($(this).val() || ""); }
+                validateLines();
+            });
             $dialogBody.on('click', '.vas-egrn-create-btn', createGRN);
+            $dialogBody.on('click', '.vas-egrn-rcv-prev', function () { if (rcvPageNo > 1) { rcvPageNo--; renderLineEntry(); } });
+            $dialogBody.on('click', '.vas-egrn-rcv-next', function () { rcvPageNo++; renderLineEntry(); });
+
+            /* The modal never scrolls: whenever its size changes (window
+               resize, browser zoom), refit how many line rows are shown. */
+            if (window.ResizeObserver) {
+                modalResizeObserver = new ResizeObserver(function () {
+                    if (modalFitRaf) { window.cancelAnimationFrame(modalFitRaf); }
+                    modalFitRaf = window.requestAnimationFrame(fitModalLines);
+                });
+                modalResizeObserver.observe($dialogBody[0]);
+            }
 
             $(document).on('keydown.vas-egrn', function (e) {
                 if (e.key === 'Escape' && !$dialog.hasClass('vas-egrn-hidden')) { closeDialog(); }
@@ -380,6 +454,12 @@
                         return;
                     }
                     currentLines = data.rows || [];
+                    rcvPageNo = 1;
+                    rcvPageSize = RCV_PAGE_MAX;
+                    lineEntry = {};
+                    for (var li = 0; li < currentLines.length; li++) {
+                        lineEntry[currentLines[li].poLineId] = toInputValue(currentLines[li].defaultReceivedQty);
+                    }
                     renderLineEntry();
                 },
                 error: function () {
@@ -397,6 +477,36 @@
                 '</div>';
         }
 
+        /* Footer pager matching the widget's own pagination design: "Showing
+           X-Y of Z" on the left, the ‹ X of Y › pager on the right (same
+           vas-egrn-foot / vas-egrn-pager markup and text). */
+        function linePagerHtml(pageNo, totalPages, totalRows, pageSize) {
+            if (totalPages <= 1) { return ''; }
+            var chevL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+            var chevR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+            var from = (pageNo - 1) * pageSize + 1;
+            var to = Math.min(pageNo * pageSize, totalRows);
+            return '<div class="vas-egrn-foot">' +
+                '<span class="vas-egrn-foot-info">' + escapeHtml(VIS.Msg.getMsg("VAS_Showing") + ' ' + from + '-' + to + ' ' + VIS.Msg.getMsg("VAS_Of") + ' ' + totalRows) + '</span>' +
+                '<div class="vas-egrn-pager">' +
+                '<button type="button" class="vas-egrn-pgbtn vas-egrn-rcv-prev"' + (pageNo <= 1 ? ' disabled' : '') + '>' + chevL + '</button>' +
+                '<span class="vas-egrn-pgtext">' + escapeHtml(pageNo + VIS.Msg.getMsg("VAS_Of") + totalPages) + '</span>' +
+                '<button type="button" class="vas-egrn-pgbtn vas-egrn-rcv-next"' + (pageNo >= totalPages ? ' disabled' : '') + '>' + chevR + '</button>' +
+                '</div>' +
+                '</div>';
+        }
+
+        /* Empty attribute-set instances carry dash-only descriptions ("-",
+           "---"): those render as a plain dash; real values render as a chip
+           sitting right next to the item name, per the reference design. */
+        function attrCellHtml(attributeName) {
+            var text = (attributeName && !/^-+$/.test(String(attributeName).trim())) ? String(attributeName) : '';
+            if (!text) {
+                return '<div class="vas-egrn-rcv-attr">-</div>';
+            }
+            return '<div class="vas-egrn-rcv-attr" title="' + escapeHtml(text) + '"><span class="vas-egrn-attr-chip">' + escapeHtml(text) + '</span></div>';
+        }
+
         function renderLineEntry() {
             if (!currentPO) { return; }
 
@@ -405,22 +515,35 @@
                 return;
             }
 
+            /* Correction 2026-07-18: the document field is labelled "Purchase
+               Order" (core message key), not "Expected GRN". */
             var fields =
                 '<div class="vas-egrn-form-grid">' +
-                fieldHtml(lbl("VAS_ExpectedGRN", "Expected GRN"), currentPO.poNo, true) +
+                fieldHtml(lbl("PurchaseOrder", "Purchase Order"), currentPO.poNo, true) +
                 fieldHtml(lbl("Vendor", "Supplier"), currentPO.supplier) +
                 fieldHtml(lbl("VAS_VendorLocation", "Address"), currentPO.addressLine) +
                 fieldHtml(lbl("VAS_NoOfLines", "No of Lines"), String(currentLines.length)) +
                 '</div>';
 
+            /* Show at most rcvPageSize rows per page; further lines are paged,
+               never scrolled (fitModalLines keeps the page size in step with
+               the space available). Typed quantities persist in lineEntry. */
+            var totalPages = Math.max(1, Math.ceil(currentLines.length / rcvPageSize));
+            if (rcvPageNo > totalPages) { rcvPageNo = totalPages; }
+            if (rcvPageNo < 1) { rcvPageNo = 1; }
+            var start = (rcvPageNo - 1) * rcvPageSize;
+            var end = Math.min(start + rcvPageSize, currentLines.length);
+
             var rows = '';
-            for (var i = 0; i < currentLines.length; i++) {
+            for (var i = start; i < end; i++) {
                 var line = currentLines[i];
+                var qtyValue = lineEntry[line.poLineId] != null ? lineEntry[line.poLineId] : toInputValue(line.defaultReceivedQty);
                 rows +=
                     '<div class="vas-egrn-rcv-line" data-lineid="' + escapeHtml(line.poLineId) + '" data-openqty="' + escapeHtml(line.openQty) + '">' +
                     '<div class="vas-egrn-rcv-name" title="' + escapeHtml(line.itemName) + '">' + escapeHtml(line.itemName) + '</div>' +
+                    attrCellHtml(line.attributeName) +
                     '<div class="vas-egrn-rcv-po">' + escapeHtml(formatQty(line.poQty)) + '</div>' +
-                    '<input class="vas-egrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(toInputValue(line.defaultReceivedQty)) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
+                    '<input class="vas-egrn-rcv-in" type="number" min="0" max="' + escapeHtml(line.openQty) + '" step="any" value="' + escapeHtml(qtyValue) + '" aria-label="' + escapeHtml(lbl("VAS_Received", "Received")) + '"/>' +
                     '<div class="vas-egrn-rcv-uom" title="' + escapeHtml(line.uom) + '">' + escapeHtml(line.uom) + '</div>' +
                     '</div>';
             }
@@ -430,49 +553,85 @@
                 '<div class="vas-egrn-note">' + fileIcon() + '<span>' + escapeHtml(lbl("VAS_EnterReceivedQtyAgainstLine", "Enter received quantity against each PO line, then create the GRN.")) + '</span></div>' +
                 '<div class="vas-egrn-rcv-line vas-egrn-rcv-head">' +
                 '<div>' + escapeHtml(lbl("VAS_Item", "Item")) + '</div>' +
+                '<div>' + escapeHtml(lbl("VAS_Attribute", "Attribute")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_POQty", "PO Qty")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Received", "Received")) + '</div>' +
                 '<div>' + escapeHtml(lbl("VAS_Uom", "UOM")) + '</div>' +
                 '</div>' +
-                '<div class="vas-egrn-lines">' + rows + '</div>' +
+                '<div class="vas-egrn-rcv-viewport"><div class="vas-egrn-lines">' + rows + '</div></div>' +
+                linePagerHtml(rcvPageNo, totalPages, currentLines.length, rcvPageSize) +
                 '<div class="vas-egrn-error vas-egrn-hidden"></div>' +
                 '<div class="vas-egrn-action"><button type="button" class="vas-egrn-create-btn">' + checkIcon() + '<span>' + escapeHtml(lbl("VAS_SelectAndMakeGRN", "Select & Make GRN")) + '</span></button></div>'
             );
 
             validateLines();
+            window.setTimeout(fitModalLines, 0);
         }
 
+        /* The modal never scrolls: the line rows live in a clipped viewport
+           and rcvPageSize is recomputed to the largest row count that fits
+           the space the modal can give it before hitting its height cap -
+           zooming in or shrinking the window pages the rows instead of
+           showing a scrollbar (reference design behaviour). */
+        function fitModalLines() {
+            if (!$dialog || $dialog.hasClass('vas-egrn-hidden') || currentLines.length === 0) { return; }
+            var $vp = $dialogBody.find('.vas-egrn-rcv-viewport');
+            var $row = $vp.find('.vas-egrn-rcv-line').first();
+            if (!$vp.length || !$row.length) { return; }
+            var rowHeight = $row.outerHeight(true);
+            if (!rowHeight || rowHeight <= 0) { return; }
+
+            /* Space the list may use = its current height plus whatever the
+               modal can still grow before reaching its 88vh cap (matches the
+               CSS max-height on .vas-egrn-modal). */
+            var $modal = $dialog.find('.vas-egrn-modal');
+            var slack = Math.max(0, Math.floor(window.innerHeight * 0.88) - Math.ceil($modal.outerHeight()));
+            var fit = Math.max(1, Math.min(RCV_PAGE_MAX, Math.floor(($vp[0].clientHeight + slack) / rowHeight)));
+
+            if (fit !== rcvPageSize) {
+                var firstIndex = (rcvPageNo - 1) * rcvPageSize;
+                rcvPageSize = fit;
+                rcvPageNo = Math.floor(firstIndex / rcvPageSize) + 1;
+                renderLineEntry();
+                return;
+            }
+
+            /* Widget-development-rules #15: the viewport must not resize
+               with the number of lines on the CURRENT page. renderLineEntry
+               rebuilds $dialogBody's innerHTML on every call (wiping any
+               inline style on $vp), so this has to be reapplied on every
+               settled render, not just when rcvPageSize changes above. */
+            $vp.css('min-height', Math.ceil(rowHeight * rcvPageSize) + 'px');
+        }
+
+        /* Reads every line from lineEntry state (covers ALL pages, not just the
+           visible one), so paging never drops a typed quantity. */
         function collectLines() {
             var lines = [];
             var invalid = false;
             var message = "";
 
-            $dialogBody.find('.vas-egrn-rcv-line[data-lineid]').each(function () {
-                var $row = $(this);
-                var lineId = Number($row.data('lineid') || 0);
-                var openQty = Number($row.data('openqty') || 0);
-                var qty = Number($row.find('.vas-egrn-rcv-in').val() || 0);
-
-                $row.removeClass('invalid');
+            for (var i = 0; i < currentLines.length; i++) {
+                var line = currentLines[i];
+                var lineId = Number(line.poLineId);
+                var openQty = Number(line.openQty || 0);
+                var raw = lineEntry[lineId] != null ? lineEntry[lineId] : toInputValue(line.defaultReceivedQty);
+                var qty = Number(raw);
 
                 if (!isFinite(qty) || qty < 0) {
                     invalid = true;
                     message = lbl("VAS_NegativeReceivedQty", "Received quantity cannot be negative.");
-                    $row.addClass('invalid');
-                    return;
+                    break;
                 }
-
                 if (qty > openQty) {
                     invalid = true;
                     message = lbl("VAS_ReceivedQtyTooHigh", "Received quantity cannot be greater than open quantity.");
-                    $row.addClass('invalid');
-                    return;
+                    break;
                 }
-
                 if (qty > 0) {
                     lines.push({ poLineId: lineId, receivedQty: qty });
                 }
-            });
+            }
 
             return { lines: lines, invalid: invalid, message: message };
         }
@@ -481,6 +640,14 @@
             var result = collectLines();
             var $error = $dialogBody.find('.vas-egrn-error');
             var $button = $dialogBody.find('.vas-egrn-create-btn');
+
+            /* Flag invalid rows visible on the current page. */
+            $dialogBody.find('.vas-egrn-rcv-line[data-lineid]').each(function () {
+                var $row = $(this);
+                var openQty = Number($row.data('openqty') || 0);
+                var qty = Number($row.find('.vas-egrn-rcv-in').val() || 0);
+                $row.toggleClass('invalid', !isFinite(qty) || qty < 0 || qty > openQty);
+            });
 
             if (result.invalid) {
                 $error.text(result.message).removeClass('vas-egrn-hidden');
@@ -540,6 +707,8 @@
             if (!$dialog) { return; }
             currentPO = null;
             currentLines = [];
+            rcvPageNo = 1;
+            rcvPageSize = RCV_PAGE_MAX;
             $dialog.addClass('vas-egrn-hidden');
             $('body').removeClass('vas-egrn-body-lock');
         }
@@ -555,6 +724,9 @@
         this.disposeComponent = function () {
             $(document).off('keydown.vas-egrn');
             $('body').removeClass('vas-egrn-body-lock');
+            if (rowResizeObserver) { rowResizeObserver.disconnect(); rowResizeObserver = null; }
+            if (modalResizeObserver) { modalResizeObserver.disconnect(); modalResizeObserver = null; }
+            if (modalFitRaf) { window.cancelAnimationFrame(modalFitRaf); modalFitRaf = null; }
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();
         };

@@ -7,6 +7,7 @@
 
 /* ── Root wrapper ────────────────────────────────────────────────────────── */
 .VAS-glje-root {
+    --on-text-muted: #748494;
     height: 100%;
     width: 100%;
 }
@@ -17,11 +18,11 @@
     flex-direction: column;
     justify-content: space-between;
     height: 100%;
-    padding: 1em;
-    border-radius: 0.875em;
+    padding: 0.85em;
+    border-radius: 14px;
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     position: relative;
     overflow: hidden;
     box-sizing: border-box;
@@ -37,16 +38,17 @@
     outline-offset: 2px;
 }
 
-/* Blue-tint variant — pale info palette from the design system */
+/* design.md: KPI surface stays the shared glass — semantic meaning comes from
+   value text + icon color, NOT a tinted surface. Tint variant is neutralized. */
 .VAS-glje-root .kpi.kpi-blue {
-    background: linear-gradient(145deg, rgba(234, 248, 255, 0.95) 0%, rgba(202, 237, 255, 0.80) 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
 }
 
 /* ── Widget header row ───────────────────────────────────────────────────── */
 .VAS-glje-root .w-head {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.625em;
 }
 
 /* Icon well */
@@ -108,6 +110,7 @@
     color: #102C3F;
     line-height: 1;
     letter-spacing: -0.01em;
+    padding-left: 0.3125em;
 }
 
 /* ── Why section ─────────────────────────────────────────────────────────── */
@@ -134,48 +137,9 @@
     line-height: 1.4;
 }
 
-/* ── Responsive scaling ──────────────────────────────────────────────────── */
-@media screen and (max-width: 1920px) {
-    .vis-editModeWidget .VAS-glje-root .kpi {
-        font-size: 10px;
-    }
-}
-
-@media screen and (max-width: 1366px) {
-    .VAS-glje-root .kpi {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .VAS-glje-root .kpi {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 1024px) {
-    .VAS-glje-root .kpi {
-        font-size: 9px;
-    }
-
-    .vis-editModeWidget .VAS-glje-root .kpi {
-        font-size: 6px;
-    }
-}
-
-@media screen and (max-width: 768px) {
-    .VAS-glje-root .kpi {
-        font-size: 10px;
-    }
-
-    .vis-editModeWidget .VAS-glje-root .kpi {
-        font-size: 7px;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .VAS-glje-root .kpi {
-        font-size: 11px;
-    }
-}
+/* Widget content scales off the widget-root font-size lever (set below), not
+   px breakpoints. The old per-viewport font-size hacks are removed per design.md
+   (Widget Internal Sizing) — one em lever drives every internal value. */
 
 /* RTL support */
 html[dir="rtl"] .VAS-glje-root .w-head {
@@ -266,8 +230,24 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     line-height: 1.2;
 }
 
+/* Description header line — single line, ellipsised; full text on hover (title). */
+.VAS-glje-dialog-desc {
+    margin-top: 0.3em;
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * .0088), 24px);
+    color: #5F7283;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.VAS-glje-dialog-desc:empty {
+    display: none;
+}
+
 .VAS-glje-dialog-sub {
-    margin-top: 0.4em;
+    margin-top: 0.3em;
     font-size: 1.15em;
     color: #5F7283;
     line-height: 1.3;
@@ -364,6 +344,8 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     cursor: pointer;
 }
 
+/* Columns: 1 Journal No · 2 Accounting Schema · 3 Date · 4 Description ·
+   5 Status · 6 Total Debit · 7 Total Credit. Description takes the slack. */
 .VAS-glje-dialog-table th:nth-child(1),
 .VAS-glje-dialog-table td:nth-child(1) {
     width: 11em;
@@ -374,23 +356,35 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     width: 10em;
 }
 
-.VAS-glje-dialog-table th:nth-child(4),
-.VAS-glje-dialog-table td:nth-child(4) {
-    width: 12em;
+.VAS-glje-dialog-table th:nth-child(3),
+.VAS-glje-dialog-table td:nth-child(3) {
+    width: 10em;
 }
 
 .VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(5) {
+    width: 12em;
+}
+
 .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-table td:nth-child(5),
-.VAS-glje-dialog-table td:nth-child(6) {
+.VAS-glje-dialog-table th:nth-child(7),
+.VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(7) {
     width: 11em;
     text-align: right;
 }
 
 .VAS-glje-doc,
-.VAS-glje-date {
+.VAS-glje-date,
+.VAS-glje-schema {
     color: #5F7283;
     font-variant-numeric: tabular-nums;
+}
+
+.VAS-glje-schema {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .VAS-glje-desc {
@@ -398,7 +392,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 }
 
 .VAS-glje-amt {
-    font-weight: 700;
+    font-weight: 400;
     font-variant-numeric: tabular-nums;
 }
 
@@ -464,18 +458,56 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     flex-shrink: 0;
 }
 
-.VAS-glje-dialog-total {
-    color: #718398;
-    font-size: 1.05em;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-
 .VAS-glje-dialog-actions {
     display: inline-flex;
     align-items: center;
     gap: 0.75em;
 }
+
+/* ── Header Export link ──────────────────────────────────────────────────────
+   Export sits in the dialog header as a plain hyperlink, not a button: it is a
+   secondary utility next to the close affordance. The button rules elsewhere in
+   this file still serve the detail dialog's own footer buttons, so this override
+   is scoped to the header and wins on specificity (element + class + ancestor). */
+.VAS-glje-dialog-head a.VAS-glje-export {
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    margin-right: 0.5em;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    color: #0083DA;
+    font-size: 0.8125em;
+    font-weight: 400;
+    /* Underline the LABEL only — an underlined glyph reads as a broken icon. */
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+    .VAS-glje-dialog-head a.VAS-glje-export span {
+        text-decoration: underline;
+        text-underline-offset: 0.15em;
+    }
+
+    /* Vienna icon font glyph (vis-doc-excel) — sized against the link text. */
+    .VAS-glje-dialog-head a.VAS-glje-export .vis {
+        font-size: 1.15em;
+        line-height: 1;
+        text-decoration: none;
+    }
+
+    .VAS-glje-dialog-head a.VAS-glje-export:hover,
+    .VAS-glje-dialog-head a.VAS-glje-export:focus-visible {
+        background: transparent;
+        color: #005FA3;
+    }
 
 .VAS-glje-export,
 .VAS-glje-close-primary {
@@ -743,18 +775,23 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-dialog-table th:nth-child(2),
 .VAS-glje-dialog-table td:nth-child(2) {
-    width: 8em;
+    width: 22em;
 }
 
-.VAS-glje-dialog-table th:nth-child(4),
-.VAS-glje-dialog-table td:nth-child(4) {
+.VAS-glje-dialog-table th:nth-child(3),
+.VAS-glje-dialog-table td:nth-child(3) {
     width: 8em;
 }
 
 .VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-table td:nth-child(5) {
+    width: 8em;
+}
+
 .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-table td:nth-child(5),
-.VAS-glje-dialog-table td:nth-child(6) {
+.VAS-glje-dialog-table th:nth-child(7),
+.VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(7) {
     width: 9.5em;
     text-align: right;
 }
@@ -822,16 +859,6 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     flex-shrink: 0;
 }
 
-.VAS-glje-dialog-total {
-    font-size: 0.8125em;
-    color: #748494;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-    flex: 1 1 auto;
-}
-
 .VAS-glje-dialog-actions {
     display: inline-flex;
     align-items: center;
@@ -893,14 +920,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
         gap: 0.625em;
     }
 
-    .VAS-glje-dialog-total {
-        flex: 1 1 100%;
-        order: 2;
-        text-align: center;
-    }
-
     .VAS-glje-dialog-actions {
-        order: 1;
         margin: 0 auto;
     }
 }
@@ -918,22 +938,28 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     overflow: auto;
 }
 
+/* No scroll on the modal: the detail body + content fill the fixed-height card
+   and clip; the ONLY scroller is the lines table's tbody area below. */
+.VAS-glje-detail-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 .VAS-glje-detail-content {
     display: flex;
     flex-direction: column;
     gap: 1.25em;
-    min-height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
     padding-bottom: 0.25em;
 }
 
+/* Summary block hidden — Journal No / Accounting Book now live in the title. */
 .VAS-glje-detail-summary {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1.15em 1.75em;
-    border: 0.0625em solid #E4EDF4;
-    border-radius: 0.75em;
-    padding: 1.125em 1.25em;
-    background: #FFFFFF;
+    display: none;
 }
 
 .VAS-glje-detail-summary div {
@@ -953,9 +979,8 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-detail-summary > div > strong {
     display: block;
-    margin-top: 0.45em;
     color: #000000;
-    font-size: 0.95em;
+    font-size: 0.8em;
     font-weight: 600;
     line-height: 1.25;
     overflow: hidden;
@@ -985,14 +1010,26 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     grid-column: 1 / -1;
 }
 
+/* The scrolling region — the line rows scroll here under the sticky thead. The
+   Total sits in a separate fixed table below (see .VAS-glje-detail-total-wrap).
+   scrollbar-gutter:stable reserves the vertical scrollbar space at all times so
+   the columns stay aligned with the Total table whether or not the list scrolls. */
 .VAS-glje-detail-lines-wrap {
-    overflow: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: auto;
     background: #FFFFFF;
+    scrollbar-gutter: stable;
 }
 
 .VAS-glje-detail-lines {
     width: 100%;
-    border-collapse: collapse;
+    /* separate (not collapse) so the sticky thead/tfoot cells paint an opaque
+       background — with border-collapse:collapse the scrolling rows bleed
+       through the pinned Total row (Chrome sticky-cell bug). */
+    border-collapse: separate;
+    border-spacing: 0;
     table-layout: fixed;
     font-size: 0.875em;
     min-width: 58em;
@@ -1003,13 +1040,13 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     top: 0;
     z-index: 1;
     background: #FFFFFF;
-    color: #748494;
-    font-size: 0.75em;
-    font-weight: 400;
+    color: #41576A;
+    font-size: 0.6875em;
+    font-weight: 500;
     letter-spacing: 0;
     text-align: left;
     padding: 0.875em 0.75em;
-    border-bottom: 0.0625em solid #E4EDF4;
+    border-bottom: 1px solid #C5D2DD;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1020,19 +1057,42 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     padding: 0.875em 0.75em;
     color: #001D32;
     font-size: 0.75em;
-    border-bottom: 0.0625em solid #EDF2F6;
+    border-bottom: 1px solid #E2EAF1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Null dimension placeholder ("-") is centered; cells with real data stay left. */
+.VAS-glje-detail-lines td.VAS-glje-null {
+    text-align: center;
 }
 
 .VAS-glje-detail-lines tbody tr:hover td {
     background: #F8FBFE;
 }
 
-.VAS-glje-detail-lines tfoot td {
+/* Last body row drops its divider so it doesn't double up with the Total's top border. */
+.VAS-glje-detail-lines tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* Fixed Total row — its own table BELOW the scrolling list (never positioned over
+   the scrolling rows, so it can't bleed). It reuses .VAS-glje-detail-lines for
+   identical column widths; scrollbar-gutter on both wraps reserves the vertical
+   scrollbar space so the two tables' columns line up whether or not the list
+   scrolls. */
+.VAS-glje-detail-total-wrap {
+    flex-shrink: 0;
+    overflow: hidden;
+    scrollbar-gutter: stable;
     background: #F5F8FB;
+    border-top: 1px solid #C5D2DD;
+}
+
+.VAS-glje-detail-total-table td {
     font-weight: 700;
+    background: #F5F8FB;
     border-bottom: 0;
 }
 
@@ -1109,21 +1169,31 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     container-type: inline-size;
 }
 
+/* Widget-root anchor — design.md clamp(16px, 1.2cqi, 20px) expressed on the
+   dashboard-width variable (0.012 ≈ 1.2 % of dashboard width). cqi is NOT usable
+   here because this root sets its own container-type, so cqi would resolve against
+   the narrow widget cell — the codebase anchors on --dash-inline-size instead. */
 .VAS-glje-root .kpi {
-    font-size: clamp(16px, 1.4cqi, 24px);
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
 }
 
+/* Title — Roboto Regular 400, clamp ceiling 17px (design.md Widget Header) */
 .VAS-glje-root .w-title {
-    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
+    font-family: 'Roboto', sans-serif;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
+    line-height: 1.2;
     letter-spacing: 0;
     color: #102C3F;
 }
 
+/* KPI value — design.md 1.75em Roboto SemiBold 600, line-height 1.05.
+   Semantic accent is carried by the value/label color, not the surface. */
 .VAS-glje-root .kpi-value {
-    font-size: 1.375em;
-    font-weight: 700;
-    letter-spacing: -0.025em;
+    font-size: 1.75em;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.01em;
 }
 
 .VAS-glje-root .kpi-why-text {
@@ -1134,7 +1204,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 /* Design-system color alignment */
 .VAS-glje-root .kpi,
 .VAS-glje-root .kpi.kpi-blue {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.70), rgba(255, 255, 255, 0.49));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
     border: 2px solid #FFFFFF;
     box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
 }
@@ -1144,10 +1214,22 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     color: #102C3F;
 }
 
+/* Glass icon well + glyph — scale on --dash-inline-size (design.md Widget Header).
+   Accent (#0083DA) stays as the glyph color; surface is neutral glass. */
 .VAS-glje-root .w-icon {
-    background: #FBFDFF;
-    border: 1px solid #E4EDF4;
+    width: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    height: clamp(32px, calc(var(--dash-inline-size, 100vw) * 0.022750), 40px);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 244, 255, 0.96));
+    box-shadow: inset 0 0 0 1px rgba(31, 131, 255, 0.10);
+    border: 0;
     color: #0083DA;
+}
+
+.VAS-glje-root .w-icon svg {
+    width: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    height: clamp(18px, calc(var(--dash-inline-size, 100vw) * 0.012500), 22px);
+    stroke: currentColor;
 }
 
 .VAS-glje-root .kpi-why-label,
@@ -1391,13 +1473,19 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     white-space: nowrap;
 }
 
-/* Detail popup: pager compact, close to table */
+/* Detail popup: pager compact, close to table. Pager + created strip are fixed
+   below the scrolling tbody area (they must not scroll). */
 .VAS-glje-detail-content .VAS-glje-line-pager {
-    margin-top: calc(-1.25em);
+    flex-shrink: 0;
+    margin-top: 0;
     position: relative;
     z-index: 1;
-    padding: 0.3em 0.625em;
+    padding: 0.3em 0em;
     margin-bottom: 0;
+}
+
+.VAS-glje-detail-content .VAS-glje-created-strip {
+    flex-shrink: 0;
 }
 
 /* Unified GL Journal list table design */
@@ -1422,33 +1510,41 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     table-layout: fixed;
 }
 
+/* Grid rail header (design.md Grid Data Widget > Header Row): capitalize,
+   Roboto Medium 500, #41576A, header divider #C5D2DD (darker than body rows).
+   Keeps an opaque bg because the header is sticky over a scrollable table. */
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table thead th {
     position: sticky;
     top: 0;
     z-index: 1;
     background: #FFFFFF;
-    border-bottom: 0.0625em solid #EDF2F6;
-    color: #748494;
-    font-size: 0.75em;
-    font-weight: 400;
+    border-bottom: 1px solid #C5D2DD;
+    color: #41576A;
+    font-size: 0.6875em;
+    font-weight: 500;
     letter-spacing: 0;
-    padding: 1em 0.75em;
+    padding: 0.85em 0.75em;
     text-align: left;
     white-space: nowrap;
     text-transform: capitalize;
 }
 
+/* Body rows — divider #E2EAF1 (design.md Row And Header Separators) */
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table tbody td {
-    border-bottom: 0.0625em solid #EDF2F6;
+    border-bottom: 1px solid #E2EAF1;
     color: #102C3F;
     font-size: 0.75em;
-    padding: 1em 0.75em;
+    padding: 0.85em 0.75em;
 }
 
-.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(5),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(5),
-.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6) {
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table th:nth-child(7),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-table td:nth-child(7) {
     text-align: right;
 }
 
@@ -1532,7 +1628,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-dialog-body:not(.VAS-glje-detail-body) .VAS-glje-dialog-pager {
     margin: 0;
-    padding: 1.35em 0.625em 1em;
+    padding: 0.75em 0em;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
@@ -1572,10 +1668,10 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 /* Table amount columns only */
 .VAS-glje-dialog-table .VAS-glje-amt,
 .VAS-glje-detail-lines .VAS-glje-amt,
-.VAS-glje-dialog-table th:nth-child(5),
 .VAS-glje-dialog-table th:nth-child(6),
-.VAS-glje-dialog-table td:nth-child(5),
+.VAS-glje-dialog-table th:nth-child(7),
 .VAS-glje-dialog-table td:nth-child(6),
+.VAS-glje-dialog-table td:nth-child(7),
 .VAS-glje-detail-lines th:nth-child(2),
 .VAS-glje-detail-lines th:nth-child(3),
 .VAS-glje-detail-lines td:nth-child(2),
@@ -1594,7 +1690,7 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
     flex-shrink: 0;
     margin: 8px 0 0;
     padding: 8px 10px 0;
-    border-top: 1px solid #EDF2F6;
+    /*border-top: 1px solid #EDF2F6;*/
     background: transparent;
     box-sizing: border-box;
 }
@@ -1634,11 +1730,150 @@ html[dir="rtl"] .VAS-glje-root .kpi-why {
 
 .VAS-glje-line-pager .VAS-glje-page-text,
 .VAS-glje-dialog-pager .VAS-glje-page-text {
-    min-width: 52px;
-    text-align: center;
-    color: #102C3F;
-    font-size: 0.85rem;
+    min-width: 116px;
+    margin-right: auto;
+    text-align: left;
+    font-size: 11.5px;
+    font-family: 'Roboto Mono', monospace;
+    color: var(--on-text-muted);
+    letter-spacing: 0.02em;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+.VAS-glje-line-pager .VAS-glje-page-count,
+.VAS-glje-dialog-pager .VAS-glje-page-count {
+    min-width: 48px;
+    text-align: center;
+    font-size: 11.5px;
+    font-family: 'Roboto Mono', monospace;
+    color: var(--on-text-muted);
+    letter-spacing: 0.02em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Popup spacing normalized to VAS_044_GLJournalRecentWidget (reference popup)
+   ========================================================================== */
+
+/* Overlay + card box */
+.VAS-glje-dialog,
+.VAS-glje-detail-dialog {
+    padding: 1.25em;
+}
+
+.VAS-glje-dialog-card,
+.VAS-glje-detail-card {
+    width: min(62em, 100%);
+    height: min(34em, 100%);
+    border-radius: 1em;
+}
+
+/* Header */
+.VAS-glje-dialog-head,
+.VAS-glje-detail-head {
+    gap: 0.75em;
+    padding: 1em 1em 1em 1.125em;
+    margin-bottom: 0;
+}
+
+/* Body + content stack */
+.VAS-glje-dialog-body,
+.VAS-glje-detail-body {
+    padding: 0 1.125em;
+}
+
+.VAS-glje-detail-content {
+    gap: 0.375em;
+    padding-bottom: 0.25em;
+}
+
+/* Summary block */
+.VAS-glje-detail-summary {
+    gap: 0.6em;
+    padding: 1.125em 1.25em;
+    border-radius: 0.75em;
+}
+
+/* Line table cells */
+.VAS-glje-detail-lines th,
+.VAS-glje-detail-lines td {
+    padding: 0.875em 0.75em;
+}
+
+/* Created-by strip */
+.VAS-glje-created-strip {
+    gap: 0.8em;
+    padding: 0.9em 1.125em;
+    border-radius: 0.75em;
+}
+
+/* Footer */
+.VAS-glje-dialog-footer,
+.VAS-glje-detail-footer {
+    gap: 1em;
+    padding: 0.75em 1.125em;
+}
+
+.VAS-glje-dialog-actions,
+.VAS-glje-detail-actions {
+    gap: 0.5em;
+}
+
+/* ==========================================================================
+   Summary block above the table uses the same type as the table below:
+   label = table header cell, value = table body cell.
+   ========================================================================== */
+
+.VAS-glje-detail-summary > div > span,
+.VAS-glje-created-strip > div > span,
+.VAS-glje-detail-section-title {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #748494;
+    letter-spacing: 0;
+    line-height: 1.3;
+    text-transform: none;
+}
+
+.VAS-glje-detail-summary > div > strong,
+.VAS-glje-created-strip strong {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #102C3F;
+    letter-spacing: 0;
+    line-height: 1.3;
+    margin-top: 4px;
+}
+
+/* ── List-dialog footer band (design.md widget footer pager) ─────────────────
+   "Showing x-y of N" on the left, the compact pager on the right, on a tinted
+   band. Scoped away from the shared detail dialog (.VAS-glje-detail-dialog),
+   whose footer still holds Download / Post journal / Close buttons and must
+   keep them grouped at the trailing edge. Appended last so it wins over the
+   earlier .VAS-glje-dialog-footer / -actions declarations in this file. */
+.VAS-glje-dialog:not(.VAS-glje-detail-dialog) .VAS-glje-dialog-footer {
+    justify-content: space-between;
+    background: #F4F9FD;
+    border-top: 1px solid #E6EEF5;
+    padding: 0.75em 1.5em;
+}
+
+.VAS-glje-dialog:not(.VAS-glje-detail-dialog) .VAS-glje-dialog-actions {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.VAS-glje-dialog:not(.VAS-glje-detail-dialog) .VAS-glje-dialog-pager {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
 }

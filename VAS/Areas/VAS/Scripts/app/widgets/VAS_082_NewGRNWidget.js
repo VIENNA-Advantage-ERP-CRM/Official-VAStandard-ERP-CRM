@@ -30,6 +30,7 @@
  * 19  | Enter received quantity for at least one line.   | VAS_082_ReceivedQtyRequired
  * 20  | Received quantity cannot be greater than open... | VAS_082_ReceivedQtyTooHigh
  * 21  | GRN could not be created.                        | VAS_082_GRNCouldNotBeCreated
+ * 22  | Unable to open the GRN window.                   | VAS_082_CouldntOpenWindow
  */
 ; VAS = window.VAS || {};
 
@@ -68,8 +69,9 @@
         var purchaseOrdersById = {};
         var currentPO = null;
         var currentLines = [];
+        var grnWindowId = 0;
         var pageNo = 1;
-        var pageSize = 20;
+        var pageSize = 8;
         var totalPages = 0;
         var loading = false;
 
@@ -123,7 +125,154 @@
         this.Initalize = function () {
             createWidget();
             createDialog();
+            loadGrnWindowId(null);
         };
+
+        // Review #17: clicking New GRN navigates straight to the Material Receipt
+        // (GRN) window - no modal is opened.
+        function loadGrnWindowId(onReady) {
+            $.ajax({
+                url: VIS.Application.contextUrl + 'VAS_082_NewGRNWidget/GetGrnWindowId',
+                type: 'GET',
+                cache: false,
+                success: function (response) {
+                    var result = parseResponse(response);
+                    grnWindowId = Number((result && result.windowId) || 0);
+                    if (onReady) { onReady(grnWindowId); }
+                },
+                error: function () {
+                    if (onReady) { onReady(0); }
+                }
+            });
+        }
+
+        /* The GRN window must open on a NEW record and must never be duplicated.
+           viewManager.startWindow only reuses windows in its closed-window cache;
+           an already-OPEN window gets a second instance on every click. So:
+           - if the GRN window this widget opened is still open, bring that SAME
+             window to the front and start another new record in it (cmd_new);
+           - otherwise open it once with a "new record" query so the CORE itself
+             auto-starts the blank record when the tab loads (buildNewRecordQuery).
+           The opened-window reference is kept on a WINDOW-GLOBAL (keyed by window
+           id), not on widget-instance state, so it survives the dashboard
+           re-creating the widget - otherwise the reference resets and a new window
+           opens every time. */
+        var GRN_VIEW_STORE = '__vasGrnViews';
+
+        function rememberGrnView(windowId, view) {
+            if (!window[GRN_VIEW_STORE]) { window[GRN_VIEW_STORE] = {}; }
+            window[GRN_VIEW_STORE][windowId] = view || null;
+        }
+
+        function recallGrnView(windowId) {
+            return window[GRN_VIEW_STORE] ? window[GRN_VIEW_STORE][windowId] : null;
+        }
+
+        function startNewRecordIn(view) {
+            try {
+                if (view && view.cPanel && view.cPanel.cmd_new) {
+                    view.cPanel.cmd_new(false);
+                    return true;
+                }
+            } catch (e) { /* window still open; user can press New */ }
+            return false;
+        }
+
+        // The taskbar LI carries the view id and is removed on close, so its
+        // presence in the DOM means that window is still open.
+        function isViewStillOpen(view) {
+            if (!view || !view.getId) { return false; }
+            var li = document.getElementById(String(view.getId()));
+            return !!(li && li.tagName === 'LI');
+        }
+
+        function focusView(view) {
+            var viewId = view.getId();
+            var li = document.getElementById(String(viewId));
+            if (li && $(li).hasClass('vis-app-f-selected')) { return; }
+            if (VIS.desktopMgr && VIS.desktopMgr.toggleContainer) {
+                VIS.desktopMgr.toggleContainer(viewId);
+            }
+            if (VIS.desktopMgr && VIS.desktopMgr.activateTaskBarItemUsingID) {
+                VIS.desktopMgr.activateTaskBarItemUsingID({ data: function () { return viewId; } });
+            }
+        }
+
+        /* Core-native "open on new record": a query flagged as a new-record query
+           loads no rows ("2=3"), and GridController.queryCompleted ->
+           checkInsertNewRow() then auto-starts a blank record (dataNew) as soon
+           as the tab finishes loading. No onLoad/cmd_new timing needed - this is
+           the same path the core itself uses for zoom-to-new-record. */
+        function buildNewRecordQuery() {
+            var query = null;
+            try {
+                query = new VIS.Query("M_InOut");
+                query.addRestriction(VIS.Query.prototype.NEWRECORD); // "2=3" -> loads no rows
+                // addRestriction only auto-flags against the static VIS.Query.NEWRECORD,
+                // which this core never assigns (only the prototype constant exists),
+                // so set the flag checkInsertNewRow() reads directly.
+                query.newRecord = true;
+                if (query.setRecordCount) { query.setRecordCount(0); }
+            } catch (e) { query = null; }
+            return query;
+        }
+
+        function startWindowById(windowId) {
+            // Reuse the window we already opened, if it is still open: focus it
+            // and start a new record in it - no second window.
+            var existing = recallGrnView(windowId);
+            if (existing && isViewStillOpen(existing)) {
+                try {
+                    focusView(existing);
+                    startNewRecordIn(existing);
+                    return;
+                } catch (e) { /* fall through and open it again */ }
+            }
+
+            var newRecordQuery = buildNewRecordQuery();
+
+            var view = null;
+            if (VIS.viewManager && VIS.viewManager.startWindow) {
+                view = VIS.viewManager.startWindow(windowId, newRecordQuery);
+            }
+            else if (VIS.AEnv && VIS.AEnv.startWindow) {
+                view = VIS.AEnv.startWindow(windowId, newRecordQuery);
+            }
+
+            rememberGrnView(windowId, view);
+        }
+
+        // Open the widget's configured window (the Material Receipt / GRN window)
+        // directly on a NEW record through the widget framework's value-changed
+        // channel. The host reuses the same window and starts a blank record
+        // (IsTabInNewMode) - no duplicate window is opened.
+        function openGrnNewRecord() {
+            var windowParam = {
+                "IsTabInNewMode": "true",
+                "TabIndex": "0"
+            };
+            $self.widgetFirevalueChanged(windowParam);
+        }
+
+        function openGrnWindow() {
+            if (grnWindowId > 0) {
+                startWindowById(grnWindowId);
+                return;
+            }
+            loadGrnWindowId(function (windowId) {
+                if (windowId > 0) {
+                    startWindowById(windowId);
+                }
+                else {
+                    VIS.ADialog.error(
+                        'VAS_082_CouldntOpenWindow',
+                        true,
+                        '',
+                        lbl('VAS_082_CouldntOpenWindow', 'Unable to open the GRN window.')
+                    );
+                }
+            });
+        }
 
         function createWidget() {
             var $card = $(
@@ -140,7 +289,10 @@
                 '</button>'
             );
 
-            $card.on('click', function () { openDialog(); });
+            // Open the GRN window on a NEW record via the widget framework's
+            // value-changed channel (IsTabInNewMode), reusing the same window
+            // instead of opening a duplicate each click.
+            $card.on('click', function () { openGrnNewRecord(); });
             $root.append($card);
         }
 
@@ -191,6 +343,7 @@
             $(document).on('keydown.vas-ngrn', function (e) {
                 if (e.key === 'Escape' && !$dialog.hasClass('vas-ngrn-hidden')) { closeDialog(); }
             });
+            $(window).on('resize.vas-ngrn', syncPOPageSize);
 
             $('body').append($dialog);
         }
@@ -218,6 +371,35 @@
             $dialogTitle.text(lbl("VAS_082_NewGRN", "New GRN"));
             setBadge("", "");
             renderPOList();
+        }
+
+        function measurePOPageSize() {
+            if (!$dialog || $dialog.hasClass('vas-ngrn-hidden') || currentPO) { return pageSize; }
+
+            var $list = $dialogBody.find('.vas-ngrn-po-list');
+            if (!$list.length) { return pageSize; }
+
+            var available = Math.floor($dialogBody.innerHeight());
+            available -= Math.ceil($dialogBody.find('.vas-ngrn-step-hint:first').outerHeight(true) || 0);
+            available -= Math.ceil($dialogBody.find('.vas-ngrn-pager:first').outerHeight(true) || 0);
+            available -= 12;
+
+            var $sample = $list.find('.vas-ngrn-po-row:first');
+            var rowHeight = $sample.length ? Math.ceil($sample.outerHeight(true)) : 56;
+            if (rowHeight <= 0) { rowHeight = 56; }
+
+            return Math.max(3, Math.floor(available / rowHeight));
+        }
+
+        function syncPOPageSize() {
+            if (loading || currentPO) { return; }
+
+            var nextPageSize = measurePOPageSize();
+            if (nextPageSize === pageSize) { return; }
+
+            var firstRecord = ((pageNo - 1) * pageSize) + 1;
+            pageSize = nextPageSize;
+            loadPOs(Math.max(1, Math.ceil(firstRecord / pageSize)));
         }
 
         function loadPOs(targetPage) {
@@ -300,6 +482,7 @@
                 '<div class="vas-ngrn-po-list">' + rows + '</div>' +
                 paging
             );
+            window.setTimeout(syncPOPageSize, 0);
         }
 
         function selectPO(poId) {
@@ -506,6 +689,7 @@
 
         this.disposeComponent = function () {
             $(document).off('keydown.vas-ngrn');
+            $(window).off('resize.vas-ngrn');
             $('body').removeClass('vas-ngrn-body-lock');
             if ($dialog) { $dialog.remove(); $dialog = null; }
             $root.remove();

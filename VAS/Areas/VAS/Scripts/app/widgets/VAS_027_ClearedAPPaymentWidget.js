@@ -7,17 +7,18 @@
  *  #  | Current Text                                      | Message Key
  * ----+---------------------------------------------------+------------------------------
  *  1  | Unreconciled                                      | VAS_027_messageCleared
+ *  1b | All-time Payments not yet reconciled              | VAS_027_messageAllTimeNotReconciled
  *  2  | Of last month                                     | VAS_027_messageAPPaymentClearedWhy
  *  3  | No Data                                           | VAS_027_messageNoData
  *  4  | payments                                          | VAS_027_messagePayments
  *  5  | awaiting bank match                               | VAS_027_messageAwaitingBankMatch
  *  6  | days                                              | VAS_027_messageDays
- *  7  | No unreconciled payments                          | VAS_027_messageNoUnreconciledPayments
+ *  7  | No unreconciled payments                          | VAS_027_NoUnreconciledPayments
  *  8  | Showing                                           | VAS_Showing
  *  9  | of                                                | VAS_Of
- * 10  | Unreconciled payments                             | VAS_027_messageUnreconciledPayments
- * 11  | Auto-match process is not configured              | VAS_027_messageAutoMatchProcessNotConfigured
- * 12  | Payment reconciliation window is not configured    | VAS_027_messageReconciliationWindowNotConfigured
+ * 10  | Unreconciled payments                             | VAS_027_UnreconciledPayments
+ * 11  | Auto-match process is not configured              | VAS_027_AutoMatchProcessNotConfigured
+ * 12  | Payment reconciliation window is not configured    | VAS_027_ReconciliationWindowNotConfigured
  * 13  | Could not open action                             | VAS_ErrorLoading
  * 14  | Unreconciled (summary label)                      | VAS_027_messageUnreconciled
  * 15  | Amount (summary label)                            | VAS_027_messageAmount
@@ -58,6 +59,7 @@
         var $state = null;
 
         var $dialog = null;
+        var $dialogBody = null;
         var $dialogTbody = null;
         var $dialogBusy = null;
         var $dialogSubtitle = null;
@@ -81,6 +83,19 @@
         var totalPages = 0;
         var totalRecords = 0;
 
+        /*
+         * The dialog body is a flex scroll area, so the number of rows that
+         * fit follows the popup's rendered height instead of a fixed page
+         * size. The row height is measured from a real row when one exists
+         * and falls back to this estimate while the table is still empty.
+         */
+        var dialogResizeObserver = null;
+        var adaptiveResizeHandler = null;
+        var adaptiveResizeFrame = null;
+        var dialogRowHeightEstimate = 44;
+        var dialogMinimumRows = 3;
+        var adaptiveAdjustCount = 0;
+
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
 
@@ -101,6 +116,38 @@
             catch (error) {
                 return null;
             }
+        }
+
+        function getResponseMessage(
+            data,
+            fallback
+        ) {
+            var key;
+
+            if (!data) {
+                return fallback;
+            }
+
+            key =
+                data.errorKey ||
+                data.messageKey;
+
+            if (key) {
+                return lbl(
+                    key,
+                    data.errorText ||
+                    data.error ||
+                    data.message ||
+                    fallback
+                );
+            }
+
+            return (
+                data.errorText ||
+                data.error ||
+                data.message ||
+                fallback
+            );
         }
 
         function normalizePrecision(value) {
@@ -136,24 +183,56 @@
         }
 
         function formatPercent(
-            value,
-            precision
+            value
         ) {
-            var stdPrecision =
-                normalizePrecision(precision);
-
             return Number(
                 value || 0
             ).toLocaleString(
                 window.navigator.language,
                 {
                     minimumFractionDigits:
-                        stdPrecision,
+                        2,
 
                     maximumFractionDigits:
-                        stdPrecision
+                        2
                 }
             ) + '%';
+        }
+
+        /*
+         * Amounts shown in the dialog header are rounded to whole
+         * numbers and the currency symbol is printed without the
+         * trailing separator that comes from the currency setup,
+         * for example ID12,000. Table cells keep the exact amount.
+         */
+        function formatHeaderAmount(
+            value,
+            symbol
+        ) {
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign =
+                numericValue < 0 ? '-' : '';
+
+            var numberText = Math.abs(
+                numericValue
+            ).toLocaleString(
+                window.navigator.language,
+                {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }
+            );
+
+            var cleanSymbol = String(
+                symbol || ''
+            ).replace(/[\s-]+$/, '');
+
+            return sign + cleanSymbol + numberText;
         }
 
         function formatExactAmount(
@@ -164,8 +243,17 @@
             var stdPrecision =
                 normalizePrecision(precision);
 
-            var numberText = Number(
-                value || 0
+            var numericValue = Number(value || 0);
+
+            if (isNaN(numericValue)) {
+                numericValue = 0;
+            }
+
+            var sign =
+                numericValue < 0 ? '-' : '';
+
+            var numberText = Math.abs(
+                numericValue
             ).toLocaleString(
                 window.navigator.language,
                 {
@@ -177,7 +265,7 @@
                 }
             );
 
-            return (
+            return sign + (
                 symbol ? symbol : ''
             ) + numberText;
         }
@@ -390,20 +478,31 @@
                 )
             );
 
-            var $arrow = $(
-                '<span class="vas-finance-kpi-arrow" aria-hidden="true">' +
-                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M9 18l6-6-6-6"></path>' +
-                '</svg>' +
-                '</span>'
+            var $sub = $(
+                '<div class="vas-finance-kpi-sub">'
+            ).text(
+                lbl(
+                    'VAS_027_messageAllTimeNotReconciled',
+                    'All-time Payments not yet reconciled'
+                )
             );
+
+            /* The title and its subtitle stack in a box of their own so the
+               icon stays centred against the pair rather than against the
+               title alone -- the header is a centred flex row. */
+            var $headerText = $(
+                '<div class="vas-finance-kpi-header-text">'
+            );
+
+            $headerText
+                .append($title)
+                .append($sub);
 
             $iconBox.append($icon);
 
             $header
                 .append($iconBox)
-                .append($title)
-                .append($arrow);
+                .append($headerText);
 
             $body = $(
                 '<div class="vas-finance-kpi-body">'
@@ -505,12 +604,13 @@
                     ) {
                         showState(
                             true,
-                            data && data.errorText
-                                ? data.errorText
-                                : lbl(
+                            getResponseMessage(
+                                data,
+                                lbl(
                                     'VAS_ErrorLoading',
                                     'Could not load data'
                                 )
+                            )
                         );
 
                         return;
@@ -592,6 +692,180 @@
             );
         }
 
+        function measureDialogRowHeight() {
+            var $row = $dialogTbody
+                ? $dialogTbody
+                    .find('tr')
+                    .not(':has(.vas-cpa-dialog-empty)')
+                    .first()
+                : null;
+
+            var measured =
+                $row && $row.length
+                    ? $row.outerHeight()
+                    : 0;
+
+            return measured > 0
+                ? measured
+                : dialogRowHeightEstimate;
+        }
+
+        function updateAdaptivePageSize() {
+            if (
+                isDisposed ||
+                !$dialogBody ||
+                !$dialogBody[0] ||
+                !$dialogTbody ||
+                !$dialogTbody[0] ||
+                !$dialog ||
+                !$dialog.is(':visible')
+            ) {
+                return;
+            }
+
+            var container = $dialogBody[0];
+
+            if (container.clientHeight <= 0) {
+                return;
+            }
+
+            /*
+             * Whatever sits above the first row inside the scroll area - the
+             * table header, padding, any summary strip - is measured from the
+             * tbody's own position rather than assumed, so the row space left
+             * over is exact.
+             */
+            var headerOffset =
+                (
+                    $dialogTbody[0].getBoundingClientRect().top -
+                    container.getBoundingClientRect().top
+                ) + container.scrollTop;
+
+            var availableHeight = Math.max(
+                0,
+                container.clientHeight - headerOffset
+            );
+
+            var rowHeight = measureDialogRowHeight();
+
+            if (rowHeight <= 0) {
+                return;
+            }
+
+            var nextPageSize = Math.max(
+                dialogMinimumRows,
+                Math.floor(availableHeight / rowHeight)
+            );
+
+            if (nextPageSize === pageSize) {
+                adaptiveAdjustCount = 0;
+                return;
+            }
+
+            /*
+             * Each render re-checks the fit, so cap the corrections to stop a
+             * layout that never settles from looping.
+             */
+            if (adaptiveAdjustCount >= 4) {
+                return;
+            }
+
+            if (rowsLoading) {
+                return;
+            }
+
+            adaptiveAdjustCount++;
+
+            // Keep the record the user is looking at on screen.
+            var firstVisibleRecord =
+                ((pageNo - 1) * pageSize) + 1;
+
+            pageSize = nextPageSize;
+
+            pageNo = Math.max(
+                1,
+                Math.ceil(firstVisibleRecord / pageSize)
+            );
+
+            loadRows();
+        }
+
+        function setupAdaptivePagination() {
+            if (!$dialogBody || !$dialogBody[0]) {
+                return;
+            }
+
+            updateAdaptivePageSize();
+
+            window.setTimeout(function () {
+                updateAdaptivePageSize();
+            }, 0);
+
+              if (
+                  window.ResizeObserver &&
+                  !dialogResizeObserver
+              ) {
+                dialogResizeObserver = new ResizeObserver(
+                    function () {
+                        updateAdaptivePageSize();
+                    }
+                );
+
+                dialogResizeObserver.observe($dialogBody[0]);
+
+                /*
+                 * The scroll area keeps a fixed height, so only the row
+                 * container changes size when rows arrive. Watching it is
+                 * what corrects the estimate the first pass had to use.
+                 */
+                if ($dialogTbody && $dialogTbody[0]) {
+                      dialogResizeObserver.observe($dialogTbody[0]);
+                  }
+              }
+
+              if (!adaptiveResizeHandler) {
+                  adaptiveResizeHandler = function () {
+                      if (adaptiveResizeFrame !== null) {
+                          return;
+                      }
+
+                      adaptiveResizeFrame = window.requestAnimationFrame(function () {
+                          adaptiveResizeFrame = null;
+                          adaptiveAdjustCount = 0;
+                          updateAdaptivePageSize();
+                      });
+                  };
+
+                  window.addEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.addEventListener('resize', adaptiveResizeHandler);
+                  }
+              }
+          }
+
+          function teardownAdaptivePagination() {
+            if (dialogResizeObserver) {
+                  dialogResizeObserver.disconnect();
+                  dialogResizeObserver = null;
+              }
+
+              if (adaptiveResizeHandler) {
+                  window.removeEventListener('resize', adaptiveResizeHandler);
+
+                  if (window.visualViewport) {
+                      window.visualViewport.removeEventListener('resize', adaptiveResizeHandler);
+                  }
+
+                  adaptiveResizeHandler = null;
+              }
+
+              if (adaptiveResizeFrame !== null) {
+                  window.cancelAnimationFrame(adaptiveResizeFrame);
+                  adaptiveResizeFrame = null;
+              }
+          }
+
         function loadRows() {
             if (
                 isDisposed ||
@@ -634,12 +908,13 @@
                         data.error
                     ) {
                         renderErrorRow(
-                            data && data.errorText
-                                ? data.errorText
-                                : lbl(
+                            getResponseMessage(
+                                data,
+                                lbl(
                                     'VAS_ErrorLoading',
                                     'Could not load data'
                                 )
+                            )
                         );
 
                         return;
@@ -670,6 +945,7 @@
                         rowsLoading = false;
 
                         showDialogBusy(false);
+                        updateAdaptivePageSize();
                         updatePagerButtons();
                     }
                 }
@@ -732,20 +1008,14 @@
         }
 
         function renderSummary(data) {
-            var stdPrecision =
-                normalizePrecision(
-                    data.stdPrecision
-                );
-
             var symbol =
                 data.curSymbol ||
                 data.currencyIso ||
                 '';
 
             var totalAmountText =
-                formatExactAmount(
+                formatHeaderAmount(
                     data.totalAmount,
-                    stdPrecision,
                     symbol
                 );
 
@@ -810,10 +1080,10 @@
                 $dialogTbody.html(
                     '<tr>' +
                     '<td class="vas-cpa-dialog-empty" ' +
-                    'colspan="8">' +
+                    'colspan="7">' +
                     escapeHtml(
                         lbl(
-                            'VAS_027_messageNoUnreconciledPayments',
+                            'VAS_027_NoUnreconciledPayments',
                             'No unreconciled payments'
                         )
                     ) +
@@ -916,6 +1186,8 @@
                     );
                 }
             );
+        
+            updateAdaptivePageSize();
         }
 
         function updatePager() {
@@ -964,17 +1236,19 @@
                     : ''
             );
 
+            /* The indicator always reads, down to "1 of 1" on an empty or
+               single-page list: blanking it left the two arrows framing a gap,
+               which looks like a pager that failed to load rather than one
+               with nowhere to go. Being disabled is what says that. */
             $pagerText.text(
-                totalPages > 0
-                    ? pageNo +
-                    ' ' +
-                    lbl(
-                        'VAS_Of',
-                        'of'
-                    ) +
-                    ' ' +
-                    totalPages
-                    : ''
+                pageNo +
+                ' ' +
+                lbl(
+                    'VAS_Of',
+                    'of'
+                ) +
+                ' ' +
+                Math.max(1, totalPages)
             );
 
             updatePagerButtons();
@@ -1006,6 +1280,8 @@
                 'vas-cpa-body-lock'
             );
 
+            setupAdaptivePagination();
+
             if (!rowsLoaded) {
                 pageNo = 1;
                 loadRows();
@@ -1016,6 +1292,8 @@
             if (!$dialog) {
                 return;
             }
+
+            teardownAdaptivePagination();
 
             $dialog.hide();
 
@@ -1069,7 +1347,7 @@
                 '<div class="vas-cpa-dialog-title">' +
                 escapeHtml(
                     lbl(
-                        'VAS_027_messageUnreconciledPayments',
+                        'VAS_027_UnreconciledPayments',
                         'Unreconciled payments'
                     )
                 ) +
@@ -1194,6 +1472,10 @@
                 '</div>'
             );
 
+            $dialogBody = $dialog.find(
+                '.vas-cpa-dialog-body'
+            );
+
             $dialogTbody = $dialog.find(
                 '.vas-cpa-dialog-tbody'
             );
@@ -1290,7 +1572,7 @@
                     if (!started) {
                         showActionError(
                             lbl(
-                                'VAS_027_messageAutoMatchProcessNotConfigured',
+                                'VAS_027_AutoMatchProcessNotConfigured',
                                 'Auto-match process is not configured'
                             )
                         );
@@ -1312,7 +1594,7 @@
                     if (!started) {
                         showActionError(
                             lbl(
-                                'VAS_027_messageReconciliationWindowNotConfigured',
+                                'VAS_027_ReconciliationWindowNotConfigured',
                                 'Payment reconciliation window is not configured'
                             )
                         );
@@ -1381,6 +1663,8 @@
                 'vas-cpa-body-lock'
             );
 
+            teardownAdaptivePagination();
+
             if ($dialog) {
                 $dialog.remove();
             }
@@ -1394,6 +1678,7 @@
             $busy = null;
             $state = null;
             $dialog = null;
+            $dialogBody = null;
             $dialogTbody = null;
             $dialogBusy = null;
         };

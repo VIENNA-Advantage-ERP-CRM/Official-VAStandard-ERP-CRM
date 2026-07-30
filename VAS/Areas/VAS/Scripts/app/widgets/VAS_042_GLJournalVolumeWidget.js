@@ -23,6 +23,25 @@
 
 ; (function (VAS, $) {
 
+    /* Creates a single document-level ResizeObserver on the dashboard container
+       and mirrors its width into the global CSS var --dash-inline-size (px), so
+       the widget's clamp() sizing tracks the dashboard width, not the viewport. */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     // ─── Messages & Labels used in this file ───────────────────────────────────
     // Messages : VIS_NoData, VIS_Error
     // Labels   : VAS_042_JournalVolumeByDay, VAS_042_CountVsValue,
@@ -200,7 +219,6 @@
             createBusyIndicator();
             showBusy(true);
             loadData();
-            setInterval(function () { $self.refreshWidget(); }, 1000 * 60 * 5);
         };
 
         function createBusyIndicator() {
@@ -232,11 +250,19 @@
                 // ── Header ────────────────────────────────────────────────────
                 + '<div class="w-head">'
                 +   '<div class="VAS-gljv-icon">' + barIcon + '</div>'
-                +   '<div class="w-title">' + lbl('VAS_042_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
+                +   '<div class="VAS-gljv-title-wrap">'
+                +     '<div class="w-title">' + lbl('VAS_042_JournalVolumeByDay', 'Journal Volume by Day') + '</div>'
+                +     '<div class="VAS-gljv-subtitle">' + lbl('VAS_042_PrimaryBookSubtitle', 'Showing data from Primary Accounting Book') + '</div>'
+                +   '</div>'
                 +   '<span class="VAS-gljv-sub" id="VAS-gljv-sub-' + id + '">—</span>'
-                +   '<button class="VAS-gljv-toggle" id="VAS-gljv-toggle-' + id + '">'
-                +     lbl('VAS_042_Month', 'Month') + ' ▾'
-                +   '</button>'
+                +   '<div class="VAS-gljv-period-group" role="group" aria-label="Period">'
+                +     '<button type="button" class="VAS-gljv-period-btn" data-period="week">'
+                +       lbl('VAS_042_Week', 'Week')
+                +     '</button>'
+                +     '<button type="button" class="VAS-gljv-period-btn is-active" data-period="month">'
+                +       lbl('VAS_042_Month', 'Month')
+                +     '</button>'
+                +   '</div>'
                 + '</div>'
 
                 // ── Chart area ────────────────────────────────────────────────
@@ -266,13 +292,16 @@
 
             $root.append(html);
 
-            // Period toggle
-            $root.find('#VAS-gljv-toggle-' + id).on('click', function () {
-                activePeriod = (activePeriod === 'month') ? 'week' : 'month';
-                $(this).text(
-                    lbl(activePeriod === 'month' ? 'VAS_042_Month' : 'VAS_042_Week',
-                        activePeriod === 'month' ? 'Month' : 'Week') + ' ▾'
-                );
+            $root.on('click', '.VAS-gljv-period-btn', function () {
+                var nextPeriod = String($(this).data('period') || 'month');
+
+                if (nextPeriod === activePeriod) {
+                    return;
+                }
+
+                activePeriod = nextPeriod;
+                $root.find('.VAS-gljv-period-btn').removeClass('is-active');
+                $(this).addClass('is-active');
                 showBusy(true);
                 loadData();
             });
@@ -339,6 +368,8 @@
         this.windowNo            = windowNo;
         this.Initalize();
         this.frame.getContentGrid().append(this.getRoot());
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_042_GLJournalVolumeWidget.prototype.widgetSizeChange = function (height, width) {};

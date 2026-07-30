@@ -97,7 +97,7 @@ namespace VAS.Areas.VAS.Controllers
             // ensuring the widget always uses the correct base currency for this client.
             int schemaCurrencyId = 0;
 
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision, c.ISO_Code
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -114,6 +114,7 @@ namespace VAS.Areas.VAS.Controllers
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+                result.CurIso = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
             }
 
             if (schemaCurrencyId == 0) { return result; }
@@ -223,7 +224,7 @@ namespace VAS.Areas.VAS.Controllers
             ReportWindows w = GetReportWindows(ctx);
 
             int schemaCurrencyId = 0;
-            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision
+            strQuery = @"SELECT cs.C_Currency_ID, c.CurSymbol, c.StdPrecision, c.ISO_Code
                     FROM C_AcctSchema cs
                     INNER JOIN AD_ClientInfo ci ON (ci.C_AcctSchema1_ID = cs.C_AcctSchema_ID)
                     INNER JOIN C_Currency c ON (cs.C_Currency_ID = c.C_Currency_ID)
@@ -240,6 +241,7 @@ namespace VAS.Areas.VAS.Controllers
                 schemaCurrencyId = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["C_Currency_ID"]);
                 result.CurSymbol = Util.GetValueOfString(cDs.Tables[0].Rows[0]["CurSymbol"]);
                 result.StdPrecision = Util.GetValueOfInt(cDs.Tables[0].Rows[0]["StdPrecision"]);
+                result.CurIso = Util.GetValueOfString(cDs.Tables[0].Rows[0]["ISO_Code"]);
             }
 
             if (schemaCurrencyId == 0) { return result; }
@@ -281,11 +283,8 @@ namespace VAS.Areas.VAS.Controllers
                    WHERE ips.IsActive = 'Y'
                      AND ips.VA009_IsPaid = 'N'
                      AND ips.DueAmt > 0
-                     AND bp.IsActive = 'Y'
-                     AND bp.IsVendor = 'Y'
                      AND bp.AD_Client_ID = @ClientID
                    GROUP BY bp.Name
-                  HAVING SUM(" + amountSql + @") > 0
                    ORDER BY OutstandingAmount DESC";
 
             DataSet ds = DB.ExecuteDataset(strQuery, dataParams, null);
@@ -344,6 +343,7 @@ namespace VAS.Areas.VAS.Controllers
             public int VendorCount { get; set; }
             public string CurSymbol { get; set; }
             public int StdPrecision { get; set; }
+            public string CurIso { get; set; }
             public List<decimal> SparklineData { get; set; }
         }
         public class OutstandingDrilldownResult
@@ -357,6 +357,7 @@ namespace VAS.Areas.VAS.Controllers
             public int OverdueInvoiceCount { get; set; }
             public string CurSymbol { get; set; }
             public int StdPrecision { get; set; }
+            public string CurIso { get; set; }
             public List<OutstandingVendorRow> Vendors { get; set; }
         }
 

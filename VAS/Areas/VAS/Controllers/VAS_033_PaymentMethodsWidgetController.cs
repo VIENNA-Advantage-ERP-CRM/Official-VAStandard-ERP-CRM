@@ -220,11 +220,16 @@ namespace VAS.Controllers
 
                     decimal percentage = 0;
 
-                    if (totalAmount > 0)
+                    /*
+                     * AP amounts are outflows and arrive negative, so the
+                     * share is taken from the magnitudes and only a zero
+                     * total leaves the percentage at zero.
+                     */
+                    if (totalAmount != 0)
                     {
                         percentage = decimal.Round(
-                            row.PaymentAmount * 100M /
-                            totalAmount,
+                            Math.Abs(row.PaymentAmount) * 100M /
+                            Math.Abs(totalAmount),
                             2,
                             MidpointRounding.AwayFromZero
                         );
@@ -323,13 +328,21 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
-                        error = ex.Message,
-                        errorText = ex.Message,
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage,
                         sql = sql
                     },
                     JsonRequestBehavior.AllowGet
@@ -888,7 +901,7 @@ SELECT
 FROM PaymentData PaymentData
 
 ORDER BY
-    PaymentData.PaymentAmount DESC,
+    ABS(PaymentData.PaymentAmount) DESC,
     PaymentData.PaymentMethodName ASC";
 
             SqlParameter[] parameters =
@@ -1105,9 +1118,16 @@ FROM CurrentPeriod CurrentPeriod";
             string columnName
         )
         {
+            if (DB.IsOracle())
+            {
+                return "CAST("
+                    + columnName
+                    + " AS DATE) + 1";
+            }
+
             return "CAST("
                 + columnName
-                + " AS DATE) + 1";
+                + " AS DATE) + INTERVAL '1 DAY'";
         }
 
         private string GetPaymentMethodNameColumn(

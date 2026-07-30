@@ -170,15 +170,23 @@ namespace VAS.Controllers
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
                         success = false,
                         hasData = false,
-                        error = ex.Message,
-                        errorText = ex.Message
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage
                     },
                     JsonRequestBehavior.AllowGet
                 );
@@ -770,15 +778,23 @@ ORDER BY
                     JsonRequestBehavior.AllowGet
                 );
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                string errorMessage = GetMsg(
+                    ctx,
+                    "VAS_ErrorLoading",
+                    "Could not load data"
+                );
+
                 return Json(
                     new
                     {
                         success = false,
                         hasData = false,
-                        error = ex.Message,
-                        errorText = ex.Message,
+                        errorKey = "VAS_ErrorLoading",
+                        messageKey = "VAS_ErrorLoading",
+                        error = errorMessage,
+                        errorText = errorMessage,
                         summarySql = summarySql,
                         rowsSql = rowsSql
                     },
@@ -813,6 +829,11 @@ ORDER BY
                 DB.IsOracle()
                     ? "VARCHAR2(4000)"
                     : "VARCHAR(4000)";
+
+            string addOneDaySql =
+                DB.IsOracle()
+                    ? " + 1"
+                    : " + INTERVAL '1 DAY'";
 
             string paymentAccessSql = @"
 SELECT
@@ -917,7 +938,7 @@ CurrentPeriodSource AS
         Period.StartDate
 
     AND CURRENT_DATE <
-        Period.EndDate + 1
+        Period.EndDate" + addOneDaySql + @"
 ),
 
 CurrentPeriod AS
@@ -1020,7 +1041,7 @@ LEFT OUTER JOIN PaymentFiltered PaymentFiltered ON
         PreviousPeriod.StartDate
 
     AND PaymentFiltered.DateTrx <
-        PreviousPeriod.EndDate + 1
+        PreviousPeriod.EndDate" + addOneDaySql + @"
 )";
 
             SqlParameter[] parameters =
@@ -1054,6 +1075,11 @@ LEFT OUTER JOIN PaymentFiltered PaymentFiltered ON
                 DB.IsOracle()
                     ? "VARCHAR2(4000)"
                     : "VARCHAR(4000)";
+
+            string addOneDaySql =
+                DB.IsOracle()
+                    ? " + 1"
+                    : " + INTERVAL '1 DAY'";
 
             string paymentRoleSql = @"
 SELECT
@@ -1160,7 +1186,7 @@ AND EXISTS
         CurrentPeriod.StartDate
 
     AND CURRENT_DATE <
-        CurrentPeriod.EndDate + 1
+        CurrentPeriod.EndDate" + addOneDaySql + @"
 
     AND PreviousPeriod.EndDate =
     (
@@ -1189,7 +1215,7 @@ AND EXISTS
         PreviousPeriod.StartDate
 
     AND Payment.DateTrx <
-        PreviousPeriod.EndDate + 1
+        PreviousPeriod.EndDate" + addOneDaySql + @"
 )";
 
             paymentRoleSql =

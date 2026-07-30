@@ -1,10 +1,19 @@
 /* ==========================================================
-   VAS Avg Payment Period (DPO) Widget  —  vas-apwdg-* namespace
+   VAS AP "Avg Days to Pay" KPI Widget  —  vas-apwdg-* namespace
    ========================================================== */
 
 .vas-apwdg-root {
+    /* Positioning context only (mirrors VIS.OutstandingSalesOrderWidget's root);
+       the glass surface lives on the card (.vas-apwdg-container) below. No
+       overflow:hidden here so the card's drop-shadow is not clipped. */
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
     position: relative;
-    overflow: hidden;
+    font-family: Roboto, sans-serif;
+    /* Named query container so narrow/zoomed cells can step the card base font
+       below its 16px clamp floor (mirrors VIS.OutstandingSalesOrderWidget's root). */
+    container: vas-apwdg / inline-size;
 }
 
 /* ---- Busy indicator overlay ---- */
@@ -16,482 +25,106 @@
     z-index: 999;
 }
 
+/* The card: glass surface + layout + base font-size anchor for all em sizing
+   (mirrors VIS.OutstandingSalesOrderWidget's card). */
 .vas-apwdg-container {
-    height: 100%;
+    /* Widget root anchor: every internal value below is em against this clamp. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.012), 20px);
+    box-sizing: border-box;
     width: 100%;
-    padding: 1em;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    gap: 0.5em;                      /* spec stack gap between header / value / why */
+    padding: 0.875em;                /* Widget Edge Spacing */
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0.6));
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(15, 61, 97, 0.06);
     position: relative;
     overflow: hidden;
-    font-size: 14px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.49));
-    border-radius: 0.85em;
-    box-sizing: border-box;
 }
 
+/* ---- Header: tinted icon well + title (mirrors AvgDaysToPayWidget) ---- */
+.vas-apwdg-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625em;
+    min-width: 0;
+}
 
-.vas-apwdg-label {
-    font-size: 0.86em;
+.vas-apwdg-icon {
+    width: 2em;
+    height: 2em;
+    min-width: 2em;
+    flex-shrink: 0;
+    border-radius: 0.5625em;
+    /* Violet tint to match this widget's semantic; the SVG stroke inherits
+       this color via currentColor. */
+    background: linear-gradient(180deg, #FFFFFF, #EFEEFF);
+    color: #5F4AA6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vas-apwdg-icon svg {
+    width: 1.125em;
+    height: 1.125em;
+}
+
+.vas-apwdg-title {
+    /* Widget title (shared Widget Header clamp), Roboto Regular. */
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011375), 17px);
     font-weight: 400;
-    color: #5F7283;
-    font-family: Roboto, sans-serif;
-    line-height: 1.3;
-    margin-bottom: 0.15em;
+    color: #102C3F;
+    line-height: 1.2;
+    margin: 0;
 }
 
 .vas-apwdg-value {
-    font-size: 2.2em;
-    font-weight: 700;
+    font-size: 1.75em;
+    font-weight: 700; /* Roboto Bold (spec weight palette: 400/500/700) */
     color: #5F4AA6;
-    line-height: 1.1;
+    line-height: 1.05;
     letter-spacing: -0.01em;
-    margin-bottom: 0.3em;
+    margin-bottom: 0.5em;   /* mirror VAS_025 value: sit in the space-between stack */
+    padding-left: 0.3125em;
     font-family: Roboto, sans-serif;
 }
 
-/* ---- Pills row ---- */
-.vas-apwdg-pills-row {
-    display: flex;
-    gap: 0.45em;
-    flex-wrap: wrap;
-    margin-bottom: 0.35em;
-}
-
-.vas-apwdg-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3em;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid #C8BEFF;
-    border-radius: 999px;
-    padding: 0.22em 0.65em;
-    font-size: 0.78em;
-    font-family: Roboto, sans-serif;
-    white-space: nowrap;
-}
-
-.vas-apwdg-pill-label {
+/* Muted 'd' day suffix trailing the big metric number. */
+.vas-apwdg-metric-suffix {
+    font-size: 0.5em;
+    font-weight: 500;
     color: #5F7283;
-    font-weight: 400;
-    font-size: 0.95em;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+    margin-left: 0.15em;
 }
 
-/* Default pill value (target): violet */
-.vas-apwdg-pill-value {
-    color: #5F4AA6;
-    font-weight: 700;
-}
-
-/* Gap over target: amber warning */
-.vas-apwdg-pill-value-warn {
-    color: #D78B10;
-}
-
-/* Gap at or under target: green */
-.vas-apwdg-pill-value-good {
-    color: #019D89;
-}
-
-/* ---- Trend row ---- */
-.vas-apwdg-trend-row {
+/* ---- Comparison line vs last quarter (mirrors AvgDaysToPayWidget's subtitle) ---- */
+.vas-apwdg-why-wrap {
     display: flex;
-    align-items: center;
-    gap: 0.3em;
-    font-size: 0.8em;
-    font-family: Roboto, sans-serif;
-    font-weight: 400;
-    line-height: 1.2;
+    align-items: flex-start;
+    gap: 0.375em;
+    /* Was margin-top:auto (pinned the value to the top); mirror VAS_025 so the value
+       distributes via the container's justify-content:space-between (centers on zoom-out). */
+    margin-top: 0.125em;
 }
 
-/* DPO increasing: amber warning (taking longer to pay) */
-.vas-apwdg-trend-warn {
-    color: #D78B10;
+.vas-apwdg-why-text {
+    font-size: 0.6875em;
+    color: #717182;
+    line-height: 1.3;
 }
 
-/* DPO decreasing: green (paying faster) */
-.vas-apwdg-trend-good {
-    color: #019D89;
+/* ---- Responsive ----
+   Widget interior scales via the em anchor clamp on .vas-apwdg-container.
+   Narrow/zoomed-in cell: step the card base font below the 16px clamp floor so the
+   content doesn't overflow (mirrors VIS.OutstandingSalesOrderWidget's @container steps). */
+@container vas-apwdg (max-width: 300px) {
+    .vas-apwdg-container { font-size: 13px; }
 }
 
-.vas-apwdg-trend-icon {
-    width: 1.1em;
-    height: 1.1em;
-    flex-shrink: 0;
-}
-
-/* ---- Sparkline (bottom-right, decorative) ---- */
-.vas-apwdg-sparkline {
-    position: absolute;
-    bottom: 0.4em;
-    right: 0.5em;
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-/* ---- Full-card click overlay (opens the drill-down) ---- */
-.vas-apwdg-open {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    padding: 0;
-    margin: 0;
-    background: transparent;
-    cursor: pointer;
-    z-index: 2;
-}
-
-.vas-apwdg-open:focus-visible {
-    outline: 2px solid #8B7CFF;
-    outline-offset: -4px;
-}
-
-.vis-editModeWidget .vas-apwdg-open {
-    pointer-events: none;
-}
-
-/* ==========================================================
-   DPO analysis dialog (jQuery UI) — matches the Onfinity modal
-   ========================================================== */
-.vas-apwdg-dialog-shell {
-    background: #FFFFFF;
-    border: 1px solid #ECEFF3 !important;
-    border-radius: 14px !important;
-    box-shadow: 0 20px 60px rgba(10, 28, 45, 0.25) !important;
-    overflow: hidden !important;
-}
-
-.vas-apwdg-dialog-shell .ui-dialog-titlebar {
-    background: #FFFFFF !important;
-    border: 0;
-    border-bottom: 1px solid #EDF2F6;
-    color: #102C3F;
-    font-family: Roboto, sans-serif;
-    letter-spacing: 0;
-    padding: 18px 20px 14px;
-    position: relative;
-    overflow: visible;
-}
-
-.vas-apwdg-dialog-shell .ui-dialog-title {
-    color: #102C3F !important;
-    font-family: Roboto, sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0;
-    line-height: 1.2;
-}
-
-.vas-apwdg-dialog-shell .vas-apwdg-dialog-close {
-    -webkit-appearance: none;
-    appearance: none;
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: 8px;
-    box-shadow: none;
-    box-sizing: border-box;
-    color: #6B7280;
-    cursor: pointer;
-    display: flex;
-    height: 30px;
-    justify-content: center;
-    line-height: 0;
-    margin: 0;
-    outline: 0;
-    padding: 0;
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 30px;
-}
-
-.vas-apwdg-dialog-shell .vas-apwdg-dialog-close:hover,
-.vas-apwdg-dialog-shell .vas-apwdg-dialog-close:focus-visible {
-    background: rgba(0, 0, 0, 0.07);
-    color: #111827;
-}
-
-.vas-apwdg-dialog-shell .vas-apwdg-dialog-close svg {
-    display: block;
-    fill: currentColor;
-    height: 14px;
-    pointer-events: none;
-    width: 14px;
-}
-
-.vas-apwdg-dialog-shell .ui-dialog-content {
-    padding: 18px 20px;
-}
-
-.vas-apwdg-dialog-shell .ui-dialog-buttonpane {
-    background: #FFFFFF;
-    border-top: 1px solid #EDF2F6;
-    margin: 0;
-    padding: 12px 20px;
-}
-
-.vas-apwdg-dialog-shell .ui-dialog-buttonset button {
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid #E4EDF4;
-    border-radius: 999px;
-    color: #5F7283;
-    font-family: Roboto, sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    line-height: 1.2;
-    padding: 0.45rem 0.9rem;
-}
-
-.vas-apwdg-dialog-shell .ui-dialog-buttonset button:hover,
-.vas-apwdg-dialog-shell .ui-dialog-buttonset button:focus {
-    background: rgba(255, 255, 255, 0.95);
-    color: #102C3F;
-    outline: 0;
-}
-
-.vas-apwdg-dialog {
-    color: #102C3F;
-    font-family: Roboto, sans-serif;
-    min-height: 220px;
-}
-
-.vas-apwdg-drill-state {
-    align-items: center;
-    color: #748494;
-    display: flex;
-    font-size: 14px;
-    justify-content: center;
-    min-height: 180px;
-    text-align: center;
-}
-
-.vas-apwdg-drill-error {
-    color: #D14545;
-}
-
-/* ---- Three mini-stat cards ---- */
-.vas-apwdg-drill-stats {
-    display: grid;
-    gap: 12px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    margin-bottom: 16px;
-}
-
-.vas-apwdg-drill-mini {
-    border: 1px solid #E4EDF4;
-    border-radius: 8px;
-    padding: 10px 12px;
-    text-align: center;
-}
-
-.vas-apwdg-drill-mini-label {
-    color: #748494;
-    font-size: 10px;
-    margin-bottom: 4px;
-}
-
-.vas-apwdg-drill-mini-value {
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1;
-}
-
-.vas-apwdg-drill-mini--vio {
-    background: rgba(139, 124, 255, 0.07);
-    border-color: rgba(139, 124, 255, 0.19);
-}
-
-.vas-apwdg-drill-mini--vio .vas-apwdg-drill-mini-value {
-    color: #8B7CFF;
-}
-
-.vas-apwdg-drill-mini--grn {
-    background: rgba(32, 164, 100, 0.07);
-    border-color: rgba(32, 164, 100, 0.19);
-}
-
-.vas-apwdg-drill-mini--grn .vas-apwdg-drill-mini-value {
-    color: #20A464;
-}
-
-.vas-apwdg-drill-mini--blu {
-    background: rgba(0, 131, 218, 0.07);
-    border-color: rgba(0, 131, 218, 0.19);
-}
-
-.vas-apwdg-drill-mini--blu .vas-apwdg-drill-mini-value {
-    color: #0083DA;
-}
-
-/* ---- Description + warning ---- */
-.vas-apwdg-drill-desc {
-    color: #5F7283;
-    font-size: 13px;
-    line-height: 1.6;
-    margin: 0 0 12px;
-}
-
-.vas-apwdg-drill-warn {
-    background: #FFF0D0;
-    border-left: 3px solid #D78B10;
-    border-radius: 6px;
-    color: #7A4A00;
-    font-size: 12px;
-    line-height: 1.5;
-    margin-bottom: 14px;
-    padding: 10px 12px;
-}
-
-/* ---- DPO by category ---- */
-.vas-apwdg-drill-title {
-    color: #5F7283;
-    font-size: 12px;
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-
-.vas-apwdg-drill-row {
-    align-items: center;
-    border-bottom: 1px solid #EDF2F6;
-    display: flex;
-    gap: 10px;
-    justify-content: space-between;
-    padding: 7px 0;
-}
-
-/* Invisible filler row — keeps the popup body a stable height on short pages. */
-.vas-apwdg-drill-row--ph {
-    visibility: hidden;
-}
-
-.vas-apwdg-drill-row:last-child {
-    border-bottom: 0;
-}
-
-.vas-apwdg-drill-row-name {
-    color: #102C3F;
-    font-size: 12px;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.vas-apwdg-drill-row-val {
-    flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 700;
-}
-
-.vas-apwdg-drill-row-val--bad {
-    color: #D14545;
-}
-
-.vas-apwdg-drill-row-val--good {
-    color: #20A464;
-}
-
-/* ---- Drill-down pager (rule 18) ---- */
-.vas-apwdg-drill-pager {
-    align-items: center;
-    display: flex;
-    gap: 0.75em;
-    justify-content: space-between;
-    margin-top: 0.85em;
-}
-
-.vas-apwdg-drill-pager-info {
-    color: #5A6B78;
-    font-size: 0.85em;
-}
-
-.vas-apwdg-drill-pager-nav {
-    align-items: center;
-    display: flex;
-    gap: 0.5em;
-}
-
-.vas-apwdg-drill-pager-btn {
-    align-items: center;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(16, 44, 63, 0.18);
-    border-radius: 6px;
-    color: #102C3F;
-    cursor: pointer;
-    display: flex;
-    height: 24px;
-    justify-content: center;
-    padding: 0;
-    transition: background 0.15s ease, border-color 0.15s ease;
-    width: 24px;
-}
-
-.vas-apwdg-drill-pager-btn:hover:not([disabled]) {
-    background: #FFFFFF;
-    border-color: rgba(16, 44, 63, 0.35);
-}
-
-.vas-apwdg-drill-pager-btn[disabled] {
-    cursor: default;
-    opacity: 0.4;
-}
-
-.vas-apwdg-drill-pager-label {
-    color: #5A6B78;
-    font-size: 0.85em;
-    min-width: 4.5em;
-    text-align: center;
-}
-
-/* ---- Responsive ---- */
-@media screen and (max-width: 1920px) {
-    .vis-editModeWidget .vas-apwdg-container { font-size: 10px; }
-}
-
-@media screen and (max-width: 1366px) {
-    .vas-apwdg-container { font-size: 12px; }
-    .vis-editModeWidget .vas-apwdg-container { font-size: 8px; }
-}
-
-@media screen and (max-width: 1024px) {
-    .vas-apwdg-container { font-size: 10px; }
-    .vis-editModeWidget .vas-apwdg-container { font-size: 7px; }
-}
-
-@media screen and (max-width: 900px) {
+@container vas-apwdg (max-width: 220px) {
     .vas-apwdg-container { font-size: 11px; }
-    .vis-editModeWidget .vas-apwdg-container { font-size: 8px; }
-}
-
-@media screen and (max-width: 768px) {
-    .vas-apwdg-container { font-size: 10px; }
-    .vis-editModeWidget .vas-apwdg-container { font-size: 7px; }
-}
-
-@media screen and (max-width: 680px) {
-    .vas-apwdg-container { font-size: 9px; }
-
-    .vas-apwdg-dialog-shell .ui-dialog-content {
-        padding: 0.875rem;
-    }
-
-    .vas-apwdg-drill-stats {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .vas-apwdg-container { font-size: 12px; }
-}
-
-@media screen and (max-width: 320px) {
-    .vas-apwdg-container { font-size: 9px; }
 }

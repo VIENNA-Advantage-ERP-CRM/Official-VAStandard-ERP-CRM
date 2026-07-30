@@ -29,7 +29,7 @@ namespace VAdvantage.Process
         int apiAuthCred_ID = 0;
         private Imap imapMail;
         //string sender = "contacts";
-        string sender = string.Empty;
+        string sender = string.Empty, userAccount = string.Empty;
         string folderName = "Inbox";
         string isExcludeEmployee = string.Empty, excludedEmails = string.Empty;
         string accessToken = string.Empty, provider = string.Empty, userEmail = string.Empty, userDomain = string.Empty;
@@ -73,7 +73,7 @@ namespace VAdvantage.Process
                                   umail.imapusername,
                                   umail.AD_User_ID,
                                   umail.AD_CLient_ID,
-                                  umail.AD_Org_ID,umail.ISAUTOATTACH,umail.TABLEATTACH,umail.IsExcludeEmployee,
+                                  umail.AD_Org_ID,umail.ISAUTOATTACH,umail.TABLEATTACH,umail.IsExcludeEmployee,umail.EMail,
                                   umail.DateLastRun, umail.AD_UserMailConfigration_ID, umail.VA101_Protocol, umail.VAS_ExcludedEmailList,
                                   ap.VA101_Provider, ac.VA101_APIAuthCredential_ID, ac.VA101_AccessToken, ac.VA101_Email
                                 FROM ad_usermailconfigration umail LEFT JOIN VA101_APIAuthCredential ac
@@ -91,7 +91,7 @@ namespace VAdvantage.Process
                                   umail.AD_User_ID,
                                   umail.AD_CLient_ID,
                                   umail.AD_Org_ID,umail.ISAUTOATTACH,umail.TABLEATTACH,umail.IsExcludeEmployee,
-                                  umail.DateLastRun, AD_UserMailConfigration_ID
+                                  umail.EMail,umail.DateLastRun, AD_UserMailConfigration_ID
                                 FROM ad_usermailconfigration umail
                                 WHERE umail.IsActive ='Y' ";
 
@@ -213,6 +213,11 @@ namespace VAdvantage.Process
                 if (ds.Tables[0].Rows[i]["AD_Org_ID"] != DBNull.Value && ds.Tables[0].Rows[i]["AD_Org_ID"] != null)
                 {
                     AD_Org_ID = Util.GetValueOfInt(ds.Tables[0].Rows[i]["AD_Org_ID"]);
+                }
+
+                if (ds.Tables[0].Rows[i]["EMail"] != DBNull.Value && ds.Tables[0].Rows[i]["EMail"] != null)
+                {
+                    userAccount = Util.GetValueOfString(ds.Tables[0].Rows[i]["EMail"]);
                 }
 
                 if (AD_User_ID > 0)
@@ -593,6 +598,7 @@ namespace VAdvantage.Process
             mailDataIn.table_id = tableID;
             mailDataIn.record_id = recordID;
             mailDataIn.sessionID = ctx.GetAD_Session_ID();
+            mailDataIn.sessionGUID = ctx.GetContext("#AD_Session_GUID");
             mailDataIn.userID = userID;
 
             // vis0008 Handled case for the API being called from VServer
@@ -721,6 +727,8 @@ namespace VAdvantage.Process
             mAttachment.SetMailUserName(mail.To);
             mAttachment.SetTextMsg(textmsg);
             mAttachment.SetTitle(mail.Subject);
+            mAttachment.Set_Value("MailAccount", userAccount);
+            mAttachment.Set_Value("UserAccount_ID", AD_User_ID);
             if (!mAttachment.Save())//save into database
             {
                 retVal.Append("SaveError");

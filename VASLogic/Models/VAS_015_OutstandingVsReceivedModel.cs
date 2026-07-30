@@ -22,19 +22,23 @@ namespace VASLogic.Models
     ///               Compares, per month over the last 6 calendar months, the open
     ///               sales receivable balance (bars, SUM(C_InvoicePaySchedule.DueAmt)
     ///               of unpaid sales schedules by due month) against actual customer
-    ///               collections (line, SUM(C_Payment.PaymentAmount) of receipts by trx
-    ///               month). Both series are converted to the accounting-schema
-    ///               (base) currency; the base-currency lookup is scoped to the
-    ///               session client (client check). MRole row-level security is
-    ///               applied only on the main physical table of each query
-    ///               (C_Payment for received, C_Invoice for outstanding); the second
-    ///               table in the outstanding query (C_InvoicePaySchedule) is joined
-    ///               only to source DueAmt and is not given an access predicate. The
-    ///               6-month calendar fill is computed in C# so each SQL stays a
-    ///               simple portable GROUP BY (no CTE / window functions).
-    ///               Compatible with PostgreSQL and Oracle.
+    ///               collections (line, by month). The collections line sums BOTH AR
+    ///               receipts (SUM(C_Payment.PaymentAmount) by trx month) and
+    ///               cash-journal collections (SUM(C_CashLine.Amount) of Receipt /
+    ///               ReceiptReturn lines by statement month). All series are
+    ///               converted to the accounting-schema (base) currency; the
+    ///               base-currency lookup is scoped to the session client (client
+    ///               check). MRole row-level security is applied only on the main
+    ///               physical table of each query (C_Payment and C_Cash for received,
+    ///               C_Invoice for outstanding); the secondary joined tables
+    ///               (C_InvoicePaySchedule, C_CashLine) source amounts only and are
+    ///               not given an access predicate. The 6-month calendar fill is
+    ///               computed in C# so each SQL stays a simple portable GROUP BY (no
+    ///               CTE / window functions). Compatible with PostgreSQL and Oracle.
     /// Chronological development:
     ///   VAI145      2026-06-02 Created
+    ///   VAI145      2026-07-14 Add cash-journal Receipt / ReceiptReturn collections
+    ///                          (C_Cash / C_CashLine) to the received series.
     /// </summary>
     public class VAS_015_OutstandingVsReceivedModel
     {
@@ -118,9 +122,13 @@ namespace VASLogic.Models
         }
 
         /// <summary>
-        /// Monthly customer-collection totals (C_Payment.PaymentAmount of completed/closed
-        /// receipts, by transaction month) converted to the base currency, keyed by
-        /// yyyy-MM. MRole is applied only on the main physical table C_Payment.
+        /// Monthly customer-collection totals converted to the base currency, keyed
+        /// by yyyy-MM. Sums two sources by month: AR receipts
+        /// (C_Payment.PaymentAmount of completed/closed receipts, by transaction
+        /// month) and cash-journal collections (C_CashLine.Amount of completed/closed
+        /// lines whose VSS_PAYMENTTYPE is a customer Receipt or ReceiptReturn, by
+        /// statement month). MRole is applied independently to each main physical
+        /// table (C_Payment; C_Cash — the joined C_CashLine is a child detail).
         /// </summary>
         private Dictionary<string, decimal> LoadReceived(Ctx ctx, int clientId, int acctCurrencyId,
             string startLit, string endLit, int stdPrecision)
@@ -128,8 +136,8 @@ namespace VASLogic.Models
             /* Month grouping is dialect-aware (date_trunc on PostgreSQL, TRUNC on
                Oracle); both yield the first-of-month DATE used as the bucket key. */
             string monthExpr = DB.IsPostgreSQL()
-                ? "CAST(date_trunc('month', Payment.DateTrx) AS DATE)"
-                : "TRUNC(Payment.DateTrx, 'MM')";
+                ? "CAST(date_trunc('month', Payment.DateAcct) AS DATE)"
+                : "TRUNC(Payment.DateAcct, 'MM')";
 
             /* acctCurrencyId is a trusted int from the schema lookup, so it is
                inlined (same style as clientId) rather than parameterized. PaymentAmount is
@@ -156,8 +164,8 @@ namespace VASLogic.Models
                   AND Payment.IsActive = 'Y'
                   AND Payment.DocStatus IN ('CO', 'CL')
                   AND Payment.AD_Client_ID = " + clientId + @"
-                  AND Payment.DateTrx >= " + startLit + @"
-                  AND Payment.DateTrx < " + endLit;
+                  AND Payment.DateAcct >= " + startLit + @"
+                  AND Payment.DateAcct < " + endLit;
 
             /* MRole only on the main physical table (C_Payment / alias Payment).
                GROUP BY is appended AFTER MRole so the FROM-clause parser is not
@@ -168,7 +176,79 @@ namespace VASLogic.Models
             sql += @"
                 GROUP BY " + monthExpr;
 
-            return ReadBuckets(sql, "Received_Amount", stdPrecision);
+            Dictionary<string, decimal> receivedByMonth =
+                ReadBuckets(sql, "Received_Amount", stdPrecision);
+
+            /* Cash-journal collections recorded directly in the cash book also
+               count as money received. Include completed/closed C_CashLine rows
+               whose VSS_PAYMENTTYPE is a customer Receipt or ReceiptReturn (the
+               return leg is signed by its own Amount), bucket them by statement
+               month and ADD them into the receipt totals. Same source, currency
+               conversion and payment-type rule as the Daily Collection Trend
+               widget (VAS_014). */
+            string cashMonthExpr = DB.IsPostgreSQL()
+                ? "CAST(date_trunc('month', Cash.StatementDate) AS DATE)"
+                : "TRUNC(Cash.StatementDate, 'MM')";
+
+            /* VSS_PAYMENTTYPE list values rendered as SQL literals via the same
+               framework helper used elsewhere (e.g. VAS_014). */
+            string cashReceiptTypes =
+                GlobalVariable.TO_STRING(MCashLine.VSS_PAYMENTTYPE_Receipt) + ", " +
+                GlobalVariable.TO_STRING(MCashLine.VSS_PAYMENTTYPE_ReceiptReturn);
+
+            string cashSql = @"
+                SELECT " + cashMonthExpr + @" AS Bucket_Month,
+                       SUM(
+                           CASE
+                               WHEN Cash.C_Currency_ID = " + acctCurrencyId + @"
+                               THEN COALESCE(CashLine.Amount, 0)
+                               ELSE CurrencyConvert(
+                                   COALESCE(CashLine.Amount, 0),
+                                   CashLine.C_Currency_ID,
+                                   " + acctCurrencyId + @",
+                                   COALESCE(Cash.DateAcct, Cash.StatementDate),
+                                   COALESCE(CashLine.C_ConversionType_ID, 0),
+                                   CashLine.AD_Client_ID,
+                                   CashLine.AD_Org_ID
+                               )
+                           END
+                       ) AS Received_Amount
+                FROM C_Cash Cash
+                INNER JOIN C_CashLine CashLine ON (CashLine.C_Cash_ID = Cash.C_Cash_ID)
+                WHERE Cash.IsActive = 'Y'
+                  AND CashLine.IsActive = 'Y'
+                  AND CashLine.VSS_PAYMENTTYPE IN (" + cashReceiptTypes + @")
+                  AND Cash.DocStatus IN ('CO', 'CL')
+                  AND Cash.AD_Client_ID = " + clientId + @"
+                  AND Cash.StatementDate >= " + startLit + @"
+                  AND Cash.StatementDate < " + endLit;
+
+            /* MRole only on the main physical table (C_Cash / alias Cash); the
+               joined C_CashLine is a child of the access-controlled header. GROUP
+               BY is appended AFTER MRole so the FROM-clause parser is not confused
+               by a trailing clause. */
+            cashSql = MRole.GetDefault(ctx).AddAccessSQL(
+                cashSql, "Cash", MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+            cashSql += @"
+                GROUP BY " + cashMonthExpr;
+
+            Dictionary<string, decimal> cashByMonth =
+                ReadBuckets(cashSql, "Received_Amount", stdPrecision);
+
+            foreach (KeyValuePair<string, decimal> entry in cashByMonth)
+            {
+                if (receivedByMonth.ContainsKey(entry.Key))
+                {
+                    receivedByMonth[entry.Key] = receivedByMonth[entry.Key] + entry.Value;
+                }
+                else
+                {
+                    receivedByMonth[entry.Key] = entry.Value;
+                }
+            }
+
+            return receivedByMonth;
         }
 
         /// <summary>

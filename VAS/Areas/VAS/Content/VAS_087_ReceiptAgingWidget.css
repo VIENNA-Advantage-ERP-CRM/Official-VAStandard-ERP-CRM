@@ -59,17 +59,17 @@
 }
 
 .vas-rag-title {
-    font-size: clamp(13px, calc(var(--dash-inline-size, 100vw) * 0.011375), 16px);
+    font-size: clamp(15.5px, calc(var(--dash-inline-size, 100vw) * 0.011375), 31px);
     font-weight: 500;
     color: #102C3F;
     line-height: 1.3;
 }
 
 .vas-rag-sub {
-    font-size: clamp(11px, calc(var(--dash-inline-size, 100vw) * 0.009625), 13px);
+    font-size: clamp(12px, calc(var(--dash-inline-size, 100vw) * 0.0088), 24px);
     color: #717182;
     line-height: 1.25;
-    margin-top: 2px;
+    margin-top: 0.167em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -103,8 +103,8 @@
 .vas-rag-list {
     flex: 1 1 auto;
     min-height: 0;
-    display: grid;
-    grid-template-rows: repeat(4, minmax(0, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 0.26em;
     overflow: hidden;
 }
@@ -114,12 +114,13 @@
     flex-direction: column;
     gap: 0.12em;
     width: 100%;
-    min-height: 0;
+    min-height: 2.35em;
     text-align: left;
     padding: 0.06em 0.15em;
     border: 0;
     border-radius: 8px;
-    background: rgba(16, 44, 63, 0.07);
+    /* Review #19: no grey block behind each line; hover keeps its light tint. */
+    background: transparent;
     cursor: pointer;
 }
 
@@ -244,7 +245,7 @@
 }
 
 .vas-rag-foot-info {
-    font-size: 0.6875rem;
+    font-size: 0.6875em;
     color: #748494;
     white-space: nowrap;
     overflow: hidden;
@@ -260,8 +261,8 @@
 }
 
 .vas-rag-pgbtn {
-    width: 22px;
-    height: 22px;
+    width: 1.375em;
+    height: 1.375em;
     border-radius: 7px;
     border: 1px solid #E4EDF4;
     background: rgba(255, 255, 255, 0.8);
@@ -273,8 +274,8 @@
 }
 
     .vas-rag-pgbtn svg {
-        width: 14px;
-        height: 14px;
+        width: 0.875em;
+        height: 0.875em;
     }
 
     .vas-rag-pgbtn:hover:not(:disabled) {
@@ -287,7 +288,7 @@
     }
 
 .vas-rag-pgtext {
-    font-size: 0.75rem;
+    font-size: 0.75em;
     font-weight: 400;
     color: #102C3F;
     min-width: 3.2em;
@@ -311,14 +312,14 @@
 }
 
 .vas-rag-dialog {
-    font-size: 16px;
+    font-size: clamp(16px, calc(var(--dash-inline-size, 100vw) * 0.011733), 32px);
     position: fixed;
     inset: 0;
     z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 32px;
+    padding: 2em;
 }
 
     .vas-rag-dialog,
@@ -335,7 +336,7 @@
 
 .vas-rag-modal {
     position: relative;
-    width: min(880px, 100%);
+    width: min(55em, calc(100vw - 2em));
     max-height: 88vh;
     background: #FFFFFF;
     border-radius: 14px;
@@ -347,12 +348,12 @@
 
 .vas-rag-modal-head {
     flex: 0 0 auto;
-    height: 56px;
+    height: 3.5em;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 0 20px;
+    gap: 0.75em;
+    padding: 0 1.25em;
     border-bottom: 1px solid #1F83FF;
     background: rgba(255, 255, 255, 0.9);
 }
@@ -360,14 +361,14 @@
 .vas-rag-modal-title-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75em;
     flex: 1 1 auto;
     min-width: 0;
 }
 
 .vas-rag-modal-title {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 400;
     color: #141414;
     min-width: 0;
@@ -378,7 +379,7 @@
 
 .vas-rag-modal-status {
     flex: 0 0 auto;
-    font-size: 0.72rem;
+    font-size: 0.72em;
 }
 
 .vas-rag-pill {
@@ -411,8 +412,8 @@
     }
 
 .vas-rag-modal-close {
-    width: 32px;
-    height: 32px;
+    width: 2em;
+    height: 2em;
     border: 0;
     background: transparent;
     cursor: pointer;
@@ -425,8 +426,8 @@
 }
 
     .vas-rag-modal-close svg {
-        width: 20px;
-        height: 20px;
+        width: 1.25em;
+        height: 1.25em;
     }
 
     .vas-rag-modal-close:hover {
@@ -438,31 +439,31 @@
     flex: 0 1 auto;
     min-height: 0;
     overflow: auto;
-    padding: 22px 24px;
+    padding: 1.375em 1.5em;
     position: relative;
 }
 
 .vas-rag-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0 24px;
+    gap: 0 1.5em;
 }
 
 .vas-rag-field {
-    padding: 8px 12px;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid #D7D7D7;
     min-width: 0;
 }
 
 .vas-rag-field-lbl {
-    font-size: 0.75rem;
+    font-size: 0.75em;
     color: #5F7283;
 }
 
 .vas-rag-field-val {
-    font-size: 1rem;
+    font-size: 1em;
     color: #102C3F;
-    margin-top: 6px;
+    margin-top: 0.375em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -473,32 +474,32 @@
     }
 
 .vas-rag-lines-title {
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 700;
     color: #000000;
-    padding: 18px 0 8px;
+    padding: 1.125em 0 0.5em;
 }
 
 .vas-rag-lines-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 6px;
+    margin-top: 0.375em;
 }
 
     .vas-rag-lines-table thead th {
         text-align: left;
-        font-size: 0.75rem;
+        font-size: 0.75em;
         font-weight: 400;
         color: #748494;
-        padding: 6px 8px;
+        padding: 0.5em 0.667em;
         border-bottom: 1px solid #EDF2F6;
         text-transform: capitalize;
     }
 
     .vas-rag-lines-table tbody td {
-        font-size: 0.875rem;
+        font-size: 0.875em;
         color: #5F7283;
-        padding: 8px;
+        padding: 0.5715em;
         border-bottom: 1px solid #EDF2F6;
         vertical-align: middle;
     }

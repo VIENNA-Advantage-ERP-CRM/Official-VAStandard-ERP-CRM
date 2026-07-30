@@ -6,9 +6,7 @@
  *  #  | Current Text                         | Message Key
  * ----+--------------------------------------+--------------------------------
  *  1  | Cash Out by Category                 | VAS_055_CashOutByCategory
- *  2  | Today                                | VAS_055_Today
- *  3  | Why                                  | VAS_055_Why
- *  4  | Grouped by cash type for today.      | VAS_055_WhyText
+ *  2  | Grouped by cash type for today       | VAS_055_Subtitle
  *  5  | Other                                | VAS_055_Other
  *  6  | Loading                              | VAS_055_Loading
  *  7  | No cash out today                    | VAS_055_NoData
@@ -20,6 +18,31 @@
 ; VAS = window.VAS || {};
 
 ; (function (VAS, $) {
+
+    /**
+     * Creates a single ResizeObserver that monitors the dashboard container's
+     * width. Whenever the container is resized, it updates the global CSS
+     * variable '--dash-inline-size' with the container's current width (in px),
+     * so the widget title/header clamp() tracks the dashboard width rather than
+     * the viewport. One observer per document is sufficient — every widget reads
+     * the same var.
+     */
+    function ensureDashInlineSizeVar($el) {
+        if (window.__vasDashInlineSizeObserver) { return; }
+        if (typeof ResizeObserver === 'undefined') { return; }
+
+        var container = $el.closest('.vis-widget-container, [data-dashboard-container]')[0];
+        if (!container) { return; }
+
+        var write = function () {
+            document.documentElement.style.setProperty('--dash-inline-size', container.clientWidth + 'px');
+        };
+
+        window.__vasDashInlineSizeObserver = new ResizeObserver(write);
+        window.__vasDashInlineSizeObserver.observe(container);
+        write();
+    }
+
     VAS.VAS_055_CashByCategoryCashJournalWidget = function () {
         var $self = this;
         var $root = null;
@@ -39,6 +62,16 @@
         var pageSize = 2;
         var totalPages = 0;
         var totalRecords = 0;
+
+        /* Row-height guess used ONLY before the first row is rendered; from then on
+           the real height is measured (see measureRowHeight). */
+        var ROW_HEIGHT_FALLBACK = 62;
+        var MIN_PAGE_SIZE = 2;
+        /* Retry budget for a capacity measurement taken before the widget is laid
+           out (clientHeight 0). Bounded so a hidden widget can't spin forever. */
+        var MAX_CAPACITY_RETRIES = 30;
+        var capacityRetries = 0;
+        var capacitySyncPending = false;
 
         function lbl(key, fallback) {
             var text = VIS.Msg.getMsg(key);
@@ -70,64 +103,38 @@
             return '';
         }
 
-        function normalizeCurrencyLabel(value) {
-            var label = firstText(value);
-            return label.toUpperCase() === 'IQD' ? 'ID' : label;
-        }
-
-        function formatCurrencyAmount(value, currencySymbol, currencyISO, currencyId, precision) {
-            var numericValue = Number(value || 0);
-            var stdPrecision = getPrecision(precision);
-            var symbol = normalizeCurrencyLabel(currencySymbol);
-            var iso = normalizeCurrencyLabel(currencyISO);
-            var id = firstText(currencyId);
-
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-            var sign = numericValue < 0 ? '-' : '';
-
+        /* ── Amount formatter ───────────────────────────────────────── */
+        /* Prefer the currency symbol; fall back to the ISO code when no
+           symbol is available (IQD's ISO renders as the short 'ID'). */
+        function getCurrencyLabel(currencySymbol, currencyISO) {
+            var symbol = String(currencySymbol || '').trim();
             if (symbol) {
-                return sign + symbol + amount;
+                return symbol;
             }
 
-            if (iso) {
-                return sign + iso + amount;
-            }
-
-            return id ? sign + '#' + id + amount : sign + amount;
+            var iso = String(currencyISO || '').trim();
+            return iso.toUpperCase() === 'IQD' ? 'ID' : iso;
         }
 
-        function renderCurrencyAmount($target, value, currencySymbol, currencyISO, currencyId, precision) {
-            var numericValue = Number(value || 0);
-            var stdPrecision = getPrecision(precision);
-            var prefix = normalizeCurrencyLabel(firstText(currencySymbol, currencyISO));
-            var id = firstText(currencyId);
+        /*
+         * Category amounts are aggregates — render a compact, locale-aware
+         * magnitude via VIS.Util.formatCompactAmount (K/L/Cr or M/B tiers by
+         * base currency). The formatter returns a non-negative magnitude, so we
+         * compose the final string ourselves: sign, then currency, then
+         * magnitude — a negative renders as e.g. -$200 (leading minus, before
+         * the symbol).
+         */
+        function formatCompactCurrency(value, currencySymbol, currencyISO, precision) {
+            var numericValue = Number(value) || 0;
+            var sign = numericValue < 0 ? '-' : '';
+            var currency = getCurrencyLabel(currencySymbol, currencyISO);
+            var magnitude = VIS.Util.formatCompactAmount(numericValue, currencyISO, getPrecision(precision));
 
-            if (!prefix && id) {
-                prefix = '#' + id;
-            }
+            return sign + currency + magnitude;
+        }
 
-            var amount = Math.abs(numericValue).toLocaleString(window.navigator.language, {
-                minimumFractionDigits: stdPrecision,
-                maximumFractionDigits: stdPrecision
-            });
-            var decimalMatch = amount.match(/([.,]\d+)$/);
-
-            $target.empty()
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-prefix',
-                    'text': (numericValue < 0 ? '-' : '') + prefix
-                }))
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-main',
-                    'text': decimalMatch ? amount.substring(0, amount.length - decimalMatch[1].length) : amount
-                }))
-                .append($('<span>', {
-                    'class': 'VAS-cash-amount-decimal',
-                    'text': decimalMatch ? decimalMatch[1] : ''
-                }));
+        function renderCurrencyAmount($target, value, currencySymbol, currencyISO, precision) {
+            $target.text(formatCompactCurrency(value, currencySymbol, currencyISO, precision));
         }
 
         function showBusy(show) {
@@ -199,10 +206,14 @@
                 'text': lbl('VAS_055_CashOutByCategory', 'Cash Out by Category')
             });
 
-            var $meta = $('<span>', {
-                'class': 'VAS_055_cash-category-meta',
-                'id': 'VAS_055_cash-category-meta-' + widgetId,
-                'text': lbl('VAS_055_Today', 'Today')
+            var $subtitle = $('<span>', {
+                'class': 'VAS_055_cash-category-subtitle',
+                'id': 'VAS_055_cash-category-subtitle-' + widgetId,
+                'text': lbl('VAS_055_Subtitle', 'Grouped by cash type for today')
+            });
+
+            var $titleWrap = $('<div>', {
+                'class': 'VAS_055_cash-category-title-wrap'
             });
 
             $body = $('<div>', {
@@ -216,12 +227,6 @@
 
             var $footerText = $('<div>', {
                 'class': 'VAS_055_cash-category-footer-text'
-            });
-
-            var $whyText = $('<span>', {
-                'class': 'VAS_055_cash-category-why-text',
-                'id': 'VAS_055_cash-category-why-text-' + widgetId,
-                'text': lbl('VAS_055_WhyText', 'Grouped by cash type for today.')
             });
 
             $pageInfo = $('<span>', {
@@ -275,9 +280,10 @@
             });
 
             $pager.append($prevBtn).append($pageText).append($nextBtn);
-            $footerText.append($whyText).append($pageInfo);
-            $titleRow.append($icon).append($title);
-            $header.append($titleRow).append($meta);
+            $footerText.append($pageInfo);
+            $titleWrap.append($title).append($subtitle);
+            $titleRow.append($icon).append($titleWrap);
+            $header.append($titleRow);
             $footer.append($footerText).append($pager);
             $card.append($busy).append($header).append($body).append($footer).append($state);
             $root.append($card);
@@ -300,8 +306,17 @@
         }
 
         function updatePager() {
+            /* The pager stays on screen for a SINGLE page too — it then reads
+               "1 of 1" with both arrows disabled, so the control never disappears
+               under the user. It is hidden only when there is nothing to page. */
+            var pagesShown = Math.max(totalPages, totalRecords > 0 ? 1 : 0);
+
             if ($pageText) {
-                $pageText.text(totalPages > 1 ? (pageNo + ' ' + lbl('VAS_Of', 'of') + ' ' + totalPages) : '');
+                $pageText.text(
+                    pagesShown > 0
+                        ? (Math.max(1, pageNo) + ' ' + lbl('VAS_Of', 'of') + ' ' + pagesShown)
+                        : ''
+                );
             }
 
             if ($pageInfo) {
@@ -335,8 +350,66 @@
             }
 
             if ($pager) {
-                $pager.css('display', totalPages > 1 ? 'inline-flex' : 'none');
+                $pager.css('display', pagesShown > 0 ? 'inline-flex' : 'none');
             }
+        }
+
+        /* Height of ONE rendered row, measured from the DOM so the capacity tracks
+           the card's actual font scale (a row is ~45px at the default clamp — the
+           old fixed 72px divisor over-stated it and left rows' worth of space
+           unused). The fallback applies only before the first row exists. */
+        function measureRowHeight() {
+            var $sampleRow =
+                $body
+                    ? $body.children('.VAS_055_cash-category-row').first()
+                    : null;
+
+            var rowHeight =
+                ($sampleRow && $sampleRow.length)
+                    ? $sampleRow.outerHeight()
+                    : 0;
+
+            return rowHeight > 0 ? rowHeight : ROW_HEIGHT_FALLBACK;
+        }
+
+        /* The body is a flex column with a `gap` between rows — it has to be part of
+           the fit, otherwise every extra row is short by one gap. */
+        function measureRowGap() {
+            if (!$body || !$body[0] || !window.getComputedStyle) {
+                return 0;
+            }
+
+            var style = window.getComputedStyle($body[0]);
+            var gap = parseFloat(style.rowGap || style.gap);
+
+            return isNaN(gap) ? 0 : gap;
+        }
+
+        /* Re-measure on the next frame — used when the body has no height yet (still
+           detached / not laid out), so the page size is not locked to the minimum. */
+        function scheduleCapacitySync(shouldReload) {
+            if (capacitySyncPending || capacityRetries >= MAX_CAPACITY_RETRIES) {
+                return;
+            }
+
+            capacityRetries++;
+            capacitySyncPending = true;
+
+            var raf =
+                window.requestAnimationFrame ||
+                function (callback) {
+                    return window.setTimeout(callback, 16);
+                };
+
+            raf(function () {
+                capacitySyncPending = false;
+
+                if (isDisposed) {
+                    return;
+                }
+
+                updateAdaptivePageSize(shouldReload);
+            });
         }
 
         function updateAdaptivePageSize(shouldReload) {
@@ -344,7 +417,28 @@
                 return;
             }
 
-            var nextPageSize = Math.max(2, Math.floor($body[0].clientHeight / 72));
+            var availableHeight = $body[0].clientHeight;
+
+            if (availableHeight <= 0) {
+                scheduleCapacitySync(shouldReload);
+                return;
+            }
+
+            capacityRetries = 0;
+
+            var rowHeight = measureRowHeight();
+            var gap = measureRowGap();
+
+            /* n rows occupy n*rowHeight + (n-1)*gap, so the fit is
+               n = (available + gap) / (rowHeight + gap). */
+            var nextPageSize =
+                Math.max(
+                    MIN_PAGE_SIZE,
+                    Math.floor(
+                        (availableHeight + gap) /
+                        (rowHeight + gap)
+                    )
+                );
 
             if (nextPageSize === pageSize) {
                 return;
@@ -371,6 +465,7 @@
             }
 
             resizeObserver = new ResizeObserver(function () {
+                capacityRetries = 0;
                 updateAdaptivePageSize(true);
             });
 
@@ -383,12 +478,11 @@
             var precision = item.stdPrecision || item.StdPrecision || precisionFallback;
             var rowCurrencySymbol = firstText(item.currencySymbol, item.CurrencySymbol, item.symbol, item.Symbol, currencySymbol);
             var rowCurrencyISO = firstText(item.currencyISO, item.CurrencyISO, item.currencyISOCode, item.CurrencyISOCode, currencyISO);
-            var rowCurrencyId = firstText(item.cCurrencyId, item.C_Currency_ID, item.CCurrencyId, currencyId);
             var colorClass = item.colorClass || 'VAS_055_cash-category-bar-' + ((index % 3) + 1);
 
             var $row = $('<div>', {
                 'class': 'VAS_055_cash-category-row',
-                'title': (item.name || lbl('VAS_055_Other', 'Other')) + ' · ' + formatCurrencyAmount(amount, rowCurrencySymbol, rowCurrencyISO, rowCurrencyId, precision)
+                'title': (item.name || lbl('VAS_055_Other', 'Other')) + ' · ' + formatCompactCurrency(amount, rowCurrencySymbol, rowCurrencyISO, precision)
             });
 
             var $rowTop = $('<div>', {
@@ -417,7 +511,7 @@
                 'class': 'VAS_055_cash-category-amount'
             });
 
-            renderCurrencyAmount($amount, amount, rowCurrencySymbol, rowCurrencyISO, rowCurrencyId, precision);
+            renderCurrencyAmount($amount, amount, rowCurrencySymbol, rowCurrencyISO, precision);
 
             var $track = $('<div>', {
                 'class': 'VAS_055_cash-category-track',
@@ -431,7 +525,15 @@
                 'class': 'VAS_055_cash-category-fill ' + colorClass
             }).css('--VAS_055_bar-width', percent + '%');
 
-            $metrics.append($percent).append($amount);
+            /* One metric line: amount, a muted middle-dot, then the share —
+               "$1.069B · 82%". */
+            var $separator = $('<span>', {
+                'class': 'VAS_055_cash-category-sep',
+                'aria-hidden': 'true',
+                'text': '·'
+            });
+
+            $metrics.append($amount).append($separator).append($percent);
             $rowTop.append($name).append($metrics);
             $track.append($bar);
             $row.append($rowTop).append($track);
@@ -446,7 +548,7 @@
 
             var widgetId = $self.AD_UserHomeWidgetID;
             var items = data.items || [];
-            var $body = $root.find('#VAS_055_cash-category-body-' + widgetId);
+            var $rows = $root.find('#VAS_055_cash-category-body-' + widgetId);
             var currencySymbol = firstText(data.currencySymbol, data.CurrencySymbol, data.symbol, data.Symbol);
             var currencyISO = firstText(data.currencyISO, data.CurrencyISO, data.currencyISOCode, data.CurrencyISOCode);
             var currencyId = firstText(data.cCurrencyId, data.C_Currency_ID, data.CCurrencyId);
@@ -461,24 +563,27 @@
 
             $root.find('#VAS_055_cash-category-state-' + widgetId).removeClass('is-visible').text('');
             var title = data.title || lbl('VAS_055_CashOutByCategory', 'Cash Out by Category');
-            var metaText = data.metaText || lbl('VAS_055_Today', 'Today');
             $root.find('#VAS_055_cash-category-title-' + widgetId).text(title).attr('title', title);
-            $root.find('#VAS_055_cash-category-meta-' + widgetId).text(metaText).attr('title', metaText);
-            $root.find('#VAS_055_cash-category-why-' + widgetId).text(data.whyLabel || lbl('VAS_055_Why', 'Why'));
-            $root.find('#VAS_055_cash-category-why-text-' + widgetId).text(data.whyText || lbl('VAS_055_WhyText', 'Grouped by cash type for today.'));
 
-            $body.empty();
+            $rows.empty();
 
             if (data.hasData === false || items.length === 0) {
-                setState('No data');
+                setState(lbl('VAS_055_NoData', 'No cash out today'));
                 return;
             }
 
             $.each(items, function (index, item) {
-                $body.append(createRow(item, index, currencySymbol, currencyISO, currencyId, precision));
+                $rows.append(createRow(item, index, currencySymbol, currencyISO, currencyId, precision));
             });
 
             updatePager();
+
+            /* Rows are on screen now, so the capacity can be measured for real
+               (row height + gap). updateAdaptivePageSize() no-ops when the size is
+               unchanged, so this settles after at most one extra fetch. Without it
+               the widget kept the size it guessed while its body was still
+               unsized — e.g. 2 rows in a card with room for 4. */
+            updateAdaptivePageSize(true);
         }
 
         function loadData() {
@@ -542,6 +647,17 @@
             loadData();
         };
 
+        /* Re-measure the row capacity when the dashboard resizes the widget — the
+           framework's own size hook, in addition to the ResizeObserver. */
+        this.handleSizeChange = function () {
+            if (isDisposed) {
+                return;
+            }
+
+            capacityRetries = 0;
+            updateAdaptivePageSize(true);
+        };
+
         this.disposeComponent = function () {
             isDisposed = true;
 
@@ -587,9 +703,14 @@
         if (this.frame && this.frame.getContentGrid) {
             this.frame.getContentGrid().append(this.getRoot());
         }
+
+        ensureDashInlineSizeVar(this.getRoot());
     };
 
     VAS.VAS_055_CashByCategoryCashJournalWidget.prototype.widgetSizeChange = function (height, width) {
+        if (this.handleSizeChange) {
+            this.handleSizeChange();
+        }
     };
 
     VAS.VAS_055_CashByCategoryCashJournalWidget.prototype.dispose = function () {

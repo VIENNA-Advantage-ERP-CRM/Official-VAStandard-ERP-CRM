@@ -1,0 +1,874 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Goods Receipt Note (GRN) Overview tab panel
+ *               (VAS.VAS_099_OverviewGRN). All classes are MPC-prefixed
+ *               (MPC-vasgrn-*) and scoped under the panel root to avoid global
+ *               collisions. Ports the Onfinity GRN reference design (Roboto,
+ *               white/glass surfaces, soft blue borders, chips with leading
+ *               dots, KPI tiles with accent rails, pastel stepper, flat table)
+ *               into the windows-and-panels em-anchored body language shared
+ *               with VAS_092_OverviewPurchaseOrder.
+ * Chronological development:
+ *   VAI163   2026-07-06  Created
+ *   VAI163   2026-07-17  Header title strip is now untinted (gradient dropped),
+ *                        matching VAS_106_OverviewSalesOrder.
+ *   VAI163   2026-07-17  Header identity card aligned to VAS_106: 1.4fr/1fr
+ *                        columns with a divider between them (stacking to a
+ *                        bottom rule when narrow), plus its RTL mirror.
+ *   VAI163   2026-07-27  Added the line-item Attribute Set Instance sub-line
+ *                        (.MPC-vasgrn-itAttr). Enlarged the panel title
+ *                        (.MPC-vasgrn-hdrTitle 1.25em -> 1.4em). Root no longer
+ *                        scrolls horizontally (overflow-x hidden) so the panel
+ *                        renders correctly at 80% browser zoom; the material
+ *                        table keeps its own inner scroll. Added disabled / busy
+ *                        action-button states and an action-feedback toast
+ *                        (.MPC-vasgrn-toast).
+ *   VAI163   2026-07-28  Added the References card (.MPC-vasgrn-refCard), the
+ *                        Notes card (.MPC-vasgrn-textCard) and the locator
+ *                        tooltip affordance (.MPC-vasgrn-itLoc). The material
+ *                        table drops to six columns when the Quality column is
+ *                        not rendered (.MPC-vasgrn-table.no-quality).
+ *   VAI163   2026-07-28  Quality inspection styling: accepted / rejected metric
+ *                        tones, the three-up snapshot grid used when those two
+ *                        cards are present (.MPC-vasgrn-snap.has-qc), and the
+ *                        Quality Product table (.MPC-vasgrn-qpTable) with its
+ *                        pass / fail / pending tags.
+ *   VAI163   2026-07-28  Received quantity stacks its progress bar under the
+ *                        figure so it aligns with Ordered; tabular figures on the
+ *                        numeric columns. Added the Activity list
+ *                        (.MPC-vasgrn-actList) and the material-lines pager
+ *                        (.MPC-vasgrn-pager).
+ ***********************************************************/
+
+.MPC-vasgrn-root {
+    /* Canonical palette */
+    --grn-text:        #102C3F;
+    --grn-muted:       #5F7283;
+    --grn-sub:         #41576A;
+    --grn-action:      #0083DA;
+    --grn-action-dk:   #005FA3;
+    --grn-link:        #106AB0;
+    --grn-card-bd:     #D9E2EB;
+    --grn-row-div:     #E2EAF1;
+    --grn-card-radius: 12px;
+    /* Semantic tones */
+    --grn-info-bg:     #EAF8FF;  --grn-info-tx:    #0083DA;
+    --grn-success-bg:  #E9F6EE;  --grn-success-tx: #0B6B45;
+    --grn-warning-bg:  #FFF6E2;  --grn-warning-tx: #9A6500;
+    --grn-risk-bg:     #FCEFEF;  --grn-risk-tx:    #D14545;
+    --grn-purple-bg:   #EFEEFF;  --grn-purple-tx:  #5F4AA6;
+    --grn-neutral-bg:  #EEF1F4;  --grn-neutral-tx: #5F7283;
+
+    position: relative;
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    overflow-y: auto;
+    /* Never let the panel itself scroll horizontally (e.g. at 80% browser zoom);
+       the material table keeps its own inner overflow-x scroll when narrow. */
+    overflow-x: hidden;
+    color: var(--grn-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    /* Body anchor: container-query inline size drives the em scale. */
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vasgrn-root * { box-sizing: border-box; }
+
+/* The body sets the em anchor — every internal size below is em against this. */
+.MPC-vasgrn-body {
+    font-size: clamp(15px, 2.8cqi, 17px);
+    padding: 1.125em 0.875em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875em;
+}
+
+.MPC-vasgrn-empty {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--grn-muted);
+    font-size: 0.875em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Section + Section Header                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-sec { display: block; }
+
+.MPC-vasgrn-secHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75em;
+    margin-bottom: 0.5em;
+}
+
+.MPC-vasgrn-secTitle {
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--grn-text);
+    margin: 0;
+    line-height: 1.2;
+}
+
+.MPC-vasgrn-secSummary {
+    font-size: 0.75em;
+    font-weight: 400;
+    color: var(--grn-muted);
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Icon wrapper                                               */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-ic { display: inline-flex; align-items: center; flex: none; }
+.MPC-vasgrn-ic svg { display: block; }
+
+/* ----------------------------------------------------------- */
+/*  Header — title strip                                        */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-hdr {
+    border-radius: 14px;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasgrn-hdrTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.875em;
+}
+
+.MPC-vasgrn-hdrTitleWrap { min-width: 0; }
+
+.MPC-vasgrn-hdrTitle {
+    font-size: 1.4em;
+    font-weight: 700;
+    color: var(--grn-text);
+    line-height: 1.2;
+}
+
+.MPC-vasgrn-hdrSub {
+    font-size: 0.75em;
+    color: var(--grn-sub);
+    margin-top: 0.3125em;
+}
+
+.MPC-vasgrn-hdrPills {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5em;
+}
+
+.MPC-vasgrn-hdrPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border-radius: 999px;
+    padding: 0.3125em 0.625em;
+    font-size: 0.6875em;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vasgrn-hdrPill.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.MPC-vasgrn-hdrPill.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.MPC-vasgrn-hdrPill.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.MPC-vasgrn-hdrPill.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.MPC-vasgrn-hdrPill.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.MPC-vasgrn-hdrPill.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+
+.MPC-vasgrn-hdrPill .MPC-vasgrn-ic { color: currentColor; }
+
+.MPC-vasgrn-hdrDot {
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Header — details card (supplier | receipt)                  */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-hdrCard {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 0.875em 1.75em;
+    border: 1px solid var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+.MPC-vasgrn-hdrColL { min-width: 0; border-right: 1px solid var(--grn-row-div); padding-right: 1.25em; }
+
+.MPC-vasgrn-hdrColR {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625em;
+}
+
+.MPC-vasgrn-hdrField { min-width: 0; }
+
+.MPC-vasgrn-fLabel {
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--grn-muted);
+    line-height: 1.3;
+}
+
+.MPC-vasgrn-fVal {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--grn-text);
+    line-height: 1.35;
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.MPC-vasgrn-fVal.is-link { color: var(--grn-link); }
+
+/* Narrow panels: stack the two columns and drop the pills below the title. */
+@container (max-width: 460px) {
+    .MPC-vasgrn-hdrCard { grid-template-columns: 1fr; }
+    .MPC-vasgrn-hdrColL { border-right: none; padding-right: 0; border-bottom: 1px solid var(--grn-row-div); padding-bottom: 0.75em; }
+    .MPC-vasgrn-hdrTop  { flex-direction: column; }
+    .MPC-vasgrn-hdrPills { justify-content: flex-start; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Vendor identity                                             */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-vendName {
+    font-size: 0.9375em;
+    font-weight: 700;
+    color: var(--grn-text);
+    margin-top: 0.1875em;
+}
+
+.MPC-vasgrn-vendGst {
+    font-size: 0.75em;
+    color: var(--grn-text);
+    margin-top: 0.25em;
+}
+.MPC-vasgrn-vendGst .MPC-vasgrn-gstLbl { color: var(--grn-muted); font-weight: 700; }
+
+.MPC-vasgrn-vendAddr {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5em;
+    font-size: 0.75em;
+    color: var(--grn-muted);
+    line-height: 1.45;
+    margin-top: 0.25em;
+}
+.MPC-vasgrn-vendAddr .MPC-vasgrn-ic { color: var(--grn-muted); margin-top: 0.15em; }
+
+.MPC-vasgrn-vendContact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375em 1.125em;
+    font-size: 0.75em;
+    color: var(--grn-text);
+    margin-top: 0.375em;
+}
+.MPC-vasgrn-contactBit { display: inline-flex; align-items: center; gap: 0.4375em; }
+.MPC-vasgrn-contactBit .MPC-vasgrn-ic { color: var(--grn-action); }
+
+/* ----------------------------------------------------------- */
+/*  References card (PO + linked documents)                     */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-refCard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr));
+    gap: 0.75em 1.5em;
+    border: 1px solid var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+}
+
+/* ----------------------------------------------------------- */
+/*  Snapshot (metric grid)                                      */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-snap {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75em;
+}
+
+.MPC-vasgrn-metric {
+    min-width: 0;
+    border: 1px solid var(--grn-card-bd);
+    border-left: 3px solid var(--grn-neutral-tx);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    padding: 0.75em 0.875em;
+}
+
+.MPC-vasgrn-metric.tone-total    { border-left-color: var(--grn-info-tx); }
+.MPC-vasgrn-metric.tone-lines    { border-left-color: var(--grn-neutral-tx); }
+.MPC-vasgrn-metric.tone-received { border-left-color: var(--grn-success-tx); }
+.MPC-vasgrn-metric.tone-quality  { border-left-color: #E08A1E; }
+.MPC-vasgrn-metric.tone-accepted { border-left-color: var(--grn-success-tx); }
+.MPC-vasgrn-metric.tone-rejected { border-left-color: var(--grn-risk-tx); }
+
+.MPC-vasgrn-mHead {
+    display: flex;
+    align-items: center;
+    gap: 0.375em;
+    margin-bottom: 0.375em;
+}
+
+.MPC-vasgrn-mLabel {
+    min-width: 0;
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--grn-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasgrn-metric.tone-total    .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-info-tx); }
+.MPC-vasgrn-metric.tone-lines    .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-neutral-tx); }
+.MPC-vasgrn-metric.tone-received .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-success-tx); }
+.MPC-vasgrn-metric.tone-quality  .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: #E08A1E; }
+.MPC-vasgrn-metric.tone-accepted .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-success-tx); }
+.MPC-vasgrn-metric.tone-rejected .MPC-vasgrn-mHead .MPC-vasgrn-ic { color: var(--grn-risk-tx); }
+
+.MPC-vasgrn-metric.tone-accepted .MPC-vasgrn-mVal { color: var(--grn-success-tx); }
+.MPC-vasgrn-metric.tone-rejected .MPC-vasgrn-mVal { color: var(--grn-risk-tx); }
+
+.MPC-vasgrn-mVal {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--grn-text);
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasgrn-mSub {
+    font-size: 0.6875em;
+    color: var(--grn-muted);
+    margin-top: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* With the Accepted / Rejected cards present there are six tiles — three-up keeps
+   them in two even rows instead of leaving two orphans on a second row. */
+.MPC-vasgrn-snap.has-qc { grid-template-columns: repeat(3, 1fr); }
+
+/* Narrow panels: 2-up, then single-column. */
+@container (max-width: 620px) {
+    .MPC-vasgrn-snap,
+    .MPC-vasgrn-snap.has-qc { grid-template-columns: repeat(2, 1fr); }
+}
+@container (max-width: 340px) {
+    .MPC-vasgrn-snap,
+    .MPC-vasgrn-snap.has-qc { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Receipt timeline (horizontal stepper)                       */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+}
+
+.MPC-vasgrn-step {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.MPC-vasgrn-stepRail {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.MPC-vasgrn-stepLine {
+    flex: 1 1 auto;
+    height: 2px;
+    background: #D9E6F2;
+}
+.MPC-vasgrn-step:first-child .MPC-vasgrn-stepLine-l,
+.MPC-vasgrn-step:last-child  .MPC-vasgrn-stepLine-r { visibility: hidden; }
+
+.MPC-vasgrn-step.is-done   .MPC-vasgrn-stepLine-r,
+.MPC-vasgrn-step.is-done   .MPC-vasgrn-stepLine-l,
+.MPC-vasgrn-step.is-active .MPC-vasgrn-stepLine-l { background: #67B98A; }
+
+.MPC-vasgrn-stepDot {
+    flex: none;
+    width: 2em;
+    height: 2em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    background: #EEF2F6;
+    color: #8A99A8;
+    border: 1.5px solid #DCE5EE;
+}
+.MPC-vasgrn-stepDot .MPC-vasgrn-ic { display: inline-flex; }
+
+.MPC-vasgrn-step.is-done .MPC-vasgrn-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border-color: #BFE6D2;
+}
+.MPC-vasgrn-step.is-active .MPC-vasgrn-stepDot {
+    background: #E4F3EC;
+    color: #1F9D5B;
+    border: 2px solid #67B98A;
+}
+
+.MPC-vasgrn-stepLabel {
+    margin-top: 0.5em;
+    text-align: center;
+    padding: 0 0.25em;
+    min-width: 0;
+}
+
+.MPC-vasgrn-stepTitle {
+    font-size: 0.8125em;
+    font-weight: 700;
+    color: var(--grn-text);
+}
+
+.MPC-vasgrn-stepMeta {
+    font-size: 0.6875em;
+    color: var(--grn-muted);
+    margin-top: 0.25em;
+}
+.MPC-vasgrn-step.is-pending .MPC-vasgrn-stepMeta { color: var(--grn-warning-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Material table                                              */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-table {
+    border: 1px solid var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+.MPC-vasgrn-tRow {
+    display: grid;
+    align-items: center;
+    gap: 0.625em;
+    padding: 0.625em 0.875em;
+    grid-template-columns: 2.4fr 0.7fr 0.8fr 1fr 0.9fr 1fr 0.9fr;
+}
+
+/* No line on the receipt has a quality check applicable — the Quality column is
+   not rendered, so the grid runs six columns wide. */
+.MPC-vasgrn-table.no-quality .MPC-vasgrn-tRow {
+    grid-template-columns: 2.4fr 0.7fr 0.8fr 1fr 0.9fr 1fr;
+}
+
+.MPC-vasgrn-tHead {
+    background: #F5F8FB;
+    border-bottom: 1px solid var(--grn-card-bd);
+    font-size: 0.6875em;
+    font-weight: 700;
+    letter-spacing: .3px;
+    text-transform: uppercase;
+    color: var(--grn-muted);
+}
+
+.MPC-vasgrn-tBody {
+    border-bottom: 1px solid var(--grn-row-div);
+    font-size: 0.8125em;
+    color: var(--grn-text);
+}
+.MPC-vasgrn-tBody:last-of-type { border-bottom: none; }
+.MPC-vasgrn-tBody:hover { background: #FAFCFE; }
+
+.MPC-vasgrn-table .ta-r { text-align: right; justify-content: flex-end; }
+.MPC-vasgrn-table .ta-c { text-align: center; justify-content: center; }
+
+/* Tabular figures so the quantity / amount columns line up digit for digit
+   instead of drifting with proportional glyph widths. */
+.MPC-vasgrn-table .ta-r,
+.MPC-vasgrn-recvVal { font-variant-numeric: tabular-nums; }
+
+.MPC-vasgrn-itItem { min-width: 0; }
+.MPC-vasgrn-itName {
+    font-size: 1.0769em; /* ~0.875em against the body anchor */
+    font-weight: 700;
+    color: var(--grn-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.MPC-vasgrn-itSku {
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    color: var(--grn-muted);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Locator segment — the full locator name is on its title attribute, so signal
+   that hovering reveals something. */
+.MPC-vasgrn-itLoc { cursor: help; }
+/* Attribute Set Instance sub-line (size / lot / serial ...). */
+.MPC-vasgrn-itAttr {
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    color: var(--grn-sub);
+    margin-top: 0.125em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Received cell — value on its own line with the progress bar stacked beneath,
+   so the figure shares a baseline and right edge with the Ordered column instead
+   of being pushed inward by an inline bar. */
+.MPC-vasgrn-recv {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    /* .ta-r sets justify-content for row-direction cells; on this column-direction
+       cell that would sink the content to the bottom. */
+    justify-content: center;
+    gap: 0.3em;
+}
+.MPC-vasgrn-recvVal { line-height: 1.25; }
+.MPC-vasgrn-recvBar {
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: #E7EEF4;
+    overflow: hidden;
+    flex: none;
+}
+.MPC-vasgrn-recvBar i { display: block; height: 100%; border-radius: 999px; }
+.MPC-vasgrn-recv.full i { background: var(--grn-success-tx); }
+.MPC-vasgrn-recv.part i { background: var(--grn-warning-tx); }
+.MPC-vasgrn-recv.none i { background: #CBD5DF; }
+.MPC-vasgrn-recv.full { color: var(--grn-success-tx); font-weight: 500; }
+.MPC-vasgrn-recv.part { color: var(--grn-warning-tx); font-weight: 500; }
+.MPC-vasgrn-recv.none { color: var(--grn-muted); }
+
+/* Quality tag */
+.MPC-vasgrn-tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1875em 0.5em;
+    font-size: 0.9231em;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: nowrap;
+}
+.MPC-vasgrn-tag.q-on  { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.MPC-vasgrn-tag.q-off { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+
+/* Quality Product verdict tags. */
+.MPC-vasgrn-tag.q-pass { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.MPC-vasgrn-tag.q-fail { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.MPC-vasgrn-tag.q-wait { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+
+/* ----------------------------------------------------------- */
+/*  Quality Product table                                       */
+/* ----------------------------------------------------------- */
+/* Product | Parameter | To Verify | Acceptable | Actual | QA Date | Status |
+   Confirmation. Reuses the material table's frame, rows and header. */
+.MPC-vasgrn-qpTable .MPC-vasgrn-tRow {
+    grid-template-columns: 1.8fr 1.5fr 0.8fr 1fr 1fr 1fr 0.9fr 1fr;
+}
+
+.MPC-vasgrn-qpName {
+    font-size: 1.0769em; /* ~0.875em against the body anchor */
+    font-weight: 700;
+    color: var(--grn-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* A quality check applies but no parameters have been recorded yet. */
+.MPC-vasgrn-qpEmpty {
+    border: 1px dashed var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    padding: 0.875em 1em;
+    font-size: 0.8125em;
+    color: var(--grn-muted);
+    text-align: center;
+}
+
+/* Totals footer */
+.MPC-vasgrn-tFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 1.375em;
+    padding: 0.6875em 0.875em;
+    background: #F5F8FB;
+    border-top: 1px solid var(--grn-card-bd);
+    font-size: 0.8125em;
+}
+.MPC-vasgrn-tf { color: var(--grn-muted); }
+.MPC-vasgrn-tf b { color: var(--grn-text); font-weight: 700; margin-left: 0.375em; }
+.MPC-vasgrn-tf.is-grand { color: var(--grn-text); font-weight: 700; }
+.MPC-vasgrn-tf.is-grand b { color: var(--grn-action); margin-left: 0.5em; font-size: 1.15em; }
+
+/* Narrow panels: let the table scroll horizontally rather than crush columns. */
+@container (max-width: 620px) {
+    .MPC-vasgrn-table { overflow-x: auto; }
+    .MPC-vasgrn-tRow { min-width: 560px; }
+    .MPC-vasgrn-table.no-quality .MPC-vasgrn-tRow { min-width: 480px; }
+    /* Eight columns need more room before they start crushing. */
+    .MPC-vasgrn-qpTable .MPC-vasgrn-tRow { min-width: 720px; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Pager (material lines)                                      */
+/* ----------------------------------------------------------- */
+/* Deliberately a sibling of the table, not a child: the table scrolls
+   horizontally on narrow panels and the controls must stay put. */
+.MPC-vasgrn-pager {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5em 0.875em;
+    margin-top: 0.5em;
+    font-size: 0.75em;
+    color: var(--grn-muted);
+}
+
+.MPC-vasgrn-pgCtrls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.MPC-vasgrn-pgPos { color: var(--grn-text); font-weight: 700; }
+
+.MPC-vasgrn-pgBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125em;
+    border: 1px solid var(--grn-card-bd);
+    border-radius: 999px;
+    background: #fff;
+    padding: 0.3125em 0.75em;
+    color: var(--grn-action);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.MPC-vasgrn-pgBtn:hover { background: var(--grn-info-bg); border-color: var(--grn-action); }
+.MPC-vasgrn-pgBtn .MPC-vasgrn-ic { color: currentColor; }
+.MPC-vasgrn-pgBtn.is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+    color: var(--grn-muted);
+}
+
+/* ----------------------------------------------------------- */
+/*  Notes (GRN header description)                              */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-textCard {
+    border: 1px solid var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    padding: 0.75em 1em;
+    font-size: 0.8125em;
+    color: var(--grn-sub);
+    line-height: 1.55;
+}
+.MPC-vasgrn-textCard p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.MPC-vasgrn-textCard p + p { margin-top: 0.5em; }
+
+/* ----------------------------------------------------------- */
+/*  Activity (audit trail)                                      */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-actList {
+    border: 1px solid var(--grn-card-bd);
+    border-radius: var(--grn-card-radius);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* tag | what happened | when · by whom */
+.MPC-vasgrn-actRow {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.5625em 0.875em;
+    border-bottom: 1px solid var(--grn-row-div);
+    font-size: 0.8125em;
+}
+.MPC-vasgrn-actRow:last-child { border-bottom: none; }
+.MPC-vasgrn-actRow:hover { background: #FAFCFE; }
+
+.MPC-vasgrn-actTag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375em;
+    flex: none;
+    border-radius: 999px;
+    padding: 0.25em 0.625em;
+    font-size: 0.8462em; /* ~0.6875em against the body anchor */
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.MPC-vasgrn-actTag .MPC-vasgrn-ic { color: currentColor; }
+.MPC-vasgrn-actTag.tone-info    { background: var(--grn-info-bg);    color: var(--grn-info-tx); }
+.MPC-vasgrn-actTag.tone-success { background: var(--grn-success-bg); color: var(--grn-success-tx); }
+.MPC-vasgrn-actTag.tone-warning { background: var(--grn-warning-bg); color: var(--grn-warning-tx); }
+.MPC-vasgrn-actTag.tone-risk    { background: var(--grn-risk-bg);    color: var(--grn-risk-tx); }
+.MPC-vasgrn-actTag.tone-purple  { background: var(--grn-purple-bg);  color: var(--grn-purple-tx); }
+.MPC-vasgrn-actTag.tone-neutral { background: var(--grn-neutral-bg); color: var(--grn-neutral-tx); }
+
+.MPC-vasgrn-actTitle {
+    min-width: 0;
+    color: var(--grn-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vasgrn-actWhen {
+    flex: none;
+    text-align: right;
+    color: var(--grn-muted);
+    font-size: 0.9231em; /* ~0.75em against the body anchor */
+    white-space: nowrap;
+}
+
+/* Narrow panels: drop the timestamp onto its own line under the description. */
+@container (max-width: 460px) {
+    .MPC-vasgrn-actRow { grid-template-columns: auto 1fr; }
+    .MPC-vasgrn-actWhen { grid-column: 2; text-align: left; }
+}
+
+/* ----------------------------------------------------------- */
+/*  Actions (visual buttons)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.625em;
+    padding-top: 0.125em;
+}
+
+.MPC-vasgrn-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375em;
+    height: 2.25em;
+    padding: 0 1.125em;
+    border-radius: 999px;
+    font-size: 0.8125em;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+}
+.MPC-vasgrn-btn .MPC-vasgrn-ic { color: currentColor; }
+
+.MPC-vasgrn-btn.btn-pri {
+    background: var(--grn-action);
+    border: 1px solid var(--grn-action);
+    color: #fff;
+}
+.MPC-vasgrn-btn.btn-pri:hover { background: var(--grn-action-dk); border-color: var(--grn-action-dk); }
+
+.MPC-vasgrn-btn.btn-sec {
+    background: #fff;
+    border: 1px solid var(--grn-action);
+    color: var(--grn-action);
+}
+.MPC-vasgrn-btn.btn-sec:hover { background: var(--grn-info-bg); }
+
+/* Disabled / in-flight action buttons. */
+.MPC-vasgrn-btn.is-disabled {
+    opacity: .45;
+    cursor: default;
+    pointer-events: none;
+}
+.MPC-vasgrn-btn.is-busy {
+    opacity: .7;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ----------------------------------------------------------- */
+/*  Toast (action feedback)                                    */
+/* ----------------------------------------------------------- */
+.MPC-vasgrn-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 16px;
+    transform: translate(-50%, 12px);
+    max-width: 90%;
+    padding: 0.5em 0.875em;
+    border-radius: 8px;
+    background: #102C3F;
+    color: #fff;
+    font-size: 0.8125em;
+    line-height: 1.4;
+    box-shadow: 0 6px 18px rgba(16, 44, 63, 0.25);
+    opacity: 0;
+    z-index: 1000;
+    transition: opacity .25s ease, transform .25s ease;
+    pointer-events: none;
+}
+.MPC-vasgrn-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.MPC-vasgrn-toast.err  { background: #B23636; }
+.MPC-vasgrn-toast.ok   { background: #0C5D38; }
+
+/* ----------------------------------------------------------- */
+/*  RTL                                                         */
+/* ----------------------------------------------------------- */
+[dir="rtl"] .MPC-vasgrn-hdrColL { border-right: none; border-left: 1px solid var(--grn-row-div); padding-right: 0; padding-left: 1.25em; }
+[dir="rtl"] .MPC-vasgrn-table .ta-r { text-align: left; justify-content: flex-start; }
+[dir="rtl"] .MPC-vasgrn-recv { align-items: flex-start; }
+[dir="rtl"] .MPC-vasgrn-actRow { text-align: right; }
+[dir="rtl"] .MPC-vasgrn-actWhen { text-align: left; }
+[dir="rtl"] .MPC-vasgrn-pgBtn .MPC-vasgrn-ic svg { transform: scaleX(-1); }
+[dir="rtl"] .MPC-vasgrn-tFoot { justify-content: flex-start; }
+[dir="rtl"] .MPC-vasgrn-tf b { margin-left: 0; margin-right: 0.375em; }
+[dir="rtl"] .MPC-vasgrn-tf.is-grand b { margin-left: 0; margin-right: 0.5em; }
+[dir="rtl"] .MPC-vasgrn-actions { justify-content: flex-start; }

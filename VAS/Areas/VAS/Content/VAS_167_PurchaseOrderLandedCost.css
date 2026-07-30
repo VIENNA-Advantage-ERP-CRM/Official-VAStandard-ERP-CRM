@@ -1,0 +1,727 @@
+/************************************************************
+ * Module Name : VAS
+ * Purpose     : Styles for the Expected Landed Cost tab panel
+ *               (VAS.VAS_167_PurchaseOrderLandedCost). All classes are
+ *               MPC-prefixed (MPC-vaselc-*) and scoped under the panel
+ *               root to avoid global collisions.
+ *
+ *               Structure follows the reference design: a fixed header bar
+ *               (title, PO Number · Order Date · Document Type, state badge)
+ *               above the only scrolling region — the panel body. Every flex
+ *               child in that chain carries min-height: 0 / min-width: 0 so a
+ *               body full of expanded generated-lines blocks scrolls instead
+ *               of stretching the panel.
+ *
+ *               Palette is the canonical one (primary #0083DA, action
+ *               #1F83FF, link #106AB0, text #102C3F / #5F7283 / #748494,
+ *               surfaces #FFFFFF / #EEF6FF, border #E4EDF4, divider #EDF2F6).
+ *               Underline-only form fields, capsule buttons, no boxed inputs,
+ *               no nested card mosaics, no dark mode.
+ * Chronological development:
+ *   VAI163   2026-07-30  Created
+ ***********************************************************/
+
+.MPC-vaselc-root {
+    /* Canonical palette */
+    --vaselc-text:        #102C3F;
+    --vaselc-text-strong: #141414;
+    --vaselc-sub:         #5F7283;
+    --vaselc-muted:       #748494;
+    --vaselc-primary:     #0083DA;
+    --vaselc-action:      #1F83FF;
+    --vaselc-link:        #106AB0;
+    --vaselc-white:       #FFFFFF;
+    --vaselc-faint:       #EEF6FF;
+    --vaselc-active:      #EAF8FF;
+    --vaselc-pale-bd:     #BFE4FF;
+    --vaselc-border:      #E4EDF4;
+    --vaselc-divider:     #EDF2F6;
+    --vaselc-field-bd:    #D7D7D7;
+    --vaselc-info-bg:     #DFF1FF;
+    /* Semantic tones */
+    --vaselc-success-bg:  #CCEFDD;  --vaselc-success-tx: #0C5D38;
+    --vaselc-neutral-bg:  #E9EDF1;  --vaselc-neutral-tx: #5A6B79;
+    --vaselc-warn-bg:     #FCEFD2;  --vaselc-warn-tx:    #9A6500;
+    --vaselc-risk-bg:     #FAD7D7;  --vaselc-risk-tx:    #8F2D2D;
+    --vaselc-danger:      #ED1C24;
+    --vaselc-qty-bg:      #D9ECFF;  --vaselc-qty-tx:     #0E5DA8;
+    --vaselc-value-bg:    #EDE9FF;  --vaselc-value-tx:   #5F4AA6;
+    --vaselc-equal-bg:    #E4F5EC;  --vaselc-equal-tx:   #0C5D38;
+    --vaselc-shadow:      0 10px 24px rgba(15, 61, 97, 0.06);
+    --vaselc-radius:      13px;
+
+    position: relative;
+    height: 100%;
+    /* Header fixed, body scrolls: the panel itself never scrolls. */
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    background: var(--vaselc-white);
+    color: var(--vaselc-text);
+    font-family: Roboto, "Segoe UI", Arial, sans-serif;
+    container-type: inline-size;
+    box-sizing: border-box;
+}
+
+.MPC-vaselc-root * { box-sizing: border-box; }
+
+/* ---------------- Fixed header bar ---------------- */
+
+.MPC-vaselc-head {
+    flex: none;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 18px;
+    background: var(--vaselc-white);
+    border-bottom: 1px solid var(--vaselc-border);
+}
+
+.MPC-vaselc-headText { min-width: 0; }
+
+.MPC-vaselc-headTitle {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--vaselc-text-strong);
+    line-height: 1.2;
+}
+
+.MPC-vaselc-headSub {
+    font-size: 12px;
+    color: #717182;
+    margin-top: 3px;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.MPC-vaselc-headSub b {
+    color: var(--vaselc-text);
+    font-weight: 500;
+}
+
+/* State badge: neutral "Expected" in draft, green "Lines Generated" once
+   the order is completed. */
+.MPC-vaselc-badge {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    background: var(--vaselc-neutral-bg);
+    color: var(--vaselc-neutral-tx);
+}
+
+.MPC-vaselc-badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #9FB1C0;
+}
+
+.MPC-vaselc-badge.is-generated {
+    background: var(--vaselc-success-bg);
+    color: var(--vaselc-success-tx);
+}
+
+.MPC-vaselc-badge.is-generated::before { background: var(--vaselc-success-tx); }
+
+/* ---------------- Scrolling body ---------------- */
+
+.MPC-vaselc-body {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    padding: 14px 18px 20px;
+}
+
+.MPC-vaselc-body::-webkit-scrollbar { width: 9px; }
+.MPC-vaselc-body::-webkit-scrollbar-thumb {
+    background: rgba(15, 61, 97, 0.14);
+    border-radius: 99px;
+}
+
+.MPC-vaselc-stack {
+    min-width: 0;
+    animation: MPC-vaselc-rise 0.28s ease both;
+}
+
+.MPC-vaselc-noRecord {
+    padding: 40px 18px;
+    text-align: center;
+    color: var(--vaselc-muted);
+    font-size: 13px;
+}
+
+/* ---------------- Notice strips / hints ---------------- */
+
+.MPC-vaselc-strip {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 9px 13px;
+    margin-bottom: 12px;
+    border: 1px solid var(--vaselc-border);
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(230, 243, 252, 0.55), rgba(245, 250, 253, 0.7));
+    font-size: 12px;
+    color: var(--vaselc-sub);
+    line-height: 1.45;
+}
+
+.MPC-vaselc-strip .MPC-vaselc-ic { flex: none; margin-top: 1px; }
+.MPC-vaselc-strip.tone-warn .MPC-vaselc-ic { color: var(--vaselc-warn-tx); }
+.MPC-vaselc-strip.tone-risk .MPC-vaselc-ic { color: var(--vaselc-risk-tx); }
+
+.MPC-vaselc-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--vaselc-sub);
+    line-height: 1.45;
+}
+
+.MPC-vaselc-hint .MPC-vaselc-ic { flex: none; margin-top: 1px; }
+
+.MPC-vaselc-ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ---------------- Sub-caption row ---------------- */
+
+.MPC-vaselc-subcap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 0 9px;
+}
+
+.MPC-vaselc-cap {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vaselc-link);
+}
+
+.MPC-vaselc-capHint {
+    font-size: 11px;
+    color: var(--vaselc-sub);
+}
+
+/* ---------------- Cost elements table ---------------- */
+
+.MPC-vaselc-table {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-border);
+    border-radius: var(--vaselc-radius);
+    overflow: hidden;
+    box-shadow: var(--vaselc-shadow);
+}
+
+/* Three visual columns: identity | amount | actions. The panel is too narrow
+   for the five stored attributes as separate columns. */
+.MPC-vaselc-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr auto;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 13px;
+    min-width: 0;
+}
+
+.MPC-vaselc-row > span { min-width: 0; }
+
+.MPC-vaselc-rowHead {
+    background: var(--vaselc-faint);
+    border-bottom: 1px solid var(--vaselc-border);
+    font-size: 11.5px;
+    color: var(--vaselc-muted);
+}
+
+.MPC-vaselc-rowBody {
+    font-size: 13px;
+    border-bottom: 1px solid var(--vaselc-divider);
+}
+
+.MPC-vaselc-rowBody:hover { background: #FAFCFE; }
+
+.MPC-vaselc-rowBody.is-editing {
+    background: var(--vaselc-active);
+    box-shadow: inset 3px 0 0 var(--vaselc-primary);
+}
+
+.MPC-vaselc-name {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--vaselc-text);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vaselc-sub {
+    font-size: 10.5px;
+    color: var(--vaselc-muted);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vaselc-sub.is-warn { color: var(--vaselc-risk-tx); }
+
+.MPC-vaselc-chipWrap { margin-top: 4px; }
+
+.MPC-vaselc-distChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.MPC-vaselc-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.MPC-vaselc-distChip.dist-qty   { background: var(--vaselc-qty-bg);     color: var(--vaselc-qty-tx); }
+.MPC-vaselc-distChip.dist-value { background: var(--vaselc-value-bg);   color: var(--vaselc-value-tx); }
+.MPC-vaselc-distChip.dist-equal { background: var(--vaselc-equal-bg);   color: var(--vaselc-equal-tx); }
+.MPC-vaselc-distChip.dist-other { background: var(--vaselc-neutral-bg); color: var(--vaselc-neutral-tx); }
+
+.MPC-vaselc-amt { text-align: right; }
+
+.MPC-vaselc-amtV {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--vaselc-text);
+}
+
+.MPC-vaselc-amtV span {
+    margin-left: 3px;
+    font-weight: 400;
+    font-size: 10.5px;
+    color: var(--vaselc-muted);
+}
+
+.MPC-vaselc-amt .MPC-vaselc-sub { white-space: nowrap; }
+
+.ta-r { text-align: right; }
+.ta-c { text-align: center; }
+
+/* ---------------- Row actions ---------------- */
+
+.MPC-vaselc-acts {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Icon hit target stays at least 32px tall for pointer accessibility while the
+   painted button keeps the compact 26px look of the reference. */
+.MPC-vaselc-icBtn {
+    width: 32px;
+    height: 32px;
+    padding: 3px;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: #9FB1C0;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.MPC-vaselc-icBtn.is-edit:hover { background: var(--vaselc-info-bg); color: var(--vaselc-link); }
+.MPC-vaselc-icBtn.is-rm:hover   { background: var(--vaselc-risk-bg); color: var(--vaselc-risk-tx); }
+.MPC-vaselc-icBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+
+.MPC-vaselc-linesBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 26px;
+    padding: 0 9px;
+    flex: none;
+    border: none;
+    border-radius: 999px;
+    background: var(--vaselc-info-bg);
+    color: var(--vaselc-link);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.MPC-vaselc-linesBtn:hover { background: #CDE9FF; }
+.MPC-vaselc-linesBtn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 1px; }
+.MPC-vaselc-linesBtn .MPC-vaselc-ic { transition: transform 0.2s ease; }
+.MPC-vaselc-linesBtn.is-open .MPC-vaselc-ic { transform: rotate(180deg); }
+
+/* ---------------- Generated lines block ---------------- */
+
+.MPC-vaselc-linesWrap {
+    padding: 10px 12px 13px;
+    background: var(--vaselc-faint);
+    border-bottom: 1px solid var(--vaselc-divider);
+    animation: MPC-vaselc-rise 0.28s ease both;
+}
+
+.MPC-vaselc-linesWrap.is-closed { display: none; }
+
+.MPC-vaselc-linesCap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--vaselc-link);
+}
+
+.MPC-vaselc-linesEmpty {
+    padding: 6px 2px;
+    font-size: 11.5px;
+    color: var(--vaselc-muted);
+}
+
+.MPC-vaselc-lTable {
+    background: var(--vaselc-white);
+    border: 1px solid var(--vaselc-pale-bd);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.MPC-vaselc-lRow {
+    display: grid;
+    grid-template-columns: 1.9fr 1.1fr 0.55fr 1fr;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    min-width: 0;
+}
+
+.MPC-vaselc-lRow > span { min-width: 0; }
+
+.MPC-vaselc-lHead {
+    background: var(--vaselc-active);
+    border-bottom: 1px solid var(--vaselc-pale-bd);
+    font-size: 10.5px;
+    color: var(--vaselc-muted);
+}
+
+.MPC-vaselc-lBody {
+    font-size: 12px;
+    border-bottom: 1px solid var(--vaselc-divider);
+}
+
+.MPC-vaselc-lBody:last-child { border-bottom: none; }
+.MPC-vaselc-lBody:hover { background: #FAFCFE; }
+.MPC-vaselc-lBody .MPC-vaselc-name { font-size: 12px; }
+
+.MPC-vaselc-base {
+    font-size: 11px;
+    color: var(--vaselc-sub);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.MPC-vaselc-lFoot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 7px 11px;
+    background: var(--vaselc-active);
+    border-top: 1px solid var(--vaselc-pale-bd);
+    font-size: 11.5px;
+}
+
+.MPC-vaselc-lFoot .MPC-vaselc-tf { color: var(--vaselc-sub); }
+.MPC-vaselc-lFoot .MPC-vaselc-tf b {
+    margin-left: 5px;
+    color: var(--vaselc-text);
+    font-weight: 700;
+}
+
+/* Reconciliation warning: the generated lines no longer sum to the entry. */
+.MPC-vaselc-tf.is-warn { color: var(--vaselc-risk-tx); font-weight: 700; }
+
+/* ---------------- Table footer / empty ---------------- */
+
+.MPC-vaselc-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 9px 13px;
+    background: var(--vaselc-faint);
+    border-top: 1px solid var(--vaselc-border);
+    font-size: 12px;
+}
+
+.MPC-vaselc-foot .MPC-vaselc-tf { color: var(--vaselc-sub); }
+.MPC-vaselc-foot .MPC-vaselc-tf b {
+    margin-left: 5px;
+    color: var(--vaselc-text);
+    font-weight: 600;
+}
+
+.MPC-vaselc-grand {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--vaselc-text);
+}
+
+.MPC-vaselc-grand b {
+    margin-left: 6px;
+    font-size: 14px;
+    color: var(--vaselc-primary);
+}
+
+.MPC-vaselc-empty {
+    padding: 15px 13px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--vaselc-muted);
+}
+
+/* ---------------- Add / edit form ---------------- */
+
+.MPC-vaselc-form {
+    margin-top: 12px;
+    padding: 13px 15px 15px;
+    background: var(--vaselc-faint);
+    border: 1px dashed var(--vaselc-pale-bd);
+    border-radius: var(--vaselc-radius);
+}
+
+.MPC-vaselc-formCap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 13px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: var(--vaselc-link);
+}
+
+/* Two columns — the usual four do not fit a 30% panel. */
+.MPC-vaselc-formGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+}
+
+@container (max-width: 320px) {
+    .MPC-vaselc-formGrid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Underline-only field: no boxed input, no rounded card input. */
+.MPC-vaselc-ff {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--vaselc-field-bd);
+    min-width: 0;
+}
+
+.MPC-vaselc-ff:hover,
+.MPC-vaselc-ff:focus-within { border-bottom-color: var(--vaselc-primary); }
+
+.MPC-vaselc-ffBody {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.MPC-vaselc-ffBody label {
+    font-size: 11.5px;
+    color: var(--vaselc-sub);
+}
+
+.MPC-vaselc-req {
+    margin-left: 2px;
+    color: var(--vaselc-danger);
+}
+
+.MPC-vaselc-input {
+    width: 100%;
+    min-height: 18px;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--vaselc-text);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+input.MPC-vaselc-input { cursor: text; }
+.MPC-vaselc-input.is-num { text-align: right; }
+.MPC-vaselc-input::placeholder { color: #9F9F9F; font-weight: 400; }
+
+/* Select caret, drawn on the field rather than boxing the control. */
+.MPC-vaselc-ffBody.is-select { position: relative; }
+.MPC-vaselc-ffBody.is-select::after {
+    content: '';
+    position: absolute;
+    right: 2px;
+    bottom: 6px;
+    width: 6px;
+    height: 6px;
+    border-right: 1.8px solid var(--vaselc-primary);
+    border-bottom: 1.8px solid var(--vaselc-primary);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+.MPC-vaselc-formFoot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.MPC-vaselc-formNote {
+    font-size: 11px;
+    color: var(--vaselc-sub);
+}
+
+.MPC-vaselc-formErr {
+    margin-top: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: var(--vaselc-risk-bg);
+    color: var(--vaselc-risk-tx);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+/* Capsule buttons: filled primary, white/bordered secondary. */
+.MPC-vaselc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 13px;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.MPC-vaselc-btn.is-primary {
+    border: none;
+    background: var(--vaselc-action);
+    color: #fff;
+}
+
+.MPC-vaselc-btn.is-primary:hover { background: #0069AE; }
+
+.MPC-vaselc-btn.is-primary:disabled,
+.MPC-vaselc-btn.is-primary:disabled:hover {
+    background: var(--vaselc-action);
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.MPC-vaselc-btn.is-ghost {
+    border: 1px solid var(--vaselc-action);
+    background: #fff;
+    color: var(--vaselc-primary);
+}
+
+.MPC-vaselc-btn.is-ghost:hover { background: var(--vaselc-faint); }
+.MPC-vaselc-btn:focus-visible { outline: 2px solid var(--vaselc-primary); outline-offset: 2px; }
+
+/* ---------------- Toast ---------------- */
+
+.MPC-vaselc-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translate(-50%, 12px);
+    max-width: 88%;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 1.4;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.MPC-vaselc-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.MPC-vaselc-toast.ok  { background: var(--vaselc-success-bg); color: var(--vaselc-success-tx); }
+.MPC-vaselc-toast.err { background: var(--vaselc-risk-bg);    color: var(--vaselc-risk-tx); }
+
+/* ---------------- Motion ---------------- */
+
+@keyframes MPC-vaselc-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ---------------- RTL ---------------- */
+
+.vis-rtl .MPC-vaselc-amt,
+[dir="rtl"] .MPC-vaselc-amt,
+.vis-rtl .ta-r,
+[dir="rtl"] .ta-r { text-align: left; }
+
+.vis-rtl .MPC-vaselc-acts,
+[dir="rtl"] .MPC-vaselc-acts { justify-self: start; }
+
+.vis-rtl .MPC-vaselc-ffBody.is-select::after,
+[dir="rtl"] .MPC-vaselc-ffBody.is-select::after { right: auto; left: 2px; }
