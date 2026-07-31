@@ -127,6 +127,28 @@
             return code || "";
         }
 
+        // Reversing a purchase invoice leaves the document on DocStatus 'RE'. The
+        // panel must say "Reversed" wherever it would otherwise say "Completed" -
+        // a reversed document is finished, but it is not a good invoice.
+        function isReversed() {
+            return !!(data && (data.IsReversed || data.DocStatus === "RE"));
+        }
+
+        // The document reached its end state (nothing further happens on its own).
+        function isDocFinal() {
+            return !!(data && ["CO", "CL", "RE", "VO"].indexOf(data.DocStatus) >= 0);
+        }
+
+        // Status wording for the lifecycle / section chips: the in-progress, reversed
+        // and voided states win over the generic "Completed".
+        function docStateLabel() {
+            if (isReversed()) return lbl("VAS_065_Reversed", "Reversed");
+            if (data && data.DocStatus === "VO") return lbl("VAS_065_Voided", "Voided");
+            if (data && data.DocStatus === "CL") return lbl("VAS_065_Closed", "Closed");
+            if (data && data.DocStatus === "IP") return lbl("VAS_065_InProgress", "In progress");
+            return lbl("VAS_065_Completed", "Completed");
+        }
+
         /* ---------- lifecycle ---------- */
         this.init = function () {
             $root = $('<div class="vas-apinv-root"></div>');
@@ -434,17 +456,37 @@
             return (v == null || String(v).length === 0) ? "—" : v;
         }
 
-        /* Lifecycle stepper — at least two states required */
+        /* Lifecycle stepper — Drafted -> (In progress / Completed / Reversed) ->
+           Matched -> Posted -> Paid / Payment Due. The status stage is one stage that
+           names the state the document moved to, and is omitted while it is still a
+           draft. Approval is not part of the purchase-invoice lifecycle here, so
+           neither the Approved stage nor the approver is shown. */
         function buildLifecycle() {
             var steps = [];
-            steps.push({ t: lbl("VAS_065_Drafted", "Drafted"), sub: subLine(data.CreatedByName, data.Created), done: true });
+            var reachedEnd = isDocFinal();
+            var isDraft = data.DocStatus === "DR";
+
+            steps.push({
+                t: lbl("VAS_065_Drafted", "Drafted"),
+                sub: subLine(data.CreatedByName, data.Created),
+                done: !isDraft,
+                active: isDraft
+            });
+            // Where the document went after the draft — In progress while it is being
+            // processed, Completed / Reversed / Voided / Closed once it settles. A
+            // document still on Drafted has not reached this stage, so it is left out.
+            if (!isDraft) {
+                steps.push({
+                    t: docStateLabel(),
+                    sub: subLine("", data.Updated),
+                    done: reachedEnd,
+                    active: !reachedEnd
+                });
+            }
 
             var hasReceipt = data.GoodsReceipt && data.GoodsReceipt.Rows && data.GoodsReceipt.Rows.length;
             if (hasReceipt) {
                 steps.push({ t: lbl("Matched"), sub: subLine(data.GoodsReceipt.ReceiptDocumentNo, data.GoodsReceipt.ReceivedDate), done: true });
-            }
-            if (data.IsApproved) {
-                steps.push({ t: lbl("VAS_065_Approved", "Approved"), sub: subLine(data.ApprovedByName, data.Updated), done: true });
             }
             var posted = data.Posted === "Y";
             if (posted) {
@@ -466,9 +508,13 @@
             for (var k = 0; k < steps.length; k++) {
                 if (steps[k].active) activeIdx = k;
             }
+            // A reversed / voided document is not "Complete" - name the end state it
+            // actually reached.
             var summary = (activeIdx >= 0)
                 ? lbl("VAS_065_StageOf", "Stage {0} of {1}").replace("{0}", activeIdx + 1).replace("{1}", steps.length)
-                : lbl("VAS_065_Complete", "Complete");
+                : ((isReversed() || data.DocStatus === "VO")
+                    ? docStateLabel()
+                    : lbl("VAS_065_Complete", "Complete"));
 
             var $sec = section(lbl("VAS_065_Lifecycle", "Lifecycle"), summary);
             var $pipe = $('<div class="vas-apinv-pipe"></div>');
@@ -835,6 +881,11 @@
                 "VAS_065_GoodsReceiptMatching", "Goods Receipt & Matching",
                 "VAS_065_VendorReturnMatching", "Vendor Return & Matching"));
             $sec.find(".js-st").text(lbl("Matched"));
+            // Matched, but not cleanly - the header chip carries the same warning tone
+            // as the variance rows below it.
+            if (!gr.IsCleanMatch) {
+                $sec.find(".vas-apinv-spill").removeClass("ok").addClass("warn");
+            }
 
             var $kv = $sec.find(".js-kv");
             // Receipt/order docs, dates and warehouse can each be several distinct values
@@ -849,23 +900,38 @@
                 "VAS_065_VendorRMA", "Vendor RMA"), gr.OrderDocumentNo);
             kvRow($kv, retLbl("VAS_065_ReceivedOn", "Received On",
                 "VAS_065_ReturnedOn", "Returned On"), receivedOn);
-            // "QtyReceived" is an existing dictionary key, so it carries no inline
-            // fallback (undefined keeps lbl's raw-key behaviour unchanged).
+            // Quantity and price are the two figures the 3-way match can disagree on.
+            // Where the invoice differs from the receipt / order the row is tinted and
+            // the difference is spelled out, so "Variance found" points at something.
+            // ("QtyReceived" is an existing dictionary key, so it carries no inline
+            // fallback - undefined keeps lbl's raw-key behaviour unchanged.)
+            var qtyVar = +gr.QtyVariance || 0;
+            var priceVar = +gr.PriceVariance || 0;
             kvRow($kv, retLbl("QtyReceived", undefined,
                 "VAS_065_QtyReturned", "Quantity Returned"),
                 fmtNumber(gr.TotalReceived, 0) + " " +
-                lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim());
+                lbl("VAS_065_UnitsCount", "Units").replace("{0}", "").trim(),
+                qtyVar !== 0 ? "warn" : "",
+                qtyVar !== 0
+                    ? lbl("VAS_065_VarianceOf", "Variance {0}").replace("{0}", fmtNumber(qtyVar, 0))
+                    : "");
             kvRow($kv, lbl("VAS_065_Warehouse", "Warehouse"), gr.WarehouseName);
-            kvRow($kv, lbl("VAS_065_PriceVariance", "Price Variance"), fmtAmount(gr.PriceVariance));
+            kvRow($kv, lbl("VAS_065_PriceVariance", "Price Variance"), fmtAmount(gr.PriceVariance),
+                priceVar !== 0 ? "warn" : "");
             return $sec;
         }
-        function kvRow($kv, k, v) {
+        /* One key/value row. `tone` tints the row + value (variance highlight) and
+           `note` adds a second line under the value (e.g. the size of the variance). */
+        function kvRow($kv, k, v, tone, note) {
             if (v == null || String(v).length === 0) return;
+            var $r = $('<div class="vas-apinv-kv-r"></div>');
+            if (tone) $r.addClass("variance");
             // Show the full value as a hover title so large (comma-separated) details
             // stay readable even when the value is long.
-            $kv.append($('<div class="vas-apinv-kv-r"></div>')
-                .append($('<span class="vas-apinv-kv-k"></span>').text(k))
-                .append($('<span class="vas-apinv-kv-v"></span>').text(v).attr("title", String(v))));
+            var $v = $('<span class="vas-apinv-kv-v ' + (tone || "") + '"></span>')
+                .text(v).attr("title", String(v));
+            if (note) $v.append($('<span class="delta"></span>').text(note));
+            $kv.append($r.append($('<span class="vas-apinv-kv-k"></span>').text(k)).append($v));
         }
 
         function buildPaymentSchedule() {
@@ -977,9 +1043,6 @@
                         .replace("{1}", data.GoodsReceipt.OrderDocumentNo || ""), done: true
                 });
             }
-            if (data.IsApproved) {
-                steps.push({ st: lbl("VAS_065_Approved", "Approved"), mt: subLine(data.ApprovedByName, data.Updated), done: true });
-            }
             if (data.Posted === "Y") {
                 steps.push({ st: lbl("VAS_065_PostedToLedger", "Posted to ledger"), mt: fmtDate(data.DateAcct), done: true });
             }
@@ -995,7 +1058,14 @@
                 '</section>'
             );
             $sec.find(".vas-apinv-block-h").text(lbl("VAS_065_Approval", "Approval"));
-            $sec.find(".js-st").text(data.IsApproved ? lbl("VAS_065_Approved", "Approved") : (data.DocStatusName || docStatusLabel(data.DocStatus)));
+            // The document's own status - never "Approved". A reversed document reads
+            // "Reversed" here even though DocStatusName may lag behind.
+            $sec.find(".js-st").text(isReversed()
+                ? lbl("VAS_065_Reversed", "Reversed")
+                : (data.DocStatusName || docStatusLabel(data.DocStatus)));
+            if (isReversed() || data.DocStatus === "VO") {
+                $sec.find(".vas-apinv-spill").removeClass("ok").addClass("warn");
+            }
 
             var $steps = $sec.find(".js-steps");
             steps.forEach(function (s) {

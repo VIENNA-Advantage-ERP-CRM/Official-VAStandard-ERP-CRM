@@ -184,6 +184,9 @@ namespace VASLogic.Models
             data.PostedName = GetListReferenceName(ctx, "C_Invoice", "Posted", data.Posted);
             data.Processed = Util.GetValueOfString(r["Processed"]) == "Y";
             data.IsApproved = Util.GetValueOfString(r["IsApproved"]) == "Y";
+            // Reversing a purchase invoice (ReverseCorrectIt) leaves the document on
+            // DocStatus 'RE'. The panel shows "Reversed" instead of "Completed" for it.
+            data.IsReversed = data.DocStatus == "RE";
             data.Created = Util.GetValueOfDateTime(r["Created"]);
             data.CreatedByName = Util.GetValueOfString(r["CreatedByName"]);
             data.Updated = Util.GetValueOfDateTime(r["Updated"]);
@@ -2363,6 +2366,8 @@ namespace VASLogic.Models
             public string PostedName { get; set; }
             public bool Processed { get; set; }
             public bool IsApproved { get; set; }
+            /// <summary>Document was reversed (ReverseCorrectIt leaves DocStatus 'RE').</summary>
+            public bool IsReversed { get; set; }
             public DateTime? Created { get; set; }
             public string CreatedByName { get; set; }
             public DateTime? Updated { get; set; }
