@@ -528,7 +528,7 @@
             return Number(count) === 1
                 ? lbl(
                     'VAS_031_MessageInvoice',
-                    'invoice'
+                    'Invoice'
                 )
                 : lbl(
                     'VAS_031_MessageInvoices',

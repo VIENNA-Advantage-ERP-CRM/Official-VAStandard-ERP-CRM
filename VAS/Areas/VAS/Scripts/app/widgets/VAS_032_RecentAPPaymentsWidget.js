@@ -12,8 +12,8 @@
  *  3  | Vendor                               | VAS_032_MessageVendor
  *  4  | Document Number                      | VAS_032_MessageValueDocumentNumber
  *  5  | Method                               | VAS_032_MessageMethod
- *  6  | Bank Account Name                    | VAS_032_MessageBankAccountName
- *  7  | Status                               | VAS_032_MessageStatus
+ *  6  | Bank Account                         | VAS_032_MessageBankAccountName
+ *  7  | Execution Status                     | VAS_032_MessageStatus
  *  8  | Amount                               | VAS_032_MessageAmount
  *  9  | Loading                              | VAS_032_MessageLoading
  * 10  | No Data                              | VAS_032_MessageNoData
@@ -435,8 +435,8 @@
                 .append($('<th class="vas-recent-ap-payments-value">').text(lbl('VAS_032_MessageValueDocumentNumber', 'Document Number')))
                 .append($('<th class="vas-recent-ap-payments-vendor">').text(lbl('VAS_032_MessageVendor', 'Vendor')))
                 .append($('<th class="vas-recent-ap-payments-method-col">').text(lbl('VAS_032_MessageMethod', 'Method')))
-                .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name')))
-                .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_032_MessageStatus', 'Status')))
+                .append($('<th class="vas-recent-ap-payments-bank-account">').text(lbl('VAS_032_MessageBankAccountName', 'Bank Account')))
+                .append($('<th class="vas-recent-ap-payments-status-col">').text(lbl('VAS_032_MessageStatus', 'Execution Status')))
                 .append($('<th class="vas-recent-ap-payments-amount">').text(lbl('VAS_032_MessageAmount', 'Amount')));
 
             $thead.append($headerRow);
@@ -739,9 +739,9 @@
                 fieldHtml(lbl('VAS_032_MessagePaymentDate', 'Payment date'), escapeHtml(formatDate(payment.paymentDate))) +
                 fieldHtml(lbl('VAS_032_MessageValueDocumentNumber', 'Value (Document Number)'), '<span class="vas-recent-ap-payments-dialog-mono">' + escapeHtml(documentNo) + '</span>', null, documentNo) +
                 fieldHtml(lbl('VAS_032_MessageVendor', 'Vendor'), '<strong>' + escapeHtml(vendorName) + '</strong>', null, vendorName) +
-                fieldHtml(lbl('VAS_032_MessagePaymentMethod', 'Payment method'), escapeHtml(methodName), null, methodName) +
-                fieldHtml(lbl('VAS_032_MessageBankAccountName', 'Bank Account Name'), escapeHtml(bankAccountText), null, bankAccountText) +
-                fieldHtml(lbl('VAS_032_MessageStatus', 'Status'), '<span class="vas-recent-ap-payments-status ' + statusClass + '">' + escapeHtml(statusText) + '</span>') +
+                fieldHtml(lbl('VAS_032_MessagePaymentMethod', 'Payment Method'), escapeHtml(methodName), null, methodName) +
+                fieldHtml(lbl('VAS_032_MessageBankAccountName', 'Bank Account'), escapeHtml(bankAccountText), null, bankAccountText) +
+                fieldHtml(lbl('VAS_032_MessageStatus', 'Execution Status'), '<span class="vas-recent-ap-payments-status ' + statusClass + '">' + escapeHtml(statusText) + '</span>') +
                 fieldHtml(lbl('VAS_032_MessageAmount', 'Amount'), '<span class="vas-recent-ap-payments-dialog-amount">' + escapeHtml(amountText) + '</span>', 'vas-recent-ap-payments-dialog-amount-field', amountText);
 
             if (currencyText) {

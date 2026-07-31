@@ -19,11 +19,11 @@
  * 10  | Payment No.                                       | VAS_030_MessagePaymentNo
  * 11  | Date                                              | VAS_Date
  * 12  | Vendor                                            | VAS_Vendor
- * 13  | Bank account                                      | VAS_BankAccount
+ * 13  | Bank Account                                      | VAS_BankAccount
  * 14  | Payment Currency                                  | VAS_PaymentCurrency
  * 15  | Amount                                            | VAS_Amount
- * 16  | Method                                            | VAS_Method
- * 17  | Status                                            | VAS_Status
+ * 16  | Payment Method                                    | VAS_Method
+ * 17  | Execution Status                                  | VAS_030_Status
  * 18  | Previous                                          | VAS_Previous
  * 19  | Next                                              | VAS_Next
  * ──────────────────────────────────────────────────────────────────────────────
@@ -1754,7 +1754,7 @@
                 escapeHtml(
                     lbl(
                         'VAS_BankAccount',
-                        'Bank account'
+                        'Bank Account'
                     )
                 ) +
                 '</th>' +
@@ -1781,7 +1781,7 @@
                 '<th>' +
                 escapeHtml(
                     lbl(
-                        'VAS_Status',
+                        'VAS_030_Status',
                         'Execution Status'
                     )
                 ) +
