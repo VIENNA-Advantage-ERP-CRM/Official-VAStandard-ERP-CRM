@@ -1233,8 +1233,8 @@ namespace VAdvantage.Model
                                            inner join c_invoice i on i.c_invoice_id = il.c_invoice_id 
                                            WHERE ced.c_invoiceline_id > 0 AND ced.M_Inoutline_ID > 0 AND ced.qty > 0 AND ced.M_CostElement_ID in ( " + ce.GetM_CostElement_ID() + @" ) 
                                            and i.docstatus in ('CO' , 'CL') AND ced.C_AcctSchema_ID = " + GetC_AcctSchema_ID() +
-                                           @" AND ced.M_Product_ID = " + GetM_Product_ID() + $@" AND ced.AD_Org_ID IN ( { Org_ID } , {cd.GetAD_Org_ID()})
-                                                      AND NVL(ced.M_AttributeSetInstance_ID , 0) IN ( { M_ASI_ID }, {cd.GetM_AttributeSetInstance_ID()} )
+                                           @" AND ced.M_Product_ID = " + GetM_Product_ID() + $@" AND ced.AD_Org_ID IN ( {Org_ID} , {cd.GetAD_Org_ID()})
+                                                      AND NVL(ced.M_AttributeSetInstance_ID , 0) IN ( {M_ASI_ID}, {cd.GetM_AttributeSetInstance_ID()} )
                                                 AND ced.c_invoiceline_id <> {invoiceline.GetReversalDoc_ID()}
                                            ORDER BY ced.m_costelementdetail_id DESC ) where rnm <=1";
                             DataSet ds = DB.ExecuteDataset(sql, null, null);
@@ -3391,8 +3391,8 @@ namespace VAdvantage.Model
                                            inner join m_inout i on i.m_inout_id = il.m_inout_id 
                                            WHERE ced.m_inoutline_id > 0 AND ced.C_Orderline_ID > 0 AND ced.qty > 0 AND ced.M_CostElement_ID in ( " + ce.GetM_CostElement_ID() + @" ) 
                                            and i.docstatus in ('CO' , 'CL') AND ced.C_AcctSchema_ID = " + GetC_AcctSchema_ID() +
-                                           @" AND ced.M_Product_ID = " + GetM_Product_ID() + $@" AND ced.AD_Org_ID IN (  { Org_ID} , {cd.GetAD_Org_ID()} )
-                                                  AND NVL(ced.M_AttributeSetInstance_ID , 0) IN ( { M_ASI_ID }, {cd.GetM_AttributeSetInstance_ID()})
+                                           @" AND ced.M_Product_ID = " + GetM_Product_ID() + $@" AND ced.AD_Org_ID IN (  {Org_ID} , {cd.GetAD_Org_ID()} )
+                                                  AND NVL(ced.M_AttributeSetInstance_ID , 0) IN ( {M_ASI_ID}, {cd.GetM_AttributeSetInstance_ID()})
                                             AND ced.m_inoutline_id <> {inoutline.GetReversalDoc_ID()}
                                            ORDER BY ced.m_costelementdetail_id DESC ) where rnm <=1";
                             DataSet ds = DB.ExecuteDataset(sql, null, null);
@@ -3940,11 +3940,11 @@ namespace VAdvantage.Model
                     sql += $@" WHERE il.C_InvoiceLine_ID = {costingCheck.invoiceline.GetReversalDoc_ID()}
                                   AND ced.IsActive = 'Y'
                                   {(costingCheck.IsQunatityValidated ? "AND COALESCE(ced.M_CostElement_ID, 0) = 0" : "")}
-                                  AND ced.M_Product_ID = { product.GetM_Product_ID()}
-                                  AND ced.C_AcctSchema_ID = { mas.GetC_AcctSchema_ID()}
-                                  AND COALESCE(ced.M_AttributeSetInstance_ID, 0) IN(0, { M_ASI_ID})
+                                  AND ced.M_Product_ID = {product.GetM_Product_ID()}
+                                  AND ced.C_AcctSchema_ID = {mas.GetC_AcctSchema_ID()}
+                                  AND COALESCE(ced.M_AttributeSetInstance_ID, 0) IN(0, {M_ASI_ID})
                                   AND COALESCE(ced.C_InvoiceLine_ID, 0) = 0
-                                  AND ced.AD_Client_ID = { cd.GetAD_Client_ID()} ";
+                                  AND ced.AD_Client_ID = {cd.GetAD_Client_ID()} ";
                     dsValue = DB.ExecuteDataset(sql, null, null);/* Not tpo pass Trx, bcz match inv record deleted in trx*/
                     if (dsValue != null && dsValue.Tables.Count > 0 && dsValue.Tables[0].Rows.Count > 0)
                     {
@@ -4601,7 +4601,7 @@ namespace VAdvantage.Model
                       (SELECT CASE  WHEN costingmethod IS NOT NULL THEN CostingMethod  ELSE '' END  FROM m_costelement 
                                 WHERE m_costelement_id = CAST(cel.M_Ref_CostElement AS INTEGER) ) AS linkedcostMethod 
                             FROM M_CostElement ce INNER JOIN m_costelementline cel ON ce.M_CostElement_ID = cel.M_CostElement_ID 
-                          WHERE ce.AD_Client_ID= { GetAD_Client_ID() }
+                          WHERE ce.AD_Client_ID= {GetAD_Client_ID()}
                            AND ce.IsActive='Y' AND ce.CostElementType='C' AND cel.IsActive='Y' ";
             if (optionalStrcc == "window" && costingMethod == "C")
             {
@@ -4812,6 +4812,12 @@ namespace VAdvantage.Model
                             + cd.GetM_MovementLine_ID(), null, cd.Get_Trx())) > 0 ? true : false;
             }
 
+            bool VAS_IsAdjustLandedCostOnPhyInv = true;
+            if (windowName.Equals("Physical Inventory"))
+            {
+                VAS_IsAdjustLandedCostOnPhyInv = Util.GetValueOfBool(MClient.Get(cd.GetCtx(), cd.GetAD_Client_ID()).Get_Value("VAS_AdjustLandedCostOnPhyInv"));
+            }
+
             // Get Element which belongs to Landed Cost
             String sql = "SELECT M_CostElement_ID , Name FROM M_CostElement WHERE CostElementType = '" + MCostElement.COSTELEMENTTYPE_Material +
                         @"' AND CostingMethod IS NULL AND IsActive = 'Y' AND AD_Client_ID = " + cd.GetAD_Client_ID();
@@ -4836,7 +4842,7 @@ namespace VAdvantage.Model
                         && !(windowName.Equals("Material Receipt") ||
                              windowName.Equals("Customer Return") ||
                              windowName.Equals("PE-FinishGood") ||
-                             windowName.Equals("Physical Inventory") ||
+                             (VAS_IsAdjustLandedCostOnPhyInv && windowName.Equals("Physical Inventory")) ||
                              windowName.Equals("Invoice(Vendor)") ||
                              (windowName.Equals("Inventory Move") && ((cd.GetQty() > 0 && !isReversed) || (cd.GetQty() < 0 && isReversed)))
                              ))
