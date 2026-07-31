@@ -400,6 +400,7 @@
     <Content Include="Areas\VAS\Content\VAS_072_MatchSuggestionAPPayment.css" />
     <Content Include="Areas\VAS\Content\VAS_092_OverviewPurchaseOrder.css" />
     <Content Include="Areas\VAS\Content\VAS_093_PendingGRNWidget.css" />
+    <Content Include="Areas\VAS\Content\VAS_123_QuotationRightPanel.css" />
     <Content Include="Areas\VAS\Content\VAS_167_PurchaseOrderLandedCost.css" />
     <Content Include="Areas\VAS\Content\VAS_098_PurchaseRequisition.css" />
     <Content Include="Areas\VAS\Content\VAS_099_OverviewGRN.css" />
@@ -429,6 +430,7 @@
     <Content Include="Areas\VAS\Content\VAS_InvoiceOverview.css" />
     <Content Include="Areas\VAS\Content\VAS_PaymentVoucherPanel.css" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_092_OverviewPurchaseOrder.js" />
+    <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_123_QuotationRightPanel.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_167_PurchaseOrderLandedCost.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_098_PurchaseRequisition.js" />
     <Content Include="Areas\VAS\Scripts\app\tabpanel\VAS_099_OverviewGRN.js" />
