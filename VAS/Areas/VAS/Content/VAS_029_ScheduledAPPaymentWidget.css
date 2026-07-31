@@ -471,50 +471,6 @@
         background: #f3f7fb;
     }
 
-.vas-scheduled-ap-payment-dialog-summary {
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.25em;
-    padding: 1.25em 2em;
-    border-bottom: 1px solid #e2eaf1;
-    background: #fbfdff;
-}
-
-    .vas-scheduled-ap-payment-dialog-summary div {
-        min-width: 0;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary span,
-    .vas-scheduled-ap-payment-dialog-summary strong {
-        display: block;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary span {
-        color: #5f7283;
-        font-size: 0.75em;
-        font-weight: 700;
-        line-height: 1.2;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary strong {
-        margin-top: 0.5em;
-        color: #102c3f;
-        font-size: 1.25em;
-        font-weight: 800;
-        line-height: 1.15;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary div:first-child strong {
-        color: #102c3f;
-        font-weight: 700;
-    }
-
 .vas-scheduled-ap-payment-dialog-body {
     flex: 1 1 auto;
     min-height: 0;
@@ -742,14 +698,9 @@
     }
 
     .vas-scheduled-ap-payment-dialog-header,
-    .vas-scheduled-ap-payment-dialog-summary,
     .vas-scheduled-ap-payment-dialog-footer {
         padding-left: 1em;
         padding-right: 1em;
-    }
-
-    .vas-scheduled-ap-payment-dialog-summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .vas-scheduled-ap-payment-dialog-body {
@@ -834,12 +785,6 @@
     text-align: right !important;
 }
 
-.vas-scheduled-ap-payment-summary-total {
-    display: block;
-    text-align: left;
-    font-variant-numeric: tabular-nums;
-}
-
 /* --- RTL: pagination -------------------------------------------------------
    Switching the UI to Arabic flips the footer, which swaps the prev/next
    buttons while their chevrons keep pointing the same way -- so the arrows
@@ -863,7 +808,6 @@ html[dir="rtl"] .vas-scheduled-ap-payment-pager-text {
    direction from its first strong character -- LTR for a Latin currency code,
    RTL for a translated one -- so the sign stays glued to the number. */
 html[dir="rtl"] .vas-scheduled-ap-payment-td-amount,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary-total,
 html[dir="rtl"] .vas-scheduled-ap-payment-value {
     unicode-bidi: plaintext;
 }
@@ -879,10 +823,6 @@ html[dir="rtl"] .vas-scheduled-ap-payment-value {
    text stays RTL. */
 html[dir="rtl"] .vas-scheduled-ap-payment-dialog td,
 html[dir="rtl"] .vas-scheduled-ap-payment-dialog th,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary span,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary strong,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary span,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong,
 html[dir="rtl"] .vas-scheduled-ap-payment-sub,
 html[dir="rtl"] .vas-scheduled-ap-payment-desc,
 html[dir="rtl"] .vas-scheduled-ap-payment-dialog-subtitle {
@@ -895,11 +835,7 @@ html[dir="rtl"] .vas-scheduled-ap-payment-dialog-subtitle {
    the cell and never reached the string that actually renders. Repeat the
    treatment for whatever sits inside. */
 html[dir="rtl"] .vas-scheduled-ap-payment-dialog td *,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog th *,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary span *,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary strong *,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary span *,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong * {
+html[dir="rtl"] .vas-scheduled-ap-payment-dialog th * {
     unicode-bidi: plaintext;
 }
 
@@ -926,10 +862,6 @@ html[dir="rtl"] .vas-scheduled-ap-payment-th-amount,
 html[dir="rtl"] .vas-scheduled-ap-payment-th-amount *,
 html[dir="rtl"] .vas-scheduled-ap-payment-td-amount,
 html[dir="rtl"] .vas-scheduled-ap-payment-td-amount *,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary-total,
-html[dir="rtl"] .vas-scheduled-ap-payment-summary-total *,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong *,
 html[dir="rtl"] .vas-scheduled-ap-payment-value,
 html[dir="rtl"] .vas-scheduled-ap-payment-value * {
     direction: ltr;
@@ -945,13 +877,6 @@ html[dir="rtl"] .vas-scheduled-ap-payment-value {
     text-align: right;
 }
 
-/* Summary tiles and popup read-outs are not table columns -- they sit under a
-   right-aligned label, so the figure belongs on the same side. Only the
-   direction stays pinned, to keep the sign in front of the number. */
-html[dir="rtl"] .vas-scheduled-ap-payment-summary-total,
-html[dir="rtl"] .vas-scheduled-ap-payment-dialog-summary strong {
-    text-align: right !important;
-}
 
 /* The figure sits in a `display: block` ellipsis span inside the cell, which
    is its own alignment context -- name it too instead of trusting the cell to
