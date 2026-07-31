@@ -107,6 +107,33 @@
     }
 
     /// <summary>
+    /// when we select Product, pick respective UOM based on respective input
+    /// </summary>
+    /// <param name="ctx">Context</param>
+    /// <param name="windowNo">current Window No</param>
+    /// <param name="mTab">Model Tab</param>
+    /// <param name="mField">Model Field</param>
+    /// <param name="value">The new value</param>
+    /// <returns>Error message or ""</returns>
+    CalloutProduction.prototype.SetUOM = function (ctx, windowNo, mTab, mField, value, oldValue) {
+        if (value == null || value.toString() == "" || this.isCalloutActive()) {
+            return "";
+        }
+        this.setCalloutActive(true);
+        try {
+            var paramString = value.toString();            
+            var uom = VIS.dataContext.getJSONRecord("MProduct/GetC_UOM_ID", paramString);
+            mTab.setValue("C_UOM_ID", uom);
+        }
+        catch (err) {
+            this.setCalloutActive(false);            
+        }
+        this.setCalloutActive(false);
+        ctx = windowNo = mTab = mField = value = oldValue = null;
+        return "";
+    }
+
+    /// <summary>
     /// VAI050-set qty acc to precision defined on UOM
     /// </summary>
     /// <param name="ctx">Context</param>
