@@ -179,6 +179,7 @@
     <Compile Include="Areas\VAS\Controllers\VAS_106_OverviewSalesOrderController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_120_CustomerSearchWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_122_TotalCustomersWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_123_QuotationRightPanelController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_124_DelayedPaymentsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_125_OpenPipelineWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_126_OpenTicketsWidgetController.cs" />
