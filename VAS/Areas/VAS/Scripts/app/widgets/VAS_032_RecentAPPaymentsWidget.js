@@ -45,8 +45,11 @@
         this.AD_UserHomeWidgetID;
 
         var $self = this;
-        /* AD_Window_ID the Value hyperlink zooms to; sent by GetRecentAPPayments. */
+        /* AD_Window_ID the Value hyperlink zooms to; sent by GetRecentAPPayments.
+           If it arrives as 0, VAS.ZoomUtil falls back to these window names. */
         var zoomWindowId = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_APPayment';
+        var ZOOM_WINDOW_NAME_OLD = 'Payment';
         var $root = $('<div class="vas-recent-ap-payments-root">');
         var $card;
         var $banner;
@@ -262,13 +265,6 @@
 
 
         function renderData(data) {
-            /* AD_Window_ID for the Value zoom link, resolved server-side by
-               PoReceiptTabPanelModel.GetWindowId(newScreen, oldScreen). */
-            zoomWindowId = Number(data.zoomWindowId || 0);
-
-            if (isNaN(zoomWindowId) || zoomWindowId < 0) {
-                zoomWindowId = 0;
-            }
 
             paymentsData = $.isArray(data.payments)
                 ? $.grep(data.payments, function (payment) {
@@ -628,19 +624,17 @@
                     });
                 }
                 else {
-                    handleZoomClick(paymentId, zoomWindowId, 'C_Payment_ID');
+                    /* zoomWindowId comes from GetRecentAPPayments; when it is 0 the shared
+                       helper resolves the window from its name before zooming. */
+                    VAS.ZoomUtil.zoomToRecord('C_Payment_ID', paymentId, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (windowId) {
+                            if (windowId > 0) {
+                                zoomWindowId = windowId;
+                            }
+                        });
                 }
             }
             catch (e) { /* zoom is best-effort */ }
-        }
-
-        function handleZoomClick(Record_ID, windowId, Primary_ID) {
-            if (windowId > 0) {
-                var zoomQuery = new VIS.Query();
-                zoomQuery.addRestriction(Primary_ID, VIS.Query.prototype.EQUAL, Record_ID);
-                zoomQuery.setRecordCount(1);
-                VIS.viewManager.startWindow(windowId, zoomQuery);
-            }
         }
 
         function last4(accountNo) {

@@ -68,6 +68,10 @@
         var $btn;
         var widgetID = 0;
 
+        var zoomWindowId = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_APPayment';
+        var ZOOM_WINDOW_NAME_OLD = 'Payment';
+
         /* ------------------------------------------------------------ */
         /* Lifecycle                                                    */
         /* ------------------------------------------------------------ */
@@ -124,12 +128,24 @@
             e.preventDefault();
             e.stopPropagation();
             try {
-                var windowParam = {
-                    "IsTabInNewMode": "true",
-                    "TabIndex": "0",
-                    "IsReceipt": "N"
-                };
-                $self.widgetFirevalueChanged(windowParam);
+                if ($self.windowNo >= 0) {
+                    var windowParam = {
+                        "IsTabInNewMode": "true",
+                        "TabIndex": "0",
+                        "IsReceipt": "N"
+                    };
+                    $self.widgetFirevalueChanged(windowParam);
+                }
+                else {
+                    /* zoomWindowId comes from GetRecentAPPayments; when it is 0 the shared
+                       helper resolves the window from its name before zooming. */
+                    VAS.ZoomUtil.zoomToRecord('C_Payment_ID', 0, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (windowId) {
+                            if (windowId > 0) {
+                                zoomWindowId = windowId;
+                            }
+                        });
+                }
             }
             catch (err) {
                 if (window.console) {

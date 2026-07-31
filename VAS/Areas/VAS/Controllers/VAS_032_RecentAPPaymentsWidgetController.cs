@@ -34,23 +34,6 @@ namespace VAS.Controllers
 {
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
-        private const string ZoomWindowNameNew = "VAS_APPayment";
-        private const string ZoomWindowNameOld = "Payment";
-
-        private int GetZoomWindowId()
-        {
-            try
-            {
-                PoReceiptTabPanelModel windowResolver = new PoReceiptTabPanelModel();
-                return windowResolver.GetWindowId(ZoomWindowNameNew, ZoomWindowNameOld);
-            }
-            catch (Exception ex)
-            {
-                VLogger.Get().SaveError("VAS_032_GetZoomWindowId", ex);
-                return 0;
-            }
-        }
-
         public JsonResult GetRecentAPPayments()
         {
             Ctx ctx = GetContext();
@@ -65,41 +48,21 @@ namespace VAS.Controllers
 
             try
             {
-                SqlQueryData queryData =
-                    BuildRecentPaymentsSql(
-                        ctx
-                    );
+                SqlQueryData queryData =BuildRecentPaymentsSql(ctx);
 
-                sql =
-                    queryData.Sql;
+                sql =queryData.Sql;
 
-                dr = DB.ExecuteReader(
-                    queryData.Sql,
-                    queryData.Parameters,
-                    null
-                );
+                dr = DB.ExecuteReader(queryData.Sql,queryData.Parameters,null);
 
-                List<object> payments =
-                    new List<object>();
+                List<object> payments =new List<object>();
 
-                List<string> autoMatchedRefs =
-                    new List<string>();
+                List<string> autoMatchedRefs =new List<string>();
 
                 int autoMatchedCount = 0;
 
-                while (
-                    dr != null &&
-                    dr.Read() &&
-                    payments.Count < 30
-                )
+                while (dr != null && dr.Read() && payments.Count < 30)
                 {
-                    AddPaymentRow(
-                        ctx,
-                        dr,
-                        payments,
-                        autoMatchedRefs,
-                        ref autoMatchedCount
-                    );
+                    AddPaymentRow(ctx,dr,payments,autoMatchedRefs,ref autoMatchedCount);
                 }
 
                 return Json(
@@ -122,12 +85,6 @@ namespace VAS.Controllers
 
                         autoMatchedRefs =
                             autoMatchedRefs,
-
-                        /* AD_Window_ID the Value hyperlink zooms to. Resolved
-                           server-side and shipped with the rows so the click
-                           handler needs no extra round trip. */
-                        zoomWindowId =
-                            GetZoomWindowId(),
 
                         payments =
                             payments
@@ -155,8 +112,7 @@ namespace VAS.Controllers
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPaymentAllocationDetail(
-    int paymentId)
+        public JsonResult GetPaymentAllocationDetail(int paymentId)
         {
             Ctx ctx = GetContext();
 
