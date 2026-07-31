@@ -27,14 +27,13 @@ using VAdvantage.DataBase;
 using VAdvantage.Logging;
 using VAdvantage.Model;
 using VAdvantage.Utility;
+using VASLogic.Models;
 using VIS.Filters;
 
 namespace VAS.Controllers
 {
     public class VAS_032_RecentAPPaymentsWidgetController : Controller
     {
-        [AjaxAuthorizeAttribute]
-        [AjaxSessionFilterAttribute]
         public JsonResult GetRecentAPPayments()
         {
             Ctx ctx = GetContext();
@@ -49,41 +48,21 @@ namespace VAS.Controllers
 
             try
             {
-                SqlQueryData queryData =
-                    BuildRecentPaymentsSql(
-                        ctx
-                    );
+                SqlQueryData queryData =BuildRecentPaymentsSql(ctx);
 
-                sql =
-                    queryData.Sql;
+                sql =queryData.Sql;
 
-                dr = DB.ExecuteReader(
-                    queryData.Sql,
-                    queryData.Parameters,
-                    null
-                );
+                dr = DB.ExecuteReader(queryData.Sql,queryData.Parameters,null);
 
-                List<object> payments =
-                    new List<object>();
+                List<object> payments =new List<object>();
 
-                List<string> autoMatchedRefs =
-                    new List<string>();
+                List<string> autoMatchedRefs =new List<string>();
 
                 int autoMatchedCount = 0;
 
-                while (
-                    dr != null &&
-                    dr.Read() &&
-                    payments.Count < 30
-                )
+                while (dr != null && dr.Read() && payments.Count < 30)
                 {
-                    AddPaymentRow(
-                        ctx,
-                        dr,
-                        payments,
-                        autoMatchedRefs,
-                        ref autoMatchedCount
-                    );
+                    AddPaymentRow(ctx,dr,payments,autoMatchedRefs,ref autoMatchedCount);
                 }
 
                 return Json(
@@ -133,8 +112,7 @@ namespace VAS.Controllers
 
         [AjaxAuthorizeAttribute]
         [AjaxSessionFilterAttribute]
-        public JsonResult GetPaymentAllocationDetail(
-    int paymentId)
+        public JsonResult GetPaymentAllocationDetail(int paymentId)
         {
             Ctx ctx = GetContext();
 

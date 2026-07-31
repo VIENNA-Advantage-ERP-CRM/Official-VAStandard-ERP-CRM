@@ -44,6 +44,12 @@
         this.windowNo;
         this.AD_UserHomeWidgetID;
 
+        var $self = this;
+        /* AD_Window_ID the Value hyperlink zooms to; sent by GetRecentAPPayments.
+           If it arrives as 0, VAS.ZoomUtil falls back to these window names. */
+        var zoomWindowId = 0;
+        var ZOOM_WINDOW_NAME_NEW = 'VAS_APPayment';
+        var ZOOM_WINDOW_NAME_OLD = 'Payment';
         var $root = $('<div class="vas-recent-ap-payments-root">');
         var $card;
         var $banner;
@@ -259,6 +265,7 @@
 
 
         function renderData(data) {
+
             paymentsData = $.isArray(data.payments)
                 ? $.grep(data.payments, function (payment) {
                     var amount = Number(payment.amount || 0);
@@ -458,8 +465,8 @@
                 $showingText.text(
                     count > 0
                         ? lbl('VAS_Showing', 'Showing') + ' ' +
-                          startIndex + '–' + endIndex + ' ' +
-                          lbl('VAS_Of', 'of') + ' ' + count
+                        startIndex + '–' + endIndex + ' ' +
+                        lbl('VAS_Of', 'of') + ' ' + count
                         : ''
                 );
             }
@@ -504,9 +511,7 @@
                         .text(formatDate(payment.paymentDate))))
 
                 .append($('<td class="vas-recent-ap-payments-value">')
-                    .append($('<span class="vas-recent-ap-payments-cell-text">')
-                        .attr('title', documentNo)
-                        .text(documentNo)))
+                    .append(buildValueCell(payment, documentNo)))
 
                 .append($('<td class="vas-recent-ap-payments-vendor">')
                     .append($('<span class="vas-recent-ap-payments-cell-text">')
@@ -549,6 +554,87 @@
 
         function getDocumentNo(payment) {
             return payment.value || payment.documentNo || payment.referenceNo || '';
+        }
+
+        function getPaymentId(payment) {
+            if (!payment) {
+                return 0;
+            }
+
+            var id = Number(
+                payment.paymentId ||
+                payment.cPaymentId ||
+                payment.C_Payment_ID ||
+                0
+            );
+
+            return (isNaN(id) || id <= 0) ? 0 : id;
+        }
+
+        /* The Value (document number) cell is a zoom link: it navigates to the
+           C_Payment record rather than opening this widget's detail dialog, so the
+           handlers stopPropagation() to keep the row's own click from firing too.
+           A row whose id cannot be resolved degrades to plain text - no dead link. */
+        function buildValueCell(payment, documentNo) {
+            var paymentId = getPaymentId(payment);
+
+            if (!documentNo || paymentId <= 0) {
+                return $('<span class="vas-recent-ap-payments-cell-text">')
+                    .attr('title', documentNo)
+                    .text(documentNo);
+            }
+
+            var $link = $('<a class="vas-recent-ap-payments-cell-text vas-recent-ap-payments-doclink" role="link" tabindex="0">')
+                .attr('title', documentNo)
+                .text(documentNo);
+
+            $link.on('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                zoomToPayment(paymentId);
+            });
+
+            /* An <a> without href gets no implicit key activation. */
+            $link.on('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    zoomToPayment(paymentId);
+                }
+            });
+
+            return $link;
+        }
+
+        function zoomToPayment(paymentId) {
+            if (!paymentId) {
+                return;
+            }
+
+            /* The detail dialog is modal over the widget - close it so the zoomed
+               record is not left hidden behind it. */
+            closeDialog();
+
+            try {
+                if ($self.windowNo >= 0) {
+                    $self.widgetFirevalueChanged({
+                        'TabWhereClause': 'C_Payment_ID = ' + paymentId,
+                        'TabLayout': 'Y', /* 'N' Grid, 'Y' Single, 'C' Card */
+                        'TabIndex': '0'
+                    });
+                }
+                else {
+                    /* zoomWindowId comes from GetRecentAPPayments; when it is 0 the shared
+                       helper resolves the window from its name before zooming. */
+                    VAS.ZoomUtil.zoomToRecord('C_Payment_ID', paymentId, zoomWindowId, ZOOM_WINDOW_NAME_NEW, ZOOM_WINDOW_NAME_OLD)
+                        .done(function (windowId) {
+                            if (windowId > 0) {
+                                zoomWindowId = windowId;
+                            }
+                        });
+                }
+            }
+            catch (e) { /* zoom is best-effort */ }
         }
 
         function last4(accountNo) {
@@ -1531,6 +1617,20 @@
     };
 
     VAS.VAS_032_RecentAPPaymentsWidget.prototype.widgetSizeChange = function (height, width) {
+    };
+
+    /* Zoom channel. The host frame registers itself via addChangeListener() and
+       acts on the descriptor passed to widgetFirevalueChanged() - here, to
+       navigate to the clicked C_Payment record. Same surface as
+       VAS_068_APPaymentSearchWidget. */
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.addChangeListener = function (listener) {
+        this.listener = listener;
+    };
+
+    VAS.VAS_032_RecentAPPaymentsWidget.prototype.widgetFirevalueChanged = function (value) {
+        if (this.listener && typeof this.listener.widgetFirevalueChanged === 'function') {
+            this.listener.widgetFirevalueChanged(value);
+        }
     };
 
     VAS.VAS_032_RecentAPPaymentsWidget.prototype.refreshWidget = function () {

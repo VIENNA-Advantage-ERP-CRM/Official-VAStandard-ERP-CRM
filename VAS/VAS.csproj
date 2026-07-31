@@ -256,6 +256,7 @@
     <Compile Include="Areas\VAS\Controllers\PaidThisMonthController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_033_PaymentMethodsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_032_RecentAPPaymentsWidgetController.cs" />
+    <Compile Include="Areas\VAS\Controllers\VAS_ZoomWindowController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_046_ReconciliationStatusWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\VAS_031_UpcomingAPRunsWidgetController.cs" />
     <Compile Include="Areas\VAS\Controllers\ReceiptsController.cs" />
@@ -652,6 +653,7 @@
     <Content Include="Areas\VAS\Scripts\app\widgets\TotalAmountReceivedThisMonthWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\util\CurrencyFormat.js" />
     <Content Include="Areas\VAS\Scripts\app\util\AttributeControl.js" />
+    <Content Include="Areas\VAS\Scripts\app\util\VAS_ZoomUtil.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AgingReceivablesWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\AvgDaysToPayWidget.js" />
     <Content Include="Areas\VAS\Scripts\app\widgets\InvoicesWidget.js" />

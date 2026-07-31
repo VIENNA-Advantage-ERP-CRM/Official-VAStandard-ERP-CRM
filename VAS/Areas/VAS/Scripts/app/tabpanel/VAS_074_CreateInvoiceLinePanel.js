@@ -92,6 +92,19 @@
         // batch persists back-to-back, while an in-progress unsaved line is left untouched.
         var saveInFlight = false, pendingSaveIds = {};
 
+        // Callout serialization for actions that must see post-callout values.
+        // Committing a cell (focus-out) fires the column callout, and BOTH callout paths are
+        // asynchronous: the real framework callout runs in a setTimeout(0) so the row spinner
+        // paints first, and the server fallback is an AJAX call. So a Save issued in the same
+        // tick as the commit - clicking Save or pressing Ctrl+Alt+S straight after typing a qty
+        // without tabbing out - would post the PRE-callout values (stale price / tax / amounts).
+        // runCallout() counts itself in `calloutPending` before going async and settles on
+        // completion; afterCallouts() defers a callback until the count reaches zero, so Save
+        // behaves exactly as if the user had focused out first.
+        var calloutPending = 0, calloutWaiters = [];
+        // Backstop: never let a wedged callout block Save forever.
+        var CALLOUT_WAIT_MS = 8000;
+
         var CATALOG_PAGE_SIZE = 50;
         var SEARCH_DEBOUNCE = 260;
         var TAB_ORDER = ["primary", "description", "quantity", "uom", "price", "tax", "more"];
@@ -530,11 +543,16 @@
             // editor blurs, so we can flush that pending edit ourselves and the action
             // never gets lost to a blur/commit re-render happening between mousedown and
             // mouseup. preventDefault keeps focus from being stolen first.
-            $saveBtn.on("mousedown", function (e) { e.preventDefault(); flushActiveEdit(); saveRows(); });
+            //
+            // flushActiveEdit() commits the focused cell, which fires that column's callout
+            // ASYNCHRONOUSLY, so the save is deferred through afterCallouts() until the
+            // callout has written back price / tax / amounts. Without that wait, a qty typed
+            // and Saved without tabbing out would post the pre-callout values.
+            $saveBtn.on("mousedown", function (e) { e.preventDefault(); flushAndSave(); });
             // Keyboard activation (Enter / Space) fires click with detail 0 and no
             // mousedown - handle that here so the button stays accessible, without
             // double-firing on a real mouse click (detail >= 1, already handled above).
-            $saveBtn.on("click", function (e) { if (e.detail === 0) { flushActiveEdit(); saveRows(); } });
+            $saveBtn.on("click", function (e) { if (e.detail === 0) { flushAndSave(); } });
             $deleteBtn.on("click", deleteSelected);
         }
 
@@ -1729,6 +1747,31 @@
             return (m && m.Callout) || DEFAULT_CALLOUTS[column] || null;
         }
 
+        /* One async callout finished. Drains the waiter queue once nothing is outstanding.
+           Waiters are taken before running so a waiter that itself starts a callout (and
+           re-queues) can't be lost or re-run. */
+        function calloutSettled() {
+            if (calloutPending > 0) calloutPending--;
+            if (calloutPending > 0 || !calloutWaiters.length) return;
+            var waiters = calloutWaiters;
+            calloutWaiters = [];
+            for (var i = 0; i < waiters.length; i++) {
+                try { waiters[i](); } catch (ex) { console.log(ex); }
+            }
+        }
+
+        /* Run `fn` once every in-flight callout has applied its values - immediately when
+           none is pending. Used by Save so a qty/price typed and then Saved without tabbing
+           out is persisted with the callout's recomputed price / tax / amounts. */
+        function afterCallouts(fn) {
+            if (!calloutPending) { fn(); return; }
+            var ran = false;
+            var once = function () { if (ran) return; ran = true; fn(); };
+            calloutWaiters.push(once);
+            // Backstop against a callout that never settles - Save must not become dead.
+            setTimeout(once, CALLOUT_WAIT_MS);
+        }
+
         function runCallout(line, column, done) {
             if (!parent) { if (done) done(); return; }
             var v = line.values;
@@ -1745,6 +1788,9 @@
                 // paint the row busy indicator first, then run on the next tick so
                 // the spinner is actually visible while the callout executes.
                 setRowBusy(line, true);
+                // Counted BEFORE going async so a Save in this same tick already sees the
+                // callout as pending and defers (see afterCallouts).
+                calloutPending++;
                 setTimeout(function () {
                     try {
                         runRealCallout(line, column, chain);
@@ -1753,14 +1799,22 @@
                     } finally {
                         line._busy = false;
                         render();
-                        if (done) done();
+                        // done() may chain another callout, so settle AFTER it has had the
+                        // chance to increment - otherwise the count could dip to zero and
+                        // release Save between two links of the chain.
+                        try { if (done) done(); } finally { calloutSettled(); }
                     }
                 }, 0);
                 return;
             }
             // Async server fallback - show the busy indicator until it returns.
             setRowBusy(line, true);
-            runCalloutServer(line, column, function () { line._busy = false; render(); if (done) done(); });
+            calloutPending++;
+            runCalloutServer(line, column, function () {
+                line._busy = false;
+                render();
+                try { if (done) done(); } finally { calloutSettled(); }
+            });
         }
 
         function rowSpinHtml(label) { return '<span class="vas-cil-row-spin" aria-label="' + esc(label || "") + '"></span>'; }
@@ -3251,7 +3305,7 @@
                 newAttribute: !(parent && parent.IsSOTrx),
                 // Default state of the instance list's "Show All (include zero and (-ve) qty)"
                 // checkbox for THIS screen. true -> show all; false -> only QtyOnHand > 0.
-                showAll: true,
+                showAll: !(parent && parent.IsSOTrx),
                 lbl: lbl, esc: esc, icon: icon,
                 showBusy: showBusy, showToast: showToast,
                 dateStr: dateStr, fmtMoney: fmtMoney, parseNum: parseNum,
@@ -3878,6 +3932,16 @@
             if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") $(el).triggerHandler("blur");
         }
 
+        /* The single Save entry point for every user gesture (button mousedown, keyboard
+           activation of the button, Ctrl+Alt+S). Commits the focused cell exactly as a
+           focus-out would, then waits for that commit's callout to finish before posting,
+           so the line is saved with the recomputed price / tax / amounts rather than the
+           values that were on screen when the gesture happened. */
+        function flushAndSave() {
+            flushActiveEdit();
+            afterCallouts(function () { saveRows(); });
+        }
+
         function buildRowPayload(l) {
             var v = l.values;
             // Core fields drive the business setters; Values carries the full column
@@ -4087,7 +4151,7 @@
             if (document.getElementById("vasCilAttr") || document.getElementById("vasCilScan") || document.getElementById("vasCilMore")) return;
             var k = (e.key || "").toLowerCase(), code = e.code, act = null;
             if (k === "n" || code === "KeyN") act = function () { addLine(); };
-            else if (k === "s" || code === "KeyS") act = function () { flushActiveEdit(); saveRows(); };
+            else if (k === "s" || code === "KeyS") act = function () { flushAndSave(); };
             else if (k === "d" || code === "KeyD") act = function () {
                 if (!selectedCount()) { showToast(lbl("VAS_074_SelectRowToDelete", "Select a row to delete")); return; }
                 deleteSelected();
